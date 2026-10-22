@@ -2231,7 +2231,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
         }
 
         return ATHLTHTheme
-            .vitality
+            .premiumGold
     }
 
     @MainActor
@@ -2645,138 +2645,97 @@ struct CommunityFriendsVsFriendsDetailView: View {
         .frame(maxWidth: .infinity)
     }
 
+    /// Category-first comparison with accessible values and a restrained
+    /// relative bar. No ratios are shown when a value is hidden or missing.
     private func metricRow(
         _ title: String,
         icon: String,
         mine: Double?,
         theirs: Double?,
         format: (Double?) -> String,
-        emphasis:
-            CommunityMatchupMetricEmphasis =
-                .normal
+        emphasis: CommunityMatchupMetricEmphasis = .normal
     ) -> some View {
-        HStack(spacing: 10) {
-            Text(format(mine))
-                .font(
-                    emphasis == .highlighted
-                        ? .headline
-                            .monospacedDigit()
-                            .weight(.bold)
-                        : .subheadline
-                            .monospacedDigit()
-                            .weight(.bold)
-                )
-                .foregroundStyle(
-                    emphasis == .highlighted
-                        ? ATHLTHTheme
-                            .vitality
-                        : metricTint(
-                            mine,
-                            versus: theirs
-                        )
-                )
-                .frame(
-                    width: 82,
-                    alignment: .leading
-                )
-
-            VStack(spacing: 3) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 9) {
                 Image(systemName: icon)
-                    .font(
-                        .caption.weight(
-                            .semibold
-                        )
-                    )
-                    .foregroundStyle(
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 32, height: 32)
+                    .background(
                         emphasis == .highlighted
-                            ? ATHLTHTheme
-                                .vitality
-                            : ATHLTHTheme
-                                .accentDeep
+                            ? ATHLTHTheme.premiumGoldSoft
+                            : ATHLTHTheme.surfaceStone,
+                        in: RoundedRectangle(cornerRadius: 10)
                     )
-
                 Text(title)
-                    .font(
-                        emphasis == .highlighted
-                            ? .caption
-                                .weight(.bold)
-                            : .caption
-                    )
-                    .foregroundStyle(
-                        emphasis == .highlighted
-                            ? ATHLTHTheme
-                                .primaryText
-                            : Color.secondary
-                    )
-            }
-            .frame(
-                maxWidth: .infinity
-            )
-
-            Text(format(theirs))
-                .font(
-                    emphasis == .highlighted
-                        ? .headline
-                            .monospacedDigit()
-                            .weight(.bold)
-                        : .subheadline
-                            .monospacedDigit()
-                            .weight(.bold)
-                )
-                .foregroundStyle(
-                    emphasis == .highlighted
-                        ? ATHLTHTheme
-                            .vitality
-                        : metricTint(
-                            theirs,
-                            versus: mine
-                        )
-                )
-                .frame(
-                    width: 82,
-                    alignment: .trailing
-                )
-        }
-        .padding(
-            .horizontal,
-            emphasis == .highlighted
-                ? 10
-                : 0
-        )
-        .padding(.vertical, 11)
-        .background {
-            if emphasis == .highlighted {
-                RoundedRectangle(
-                    cornerRadius: 14,
-                    style: .continuous
-                )
-                .fill(
-                    ATHLTHTheme
-                        .vitalitySoft
-                        .opacity(0.78)
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 14,
-                        style:
-                            .continuous
-                    )
-                    .stroke(
-                        ATHLTHTheme
-                            .vitality
-                            .opacity(
-                                0.16
-                            ),
-                        lineWidth: 0.8
-                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Spacer(minLength: 4)
+                if emphasis == .highlighted {
+                    Text(ATHLTHLocalization.choose(
+                        english: "DUEL", norwegian: "DUELL"
+                    ))
+                    .font(.system(size: 9, weight: .heavy))
+                    .tracking(0.8)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(ATHLTHTheme.premiumGoldSoft, in: Capsule())
                 }
             }
+
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(format(mine))
+                    .foregroundStyle(metricTint(mine, versus: theirs))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Text("VS")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                Text(format(theirs))
+                    .foregroundStyle(metricTint(theirs, versus: mine))
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .font(.system(size: 17, weight: .bold, design: .rounded))
+            .monospacedDigit()
+            .minimumScaleFactor(0.73)
+            .lineLimit(1)
+
+            GeometryReader { geometry in
+                if let share = CommunityMatchupVisualPolicy.fraction(
+                    mine, theirs
+                ) {
+                    HStack(spacing: 0) {
+                        ATHLTHTheme.premiumGold
+                            .frame(width: geometry.size.width * share)
+                        ATHLTHTheme.accentDeep.opacity(0.36)
+                    }
+                    .clipShape(Capsule())
+                } else {
+                    Capsule()
+                        .fill(ATHLTHTheme.surfaceStone)
+                }
+            }
+            .frame(height: 5)
         }
-        .opacity(
-            emphasis == .dimmed
-                ? 0.38
-                : 1
+        .padding(13)
+        .background(
+            emphasis == .highlighted
+                ? ATHLTHTheme.cardWarm
+                : ATHLTHTheme.canvasTop.opacity(0.65),
+            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
         )
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(
+                    emphasis == .highlighted
+                        ? ATHLTHTheme.premiumGold.opacity(0.3)
+                        : ATHLTHTheme.border,
+                    lineWidth: 0.8
+                )
+        }
+        .opacity(emphasis == .dimmed ? 0.73 : 1)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title): \(format(mine)) versus \(format(theirs))")
     }
 
     private func metricTint(
@@ -2792,7 +2751,7 @@ struct CommunityFriendsVsFriendsDetailView: View {
         }
 
         return ATHLTHTheme
-            .accentDeep
+            .premiumGold
     }
 
     private func pointsText(
