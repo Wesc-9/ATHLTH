@@ -160,6 +160,14 @@ extension Notification.Name {
         )
 }
 
+struct HomeAssistantPerformanceRecordPayload: Hashable {
+    let id: String
+    let title: String
+    let value: String
+    let category: String
+    let date: Date
+}
+
 struct HomeAssistantCalendarEventPayload: Hashable {
     let id: String
     let title: String
@@ -412,6 +420,15 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
     }
 
+    @Published var shareAthleteProfile: Bool {
+        didSet {
+            UserDefaults.standard.set(
+                shareAthleteProfile,
+                forKey: Self.shareAthleteProfileKey
+            )
+        }
+    }
+
     @Published var shareMilestoneEvents: Bool {
         didSet {
             UserDefaults.standard.set(
@@ -449,6 +466,8 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         "athlth.homeAssistant.shareLiveWorkoutDetails"
     private static let shareStrengthDetailsKey =
         "athlth.homeAssistant.shareStrengthDetails"
+    private static let shareAthleteProfileKey =
+        "athlth.homeAssistant.shareAthleteProfile"
     private static let shareMilestoneEventsKey =
         "athlth.homeAssistant.shareMilestoneEvents"
     private static let processedCommandIDsKey =
@@ -612,6 +631,11 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         shareStrengthDetails = Self.storedBool(
             defaults,
             key: Self.shareStrengthDetailsKey,
+            defaultValue: false
+        )
+        shareAthleteProfile = Self.storedBool(
+            defaults,
+            key: Self.shareAthleteProfileKey,
             defaultValue: false
         )
         shareMilestoneEvents = Self.storedBool(
@@ -2023,7 +2047,10 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         goalProgress: Double?,
         goalDaysRemaining: Int?,
         calendarEvents:
-            [HomeAssistantCalendarEventPayload]
+            [HomeAssistantCalendarEventPayload],
+        athleteDisplayName: String?,
+        athleteAvatarURL: URL?,
+        performanceRecords: [HomeAssistantPerformanceRecordPayload]
     ) async {
         guard isConnected else {
             return
@@ -2294,6 +2321,54 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
                 )
                 : .array([])
 
+        state["athlete_display_name"] =
+            shareAthleteProfile
+                ? (
+                    Self.sanitizedText(athleteDisplayName)
+                        .map(HomeAssistantJSONValue.string)
+                    ?? .null
+                )
+                : .null
+
+        let approvedAvatar = athleteAvatarURL.flatMap { avatar in
+            let host = avatar.host?.lowercased() ?? ""
+            return avatar.scheme?.lowercased() == "https"
+                && host.hasSuffix(".supabase.co")
+                && avatar.path.hasPrefix(
+                    "/storage/v1/object/public/profile-avatars/"
+                )
+                ? avatar.absoluteString : nil
+        }
+        state["athlete_avatar_url"] =
+            shareAthleteProfile
+                ? (approvedAvatar.map(HomeAssistantJSONValue.string) ?? .null)
+                : .null
+
+        state["performance_records"] =
+            shareMilestoneEvents
+                ? .array(
+                    performanceRecords.prefix(12).map { record in
+                        .object([
+                            "id": .string(
+                                Self.sanitizedText(record.id) ?? "record"
+                            ),
+                            "title": .string(
+                                Self.sanitizedText(record.title) ?? "Prestasjon"
+                            ),
+                            "value": .string(
+                                Self.sanitizedText(record.value) ?? "—"
+                            ),
+                            "category": .string(
+                                ["running", "strength", "other"].contains(
+                                    record.category
+                                ) ? record.category : "other"
+                            ),
+                            "date": .string(Self.iso8601(record.date))
+                        ])
+                    }
+                )
+                : .array([])
+
         state["pending_delivery_count"] =
             .int(pendingDeliveryCount)
 
@@ -2349,6 +2424,13 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
         }
         if !shareCompletedWorkouts {
             state["last_workout"] = .null
+        }
+        if !shareAthleteProfile {
+            state["athlete_display_name"] = .null
+            state["athlete_avatar_url"] = .null
+        }
+        if !shareMilestoneEvents {
+            state["performance_records"] = .array([])
         }
         if !shareRecovery {
             state["recovery_score"] = .null
