@@ -2303,9 +2303,18 @@ final class StrengthWorkoutStore: ObservableObject {
             additions[idx].appendedWorkoutTitle = session.title
         }
 
-        let runBlocks = ATHLTHUnifiedWorkout.editorBlocks(from: session)
+        var runningOnly = session
+        runningOnly.exercises = []
+        // Legacy strength plans produce .rest blocks between strength sets.
+        // Those are not running intervals and must not become treadmill sets.
+        if let blocks = runningOnly.workoutBlocks {
+            runningOnly.workoutBlocks = blocks.filter {
+                $0.kind == .run || $0.kind == .rest
+            }
+        }
+        let runBlocks = ATHLTHUnifiedWorkout.editorBlocks(from: runningOnly)
             .filter { $0.kind == .run || $0.kind == .rest }
-        if !runBlocks.isEmpty {
+        if runBlocks.contains(where: { $0.kind == .run }) {
             // A distance-only workout cannot be executed using the
             // duration countdown; refuse it instead of silently skipping.
             guard runBlocks.allSatisfy({
