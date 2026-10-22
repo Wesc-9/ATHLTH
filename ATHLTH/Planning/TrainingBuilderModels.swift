@@ -346,6 +346,8 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     /// Nil preserves automatic progression for existing workout templates.
     /// When false, timed running phases advance via the athlete's Next action.
     var autoAdvanceTimedSteps: Bool? = nil
+    /// Default: finish warm-up, then explicitly start the main section.
+    var autoStartMainAfterWarmup: Bool? = nil
     /// Optional per-interval spoken progress, independent of global distance/time cues.
     var intervalCoachCueEverySeconds: TimeInterval? = nil
     /// One spoken heads-up this many seconds before a timed interval ends.
