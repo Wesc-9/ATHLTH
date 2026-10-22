@@ -1579,6 +1579,12 @@ final class StrengthWorkoutStore: ObservableObject {
                 set?.resolvedTargetKind.rawValue,
             loadKindRaw:
                 set?.resolvedLoadKind.rawValue,
+            isEmbeddedRunningInterval:
+                exercise?.isEmbeddedRunningInterval,
+            embeddedRunningPhaseTitle:
+                set?.hybridPhaseTitle,
+            embeddedRunningPhaseKind:
+                set?.hybridPhaseKind,
             isResting: isResting,
             restEndsAt: restEndsAt,
             currentExerciseComplete:
