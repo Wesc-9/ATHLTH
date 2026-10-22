@@ -12,6 +12,7 @@ struct ActiveStrengthWorkoutView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var social: SocialStore
 
     @StateObject private var socialCompanion =
@@ -22,6 +23,8 @@ struct ActiveStrengthWorkoutView: View {
         Task<Void, Never>?
     @State private var watchFinishError: String?
     @State private var showingExerciseLibrary = false
+    @State private var showingAppendWorkout = false
+
     @State private var showingAIExercisePlanner = false
     @State private var pendingExercise: ExerciseLibraryEntry?
     @State private var editingSetResult:
@@ -155,22 +158,36 @@ struct ActiveStrengthWorkoutView: View {
                         .topBarTrailing
                 ) {
                     if strength.activeWorkout != nil {
-                        Button {
-                            showingExerciseLibrary =
-                                true
+                        Menu {
+                            Button {
+                                showingExerciseLibrary = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Exercise", norwegian: "Øvelse"
+                                    ),
+                                    systemImage: "dumbbell"
+                                )
+                            }
+
+                            Button {
+                                showingAppendWorkout = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Entire workout",
+                                        norwegian: "Hel treningsøkt"
+                                    ),
+                                    systemImage: "rectangle.stack.badge.plus"
+                                )
+                            }
                         } label: {
-                            Image(
-                                systemName: "plus"
-                            )
+                            Image(systemName: "plus")
                         }
-                        .accessibilityLabel(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Add exercise",
-                                norwegian:
-                                    "Legg til øvelse"
-                            )
-                        )
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Add exercise or workout",
+                            norwegian: "Legg til øvelse eller treningsøkt"
+                        ))
                     }
 
                     Button(
@@ -196,6 +213,29 @@ struct ActiveStrengthWorkoutView: View {
                     strength.setWorkoutTrainingPlace(place)
                 }
                 .environmentObject(appSession)
+            }
+            .sheet(isPresented: $showingAppendWorkout) {
+                ActiveHybridWorkoutPicker { session, startNow in
+                    let existingIDs = Set(
+                        strength.activeWorkout?.exercises.map(\.id) ?? []
+                    )
+                    guard strength.appendWorkoutDuringSession(session)
+                    else { return false }
+                    if startNow,
+                       let added = strength.activeWorkout?.exercises.first(where: {
+                           !existingIDs.contains($0.id)
+                       }) {
+                        // Explicit "start this part" closes a previous partial
+                        // timer with its actual elapsed time; nothing is lost.
+                        if strength.currentTimedSetCountdown?.isRunning == true {
+                            strength.completeCurrentDraftSet()
+                        }
+                        _ = strength.selectExerciseForNow(added.id)
+                    }
+                    return true
+                }
+                .environmentObject(appSession)
+                .environmentObject(runningWorkoutLibrary)
             }
             .sheet(isPresented: $showingExerciseQueue) {
                 StrengthActiveExerciseQueueView()
@@ -475,6 +515,15 @@ struct ActiveStrengthWorkoutView: View {
                 updateScreenAwakeState()
                 if phase == .background {
                     strength.checkpoint()
+                } else if phase == .active {
+                    strength.advanceEmbeddedIntervalIfNeeded()
+                }
+            }
+            .onReceive(
+                Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+            ) { timestamp in
+                if strength.currentExercise?.isEmbeddedRunningInterval == true {
+                    strength.advanceEmbeddedIntervalIfNeeded(at: timestamp)
                 }
             }
             .onChange(
