@@ -1725,9 +1725,9 @@ private struct CommunityReferenceFriendsCard: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Friends vs Friends",
+                                "Head-to-head",
                             norwegian:
-                                "Venner mot venner"
+                                "Head-to-head"
                         )
                     )
                     .font(
@@ -1739,9 +1739,9 @@ private struct CommunityReferenceFriendsCard: View {
                     Text(
                         ATHLTHLocalization.choose(
                             english:
-                                "Weekly activity duel",
+                                "Activity points · last 7 days",
                             norwegian:
-                                "Ukentlig aktivitetsduell"
+                                "Aktivitetspoeng · siste 7 dager"
                         )
                     )
                     .font(.caption)
@@ -1793,7 +1793,7 @@ private struct CommunityReferenceFriendsCard: View {
                             currentActivityPoints,
                         workouts:
                             currentWorkoutCount,
-                        ringTint: .green,
+                        ringTint: ATHLTHTheme.premiumGold,
                         openProfile: { showOwnProfile = true }
                     )
 
@@ -1846,7 +1846,7 @@ private struct CommunityReferenceFriendsCard: View {
                             friendWorkoutCount(
                                 topFriend
                             ),
-                        ringTint: .blue,
+                        ringTint: ATHLTHTheme.accentDeep,
                         openProfile: { selectedFriendProfile = topFriend }
                     )
                 }
@@ -1855,7 +1855,7 @@ private struct CommunityReferenceFriendsCard: View {
                     HStack(spacing: 0) {
                         Capsule()
                             .fill(
-                                Color.green
+                                ATHLTHTheme.premiumGold
                                     .opacity(
                                         0.78
                                     )
@@ -1868,7 +1868,7 @@ private struct CommunityReferenceFriendsCard: View {
 
                         Capsule()
                             .fill(
-                                Color.blue
+                                ATHLTHTheme.accentDeep
                                     .opacity(
                                         0.72
                                     )
