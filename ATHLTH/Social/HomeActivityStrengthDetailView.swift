@@ -276,87 +276,53 @@ struct HomeActivityStrengthDetailView: View {
                 }
             }
 
-            LazyVGrid(
-                columns: [
-                    GridItem(
-                        .flexible(),
-                        spacing: 8
+            ATHLTHWorkoutMetricGrid(
+                metrics: [
+                    ATHLTHWorkoutDisplayMetric(
+                        icon: "timer",
+                        label: ATHLTHLocalization.choose(
+                            english: "Time", norwegian: "Tid"
+                        ),
+                        value: durationText
                     ),
-                    GridItem(
-                        .flexible(),
-                        spacing: 8
+                    ATHLTHWorkoutDisplayMetric(
+                        icon: "dumbbell.fill",
+                        label: ATHLTHLocalization.choose(
+                            english: "Exercises", norwegian: "Øvelser"
+                        ),
+                        value: exerciseCountText
                     ),
-                    GridItem(
-                        .flexible(),
-                        spacing: 8
+                    ATHLTHWorkoutDisplayMetric(
+                        icon: "square.stack.3d.up.fill",
+                        label: ATHLTHLocalization.choose(
+                            english: "Sets", norwegian: "Sett"
+                        ),
+                        value: setsText
+                    ),
+                    ATHLTHWorkoutDisplayMetric(
+                        icon: "repeat.circle.fill",
+                        label: ATHLTHLocalization.choose(
+                            english: "Reps", norwegian: "Reps"
+                        ),
+                        value: repsText
+                    ),
+                    ATHLTHWorkoutDisplayMetric(
+                        icon: "scalemass.fill",
+                        label: ATHLTHLocalization.choose(
+                            english: "Volume", norwegian: "Volum"
+                        ),
+                        value: volumeText
+                    ),
+                    ATHLTHWorkoutDisplayMetric(
+                        icon: "pause.circle.fill",
+                        label: ATHLTHLocalization.choose(
+                            english: "Total rest", norwegian: "Total pause"
+                        ),
+                        value: restSummaryText
                     )
                 ],
-                spacing: 8
-            ) {
-                sessionMetricTile(
-                    icon: "timer",
-                    label:
-                        ATHLTHLocalization.choose(
-                            english: "Time",
-                            norwegian: "Tid"
-                        ),
-                    value: durationText
-                )
-
-                sessionMetricTile(
-                    icon: "dumbbell.fill",
-                    label:
-                        ATHLTHLocalization.choose(
-                            english: "Exercises",
-                            norwegian: "Øvelser"
-                        ),
-                    value: exerciseCountText
-                )
-
-                sessionMetricTile(
-                    icon: "square.stack.3d.up.fill",
-                    label:
-                        ATHLTHLocalization.choose(
-                            english: "Sets",
-                            norwegian: "Sett"
-                        ),
-                    value: setsText
-                )
-
-                sessionMetricTile(
-                    icon:
-                        "repeat.circle.fill",
-                    label:
-                        ATHLTHLocalization.choose(
-                            english: "Reps",
-                            norwegian: "Reps"
-                        ),
-                    value: repsText
-                )
-
-                sessionMetricTile(
-                    icon:
-                        "scalemass.fill",
-                    label:
-                        ATHLTHLocalization.choose(
-                            english: "Volume",
-                            norwegian: "Volum"
-                        ),
-                    value: volumeText
-                )
-
-                sessionMetricTile(
-                    icon:
-                        "pause.circle.fill",
-                    label:
-                        ATHLTHLocalization.choose(
-                            english: "Rest",
-                            norwegian: "Pause"
-                        ),
-                    value:
-                        restSummaryText
-                )
-            }
+                columnCount: 3
+            )
         }
         .padding(16)
         .background(
@@ -378,66 +344,6 @@ struct HomeActivityStrengthDetailView: View {
         }
     }
 
-    private func sessionMetricTile(
-        icon: String,
-        label: String,
-        value: String
-    ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 6
-        ) {
-            Image(
-                systemName: icon
-            )
-            .font(
-                .caption.weight(
-                    .semibold
-                )
-            )
-            .foregroundStyle(
-                ATHLTHTheme.accentDeep
-            )
-
-            Text(value)
-                .font(
-                    .subheadline
-                        .weight(.bold)
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .lineLimit(1)
-        }
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 70,
-            alignment: .leading
-        )
-        .padding(10)
-        .background(
-            ATHLTHTheme
-                .surfaceStone
-                .opacity(0.72),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 15,
-                    style: .continuous
-                )
-        )
-    }
-
-    // The detail hero uses the media for the exercise that best represents
-    // this completed session. Home deliberately keeps the lightweight
-    // anatomical doll so the activity stream remains fast and scannable.
     private var representativeExerciseEntry:
         ExerciseLibraryEntry? {
         guard let strengthWorkout =
