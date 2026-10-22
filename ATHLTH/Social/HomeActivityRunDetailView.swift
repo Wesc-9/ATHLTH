@@ -45,6 +45,10 @@ struct HomeActivityRunDetailView: View {
         workout.activity == .running && workout.isIndoor == true
     }
 
+    private var isIndoorActivity: Bool {
+        workout.isIndoor == true
+    }
+
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
@@ -171,7 +175,7 @@ struct HomeActivityRunDetailView: View {
     }
 
     private func saveRecordedRoute() {
-        guard !isTreadmillWorkout, route.count >= 2,
+        guard !isIndoorActivity, route.count >= 2,
               savedRecordedRoute == nil,
               let distance = workout.distanceMeters,
               distance.isFinite, distance >= 100
@@ -319,7 +323,9 @@ struct HomeActivityRunDetailView: View {
 
                 if isTreadmillWorkout {
                     treadmillFactsCard
-                } else {
+                }
+
+                if !isIndoorActivity {
                     ATHLTHRunningResultAnalysisCard(
                         splits: verifiedSplits,
                         elevation: elevationProfile,
@@ -348,7 +354,7 @@ struct HomeActivityRunDetailView: View {
                         Label(tr("Share result", "Del resultat"),
                               systemImage: "square.and.arrow.up")
                     }
-                    if !isTreadmillWorkout && routeCoordinates.count >= 2 {
+                    if !isIndoorActivity && routeCoordinates.count >= 2 {
                         Button {
                             showingFullscreenMap = true
                         } label: {
@@ -363,7 +369,7 @@ struct HomeActivityRunDetailView: View {
                             Label(tr("Open saved route / Ghost", "Åpne lagret rute / Ghost"),
                                   systemImage: "figure.run.circle")
                         }
-                    } else if !isTreadmillWorkout && routeCoordinates.count >= 2 {
+                    } else if !isIndoorActivity && routeCoordinates.count >= 2 {
                         Button {
                             showingSaveRouteConfirmation = true
                         } label: {
@@ -386,9 +392,9 @@ struct HomeActivityRunDetailView: View {
             ATHLTHRunningResultShareSheet(
                 workout: workout,
                 averageHeartRateBPM: detail?.averageHeartRate,
-                elevationGainMeters: isTreadmillWorkout ? nil :
+                elevationGainMeters: isIndoorActivity ? nil :
                     (ascentText == nil ? nil : elevationGainMeters),
-                rawRoute: isTreadmillWorkout ? [] : route,
+                rawRoute: isIndoorActivity ? [] : route,
                 highlights: verifiedSplits
             )
         }
@@ -1297,7 +1303,7 @@ struct HomeActivityRunDetailView: View {
                     )
             } else if isLoadingAIInsight {
                 Text(
-                    isTreadmillWorkout
+                    isIndoorActivity
                         ? tr("Coach is analyzing pace and effort…", "Coachen analyserer tempo og belastning…")
                         : tr("Coach is analyzing pace, route, elevation and effort…", "Coachen analyserer tempo, rute, høydemeter og belastning…")
                 )
@@ -1327,7 +1333,7 @@ struct HomeActivityRunDetailView: View {
             isLoadingDetail = false
         }
 
-        if !isTreadmillWorkout {
+        if !isIndoorActivity {
             await loadRouteResultIfNeeded()
         }
         await loadCoachInsightIfNeeded()
