@@ -1357,6 +1357,20 @@ struct ATHLTHRecordedRunningStep: Codable, Hashable {
     }
 }
 
+/// Watch-sampled interval timeline. A sample represents up to one minute,
+/// including a shorter final slice. Targets are never reported as measurements.
+struct ATHLTHRecordedRunningMinute: Codable, Hashable {
+    var stepIndex: Int
+    var stepElapsedAtEndSeconds: TimeInterval
+    var activeSeconds: TimeInterval
+    var watchDistanceMeters: Double
+    var watchHeartRateBPM: Double?
+    var targetPaceSecondsPerKilometer: Double?
+    var targetTreadmillInclinePercent: Double?
+    /// The treadmill incline shown during the session was entered manually.
+    var manuallyEnteredTreadmillInclinePercent: Double?
+}
+
 struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     let id: UUID
     var kind: WatchWorkoutKind
@@ -1389,6 +1403,7 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var structuredWorkoutSourceID: UUID? = nil
     var structuredWorkoutTitle: String? = nil
     var recordedRunningSteps: [ATHLTHRecordedRunningStep]? = nil
+    var recordedRunningMinutes: [ATHLTHRecordedRunningMinute]? = nil
 
     // Strength work performed while iPhone is unavailable is shipped together
     // with the final HealthKit result. This makes offline completion atomic
