@@ -46,6 +46,8 @@ final class MirroredWorkoutAudioCoach:
     private var lastState:
         WatchWorkoutMirrorState?
     private var lastStepIndex: Int?
+    private var lastIntervalProgressKey: String?
+    private var lastIntervalWarningKey: String?
     private var announcedStart = false
     private var finished = false
 
@@ -71,6 +73,8 @@ final class MirroredWorkoutAudioCoach:
         onLastSpokenCoachMessage?(nil)
         lastState = nil
         lastStepIndex = nil
+        lastIntervalProgressKey = nil
+        lastIntervalWarningKey = nil
         announcedStart = false
         finished = false
         workoutStartedAt = nil
@@ -186,6 +190,7 @@ final class MirroredWorkoutAudioCoach:
                maximumAge: ATHLTHCoachSensorFreshness.maximumSnapshotAge
            ) {
             announceStepIfNeeded(snapshot)
+            announceIntervalProgressIfDue(snapshot)
             announceFuelIfNeeded(snapshot)
             announceRoutineIfNeeded(snapshot)
         }
@@ -293,6 +298,61 @@ final class MirroredWorkoutAudioCoach:
         announcedStart = false
         finished = false
         workoutStartedAt = nil
+    }
+
+    private func announceIntervalProgressIfDue(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) {
+        guard let step = snapshot.runningStepTitle,
+              !step.isEmpty,
+              let index = snapshot.runningStepIndex,
+              let elapsed = snapshot.runningStepElapsedSeconds,
+              let remaining = snapshot.runningStepRemainingSeconds,
+              elapsed.isFinite, elapsed >= 0,
+              remaining.isFinite, remaining >= 0 else { return }
+
+        if let warning = snapshot.runningIntervalCoachCountdownSeconds,
+           warning >= 5, warning.isFinite,
+           remaining > 0, remaining <= warning {
+            let key = "\(snapshot.startedAt?.timeIntervalSince1970 ?? 0):\(index):\(Int(warning))"
+            if lastIntervalWarningKey != key {
+                lastIntervalWarningKey = key
+                speak(
+                    phrase(
+                        english: "\(Int(ceil(remaining))) seconds left in \(step)",
+                        norwegian: "\(Int(ceil(remaining))) sekunder igjen av \(step)"
+                    ),
+                    priority: .structuredStep,
+                    event: ATHLTHCoachEvent(
+                        kind: .runningStep, key: "mirror-warning:\(key)",
+                        priority: .structuredStep,
+                        createdAt: snapshot.capturedAt, validFor: 8
+                    )
+                )
+            }
+            return
+        }
+
+        guard let cadence = snapshot.runningIntervalCoachCueEverySeconds,
+              cadence.isFinite, cadence >= 15,
+              elapsed >= cadence, remaining > 2 else { return }
+        let slot = Int(floor(elapsed / cadence))
+        guard slot > 0, elapsed - Double(slot) * cadence < 2 else { return }
+        let key = "\(snapshot.startedAt?.timeIntervalSince1970 ?? 0):\(index):\(slot)"
+        guard lastIntervalProgressKey != key else { return }
+        lastIntervalProgressKey = key
+        speak(
+            phrase(
+                english: "\(Int(ceil(remaining))) seconds remaining in \(step)",
+                norwegian: "\(Int(ceil(remaining))) sekunder igjen av \(step)"
+            ),
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone, key: "mirror-interval:\(key)",
+                priority: .routineCoach,
+                createdAt: snapshot.capturedAt, validFor: 8
+            )
+        )
     }
 
     private func announceStepIfNeeded(
