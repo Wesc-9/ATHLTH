@@ -2436,6 +2436,17 @@ final class StrengthWorkoutStore: ObservableObject {
         let runBlocks = ATHLTHUnifiedWorkout.editorBlocks(from: runningOnly)
             .filter { $0.kind == .run || $0.kind == .rest }
         if runBlocks.contains(where: { $0.kind == .run }) {
+            // This embedded motor is for indoor treadmill intervals only.
+            // A saved outdoor route must stay on its real GPS run engine.
+            guard session.routeID == nil,
+                  session.resolvedRunningWorkouts.allSatisfy({
+                      $0.routeID == nil
+                  }),
+                  runBlocks.filter({ $0.kind == .run }).allSatisfy({
+                      $0.isIndoor != false
+                  })
+            else { return false }
+
             // A distance-only workout cannot be executed using the
             // duration countdown; refuse it instead of silently skipping.
             guard runBlocks.allSatisfy({
