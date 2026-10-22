@@ -21,6 +21,23 @@ enum MessageShareKind: String, Codable, CaseIterable, Identifiable, Hashable {
         }
     }
 
+    var localizedTitle: String {
+        switch self {
+        case .workout:
+            return ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt")
+        case .trainingPlan:
+            return ATHLTHLocalization.choose(english: "Training Plan", norwegian: "Treningsplan")
+        case .exercise:
+            return ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse")
+        case .runningWorkout:
+            return ATHLTHLocalization.choose(english: "Running Workout", norwegian: "Løpeøkt")
+        case .route:
+            return ATHLTHLocalization.choose(english: "Route", norwegian: "Rute")
+        case .challenge:
+            return ATHLTHLocalization.choose(english: "Challenge", norwegian: "Utfordring")
+        }
+    }
+
     var systemImage: String {
         switch self {
         case .workout: return "dumbbell.fill"
