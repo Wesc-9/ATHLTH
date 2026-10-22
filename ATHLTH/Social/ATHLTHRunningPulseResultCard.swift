@@ -11,10 +11,10 @@ struct ATHLTHRunningPulseResultCard: View {
     let isStructured: Bool
 
     private struct ChartPoint: Identifiable {
+        let id: Int
         let date: Date
         let bpm: Double
         let segment: Int
-        var id: Date { date }
     }
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -25,12 +25,13 @@ struct ATHLTHRunningPulseResultCard: View {
         let reduced = ATHLTHRunningHeartRateAnalysis.chartPoints(points)
         var group = 0
         var previous: Date?
-        return reduced.map { point in
+        return reduced.enumerated().map { index, point in
             if let previous, point.date.timeIntervalSince(previous) > 90 {
                 group += 1
             }
             previous = point.date
-            return ChartPoint(date: point.date, bpm: point.bpm, segment: group)
+            return ChartPoint(id: index, date: point.date,
+                              bpm: point.bpm, segment: group)
         }
     }
 
