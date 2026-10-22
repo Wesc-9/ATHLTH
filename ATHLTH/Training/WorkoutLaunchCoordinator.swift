@@ -85,7 +85,9 @@ struct PlannedWorkoutWatchBuilder {
                     autoPauseEnabled ??
                     workout.autoPauseEnabled,
                 autoAdvanceTimedSteps:
-                    structured.allSatisfy { $0.autoAdvanceTimedSteps != false }
+                    structured.allSatisfy { $0.autoAdvanceTimedSteps != false },
+                intervalCoachCueEverySeconds: structured.first?.intervalCoachCueEverySeconds,
+                intervalCoachCountdownSeconds: structured.first?.intervalCoachCountdownSeconds
             )
         }
 
@@ -161,7 +163,9 @@ struct PlannedWorkoutWatchBuilder {
             steps: runningSteps(from: workout),
             routeAlerts: routeAlerts,
             autoPauseEnabled: autoPauseEnabled,
-            autoAdvanceTimedSteps: workout.autoAdvanceTimedSteps
+            autoAdvanceTimedSteps: workout.autoAdvanceTimedSteps,
+            intervalCoachCueEverySeconds: workout.intervalCoachCueEverySeconds,
+            intervalCoachCountdownSeconds: workout.intervalCoachCountdownSeconds
         )
     }
 
@@ -241,6 +245,7 @@ struct PlannedWorkoutWatchBuilder {
             targetPaceMaxSecondsPerKilometer: target.intensity.paceMaxSecondsPerKilometer,
             phase: phase,
             targetHeartRateZone: target.intensity.heartRateZone,
+            targetTreadmillInclinePercent: target.treadmillInclinePercent,
             ghostPaceSecondsPerKilometer: ghostPace,
             ghostFollowsRecovery: ghostFollowsRecovery,
             ghostRecoverySlowdownPercent: slowdownPercent,
