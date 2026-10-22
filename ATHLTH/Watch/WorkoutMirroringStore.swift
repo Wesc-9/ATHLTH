@@ -416,7 +416,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     ) -> Bool {
         guard hasActiveMirroredWorkout,
               let snapshot,
-              (snapshot.kind == .running || snapshot.kind == .walking),
+              snapshot.kind == .running,
               (snapshot.state == .running || snapshot.state == .paused),
               let startedAt = snapshot.startedAt,
               let mirroredSession else { return false }
