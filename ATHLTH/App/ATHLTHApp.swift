@@ -3478,7 +3478,7 @@ struct AppRootView: View {
         // workout/history sharing.
         if !homeAssistant.shareCompletedWorkouts ||
             !homeAssistant.shareWorkoutHistory ||
-            (health.lastSuccessfulRefreshAt != nil && !health.isRefreshing) {
+            (health.lastWorkoutsFetchedAt != nil && !health.isRefreshing) {
             await homeAssistant.syncWorkoutHistory(health.workouts)
         }
     }
