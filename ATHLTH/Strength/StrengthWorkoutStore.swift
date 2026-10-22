@@ -2327,6 +2327,65 @@ final class StrengthWorkoutStore: ObservableObject {
         guard var workout = activeWorkout else { return false }
 
         var additions = Self.strengthExerciseLogs(from: session)
+
+        // Modern advanced workout builders can store only ordered blocks,
+        // with no legacy session.exercises. Import those blocks once,
+        // preserving their saved repetitions, duration, load and rest.
+        if additions.isEmpty {
+            for block in session.resolvedWorkoutBlocks {
+                if block.kind == .rest {
+                    if let lastExercise = additions.indices.last,
+                       let lastSet = additions[lastExercise].sets.indices.last,
+                       let seconds = block.durationSeconds, seconds > 0 {
+                        additions[lastExercise].sets[lastSet].restSeconds =
+                            min(Int(seconds.rounded()), 3_600)
+                    }
+                    continue
+                }
+                guard block.kind == .exercise else { continue }
+                let snapshot = block.exerciseSnapshot ?? ExerciseSnapshot(
+                    name: block.title,
+                    instructions: [],
+                    primaryMuscles: [],
+                    equipment: [],
+                    imageURL: nil
+                )
+                let timed = block.durationSeconds != nil
+                let newSet = StrengthSetLog(
+                    id: UUID(),
+                    setNumber: 1,
+                    plannedReps: timed ? nil : (block.repetitions ?? 8),
+                    plannedWeightKilograms: block.targetWeightKilograms,
+                    completedReps: nil,
+                    completedWeightKilograms: nil,
+                    rpe: nil,
+                    completedAt: nil,
+                    restSeconds: 0,
+                    isWarmUp: block.phase == .warmup,
+                    targetKind: timed ? .time : .reps,
+                    plannedDurationSeconds: block.durationSeconds.map {
+                        min(max(Int($0.rounded()), 15), 7_200)
+                    }
+                )
+
+                if let last = additions.indices.last,
+                   additions[last].exercise.name == snapshot.name,
+                   additions[last].appendedWorkoutID == nil {
+                    var next = newSet
+                    next.setNumber = additions[last].sets.count + 1
+                    additions[last].sets.append(next)
+                } else {
+                    additions.append(StrengthExerciseLog(
+                        id: UUID(),
+                        plannedExerciseID: nil,
+                        exercise: snapshot,
+                        sets: [newSet],
+                        completedAt: nil
+                    ))
+                }
+            }
+        }
+
         for idx in additions.indices {
             additions[idx].appendedWorkoutID = session.id
             additions[idx].appendedWorkoutTitle = session.title
