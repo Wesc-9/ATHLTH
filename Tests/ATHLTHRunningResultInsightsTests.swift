@@ -29,6 +29,19 @@ final class ATHLTHRunningResultInsightsTests: XCTestCase {
         XCTAssertTrue(splits.allSatisfy { $0.durationSeconds > 300 })
     }
 
+    func testVerifiedSplitRetainsTimeRangeForMeasuredPulseMatching() {
+        let points = route()
+        let splits = ATHLTHRunningResultInsights.kilometerSplits(
+            from: points, reportedDistanceMeters: 2_300
+        )
+        XCTAssertEqual(splits.count, 2)
+        XCTAssertEqual(splits.first?.startedAt, points.first?.timestamp)
+        XCTAssertNotNil(splits.first?.endedAt)
+        XCTAssertEqual(splits[1].startedAt, splits[0].endedAt)
+        XCTAssertGreaterThan(splits[1].endedAt ?? .distantPast,
+                             splits[1].startedAt ?? .distantFuture)
+    }
+
     func testSuspiciousGPSJumpIsNotTurnedIntoBestKilometer() {
         var samples = route()
         samples[8] = CLLocation(
