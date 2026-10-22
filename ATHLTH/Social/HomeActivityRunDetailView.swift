@@ -310,14 +310,16 @@ struct HomeActivityRunDetailView: View {
             VStack(spacing: 16) {
                 summaryCard
 
-                if workout.allowsTrainingPlaceCheckIn {
-                    WorkoutPlaceCheckInSection(workoutID: workout.id)
+                ATHLTHWorkoutLocationSection(
+                    workout: workout,
+                    hasRecordedGPS: routeCoordinates.count >= 2
+                ) {
+                    mapCard
                 }
 
                 if isTreadmillWorkout {
                     treadmillFactsCard
                 } else {
-                    mapCard
                     ATHLTHRunningResultAnalysisCard(
                         splits: verifiedSplits,
                         elevation: elevationProfile,
