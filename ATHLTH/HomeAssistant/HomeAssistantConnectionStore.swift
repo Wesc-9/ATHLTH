@@ -2362,8 +2362,9 @@ final class HomeAssistantConnectionStore: NSObject, ObservableObject {
 
             let records: [HomeAssistantJSONValue] =
                 performanceRecords.prefix(12).map { record in
-                    let recordID = Self.sanitizedText(record.id)
-                        .map { String($0.prefix(96)) } ?? "record"
+                    let recordID = SHA256.hash(
+                        data: Data(record.id.utf8)
+                    ).map { String(format: "%02x", $0) }.joined()
                     let title = Self.sanitizedText(record.title)
                         .map { String($0.prefix(96)) } ?? "Prestasjon"
                     let value = Self.sanitizedText(record.value)
