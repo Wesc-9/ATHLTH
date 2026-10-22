@@ -8,6 +8,21 @@ struct ATHLTHRunningResultAnalysisCard: View {
     let elevation: [ATHLTHRunningResultInsights.ElevationPoint]
     let activeEnergyKilocalories: Double?
     let maxHeartRateBPM: Double?
+    var pulseSamples: [ATHLTHRunningHeartRatePoint] = []
+
+    private func splitPulse(_ split: ATHLTHRunningResultInsights.KilometerSplit) -> String {
+        guard let start = split.startedAt, let end = split.endedAt,
+              let value = ATHLTHRunningHeartRateAnalysis.average(
+                pulseSamples, from: start, through: end
+              ) else { return "—" }
+        return "\(Int(value.rounded()))"
+    }
+
+    private func time(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds > 0 else { return "—" }
+        let value = Int(seconds.rounded())
+        return String(format: "%d:%02d", value / 60, value % 60)
+    }
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -94,37 +109,79 @@ struct ATHLTHRunningResultAnalysisCard: View {
 
             if !splits.isEmpty {
                 ATHLTHPlanSurface {
-                    VStack(alignment: .leading, spacing: 11) {
-                        Text(tr("Kilometre splits", "Kilometersplits"))
-                            .font(.system(size: 21, weight: .semibold, design: .serif))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                        Text(tr("Only completed kilometres from a continuous, verified GPS track.",
-                                "Bare hele kilometer fra et sammenhengende, kvalitetssikret GPS-spor."))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(tr("Your kilometre rhythm", "Rytmen per kilometer"))
+                                    .font(.system(size: 21, weight: .semibold, design: .serif))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Text(tr(
+                                    "Complete, verified outdoor kilometres.",
+                                    "Hele, kvalitetssikrede kilometer utendørs."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            Spacer()
+                            Image(systemName: "figure.run.circle.fill")
+                                .font(.system(size: 25))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+
+                        HStack(spacing: 8) {
+                            Text("KM").frame(width: 43, alignment: .leading)
+                            Text(tr("TIME", "TID"))
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                            Text(tr("PACE", "TEMPO"))
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                            Text(tr("PULSE", "PULS"))
+                                .frame(width: 53, alignment: .trailing)
+                        }
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(0.7)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
                         ForEach(splits) { split in
-                            HStack(spacing: 10) {
-                                Text("\(split.kilometer). km")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                    .frame(width: 55, alignment: .leading)
+                            VStack(spacing: 5) {
+                                HStack(spacing: 8) {
+                                    Text(String(format: "%02d", split.kilometer))
+                                        .font(.subheadline.weight(.bold))
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        .frame(width: 43, alignment: .leading)
+                                    Text(time(split.durationSeconds))
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                    Text(pace(split.paceSecondsPerKilometer))
+                                        .frame(maxWidth: .infinity, alignment: .trailing)
+                                    Text(splitPulse(split))
+                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        .frame(width: 53, alignment: .trailing)
+                                }
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+
                                 GeometryReader { geometry in
                                     let slowest = splits.map(\.durationSeconds).max() ?? 1
-                                    let fraction = max(0.2, min(1, slowest / max(split.durationSeconds, 1) / 1.65))
+                                    let ratio = min(1, slowest /
+                                        max(split.durationSeconds, 1) / 1.08)
                                     Capsule()
-                                        .fill(ATHLTHPlanDesign.accent.opacity(0.55))
-                                        .frame(width: geometry.size.width * fraction)
+                                        .fill(ATHLTHPlanDesign.selectedSurface)
+                                        .overlay(alignment: .leading) {
+                                            Capsule()
+                                                .fill(ATHLTHPlanDesign.accentInk.opacity(0.65))
+                                                .frame(width: geometry.size.width * ratio)
+                                        }
                                 }
-                                .frame(height: 8)
-                                Text(pace(split.paceSecondsPerKilometer))
-                                    .font(.caption.weight(.semibold))
-                                    .monospacedDigit()
-                                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                                    .frame(width: 73, alignment: .trailing)
+                                .frame(height: 4)
                             }
-                            .frame(height: 30)
+                            .padding(.vertical, 5)
                         }
+                        Text(tr(
+                            "Pace and time from verified GPS. Pulse from measured HealthKit readings in each kilometre, when available.",
+                            "Tid og tempo fra kvalitetssikret GPS. Puls fra registrerte HealthKit-målinger for hver kilometer, når tilgjengelig."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                 }
             }
