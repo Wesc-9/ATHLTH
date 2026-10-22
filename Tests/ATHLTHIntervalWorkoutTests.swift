@@ -3,6 +3,41 @@ import XCTest
 
 @MainActor
 final class ATHLTHIntervalWorkoutTests: XCTestCase {
+    func testManualMainStartIsDefaultButAthleteCanOptIntoAutomatic() throws {
+        var template = try XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first {
+            $0.title == "4 × 4 intervaller"
+        })
+        let defaultTransfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: template, routeAlerts: .standard
+        )
+        XCTAssertNotEqual(defaultTransfer.autoStartMainAfterWarmup, true)
+        template.autoStartMainAfterWarmup = true
+        let automaticTransfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: template, routeAlerts: .standard
+        )
+        XCTAssertEqual(automaticTransfer.autoStartMainAfterWarmup, true)
+        let data = try JSONEncoder().encode(automaticTransfer)
+        XCTAssertEqual(try JSONDecoder().decode(
+            WatchRunningWorkoutTransfer.self, from: data
+        ).autoStartMainAfterWarmup, true)
+    }
+
+    func testStartMainCommandCarriesExactWorkoutAndStep() throws {
+        let date = Date()
+        let command = WatchWorkoutMirrorCommand(
+            command: .advanceRunningStep,
+            workoutStartedAt: date,
+            expectedRunningStepIndex: 1,
+            startMainAfterWarmup: true
+        )
+        let data = try JSONEncoder().encode(command)
+        let restored = try JSONDecoder().decode(WatchWorkoutMirrorCommand.self, from: data)
+        XCTAssertEqual(restored.command, .advanceRunningStep)
+        XCTAssertEqual(restored.expectedRunningStepIndex, 1)
+        XCTAssertEqual(restored.startMainAfterWarmup, true)
+        XCTAssertEqual(restored.workoutStartedAt, date)
+    }
+
     func testFourByFourHasOnlyThreeRecoveries() {
         let template = try! XCTUnwrap(RunningWorkoutLibraryStore.builtInTemplates.first {
             $0.title == "4 × 4 intervaller"
