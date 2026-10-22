@@ -3138,9 +3138,12 @@ struct PerformanceStatsView: View {
         guard let healthKind = kind.healthKind else {
             return text("Calculated", "Beregnet")
         }
-        return resolvedHealthRecords.contains(where: { $0.kind == healthKind })
+        guard resolvedHealthRecords.contains(where: { $0.kind == healthKind }) else {
+            return text("Calculated", "Beregnet")
+        }
+        return healthKind.targetDistanceMeters != nil
             ? "Apple Health · GPS"
-            : text("Calculated", "Beregnet")
+            : "Apple Health"
     }
 
     private func profileRecordMetric(
@@ -3298,7 +3301,7 @@ struct PerformanceStatsView: View {
                             sources:
                                 Array(
                                     repeating:
-                                        "ATHLTH",
+                                        text("ATHLTH log", "ATHLTH-logg"),
                                     count:
                                         strengthDisplayItems
                                             .count
@@ -3469,7 +3472,7 @@ struct PerformanceStatsView: View {
     ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: 7
+            spacing: 4
         ) {
             HStack {
                 Image(
@@ -3575,27 +3578,16 @@ struct PerformanceStatsView: View {
                 .fill(
                     item.tint
                 )
-                .frame(height: 3)
+                .frame(height: 2)
         }
-        .padding(11)
+        .padding(10)
         .frame(
             maxWidth: .infinity,
-            minHeight: 126,
+            minHeight: 101,
             alignment: .topLeading
         )
         .background(
-            LinearGradient(
-                colors: [
-                    item.tint
-                        .opacity(0.055),
-                    Color.white
-                        .opacity(0.94)
-                ],
-                startPoint:
-                    .topLeading,
-                endPoint:
-                    .bottomTrailing
-            ),
+            Color.white.opacity(0.95),
             in:
                 RoundedRectangle(
                     cornerRadius: 17,
@@ -3609,8 +3601,7 @@ struct PerformanceStatsView: View {
                 style: .continuous
             )
             .stroke(
-                item.tint
-                    .opacity(0.09),
+                ATHLTHTheme.border.opacity(0.65),
                 lineWidth: 0.7
             )
         }
@@ -7361,7 +7352,7 @@ private struct PerformanceRecordCollectionView:
     ) -> some View {
         VStack(
             alignment: .leading,
-            spacing: 8
+            spacing: 5
         ) {
             HStack {
                 Image(
@@ -7445,12 +7436,12 @@ private struct PerformanceRecordCollectionView:
 
             Capsule()
                 .fill(item.tint)
-                .frame(height: 3)
+                .frame(height: 2)
         }
-        .padding(13)
+        .padding(11)
         .frame(
             maxWidth: .infinity,
-            minHeight: 154,
+            minHeight: 118,
             alignment: .topLeading
         )
         .background(
