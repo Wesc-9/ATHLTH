@@ -649,6 +649,10 @@ final class WatchRouteStore: NSObject, ObservableObject {
             // Require the workout-scoped identity carried by the live
             // HealthKit mirror, never act on a stale WCSession command.
             break
+        case .appendRunningWorkout, .advanceRunningStep:
+            // Structured phases need the workout token and intended step
+            // index delivered through the authorized HealthKit mirror.
+            break
         }
     }
 
