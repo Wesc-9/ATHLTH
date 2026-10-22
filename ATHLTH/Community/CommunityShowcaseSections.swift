@@ -597,6 +597,8 @@ struct CommunityFriendsVsFriendsDetailView: View {
     @State private var loadingFriend = false
     @State private var showingChallenge = false
     @State private var showingDirectDuelPicker = false
+    @State private var showingFriendSelector = false
+    @State private var showingPointRules = false
     @State private var creatingDirectDuel = false
     @State private var directDuelError: String?
 
@@ -625,11 +627,12 @@ struct CommunityFriendsVsFriendsDetailView: View {
                     .padding(.top, 80)
                 } else {
                     friendPicker
-                    matchupHero
-                    primaryScoreCard
                     periodPicker
+                    matchupHero
+                    comparisonInsightCard
                     metricCard
-                    contextCard
+                    trendCard
+                    duelActionCard
                     pointsExplainerCard
                 }
             }
@@ -640,50 +643,29 @@ struct CommunityFriendsVsFriendsDetailView: View {
             .frame(maxWidth: .infinity)
         }
         .background {
-            ZStack {
-                ATHLTHPremiumCanvas(
-                    accent:
-                        ATHLTHTheme
-                            .vitality
-                            .opacity(0.13)
-                )
-
-                Circle()
-                    .fill(
-                        ATHLTHTheme
-                            .vitality
-                            .opacity(0.055)
-                    )
-                    .frame(
-                        width: 310,
-                        height: 310
-                    )
-                    .blur(radius: 42)
-                    .offset(
-                        x: 170,
-                        y: -250
-                    )
-
-                Circle()
-                    .fill(
-                        ATHLTHTheme
-                            .accentSoft
-                            .opacity(0.34)
-                    )
-                    .frame(
-                        width: 260,
-                        height: 260
-                    )
-                    .blur(radius: 52)
-                    .offset(
-                        x: -150,
-                        y: 360
-                    )
-            }
+            ATHLTHPremiumCanvas(
+                accent: ATHLTHTheme.champagneSoft.opacity(0.34)
+            )
             .ignoresSafeArea()
         }
         .navigationTitle("Head-to-head")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                if selectedFriend != nil {
+                    ShareLink(item: matchupShareText) {
+                        Image(systemName: "square.and.arrow.up")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Share comparison",
+                            norwegian: "Del sammenligning"
+                        )
+                    )
+                }
+            }
+        }
         .task {
             if selectedFriendID == nil {
                 selectedFriendID =
@@ -734,7 +716,60 @@ struct CommunityFriendsVsFriendsDetailView: View {
             await social.refresh(
                 challengeStore: challenges
             )
+            ownActivities = await social.loadActivitiesForMatchup(
+                currentUserID
+            )
             await loadSelectedFriend()
+        }
+        .sheet(isPresented: $showingFriendSelector) {
+            NavigationStack {
+                List(friends) { friend in
+                    Button {
+                        selectedFriendID = friend.userID
+                        showingFriendSelector = false
+                    } label: {
+                        HStack(spacing: 13) {
+                            CommunityShowcaseAvatar(
+                                url: friend.avatarURL.flatMap(URL.init(string:)),
+                                fallback: friend.resolvedName,
+                                size: 42
+                            )
+                            Text(friend.resolvedName)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                            Spacer()
+                            if selectedFriend?.userID == friend.userID {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                            }
+                        }
+                        .padding(.vertical, 5)
+                    }
+                    .buttonStyle(.plain)
+                    .listRowBackground(ATHLTHTheme.card)
+                }
+                .listStyle(.plain)
+                .background(ATHLTHTheme.canvasTop)
+                .navigationTitle(
+                    ATHLTHLocalization.choose(
+                        english: "Choose opponent",
+                        norwegian: "Velg motstander"
+                    )
+                )
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Done",
+                                norwegian: "Ferdig"
+                            )
+                        ) { showingFriendSelector = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(
             isPresented:
@@ -1101,584 +1136,204 @@ struct CommunityFriendsVsFriendsDetailView: View {
         )
     }
 
+    /// Keep the selected opponent visible without occupying a row of pills.
+    /// The list sheet scales to an arbitrary number of mutual follows.
     private var friendPicker: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 9
-        ) {
-            Text(
-                ATHLTHLocalization.choose(
-                    english: "CHOOSE MATCHUP",
-                    norwegian: "VELG DUELL"
-                )
-            )
-            .font(.caption2.weight(.bold))
-            .tracking(1.2)
-            .foregroundStyle(
-                ATHLTHTheme.mutedText
-            )
-
-            ScrollView(
-                .horizontal,
-                showsIndicators: false
-            ) {
-                HStack(spacing: 10) {
-                    ForEach(friends) { friend in
-                        Button {
-                            selectedFriendID =
-                                friend.userID
-                        } label: {
-                            HStack(spacing: 8) {
-                                CommunityShowcaseAvatar(
-                                    url:
-                                        friend.avatarURL
-                                            .flatMap(
-                                                URL.init(string:)
-                                            ),
-                                    fallback:
-                                        friend.resolvedName,
-                                    size: 34
-                                )
-
-                                Text(
-                                    firstName(
-                                        friend
-                                            .resolvedName
-                                    )
-                                )
-                                .font(
-                                    .caption.weight(
-                                        .semibold
-                                    )
-                                )
-                            }
-                            .foregroundStyle(
-                                selectedFriendID ==
-                                    friend.userID
-                                    ? Color.white
-                                    : ATHLTHTheme
-                                        .primaryText
-                            )
-                            .padding(
-                                .horizontal,
-                                11
-                            )
-                            .frame(height: 46)
-                            .background(
-                                selectedFriendID ==
-                                    friend.userID
-                                    ? ATHLTHTheme
-                                        .vitality
-                                    : Color.white
-                                        .opacity(
-                                            0.88
-                                        ),
-                                in: Capsule()
-                            )
-                            .overlay {
-                                Capsule()
-                                    .stroke(
-                                        selectedFriendID ==
-                                            friend.userID
-                                            ? Color.white
-                                                .opacity(
-                                                    0.18
-                                                )
-                                            : ATHLTHTheme
-                                                .vitality
-                                                .opacity(
-                                                    0.08
-                                                ),
-                                        lineWidth:
-                                            0.8
-                                    )
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
+        Button {
+            showingFriendSelector = true
+        } label: {
+            HStack(spacing: 12) {
+                if let friend = selectedFriend {
+                    CommunityShowcaseAvatar(
+                        url: friend.avatarURL.flatMap(URL.init(string:)),
+                        fallback: friend.resolvedName,
+                        size: 38
+                    )
                 }
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "OPPONENT",
+                        norwegian: "MOTSTANDER"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text(selectedFriend?.resolvedName ?? "—")
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Text(ATHLTHLocalization.choose(
+                    english: "Change",
+                    norwegian: "Bytt"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(ATHLTHTheme.card, in: RoundedRectangle(
+                cornerRadius: 19, style: .continuous
+            ))
+            .overlay {
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
+                    .stroke(ATHLTHTheme.border, lineWidth: 1)
             }
         }
+        .buttonStyle(.plain)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Select a friend to compare workouts",
+            norwegian: "Velg en venn for å sammenligne treningen"
+        ))
     }
 
+    /// A single scoreboard replaces the duplicated matchup and score cards.
     private var matchupHero: some View {
-        VStack(spacing: 16) {
-            HStack {
-                Label(
-                    "HEAD-TO-HEAD",
-                    systemImage:
-                        "bolt.horizontal.circle.fill"
-                )
-                .font(.caption.bold())
-                .tracking(0.8)
-                .foregroundStyle(
-                    ATHLTHTheme.vitality
-                )
+        let mine = primaryScoreValues.mine
+        let theirs = primaryScoreValues.theirs
 
+        return VStack(spacing: 18) {
+            HStack(spacing: 8) {
+                ATHLTHMarkShape()
+                    .fill(ATHLTHTheme.premiumGold)
+                    .frame(width: 25, height: 19)
+                    .accessibilityHidden(true)
+
+                Text("HEAD-TO-HEAD")
+                    .font(.system(size: 11, weight: .heavy))
+                    .tracking(1.8)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
                 Spacer()
-
-                Text(
-                    activeDirectDuel == nil
-                        ? ATHLTHLocalization.choose(
-                            english: "ACTIVITY SCORE",
-                            norwegian: "AKTIVITETSSCORE"
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "DIRECT DUEL",
-                            norwegian: "DIREKTE DUELL"
-                        )
+                Text(activeDirectDuel == nil
+                    ? ATHLTHLocalization.choose(
+                        english: "ACTIVITY", norwegian: "AKTIVITET")
+                    : ATHLTHLocalization.choose(
+                        english: "ACTIVE DUEL", norwegian: "AKTIV DUELL")
                 )
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .bold
-                    )
-                )
-                .tracking(0.8)
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
-                )
-                .padding(
-                    .horizontal,
-                    9
-                )
-                .padding(
-                    .vertical,
-                    5
-                )
+                .font(.system(size: 9, weight: .bold))
+                .tracking(1)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
                 .background(
-                    Color.white
-                        .opacity(0.74),
+                    ATHLTHTheme.champagneSoft,
                     in: Capsule()
                 )
             }
 
-            HStack(spacing: 18) {
+            HStack(spacing: 12) {
                 matchupPerson(
-                    name:
-                        currentDisplayName
-                            .isEmpty
-                            ? "You"
-                            : currentDisplayName,
-                    avatarURL:
-                        currentAvatarURL,
-                    label: "YOU"
+                    name: currentDisplayName.isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "You", norwegian: "Deg")
+                        : currentDisplayName,
+                    avatarURL: currentAvatarURL,
+                    label: ATHLTHLocalization.choose(
+                        english: "YOU", norwegian: "DU"
+                    )
                 )
 
-                VStack(spacing: 7) {
+                VStack(spacing: 5) {
+                    Image(systemName: "bolt.horizontal.fill")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
                     Text("VS")
-                        .font(
-                            .system(
-                                size: 18,
-                                weight: .black,
-                                design: .rounded
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .accentDeep
-                        )
-                        .frame(
-                            width: 48,
-                            height: 48
-                        )
-                        .background(
-                            Color.white
-                                .opacity(0.82),
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    ATHLTHTheme
-                                        .vitality
-                                        .opacity(
-                                            0.20
-                                        ),
-                                    lineWidth: 1
-                                )
-                        }
-                        .shadow(
-                            color:
-                                ATHLTHTheme
-                                    .vitality
-                                    .opacity(
-                                        0.12
-                                    ),
-                            radius: 12
-                        )
-
-                    Image(
-                        systemName:
-                            "bolt.fill"
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .premiumGold
-                    )
+                        .font(.system(size: 12, weight: .heavy, design: .rounded))
+                        .tracking(1)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                 }
+                .frame(width: 38)
 
                 if let selectedFriend {
                     matchupPerson(
-                        name:
-                            selectedFriend
-                                .resolvedName,
-                        avatarURL:
-                            selectedFriend
-                                .avatarURL
-                                .flatMap(
-                                    URL.init(string:)
-                                ),
-                        label: "FRIEND"
+                        name: selectedFriend.resolvedName,
+                        avatarURL: selectedFriend.avatarURL.flatMap(URL.init(string:)),
+                        label: ATHLTHLocalization.choose(
+                            english: "FRIEND", norwegian: "VENN"
+                        )
                     )
                 }
             }
+
+            Rectangle()
+                .fill(ATHLTHTheme.divider)
+                .frame(height: 1)
+
+            VStack(spacing: 8) {
+                Text(primaryScoreTitle)
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.35)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(primaryScoreText(mine))
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .foregroundStyle(scoreTint(mine, versus: theirs))
+                    Text("–")
+                        .font(.title2.weight(.light))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    Text(primaryScoreText(theirs))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .foregroundStyle(scoreTint(theirs, versus: mine))
+                }
+                .font(.system(size: 30, weight: .heavy, design: .rounded))
+                .monospacedDigit()
+                .minimumScaleFactor(0.62)
+                .lineLimit(1)
+                .contentTransition(.numericText())
+
+                GeometryReader { geometry in
+                    let share = CommunityMatchupVisualPolicy.share(
+                        mine: mine,
+                        theirs: theirs
+                    )
+                    HStack(spacing: 0) {
+                        ATHLTHTheme.premiumGold
+                            .frame(width: geometry.size.width * share)
+                        ATHLTHTheme.accentDeep.opacity(0.34)
+                    }
+                    .clipShape(Capsule())
+                }
+                .frame(height: 6)
+                .background(ATHLTHTheme.surfaceStone, in: Capsule())
+
+                Text(matchupLeadText)
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .multilineTextAlignment(.center)
+
+                Text(primaryScoreSubtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
-        .padding(18)
+        .padding(21)
         .frame(maxWidth: .infinity)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white
-                        .opacity(0.96),
-                    ATHLTHTheme
-                        .vitalitySoft
-                        .opacity(0.76),
-                    ATHLTHTheme
-                        .vitality
-                        .opacity(0.075)
-                ],
-                startPoint:
-                    .topLeading,
-                endPoint:
-                    .bottomTrailing
-            ),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 24,
-                    style: .continuous
-                )
-        )
+        .background {
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [
+                        ATHLTHTheme.card,
+                        ATHLTHTheme.cardWarm.opacity(0.55),
+                        ATHLTHTheme.canvasTop
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+        }
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                ATHLTHTheme
-                    .vitality
-                    .opacity(0.14),
-                lineWidth: 0.9
-            )
+            RoundedRectangle(cornerRadius: 28, style: .continuous)
+                .stroke(ATHLTHTheme.premiumGold.opacity(0.24), lineWidth: 1)
         }
-        .shadow(
-            color:
-                Color.black
-                    .opacity(0.045),
-            radius: 16,
-            y: 7
-        )
-    }
-
-    private var primaryScoreCard:
-        some View {
-        let mine =
-            primaryScoreValues.mine
-        let theirs =
-            primaryScoreValues.theirs
-
-        return VStack(spacing: 12) {
-            HStack {
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(
-                        primaryScoreTitle
-                    )
-                    .font(
-                        .caption.weight(
-                            .bold
-                        )
-                    )
-                    .tracking(0.9)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-
-                    Text(
-                        primaryScoreSubtitle
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        .secondary
-                    )
-                }
-
-                Spacer()
-
-                if activeDirectDuel != nil {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "ACTIVE DUEL",
-                            norwegian: "AKTIV DUELL"
-                        )
-                    )
-                    .font(
-                        .system(
-                            size: 9,
-                            weight: .bold
-                        )
-                    )
-                    .tracking(0.8)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .vitality
-                    )
-                    .padding(
-                        .horizontal,
-                        8
-                    )
-                    .padding(
-                        .vertical,
-                        5
-                    )
-                    .background(
-                        ATHLTHTheme
-                            .vitalitySoft,
-                        in: Capsule()
-                    )
-                }
-            }
-
-            HStack(
-                alignment: .firstTextBaseline
-            ) {
-                Text(
-                    primaryScoreText(
-                        mine
-                    )
-                )
-                .font(
-                    .system(
-                        size: 28,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .monospacedDigit()
-                .foregroundStyle(
-                    scoreTint(
-                        mine,
-                        versus: theirs
-                    )
-                )
-
-                Spacer()
-
-                Text("VS")
-                    .font(
-                        .caption.weight(
-                            .heavy
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-
-                Spacer()
-
-                Text(
-                    primaryScoreText(
-                        theirs
-                    )
-                )
-                .font(
-                    .system(
-                        size: 28,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .monospacedDigit()
-                .foregroundStyle(
-                    scoreTint(
-                        theirs,
-                        versus: mine
-                    )
-                )
-            }
-
-            Button {
-                showingDirectDuelPicker =
-                    true
-            } label: {
-                HStack(spacing: 8) {
-                    if creatingDirectDuel {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(
-                            systemName:
-                                activeDirectDuel == nil
-                                    ? "scope"
-                                    : "arrow.triangle.2.circlepath"
-                        )
-                    }
-
-                    Text(
-                        directDuelButtonTitle
-                    )
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-
-                    Spacer()
-
-                    if !creatingDirectDuel {
-                        Image(
-                            systemName:
-                                "chevron.right"
-                        )
-                        .font(
-                            .caption.bold()
-                        )
-                    }
-                }
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .vitality
-                )
-                .padding(.horizontal, 14)
-                .frame(height: 46)
-                .background(
-                    ATHLTHTheme
-                        .vitalitySoft,
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 14,
-                            style:
-                                .continuous
-                        )
-                )
-                .overlay {
-                    RoundedRectangle(
-                        cornerRadius: 14,
-                        style: .continuous
-                    )
-                    .stroke(
-                        ATHLTHTheme
-                            .vitality
-                            .opacity(0.10),
-                        lineWidth: 0.8
-                    )
-                }
-            }
-            .buttonStyle(.plain)
-            .disabled(
-                selectedFriend == nil ||
-                creatingDirectDuel ||
-                outgoingPendingDirectDuel != nil
-            )
-
-            if let pending =
-                    outgoingPendingDirectDuel,
-               let metric =
-                    directMetric(
-                        for: pending
-                    ) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Request sent · waiting for \(firstName(selectedFriend?.resolvedName ?? "friend")) · \(metric.title)",
-                        norwegian:
-                            "Forespørsel sendt · venter på \(firstName(selectedFriend?.resolvedName ?? "venn")) · \(metric.title)"
-                    ),
-                    systemImage: "clock.fill"
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-            } else if let pending =
-                        incomingPendingDirectDuel,
-                      let metric =
-                        directMetric(
-                            for: pending
-                        ) {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Incoming request · \(metric.title) · respond in Inbox",
-                        norwegian:
-                            "Ny forespørsel · \(metric.title) · svar i innboksen"
-                    ),
-                    systemImage:
-                        "tray.fill"
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .premiumGold
-                )
-            }
-        }
-        .padding(18)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white
-                        .opacity(0.985),
-                    activeDirectDuel == nil
-                        ? ATHLTHTheme
-                            .accentSoft
-                            .opacity(0.34)
-                        : ATHLTHTheme
-                            .vitality
-                            .opacity(0.10),
-                    Color.white
-                        .opacity(0.94)
-                ],
-                startPoint:
-                    .topLeading,
-                endPoint:
-                    .bottomTrailing
-            ),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 24,
-                    style: .continuous
-                )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                activeDirectDuel == nil
-                    ? ATHLTHTheme
-                        .accentDeep
-                        .opacity(0.08)
-                    : ATHLTHTheme
-                        .vitality
-                        .opacity(0.18),
-                lineWidth: 0.9
-            )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(
-                    0.04
-                ),
-            radius: 14,
-            y: 6
-        )
+        .shadow(color: ATHLTHTheme.accentDeep.opacity(0.085), radius: 19, y: 9)
+        .accessibilityElement(children: .combine)
     }
 
     private var periodPicker: some View {
