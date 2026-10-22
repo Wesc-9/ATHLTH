@@ -169,6 +169,8 @@ struct PhoneWorkout: Codable, Identifiable {
     // Recorded active-time and distance at each completed structured step.
     // Partial runs retain this diagnostic data but never enter progression.
     var recordedRunningSteps: [ATHLTHRecordedRunningStep]? = nil
+    /// Per-minute step evidence, including partial final slices.
+    var recordedRunningMinutes: [ATHLTHRecordedRunningMinute]? = nil
 
     var audioCoachConfiguration:
         WatchAudioCoachConfiguration? = nil
@@ -1437,6 +1439,7 @@ final class IPhoneWorkoutStore:
                 recoveryEnd ?? Date(),
                 workout.start
             )
+        recordRunningMinuteIfDue(&workout, force: true, at: workout.end ?? Date())
         // Keep the final in-progress phase in the durable result as a
         // partial step. A fully completed structured workout already records
         // its last phase at the transition.
@@ -2098,6 +2101,7 @@ final class IPhoneWorkoutStore:
         guard active?.structuredRunningWorkout?.steps.isEmpty == false,
               structuredTickTask == nil else { return }
         structuredTickTask = Task { @MainActor [weak self] in
+            var lastMinuteCheckpoint = -1
             while !Task.isCancelled {
                 try? await Task.sleep(for: .milliseconds(200))
                 guard !Task.isCancelled, let self,
@@ -2105,13 +2109,20 @@ final class IPhoneWorkoutStore:
                       current.structuredRunningWorkout != nil else { return }
                 guard current.resumedAt != nil,
                       current.structuredWorkoutComplete != true,
-                      let step = self.currentStructuredStep,
-                      step.measure == .time else { continue }
-                // Use the authoritative active elapsed time, not a second timer.
-                if (current.structuredRunningWorkout?.autoAdvanceTimedSteps ?? true),
+                      let step = self.currentStructuredStep else { continue }
+                // Write a sample at each active minute even without GPS movement.
+                let elapsed = current.elapsed(at: Date())
+                let minute = Int(elapsed / 60)
+                if minute > 0 && minute != lastMinuteCheckpoint {
+                    lastMinuteCheckpoint = minute
+                    self.checkpoint(force: true)
+                }
+                if step.phase == "warmup" || step.phase == "cooldown" { continue }
+                // Use authoritative active time, not a second timer.
+                if step.measure == .time,
+                   (current.structuredRunningWorkout?.autoAdvanceTimedSteps ?? true),
                    let duration = step.durationSeconds,
-                   current.elapsed(at: Date()) -
-                     (current.structuredStepStartElapsedTime ?? 0) >= duration {
+                   elapsed - (current.structuredStepStartElapsedTime ?? 0) >= duration {
                     self.checkpoint(force: true)
                 }
             }
@@ -2138,6 +2149,7 @@ final class IPhoneWorkoutStore:
         workout.lastCheckpoint = now
 
         if workout.resumedAt != nil {
+            recordRunningMinuteIfDue(&workout, at: now)
             evaluateStructuredWorkout(
                 &workout
             )
@@ -3715,6 +3727,51 @@ final class IPhoneWorkoutStore:
         }
     }
 
+    private func recordRunningMinuteIfDue(
+        _ workout: inout PhoneWorkout,
+        force: Bool = false,
+        at now: Date = Date()
+    ) {
+        guard workout.structuredWorkoutComplete != true,
+              let plan = workout.structuredRunningWorkout,
+              let index = workout.structuredStepIndex,
+              plan.steps.indices.contains(index) else { return }
+
+        let existing = (workout.recordedRunningMinutes ?? [])
+            .filter { $0.stepIndex == index }
+        let lastEnd = existing.last?.stepElapsedAtEndSeconds ?? 0
+        let elapsedInStep = max(workout.elapsed(at: now) -
+            (workout.structuredStepStartElapsedTime ?? 0), 0)
+        let seconds = max(elapsedInStep - lastEnd, 0)
+        guard (force && seconds >= 2) || (!force && seconds >= 60) else {
+            return
+        }
+        let sampledDistance = existing.reduce(0.0) {
+            $0 + $1.watchDistanceMeters
+        }
+        let delta = max(0,
+            workout.distanceMeters -
+            (workout.structuredStepStartDistanceMeters ?? 0) -
+            sampledDistance)
+        let step = plan.steps[index]
+        var timeline = workout.recordedRunningMinutes ?? []
+        timeline.append(ATHLTHRecordedRunningMinute(
+            stepIndex: index,
+            stepElapsedAtEndSeconds: elapsedInStep,
+            activeSeconds: seconds,
+            watchDistanceMeters: delta,
+            watchHeartRateBPM: nil,
+            targetPaceSecondsPerKilometer:
+                step.targetPaceMinSecondsPerKilometer,
+            targetTreadmillInclinePercent:
+                step.targetTreadmillInclinePercent,
+            manuallyEnteredTreadmillInclinePercent:
+                workout.runEnvironment == .treadmill
+                    ? workout.treadmillInclinePercent : nil
+        ))
+        workout.recordedRunningMinutes = timeline
+    }
+
     private func evaluateStructuredWorkout(
         _ workout: inout PhoneWorkout,
         forceManualAdvance: Bool = false,
@@ -3736,8 +3793,10 @@ final class IPhoneWorkoutStore:
             ]
 
         if !forceManualAdvance,
-           step.measure == .time,
-           plan.autoAdvanceTimedSteps == false { return }
+           (step.phase == "warmup" || step.phase == "cooldown" ||
+            (step.measure == .time && plan.autoAdvanceTimedSteps == false)) {
+            return
+        }
         guard forceManualAdvance || ATHLTHRunningStepEngine
             .isCompleted(
                 step: step,
@@ -3768,6 +3827,7 @@ final class IPhoneWorkoutStore:
             }
             return workout.elapsed(at: now)
         }()
+        recordRunningMinuteIfDue(&workout, force: true, at: now)
         let activeSeconds = max(0, endElapsed -
             (workout.structuredStepStartElapsedTime ?? 0))
         let segmentMeters = workout.distanceMeters -
@@ -4920,6 +4980,25 @@ final class IPhoneWorkoutStore:
                         .steps.count,
                 runningStepProgress:
                     runningStepProgress,
+                runningOverallProgress:
+                    runningStepProgress.flatMap { progress in
+                        workout.structuredRunningWorkout.map {
+                            ATHLTHRunningStepEngine.overallProgress(
+                                steps: $0.steps,
+                                index: workout.structuredStepIndex ?? 0,
+                                currentStepProgress: progress
+                            )
+                        }
+                    },
+                runningStepTargetTreadmillInclinePercent:
+                    currentStep?.targetTreadmillInclinePercent,
+                runningStepTargetPaceSecondsPerKilometer:
+                    currentStep?.targetPaceMinSecondsPerKilometer,
+                runningManualAdvanceRequired:
+                    currentStep.map { step in
+                        step.phase == "warmup" || step.phase == "cooldown" ||
+                        workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false
+                    },
                 runningNextStepTitle:
                     nextStepTitle,
                 runningStepRemainingSeconds:
