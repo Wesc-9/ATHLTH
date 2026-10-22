@@ -125,7 +125,7 @@ final class ATHLTHDetailedIntervalBuilderTests: XCTestCase {
         XCTAssertEqual(steps.last?.targetHeartRateZone, 1)
     }
 
-    func testPauseAfterWarmupIsIndependentTimedPhaseForPhoneAndWatch() {
+    func testManualWarmupFinishesBeforeExplicitMainStart() {
         var plan = template()
         plan.blocks.insert(RunningWorkoutBlock(
             kind: .recovery,
@@ -133,10 +133,31 @@ final class ATHLTHDetailedIntervalBuilderTests: XCTestCase {
             work: .time(90, intensity: .easy)
         ), at: 1)
         plan.autoAdvanceTimedSteps = false
+        // Manual main start replaces the obsolete timed preparation pause.
         let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
             from: plan, routeAlerts: .standard
         )
         XCTAssertEqual(transfer.autoAdvanceTimedSteps, false)
+        XCTAssertNotEqual(transfer.autoStartMainAfterWarmup, true)
+        XCTAssertEqual(transfer.steps[0].phase, "warmup")
+        XCTAssertEqual(transfer.steps[1].phase, "work")
+        XCTAssertFalse(transfer.steps.contains {
+            $0.title == "Pause før hoveddel"
+        })
+    }
+
+    func testAutomaticMainStartRetainsExplicitPreparationRecovery() {
+        var plan = template()
+        plan.blocks.insert(RunningWorkoutBlock(
+            kind: .recovery,
+            title: "Pause før hoveddel",
+            work: .time(90, intensity: .easy)
+        ), at: 1)
+        plan.autoStartMainAfterWarmup = true
+        let transfer = PlannedWorkoutWatchBuilder.runningTransfer(
+            from: plan, routeAlerts: .standard
+        )
+        XCTAssertEqual(transfer.autoStartMainAfterWarmup, true)
         XCTAssertEqual(transfer.steps[0].phase, "warmup")
         XCTAssertEqual(transfer.steps[1].phase, "recovery")
         XCTAssertEqual(transfer.steps[1].durationSeconds, 90)
