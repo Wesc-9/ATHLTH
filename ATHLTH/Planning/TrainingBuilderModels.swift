@@ -166,6 +166,8 @@ struct RunningStepTarget: Codable, Hashable {
     var distanceMeters: Double?
     var durationSeconds: TimeInterval?
     var intensity: RunningIntensityTarget
+    /// A prescribed treadmill setting, not a sensor measurement.
+    var treadmillInclinePercent: Double? = nil
 
     static func distance(
         _ meters: Double,
@@ -344,6 +346,10 @@ struct RunningWorkoutTemplate: Identifiable, Codable, Hashable {
     /// Nil preserves automatic progression for existing workout templates.
     /// When false, timed running phases advance via the athlete's Next action.
     var autoAdvanceTimedSteps: Bool? = nil
+    /// Optional per-interval spoken progress, independent of global distance/time cues.
+    var intervalCoachCueEverySeconds: TimeInterval? = nil
+    /// One spoken heads-up this many seconds before a timed interval ends.
+    var intervalCoachCountdownSeconds: TimeInterval? = nil
 
     /// Recalculates from every resolved drag and pause, including overrides.
     private var estimateSteps: [RunningStepTarget] {
