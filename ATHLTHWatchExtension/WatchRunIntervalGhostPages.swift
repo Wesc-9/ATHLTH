@@ -43,6 +43,17 @@ struct WatchRunIntervalFocusPage: View {
                         .lineLimit(2)
                         .minimumScaleFactor(0.8)
 
+                    if workout.awaitingMainStart {
+                        Label(ATHLTHLocalization.choose(
+                            english: "READY FOR MAIN SECTION",
+                            norwegian: "KLAR FOR HOVEDDEL"
+                        ), systemImage: "figure.run.circle.fill")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(WatchTheme.accentDeep)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .watchSurface(radius: 17)
+                    } else {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(metricTitle(readout))
                             .font(.system(size: 9, weight: .bold))
@@ -99,6 +110,7 @@ struct WatchRunIntervalFocusPage: View {
                     .accessibilityElement(children: .ignore)
                     .accessibilityLabel(metricTitle(readout))
                     .accessibilityValue(accessibleRemaining(readout))
+                    }
 
                     if let pace = targetPace(step) {
                         HStack(spacing: 6) {
@@ -213,17 +225,24 @@ struct WatchRunIntervalFocusPage: View {
                     }
 
                     if let workoutPlan = workout.structuredRunningWorkout,
-                       (step.phase == "warmup" || step.phase == "cooldown" ||
+                       (workout.awaitingMainStart ||
+                        (step.phase == "warmup" &&
+                         workoutPlan.autoStartMainAfterWarmup != true) ||
+                        step.phase == "cooldown" ||
                         workoutPlan.autoAdvanceTimedSteps == false),
                        workout.state == .running {
                         Button {
                             workout.advanceStructuredRunningWorkoutManually()
                         } label: {
                             Label(ATHLTHLocalization.choose(
-                                english: workout.nextStructuredRunningStep == nil
-                                    ? "Finish phase" : "Next phase",
-                                norwegian: workout.nextStructuredRunningStep == nil
-                                    ? "Avslutt del" : "Neste del"
+                                english: workout.awaitingMainStart
+                                    ? "Start main section" : step.phase == "warmup"
+                                    ? "End warm-up" : step.phase == "cooldown"
+                                    ? "End cool-down" : "Next phase",
+                                norwegian: workout.awaitingMainStart
+                                    ? "Start hoveddel" : step.phase == "warmup"
+                                    ? "Avslutt oppvarming" : step.phase == "cooldown"
+                                    ? "Avslutt nedjogging" : "Neste del"
                             ), systemImage: "arrow.right.circle.fill")
                                 .font(.system(size: 13, weight: .bold))
                                 .frame(maxWidth: .infinity, minHeight: 42)
