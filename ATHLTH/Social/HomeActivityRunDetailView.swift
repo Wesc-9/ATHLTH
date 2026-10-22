@@ -13,6 +13,7 @@ struct HomeActivityRunDetailView: View {
     @State private var detail: WorkoutDetail?
     @State private var aiInsight: WorkoutAIInsight?
     @State private var isLoadingDetail = false
+    @State private var hasResolvedDetail = false
     @State private var isLoadingAIInsight = false
     @State private var linkedRoute: TrainingRoute?
     @State private var linkedRouteAttempt: RouteAttemptRecord?
@@ -35,6 +36,7 @@ struct HomeActivityRunDetailView: View {
         _detail = State(
             initialValue: initialDetail
         )
+        _hasResolvedDetail = State(initialValue: initialDetail != nil)
         _aiInsight = State(
             initialValue: initialAIInsight
         )
@@ -316,7 +318,8 @@ struct HomeActivityRunDetailView: View {
 
                 ATHLTHWorkoutLocationSection(
                     workout: workout,
-                    hasRecordedGPS: routeCoordinates.count >= 2
+                    hasRecordedGPS: routeCoordinates.count >= 2,
+                    isLoadingGPS: !hasResolvedDetail
                 ) {
                     mapCard
                 }
@@ -1332,6 +1335,7 @@ struct HomeActivityRunDetailView: View {
                 )
             isLoadingDetail = false
         }
+        hasResolvedDetail = true
 
         if !isIndoorActivity {
             await loadRouteResultIfNeeded()
