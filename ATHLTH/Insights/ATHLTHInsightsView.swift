@@ -11,6 +11,9 @@ struct ATHLTHInsightsView: View {
     @State private var trendError: String?
     @State private var scenarioSessionsPerWeek = 4
     @State private var scenarioFocus: InsightsScenarioFocus = .consistency
+    // Compute history aggregates only when the Health workout snapshot changes,
+    // not every time SwiftUI recreates cards while the user scrolls.
+    @State private var sessionBaselines = InsightsSessionBaselines.empty
 
     var body: some View {
         let immersive =
@@ -20,7 +23,8 @@ struct ATHLTHInsightsView: View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
                 accent: ATHLTHTheme.accentDeep.opacity(0.62),
-                pullDownFadeBridge: true
+                pullDownFadeBridge: true,
+                lightweightScrolling: true
             ) {
                 ATHLTHTabHero(
                     imageName: "ProgressHero",
@@ -60,6 +64,12 @@ struct ATHLTHInsightsView: View {
             }
             .task {
                 await loadTrend()
+            }
+            .onReceive(health.$workouts) { workouts in
+                sessionBaselines = InsightsSessionBaselines.calculate(
+                    workouts: workouts,
+                    at: Date()
+                )
             }
         }
     }
@@ -964,39 +974,24 @@ struct ATHLTHInsightsView: View {
     }
 
     private var baselineSessionMinutes: Double {
-        let calendar = Calendar.current
-        let cutoff = calendar.date(
-            byAdding: .day,
-            value: -28,
-            to: Date()
-        ) ?? Date().addingTimeInterval(-2_419_200)
+        let cached = scenarioFocus == .consistency
+            ? sessionBaselines.allSessionMinutes
+            : sessionBaselines.runningSessionMinutes
 
-        let relevant = health.workouts.filter {
-            $0.startDate >= cutoff &&
-            (
-                scenarioFocus == .consistency ||
-                $0.activity == .running
+        if let cached {
+            return max(cached, 20)
+        }
+
+        if let snapshot = trendSnapshot,
+           snapshot.workoutCount > 0 {
+            return max(
+                (snapshot.trainingDuration / 60) /
+                    Double(snapshot.workoutCount),
+                20
             )
         }
 
-        guard !relevant.isEmpty else {
-            if let snapshot = trendSnapshot,
-               snapshot.workoutCount > 0 {
-                return max(
-                    (snapshot.trainingDuration / 60) /
-                        Double(snapshot.workoutCount),
-                    20
-                )
-            }
-
-            return 45
-        }
-
-        let totalMinutes = relevant.reduce(0.0) {
-            $0 + ($1.duration / 60)
-        }
-
-        return max(totalMinutes / Double(relevant.count), 20)
+        return 45
     }
 
     private var projectedWeeklyMinutes: Double {
@@ -1083,6 +1078,56 @@ struct ATHLTHInsightsView: View {
         }
 
         return "\(minutes)m"
+    }
+}
+
+/// Immutable O(n) session averages. Recomputed on published Health workouts,
+/// not on scroll/layout passes of the simulator card.
+struct InsightsSessionBaselines: Equatable {
+    let allSessionMinutes: Double?
+    let runningSessionMinutes: Double?
+
+    static let empty = InsightsSessionBaselines(
+        allSessionMinutes: nil,
+        runningSessionMinutes: nil
+    )
+
+    static func calculate(
+        workouts: [WorkoutSummary],
+        at date: Date,
+        calendar: Calendar = .current
+    ) -> InsightsSessionBaselines {
+        let cutoff = calendar.date(byAdding: .day, value: -28, to: date)
+            ?? date.addingTimeInterval(-2_419_200)
+
+        var allTotal = 0.0
+        var allCount = 0
+        var runningTotal = 0.0
+        var runningCount = 0
+
+        for workout in workouts {
+            guard workout.startDate >= cutoff,
+                  workout.startDate <= date,
+                  workout.duration.isFinite,
+                  workout.duration > 0 else {
+                continue
+            }
+
+            let minutes = workout.duration / 60
+            allCount += 1
+            allTotal += minutes
+            if workout.activity == .running {
+                runningCount += 1
+                runningTotal += minutes
+            }
+        }
+
+        return InsightsSessionBaselines(
+            allSessionMinutes: allCount > 0
+                ? allTotal / Double(allCount) : nil,
+            runningSessionMinutes: runningCount > 0
+                ? runningTotal / Double(runningCount) : nil
+        )
     }
 }
 
