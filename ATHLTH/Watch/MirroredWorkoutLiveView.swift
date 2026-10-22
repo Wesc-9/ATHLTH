@@ -5,6 +5,7 @@ struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var mirroring: WorkoutMirroringStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
@@ -13,6 +14,7 @@ struct MirroredWorkoutLiveView: View {
     @State private var treadmillInclineDraft = 0.0
     @State private var coachOutputName: String?
     @State private var showingAIConversation = false
+    @State private var showingAddRunningWorkout = false
 
     var body: some View {
         NavigationStack {
@@ -364,6 +366,18 @@ struct MirroredWorkoutLiveView: View {
                    snapshot.kind == .running || snapshot.kind == .walking {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
+                            Button {
+                                showingAddRunningWorkout = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Add interval workout",
+                                        norwegian: "Legg til intervalløkt"
+                                    ),
+                                    systemImage: "rectangle.stack.badge.plus"
+                                )
+                            }
+
                             if let incline = snapshot.treadmillInclinePercent {
                                 Button {
                                     treadmillInclineDraft = incline
@@ -432,6 +446,17 @@ struct MirroredWorkoutLiveView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showingAddRunningWorkout) {
+            ActiveHybridWorkoutPicker(runningOnly: true) { session, startNow in
+                guard let template = session.runningWorkout else {
+                    return false
+                }
+                return mirroring.appendRunningWorkout(
+                    template, startNow: startNow
+                )
+            }
+            .environmentObject(runningLibrary)
         }
         .sheet(isPresented: $showingAIConversation) {
             ATHLTHGroqVoiceCoachView(source: .mirroredWatchWorkout)
