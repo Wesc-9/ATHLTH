@@ -52,6 +52,9 @@ struct HomeAssistantSettingsView: View {
         .onChange(of: homeAssistant.shareWorkoutHistory) { _, _ in
             clearDisabledValues()
         }
+        .onChange(of: homeAssistant.shareStrengthProgress) { _, _ in
+            clearDisabledValues()
+        }
         .onChange(of: homeAssistant.shareRecovery) { _, _ in
             clearDisabledValues()
         }
@@ -379,6 +382,19 @@ struct HomeAssistantSettingsView: View {
                 ),
                 icon: "chart.bar.xaxis",
                 isOn: $homeAssistant.shareWorkoutHistory
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "Completed strength progression",
+                    norwegian: "Styrkeprogresjon · fullførte sett"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "Optionally shares best weight at each repetition count per exercise and finished workout, up to 60 records from 90 days. Excludes warmups, drafts and incomplete sets. Off by default.",
+                    norwegian: "Deler valgfritt beste registrerte vekt per repetisjonstall og øvelse fra avsluttede økter. Maks 60 resultater fra 90 dager. Ingen oppvarming eller ufullførte sett. Av som standard."
+                ),
+                icon: "dumbbell.fill",
+                isOn: $homeAssistant.shareStrengthProgress
             )
 
             sharingToggle(
