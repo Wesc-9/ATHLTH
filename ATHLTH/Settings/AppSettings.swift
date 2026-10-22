@@ -846,7 +846,7 @@ final class AppSettingsStore: ObservableObject {
             ) as? Int ?? 10
         audioCoachTimeIntervalSeconds = min(max(
             defaults.object(forKey: "settings.audioCoach.timeIntervalSeconds") as? Int ??
-            audioCoachTimeIntervalMinutes * 60,
+            ((defaults.object(forKey: "settings.audioCoach.timeIntervalMinutes") as? Int ?? 10) * 60),
             15
         ), 7_200)
         audioCoachAnnounceDistance =
