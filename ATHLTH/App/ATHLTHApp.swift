@@ -3365,7 +3365,7 @@ struct AppRootView: View {
             let runRecords = (try? await health.personalRecords()) ?? []
             let strengthRecords = strengthWorkout.repPersonalRecords
 
-            sharedPerformance += runRecords.map { record in
+            sharedPerformance += runRecords.sorted { $0.date > $1.date }.prefix(6).map { record in
                 HomeAssistantPerformanceRecordPayload(
                     id: "run-" + record.id,
                     title: record.kind.title,
@@ -3374,7 +3374,7 @@ struct AppRootView: View {
                     date: record.date
                 )
             }
-            sharedPerformance += strengthRecords.map { record in
+            sharedPerformance += strengthRecords.sorted { $0.date > $1.date }.prefix(6).map { record in
                 HomeAssistantPerformanceRecordPayload(
                     id: "strength-" + record.id,
                     title: record.title,
