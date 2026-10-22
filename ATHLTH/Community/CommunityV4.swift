@@ -1715,251 +1715,293 @@ private struct CommunityReferenceFriendsCard: View {
             totalPoints
     }
 
+    /// A compact premium Arena preview, not another official leaderboard.
+    /// The same completed-workout points are used in the detailed comparison.
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .firstTextBaseline) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 1
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Head-to-head",
-                            norwegian:
-                                "Head-to-head"
-                        )
-                    )
-                    .font(
-                        .headline.weight(
-                            .bold
-                        )
-                    )
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(spacing: 7) {
+                ATHLTHMarkShape()
+                    .fill(ATHLTHTheme.premiumGold)
+                    .frame(width: 25, height: 18)
+                    .accessibilityHidden(true)
 
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Activity points · last 7 days",
-                            norwegian:
-                                "Aktivitetspoeng · siste 7 dager"
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                }
+                Text("ATHLTH  /  ARENA")
+                    .font(.system(size: 10, weight: .heavy, design: .rounded))
+                    .tracking(1.3)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
 
-                Spacer()
+                Spacer(minLength: 6)
 
-                HStack(spacing: 4) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "See all",
-                            norwegian: "Se alle"
-                        )
-                    )
-                    Image(
-                        systemName:
-                            "chevron.right"
-                    )
-                }
-                .font(
-                    .caption.weight(
-                        .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.accentDeep
+                Text(ATHLTHLocalization.choose(
+                    english: "LAST 7 DAYS",
+                    norwegian: "SISTE 7 DAGER"
+                ))
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+                .tracking(0.8)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 7)
+                .background(
+                    ATHLTHTheme.champagneSoft.opacity(0.88),
+                    in: Capsule()
                 )
             }
 
-            if let topFriend {
-                HStack(
-                    alignment: .center,
-                    spacing: 8
-                ) {
-                    participant(
-                        name:
-                            ATHLTHLocalization.choose(
-                                english: "You",
-                                norwegian: "Deg"
-                            ),
-                        avatarURL:
-                            currentAvatarURL,
-                        fallback:
-                            currentDisplayName,
-                        points:
-                            currentActivityPoints,
-                        workouts:
-                            currentWorkoutCount,
-                        ringTint: ATHLTHTheme.premiumGold,
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Weekly rivalry",
+                        norwegian: "Ukens rival"
+                    ))
+                    .font(.system(size: 26, weight: .regular, design: .serif))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your activity compared with a friend",
+                        norwegian: "Din aktivitet sammenlignet med en venn"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        ATHLTHTheme.champagneSoft,
+                        in: Circle()
+                    )
+                    .accessibilityHidden(true)
+            }
+
+            if let rival = topFriend {
+                let rivalPoints = friendActivityPoints(rival)
+                let rivalWorkouts = friendWorkoutCount(rival)
+
+                HStack(alignment: .center, spacing: 5) {
+                    rivalParticipant(
+                        name: currentDisplayName.isEmpty
+                            ? ATHLTHLocalization.choose(
+                                english: "You", norwegian: "Deg"
+                            )
+                            : currentDisplayName,
+                        label: ATHLTHLocalization.choose(
+                            english: "YOU", norwegian: "DU"
+                        ),
+                        avatarURL: currentAvatarURL,
+                        highlight: true,
                         openProfile: { showOwnProfile = true }
                     )
 
-                    Text("VS")
-                        .font(
-                            .caption2.weight(
-                                .heavy
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-                        .frame(
-                            width: 34,
-                            height: 34
-                        )
-                        .background(
-                            Color.white,
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.black
-                                        .opacity(
-                                            0.07
-                                        ),
-                                    lineWidth: 1
-                                )
+                    VStack(spacing: 3) {
+                        Text("VS")
+                            .font(.system(
+                                size: 10, weight: .heavy, design: .rounded
+                            ))
+                            .tracking(2.0)
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+
+                        HStack(alignment: .firstTextBaseline, spacing: 4) {
+                            Text(String(format: "%.0f", currentActivityPoints))
+                            Text("–")
+                                .font(.system(size: 19, weight: .light))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            Text(String(format: "%.0f", rivalPoints))
                         }
+                        .font(.system(
+                            size: 27, weight: .heavy, design: .rounded
+                        ))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.55)
+                        .contentTransition(.numericText())
 
-                    participant(
-                        name:
-                            firstName(
-                                topFriend
-                                    .resolvedName
-                            ),
-                        avatarURL:
-                            topFriend
-                                .avatarURL
-                                .flatMap(URL.init(string:)),
-                        fallback:
-                            topFriend
-                                .resolvedName,
-                        points:
-                            friendActivityPoints(
-                                topFriend
-                            ),
-                        workouts:
-                            friendWorkoutCount(
-                                topFriend
-                            ),
-                        ringTint: ATHLTHTheme.accentDeep,
-                        openProfile: { selectedFriendProfile = topFriend }
+                        Text(ATHLTHLocalization.choose(
+                            english: "ACTIVITY POINTS",
+                            norwegian: "AKTIVITETSPOENG"
+                        ))
+                        .font(.system(size: 8, weight: .bold))
+                        .tracking(0.6)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .accessibilityElement(children: .combine)
+
+                    rivalParticipant(
+                        name: rival.resolvedName,
+                        label: ATHLTHLocalization.choose(
+                            english: "FRIEND", norwegian: "VENN"
+                        ),
+                        avatarURL: rival.avatarURL.flatMap(URL.init(string:)),
+                        highlight: false,
+                        openProfile: { selectedFriendProfile = rival }
                     )
                 }
+                .padding(.top, 3)
 
-                GeometryReader { proxy in
+                GeometryReader { geometry in
                     HStack(spacing: 0) {
-                        Capsule()
-                            .fill(
-                                ATHLTHTheme.premiumGold
-                                    .opacity(
-                                        0.78
-                                    )
-                            )
-                            .frame(
-                                width:
-                                    proxy.size.width *
-                                    currentShare
-                            )
-
-                        Capsule()
-                            .fill(
-                                ATHLTHTheme.accentDeep
-                                    .opacity(
-                                        0.72
-                                    )
-                            )
+                        ATHLTHTheme.premiumGold
+                            .frame(width: geometry.size.width * currentShare)
+                        ATHLTHTheme.accentDeep.opacity(0.28)
                     }
+                    .clipShape(Capsule())
                 }
-                .frame(height: 7)
-                .background(
-                    Color.black.opacity(0.06),
-                    in: Capsule()
-                )
-                .clipShape(Capsule())
+                .frame(height: 5)
+                .background(ATHLTHTheme.surfaceStone, in: Capsule())
+                .accessibilityHidden(true)
+
+                VStack(spacing: 4) {
+                    Text(rivalrySummary(rivalPoints))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .multilineTextAlignment(.center)
+
+                    HStack(spacing: 6) {
+                        Text(ATHLTHLocalization.format(
+                            english: "%d workouts",
+                            norwegian: "%d økter",
+                            currentWorkoutCount
+                        ))
+                        Text("·")
+                        Text(ATHLTHLocalization.format(
+                            english: "%d workouts for your friend",
+                            norwegian: "%d økter for vennen din",
+                            rivalWorkouts
+                        ))
+                    }
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                }
+                .frame(maxWidth: .infinity)
+
+                Rectangle()
+                    .fill(ATHLTHTheme.divider)
+                    .frame(height: 1)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "swords")
+                        .font(.subheadline.weight(.medium))
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Explore your matchup",
+                        norwegian: "Se sammenligningen"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+
+                    Spacer(minLength: 3)
+
+                    Image(systemName: "arrow.right")
+                        .font(.caption.weight(.bold))
+                }
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(minHeight: 28)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Open head-to-head activity comparison",
+                    norwegian: "Åpne Head-to-head aktivitetsammenligning"
+                ))
             } else {
-                HStack(spacing: 11) {
-                    Image(
-                        systemName:
-                            "person.2.badge.plus"
-                    )
-                    .font(.title3)
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-                    .frame(
-                        width: 42,
-                        height: 42
-                    )
-                    .background(
-                        ATHLTHTheme.accentSoft,
-                        in:
-                            RoundedRectangle(
-                                cornerRadius: 13,
-                                style:
-                                    .continuous
+                VStack(alignment: .leading, spacing: 13) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.2")
+                            .font(.system(size: 23, weight: .light))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 52, height: 52)
+                            .background(
+                                ATHLTHTheme.champagneSoft,
+                                in: RoundedRectangle(cornerRadius: 18)
                             )
-                    )
 
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Follow each other to compete",
-                                norwegian:
-                                    "Følg hverandre for å konkurrere"
-                            )
-                        )
-                        .font(
-                            .subheadline
-                                .weight(
-                                    .semibold
-                                )
-                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Your next rivalry starts here",
+                                norwegian: "Din neste rivalisering starter her"
+                            ))
+                            .font(.subheadline.weight(.bold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
 
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Mutual follows unlock head-to-head matchups.",
-                                norwegian:
-                                    "Gjensidig følge åpner head-to-head."
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
+                            Text(ATHLTHLocalization.choose(
+                                english: "Follow each other to compare training.",
+                                norwegian: "Følg hverandre for å sammenligne treningen."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
                     }
 
-                    Spacer()
+                    NavigationLink {
+                        SocialHubView(initialTab: .discover)
+                    } label: {
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Find friends",
+                                norwegian: "Finn venner"
+                            ))
+                            Spacer()
+                            Image(systemName: "arrow.right")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Activity comparison · Not an official duel result",
+                norwegian: "Aktivitetssammenligning · Ikke et offisielt duellresultat"
+            ))
+            .font(.system(size: 10))
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .multilineTextAlignment(.center)
         }
-        .padding(13)
-        .background(
-            Color.white.opacity(0.90),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
+        .padding(19)
+        .frame(maxWidth: .infinity)
+        .background {
+            RoundedRectangle(cornerRadius: 27, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [
+                        ATHLTHTheme.card,
+                        ATHLTHTheme.cardWarm.opacity(0.75),
+                        ATHLTHTheme.canvasTop
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 27, style: .continuous)
+                .stroke(
+                    ATHLTHTheme.premiumGold.opacity(0.28),
+                    lineWidth: 1
                 )
+        }
+        .shadow(
+            color: ATHLTHTheme.primaryText.opacity(0.055),
+            radius: 17,
+            y: 8
         )
-        .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
-        .onTapGesture { showDuel = true }
+        .contentShape(RoundedRectangle(cornerRadius: 27))
+        .onTapGesture {
+            if topFriend != nil { showDuel = true }
+        }
         .navigationDestination(isPresented: $showDuel) {
             CommunityFriendsVsFriendsDetailView(
                 currentUserID: currentUserID,
                 currentDisplayName: currentDisplayName,
                 currentAvatarURL: currentAvatarURL,
-                friends: friends
+                friends: friends,
+                initialFriendID: topFriend?.userID
             )
         }
         .navigationDestination(isPresented: $showOwnProfile) {
@@ -1968,90 +2010,79 @@ private struct CommunityReferenceFriendsCard: View {
         .navigationDestination(item: $selectedFriendProfile) { friend in
             FriendProfileView(userID: friend.userID)
         }
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 20,
-                style: .continuous
+    }
+
+    private func rivalrySummary(_ rivalPoints: Double) -> String {
+        switch CommunityMatchupVisualPolicy.standing(
+            mine: currentActivityPoints,
+            theirs: rivalPoints
+        ) {
+        case .leading:
+            return ATHLTHLocalization.choose(
+                english: "You've been more active this week",
+                norwegian: "Du har vært mest aktiv denne uken"
             )
-            .stroke(
-                Color.black.opacity(0.045),
-                lineWidth: 0.8
+        case .trailing:
+            return ATHLTHLocalization.choose(
+                english: "Your friend has been more active this week",
+                norwegian: "Vennen din har vært mest aktiv denne uken"
+            )
+        case .tied:
+            return currentActivityPoints <= 0
+                ? ATHLTHLocalization.choose(
+                    english: "No shared training this week",
+                    norwegian: "Ingen delt trening denne uken"
+                )
+                : ATHLTHLocalization.choose(
+                    english: "You're equally active this week",
+                    norwegian: "Dere er like aktive denne uken"
+                )
+        case .unavailable:
+            return ATHLTHLocalization.choose(
+                english: "Activity data is not available yet",
+                norwegian: "Aktivitetsdata er ikke tilgjengelig ennå"
             )
         }
     }
 
-    private func participant(
+    private func rivalParticipant(
         name: String,
+        label: String,
         avatarURL: URL?,
-        fallback: String,
-        points: Double,
-        workouts: Int,
-        ringTint: Color,
+        highlight: Bool,
         openProfile: @escaping () -> Void
     ) -> some View {
-        HStack(spacing: 9) {
+        VStack(spacing: 5) {
             CommunityReferenceAvatar(
                 url: avatarURL,
-                fallback: fallback,
-                size: 58
+                fallback: name,
+                size: 62
             )
-            .contentShape(Circle())
-            .highPriorityGesture(TapGesture().onEnded { openProfile() })
-            .accessibilityAddTraits(.isButton)
             .overlay {
                 Circle()
                     .stroke(
-                        ringTint.opacity(
-                            0.75
-                        ),
-                        lineWidth: 3
+                        highlight
+                            ? ATHLTHTheme.premiumGold.opacity(0.78)
+                            : ATHLTHTheme.accentDeep.opacity(0.20),
+                        lineWidth: 2
                     )
             }
+            .contentShape(Circle())
+            .highPriorityGesture(
+                TapGesture().onEnded { openProfile() }
+            )
+            .accessibilityAddTraits(.isButton)
 
-            VStack(
-                alignment: .leading,
-                spacing: 1
-            ) {
-                Text(name)
-                    .font(
-                        .caption.weight(
-                            .semibold
-                        )
-                    )
-                    .lineLimit(1)
+            Text(firstName(name))
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
 
-                Text(
-                    ATHLTHLocalization.format(
-                        english:
-                            "%d pts",
-                        norwegian:
-                            "%d poeng",
-                        Int(
-                            points.rounded()
-                        )
-                    )
-                )
-                .font(
-                    .headline.weight(
-                        .bold
-                    )
-                )
-                .monospacedDigit()
-
-                Text(
-                    ATHLTHLocalization.format(
-                        english:
-                            "%d workouts",
-                        norwegian:
-                            "%d økter",
-                        workouts
-                    )
-                )
-                .font(.caption2)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-            }
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .tracking(1)
+                .foregroundStyle(ATHLTHTheme.mutedText)
         }
         .frame(maxWidth: .infinity)
     }
