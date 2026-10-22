@@ -4002,6 +4002,123 @@ struct RecoverySorenessLogView: View {
     }
 }
 
+/// Lightweight contextual help for the readiness info icon. Unlike a sheet,
+/// this stays anchored to the tapped control even on compact iPhones.
+struct RecoveryMethodQuickInfoPopover: View {
+    let readMore: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 8) {
+                Image(systemName: "info.circle.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                Text(recoveryText(
+                    "How readiness is calculated",
+                    "Slik beregnes dagsformen"
+                ))
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Text(recoveryText(
+                "Your latest sleep, HRV and resting heart rate are compared with your own recent baseline.",
+                "Nyeste søvn, HRV og hvilepuls sammenlignes med din personlige grunnlinje."
+            ))
+            .font(.system(size: 13))
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Rectangle()
+                .fill(ATHLTHTheme.border)
+                .frame(height: 1)
+
+            VStack(spacing: 11) {
+                infoRow(
+                    icon: "moon.fill",
+                    title: recoveryText("Sleep", "Søvn"),
+                    weight: "45 %"
+                )
+                infoRow(
+                    icon: "waveform.path.ecg",
+                    title: "HRV",
+                    weight: "35 %"
+                )
+                infoRow(
+                    icon: "heart.fill",
+                    title: recoveryText("Resting HR", "Hvilepuls"),
+                    weight: "20 %"
+                )
+            }
+
+            Rectangle()
+                .fill(ATHLTHTheme.border)
+                .frame(height: 1)
+
+            Text(recoveryText(
+                "Baseline: last 14 days, with at least 5 days containing all three measurements.",
+                "Grunnlinje: siste 14 dager, med minst 5 dager som har alle tre målingene."
+            ))
+            .font(.system(size: 12))
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Button(action: readMore) {
+                HStack(spacing: 5) {
+                    Text(recoveryText(
+                        "Read more about readiness",
+                        "Les mer om dagsform"
+                    ))
+                    .font(.system(size: 13, weight: .semibold))
+                    Spacer(minLength: 5)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(minHeight: 38)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(16)
+        .frame(width: 306, alignment: .leading)
+        .background(ATHLTHTheme.card)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func infoRow(
+        icon: String,
+        title: String,
+        weight: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 28, height: 28)
+                .background(
+                    ATHLTHTheme.champagneSoft,
+                    in: RoundedRectangle(cornerRadius: 9)
+                )
+
+            Text(title)
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Spacer(minLength: 6)
+
+            Text(weight)
+                .font(.system(size: 13, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
 struct RecoveryMethodInfoView: View {
     @Environment(\.dismiss) private var dismiss
 
