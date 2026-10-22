@@ -49,6 +49,7 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var pauseAfterWarmupEnabled: Bool
     @State private var pauseAfterWarmupSeconds: Int
     @State private var autoAdvanceTimedSteps: Bool
+    @State private var autoStartMainAfterWarmup: Bool
     @State private var coachIntervalEnabled: Bool
     @State private var coachIntervalSeconds: Int
     @State private var coachCountdownEnabled: Bool
@@ -79,6 +80,7 @@ struct ATHLTHTrainIntervalComposerView: View {
             max(15, Int(warmupPause?.work.durationSeconds ?? 90)))
         _autoAdvanceTimedSteps = State(initialValue:
             initial?.autoAdvanceTimedSteps ?? true)
+        _autoStartMainAfterWarmup = State(initialValue: initial?.autoStartMainAfterWarmup == true)
         _coachIntervalEnabled = State(initialValue: initial?.intervalCoachCueEverySeconds != nil)
         _coachIntervalSeconds = State(initialValue: Int(initial?.intervalCoachCueEverySeconds ?? 60))
         _coachCountdownEnabled = State(initialValue: initial?.intervalCoachCountdownSeconds != nil)
@@ -556,12 +558,22 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .tracking(1.4)
                 .foregroundStyle(bronze)
 
+            Toggle(tr("Start main section automatically after warm-up", "Start hoveddelen automatisk etter oppvarming"),
+                   isOn: $autoStartMainAfterWarmup)
+                .tint(ATHLTHPlanDesign.accentInk)
+            Text(tr(
+                "Default: End warm-up, then press Start main section. Automatic mode starts at the planned warm-up time.",
+                "Standard: Avslutt oppvarming, og trykk deretter Start hoveddel. Automatisk starter ved planlagt oppvarmingstid."
+            ))
+            .font(.caption)
+            .foregroundStyle(muted)
+
             Toggle(tr("Automatically advance timed phases", "Automatisk neste ved tidsstyrte deler"),
                    isOn: $autoAdvanceTimedSteps)
                 .tint(ATHLTHPlanDesign.accentInk)
             Text(tr(
-                "Work intervals and recoveries can advance automatically. Warm-up and cool-down always wait for Next. Turn this off to advance every phase manually.",
-                "Hoveddel og pauser kan gå automatisk. Oppvarming og nedjogging avsluttes alltid med Neste. Slå av for manuell styring av alle deler."
+                "Work intervals and recoveries normally advance automatically. Warm-up waits for End warm-up unless automatic main start is enabled. Cool-down ends manually.",
+                "Drag og pauser går normalt automatisk. Oppvarming avsluttes med knappen med mindre automatisk start er valgt. Nedjogging avsluttes manuelt."
             ))
             .font(.caption)
             .foregroundStyle(muted)
@@ -818,6 +830,7 @@ struct ATHLTHTrainIntervalComposerView: View {
             updatedAt: now
         )
         result.autoAdvanceTimedSteps = autoAdvanceTimedSteps
+        result.autoStartMainAfterWarmup = autoStartMainAfterWarmup
         result.intervalCoachCueEverySeconds = coachIntervalEnabled
             ? TimeInterval(coachIntervalSeconds) : nil
         result.intervalCoachCountdownSeconds = coachCountdownEnabled
