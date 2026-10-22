@@ -2161,6 +2161,7 @@ final class IPhoneWorkoutStore:
         startNow: Bool
     ) -> Bool {
         guard var workout = active,
+              !workout.walking,
               !saving,
               workout.resumedAt != nil else { return false }
 
