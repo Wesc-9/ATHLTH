@@ -11,6 +11,7 @@ final class StrengthAudioCoachSpeaker:
     private let synthesizer =
         AVSpeechSynthesizer()
     private let azureSpeech = ATHLTHAzureWorkoutSpeech()
+    private let audioOwner = "strength-\(UUID().uuidString)"
     private var cueQueue = ATHLTHCoachCueQueue()
     private var eventLedger = ATHLTHCoachEventLedger()
     private var latestConfiguration: StrengthAudioCoachConfiguration?
@@ -248,11 +249,11 @@ final class StrengthAudioCoachSpeaker:
     }
 
     private func activateLocalAudio(duck: Bool) {
-        try? ATHLTHSpokenAudioSession.activate(duckOtherAudio: duck)
+        try? ATHLTHSpokenAudioSession.activate(duckOtherAudio: duck, owner: audioOwner)
     }
 
     private func deactivateAudioSession() {
         ATHLTHSpokenAudioSession
-            .deactivate()
+            .deactivate(owner: audioOwner)
     }
 }
