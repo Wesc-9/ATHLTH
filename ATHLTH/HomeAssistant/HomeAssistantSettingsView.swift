@@ -49,6 +49,9 @@ struct HomeAssistantSettingsView: View {
         .onChange(of: homeAssistant.shareCompletedWorkouts) { _, _ in
             clearDisabledValues()
         }
+        .onChange(of: homeAssistant.shareWorkoutHistory) { _, _ in
+            clearDisabledValues()
+        }
         .onChange(of: homeAssistant.shareRecovery) { _, _ in
             clearDisabledValues()
         }
@@ -361,6 +364,21 @@ struct HomeAssistantSettingsView: View {
                 ),
                 icon: "person.crop.circle",
                 isOn: $homeAssistant.shareAthleteProfile
+            )
+
+            sharingToggle(
+                title: ATHLTHLocalization.choose(
+                    english: "90-day workout history",
+                    norwegian: "Treningshistorikk · 90 dager"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english:
+                        "Optionally sends up to 90 Apple Health workout summaries from the last 90 days. Includes activity, time, distance and energy; no GPS. Values from Health may be manually entered or estimated. Off by default.",
+                    norwegian:
+                        "Deler valgfritt opptil 90 øktsammendrag fra Apple Health de siste 90 dagene. Aktivitet, tid, distanse og energi – aldri GPS. Health-verdier kan være manuelle eller estimerte. Av som standard."
+                ),
+                icon: "chart.bar.xaxis",
+                isOn: $homeAssistant.shareWorkoutHistory
             )
 
             sharingToggle(
