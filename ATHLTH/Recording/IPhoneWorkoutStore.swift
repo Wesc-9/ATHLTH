@@ -2137,7 +2137,9 @@ final class IPhoneWorkoutStore:
                 }
                 // Use authoritative active time, not a second timer.
                 if step.measure == .time,
-                   (current.structuredRunningWorkout?.autoAdvanceTimedSteps ?? true),
+                   (step.phase == "warmup"
+                      ? current.structuredRunningWorkout?.autoStartMainAfterWarmup == true
+                      : (current.structuredRunningWorkout?.autoAdvanceTimedSteps ?? true)),
                    let duration = step.durationSeconds,
                    elapsed - (current.structuredStepStartElapsedTime ?? 0) >= duration {
                     self.checkpoint(force: true)
@@ -2287,7 +2289,8 @@ final class IPhoneWorkoutStore:
         at date: Date = Date()
     ) -> Double {
         guard let workout = active,
-              let step = currentStructuredStep
+              let step = currentStructuredStep,
+              workout.awaitingMainStart != true
         else {
             return 0
         }
@@ -4996,7 +4999,8 @@ final class IPhoneWorkoutStore:
         }
         let runningStepProgress =
             currentStep.map {
-                ATHLTHRunningStepEngine
+                if workout.awaitingMainStart == true { return 0.0 }
+                return ATHLTHRunningStepEngine
                     .progress(
                         step: $0,
                         elapsedTime:
