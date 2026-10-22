@@ -363,7 +363,7 @@ struct MirroredWorkoutLiveView: View {
                 // unimplemented second workout recorder from this screen.
                 if let snapshot = mirroring.snapshot,
                    mirroring.hasActiveMirroredWorkout,
-                   snapshot.kind == .running || snapshot.kind == .walking {
+                   snapshot.kind == .running {
                     ToolbarItem(placement: .topBarTrailing) {
                         Menu {
                             Button {
