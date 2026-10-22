@@ -1,4 +1,5 @@
 import Foundation
+import CoreLocation
 import SwiftUI
 
 /// One source of truth for how a completed workout is presented.
@@ -15,6 +16,24 @@ enum ATHLTHWorkoutLocationMode: Equatable {
 }
 
 enum ATHLTHWorkoutExperienceEngine {
+    /// Reject corrupt Apple Health route points before using them to
+    /// decide whether a recorded map is available. Never infer a GPS track
+    /// from elapsed time, distance or the activity name.
+    static func hasValidGPSLocation(in detail: WorkoutDetail) -> Bool {
+        if detail.route.contains(where: { isValidCoordinate($0.coordinate) }) {
+            return true
+        }
+        return detail.workoutLocation.map {
+            isValidCoordinate($0.coordinate)
+        } ?? false
+    }
+
+    static func isValidCoordinate(_ coordinate: CLLocationCoordinate2D) -> Bool {
+        CLLocationCoordinate2DIsValid(coordinate) &&
+        coordinate.latitude.isFinite &&
+        coordinate.longitude.isFinite
+    }
+
     static func locationMode(
         activity: WorkoutActivity,
         isIndoor: Bool?,
