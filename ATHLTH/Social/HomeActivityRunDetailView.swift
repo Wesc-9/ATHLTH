@@ -338,7 +338,10 @@ struct HomeActivityRunDetailView: View {
                 if let intervals = structuredIntervalResult {
                     ATHLTHIntervalResultSummaryCard(
                         performance: intervals,
-                        athleteMaximumBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
+                        athleteMaximumBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init),
+                        measuredHeartRate: measuredPulse,
+                        workoutStartDate: workout.startDate,
+                        workoutEndDate: workout.endDate
                     )
                 }
 
