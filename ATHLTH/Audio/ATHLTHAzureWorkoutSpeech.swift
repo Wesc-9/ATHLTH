@@ -39,7 +39,8 @@ final class ATHLTHAzureWorkoutSpeech:
         let audioBase64: String
     }
 
-    private var audio: AVAudioPlayer?
+    private var audio: AVAudioPlayer?    private let audioOwner = "azure-\(UUID().uuidString)"
+
     private var requestTask: Task<Void, Never>?
     private var timeoutTask: Task<Void, Never>?
     private var identity = UUID()
@@ -103,7 +104,8 @@ final class ATHLTHAzureWorkoutSpeech:
                 guard self.identity == generation else { return }
                 do {
                     try ATHLTHSpokenAudioSession.activate(
-                        duckOtherAudio: duckMusic
+                        duckOtherAudio: duckMusic,
+                        owner: audioOwner
                     )
                     self.ownsAudioSession = true
                     player.delegate = self
@@ -148,7 +150,7 @@ final class ATHLTHAzureWorkoutSpeech:
         audio?.stop()
         audio = nil
         if ownsAudioSession {
-            ATHLTHSpokenAudioSession.deactivate()
+            ATHLTHSpokenAudioSession.deactivate(owner: audioOwner)
             ownsAudioSession = false
         }
         isBusy = false
