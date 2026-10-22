@@ -1,4 +1,5 @@
 import XCTest
+import CoreLocation
 @testable import ATHLTH
 
 final class ATHLTHWorkoutExperienceEngineTests: XCTestCase {
@@ -60,6 +61,24 @@ final class ATHLTHWorkoutExperienceEngineTests: XCTestCase {
         XCTAssertEqual(mode(.other, nil), .noLocation)
         XCTAssertEqual(mode(.strength, false), .noLocation)
         XCTAssertEqual(mode(.strength, false, gps: true), .recordedGPSMap)
+    }
+
+    func testGPSValidityRejectsImpossibleOrMissingCoordinates() {
+        XCTAssertTrue(
+            ATHLTHWorkoutExperienceEngine.isValidCoordinate(
+                CLLocationCoordinate2D(latitude: 60.795, longitude: 11.068)
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHWorkoutExperienceEngine.isValidCoordinate(
+                CLLocationCoordinate2D(latitude: 104, longitude: 11)
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHWorkoutExperienceEngine.isValidCoordinate(
+                CLLocationCoordinate2D(latitude: .nan, longitude: 11)
+            )
+        )
     }
 
     func testLegacyPlaceEligibilityDelegatesToOneRuleEngine() {
