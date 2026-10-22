@@ -14,12 +14,14 @@ struct HomeActivityStrengthDetailView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var health: HealthKitManager
 
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
 
     @State private var aiInsight: WorkoutAIInsight?
     @State private var isLoadingAIInsight = false
+    @State private var recordedGPSDetail: WorkoutDetail?
     @State private var showingRestFlowDetails = false
     @State private var editingSetResult:
         StrengthSetResultEditTarget?
@@ -82,6 +84,21 @@ struct HomeActivityStrengthDetailView: View {
             VStack(spacing: 16) {
                 workoutHeroCard
 
+                // Same location presentation engine as run/treadmill/history.
+                // Indoor strength shows a private venue check-in, not a map.
+                ATHLTHWorkoutLocationSection(
+                    workout: workout,
+                    hasRecordedGPS: recordedGPSDetail?.route.isEmpty == false ||
+                        recordedGPSDetail?.workoutLocation != nil
+                ) {
+                    if let recordedGPSDetail {
+                        WorkoutLocationMapCard(
+                            detail: recordedGPSDetail,
+                            activity: workout.activity
+                        )
+                    }
+                }
+
                 overviewCard
 
                 // The finished-workout muscle map was previously defined
@@ -137,6 +154,14 @@ struct HomeActivityStrengthDetailView: View {
         )
         .task(id: workout.id) {
             await loadCoachInsight()
+        }
+        .task(id: workout.id) {
+            // Indoor strength needs neither GPS access nor a HealthKit route
+            // fetch. Outdoor/unknown strength can reuse saved route evidence.
+            recordedGPSDetail = nil
+            if workout.isIndoor != true {
+                recordedGPSDetail = await health.workoutDetail(for: workout.id)
+            }
         }
         .sheet(
             item: $editingSetResult
