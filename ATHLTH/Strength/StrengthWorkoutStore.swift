@@ -2218,18 +2218,11 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
-    func start(
-        session: PlannedSession,
-        watchSessionID: UUID?,
-        trackingMode: StrengthTrackingMode,
-        captureDevice: WorkoutCaptureDevice,
-        advancedConfiguration:
-            StrengthAdvancedConfiguration? = nil
-    ) {
-        recoveredCheckpointSavedAt = nil
-        cardioWatchCaptures = [:]
-        watchCaptureNeedsBaseline = []
-        let exerciseLogs = session.exercises.map { planned in
+    /// Session composition uses the same set model as starting a workout;
+    /// appending never creates a second HKWorkoutSession/HealthKit entry.
+    private static func strengthExerciseLogs(from session: PlannedSession)
+        -> [StrengthExerciseLog] {
+        return session.exercises.map { planned in
             let setTargets =
                 planned.resolvedSetTargets
 
@@ -2293,6 +2286,108 @@ final class StrengthWorkoutStore: ObservableObject {
                     planned.targetHeartRateZone
             )
         }
+
+    }
+
+    /// Append a complete saved workout while preserving the existing active
+    /// recording, captured sets, Watch workout ID and original training plan.
+    /// Timed run/recovery blocks become one embedded interval exercise with
+    /// phase-specific goals. No GPS or distance is invented for a treadmill.
+    @discardableResult
+    func appendWorkoutDuringSession(_ session: PlannedSession) -> Bool {
+        guard var workout = activeWorkout else { return false }
+
+        var additions = Self.strengthExerciseLogs(from: session)
+        for idx in additions.indices {
+            additions[idx].appendedWorkoutID = session.id
+            additions[idx].appendedWorkoutTitle = session.title
+        }
+
+        let runBlocks = ATHLTHUnifiedWorkout.editorBlocks(from: session)
+            .filter { $0.kind == .run || $0.kind == .rest }
+        if !runBlocks.isEmpty {
+            // A distance-only workout cannot be executed using the
+            // duration countdown; refuse it instead of silently skipping.
+            guard runBlocks.allSatisfy({
+                $0.durationSeconds.map { $0.isFinite && $0 >= 15 } == true
+            }) else { return false }
+
+            let snapshots = ExerciseSnapshot(
+                name: "Treadmill Running",
+                instructions: [],
+                primaryMuscles: ["Quadriceps", "Gastrocnemius"],
+                equipment: ["Treadmill"],
+                imageURL: nil
+            )
+            let sets: [StrengthSetLog] = runBlocks.enumerated().map { i, block in
+                StrengthSetLog(
+                    id: UUID(),
+                    setNumber: i + 1,
+                    plannedReps: nil,
+                    plannedWeightKilograms: nil,
+                    completedReps: nil,
+                    completedWeightKilograms: nil,
+                    rpe: nil,
+                    completedAt: nil,
+                    restSeconds: 0,
+                    isWarmUp: block.phase == .warmup,
+                    targetKind: .time,
+                    plannedDurationSeconds: min(
+                        max(Int(block.durationSeconds!.rounded()), 15),
+                        7_200
+                    ),
+                    recordsWeight: false,
+                    loadKind: .weightKilograms,
+                    hybridPhaseTitle: block.title,
+                    hybridPhaseKind: String(describing: block.phase),
+                    hybridTargetHeartRateZone: block.targetHeartRateZone,
+                    hybridTargetPaceSecondsPerKilometer:
+                        block.targetPaceSecondsPerKilometer
+                )
+            }
+            additions.append(StrengthExerciseLog(
+                id: UUID(),
+                plannedExerciseID: nil,
+                exercise: snapshots,
+                sets: sets,
+                completedAt: nil,
+                appendedWorkoutTitle: session.title,
+                appendedWorkoutID: session.id,
+                isEmbeddedRunningInterval: true
+            ))
+        }
+
+        guard !additions.isEmpty else { return false }
+        finalizeActualRestIfNeeded()
+        let shouldFocus = workout.exercises.isEmpty ||
+            workout.exercises.allSatisfy(.isCompleted)
+        let firstNew = workout.exercises.count
+        workout.exercises.append(contentsOf: additions)
+        activeWorkout = workout
+        isFreeTrainingBetweenExercises = false
+        if shouldFocus {
+            currentExerciseIndex = firstNew
+            currentSetIndex = 0
+            restStartedAt = nil
+            restEndsAt = nil
+            reloadDraftFromCurrentSet()
+        }
+        persistCheckpointNow()
+        return true
+    }
+
+    func start(
+        session: PlannedSession,
+        watchSessionID: UUID?,
+        trackingMode: StrengthTrackingMode,
+        captureDevice: WorkoutCaptureDevice,
+        advancedConfiguration:
+            StrengthAdvancedConfiguration? = nil
+    ) {
+        recoveredCheckpointSavedAt = nil
+        cardioWatchCaptures = [:]
+        watchCaptureNeedsBaseline = []
+        let exerciseLogs = Self.strengthExerciseLogs(from: session)
 
         var launchedWorkout = StrengthWorkoutLog(
             id: UUID(),
