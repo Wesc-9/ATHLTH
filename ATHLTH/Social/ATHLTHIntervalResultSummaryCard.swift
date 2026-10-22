@@ -6,6 +6,7 @@ import Charts
 struct ATHLTHIntervalResultSummaryCard: View {
     let performance: ATHLTHCompletedRunningPerformance
     @State private var showSupportingPhases = false
+    @State private var showMinuteBreakdown = false
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -74,6 +75,23 @@ struct ATHLTHIntervalResultSummaryCard: View {
         return "\(Int(mean.rounded())) bpm"
     }
 
+    private var sampledWorkPulse: String? {
+        let workIndices = Set(work.map(\.index))
+        let pulse = (performance.minutes ?? [])
+            .filter { workIndices.contains($0.stepIndex) }
+            .compactMap { $0.watchHeartRateBPM }
+            .filter { $0.isFinite && $0 > 0 }
+        guard !pulse.isEmpty else { return nil }
+        return "\(Int((pulse.reduce(0, +) / Double(pulse.count)).rounded())) bpm"
+    }
+
+    private var detailedSamples: [ATHLTHRecordedRunningMinute] {
+        let phaseIndices = Set((work + recovery).map(\.index))
+        return (performance.minutes ?? []).filter {
+            phaseIndices.contains($0.stepIndex) && $0.activeSeconds > 0
+        }
+    }
+
     private var evenness: String? {
         guard let fastest, let slowest, fastest > 0,
               work.count >= 2 else { return nil }
@@ -112,6 +130,14 @@ struct ATHLTHIntervalResultSummaryCard: View {
                     Spacer(minLength: 0)
                     headline(tr("RECOVERY TIME", "PAUSETID"),
                              value: duration(recoverySeconds))
+                }
+
+                if let pulse = sampledWorkPulse {
+                    Label(tr("Observed heart rate in the main section",
+                             "Registrert puls i hoveddelen") + " · " + pulse,
+                          systemImage: "heart.fill")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
 
                 if work.count >= 2 {
@@ -196,6 +222,49 @@ struct ATHLTHIntervalResultSummaryCard: View {
                     if number < work.count - 1 {
                         Rectangle().fill(ATHLTHPlanDesign.warmDivider).frame(height: 0.5)
                     }
+                }
+
+                if !detailedSamples.isEmpty {
+                    DisclosureGroup(
+                        tr("Minute-by-minute interval data", "Intervallene minutt for minutt"),
+                        isExpanded: $showMinuteBreakdown
+                    ) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(Array(detailedSamples.enumerated()), id: \.offset) { _, sample in
+                                VStack(alignment: .leading, spacing: 3) {
+                                    HStack {
+                                        Text(tr("Phase", "Del") + " \(sample.stepIndex + 1) · " +
+                                            duration(sample.stepElapsedAtEndSeconds))
+                                            .font(.caption.weight(.medium))
+                                        Spacer()
+                                        Text(sample.activeSeconds > 0
+                                             ? speed(sample.recordedDistanceMeters * 3.6 /
+                                                     sample.activeSeconds)
+                                             : "—")
+                                            .font(.caption.weight(.semibold))
+                                    }
+                                    HStack(spacing: 7) {
+                                        if let bpm = sample.watchHeartRateBPM {
+                                            Text("\(Int(bpm.rounded())) bpm")
+                                        }
+                                        if let target = sample.targetPaceSecondsPerKilometer,
+                                           target > 0 {
+                                            Text(tr("Target", "Mål") + " " +
+                                                speed(3_600 / target))
+                                        }
+                                        if let incline = sample.manuallyEnteredTreadmillInclinePercent {
+                                            Text(tr("Entered incline", "Oppgitt stigning") +
+                                                 String(format: " %.1f %%", incline))
+                                        }
+                                    }
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                            }
+                        }
+                        .padding(.top, 7)
+                    }
+                    .font(.subheadline.weight(.medium))
                 }
 
                 if !supporting.isEmpty {
