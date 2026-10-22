@@ -1036,6 +1036,7 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var autoPauseEnabled: Bool? = nil
     /// Automatic timed-step progression is the existing default for old plans.
     var autoAdvanceTimedSteps: Bool? = nil
+    var autoStartMainAfterWarmup: Bool? = nil
     var intervalCoachCueEverySeconds: TimeInterval? = nil
     var intervalCoachCountdownSeconds: TimeInterval? = nil
 }
@@ -1500,6 +1501,7 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepTargetTreadmillInclinePercent: Double? = nil
     var runningStepTargetPaceSecondsPerKilometer: Double? = nil
     var runningManualAdvanceRequired: Bool? = nil
+    var runningAwaitingMainStart: Bool? = nil
     var runningStepElapsedSeconds: TimeInterval? = nil
     var runningIntervalCoachCueEverySeconds: TimeInterval? = nil
     var runningIntervalCoachCountdownSeconds: TimeInterval? = nil
@@ -1748,6 +1750,7 @@ struct WatchWorkoutMirrorCommand: Codable, Hashable {
     var runningWorkoutStartImmediately: Bool? = nil
     /// Expected phase when advancing manually: repeated/stale taps cannot skip a second step.
     var expectedRunningStepIndex: Int? = nil
+    var startMainAfterWarmup: Bool? = nil
     var commandID: UUID? = nil
 }
 
