@@ -1718,7 +1718,7 @@ private struct CommunityReferenceFriendsCard: View {
     /// A compact premium Arena preview, not another official leaderboard.
     /// The same completed-workout points are used in the detailed comparison.
     var body: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 7) {
                 ATHLTHMarkShape()
                     .fill(ATHLTHTheme.premiumGold)
@@ -1888,7 +1888,7 @@ private struct CommunityReferenceFriendsCard: View {
                     .frame(height: 1)
 
                 HStack(spacing: 8) {
-                    Image(systemName: "swords")
+                    Image(systemName: "bolt.horizontal.fill")
                         .font(.subheadline.weight(.medium))
 
                     Text(ATHLTHLocalization.choose(
@@ -1957,8 +1957,8 @@ private struct CommunityReferenceFriendsCard: View {
             }
 
             Text(ATHLTHLocalization.choose(
-                english: "Activity comparison · Not an official duel result",
-                norwegian: "Aktivitetssammenligning · Ikke et offisielt duellresultat"
+                english: "Visible training data · Not an official duel result",
+                norwegian: "Synlige treningsdata · Ikke et offisielt duellresultat"
             ))
             .font(.system(size: 10))
             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -2019,13 +2019,13 @@ private struct CommunityReferenceFriendsCard: View {
         ) {
         case .leading:
             return ATHLTHLocalization.choose(
-                english: "You've been more active this week",
-                norwegian: "Du har vært mest aktiv denne uken"
+                english: "You lead this activity comparison",
+                norwegian: "Du leder aktivitetssammenligningen"
             )
         case .trailing:
             return ATHLTHLocalization.choose(
-                english: "Your friend has been more active this week",
-                norwegian: "Vennen din har vært mest aktiv denne uken"
+                english: "Your friend leads this activity comparison",
+                norwegian: "Vennen din leder aktivitetssammenligningen"
             )
         case .tied:
             return currentActivityPoints <= 0
@@ -2034,8 +2034,8 @@ private struct CommunityReferenceFriendsCard: View {
                     norwegian: "Ingen delt trening denne uken"
                 )
                 : ATHLTHLocalization.choose(
-                    english: "You're equally active this week",
-                    norwegian: "Dere er like aktive denne uken"
+                    english: "You have the same visible activity score",
+                    norwegian: "Dere har like mange synlige aktivitetspoeng"
                 )
         case .unavailable:
             return ATHLTHLocalization.choose(
