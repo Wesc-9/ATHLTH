@@ -1464,6 +1464,10 @@ struct AppRootView: View {
         .onChange(of: homeAssistant.shareAthleteProfile) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
         }
+        .onChange(of: homeAssistant.supportsAthleteSnapshot) { _, supported in
+            guard supported else { return }
+            Task { await syncHomeAssistantSnapshot() }
+        }
         .onChange(of: homeAssistant.shareMilestoneEvents) { _, _ in
             Task { await syncHomeAssistantSnapshot() }
         }
