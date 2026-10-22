@@ -211,13 +211,41 @@ enum ATHLTHSpokenAudioSession {
         revision += 1
 
         if !owners.isEmpty {
-            // If the last ducking owner finished but a mixing voice remains,
-            // remove .duckOthers without deactivating that remaining voice.
-            try? configure(AVAudioSession.sharedInstance())
+            // When a ducking voice ends while a non-ducking voice still
+            // speaks, reconfigure without .duckOthers. iOS may reject this
+            // during a Bluetooth handoff, so retry without interrupting the
+            // remaining speaker.
+            reconfigureRemainingOwners(generation: revision)
             return
         }
 
         restoreIfIdle(generation: revision)
+    }
+
+    private static func reconfigureRemainingOwners(generation: Int) {
+        delayedRestoreTask?.cancel()
+        delayedRestoreTask = nil
+        do {
+            try configure(AVAudioSession.sharedInstance())
+        } catch {
+            delayedRestoreTask = Task { @MainActor in
+                // Retry while active, but only for the matching voice
+                // generation; never override a newer coach lease.
+                for _ in 0..<18 {
+                    do { try await Task.sleep(for: .seconds(2)) }
+                    catch { return }
+                    guard !Task.isCancelled,
+                          !owners.isEmpty,
+                          revision == generation else { return }
+                    do {
+                        try configure(AVAudioSession.sharedInstance())
+                        delayedRestoreTask = nil
+                        return
+                    } catch { continue }
+                }
+                delayedRestoreTask = nil
+            }
+        }
     }
 
     private static func restoreIfIdle(generation: Int) {
@@ -260,8 +288,25 @@ enum ATHLTHSpokenAudioSession {
                         continue
                     }
                 }
-                // Still blocked by iOS. Route/interruption notifications will
-                // trigger an additional restore attempt when conditions change.
+                // Bluetooth can stay in a failed handoff for longer than
+                // this initial retry window. Continue at low frequency until
+                // iOS accepts notifyOthersOnDeactivation or a new voice starts.
+                while !Task.isCancelled,
+                      owners.isEmpty,
+                      revision == generation {
+                    do { try await Task.sleep(for: .seconds(15)) }
+                    catch { return }
+                    guard !Task.isCancelled,
+                          owners.isEmpty,
+                          revision == generation else { return }
+                    do {
+                        try session.setActive(
+                            false, options: .notifyOthersOnDeactivation
+                        )
+                        delayedRestoreTask = nil
+                        return
+                    } catch { continue }
+                }
                 delayedRestoreTask = nil
             }
         }
