@@ -4043,6 +4043,34 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    /// Measured heart-rate timeline for a single completed workout.
+    /// A failed/denied HealthKit read returns no points, never simulated data.
+    func runningHeartRateTimeline(for workoutID: UUID)
+        async -> [ATHLTHRunningHeartRatePoint] {
+        let workout: HKWorkout?
+        if let cached = workoutObjects[workoutID] {
+            workout = cached
+        } else {
+            workout = try? await workoutForChallenge(uuid: workoutID)
+            if let workout { cacheWorkoutObject(workout) }
+        }
+        guard let workout else { return [] }
+        let samples = (try? await fetchHeartRateSamplesForInsight(
+            for: workout
+        )) ?? []
+        let unit = HKUnit.count().unitDivided(by: .minute())
+        let points = samples.compactMap { sample -> ATHLTHRunningHeartRatePoint? in
+            let bpm = sample.quantity.doubleValue(for: unit)
+            guard bpm.isFinite, (30...240).contains(bpm),
+                  sample.startDate >= workout.startDate,
+                  sample.startDate <= workout.endDate else { return nil }
+            return ATHLTHRunningHeartRatePoint(date: sample.startDate, bpm: bpm)
+        }
+        return ATHLTHRunningHeartRateAnalysis.validPoints(
+            points, from: workout.startDate, through: workout.endDate
+        )
+    }
+
     private func fetchHeartRateSamplesForInsight(
         for workout: HKWorkout
     ) async throws -> [HKQuantitySample] {
