@@ -2,7 +2,6 @@ import Foundation
 import XCTest
 @testable import ATHLTH
 
-@MainActor
 final class HybridStrengthRunningSessionTests: XCTestCase {
     private func emptyStrengthPlan() -> PlannedSession {
         PlannedSession(
@@ -28,6 +27,7 @@ final class HybridStrengthRunningSessionTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testFourByFourAppendsNinePhasesUnderOneWorkoutID() throws {
         let store = StrengthWorkoutStore()
         let watchSessionID = UUID()
@@ -55,6 +55,7 @@ final class HybridStrengthRunningSessionTests: XCTestCase {
         XCTAssertEqual(workout.totalCompletedSets, 0)
     }
 
+    @MainActor
     func testExistingStrengthSetIDsSurviveAppendingAnotherWorkout() throws {
         let exercise = PlannedExercise(
             id: UUID(),
@@ -89,6 +90,7 @@ final class HybridStrengthRunningSessionTests: XCTestCase {
         XCTAssertTrue(updated.exercises.last?.isEmbeddedRunningInterval == true)
     }
 
+    @MainActor
     func testDistanceOnlyOutdoorRunIsRejectedWithoutMutatingSession() throws {
         let store = StrengthWorkoutStore()
         store.start(
@@ -108,6 +110,7 @@ final class HybridStrengthRunningSessionTests: XCTestCase {
         XCTAssertEqual(store.activeWorkout?.exercises.count, 0)
     }
 
+    @MainActor
     func testRunPhaseAutoAdvancePreservesWorkoutIdentity() throws {
         let store = StrengthWorkoutStore()
         store.start(
