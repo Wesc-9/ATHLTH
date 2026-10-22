@@ -57,7 +57,17 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
         else { return nil }
         id = phone.id
         workoutID = phone.plannedSessionID ?? recipe.sourceWorkoutID
-        title = phone.workoutTitle?.isEmpty == false ? phone.workoutTitle! : recipe.title
+        // The structured recipe is more informative than a generic
+        // environment label such as "Tredemølle". Preserve custom titles.
+        let recordedTitle = phone.workoutTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let generic = ["tredemølle", "treadmill", "løping innendørs",
+                       "indoor running", "løping", "running"]
+        if let recordedTitle, !recordedTitle.isEmpty,
+           !generic.contains(recordedTitle.lowercased()) {
+            title = recordedTitle
+        } else {
+            title = recipe.title
+        }
         completedAt = finished
         source = "iPhone"
         steps = recorded
