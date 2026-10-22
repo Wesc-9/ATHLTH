@@ -1383,7 +1383,7 @@ struct ATHLTHRecordedRunningMinute: Codable, Hashable {
     var stepIndex: Int
     var stepElapsedAtEndSeconds: TimeInterval
     var activeSeconds: TimeInterval
-    var watchDistanceMeters: Double
+    var recordedDistanceMeters: Double
     var watchHeartRateBPM: Double?
     var targetPaceSecondsPerKilometer: Double?
     var targetTreadmillInclinePercent: Double?
