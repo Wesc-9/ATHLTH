@@ -2306,62 +2306,7 @@ struct WorkoutTemplateBuilderView: View {
             } else {
                 VStack(spacing: 11) {
                     ForEach(timelineSections) { section in
-                        HStack(alignment: .top, spacing: 10) {
-                            timelineNumber(section.position + 1)
-                                .frame(width: 34)
-                            Group {
-                                if blocks[section.start].groupID != nil {
-                                    groupTimelineCard(startingAt: section.start)
-                                } else {
-                                    builderBlockRow(section.start, nested: false)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .contentShape(RoundedRectangle(cornerRadius: 20))
-                        .opacity(draggingSectionID == section.id ? 0.34 : 1)
-                        .overlay {
-                            if hoveredSectionID == section.id &&
-                                draggingSectionID != section.id {
-                                RoundedRectangle(cornerRadius: 20)
-                                    .strokeBorder(studioAccent.opacity(0.6), lineWidth: 1.4)
-                                    .allowsHitTesting(false)
-                            }
-                        }
-                        .onDrag {
-                            draggingSectionID = section.id
-                            hoveredSectionID = nil
-                            return NSItemProvider(object: section.id.uuidString as NSString)
-                        } preview: {
-                            HStack(alignment: .top, spacing: 10) {
-                                timelineNumber(section.position + 1)
-                                    .frame(width: 34)
-                                Group {
-                                    if blocks[section.start].groupID != nil {
-                                        groupTimelineCard(startingAt: section.start)
-                                    } else {
-                                        builderBlockRow(section.start, nested: false)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                            .frame(width: 340)
-                            .background(studioBackground)
-                            .clipShape(RoundedRectangle(cornerRadius: 20))
-                        }
-                        .onDrop(
-                            of: [UTType.plainText],
-                            delegate: ATHLTHWorkoutTimelineDropDelegate(
-                                targetID: section.id,
-                                activeID: $draggingSectionID,
-                                hoveredID: $hoveredSectionID,
-                                reorder: moveDraggedSection
-                            )
-                        )
-                        .accessibilityHint(tr(
-                            "Long-press and drag the whole card to rearrange.",
-                            "Hold inne og dra hele kortet for å endre rekkefølgen."
-                        ))
+                        timelineDraggableSection(section)
                     }
                 }
                 .background(alignment: .leading) {
@@ -2373,6 +2318,60 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
         }
+    }
+
+    // Keep the drag implementation separate from the timeline's ViewBuilder.
+    // This avoids another deeply nested generic SwiftUI view type.
+    private func timelineSectionContent(_ section: TimelineSection) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            timelineNumber(section.position + 1)
+                .frame(width: 34)
+            Group {
+                if blocks[section.start].groupID != nil {
+                    groupTimelineCard(startingAt: section.start)
+                } else {
+                    builderBlockRow(section.start, nested: false)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private func timelineDraggableSection(_ section: TimelineSection) -> some View {
+        timelineSectionContent(section)
+            .contentShape(RoundedRectangle(cornerRadius: 20))
+            .opacity(draggingSectionID == section.id ? 0.34 : 1)
+            .overlay {
+                if hoveredSectionID == section.id &&
+                    draggingSectionID != section.id {
+                    RoundedRectangle(cornerRadius: 20)
+                        .strokeBorder(studioAccent.opacity(0.6), lineWidth: 1.4)
+                        .allowsHitTesting(false)
+                }
+            }
+            .onDrag {
+                draggingSectionID = section.id
+                hoveredSectionID = nil
+                return NSItemProvider(object: section.id.uuidString as NSString)
+            } preview: {
+                timelineSectionContent(section)
+                    .frame(width: 340)
+                    .background(studioBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: 20))
+            }
+            .onDrop(
+                of: [UTType.plainText],
+                delegate: ATHLTHWorkoutTimelineDropDelegate(
+                    targetID: section.id,
+                    activeID: $draggingSectionID,
+                    hoveredID: $hoveredSectionID,
+                    reorder: moveDraggedSection
+                )
+            )
+            .accessibilityHint(tr(
+                "Long-press and drag the whole card to rearrange.",
+                "Hold inne og dra hele kortet for å endre rekkefølgen."
+            ))
     }
 
     private func timelineNumber(_ number: Int) -> some View {
