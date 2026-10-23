@@ -1,6 +1,7 @@
 import Foundation
 import Supabase
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Movement identity is stored separately from the existing run timeline
 /// kind so old planned workouts and their playback remain compatible.
@@ -152,6 +153,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var wellnessKind: WorkoutWellnessKind? = nil
     /// Non-running timed activities remain distinct from running metrics.
     var activityTag: String? = nil
+    /// Ephemeral, stable identity for live drag ordering. Never persisted:
+    /// old workout recipes decode unchanged and get fresh editor IDs.
+    var editorDragID: UUID = UUID()
 
     var resolvedPhase: WorkoutPhaseKind {
         phase ?? (kind == .rest ? .recovery : .main)
@@ -1636,6 +1640,37 @@ struct MyWorkoutTemplatesView: View {
     }
 }
 
+/// SwiftUI's native drag preview follows the finger while dropEntered moves
+/// nearby cards in real time. No new workout model or plan save is triggered
+/// until the athlete finishes interacting with the editor.
+private struct ATHLTHWorkoutTimelineDropDelegate: DropDelegate {
+    let targetID: UUID
+    @Binding var activeID: UUID?
+    @Binding var hoveredID: UUID?
+    let reorder: (UUID, UUID) -> Void
+
+    func dropEntered(info: DropInfo) {
+        guard let activeID, activeID != targetID else { return }
+        hoveredID = targetID
+        reorder(activeID, targetID)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        if hoveredID == targetID { hoveredID = nil }
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        guard activeID != nil else { return false }
+        activeID = nil
+        hoveredID = nil
+        return true
+    }
+}
+
 struct ATHLTHPlanCopyDay: Identifiable, Hashable {
     let weekIndex: Int
     let weekday: Int
@@ -1659,6 +1694,10 @@ struct WorkoutTemplateBuilderView: View {
     @State private var selectedExerciseInfo: WorkoutTemplateBlock?
     @State private var selectedPhase: WorkoutPhaseKind = .main
     @State private var expandedBlockIndex: Int?
+    @State private var draggingSectionID: UUID?
+    @State private var hoveredSectionID: UUID?
+    @State private var draggingGroupMemberID: UUID?
+    @State private var hoveredGroupMemberID: UUID?
     @State private var exerciseTargetGroupID: UUID?
     @State private var pendingNewGroupKind: WorkoutBlockGroupKind?
     @State private var collapsedGroupIDs: Set<UUID> = []
@@ -1857,6 +1896,56 @@ struct WorkoutTemplateBuilderView: View {
         blocks.indices.filter { index in
             guard index > 0, let id = blocks[index].groupID else { return true }
             return blocks[index - 1].groupID != id
+        }
+    }
+
+    private struct TimelineSection: Identifiable {
+        let id: UUID
+        let start: Int
+        let position: Int
+    }
+
+    private func sectionID(at index: Int) -> UUID {
+        blocks[index].groupID ?? blocks[index].editorDragID
+    }
+
+    private var timelineSections: [TimelineSection] {
+        timelineStarts.enumerated().map { position, index in
+            TimelineSection(id: sectionID(at: index),
+                            start: index, position: position)
+        }
+    }
+
+    private func moveDraggedSection(_ draggedID: UUID, over targetID: UUID) {
+        let sections = timelineSections
+        guard let from = sections.firstIndex(where: { $0.id == draggedID }),
+              let target = sections.firstIndex(where: { $0.id == targetID }),
+              from != target else { return }
+        var grouped = sections.map { section in
+            groupIndices(startingAt: section.start).map { blocks[$0] }
+        }
+        let moved = grouped.remove(at: from)
+        grouped.insert(moved, at: target)
+        withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
+            blocks = grouped.flatMap { $0 }
+            resequence()
+            expandedBlockIndex = nil
+        }
+    }
+
+    /// Exercises inside a superset/interval can be moved only within that
+    /// same group; dragging across its boundary never breaks group membership.
+    private func moveDraggedGroupMember(_ draggedID: UUID, over targetID: UUID) {
+        guard let source = blocks.firstIndex(where: { $0.editorDragID == draggedID }),
+              let target = blocks.firstIndex(where: { $0.editorDragID == targetID }),
+              source != target,
+              let group = blocks[source].groupID,
+              blocks[target].groupID == group else { return }
+        withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
+            let moved = blocks.remove(at: source)
+            blocks.insert(moved, at: target)
+            resequence()
+            expandedBlockIndex = nil
         }
     }
 
@@ -2211,25 +2300,63 @@ struct WorkoutTemplateBuilderView: View {
                 .athlthPlanCard(radius: 22, warm: isPlannedWorkout)
             } else {
                 VStack(spacing: 11) {
-                    ForEach(Array(timelineStarts.enumerated()), id: \.element) { position, index in
+                    ForEach(timelineSections) { section in
                         HStack(alignment: .top, spacing: 10) {
-                            timelineNumber(position + 1)
+                            timelineNumber(section.position + 1)
                                 .frame(width: 34)
                             Group {
-                                if blocks[index].groupID != nil {
-                                    groupTimelineCard(startingAt: index)
+                                if blocks[section.start].groupID != nil {
+                                    groupTimelineCard(startingAt: section.start)
                                 } else {
-                                    builderBlockRow(index, nested: false)
+                                    builderBlockRow(section.start, nested: false)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .dropDestination(for: String.self) { items, _ in
-                                guard let source = items.first.flatMap(Int.init),
-                                      source != index else { return false }
-                                moveTimelineSection(from: source, to: index)
-                                return true
+                        }
+                        .contentShape(RoundedRectangle(cornerRadius: 20))
+                        .opacity(draggingSectionID == section.id ? 0.34 : 1)
+                        .overlay {
+                            if hoveredSectionID == section.id &&
+                                draggingSectionID != section.id {
+                                RoundedRectangle(cornerRadius: 20)
+                                    .strokeBorder(studioAccent.opacity(0.6), lineWidth: 1.4)
+                                    .allowsHitTesting(false)
                             }
                         }
+                        .onDrag {
+                            draggingSectionID = section.id
+                            hoveredSectionID = nil
+                            return NSItemProvider(object: section.id.uuidString as NSString)
+                        } preview: {
+                            HStack(alignment: .top, spacing: 10) {
+                                timelineNumber(section.position + 1)
+                                    .frame(width: 34)
+                                Group {
+                                    if blocks[section.start].groupID != nil {
+                                        groupTimelineCard(startingAt: section.start)
+                                    } else {
+                                        builderBlockRow(section.start, nested: false)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .frame(width: 340)
+                            .background(studioBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: 20))
+                        }
+                        .onDrop(
+                            of: [UTType.plainText],
+                            delegate: ATHLTHWorkoutTimelineDropDelegate(
+                                targetID: section.id,
+                                activeID: $draggingSectionID,
+                                hoveredID: $hoveredSectionID,
+                                reorder: moveDraggedSection
+                            )
+                        )
+                        .accessibilityHint(tr(
+                            "Long-press and drag the whole card to rearrange.",
+                            "Hold inne og dra hele kortet for å endre rekkefølgen."
+                        ))
                     }
                 }
                 .background(alignment: .leading) {
@@ -2273,7 +2400,6 @@ struct WorkoutTemplateBuilderView: View {
                     .foregroundStyle(studioInk.opacity(0.36))
                     .frame(width: 20, height: 38)
                     .contentShape(Rectangle())
-                    .draggable(String(firstIndex))
                     .accessibilityLabel(tr("Drag to reorder group",
                                            "Dra for å flytte gruppe"))
 
@@ -2377,6 +2503,25 @@ struct WorkoutTemplateBuilderView: View {
                 VStack(spacing: 0) {
                     ForEach(members, id: \.self) { index in
                         builderBlockRow(index, nested: true)
+                            .opacity(draggingGroupMemberID == blocks[index].editorDragID
+                                ? 0.34 : 1)
+                            .contentShape(Rectangle())
+                            .onDrag {
+                                draggingGroupMemberID = blocks[index].editorDragID
+                                hoveredGroupMemberID = nil
+                                return NSItemProvider(
+                                    object: blocks[index].editorDragID.uuidString as NSString
+                                )
+                            }
+                            .onDrop(
+                                of: [UTType.plainText],
+                                delegate: ATHLTHWorkoutTimelineDropDelegate(
+                                    targetID: blocks[index].editorDragID,
+                                    activeID: $draggingGroupMemberID,
+                                    hoveredID: $hoveredGroupMemberID,
+                                    reorder: moveDraggedGroupMember
+                                )
+                            )
                         if index != members.last {
                             Divider()
                                 .padding(.leading, 57)
@@ -2546,7 +2691,6 @@ struct WorkoutTemplateBuilderView: View {
                         .foregroundStyle(studioInk.opacity(0.34))
                         .frame(width: 18, height: 46)
                         .contentShape(Rectangle())
-                        .draggable(String(index))
                         .accessibilityLabel(tr("Drag to reorder", "Dra for å flytte blokk"))
                 }
 
@@ -3215,6 +3359,7 @@ struct WorkoutTemplateBuilderView: View {
         var newGroups: [UUID: UUID] = [:]
         for original in source {
             var copy = original
+            copy.editorDragID = UUID()
             if let id = original.groupID {
                 if newGroups[id] == nil { newGroups[id] = UUID() }
                 copy.groupID = newGroups[id]
@@ -3553,6 +3698,7 @@ struct WorkoutTemplateBuilderView: View {
             copy.exerciseID = block.exerciseID
             copy.wellnessKind = block.wellnessKind
             copy.activityTag = block.activityTag
+            copy.editorDragID = block.editorDragID
             return copy
         }
     }
