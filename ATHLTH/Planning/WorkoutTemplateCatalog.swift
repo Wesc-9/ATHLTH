@@ -1905,6 +1905,11 @@ struct WorkoutTemplateBuilderView: View {
         let position: Int
     }
 
+    private struct TimelineGroupMember: Identifiable {
+        let id: UUID
+        let index: Int
+    }
+
     private func sectionID(at index: Int) -> UUID {
         blocks[index].groupID ?? blocks[index].editorDragID
     }
@@ -2501,7 +2506,10 @@ struct WorkoutTemplateBuilderView: View {
 
             if !collapsed {
                 VStack(spacing: 0) {
-                    ForEach(members, id: \.self) { index in
+                    ForEach(members.map {
+                        TimelineGroupMember(id: blocks[$0].editorDragID, index: $0)
+                    }) { member in
+                        let index = member.index
                         builderBlockRow(index, nested: true)
                             .opacity(draggingGroupMemberID == blocks[index].editorDragID
                                 ? 0.34 : 1)
