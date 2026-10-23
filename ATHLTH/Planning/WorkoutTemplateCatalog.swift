@@ -1949,10 +1949,10 @@ struct WorkoutTemplateBuilderView: View {
                     }
                     workoutOverview
                     durationSettings
-                    timeline
                     if isPlannedWorkout {
                         workoutActions
                     }
+                    timeline
                     if draftNotice {
                         Label(tr("Recovered saved draft", "Gjenopprettet lagret utkast"),
                               systemImage: "checkmark.circle.fill")
