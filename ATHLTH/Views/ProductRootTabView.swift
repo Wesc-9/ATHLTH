@@ -6300,16 +6300,24 @@ struct ATHLTHTrainView: View {
             Button {
                 showingLibrary = true
             } label: {
-                Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .frame(width: ATHLTHPlanDesign.minTapHeight, height: ATHLTHPlanDesign.minTapHeight)
-                    .background(ATHLTHPlanDesign.surface, in: Circle())
-                    .overlay {
-                        Circle()
-                            .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
-                    }
-                    .contentShape(Circle())
+                HStack(spacing: 8) {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 15, weight: .semibold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Library", norwegian: "Bibliotek"
+                    ))
+                        .font(.system(size: 13, weight: .semibold))
+                }
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .padding(.horizontal, 14)
+                .frame(minHeight: ATHLTHPlanDesign.minTapHeight)
+                .background(ATHLTHPlanDesign.surface,
+                            in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(
+                        ATHLTHPlanDesign.outline, lineWidth: 0.8)
+                }
+                .contentShape(Capsule())
             }
             .buttonStyle(.plain)
             .accessibilityLabel(
@@ -6335,8 +6343,8 @@ struct ATHLTHTrainView: View {
 
             premiumTrainTab(
                 ATHLTHLocalization.choose(
-                    english: "Plan",
-                    norwegian: "Plan"
+                    english: "Training plan",
+                    norwegian: "Treningsplan"
                 ),
                 selected: selectedSection == 1
             ) {
