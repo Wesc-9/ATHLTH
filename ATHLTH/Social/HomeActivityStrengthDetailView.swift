@@ -82,7 +82,14 @@ struct HomeActivityStrengthDetailView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                // Keep the strength hero and the exercise-derived muscle
+                // illustration together at the top of the result. The map
+                // must appear before location details and numeric summaries.
                 workoutHeroCard
+
+                if !muscleSummary.profile.activations.isEmpty {
+                    muscleMapCard
+                }
 
                 // Same location presentation engine as run/treadmill/history.
                 // Indoor strength shows a private venue check-in, not a map.
@@ -101,13 +108,6 @@ struct HomeActivityStrengthDetailView: View {
                 }
 
                 overviewCard
-
-                // The finished-workout muscle map was previously defined
-                // but never placed in this view's scroll hierarchy.
-                // Show it only when actual exercise-derived muscles exist.
-                if !muscleSummary.profile.activations.isEmpty {
-                    muscleMapCard
-                }
 
                 if hasRestFlowData {
                     restFlowDisclosure
