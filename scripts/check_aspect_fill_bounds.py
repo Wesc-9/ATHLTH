@@ -26,7 +26,7 @@ REQUIRED = {
     ),
     "ATHLTH/Social/HomeActivityStrengthDetailView.swift": (
         r"GeometryReader\s*\{\s*viewport\s+in",
-        r"\.frame\(width:\s*viewport\.size\.width,\s*height:\s*196\)",
+        r"\.frame\(width:\s*viewport\.size\.width,\s*height:\s*(?:196|workoutHeroHeight)\)",
         r"\.containerRelativeFrame\(\.horizontal\)",
     ),
     "ATHLTH/Community/CommunityV4.swift": (
