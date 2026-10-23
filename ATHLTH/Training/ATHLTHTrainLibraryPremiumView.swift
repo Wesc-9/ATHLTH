@@ -8,6 +8,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
     let onOpenPlan: () -> Void
+    var startWithWorkouts: Bool = false
     var onPlanCreated: ((UUID) -> Void)? = nil
 
     @StateObject private var catalog = TrainingPlanLibraryStore()
@@ -125,6 +126,11 @@ struct ATHLTHTrainLibraryPremiumView: View {
         }
         .foregroundStyle(ink)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear {
+            if startWithWorkouts {
+                section = .workouts
+            }
+        }
         .task { await catalog.refresh() }
         .task { await exerciseLibrary.refresh() }
         .sheet(isPresented: $showingCreatePlan) {
