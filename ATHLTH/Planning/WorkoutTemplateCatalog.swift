@@ -1759,6 +1759,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var collapsedGroupIDs: Set<UUID> = []
     @State private var showingDiscardConfirmation = false
     @State private var manualDurationMinutes: Int?
+    @State private var durationInputText = ""
     @State private var allRoundsExpandedIDs: Set<UUID> = []
     @State private var draftRestored = false
     @State private var draftActive = false
@@ -1770,10 +1771,11 @@ struct WorkoutTemplateBuilderView: View {
     @State private var pendingExerciseChoice: WorkoutBlockGroupKind?
     @State private var pendingSavedWorkoutPicker = false
     @State private var pendingStandaloneExercise = false
-    @State private var copiedDayIDs: Set<Int> = []
+    @State private var pendingCopyDayIDs: Set<Int> = []
     @State private var selectedCopyDayIDs: Set<Int> = []
     @State private var copyWeekIndex = 0
     @State private var savedToMyWorkouts = false
+    @State private var savedTemplateID: UUID?
     @State private var actionNotice: String?
     @AppStorage("athlth.workoutBuilder.durationInput.v1")
     private var durationInputMode = "clock"
@@ -1784,7 +1786,7 @@ struct WorkoutTemplateBuilderView: View {
     private let initialDraftSignature: String
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
-    private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Void)?
+    private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Bool)?
 
     init(
         initialTitle: String = "",
@@ -1796,12 +1798,14 @@ struct WorkoutTemplateBuilderView: View {
         planCopyDays: [ATHLTHPlanCopyDay] = [],
         initialCopyWeekIndex: Int = 0,
         onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)? = nil,
-        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Void)? = nil
+        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Bool)? = nil
     ) {
         _title = State(initialValue: initialTitle)
         _blocks = State(initialValue: initialBlocks)
         _selectedRouteID = State(initialValue: initialRouteID)
         _manualDurationMinutes = State(initialValue: initialDurationOverrideMinutes)
+        _durationInputText = State(initialValue: (initialDurationOverrideMinutes ??
+            ATHLTHWorkoutDurationEstimator.minutes(for: initialBlocks)).map(String.init) ?? "")
         self.draftContext = draftContext
         self.plannedDate = plannedDate
         self.planCopyDays = planCopyDays
@@ -1820,6 +1824,7 @@ struct WorkoutTemplateBuilderView: View {
         let blocks: [WorkoutTemplateBlock]
         let routeID: UUID?
         let manualMinutes: Int?
+        let pendingCopyDayIDs: [Int]?
         let updatedAt: Date
     }
 
@@ -1836,6 +1841,9 @@ struct WorkoutTemplateBuilderView: View {
         blocks = stored.blocks
         selectedRouteID = stored.routeID
         manualDurationMinutes = stored.manualMinutes
+        durationInputText = (stored.manualMinutes ??
+            ATHLTHWorkoutDurationEstimator.minutes(for: stored.blocks)).map(String.init) ?? ""
+        pendingCopyDayIDs = Set(stored.pendingCopyDayIDs ?? [])
         collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
         draftRestored = true
         draftNotice = true
@@ -1850,6 +1858,7 @@ struct WorkoutTemplateBuilderView: View {
             blocks: blocks,
             routeID: selectedRouteID,
             manualMinutes: manualDurationMinutes,
+            pendingCopyDayIDs: Array(pendingCopyDayIDs).sorted(),
             updatedAt: Date()
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
@@ -1936,7 +1945,9 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var canSave: Bool {
-        (hasRunning || hasStrength || hasCycling || hasTimedWellness) && !hasIncompleteSuperset
+        (hasRunning || hasStrength || hasCycling || hasTimedWellness) &&
+        !hasIncompleteSuperset &&
+        (!isPlannedWorkout || resolvedDurationMinutes != nil)
     }
 
     private var hasIncompleteSuperset: Bool {
@@ -2044,25 +2055,22 @@ struct WorkoutTemplateBuilderView: View {
                     .foregroundStyle(studioInk.opacity(0.58))
             }
             HStack(spacing: 8) {
-                TextField(
-                    tr("Enter minutes", "Skriv inn minutter"),
-                    text: Binding(
-                        get: { resolvedDurationMinutes.map(String.init) ?? "" },
-                        set: { value in
-                            let digits = value.filter { $0.isNumber }
-                            if digits.isEmpty {
-                                manualDurationMinutes = nil
-                            } else if let minutes = Int(digits), (1...240).contains(minutes) {
-                                manualDurationMinutes = minutes
-                            }
+                TextField(tr("Enter minutes", "Skriv inn minutter"),
+                          text: $durationInputText)
+                    .keyboardType(.numberPad)
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                    .foregroundStyle(studioInk)
+                    .tint(studioAccent)
+                    .onChange(of: durationInputText) { _, value in
+                        let digits = value.filter { $0.isNumber }
+                        manualDurationMinutes = Int(digits).flatMap {
+                            (1...240).contains($0) ? $0 : nil
                         }
+                        savedToMyWorkouts = false
+                    }
+                    .accessibilityLabel(
+                        tr("Workout duration in minutes", "Øktvarighet i minutter")
                     )
-                )
-                .keyboardType(.numberPad)
-                .font(.system(size: 23, weight: .semibold, design: .rounded))
-                .foregroundStyle(studioInk)
-                .tint(studioAccent)
-                .accessibilityLabel(tr("Workout duration in minutes", "Øktvarighet i minutter"))
                 Text(tr("min", "min"))
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(studioInk.opacity(0.6))
@@ -2195,14 +2203,22 @@ struct WorkoutTemplateBuilderView: View {
                 draftActive = true
             }
             .onChange(of: blocks) { _, _ in
-                // A structural edit makes the fresh estimate authoritative again.
+                // A changed recipe updates the estimate even if the
+                // user previously entered a time. Keep the field editable.
                 manualDurationMinutes = nil
+                durationInputText = knownDurationMinutes.map(String.init) ?? ""
                 savedToMyWorkouts = false
                 persistWorkoutDraft()
             }
-            .onChange(of: title) { _, _ in persistWorkoutDraft() }
+            .onChange(of: title) { _, _ in
+                savedToMyWorkouts = false
+                persistWorkoutDraft()
+            }
             .onChange(of: selectedRouteID) { _, _ in persistWorkoutDraft() }
-            .onChange(of: manualDurationMinutes) { _, _ in persistWorkoutDraft() }
+            .onChange(of: manualDurationMinutes) { _, _ in
+                persistWorkoutDraft()
+            }
+            .onChange(of: pendingCopyDayIDs) { _, _ in persistWorkoutDraft() }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { persistWorkoutDraft() }
             }
@@ -3127,11 +3143,27 @@ struct WorkoutTemplateBuilderView: View {
                 } label: {
                     Label(savedToMyWorkouts
                         ? tr("Saved in My workouts", "Lagret i mine økter")
-                        : tr("Save to My workouts", "Lagre til mine økter"),
+                        : savedTemplateID == nil
+                            ? tr("Save to My workouts", "Lagre til mine økter")
+                            : tr("Update My workout", "Oppdater min økt"),
                           systemImage: savedToMyWorkouts ? "checkmark.circle.fill" : "bookmark")
                         .frame(maxWidth: .infinity, minHeight: 46)
                 }
                 .disabled(!canSave || savedToMyWorkouts)
+                if savedTemplateID != nil {
+                    Menu {
+                        Button {
+                            saveToMyWorkouts(asNew: true)
+                        } label: {
+                            Label(tr("Save as new workout", "Lagre som ny økt"),
+                                  systemImage: "plus.square.on.square")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .frame(width: 30, height: 46)
+                    }
+                    .disabled(!canSave)
+                }
                 if onCopyToPlan != nil && !planCopyDays.isEmpty {
                     Button {
                         showingCopyPicker = true
@@ -3145,6 +3177,14 @@ struct WorkoutTemplateBuilderView: View {
             }
             .buttonStyle(.bordered)
             .tint(studioInk)
+            if !pendingCopyDayIDs.isEmpty {
+                Label("\(pendingCopyDayIDs.count) " +
+                      tr("copy destinations selected; saved together with the workout",
+                         "valgte dager; kopiene lagres sammen med originaløkten"),
+                      systemImage: "calendar.badge.clock")
+                    .font(.caption)
+                    .foregroundStyle(studioInk.opacity(0.7))
+            }
             if let actionNotice {
                 Label(actionNotice, systemImage: "checkmark.circle.fill")
                     .font(.caption.weight(.medium))
@@ -3344,7 +3384,7 @@ struct WorkoutTemplateBuilderView: View {
                                                 : ATHLTHPlanDesign.surface,
                                                 in: RoundedRectangle(cornerRadius: 14))
                                 }
-                                .disabled(option.isSource || copiedDayIDs.contains(option.id))
+                                .disabled(option.isSource)
                                 .buttonStyle(.plain)
                             }
                         }
@@ -3362,18 +3402,14 @@ struct WorkoutTemplateBuilderView: View {
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 16)
                 Button {
-                    guard let onCopyToPlan, canSave else { return }
-                    let days = Array(selectedCopyDayIDs).sorted()
-                    let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let name = clean.isEmpty ? categoryTitle : clean
-                    if onCopyToPlan(name, blocks, hasOutdoorCardio ? selectedRouteID : nil,
-                                    resolvedDurationMinutes, days) {
-                        copiedDayIDs.formUnion(days)
-                        selectedCopyDayIDs.removeAll()
-                        actionNotice = tr("Copies added. Save the original workout.",
-                                          "Kopiene er lagt til. Lagre også originaløkten.")
-                        showingCopyPicker = false
-                    }
+                    guard canSave else { return }
+                    pendingCopyDayIDs.formUnion(selectedCopyDayIDs)
+                    selectedCopyDayIDs.removeAll()
+                    actionNotice = tr(
+                        "Copy destinations are ready; save to apply them.",
+                        "Dagene er valgt. Lagre økten for å kopiere."
+                    )
+                    showingCopyPicker = false
                 } label: {
                     Text(tr("Copy to selected days", "Kopier til valgte dager") +
                          " (\(selectedCopyDayIDs.count))")
@@ -3429,11 +3465,18 @@ struct WorkoutTemplateBuilderView: View {
         resequence()
     }
 
-    private func saveToMyWorkouts() {
-        guard canSave, !savedToMyWorkouts else { return }
-        session.saveSharedWorkout(workoutSnapshot())
-        savedToMyWorkouts = true
-        actionNotice = tr("Saved in My workouts", "Lagret i Mine økter")
+    private func saveToMyWorkouts(asNew: Bool = false) {
+        guard canSave else { return }
+        let snapshot = workoutSnapshot()
+        if let savedTemplateID, !asNew,
+           session.updateSavedWorkoutTemplate(snapshot, id: savedTemplateID) {
+            savedToMyWorkouts = true
+            actionNotice = tr("Updated in My workouts", "Oppdatert i Mine økter")
+        } else {
+            savedTemplateID = session.saveSharedWorkout(snapshot)
+            savedToMyWorkouts = true
+            actionNotice = tr("Saved in My workouts", "Lagret i Mine økter")
+        }
     }
 
     private var routeSection: some View {
@@ -3789,10 +3832,24 @@ struct WorkoutTemplateBuilderView: View {
         let workout = workoutSnapshot()
         let cleanTitle = workout.title
         if let onSaveToPlan {
-            onSaveToPlan(
+            guard onSaveToPlan(
                 cleanTitle, blocks, hasOutdoorCardio ? selectedRouteID : nil,
                 resolvedDurationMinutes, manualDurationMinutes != nil
-            )
+            ) else {
+                actionNotice = tr("Cannot save this workout yet",
+                                  "Kunne ikke lagre økten ennå")
+                return
+            }
+            if !pendingCopyDayIDs.isEmpty, let onCopyToPlan {
+                guard onCopyToPlan(
+                    cleanTitle, blocks, hasOutdoorCardio ? selectedRouteID : nil,
+                    resolvedDurationMinutes, Array(pendingCopyDayIDs).sorted()
+                ) else {
+                    actionNotice = tr("Workout saved; check copy destinations",
+                                      "Økten er lagret. Kontroller kopieringsdagene.")
+                    return
+                }
+            }
         } else {
             session.saveSharedWorkout(workout)
         }
