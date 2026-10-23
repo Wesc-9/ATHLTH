@@ -653,11 +653,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
                 plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
                 planCopyDays: (0..<weekCount).flatMap { week in
-                    (1...7).compactMap { weekday -> ATHLTHPlanCopyDay? in
+                    (1...7).map { weekday -> ATHLTHPlanCopyDay in
                         let key = weekDayKey(weekday, weekIndex: week)
-                        guard key != weekDayKey(selection.id, weekIndex: selectedPlanWeekIndex) else {
-                            return nil
-                        }
                         let date = dateForWeekDay(weekday, weekIndex: week)
                         let planDay = weekDayEdits[key]
                         return ATHLTHPlanCopyDay(
@@ -665,7 +662,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             weekday: weekday,
                             date: date,
                             hasWorkout: planDay?.detailedWorkout != nil ||
-                                !(planDay?.additionalDetailedWorkouts ?? []).isEmpty
+                                !(planDay?.additionalDetailedWorkouts ?? []).isEmpty,
+                            isSource: key == weekDayKey(
+                                selection.id, weekIndex: selectedPlanWeekIndex
+                            )
                         )
                     }
                 },
