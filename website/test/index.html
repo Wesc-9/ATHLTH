@@ -137,6 +137,8 @@ const rule=document.getElementById('display-rule');
 const shadow=document.getElementById('object-shadow');
 const stage=document.getElementById('stage');
 const letters=[...document.querySelectorAll('.char')];
+// Release the entrance keyframes so the scroll compositor can own the brand transform.
+brand.addEventListener('animationend',()=>{brand.style.animation='none'},{once:true});
 const reduce=matchMedia('(prefers-reduced-motion:reduce)').matches;
 const fine=matchMedia('(hover:hover) and (pointer:fine)').matches;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
