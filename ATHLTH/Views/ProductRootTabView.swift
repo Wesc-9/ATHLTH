@@ -5647,6 +5647,7 @@ struct ATHLTHTrainView: View {
     @State private var showingWalkQuickStart = false
     @State private var showingStrengthQuickStart = false
     @State private var showingCustomQuickStart = false
+    @State private var customQuickInitialActivity: CustomQuickWorkoutActivity = .hiit
     @State private var pendingCustomIPhoneQuick: CustomIPhoneQuickLaunch?
     @State private var activeCustomIPhoneQuick: CustomIPhoneQuickLaunch?
     @State private var showingStrengthWorkout = false
@@ -6148,7 +6149,8 @@ struct ATHLTHTrainView: View {
                 CustomQuickStartSheet(
                     trainingDeviceProvider:
                         watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isVerifiedForLiveLaunch
+                    watchConnected: watchConnection.isVerifiedForLiveLaunch,
+                    initialActivity: customQuickInitialActivity
                 ) { configuration, destination in
                     let invitedFriends = social.resolvedQuickTrainPartners(
                         configuration.selectedFriendIDs
@@ -6702,6 +6704,7 @@ struct ATHLTHTrainView: View {
                 session.updateSession(original.restoring(current), inPlan: plan.id)
             },
             onQuickTrain: { kind in handleQuickStart(kind) },
+            onQuickCycling: { startCyclingQuick() },
             onGhostRace: { showingGhostHub = true }
         )
     }
@@ -11000,6 +11003,7 @@ struct ATHLTHTrainView: View {
             }
         case .custom:
             if customQuickStartAvailable {
+                customQuickInitialActivity = .hiit
                 showingCustomQuickStart = true
             } else {
                 watchTransferError = ATHLTHLocalization.choose(
@@ -11010,6 +11014,18 @@ struct ATHLTHTrainView: View {
         case .mobility, .recovery:
             break
         }
+    }
+
+    private func startCyclingQuick() {
+        guard customQuickStartAvailable else {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "Finish the active workout before starting another.",
+                norwegian: "Avslutt økten som pågår før du starter en ny."
+            )
+            return
+        }
+        customQuickInitialActivity = .cycling
+        showingCustomQuickStart = true
     }
 
     private var quickStrengthSession:
