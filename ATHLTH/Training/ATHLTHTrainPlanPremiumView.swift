@@ -1244,7 +1244,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 )
 
                 VStack(alignment: .leading, spacing: 7) {
-                    Text(tr("TRAINING PLAN", "TRENINGSPPLAN"))
+                    Text(tr("TRAINING PLAN", "TRENINGSPLAN"))
                         .font(.system(size: 10, weight: .bold))
                         .tracking(2.5)
                     Text(plan.title)
@@ -1368,7 +1368,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                 tr("Edit plan", "Rediger plan"), icon: "slider.horizontal.3"
             ) { showingEditor = true }
             Menu {
-                ForEach(Array(plan.weeks.enumerated()), id: \.offset) { index, _ in
+                ForEach(Array(plan.weeks.enumerated()), id: \.offset) { entry in
+                    let index = entry.offset
                     Button(tr("Week \(index + 1)", "Uke \(index + 1)")) {
                         selectPremiumPlanWeek(index)
                     }
@@ -1421,7 +1422,8 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private func premiumAllWeeks(_ plan: TrainingPlan) -> some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 77))], spacing: 8) {
-            ForEach(Array(plan.weeks.enumerated()), id: \.offset) { index, _ in
+            ForEach(Array(plan.weeks.enumerated()), id: \.offset) { entry in
+                    let index = entry.offset
                 let selected = (selectedWeekIndex ?? currentWeekIndex(plan)) == index
                 Button {
                     selectPremiumPlanWeek(index)
