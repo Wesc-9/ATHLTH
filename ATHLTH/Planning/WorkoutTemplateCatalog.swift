@@ -3152,8 +3152,8 @@ struct WorkoutTemplateBuilderView: View {
                     }
                     .onAppear { proxy.scrollTo("copy-top", anchor: .top) }
                 }
-                Text(tr("An existing workout is kept; the copy is added as another session.",
-                        "Eksisterende økter beholdes. Kopien legges til som en ekstra økt."))
+                Text(tr("Existing workouts are kept. Save the original workout when you return.",
+                        "Eksisterende økter beholdes. Husk å lagre originaløkten når du kommer tilbake."))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal, 16)
@@ -3161,12 +3161,13 @@ struct WorkoutTemplateBuilderView: View {
                     guard let onCopyToPlan, canSave else { return }
                     let days = Array(selectedCopyDayIDs).sorted()
                     let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
-                    let name = clean.isEmpty ? resolvedWorkoutKind.title : clean
+                    let name = clean.isEmpty ? categoryTitle : clean
                     if onCopyToPlan(name, blocks, hasOutdoorCardio ? selectedRouteID : nil,
                                     resolvedDurationMinutes, days) {
                         copiedDayIDs.formUnion(days)
                         selectedCopyDayIDs.removeAll()
-                        actionNotice = tr("Copied to selected days", "Kopiert til valgte dager")
+                        actionNotice = tr("Copies added. Save the original workout.",
+                                          "Kopiene er lagt til. Lagre også originaløkten.")
                         showingCopyPicker = false
                     }
                 } label: {
@@ -3558,7 +3559,7 @@ struct WorkoutTemplateBuilderView: View {
 
     private func workoutSnapshot() -> PlannedSession {
         let requestedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanTitle = requestedTitle.isEmpty ? resolvedWorkoutKind.title : requestedTitle
+        let cleanTitle = requestedTitle.isEmpty ? categoryTitle : requestedTitle
 
         var workout = PlannedSession(
             id: UUID(),
