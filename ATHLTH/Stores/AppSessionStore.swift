@@ -4451,11 +4451,12 @@ final class AppSessionStore: ObservableObject {
         persistPlanTemplates()
     }
 
+    @discardableResult
     func saveSharedWorkout(
         _ source: PlannedSession,
         sourceOwnerID: UUID? = nil,
         sourceSessionID: UUID? = nil
-    ) {
+    ) -> UUID {
         var copy = PlannedSession(
             id: UUID(),
             title: source.title,
@@ -4498,6 +4499,32 @@ final class AppSessionStore: ObservableObject {
 
         savedWorkoutTemplates.insert(copy, at: 0)
         persistSavedWorkoutTemplates()
+        return copy.id
+    }
+
+    /// Update the exact saved template rather than generating duplicate entries.
+    /// Existing source attribution and the template identifier are preserved.
+    @discardableResult
+    func updateSavedWorkoutTemplate(_ source: PlannedSession, id: UUID) -> Bool {
+        guard let index = savedWorkoutTemplates.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+        var stored = savedWorkoutTemplates[index]
+        stored.title = source.title
+        stored.kind = source.kind
+        stored.durationMinutes = source.durationMinutes
+        stored.routeID = source.routeID
+        stored.targetDistanceKilometers = source.targetDistanceKilometers
+        stored.targetPaceSecondsPerKilometer = source.targetPaceSecondsPerKilometer
+        stored.workoutBlocks = source.workoutBlocks
+        stored.workoutCategory = source.workoutCategory
+        stored.exercises = source.exercises
+        stored.notes = source.notes
+        stored.runningWorkout = source.runningWorkout
+        stored.runningWorkouts = source.runningWorkouts
+        savedWorkoutTemplates[index] = stored
+        persistSavedWorkoutTemplates()
+        return true
     }
 
     func deleteSavedWorkoutTemplate(_ workoutID: UUID) {
