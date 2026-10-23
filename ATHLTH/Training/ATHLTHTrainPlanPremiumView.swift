@@ -1150,6 +1150,438 @@ struct ATHLTHTrainPlanPremiumView: View {
         .surface(line: line)
     }
 
+
+    // MARK: - Premium plan overview (same visual language as Train / I dag)
+
+    private func premiumPlanDashboard(_ plan: TrainingPlan) -> some View {
+        VStack(alignment: .leading, spacing: 19) {
+            if session.activePlan?.id != plan.id {
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle")
+                    Text(tr("Saved or upcoming plan", "Lagret eller kommende plan"))
+                    Spacer()
+                    if let active = session.activePlan {
+                        Button(tr("Active plan", "Aktiv plan")) {
+                            focusedPlanID = active.id
+                            selectedWeekIndex = nil
+                            selectedDayID = nil
+                        }
+                        .fontWeight(.semibold)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(secondaryInk)
+            }
+
+            premiumPlanHeader(plan)
+            premiumPlanActions(plan)
+            if showingEntirePlan {
+                premiumAllWeeks(plan)
+            }
+            if let week = selectedWeek {
+                premiumPlanWeek(plan, week: week)
+            } else {
+                Text(tr("This plan has no training weeks yet.",
+                        "Denne planen har ingen treningsuker ennå."))
+                    .font(.subheadline)
+                    .foregroundStyle(secondaryInk)
+                Button(tr("Edit plan", "Rediger plan")) { showingEditor = true }
+                    .buttonStyle(.bordered)
+            }
+        }
+    }
+
+    private func premiumPlanHeroArt(_ plan: TrainingPlan) -> String {
+        let kinds = plan.weeks.flatMap(\.days)
+            .flatMap(\.sessions).filter { !$0.isExplicitRestDay }.map(\.kind)
+        let running = kinds.filter { $0 == .running }.count
+        let strengthSessions = kinds.filter { $0 == .strength }.count
+        if running > 0 && running >= strengthSessions { return "GoalRunning" }
+        if strengthSessions > 0 { return "StrengthQuickHero" }
+        if kinds.contains(.walking) { return "GoalWalking" }
+        return "GoalMountain"
+    }
+
+    private func premiumPlanHeader(_ plan: TrainingPlan) -> some View {
+        let progress = session.trainingPlanProgress(
+            plan, healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        let percent = Int((min(max(progress.completionFraction, 0), 1) * 100).rounded())
+        let currentWeekNumber = min(
+            max((selectedWeekIndex ?? currentWeekIndex(plan)) + 1, 1),
+            max(plan.weeks.count, 1)
+        )
+        let thisWeek = selectedWeek
+        let workouts = thisWeek?.days.flatMap(\.sessions)
+            .filter { !$0.isExplicitRestDay } ?? []
+        let done = workouts.filter { isPremiumPlanWorkoutCompleted($0, plan: plan) }.count
+        let remaining = workouts.filter {
+            !isPremiumPlanWorkoutCompleted($0, plan: plan) &&
+            !session.isPlanSessionSkipped(planID: plan.id, sessionID: $0.id)
+        }.count
+        let restDays = thisWeek?.days.filter { day in
+            day.sessions.isEmpty || day.sessions.allSatisfy(\.isExplicitRestDay)
+        }.count ?? 0
+
+        return VStack(spacing: -31) {
+            ZStack(alignment: .bottomLeading) {
+                GeometryReader { geometry in
+                    Image(premiumPlanHeroArt(plan))
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: 198)
+                        .clipped()
+                }
+                .frame(height: 198)
+
+                LinearGradient(
+                    colors: [.black.opacity(0.12), .black.opacity(0.60)],
+                    startPoint: .top, endPoint: .bottom
+                )
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(tr("TRAINING PLAN", "TRENINGSPPLAN"))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(2.5)
+                    Text(plan.title)
+                        .font(.system(size: 29, weight: .regular, design: .serif))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.76)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(tr("\(plan.weeks.count) weeks", "\(plan.weeks.count) uker")
+                         + " · " + tr("Week", "Uke") + " \(currentWeekNumber)")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                    Spacer().frame(height: 20)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .padding(.bottom, 20)
+
+                Menu {
+                    Button {
+                        editingPlan = plan
+                    } label: {
+                        Label(tr("Edit plan details", "Rediger plandetaljer"),
+                              systemImage: "slider.horizontal.3")
+                    }
+                    Button { showingEditor = true } label: {
+                        Label(tr("Edit training week", "Rediger treningsuken"),
+                              systemImage: "calendar")
+                    }
+                    Button { browsingMyPlans = true } label: {
+                        Label(tr("My plans", "Mine planer"), systemImage: "square.stack")
+                    }
+                    Button {
+                        beginNewPlanCreation()
+                    } label: {
+                        Label(tr("Create new plan", "Ny treningsplan"),
+                              systemImage: "plus")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        trainingPlanPendingDeletion = plan
+                    } label: {
+                        Label(tr("Delete plan", "Slett treningsplan"),
+                              systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.headline)
+                        .foregroundStyle(graphite)
+                        .frame(width: 38, height: 38)
+                        .background(.white.opacity(0.94), in: Circle())
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: .topTrailing)
+                .padding(13)
+            }
+            .frame(height: 198)
+            .clipShape(RoundedRectangle(cornerRadius: 21))
+            .accessibilityElement(children: .contain)
+
+            HStack(spacing: 0) {
+                ZStack {
+                    Circle()
+                        .stroke(line.opacity(0.7), lineWidth: 5)
+                    Circle()
+                        .trim(from: 0, to: min(max(progress.completionFraction, 0), 1))
+                        .stroke(graphite, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    Text("\(percent) %")
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .frame(width: 65, height: 65)
+
+                premiumPlanMetric("\(workouts.count)",
+                    tr("workouts this week", "økter denne uken"))
+                premiumPlanMetric("\(done)",
+                    tr("completed", "fullført"))
+                premiumPlanMetric("\(remaining)",
+                    tr("remaining", "gjenstår"))
+                premiumPlanMetric("\(restDays)",
+                    tr("rest days", "hviledager"))
+            }
+            .padding(.horizontal, 13)
+            .padding(.vertical, 16)
+            .background(.white, in: RoundedRectangle(cornerRadius: 17))
+            .overlay {
+                RoundedRectangle(cornerRadius: 17)
+                    .strokeBorder(line.opacity(0.65), lineWidth: 0.7)
+            }
+            .shadow(color: graphite.opacity(0.09), radius: 16, y: 8)
+            .padding(.horizontal, 10)
+        }
+    }
+
+    private func premiumPlanMetric(_ value: String, _ label: String) -> some View {
+        VStack(spacing: 5) {
+            Text(value)
+                .font(.system(size: 20, weight: .medium, design: .serif))
+                .monospacedDigit()
+            Text(label)
+                .font(.system(size: 9, weight: .medium))
+                .foregroundStyle(secondaryInk)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .frame(minHeight: 52)
+    }
+
+    private func premiumPlanActions(_ plan: TrainingPlan) -> some View {
+        HStack(spacing: 7) {
+            premiumPlanAction(
+                tr("Full plan", "Se hele planen"), icon: "list.bullet"
+            ) {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    showingEntirePlan.toggle()
+                }
+            }
+            premiumPlanAction(
+                tr("Edit plan", "Rediger plan"), icon: "slider.horizontal.3"
+            ) { showingEditor = true }
+            Menu {
+                ForEach(Array(plan.weeks.enumerated()), id: \.offset) { index, _ in
+                    Button(tr("Week \(index + 1)", "Uke \(index + 1)")) {
+                        selectPremiumPlanWeek(index)
+                    }
+                }
+            } label: {
+                premiumPlanActionLabel(tr("Change week", "Bytt uke"),
+                                        icon: "chevron.left.chevron.right")
+            }
+            premiumPlanAction(
+                tr("My workouts", "Mine økter"), icon: "square.on.square"
+            ) { showingWorkoutLibrary = true }
+        }
+    }
+
+    private func premiumPlanAction(
+        _ label: String, icon: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) { premiumPlanActionLabel(label, icon: icon) }
+            .buttonStyle(.plain)
+    }
+
+    private func premiumPlanActionLabel(_ label: String, icon: String) -> some View {
+        VStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .medium))
+            Text(label)
+                .font(.system(size: 9, weight: .semibold))
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .multilineTextAlignment(.center)
+        }
+        .foregroundStyle(graphite)
+        .frame(maxWidth: .infinity, minHeight: 62)
+        .background(.white, in: RoundedRectangle(cornerRadius: 13))
+        .overlay {
+            RoundedRectangle(cornerRadius: 13)
+                .strokeBorder(line.opacity(0.65), lineWidth: 0.7)
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 13))
+    }
+
+    private func selectPremiumPlanWeek(_ index: Int) {
+        withAnimation(.easeInOut(duration: 0.21)) {
+            selectedWeekIndex = index
+            selectedDayID = nil
+            selectedDetailSection = .structure
+        }
+    }
+
+    private func premiumAllWeeks(_ plan: TrainingPlan) -> some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 77))], spacing: 8) {
+            ForEach(Array(plan.weeks.enumerated()), id: \.offset) { index, _ in
+                let selected = (selectedWeekIndex ?? currentWeekIndex(plan)) == index
+                Button {
+                    selectPremiumPlanWeek(index)
+                    showingEntirePlan = false
+                } label: {
+                    Text(tr("Week", "Uke") + " \(index + 1)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(selected ? .white : graphite)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(selected ? graphite : soft,
+                                    in: RoundedRectangle(cornerRadius: 11))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func isPremiumPlanWorkoutCompleted(
+        _ workout: PlannedSession, plan: TrainingPlan
+    ) -> Bool {
+        session.isPlanSessionCompleted(
+            planID: plan.id, sessionID: workout.id,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+    }
+
+    private func premiumSelectedDay(in week: TrainingPlanWeek, plan: TrainingPlan)
+    -> TrainingPlanDay? {
+        if let selectedDayID,
+           let found = week.days.first(where: { $0.id == selectedDayID }) {
+            return found
+        }
+        let current = week.days.first {
+            Calendar.current.isDate(planDayDate($0.dayIndex, plan: plan),
+                                    inSameDayAs: Date())
+        }
+        return current ?? week.days.first(where: {
+            $0.sessions.contains(where: { !$0.isExplicitRestDay })
+        }) ?? week.days.sorted(by: { $0.dayIndex < $1.dayIndex }).first
+    }
+
+    private func premiumPlanWeek(
+        _ plan: TrainingPlan, week: TrainingPlanWeek
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(tr("This week", "Denne uken"))
+                    .font(.system(size: 23, weight: .regular, design: .serif))
+                Spacer()
+                Text(tr("Week", "Uke") + " \((selectedWeekIndex ?? currentWeekIndex(plan)) + 1) " +
+                    tr("of", "av") + " \(plan.weeks.count)")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(secondaryInk)
+                Button {
+                    selectPremiumPlanWeek(
+                        max((selectedWeekIndex ?? currentWeekIndex(plan)) - 1, 0)
+                    )
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .frame(width: 30, height: 38)
+                }
+                .disabled((selectedWeekIndex ?? currentWeekIndex(plan)) == 0)
+                Button {
+                    selectPremiumPlanWeek(
+                        min((selectedWeekIndex ?? currentWeekIndex(plan)) + 1,
+                            plan.weeks.count - 1)
+                    )
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .frame(width: 30, height: 38)
+                }
+                .disabled((selectedWeekIndex ?? currentWeekIndex(plan)) ==
+                          plan.weeks.count - 1)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(graphite)
+
+            premiumPlanDayStrip(plan, week: week)
+            if let selected = premiumSelectedDay(in: week, plan: plan) {
+                premiumSelectedDayPanel(selected, plan: plan)
+            }
+        }
+    }
+
+    private func premiumPlanDayStrip(
+        _ plan: TrainingPlan, week: TrainingPlanWeek
+    ) -> some View {
+        HStack(alignment: .top, spacing: 5) {
+            ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                premiumPlanDayTile(day, plan: plan,
+                                   selected: premiumSelectedDay(in: week, plan: plan)?.id == day.id)
+            }
+        }
+    }
+
+    private func premiumPlanDayTile(
+        _ day: TrainingPlanDay, plan: TrainingPlan, selected: Bool
+    ) -> some View {
+        let date = planDayDate(day.dayIndex, plan: plan)
+        let workouts = day.sessions.filter { !$0.isExplicitRestDay }
+        let completed = !workouts.isEmpty &&
+            workouts.allSatisfy { isPremiumPlanWorkoutCompleted($0, plan: plan) }
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                selectedDayID = day.id
+                selectedDetailSection = .structure
+            }
+        } label: {
+            VStack(spacing: 6) {
+                Text(weekday(day.dayIndex, plan: plan))
+                    .font(.system(size: 10, weight: .semibold))
+                Text(date.formatted(.dateTime.day().month(.abbreviated)))
+                    .font(.system(size: 9))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+
+                Image(systemName: completed ? "checkmark.circle.fill" :
+                      workouts.isEmpty ? "circle.fill" :
+                      selected ? day.sessions.first?.kind.systemImage ?? "figure.run" :
+                      "circle")
+                    .font(.system(size: selected ? 17 : 14, weight: .semibold))
+                    .foregroundStyle(
+                        completed ? Color.green.opacity(0.9) :
+                        selected ? Color.white : secondaryInk.opacity(0.72)
+                    )
+                    .frame(height: 19)
+
+                Text(workouts.first.map {
+                    $0.title
+                } ?? tr("Rest", "Hvile"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.72)
+                    .frame(height: 26)
+                if let minutes = workouts.first?.durationMinutes, minutes > 0 {
+                    Text("\(minutes) min")
+                        .font(.system(size: 9))
+                        .foregroundStyle(selected ? .white.opacity(0.78) :
+                            secondaryInk)
+                        .lineLimit(1)
+                } else {
+                    Text(" ")
+                        .font(.system(size: 9))
+                }
+            }
+            .foregroundStyle(selected ? .white : graphite)
+            .frame(maxWidth: .infinity, minHeight: 115, alignment: .top)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 2)
+            .background(selected ? graphite : Color.white.opacity(0.90),
+                        in: RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .accessibilityLabel(
+            date.formatted(.dateTime.weekday(.wide).day().month(.wide)) +
+            " · " + (workouts.first?.title ?? tr("Rest", "Hviledag"))
+        )
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
     private func overview(_ plan: TrainingPlan) -> some View {
         let progress = session.trainingPlanProgress(
             plan,
