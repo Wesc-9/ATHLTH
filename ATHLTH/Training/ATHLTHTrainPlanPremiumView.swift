@@ -2108,6 +2108,182 @@ struct ATHLTHTrainPlanPremiumView: View {
         .background(soft, in: RoundedRectangle(cornerRadius: 12))
     }
 
+
+    // MARK: - Copy a complete day without discarding scheduled sessions
+
+    private func preparePlanDayCopy(
+        _ day: TrainingPlanDay, plan: TrainingPlan
+    ) {
+        guard day.sessions.contains(where: { !$0.isExplicitRestDay }) else { return }
+        copyingSourceDayID = day.id
+        copyTargetDayIDs = []
+        copyTargetWeekIndex = selectedWeekIndex ?? currentWeekIndex(plan)
+        showingCopyDay = true
+    }
+
+    private func planCopyDaySheet(
+        plan: TrainingPlan, sourceDayID: UUID
+    ) -> some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                HStack {
+                    Button {
+                        copyTargetWeekIndex = max(copyTargetWeekIndex - 1, 0)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 44, height: 44)
+                    }
+                    .disabled(copyTargetWeekIndex == 0)
+                    Spacer()
+                    Text(tr("Week", "Uke") + " \(copyTargetWeekIndex + 1) " +
+                         tr("of", "av") + " \(plan.weeks.count)")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        copyTargetWeekIndex = min(
+                            copyTargetWeekIndex + 1, plan.weeks.count - 1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .frame(width: 44, height: 44)
+                    }
+                    .disabled(copyTargetWeekIndex == plan.weeks.count - 1)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(graphite)
+                .padding(.horizontal, 12)
+
+                if plan.weeks.indices.contains(copyTargetWeekIndex) {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            ForEach(plan.weeks[copyTargetWeekIndex].days.sorted(
+                                by: { $0.dayIndex < $1.dayIndex }
+                            )) { day in
+                                let date = copyPlanDate(
+                                    day.dayIndex, week: copyTargetWeekIndex,
+                                    plan: plan)
+                                let disabled = day.id == sourceDayID ||
+                                    date < Calendar.current.startOfDay(for: Date())
+                                let selected = copyTargetDayIDs.contains(day.id)
+                                Button {
+                                    if selected {
+                                        copyTargetDayIDs.remove(day.id)
+                                    } else {
+                                        copyTargetDayIDs.insert(day.id)
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName:
+                                            selected ? "checkmark.circle.fill" : "circle")
+                                            .font(.title3)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(date.formatted(
+                                                .dateTime.weekday(.wide).day().month(.wide)))
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(day.id == sourceDayID
+                                                ? tr("Original day", "Originaldag")
+                                                : day.sessions.isEmpty
+                                                ? tr("No workout scheduled", "Ingen økt planlagt")
+                                                : tr("Existing workouts are kept",
+                                                     "Eksisterende økter beholdes"))
+                                                .font(.caption)
+                                                .foregroundStyle(secondaryInk)
+                                        }
+                                        Spacer()
+                                    }
+                                    .foregroundStyle(graphite)
+                                    .padding(14)
+                                    .background(selected ? ATHLTHPlanDesign.selectedSurface :
+                                                .white,
+                                                in: RoundedRectangle(cornerRadius: 14))
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(disabled)
+                                .opacity(disabled ? 0.42 : 1)
+                            }
+                        }
+                        .padding(.horizontal, 15)
+                    }
+                }
+
+                Text(tr("Selected dates can span several weeks. Existing workouts are kept.",
+                        "Du kan velge dager i flere uker. Eksisterende økter beholdes."))
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+                    .padding(.horizontal, 15)
+
+                Button {
+                    applyPlanDayCopy(planID: plan.id, sourceDayID: sourceDayID)
+                } label: {
+                    Text(tr("Copy to selected days", "Kopier til valgte dager") +
+                         " (\(copyTargetDayIDs.count))")
+                        .frame(maxWidth: .infinity, minHeight: 51)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(graphite)
+                .disabled(copyTargetDayIDs.isEmpty)
+                .padding(.horizontal, 15)
+                .padding(.bottom, 12)
+            }
+            .background(paper.ignoresSafeArea())
+            .navigationTitle(tr("Copy day", "Kopier dag"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Close", "Lukk")) { showingCopyDay = false }
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private func copyPlanDate(
+        _ dayIndex: Int, week: Int, plan: TrainingPlan
+    ) -> Date {
+        let start = Calendar.current.startOfDay(for: plan.startDate ?? Date())
+        return Calendar.current.date(
+            byAdding: .day, value: week * 7 + dayIndex - 1, to: start
+        ) ?? start
+    }
+
+    private func applyPlanDayCopy(planID: UUID, sourceDayID: UUID) {
+        guard let current = session.trainingPlan(withID: planID),
+              let source = current.weeks.flatMap(\.days)
+                .first(where: { $0.id == sourceDayID })
+        else { return }
+        let workouts = source.sessions.filter { !$0.isExplicitRestDay }
+        guard !workouts.isEmpty else { return }
+        var copiedCount = 0
+        var errors = 0
+
+        // Resolve the latest version before each copy. The storage API
+        // checks future dates and generates independent IDs for every copy.
+        for dayID in copyTargetDayIDs.sorted(by: { $0.uuidString < $1.uuidString }) {
+            for workout in workouts {
+                guard let latest = session.trainingPlan(withID: planID) else {
+                    errors += 1
+                    continue
+                }
+                if session.copyPlanStudioWorkout(
+                    planID: planID,
+                    sourceWorkoutID: workout.id,
+                    targetDayID: dayID,
+                    expectedVersion: latest.version
+                ) {
+                    copiedCount += 1
+                } else {
+                    errors += 1
+                }
+            }
+        }
+        showingCopyDay = false
+        copyTargetDayIDs = []
+        copyFeedback = errors == 0
+            ? tr("\(copiedCount) workout copies were added.",
+                 "\(copiedCount) øktkopier ble lagt til.")
+            : tr("\(copiedCount) copied, \(errors) could not be copied.",
+                 "\(copiedCount) kopiert, \(errors) kunne ikke kopieres.")
+    }
+
     private func overview(_ plan: TrainingPlan) -> some View {
         let progress = session.trainingPlanProgress(
             plan,
