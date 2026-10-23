@@ -4703,7 +4703,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let unplanned = guided &&
             edit?.isRestDay != true &&
             edit?.detailedWorkout?.isValid != true &&
-            !(edit?.additionalDetailedWorkouts ?? []).contains(where: .isValid)
+            !(edit?.additionalDetailedWorkouts?.contains(where: \.isValid) ?? false)
         let restDay = guided ? edit?.isRestDay == true : isPreviewRestDay(day)
         let expanded = expandedWeekPreviewDays.contains(weekDayKey(day))
         let workouts = unplanned ? [] : previewWorkouts(for: day)
