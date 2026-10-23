@@ -5210,13 +5210,24 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
-                        if let kind = block.groupKind, entry.offset == 0 {
+                        if let kind = block.groupKind,
+                           originalIndex == 0 ||
+                           (originalBlocks.indices.contains(originalIndex - 1) &&
+                            originalBlocks[originalIndex - 1].groupID != block.groupID) {
                             Text(kind.title + " · " + "\(block.groupRounds ?? 1) " +
                                  ATHLTHLocalization.choose(
                                     english: "rounds", norwegian: "runder"
                                  ))
                                 .font(.caption2.weight(.semibold))
                                 .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                        if let seconds = block.restBetweenSetsSeconds, seconds > 0 {
+                            Label("\(Int(seconds)) " + ATHLTHLocalization.choose(
+                                english: "sec rest between sets",
+                                norwegian: "sek pause mellom sett"
+                            ), systemImage: "pause.circle")
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
                     }
                     Spacer(minLength: 0)
