@@ -64,42 +64,39 @@ struct ATHLTHTrainTodayPremiumView: View {
     private let hairline = ATHLTHPlanDesign.warmDivider
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // The Train tab already says "I dag"; avoid a redundant title.
+        VStack(alignment: .leading, spacing: 23) {
+            // The athlete's next real workout owns the first screen. No
+            // fabricated weekly statistics or redundant greeting.
             if let plan {
-                if sessions.contains(where: { $0.isExplicitRestDay }) &&
-                   !sessions.contains(where: { !$0.isExplicitRestDay }) {
+                let scheduled = sessions.filter { !$0.isExplicitRestDay }
+                if scheduled.isEmpty && sessions.contains(where: \.isExplicitRestDay) {
                     restDayCard
                     if let swapped = sessions.first(where: {
                         $0.isExplicitRestDay && $0.dailyAlternativeOriginal != nil
                     }) {
                         undoAlternativeRow(swapped)
                     }
-                } else if sessions.contains(where: { !$0.isExplicitRestDay }) &&
-                          sessions.filter({ !$0.isExplicitRestDay })
-                            .allSatisfy({ completedIDs.contains($0.id) }) {
+                } else if !scheduled.isEmpty &&
+                            scheduled.allSatisfy({ completedIDs.contains($0.id) }) {
                     completedTodayCard(plan)
                 } else if let workout = primaryWorkout {
-                    // Recommendations and the reversible change live inside
-                    // the same planned-workout card, directly under Start.
                     workoutCard(workout, plan: plan)
                 } else {
                     openDayOverview(hasPlan: true)
                 }
-
-                suggestedWorkoutSection
-                quickTrainSection
-                activePlanSection(plan)
             } else {
-                // An empty plan must not mean an empty day.
                 openDayOverview(hasPlan: false)
-                // Starting a workout must not require creating a training plan.
-                quickTrainSection
-                suggestedWorkoutSection
+            }
+
+            // Quick Train is always directly below the principal workout,
+            // using precisely the same launch callbacks as before.
+            quickTrainSection
+            suggestedWorkoutSection
+
+            if let plan {
+                activePlanSection(plan)
             }
             ghostRaceSection
-                .padding(.top, 6)
-
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task {
@@ -121,8 +118,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         ) {
             if let pendingSwap {
                 Button(tr("Use", "Bruk") + " " + pendingSwap.suggestion.title) {
-                    onAcceptAlternative(
-                        pendingSwap.workout, pendingSwap.suggestion)
+                    onAcceptAlternative(pendingSwap.workout, pendingSwap.suggestion)
                     self.pendingSwap = nil
                 }
             }
@@ -301,191 +297,283 @@ struct ATHLTHTrainTodayPremiumView: View {
         )
     }
 
+    private struct HeroPhase: Identifiable {
+        let phase: WorkoutPhaseKind
+        let minutes: Int?
+        var id: String { phase.rawValue }
+    }
+
+    /// Display only phases actually present in the workout. This must never
+    /// invent warmup, cooldown, reps or recovery based on a decorative mockup.
+    private func heroPhases(for workout: PlannedSession) -> [HeroPhase] {
+        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        return WorkoutPhaseKind.allCases.compactMap { phase in
+            let matching = blocks.filter { $0.resolvedPhase == phase }
+            guard !matching.isEmpty else { return nil }
+            let seconds = matching.compactMap(\.durationSeconds)
+                .filter { $0 > 0 }
+                .reduce(0.0, +)
+            let minutes = seconds > 0
+                ? max(1, Int((seconds / 60).rounded(.up)))
+                : (blocks.count == matching.count ? workout.durationMinutes : nil)
+            return HeroPhase(phase: phase, minutes: minutes)
+        }
+    }
+
     private func workoutCard(
-        _ workout: PlannedSession,
-        plan: TrainingPlan
+        _ workout: PlannedSession, plan: TrainingPlan
     ) -> some View {
         let finished = completedIDs.contains(workout.id)
-        return VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .topLeading) {
-                // Bound the image to the card width. An unconstrained
-                // scaledToFill image can expand the entire vertical ScrollView.
-                GeometryReader { imageGeometry in
-                    Image(workoutImage(for: workout.kind))
-                        .resizable()
-                        .scaledToFill()
-                        .saturation(0.45)
-                        .frame(
-                            width: imageGeometry.size.width,
-                            height: 147
-                        )
-                        .clipped()
-                }
-                .frame(height: 147)
-
-                LinearGradient(
-                    colors: [.black.opacity(0.46), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(
-                        finished
-                            ? tr("COMPLETED TODAY", "GJENNOMFØRT I DAG")
-                            : tr("TODAY'S WORKOUT", "DAGENS ØKT")
-                    )
-                    .font(.caption2.weight(.semibold))
-                    .tracking(1.5)
-                    .foregroundStyle(.white)
-                    Spacer(minLength: 4)
-                    todayDateLabel(color: .white.opacity(0.92))
-                }
-                .padding(15)
-            }
-            .frame(height: 147)
-            .clipped()
-
-            VStack(alignment: .leading, spacing: 15) {
-                Button {
-                    onWorkoutDetails(
-                        workout,
-                        healthCompletedIDs.contains(workout.id)
-                    )
-                } label: {
-                    HStack(alignment: .top, spacing: 8) {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(workout.title)
-                                .font(.system(size: 22, weight: .medium, design: .serif))
-                                .foregroundStyle(ink)
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
-                            Text(plan.title)
-                                .font(.caption)
-                                .foregroundStyle(muted)
-                                .lineLimit(1)
-                        }
-                        Spacer(minLength: 2)
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundStyle(ink)
-                            .padding(.top, 7)
+        return VStack(alignment: .leading, spacing: 10) {
+            VStack(spacing: -54) {
+                ZStack(alignment: .bottomLeading) {
+                    GeometryReader { geometry in
+                        Image(workoutImage(for: workout.kind))
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width, height: 416)
+                            .clipped()
                     }
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                    .frame(height: 416)
 
-                HStack(spacing: 8) {
-                    detailLabel(
-                        icon: "clock",
-                        text: workout.scheduledStart?.formatted(
-                            date: .omitted,
-                            time: .shortened
-                        ) ?? tr("Today", "I dag")
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black.opacity(0.05), location: 0),
+                            .init(color: .black.opacity(0.05), location: 0.36),
+                            .init(color: .black.opacity(0.62), location: 0.96)
+                        ], startPoint: .top, endPoint: .bottom
                     )
-                    Spacer(minLength: 3)
-                    detailLabel(
-                        icon: "timer",
-                        text: workout.durationMinutes.map { "\($0) min" }
-                            ?? tr("Open", "Åpen")
-                    )
-                }
-                HStack(spacing: 8) {
-                    detailLabel(icon: workout.kind.systemImage, text: workout.kind.title)
-                    Spacer(minLength: 3)
-                    detailLabel(
-                        icon: "list.bullet",
-                        text: workout.exercises.isEmpty
-                            ? tr("Planned workout", "Planlagt økt")
-                            : tr(
-                                "\(workout.exercises.count) exercises",
-                                "\(workout.exercises.count) øvelser"
-                            )
-                    )
-                }
 
-                Button {
-                    if hasActiveWorkout || finished {
-                        onWorkoutDetails(
-                            workout,
-                            healthCompletedIDs.contains(workout.id)
-                        )
-                    } else {
-                        onStartWorkout(
-                            workout,
-                            healthCompletedIDs.contains(workout.id)
-                        )
-                    }
-                } label: {
-                    HStack {
-                        Spacer()
-                        Text(
-                            finished
-                                ? tr("View workout", "Se økten")
-                                : hasActiveWorkout
-                                ? tr("View planned workout", "Se planlagt økt")
-                                : tr("Start workout", "Start økt")
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Image(
-                            systemName: (finished || hasActiveWorkout)
-                                ? "arrow.up.right" : "play.fill"
-                        )
-                    }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 17)
-                    .frame(height: 47)
-                    .background(ink, in: RoundedRectangle(cornerRadius: 11))
-                }
-                .buttonStyle(.plain)
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(Date.now.formatted(
+                            .dateTime.weekday(.wide).day().month(.wide)
+                        ).uppercased())
+                            .font(.system(size: 11, weight: .bold))
+                            .tracking(2.0)
+                            .foregroundStyle(.white.opacity(0.91))
 
-                if workout.dailyAlternativeOriginal != nil {
-                    undoAlternativeRow(workout)
-                } else if !finished && !hasActiveWorkout,
-                          let suggested = ATHLTHDailyWorkoutAlternativeAdvisor
-                            .suggestions(for: workout, signals: selfReportedSignals).first {
-                    alternativeRecommendationCard(
-                        for: workout, suggestion: suggested)
-                }
+                        Text(workout.title)
+                            .font(.system(size: 43, weight: .regular, design: .serif))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.70)
+                            .shadow(color: .black.opacity(0.20), radius: 7)
 
-                if sessions.count > 1 {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(tr("ALSO TODAY", "OGSÅ I DAG"))
-                            .font(.caption2.weight(.semibold))
-                            .tracking(1.3)
-                            .foregroundStyle(muted)
-                        ForEach(sessions.filter { $0.id != workout.id }) { extra in
-                            Button {
-                                onWorkoutDetails(
-                                    extra,
-                                    healthCompletedIDs.contains(extra.id)
-                                )
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: extra.kind.systemImage)
-                                    Text(extra.title).lineLimit(1)
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                }
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(ink)
+                        HStack(spacing: 15) {
+                            heroMeta("clock", workout.durationMinutes.map {
+                                "\($0) min"
+                            } ?? tr("Flexible", "Fleksibel"))
+                            heroMeta(workout.kind.systemImage, workout.kind.title)
+                            if let intensity = heroIntensity(workout) {
+                                heroMeta("chart.bar.fill", intensity)
                             }
-                            .buttonStyle(.plain)
                         }
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+
+                        // The light floating control plate overlaps the photo.
+                        Spacer().frame(height: 111)
                     }
-                    .padding(.top, 3)
+                    .padding(.horizontal, 22)
+                    .padding(.bottom, 20)
                 }
+                .frame(height: 416)
+                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 15) {
+                    Button {
+                        onWorkoutDetails(
+                            workout, healthCompletedIDs.contains(workout.id))
+                    } label: {
+                        heroTimeline(for: workout)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(tr(
+                        "Open all workout steps", "Åpne alle øktdelene"
+                    ))
+
+                    HStack(spacing: 12) {
+                        Button {
+                            if hasActiveWorkout || finished {
+                                onWorkoutDetails(
+                                    workout, healthCompletedIDs.contains(workout.id))
+                            } else {
+                                onStartWorkout(
+                                    workout, healthCompletedIDs.contains(workout.id))
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Spacer()
+                                Image(systemName: hasActiveWorkout || finished
+                                    ? "arrow.up.right" : "play.fill")
+                                Text(finished
+                                     ? tr("View workout", "Se økten")
+                                     : hasActiveWorkout
+                                     ? tr("View planned workout", "Se planlagt økt")
+                                     : tr("Start workout", "Start økt"))
+                                Spacer()
+                            }
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .frame(minHeight: 58)
+                            .background(ink,
+                                        in: RoundedRectangle(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+
+                        Menu {
+                            Button {
+                                onWorkoutDetails(workout,
+                                    healthCompletedIDs.contains(workout.id))
+                            } label: {
+                                Label(tr("View workout", "Se økten"),
+                                      systemImage: "list.bullet")
+                            }
+                            Button(action: onOpenPlan) {
+                                Label(tr("Training plan", "Treningsplan"),
+                                      systemImage: "calendar")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.system(size: 19, weight: .semibold))
+                                .foregroundStyle(ink)
+                                .frame(width: 58, height: 58)
+                                .background(ATHLTHPlanDesign.warmSurface,
+                                            in: Circle())
+                                .overlay {
+                                    Circle().strokeBorder(
+                                        hairline.opacity(0.7), lineWidth: 0.8)
+                                }
+                        }
+                        .accessibilityLabel(tr(
+                            "Workout options", "Øktvalg"
+                        ))
+                    }
+                }
+                .padding(16)
+                .background(.white,
+                            in: RoundedRectangle(cornerRadius: 22))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22)
+                        .strokeBorder(hairline.opacity(0.65), lineWidth: 0.7)
+                }
+                .shadow(color: ink.opacity(0.12), radius: 22, y: 10)
+                .padding(.horizontal, 13)
             }
-            .padding(16)
+
+            // All alternatives and secondary sessions remain available,
+            // rather than being hidden or silently replaced by the redesign.
+            if workout.dailyAlternativeOriginal != nil {
+                undoAlternativeRow(workout)
+            } else if !finished && !hasActiveWorkout,
+                      let suggestion = ATHLTHDailyWorkoutAlternativeAdvisor
+                        .suggestions(for: workout,
+                                     signals: selfReportedSignals).first {
+                alternativeRecommendationCard(for: workout, suggestion: suggestion)
+            }
+
+            if sessions.filter({ !$0.isExplicitRestDay && $0.id != workout.id }).count > 0 {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(tr("ALSO TODAY", "OGSÅ I DAG"))
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(muted)
+                    ForEach(sessions.filter { !$0.isExplicitRestDay && $0.id != workout.id }) { extra in
+                        Button {
+                            onWorkoutDetails(extra,
+                                healthCompletedIDs.contains(extra.id))
+                        } label: {
+                            HStack(spacing: 9) {
+                                Image(systemName: extra.kind.systemImage)
+                                Text(extra.title).lineLimit(1)
+                                Spacer()
+                                if completedIDs.contains(extra.id) {
+                                    Image(systemName: "checkmark.circle.fill")
+                                }
+                                Image(systemName: "chevron.right")
+                            }
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ink)
+                            .padding(13)
+                            .background(.white,
+                                in: RoundedRectangle(cornerRadius: 14))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.top, 4)
+            }
         }
-        .background(.white)
-        .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(hairline.opacity(0.7), lineWidth: 0.65)
+    }
+
+    private func heroMeta(_ icon: String, _ value: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+            Text(value)
+                .font(.system(size: 13, weight: .medium))
         }
-        .shadow(color: ink.opacity(0.065), radius: 14, y: 7)
+        .foregroundStyle(.white)
+    }
+
+    private func heroIntensity(_ workout: PlannedSession) -> String? {
+        if let zone = workout.resolvedWorkoutBlocks
+            .compactMap(\.targetHeartRateZone).first {
+            return tr("Zone", "Sone") + " \(zone)"
+        }
+        return nil
+    }
+
+    @ViewBuilder
+    private func heroTimeline(for workout: PlannedSession) -> some View {
+        let phases = heroPhases(for: workout)
+        if phases.isEmpty {
+            HStack(spacing: 12) {
+                Image(systemName: "list.bullet")
+                Text(tr("View workout details", "Se øktens innhold"))
+                    .font(.subheadline.weight(.medium))
+                Spacer()
+                Image(systemName: "chevron.right")
+            }
+            .foregroundStyle(ink)
+            .frame(minHeight: 43)
+        } else {
+            HStack(alignment: .center, spacing: 10) {
+                Image(systemName: "list.bullet")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(ink)
+                    .frame(width: 24)
+                HStack(alignment: .top, spacing: 4) {
+                    ForEach(phases) { item in
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(spacing: 0) {
+                                Circle()
+                                    .fill(ATHLTHPlanDesign.ink.opacity(0.55))
+                                    .frame(width: 8, height: 8)
+                                Rectangle()
+                                    .fill(hairline)
+                                    .frame(height: 2)
+                            }
+                            Text(item.phase.title)
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.75)
+                            if let minutes = item.minutes {
+                                Text("\(minutes) min")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(muted)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(muted)
+            }
+            .foregroundStyle(ink)
+            .frame(minHeight: 58)
+        }
     }
 
     /// A plan-free day is not automatically a prescribed rest day. Keep
