@@ -55,6 +55,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         reportedMuscles = current.todayRatings
     }
     let onQuickTrain: (WorkoutKind) -> Void
+    let onQuickCycling: () -> Void
     let onGhostRace: () -> Void
 
 
@@ -996,7 +997,11 @@ struct ATHLTHTrainTodayPremiumView: View {
         Button {
             social.quickTrainFriendIDs.removeAll()
             social.discardPreparedQuickTrainFriends()
-            onQuickTrain(kind)
+            if kind == .custom {
+                onQuickCycling()
+            } else {
+                onQuickTrain(kind)
+            }
         } label: {
             ZStack(alignment: .bottomLeading) {
                 GeometryReader { geometry in
