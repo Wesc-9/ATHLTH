@@ -652,58 +652,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 initialRouteID: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeID,
                 draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
                 plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
-                planCopyDays: (0..<weekCount).flatMap { week in
-                    (1...7).map { weekday -> ATHLTHPlanCopyDay in
-                        let key = weekDayKey(weekday, weekIndex: week)
-                        let date = dateForWeekDay(weekday, weekIndex: week)
-                        let planDay = weekDayEdits[key]
-                        return ATHLTHPlanCopyDay(
-                            weekIndex: week,
-                            weekday: weekday,
-                            date: date,
-                            hasWorkout: planDay?.detailedWorkout != nil ||
-                                !(planDay?.additionalDetailedWorkouts ?? []).isEmpty,
-                            isSource: key == weekDayKey(
-                                selection.id, weekIndex: selectedPlanWeekIndex
-                            )
-                        )
-                    }
-                },
+                planCopyDays: planCopyDayOptions(
+                    excluding: selection.id, sourceWeekIndex: selectedPlanWeekIndex
+                ),
                 initialCopyWeekIndex: selectedPlanWeekIndex,
                 onCopyToPlan: { name, blocks, routeID, minutes, keys in
-                    guard !keys.isEmpty else { return false }
-                    let proposed = ATHLTHPlanStructuredWorkoutBlueprint(
-                        title: name,
-                        kind: workoutKind(for: blocks),
-                        durationMinutes: minutes ?? 45,
-                        routeID: routeID,
-                        blocks: blocks
+                    copyComposedWorkout(
+                        name: name, blocks: blocks, routeID: routeID,
+                        duration: minutes, targets: keys,
+                        sourceDay: selection.id, sourceWeek: selectedPlanWeekIndex
                     )
-                    guard proposed.isValid else { return false }
-                    let sourceKey = weekDayKey(selection.id, weekIndex: selectedPlanWeekIndex)
-                    guard keys.allSatisfy({
-                        $0 != sourceKey &&
-                        $0 >= 1 && $0 <= weekCount * 7
-                    }) else { return false }
-                    // Copy, never replace. This also permits several sessions
-                    // on one day while preserving the source workout and its IDs.
-                    for key in keys {
-                        var target = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
-                        target.isRestDay = false
-                        target.removeTemplateDetail = false
-                        if target.detailedWorkout == nil {
-                            target.detailedWorkout = proposed
-                            target.kind = proposed.kind
-                            target.title = proposed.title
-                            target.durationMinutes = proposed.durationMinutes
-                        } else {
-                            target.additionalDetailedWorkouts =
-                                (target.additionalDetailedWorkouts ?? []) + [proposed]
-                        }
-                        weekDayEdits[key] = target
-                    }
-                    saveResumableDraft()
-                    return true
                 },
                 onSaveToPlan: { name, blocks, routeID, minutes, _ in
                     let proposed = ATHLTHPlanStructuredWorkoutBlueprint(
@@ -3381,6 +3339,70 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         edit.detailedWorkout = workouts[0]
         edit.additionalDetailedWorkouts = Array(workouts.dropFirst())
         weekDayEdits[key] = edit
+    }
+
+    private func planCopyDayOptions(
+        excluding sourceDay: Int, sourceWeekIndex: Int
+    ) -> [ATHLTHPlanCopyDay] {
+        let sourceKey = weekDayKey(sourceDay, weekIndex: sourceWeekIndex)
+        return (0..<weekCount).flatMap { week in
+            (1...7).map { weekday in
+                let key = weekDayKey(weekday, weekIndex: week)
+                let edit = weekDayEdits[key]
+                return ATHLTHPlanCopyDay(
+                    weekIndex: week,
+                    weekday: weekday,
+                    date: dateForWeekDay(weekday, weekIndex: week),
+                    hasWorkout: edit?.detailedWorkout != nil ||
+                        !(edit?.additionalDetailedWorkouts ?? []).isEmpty,
+                    isSource: key == sourceKey
+                )
+            }
+        }
+    }
+
+    private func copyComposedWorkout(
+        name: String,
+        blocks: [WorkoutTemplateBlock],
+        routeID: UUID?,
+        duration: Int?,
+        targets: [Int],
+        sourceDay: Int,
+        sourceWeek: Int
+    ) -> Bool {
+        guard !targets.isEmpty else { return false }
+        let proposed = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: name,
+            kind: workoutKind(for: blocks),
+            durationMinutes: duration ?? 45,
+            routeID: routeID,
+            blocks: blocks
+        )
+        guard proposed.isValid else { return false }
+        let sourceKey = weekDayKey(sourceDay, weekIndex: sourceWeek)
+        guard targets.allSatisfy({
+            $0 != sourceKey && $0 >= 1 && $0 <= weekCount * 7
+        }) else { return false }
+
+        // Do not replace a planned session. Every destination keeps its own
+        // workout when it already has one, and copies can span plan weeks.
+        for key in targets {
+            var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
+            edit.isRestDay = false
+            edit.removeTemplateDetail = false
+            if edit.detailedWorkout == nil {
+                edit.detailedWorkout = proposed
+                edit.kind = proposed.kind
+                edit.title = proposed.title
+                edit.durationMinutes = proposed.durationMinutes
+            } else {
+                edit.additionalDetailedWorkouts =
+                    (edit.additionalDetailedWorkouts ?? []) + [proposed]
+            }
+            weekDayEdits[key] = edit
+        }
+        saveResumableDraft()
+        return true
     }
 
     private func selectedWorkoutForEditor(day: Int) -> ATHLTHPlanStructuredWorkoutBlueprint? {
