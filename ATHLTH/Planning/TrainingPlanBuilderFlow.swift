@@ -3354,7 +3354,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     weekday: weekday,
                     date: dateForWeekDay(weekday, weekIndex: week),
                     hasWorkout: edit?.detailedWorkout != nil ||
-                        !(edit?.additionalDetailedWorkouts ?? []).isEmpty,
+                        !(edit?.additionalDetailedWorkouts ?? []).isEmpty ||
+                        (selectedDays.contains(weekday) && edit?.isRestDay != true),
                     isSource: key == sourceKey
                 )
             }
@@ -3387,17 +3388,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // Do not replace a planned session. Every destination keeps its own
         // workout when it already has one, and copies can span plan weeks.
         for key in targets {
+            let weekday = (key - 1) % 7 + 1
             var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
+            // Preferred weekdays may already contain a generated session even
+            // before a specific day edit exists. Append rather than overwrite it.
+            let hasOriginal = selectedDays.contains(weekday) && edit.isRestDay != true
+            let hasDetailedWorkout = edit.detailedWorkout != nil
             edit.isRestDay = false
             edit.removeTemplateDetail = false
-            if edit.detailedWorkout == nil {
+            if hasDetailedWorkout || hasOriginal {
+                edit.additionalDetailedWorkouts =
+                    (edit.additionalDetailedWorkouts ?? []) + [proposed]
+            } else {
                 edit.detailedWorkout = proposed
                 edit.kind = proposed.kind
                 edit.title = proposed.title
                 edit.durationMinutes = proposed.durationMinutes
-            } else {
-                edit.additionalDetailedWorkouts =
-                    (edit.additionalDetailedWorkouts ?? []) + [proposed]
             }
             weekDayEdits[key] = edit
         }
