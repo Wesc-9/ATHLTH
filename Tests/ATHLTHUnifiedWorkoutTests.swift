@@ -96,6 +96,24 @@ final class ATHLTHUnifiedWorkoutTests: XCTestCase {
         )
     }
 
+    func testCyclingIsPreservedAsCyclingCategoryNotStrength() {
+        var cycling = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: "Cycling",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 1800,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil
+        )
+        cycling.activityTag = "cycling"
+        var workout = makeWorkout(kind: .strength)
+        ATHLTHUnifiedWorkout.apply(
+            blocks: [cycling], title: "Cycling session", routeID: nil,
+            estimatedMinutes: 30, to: &workout
+        )
+        XCTAssertEqual(workout.kind, .custom)
+        XCTAssertEqual(workout.workoutCategory, "cycling")
+        XCTAssertEqual(workout.resolvedWorkoutBlocks, [cycling])
+    }
+
     func testWalkingKeepsItsWorkoutClassification() {
         var workout = makeWorkout(kind: .walking)
         workout.durationMinutes = 30
