@@ -16,7 +16,8 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && !blocks.isEmpty && blocks.count <= 200
             && blocks.contains { $0.kind == .run || $0.kind == .exercise
-                || ($0.kind == .note && $0.wellnessKind != nil
+                || ($0.kind == .note
+                    && ($0.wellnessKind != nil || $0.activityTag == "cycling")
                     && ($0.durationSeconds ?? 0) > 0) }
             && blocks.expandedForExecution().count <= 1_000
             && !Set(blocks.compactMap {
@@ -37,6 +38,9 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
             return walkingOnly ? "walking" : "running"
         }
         if hasStrength { return "strength" }
+        if blocks.contains(where: { $0.activityTag == "cycling" }) {
+            return "cycling"
+        }
         let wellness = blocks.compactMap(\.wellnessKind)
         if !wellness.isEmpty {
             return wellness.allSatisfy { $0 == .meditation }
