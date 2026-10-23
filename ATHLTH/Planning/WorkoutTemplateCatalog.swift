@@ -157,6 +157,62 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     /// old workout recipes decode unchanged and get fresh editor IDs.
     var editorDragID: UUID = UUID()
 
+    // The drag token is an editor-only visual identity. It must not affect
+    // recipe equality, hashing, undo, persisted plans or Codable round trips.
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.sequence == rhs.sequence &&
+        lhs.kind == rhs.kind &&
+        lhs.title == rhs.title &&
+        lhs.exerciseSlug == rhs.exerciseSlug &&
+        lhs.distanceMeters == rhs.distanceMeters &&
+        lhs.repetitions == rhs.repetitions &&
+        lhs.durationSeconds == rhs.durationSeconds &&
+        lhs.targetWeightKilograms == rhs.targetWeightKilograms &&
+        lhs.loadNote == rhs.loadNote &&
+        lhs.notes == rhs.notes &&
+        lhs.phase == rhs.phase &&
+        lhs.targetPaceSecondsPerKilometer == rhs.targetPaceSecondsPerKilometer &&
+        lhs.targetHeartRateZone == rhs.targetHeartRateZone &&
+        lhs.setCount == rhs.setCount &&
+        lhs.restBetweenSetsSeconds == rhs.restBetweenSetsSeconds &&
+        lhs.groupID == rhs.groupID &&
+        lhs.groupKind == rhs.groupKind &&
+        lhs.groupRounds == rhs.groupRounds &&
+        lhs.cardioActivity == rhs.cardioActivity &&
+        lhs.isIndoor == rhs.isIndoor &&
+        lhs.exerciseSnapshot == rhs.exerciseSnapshot &&
+        lhs.exerciseID == rhs.exerciseID &&
+        lhs.wellnessKind == rhs.wellnessKind &&
+        lhs.activityTag == rhs.activityTag
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(sequence)
+        hasher.combine(kind)
+        hasher.combine(title)
+        hasher.combine(exerciseSlug)
+        hasher.combine(distanceMeters)
+        hasher.combine(repetitions)
+        hasher.combine(durationSeconds)
+        hasher.combine(targetWeightKilograms)
+        hasher.combine(loadNote)
+        hasher.combine(notes)
+        hasher.combine(phase)
+        hasher.combine(targetPaceSecondsPerKilometer)
+        hasher.combine(targetHeartRateZone)
+        hasher.combine(setCount)
+        hasher.combine(restBetweenSetsSeconds)
+        hasher.combine(groupID)
+        hasher.combine(groupKind)
+        hasher.combine(groupRounds)
+        hasher.combine(cardioActivity)
+        hasher.combine(isIndoor)
+        hasher.combine(exerciseSnapshot)
+        hasher.combine(exerciseID)
+        hasher.combine(wellnessKind)
+        hasher.combine(activityTag)
+    }
+
     var resolvedPhase: WorkoutPhaseKind {
         phase ?? (kind == .rest ? .recovery : .main)
     }
@@ -2340,8 +2396,7 @@ struct WorkoutTemplateBuilderView: View {
     private func timelineDraggableSection(_ section: TimelineSection) -> some View {
         timelineSectionContent(section)
             .contentShape(RoundedRectangle(cornerRadius: 20))
-            .opacity(draggingSectionID == section.id ? 0.34 : 1)
-            .overlay {
+                        .overlay {
                 if hoveredSectionID == section.id &&
                     draggingSectionID != section.id {
                     RoundedRectangle(cornerRadius: 20)
@@ -2510,9 +2565,7 @@ struct WorkoutTemplateBuilderView: View {
                     }) { member in
                         let index = member.index
                         builderBlockRow(index, nested: true)
-                            .opacity(draggingGroupMemberID == blocks[index].editorDragID
-                                ? 0.34 : 1)
-                            .contentShape(Rectangle())
+                                                        .contentShape(Rectangle())
                             .onDrag {
                                 draggingGroupMemberID = blocks[index].editorDragID
                                 hoveredGroupMemberID = nil
