@@ -787,6 +787,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                         )
                         draft = nextDraft
                         durationWasEditedManually = wasManual
+                        return true
                     }
                 )
             }
