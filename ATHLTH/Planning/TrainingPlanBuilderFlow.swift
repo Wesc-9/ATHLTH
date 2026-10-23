@@ -5120,6 +5120,48 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         composingAdvancedDay = WeekDayEditorSelection(id: day)
     }
 
+    private var weeklyPreviewSummary: some View {
+        let days = Array(1...7)
+        let activeDays = days.filter { !isPreviewRestDay($0) }
+        let workouts = activeDays.reduce(0) { count, day in
+            let details = previewWorkouts(for: day)
+            // The default weekly program may have an existing workout
+            // before the athlete edits its individual blocks.
+            return count + max(details.count, 1)
+        }
+        let minutes = activeDays.reduce(0) { total, day in
+            let details = previewWorkouts(for: day)
+            return total + (details.isEmpty
+                ? effectiveWorkoutMinutes(for: day)
+                : details.reduce(0) { $0 + $1.durationMinutes })
+        }
+        let restDays = days.count - activeDays.count
+
+        return HStack(spacing: 7) {
+            weekSummaryMetric("\(workouts) " + ATHLTHLocalization.choose(
+                english: "workouts", norwegian: "økter"
+            ), symbol: "figure.run")
+            weekSummaryMetric("\(minutes) " + ATHLTHLocalization.choose(
+                english: "min", norwegian: "min"
+            ), symbol: "clock")
+            weekSummaryMetric("\(restDays) " + ATHLTHLocalization.choose(
+                english: "rest days", norwegian: "hviledager"
+            ), symbol: "moon.stars")
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func weekSummaryMetric(_ value: String, symbol: String) -> some View {
+        Label(value, systemImage: symbol)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .frame(maxWidth: .infinity, minHeight: 32)
+            .background(ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 10))
+    }
+
     private var weeklyPreview: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
@@ -5144,6 +5186,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .padding(.bottom, 3)
 
             weekSelector
+            weeklyPreviewSummary
 
             ForEach(Array(1...7).sorted {
                 dateForWeekDay($0, weekIndex: selectedPlanWeekIndex) <
@@ -5264,6 +5307,19 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             } else {
+                // A template-generated session remains visible alongside any
+                // detailed workouts copied into the same date.
+                let edit = weekDayEdits[weekDayKey(day)]
+                if selectedDays.contains(day), edit?.detailedWorkout == nil {
+                    Label(
+                        effectiveWorkoutTitle(for: day) + " · " +
+                            "\(effectiveWorkoutMinutes(for: day)) min",
+                        systemImage: effectiveWorkoutKind(for: day).systemImage
+                    )
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .padding(.bottom, 4)
+                }
                 ForEach(Array(workouts.enumerated()), id: \.offset) { entry in
                     weeklyPreviewWorkoutDetail(entry.element, day: day, index: entry.offset)
                 }
