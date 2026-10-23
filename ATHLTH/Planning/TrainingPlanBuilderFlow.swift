@@ -5097,6 +5097,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         composingAdvancedDay = WeekDayEditorSelection(id: day)
     }
 
+    private func addPreviewWorkout(_ day: Int) {
+        guard !isPreviewRestDay(day),
+              !previewWorkouts(for: day).isEmpty else {
+            // A rest day needs an explicit activity choice; preserve the
+            // existing plan-day sheet with quick choices and library access.
+            openPreviewDayActions(day)
+            return
+        }
+        // The new workout must be appended, never overwrite the first one.
+        quickStudioOption = nil
+        editingWorkoutIndex = 0
+        addingExtraWorkout = true
+        composingAdvancedDay = WeekDayEditorSelection(id: day)
+    }
+
     private var weeklyPreview: some View {
         VStack(alignment: .leading, spacing: 9) {
             HStack {
@@ -5263,7 +5278,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .tint(ATHLTHPlanDesign.ink)
                 }
                 Button {
-                    openPreviewDayActions(day)
+                    addPreviewWorkout(day)
                 } label: {
                     Label(ATHLTHLocalization.choose(
                         english: "Add workout", norwegian: "Legg til økt"
