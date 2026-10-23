@@ -2056,18 +2056,23 @@ struct WorkoutTemplateBuilderView: View {
             }
             HStack(spacing: 8) {
                 TextField(tr("Enter minutes", "Skriv inn minutter"),
-                          text: $durationInputText)
+                          text: Binding(
+                            get: { durationInputText },
+                            set: { value in
+                                // Only user typing changes the manual override.
+                                // Restored and recalculated estimates stay estimates.
+                                durationInputText = value
+                                let digits = value.filter { $0.isNumber }
+                                manualDurationMinutes = Int(digits).flatMap {
+                                    (1...240).contains($0) ? $0 : nil
+                                }
+                                savedToMyWorkouts = false
+                            }
+                          ))
                     .keyboardType(.numberPad)
                     .font(.system(size: 23, weight: .semibold, design: .rounded))
                     .foregroundStyle(studioInk)
                     .tint(studioAccent)
-                    .onChange(of: durationInputText) { _, value in
-                        let digits = value.filter { $0.isNumber }
-                        manualDurationMinutes = Int(digits).flatMap {
-                            (1...240).contains($0) ? $0 : nil
-                        }
-                        savedToMyWorkouts = false
-                    }
                     .accessibilityLabel(
                         tr("Workout duration in minutes", "Øktvarighet i minutter")
                     )
@@ -3166,6 +3171,7 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 if onCopyToPlan != nil && !planCopyDays.isEmpty {
                     Button {
+                        selectedCopyDayIDs = pendingCopyDayIDs
                         showingCopyPicker = true
                     } label: {
                         Label(tr("Copy to days", "Kopier til andre dager"),
@@ -3403,7 +3409,7 @@ struct WorkoutTemplateBuilderView: View {
                     .padding(.horizontal, 16)
                 Button {
                     guard canSave else { return }
-                    pendingCopyDayIDs.formUnion(selectedCopyDayIDs)
+                    pendingCopyDayIDs = selectedCopyDayIDs
                     selectedCopyDayIDs.removeAll()
                     actionNotice = tr(
                         "Copy destinations are ready; save to apply them.",
