@@ -666,14 +666,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     )
                 },
                 onSaveToPlan: { name, blocks, routeID, minutes, _ in
+                    guard let minutes, (1...240).contains(minutes) else { return false }
                     let proposed = ATHLTHPlanStructuredWorkoutBlueprint(
                         title: name,
                         kind: workoutKind(for: blocks),
-                        durationMinutes: minutes ?? 45,
+                        durationMinutes: minutes,
                         routeID: routeID,
                         blocks: blocks
                     )
-                    guard proposed.isValid else { return }
+                    guard proposed.isValid else { return false }
                     updateWeekDay(selection.id) { edit in
                         edit.isRestDay = false
                         if addingExtraWorkout {
@@ -699,6 +700,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         edit.removeTemplateDetail = false
                     }
                     addingExtraWorkout = false
+                    return true
                 }
             )
         }
@@ -3373,11 +3375,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         sourceDay: Int,
         sourceWeek: Int
     ) -> Bool {
-        guard !targets.isEmpty else { return false }
+        guard !targets.isEmpty,
+              let duration, (1...240).contains(duration) else { return false }
         let proposed = ATHLTHPlanStructuredWorkoutBlueprint(
             title: name,
             kind: workoutKind(for: blocks),
-            durationMinutes: duration ?? 45,
+            durationMinutes: duration,
             routeID: routeID,
             blocks: blocks
         )
@@ -4385,6 +4388,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         if hasStrength && !runs.isEmpty || (hasRunning && hasWalking) { return .custom }
         if hasRunning { return .running }
         if hasWalking { return .walking }
+        // Cycling has its own category, but WorkoutKind has no cycling case.
+        // Never label a cycling-only session as strength.
+        if blocks.contains(where: { $0.activityTag == "cycling" }) {
+            return .custom
+        }
         let wellness = blocks.compactMap(\.wellnessKind)
         if !wellness.isEmpty {
             return wellness.allSatisfy { $0 == .meditation } ? .recovery : .mobility
