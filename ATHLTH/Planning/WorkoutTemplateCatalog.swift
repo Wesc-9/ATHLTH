@@ -150,6 +150,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var exerciseID: UUID? = nil
     /// Optional, so historic note blocks continue decoding unchanged.
     var wellnessKind: WorkoutWellnessKind? = nil
+    /// Non-running timed activities remain distinct from running metrics.
+    var activityTag: String? = nil
 
     var resolvedPhase: WorkoutPhaseKind {
         phase ?? (kind == .rest ? .recovery : .main)
@@ -183,6 +185,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case exerciseSnapshot = "exercise_snapshot"
         case exerciseID = "exercise_id"
         case wellnessKind = "wellness_kind"
+        case activityTag = "activity_tag"
     }
 
     var targetText: String? {
@@ -289,6 +292,7 @@ extension Array where Element == WorkoutTemplateBlock {
             item.exerciseID = source.exerciseID
             item.exerciseSnapshot = source.exerciseSnapshot
             item.wellnessKind = source.wellnessKind
+            item.activityTag = source.activityTag
             output.append(item)
         }
 
@@ -1632,6 +1636,15 @@ struct MyWorkoutTemplatesView: View {
     }
 }
 
+struct ATHLTHPlanCopyDay: Identifiable, Hashable {
+    let weekIndex: Int
+    let weekday: Int
+    let date: Date
+    let hasWorkout: Bool
+
+    var id: Int { weekIndex * 7 + weekday }
+}
+
 struct WorkoutTemplateBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -1655,10 +1668,23 @@ struct WorkoutTemplateBuilderView: View {
     @State private var draftActive = false
     @State private var draftFinished = false
     @State private var draftNotice = false
+    @State private var showingBlockPicker = false
+    @State private var showingSavedWorkoutPicker = false
+    @State private var showingCopyPicker = false
+    @State private var pendingExerciseChoice: WorkoutBlockGroupKind?
+    @State private var pendingSavedWorkoutPicker = false
+    @State private var pendingStandaloneExercise = false
+    @State private var copiedDayIDs: Set<Int> = []
+    @State private var selectedCopyDayIDs: Set<Int> = []
+    @State private var copyWeekIndex = 0
+    @State private var savedToMyWorkouts = false
+    @State private var actionNotice: String?
     @AppStorage("athlth.workoutBuilder.durationInput.v1")
     private var durationInputMode = "clock"
     private let draftContext: String
     private let plannedDate: Date?
+    private let planCopyDays: [ATHLTHPlanCopyDay]
+    private let onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)?
     private let initialDraftSignature: String
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
@@ -1671,6 +1697,9 @@ struct WorkoutTemplateBuilderView: View {
         initialDurationOverrideMinutes: Int? = nil,
         draftContext: String = "shared-template",
         plannedDate: Date? = nil,
+        planCopyDays: [ATHLTHPlanCopyDay] = [],
+        initialCopyWeekIndex: Int = 0,
+        onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)? = nil,
         onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Void)? = nil
     ) {
         _title = State(initialValue: initialTitle)
@@ -1679,6 +1708,9 @@ struct WorkoutTemplateBuilderView: View {
         _manualDurationMinutes = State(initialValue: initialDurationOverrideMinutes)
         self.draftContext = draftContext
         self.plannedDate = plannedDate
+        self.planCopyDays = planCopyDays
+        self.onCopyToPlan = onCopyToPlan
+        _copyWeekIndex = State(initialValue: initialCopyWeekIndex)
         let originalBlocks = (try? JSONEncoder().encode(initialBlocks))?.base64EncodedString() ?? ""
         self.initialDraftSignature = initialTitle + "|" + originalBlocks +
             "|" + (initialRouteID?.uuidString ?? "") +
@@ -1768,6 +1800,11 @@ struct WorkoutTemplateBuilderView: View {
         blocks.contains(where: { $0.kind == .exercise })
     }
 
+    private var hasCycling: Bool {
+        blocks.contains { $0.kind == .note && $0.activityTag == "cycling"
+            && ($0.durationSeconds ?? 0) > 0 }
+    }
+
     private var hasTimedWellness: Bool {
         blocks.contains { $0.kind == .note && $0.wellnessKind != nil
             && ($0.durationSeconds ?? 0) > 0 }
@@ -1780,6 +1817,7 @@ struct WorkoutTemplateBuilderView: View {
         if hasWalking { return "walking" }
         if hasRunning { return "running" }
         if hasStrength { return "strength" }
+        if hasCycling { return "cycling" }
         if hasTimedWellness {
             return blocks.contains {
                 $0.wellnessKind != nil && $0.wellnessKind != .meditation
@@ -1793,6 +1831,7 @@ struct WorkoutTemplateBuilderView: View {
         case "hybrid": return tr("Hybrid", "Hybrid")
         case "running": return tr("Running", "Løping")
         case "walking": return tr("Walking", "Gåing")
+        case "cycling": return tr("Cycling", "Sykling")
         case "strength": return tr("Strength", "Styrke")
         case "mobility": return tr("Mobility", "Mobilitet")
         case "recovery": return tr("Recovery", "Restitusjon")
@@ -1801,7 +1840,7 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var canSave: Bool {
-        (hasRunning || hasStrength || hasTimedWellness) && !hasIncompleteSuperset
+        (hasRunning || hasStrength || hasCycling || hasTimedWellness) && !hasIncompleteSuperset
     }
 
     private var hasIncompleteSuperset: Bool {
@@ -1847,43 +1886,46 @@ struct WorkoutTemplateBuilderView: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(studioInk)
                 Spacer()
-                if manualDurationMinutes == nil {
-                    Text(knownDurationMinutes.map { "~\($0) min" }
-                         ?? tr("Not estimated yet", "Kan ikke beregnes ennå"))
-                        .font(.caption)
-                        .foregroundStyle(studioInk.opacity(0.65))
-                }
+                Text(manualDurationMinutes == nil
+                     ? tr("Estimated", "Estimert")
+                     : tr("Entered", "Angitt"))
+                    .font(.caption)
+                    .foregroundStyle(studioInk.opacity(0.58))
             }
-            Toggle(
-                tr("Set duration manually", "Angi varighet selv"),
-                isOn: Binding(
-                    get: { manualDurationMinutes != nil },
-                    set: { manually in
-                        manualDurationMinutes = manually
-                            ? (knownDurationMinutes ?? 45) : nil
-                    }
+            HStack(spacing: 8) {
+                TextField(
+                    tr("Enter minutes", "Skriv inn minutter"),
+                    text: Binding(
+                        get: { resolvedDurationMinutes.map(String.init) ?? "" },
+                        set: { value in
+                            let digits = value.filter { $0.isNumber }
+                            if digits.isEmpty {
+                                manualDurationMinutes = nil
+                            } else if let minutes = Int(digits), (1...240).contains(minutes) {
+                                manualDurationMinutes = minutes
+                            }
+                        }
+                    )
                 )
-            )
-            .font(.subheadline)
-            .tint(studioAccent)
-            if manualDurationMinutes != nil {
-                Stepper(
-                    "\(manualDurationMinutes ?? 45) min",
-                    value: Binding(
-                        get: { manualDurationMinutes ?? 45 },
-                        set: { manualDurationMinutes = $0 }
-                    ),
-                    in: 5...240, step: 5
-                )
-                .font(.subheadline)
-            } else {
-                Text(tr(
-                    "Calculated from exercises, repetitions, pace and rest. Add a time or pace to distance-based running to estimate it.",
-                    "Beregnes fra øvelser, repetisjoner, tempo og pauser. Legg inn tid eller tempo på distansebasert løping for å få et anslag."
-                ))
-                .font(.caption)
-                .foregroundStyle(studioInk.opacity(0.58))
+                .keyboardType(.numberPad)
+                .font(.system(size: 23, weight: .semibold, design: .rounded))
+                .foregroundStyle(studioInk)
+                .tint(studioAccent)
+                .accessibilityLabel(tr("Workout duration in minutes", "Øktvarighet i minutter"))
+                Text(tr("min", "min"))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(studioInk.opacity(0.6))
             }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 13))
+            Text(tr(
+                "The estimate updates as you edit blocks, even after entering a duration.",
+                "Varigheten beregnes på nytt når du endrer blokker, også etter at du har skrevet inn et tall."
+            ))
+            .font(.caption)
+            .foregroundStyle(studioInk.opacity(0.58))
         }
         .padding(ATHLTHPlanDesign.Density.comfortable.cardPadding)
         .athlthPlanCard(radius: 20, warm: isPlannedWorkout)
@@ -1906,8 +1948,10 @@ struct WorkoutTemplateBuilderView: View {
                     }
                     workoutOverview
                     durationSettings
-                    addBlockSection
                     timeline
+                    if isPlannedWorkout {
+                        workoutActions
+                    }
                     if draftNotice {
                         Label(tr("Recovered saved draft", "Gjenopprettet lagret utkast"),
                               systemImage: "checkmark.circle.fill")
@@ -1923,6 +1967,27 @@ struct WorkoutTemplateBuilderView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(studioBackground.ignoresSafeArea())
+            .sheet(isPresented: $showingBlockPicker, onDismiss: {
+                if pendingStandaloneExercise {
+                    pendingStandaloneExercise = false
+                    openExercisePicker()
+                } else if let group = pendingExerciseChoice {
+                    pendingExerciseChoice = nil
+                    if group == .superset { createSuperset() }
+                    else { openExercisePicker() }
+                } else if pendingSavedWorkoutPicker {
+                    pendingSavedWorkoutPicker = false
+                    showingSavedWorkoutPicker = true
+                }
+            }) {
+                blockPickerSheet
+            }
+            .sheet(isPresented: $showingSavedWorkoutPicker) {
+                savedWorkoutPickerSheet
+            }
+            .sheet(isPresented: $showingCopyPicker) {
+                copyPickerSheet
+            }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 saveBar
             }
@@ -1978,7 +2043,12 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 draftActive = true
             }
-            .onChange(of: blocks) { _, _ in persistWorkoutDraft() }
+            .onChange(of: blocks) { _, _ in
+                // A structural edit makes the fresh estimate authoritative again.
+                manualDurationMinutes = nil
+                savedToMyWorkouts = false
+                persistWorkoutDraft()
+            }
             .onChange(of: title) { _, _ in persistWorkoutDraft() }
             .onChange(of: selectedRouteID) { _, _ in persistWorkoutDraft() }
             .onChange(of: manualDurationMinutes) { _, _ in persistWorkoutDraft() }
@@ -2021,9 +2091,13 @@ struct WorkoutTemplateBuilderView: View {
                     .blur(radius: 18)
 
                 VStack(alignment: .leading, spacing: 11) {
-                    Text("A T H L T H")
-                        .font(.system(size: 10, weight: .bold, design: .rounded))
-                        .foregroundStyle(studioInk.opacity(0.73))
+                    HStack(spacing: 7) {
+                        Text("A T H L T H")
+                        Spacer()
+                        Label(tr("Edit workout name", "Endre øktnavn"), systemImage: "pencil")
+                    }
+                    .font(.system(size: 10, weight: .bold, design: .rounded))
+                    .foregroundStyle(studioInk.opacity(0.73))
 
                     TextField(
                         tr("Workout name (optional)", "Navn på økten (valgfritt)"),
@@ -2840,139 +2914,318 @@ struct WorkoutTemplateBuilderView: View {
             }
     }
 
-    private var addBlockSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(tr("BLOCK LIBRARY", "BLOKKBIBLIOTEK"))
-                    .font(.system(size: 11, weight: .bold))
-                    .tracking(1.6)
-                    .foregroundStyle(studioInk.opacity(0.74))
-                Spacer()
-                Text(tr("Add blocks to your workout.",
-                        "Legg til blokker i økten din."))
-                    .font(.system(size: 10))
-                    .foregroundStyle(studioInk.opacity(0.55))
-            }
-
-            if isPlannedWorkout {
+    private var workoutActions: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
                 Button {
-                    addWarmUpRun()
+                    saveToMyWorkouts()
                 } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "figure.run")
-                        Text(tr("Add running warm-up", "Legg til joggeoppvarming"))
-                        Spacer()
-                        Image(systemName: "plus.circle")
+                    Label(savedToMyWorkouts
+                        ? tr("Saved in My workouts", "Lagret i mine økter")
+                        : tr("Save to My workouts", "Lagre til mine økter"),
+                          systemImage: savedToMyWorkouts ? "checkmark.circle.fill" : "bookmark")
+                        .frame(maxWidth: .infinity, minHeight: 46)
+                }
+                .disabled(!canSave || savedToMyWorkouts)
+                if onCopyToPlan != nil && !planCopyDays.isEmpty {
+                    Button {
+                        showingCopyPicker = true
+                    } label: {
+                        Label(tr("Copy to days", "Kopier til andre dager"),
+                              systemImage: "calendar.badge.plus")
+                            .frame(maxWidth: .infinity, minHeight: 46)
                     }
-                    .font(.subheadline.weight(.semibold))
+                    .disabled(!canSave)
+                }
+            }
+            .buttonStyle(.bordered)
+            .tint(studioInk)
+            if let actionNotice {
+                Label(actionNotice, systemImage: "checkmark.circle.fill")
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(studioAccent)
-                    .padding(12)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 13))
-                }
-                .buttonStyle(.plain)
-            }
-
-            HStack(spacing: 9) {
-                Button {
-                    openExercisePicker()
-                } label: {
-                    studioLibraryTile(tr("Exercise", "Øvelse"), icon: "dumbbell.fill",
-                                      color: Color(red: 0.12, green: 0.48, blue: 0.98))
-                }
-                .buttonStyle(.plain)
-
-                Menu {
-                    Button(tr("Run", "Løp"), systemImage: "figure.run") {
-                        addRunBlock(activity: .running)
-                    }
-                    Button(tr("Walk", "Gå"), systemImage: "figure.walk") {
-                        addRunBlock(activity: .walking)
-                    }
-                } label: {
-                    studioLibraryTile(tr("Run / Walk", "Løp / gå"), icon: "figure.run",
-                                      color: Color(red: 0.04, green: 0.48, blue: 0.47))
-                }
-
-                Button {
-                    addRestBlock()
-                } label: {
-                    studioLibraryTile(tr("Rest", "Pause"), icon: "pause.fill",
-                                      color: Color(red: 0.73, green: 0.38, blue: 0.29))
-                }
-                .buttonStyle(.plain)
-
-                Menu {
-                    Button {
-                        createSuperset()
-                    } label: {
-                        Label(tr("Superset", "Supersett"), systemImage: "dumbbell.fill")
-                    }
-                    Button {
-                        createIntervals()
-                    } label: {
-                        Label(tr("Intervals", "Intervaller"), systemImage: "repeat")
-                    }
-                } label: {
-                    studioLibraryTile(tr("Groups", "Grupper"), icon: "square.on.square",
-                                      color: Color(red: 0.45, green: 0.27, blue: 0.91))
-                }
-            }
-
-            Menu {
-                Button {
-                    addWellnessBlock(.meditation)
-                } label: { Label(WorkoutWellnessKind.meditation.title, systemImage: "sparkles") }
-                Button {
-                    addWellnessBlock(.stretching)
-                } label: { Label(WorkoutWellnessKind.stretching.title, systemImage: "figure.flexibility") }
-                Button {
-                    addWellnessBlock(.mobility)
-                } label: { Label(WorkoutWellnessKind.mobility.title, systemImage: "figure.cooldown") }
-                Button {
-                    addWellnessBlock(.yoga)
-                } label: { Label("Yoga", systemImage: "figure.yoga") }
-                Divider()
-                ForEach(ATHLTHWellnessGuide.all) { guide in
-                    Button {
-                        addWellnessGuide(guide)
-                    } label: {
-                        Label(guide.title + " · " + guide.durationText, systemImage: guide.icon)
-                    }
-                }
-            } label: {
-                Label(tr("Stretching, yoga and meditation", "Uttøying, yoga og meditasjon"),
-                      systemImage: "figure.mind.and.body")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(studioAccent)
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             }
         }
-        .padding(ATHLTHPlanDesign.Density.comfortable.cardPadding)
-        .athlthPlanCard(radius: 24, warm: isPlannedWorkout)
     }
 
-    private func studioLibraryTile(_ title: String, icon: String, color: Color) -> some View {
-        VStack(spacing: 11) {
-            Image(systemName: icon)
-                .font(.system(size: 21, weight: .semibold))
-            Text(title)
-                .font(.system(size: 12, weight: .semibold))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+    private func pickerRow(
+        _ name: String, icon: String, action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            action()
+        } label: {
+            HStack(spacing: 13) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .medium))
+                    .frame(width: 30)
+                Text(name)
+                    .font(.system(size: 16, weight: .medium))
+                Spacer()
+                Image(systemName: "plus")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(studioInk.opacity(0.45))
+            }
+            .foregroundStyle(studioInk)
+            .padding(.horizontal, 16)
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
         }
-        .foregroundStyle(isPlannedWorkout ? ATHLTHPlanDesign.ink : color)
-        .frame(maxWidth: .infinity)
-        .frame(height: 87)
-        .background(isPlannedWorkout ? ATHLTHPlanDesign.selectedSurface
-                     : color.opacity(0.105),
-                    in: RoundedRectangle(cornerRadius: 17, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .strokeBorder(isPlannedWorkout ? ATHLTHPlanDesign.outline
-                              : Color.clear, lineWidth: 0.8)
+        .buttonStyle(.plain)
+    }
+
+    private var blockPickerSheet: some View {
+        NavigationStack {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        Color.clear.frame(height: 1).id("picker-top")
+                        pickerRow(tr("Running", "Løping"), icon: "figure.run") {
+                            addRunBlock(activity: .running)
+                            showingBlockPicker = false
+                        }
+                        pickerRow(tr("Walking", "Gå"), icon: "figure.walk") {
+                            addRunBlock(activity: .walking)
+                            showingBlockPicker = false
+                        }
+                        pickerRow(tr("Cycling", "Sykling"), icon: "bicycle") {
+                            addCyclingBlock()
+                            showingBlockPicker = false
+                        }
+                        pickerRow("Yoga", icon: "figure.yoga") {
+                            addWellnessBlock(.yoga)
+                            showingBlockPicker = false
+                        }
+                        pickerRow(tr("Meditation", "Meditasjon"), icon: "sparkles") {
+                            addWellnessBlock(.meditation)
+                            showingBlockPicker = false
+                        }
+                        Divider().padding(.vertical, 10)
+                        pickerRow(tr("Exercise", "Øvelse"), icon: "dumbbell.fill") {
+                            pendingStandaloneExercise = true
+                            showingBlockPicker = false
+                        }
+                        pickerRow(tr("Workout", "Treningsøkt"), icon: "rectangle.stack") {
+                            pendingSavedWorkoutPicker = true
+                            showingBlockPicker = false
+                        }
+                        Divider().padding(.vertical, 10)
+                        pickerRow(tr("Intervals", "Intervall"), icon: "repeat") {
+                            createIntervals()
+                            showingBlockPicker = false
+                        }
+                        pickerRow(tr("Superset", "Supersett"), icon: "square.stack.3d.up") {
+                            pendingExerciseChoice = .superset
+                            showingBlockPicker = false
+                        }
+                        pickerRow(tr("Rest", "Pause"), icon: "pause.fill") {
+                            addRestBlock()
+                            showingBlockPicker = false
+                        }
+                        pickerRow(tr("Stretching", "Uttøying"), icon: "figure.flexibility") {
+                            addWellnessBlock(.stretching)
+                            showingBlockPicker = false
+                        }
+                    }
+                    .padding(.horizontal, 15)
+                    .padding(.top, 8)
+                    .padding(.bottom, 24)
+                }
+                .onAppear {
+                    proxy.scrollTo("picker-top", anchor: .top)
+                }
+            }
+            .background(studioBackground.ignoresSafeArea())
+            .navigationTitle(tr("Add block", "Legg til blokk"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Close", "Lukk")) { showingBlockPicker = false }
+                }
+            }
         }
-        .contentShape(RoundedRectangle(cornerRadius: 17))
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+    }
+
+    private var savedWorkoutPickerSheet: some View {
+        NavigationStack {
+            List {
+                ForEach(session.savedWorkoutTemplates.filter {
+                    !($0.workoutBlocks ?? []).isEmpty
+                }) { workout in
+                    Button {
+                        appendSavedWorkout(workout)
+                        showingSavedWorkoutPicker = false
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(workout.title)
+                                .font(.headline)
+                            Text("\(workout.workoutBlocks?.count ?? 0) " +
+                                 tr("blocks", "blokker"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .foregroundStyle(studioInk)
+                }
+                if !session.savedWorkoutTemplates.contains(where: {
+                    !($0.workoutBlocks ?? []).isEmpty
+                }) {
+                    Text(tr("Save a structured workout under My workouts first.",
+                            "Lagre først en sammensatt økt i Mine økter."))
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(tr("My workouts", "Mine økter"))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Close", "Lukk")) { showingSavedWorkoutPicker = false }
+                }
+            }
+        }
+    }
+
+    private var copyPickerSheet: some View {
+        NavigationStack {
+            VStack(spacing: 12) {
+                HStack {
+                    Button {
+                        copyWeekIndex = max(0, copyWeekIndex - 1)
+                    } label: { Image(systemName: "chevron.left").frame(width: 42, height: 42) }
+                    .disabled(copyWeekIndex == 0)
+                    Spacer()
+                    Text(tr("Week", "Uke") + " \(copyWeekIndex + 1)")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        copyWeekIndex = min(maxCopyWeekIndex, copyWeekIndex + 1)
+                    } label: { Image(systemName: "chevron.right").frame(width: 42, height: 42) }
+                    .disabled(copyWeekIndex >= maxCopyWeekIndex)
+                }
+                .padding(.horizontal, 12)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            Color.clear.frame(height: 1).id("copy-top")
+                            ForEach(planCopyDays.filter {
+                                $0.weekIndex == copyWeekIndex
+                            }) { option in
+                                let selected = selectedCopyDayIDs.contains(option.id)
+                                Button {
+                                    if selected {
+                                        selectedCopyDayIDs.remove(option.id)
+                                    } else {
+                                        selectedCopyDayIDs.insert(option.id)
+                                    }
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                                            .font(.title3)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(option.date.formatted(.dateTime.weekday(.wide)))
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(option.date.formatted(.dateTime.day().month(.wide)) +
+                                                 (option.hasWorkout ? " · " +
+                                                    tr("Has a workout", "Har allerede økt") : ""))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                        Spacer()
+                                    }
+                                    .foregroundStyle(studioInk)
+                                    .padding(14)
+                                    .background(selected ? ATHLTHPlanDesign.selectedSurface
+                                                : ATHLTHPlanDesign.surface,
+                                                in: RoundedRectangle(cornerRadius: 14))
+                                }
+                                .disabled(copiedDayIDs.contains(option.id))
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 4)
+                    }
+                    .onChange(of: copyWeekIndex) { _, _ in
+                        proxy.scrollTo("copy-top", anchor: .top)
+                    }
+                    .onAppear { proxy.scrollTo("copy-top", anchor: .top) }
+                }
+                Text(tr("An existing workout is kept; the copy is added as another session.",
+                        "Eksisterende økter beholdes. Kopien legges til som en ekstra økt."))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                Button {
+                    guard let onCopyToPlan, canSave else { return }
+                    let days = Array(selectedCopyDayIDs).sorted()
+                    let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let name = clean.isEmpty ? resolvedWorkoutKind.title : clean
+                    if onCopyToPlan(name, blocks, hasOutdoorCardio ? selectedRouteID : nil,
+                                    resolvedDurationMinutes, days) {
+                        copiedDayIDs.formUnion(days)
+                        selectedCopyDayIDs.removeAll()
+                        actionNotice = tr("Copied to selected days", "Kopiert til valgte dager")
+                        showingCopyPicker = false
+                    }
+                } label: {
+                    Text(tr("Copy to selected days", "Kopier til valgte dager") +
+                         " (\(selectedCopyDayIDs.count))")
+                        .frame(maxWidth: .infinity, minHeight: 51)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(studioAccent)
+                .disabled(selectedCopyDayIDs.isEmpty || !canSave)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
+            }
+            .navigationTitle(tr("Copy workout", "Kopier økt"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Close", "Lukk")) { showingCopyPicker = false }
+                }
+            }
+        }
+        .presentationDetents([.large])
+    }
+
+    private var maxCopyWeekIndex: Int {
+        planCopyDays.map(\.weekIndex).max() ?? 0
+    }
+
+    private func addCyclingBlock() {
+        var block = WorkoutTemplateBlock(
+            sequence: 0, kind: .note,
+            title: tr("Cycling", "Sykling"),
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 1800,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: selectedPhase
+        )
+        block.activityTag = "cycling"
+        insertBlock(block, toGroup: nil)
+    }
+
+    private func appendSavedWorkout(_ workout: PlannedSession) {
+        let source = workout.workoutBlocks ?? []
+        guard !source.isEmpty else { return }
+        var newGroups: [UUID: UUID] = [:]
+        for original in source {
+            var copy = original
+            if let id = original.groupID {
+                if newGroups[id] == nil { newGroups[id] = UUID() }
+                copy.groupID = newGroups[id]
+            }
+            blocks.append(copy)
+        }
+        resequence()
+    }
+
+    private func saveToMyWorkouts() {
+        guard canSave, !savedToMyWorkouts else { return }
+        session.saveSharedWorkout(workoutSnapshot())
+        savedToMyWorkouts = true
+        actionNotice = tr("Saved in My workouts", "Lagret i Mine økter")
     }
 
     private var routeSection: some View {
@@ -3009,36 +3262,8 @@ struct WorkoutTemplateBuilderView: View {
 
     private var saveBar: some View {
         HStack(spacing: 10) {
-            Menu {
-                Button(tr("Exercise", "Øvelse"), systemImage: "dumbbell.fill") {
-                    openExercisePicker()
-                }
-                Button(tr("Running", "Løping"), systemImage: "figure.run") {
-                    addRunBlock(activity: .running)
-                }
-                Button(tr("Walking", "Gåing"), systemImage: "figure.walk") {
-                    addRunBlock(activity: .walking)
-                }
-                Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
-                    addRestBlock()
-                }
-                ForEach(WorkoutWellnessKind.allCases, id: \.self) { wellness in
-                    Button(wellness.title, systemImage: wellness.symbol) {
-                        addWellnessBlock(wellness)
-                    }
-                }
-                Divider()
-                ForEach(ATHLTHWellnessGuide.all) { guide in
-                    Button(guide.title, systemImage: guide.icon) {
-                        addWellnessGuide(guide)
-                    }
-                }
-                Button(tr("Superset", "Supersett"), systemImage: "dumbbell.fill") {
-                    createSuperset()
-                }
-                Button(tr("Intervals", "Intervaller"), systemImage: "repeat") {
-                    createIntervals()
-                }
+            Button {
+                showingBlockPicker = true
             } label: {
                 Label(tr("Add block", "Legg til blokk"), systemImage: "plus.circle")
                     .font(.system(size: 13, weight: .semibold))
@@ -3324,12 +3549,12 @@ struct WorkoutTemplateBuilderView: View {
             copy.exerciseSnapshot = block.exerciseSnapshot
             copy.exerciseID = block.exerciseID
             copy.wellnessKind = block.wellnessKind
+            copy.activityTag = block.activityTag
             return copy
         }
     }
 
-    private func saveWorkout() {
-        guard canSave else { return }
+    private func workoutSnapshot() -> PlannedSession {
         let requestedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let cleanTitle = requestedTitle.isEmpty ? resolvedWorkoutKind.title : requestedTitle
 
@@ -3347,6 +3572,13 @@ struct WorkoutTemplateBuilderView: View {
         )
         workout.workoutBlocks = blocks
         workout.workoutCategory = category
+        return workout
+    }
+
+    private func saveWorkout() {
+        guard canSave else { return }
+        let workout = workoutSnapshot()
+        let cleanTitle = workout.title
         if let onSaveToPlan {
             onSaveToPlan(
                 cleanTitle, blocks, hasOutdoorCardio ? selectedRouteID : nil,
