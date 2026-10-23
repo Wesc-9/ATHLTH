@@ -73,6 +73,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var openingWorkout: WorkoutDestination?
     @State private var editingTrainingPlaceWorkout: WorkoutDestination?
     @State private var selectedDayID: UUID?
+    @State private var selectedWorkoutID: UUID?
     @State private var queuedLaunchPlanID: UUID?
     @State private var queuedLaunchWorkout: PlannedSession?
     @State private var deletingWorkout: PlannedSession?
@@ -353,6 +354,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         .onChange(of: plan?.id) { _, _ in
             selectedWeekIndex = nil
             selectedDayID = nil
+            selectedWorkoutID = nil
             selectedDetailSection = .structure
             if let plan {
                 advanced = plan.builderProfile?.mode == .advanced
@@ -360,6 +362,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .onChange(of: selectedWeekIndex) { _, _ in
             selectedDayID = nil
+            selectedWorkoutID = nil
             selectedDetailSection = .structure
         }
         .onChange(of: showingCreation) { _, showing in
@@ -1411,6 +1414,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         withAnimation(.easeInOut(duration: 0.21)) {
             selectedWeekIndex = index
             selectedDayID = nil
+            selectedWorkoutID = nil
             selectedDetailSection = .structure
         }
     }
@@ -1524,6 +1528,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         return Button {
             withAnimation(.easeInOut(duration: 0.18)) {
                 selectedDayID = day.id
+                selectedWorkoutID = nil
                 selectedDetailSection = .structure
             }
         } label: {
@@ -1580,6 +1585,527 @@ struct ATHLTHTrainPlanPremiumView: View {
             " · " + (workouts.first?.title ?? tr("Rest", "Hviledag"))
         )
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+
+    // MARK: - Selected training day, workout structure and details
+
+    private func premiumSelectedDayPanel(
+        _ day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        let sessions = day.sessions.filter { !$0.isExplicitRestDay }
+        return VStack(alignment: .leading, spacing: 14) {
+            if sessions.isEmpty {
+                premiumRestDayPanel(day, plan: plan)
+            } else {
+                if sessions.count > 1 {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(sessions) { workout in
+                                let current = (selectedWorkoutID ?? sessions[0].id) == workout.id
+                                Button {
+                                    selectedWorkoutID = workout.id
+                                    selectedDetailSection = .structure
+                                } label: {
+                                    Text(workout.title)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(current ? .white : graphite)
+                                        .padding(.horizontal, 13)
+                                        .frame(minHeight: 38)
+                                        .background(current ? graphite : soft,
+                                                    in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+                let current = sessions.first(where: {
+                    $0.id == (selectedWorkoutID ?? sessions[0].id)
+                }) ?? sessions[0]
+                premiumWorkoutDetailCard(
+                    current, day: day, plan: plan
+                )
+            }
+        }
+    }
+
+    private func premiumRestDayPanel(
+        _ day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(spacing: 12) {
+                Image(systemName: "moon.stars.fill")
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                    .frame(width: 47, height: 47)
+                    .background(ATHLTHTheme.recoveryBlueSoft,
+                                in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(planDayDate(day.dayIndex, plan: plan)
+                        .formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(secondaryInk)
+                    Text(tr("Rest and recovery", "Hvile og restitusjon"))
+                        .font(.system(size: 21, weight: .regular, design: .serif))
+                }
+            }
+            Text(tr("No workout is planned for this day.",
+                    "Ingen treningsøkt er planlagt denne dagen."))
+                .font(.subheadline)
+                .foregroundStyle(secondaryInk)
+
+            Button {
+                editingWorkout = WorkoutEditDestination(
+                    planID: plan.id, dayID: day.id,
+                    version: plan.version, workout: nil
+                )
+            } label: {
+                Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 46)
+            }
+            .buttonStyle(.bordered)
+            .tint(graphite)
+        }
+        .padding(16)
+        .surface(line: line)
+    }
+
+    private func premiumWorkoutDetailCard(
+        _ workout: PlannedSession,
+        day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(alignment: .center, spacing: 11) {
+                Image(premiumWorkoutArt(for: workout))
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 96, height: 91)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 13))
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 5) {
+                        Image(systemName: workout.kind.systemImage)
+                        Text(workout.kind.title.uppercased())
+                    }
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.2)
+                    .foregroundStyle(secondaryInk)
+                    Text(workout.title)
+                        .font(.system(size: 23, weight: .regular, design: .serif))
+                        .foregroundStyle(graphite)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.78)
+                    HStack(spacing: 8) {
+                        if let duration = workout.durationMinutes {
+                            Label("\(duration) min", systemImage: "clock")
+                        }
+                        if let distance = workout.targetDistanceKilometers {
+                            Text(String(format: "%.1f km", distance))
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+                    .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Menu {
+                    Button {
+                        editingWorkout = WorkoutEditDestination(
+                            planID: plan.id, dayID: day.id,
+                            version: plan.version, workout: workout
+                        )
+                    } label: {
+                        Label(tr("Edit workout", "Rediger økt"),
+                              systemImage: "square.and.pencil")
+                    }
+                    Button {
+                        beginMovingWorkout(workout, day: day, plan: plan)
+                    } label: {
+                        Label(tr("Move workout", "Flytt økt"),
+                              systemImage: "arrow.left.arrow.right")
+                    }
+                    Button { preparePlanDayCopy(day, plan: plan) } label: {
+                        Label(tr("Copy day", "Kopier dag"),
+                              systemImage: "square.on.square")
+                    }
+                    Button {
+                        session.saveSharedWorkout(workout)
+                    } label: {
+                        Label(tr("Save to My workouts", "Lagre til Mine økter"),
+                              systemImage: "bookmark")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(graphite)
+                        .frame(width: 37, height: 37)
+                        .background(soft, in: RoundedRectangle(cornerRadius: 11))
+                }
+            }
+
+            HStack(spacing: 7) {
+                if isPremiumPlanWorkoutCompleted(workout, plan: plan) {
+                    Label(tr("Completed", "Gjennomført"),
+                          systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(ATHLTHTheme.vitality)
+                } else if session.isPlanSessionSkipped(
+                    planID: plan.id, sessionID: workout.id
+                ) {
+                    Label(tr("Skipped", "Hoppet over"),
+                          systemImage: "forward.end")
+                        .foregroundStyle(secondaryInk)
+                } else {
+                    Label(tr("Planned", "Planlagt"), systemImage: "calendar")
+                        .foregroundStyle(secondaryInk)
+                }
+                Spacer()
+                Text(planDayDate(day.dayIndex, plan: plan)
+                    .formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                    .foregroundStyle(secondaryInk)
+            }
+            .font(.caption.weight(.medium))
+
+            Divider().overlay(line.opacity(0.75))
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 18) {
+                    ForEach(PlanDetailSection.allCases) { section in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                selectedDetailSection = section
+                            }
+                        } label: {
+                            VStack(spacing: 7) {
+                                Text(section.title)
+                                    .font(.system(size: 11, weight:
+                                        selectedDetailSection == section ? .semibold : .medium))
+                                    .foregroundStyle(
+                                        selectedDetailSection == section
+                                            ? graphite : secondaryInk)
+                                Rectangle()
+                                    .fill(selectedDetailSection == section
+                                        ? graphite : .clear)
+                                    .frame(height: 2)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            selectedDetailSection == section ? .isSelected : []
+                        )
+                    }
+                }
+            }
+
+            premiumWorkoutDetailSection(workout, plan: plan)
+
+            HStack(spacing: 9) {
+                premiumWorkoutFooterAction(
+                    tr("Edit", "Rediger"), icon: "pencil"
+                ) {
+                    editingWorkout = WorkoutEditDestination(
+                        planID: plan.id, dayID: day.id,
+                        version: plan.version, workout: workout
+                    )
+                }
+                premiumWorkoutFooterAction(
+                    tr("Move", "Flytt"), icon: "arrow.left.arrow.right"
+                ) {
+                    beginMovingWorkout(workout, day: day, plan: plan)
+                }
+                premiumWorkoutFooterAction(
+                    tr("Copy", "Kopier"), icon: "square.on.square"
+                ) {
+                    preparePlanDayCopy(day, plan: plan)
+                }
+                premiumWorkoutFooterAction(
+                    tr("Save", "Lagre"), icon: "bookmark"
+                ) {
+                    session.saveSharedWorkout(workout)
+                    copyFeedback = tr("Saved to My workouts", "Lagret i Mine økter")
+                }
+            }
+        }
+        .padding(14)
+        .background(.white, in: RoundedRectangle(cornerRadius: 21))
+        .overlay {
+            RoundedRectangle(cornerRadius: 21)
+                .strokeBorder(line.opacity(0.72), lineWidth: 0.8)
+        }
+    }
+
+    private func premiumWorkoutFooterAction(
+        _ title: String, icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 15, weight: .medium))
+                Text(title)
+                    .font(.system(size: 10, weight: .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.80)
+            }
+            .foregroundStyle(graphite)
+            .frame(maxWidth: .infinity, minHeight: 48)
+            .background(soft, in: RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func premiumWorkoutArt(for workout: PlannedSession) -> String {
+        switch workout.kind {
+        case .running: return "GoalRunning"
+        case .walking: return "GoalWalking"
+        case .strength: return "StrengthQuickHero"
+        case .mobility, .recovery: return "GoalRecovery"
+        case .custom: return "TrainHero"
+        }
+    }
+
+    @ViewBuilder
+    private func premiumWorkoutDetailSection(
+        _ workout: PlannedSession, plan: TrainingPlan
+    ) -> some View {
+        switch selectedDetailSection {
+        case .structure:
+            premiumWorkoutStructure(workout)
+        case .details:
+            premiumWorkoutFacts(workout)
+        case .route:
+            premiumWorkoutRoute(workout)
+        case .coach:
+            premiumWorkoutCoach(workout)
+        case .history:
+            premiumWorkoutHistory(workout, plan: plan)
+        }
+    }
+
+    private func premiumWorkoutStructure(_ workout: PlannedSession) -> some View {
+        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        let targetZones = Array(Set(blocks.compactMap(\.targetHeartRateZone))).sorted()
+        return VStack(alignment: .leading, spacing: 13) {
+            if blocks.isEmpty {
+                Label(tr("No detailed steps have been registered.",
+                         "Økten har ingen detaljerte blokker ennå."),
+                      systemImage: "list.bullet")
+                    .font(.subheadline)
+                    .foregroundStyle(secondaryInk)
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(soft, in: RoundedRectangle(cornerRadius: 12))
+            } else {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Label(tr("Workout structure", "Øktstruktur"),
+                              systemImage: "list.number")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(graphite)
+                        ForEach(Array(blocks.prefix(16).enumerated()),
+                                id: \.offset) { index, block in
+                            premiumStructureBlock(block, preceding:
+                                index == 0 ? nil : blocks[index - 1])
+                        }
+                        if blocks.count > 16 {
+                            Text(tr("\(blocks.count - 16) more steps",
+                                    "\(blocks.count - 16) flere steg"))
+                                .font(.caption)
+                                .foregroundStyle(secondaryInk)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    if !targetZones.isEmpty ||
+                       blocks.contains(where: { $0.targetPaceSecondsPerKilometer != nil }) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label(tr("Targets", "Mål"),
+                                  systemImage: "chart.bar.fill")
+                                .font(.caption.weight(.semibold))
+                            if !targetZones.isEmpty {
+                                Text(tr("Heart-rate zone", "Pulssone") + " " +
+                                     targetZones.map(String.init).joined(separator: ", "))
+                                    .font(.caption)
+                                    .foregroundStyle(secondaryInk)
+                            }
+                            if let pace = blocks.compactMap(
+                                \.targetPaceSecondsPerKilometer).first,
+                               pace > 0 {
+                                Text(String(format: "%d:%02d min/km",
+                                            Int(pace) / 60, Int(pace) % 60))
+                                    .font(.caption)
+                                    .foregroundStyle(secondaryInk)
+                            }
+                        }
+                        .padding(10)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(soft, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                }
+            }
+            if let duration = workout.durationMinutes, duration > 0 {
+                Label(tr("Estimated total", "Forventet totaltid") +
+                      " · \(duration) min", systemImage: "clock")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(graphite)
+            }
+        }
+    }
+
+    private func premiumStructureBlock(
+        _ block: WorkoutTemplateBlock, preceding: WorkoutTemplateBlock?
+    ) -> some View {
+        let startsPhase = preceding?.resolvedPhase != block.resolvedPhase
+        let startsGroup = block.groupID != nil &&
+            block.groupID != preceding?.groupID
+        return VStack(alignment: .leading, spacing: 4) {
+            if startsPhase {
+                Text(block.resolvedPhase.title.uppercased())
+                    .font(.system(size: 9, weight: .bold))
+                    .tracking(1)
+                    .foregroundStyle(secondaryInk)
+                    .padding(.top, 5)
+            }
+            if startsGroup, let kind = block.groupKind {
+                Text(kind.title + " · " + "\(block.groupRounds ?? 1) " +
+                     tr("rounds", "runder"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(graphite)
+            }
+            HStack(alignment: .top, spacing: 7) {
+                Image(systemName: block.kind == .rest ? "pause.circle" :
+                      block.kind == .exercise ? "dumbbell" :
+                      block.kind == .run ? "figure.run" : "circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(block.kind == .rest
+                        ? secondaryInk : ATHLTHTheme.accentDeep)
+                    .frame(width: 16)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(block.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(graphite)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let target = block.targetText {
+                        Text(target)
+                            .font(.system(size: 11))
+                            .foregroundStyle(secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+        .padding(9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(soft, in: RoundedRectangle(cornerRadius: 11))
+    }
+
+    private func premiumWorkoutFacts(_ workout: PlannedSession) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            premiumFact(tr("Activity", "Aktivitet"), workout.kind.title,
+                        symbol: workout.kind.systemImage)
+            if let minutes = workout.durationMinutes {
+                premiumFact(tr("Estimated duration", "Estimert varighet"),
+                            "\(minutes) min", symbol: "clock")
+            }
+            if let distance = workout.targetDistanceKilometers {
+                premiumFact(tr("Target distance", "Måldistanse"),
+                            String(format: "%.1f km", distance),
+                            symbol: "figure.run")
+            }
+            if let scheduled = workout.scheduledStart {
+                premiumFact(tr("Planned time", "Planlagt tidspunkt"),
+                            scheduled.formatted(.dateTime.hour().minute()),
+                            symbol: "calendar")
+            }
+            if let place = workout.plannedTrainingPlace {
+                premiumFact(tr("Training place", "Treningssted"),
+                            place.name, symbol: "mappin")
+            }
+            let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+            premiumFact(tr("Training steps", "Treningsblokker"),
+                        "\(blocks.count)", symbol: "list.number")
+        }
+    }
+
+    private func premiumFact(
+        _ title: String, _ value: String, symbol: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .foregroundStyle(secondaryInk)
+                .frame(width: 23)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(secondaryInk)
+            Spacer()
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(graphite)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(13)
+        .background(soft, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func premiumWorkoutRoute(_ workout: PlannedSession) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Label(tr("Route", "Rute"), systemImage: "map")
+                .font(.subheadline.weight(.semibold))
+            Text(workout.routeID == nil
+                ? tr("No route has been added to this workout.",
+                     "Ingen rute er knyttet til denne økten.")
+                : tr("A route is attached to this workout. Open workout details to view it.",
+                     "En rute er knyttet til økten. Åpne øktdetaljene for å se den."))
+                .font(.caption)
+                .foregroundStyle(secondaryInk)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(soft, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func premiumWorkoutCoach(_ workout: PlannedSession) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label(tr("Coach notes", "Trenernotater"),
+                  systemImage: "text.bubble")
+                .font(.subheadline.weight(.semibold))
+            Text((workout.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+                .isEmpty == false ? workout.notes : nil) ??
+                tr("No notes have been added yet.",
+                   "Ingen trenernotater er lagt inn ennå."))
+                .font(.subheadline)
+                .foregroundStyle(secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(soft, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func premiumWorkoutHistory(
+        _ workout: PlannedSession, plan: TrainingPlan
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(tr("Workout history", "Økthistorikk"),
+                  systemImage: "clock.arrow.circlepath")
+                .font(.subheadline.weight(.semibold))
+            Text(isPremiumPlanWorkoutCompleted(workout, plan: plan)
+                ? tr("This planned workout is recorded as completed.",
+                     "Denne planlagte økten er registrert som gjennomført.")
+                : tr("This session has not been completed yet.",
+                     "Denne økten er ennå ikke registrert som fullført."))
+                .font(.caption)
+                .foregroundStyle(secondaryInk)
+            Text(tr("Recorded results can be viewed under Progress.",
+                    "Registrerte prestasjoner finner du under Fremgang."))
+                .font(.caption)
+                .foregroundStyle(secondaryInk)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(soft, in: RoundedRectangle(cornerRadius: 12))
     }
 
     private func overview(_ plan: TrainingPlan) -> some View {
