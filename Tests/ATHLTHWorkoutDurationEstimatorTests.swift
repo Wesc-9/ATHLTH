@@ -33,6 +33,16 @@ final class ATHLTHWorkoutDurationEstimatorTests: XCTestCase {
         XCTAssertNil(ATHLTHWorkoutDurationEstimator.minutes(for: [run]))
     }
 
+    func testCyclingIsTimedActivityAndDoesNotInventDistance() {
+        var cycling = block(.note, "Cycling", seconds: 1800)
+        cycling.activityTag = "cycling"
+        XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: [cycling]), 30)
+        XCTAssertTrue(ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Cycling", kind: .custom,
+            durationMinutes: 30, routeID: nil, blocks: [cycling]
+        ).isValid)
+    }
+
     func testNotesOrRestWithoutTrainingAreNotAnExecutableEstimate() {
         XCTAssertNil(ATHLTHWorkoutDurationEstimator.minutes(for: []))
         XCTAssertNil(ATHLTHWorkoutDurationEstimator.minutes(
