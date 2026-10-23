@@ -1641,6 +1641,7 @@ struct ATHLTHPlanCopyDay: Identifiable, Hashable {
     let weekday: Int
     let date: Date
     let hasWorkout: Bool
+    let isSource: Bool
 
     var id: Int { weekIndex * 7 + weekday }
 }
@@ -3125,8 +3126,9 @@ struct WorkoutTemplateBuilderView: View {
                                             Text(option.date.formatted(.dateTime.weekday(.wide)))
                                                 .font(.subheadline.weight(.semibold))
                                             Text(option.date.formatted(.dateTime.day().month(.wide)) +
-                                                 (option.hasWorkout ? " · " +
-                                                    tr("Has a workout", "Har allerede økt") : ""))
+                                                 (option.isSource ? " · " + tr("Original", "Original") :
+                                                  option.hasWorkout ? " · " +
+                                                  tr("Has a workout", "Har allerede økt") : ""))
                                                 .font(.caption)
                                                 .foregroundStyle(.secondary)
                                         }
@@ -3138,7 +3140,7 @@ struct WorkoutTemplateBuilderView: View {
                                                 : ATHLTHPlanDesign.surface,
                                                 in: RoundedRectangle(cornerRadius: 14))
                                 }
-                                .disabled(copiedDayIDs.contains(option.id))
+                                .disabled(option.isSource || copiedDayIDs.contains(option.id))
                                 .buttonStyle(.plain)
                             }
                         }
