@@ -18,16 +18,17 @@
   --silhouette:none;
   --pointer-x:50%;
   --pointer-y:45%;
+  --light-angle:135deg;
 }
 *,*::before,*::after{box-sizing:border-box}
 html{background:var(--paper);scroll-behavior:auto}
 body{margin:0;color:var(--black);background:var(--paper);overflow-x:hidden;
   font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
-.journey{min-height:165svh;position:relative;isolation:isolate}
+.journey{min-height:232svh;position:relative;isolation:isolate}
 .view{position:sticky;top:0;height:100svh;min-height:360px;overflow:hidden;display:grid;place-items:center;
   isolation:isolate;
-  background:radial-gradient(ellipse 67% 67% at 50% 43%,#ffffff 5%,#fdfdfb 49%,#f7f9f7 100%)}
+  background:radial-gradient(ellipse 78% 75% at 50% 42%,#fff 1%,#fdfefd 53%,#f4f6f5 100%)}
 .view::before{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;
   background:
   radial-gradient(ellipse 41% 36% at 17% 12%,#e9f2f250 0%,transparent 100%),
@@ -41,9 +42,10 @@ body{margin:0;color:var(--black);background:var(--paper);overflow-x:hidden;
 .arrangement{position:relative;z-index:2;display:flex;flex-direction:column;align-items:center;
   justify-content:center;gap:0;padding:32px 24px;transform:translateY(-3vh);width:100%}
 .object{position:relative;width:clamp(122px,17vw,154px);height:clamp(122px,17vw,154px);
-  perspective:1150px;perspective-origin:50% 45%;touch-action:pan-y;isolation:isolate}
+  perspective:810px;perspective-origin:50% 46%;touch-action:pan-y;isolation:isolate;
+  will-change:transform,opacity;transform-origin:50% 50%}
 .rotator{position:relative;width:100%;height:100%;transform-style:preserve-3d;
-  will-change:transform;transform:rotateX(0deg) rotateY(0deg)}
+  will-change:transform;transform:rotateX(0deg) rotateY(0deg) translateZ(0)}
 .mark{position:absolute;inset:0;width:100%;height:100%;transform-style:preserve-3d}
 .face,.edge,.lip,.edge-light{position:absolute;left:calc((100% - var(--shape-width,77.3%)) / 2);top:calc((100% - var(--shape-height,60%)) / 2);width:var(--shape-width,77.3%);height:var(--shape-height,60%);
   -webkit-mask-image:var(--silhouette);mask-image:var(--silhouette);
@@ -51,11 +53,11 @@ body{margin:0;color:var(--black);background:var(--paper);overflow-x:hidden;
   -webkit-mask-size:100% 100%;mask-size:100% 100%;
   -webkit-mask-position:center;mask-position:center;
   backface-visibility:visible;pointer-events:none}
-.edge{background:linear-gradient(125deg,#17191b 0%,#373a3c 24%,#0a0b0c 66%,#292b2d 100%);
+.edge{background:linear-gradient(125deg,#0b0d0f 0%,#46494b 18%,#090a0b 37%,#222426 57%,#080a0b 78%,#323536 100%);
   transform:translate3d(var(--edge-x,0px),var(--edge-y,0px),var(--edge-z,-2px))}
-.edge-light{background:#a5a8aa;opacity:.3;transform:translate3d(-.55px,-.65px,1.5px)}
-.lip{background:#151718;transform:translate3d(.35px,.4px,2px)}
-.face{background:#050505;transform:translateZ(2.4px);filter:drop-shadow(0 2px 2px #18202424)}
+.edge-light{background:linear-gradient(117deg,#656a6c,#131517 40%,#555a5b);opacity:.22;transform:translate3d(-.4px,-.55px,1.85px)}
+.lip{background:#0e1011;transform:translate3d(.25px,.32px,2.15px)}
+.face{background:#030303;transform:translateZ(2.8px);filter:drop-shadow(0 1px 2px #0b12151f)}
 /* The face is truly BLACK. Lighting belongs to the edges and environment, never on the wordmark. */
 .source{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;
   mix-blend-mode:multiply;user-select:none;-webkit-user-drag:none;pointer-events:none}
@@ -71,17 +73,21 @@ body:not(.has-mask) .lip,body:not(.has-mask) .edge-light{visibility:hidden}
   filter:blur(18px)}
 h1{margin:-2px 0 0;padding-left:.38em;font-size:clamp(10px,1.2vw,12px);
   line-height:1.7;letter-spacing:.38em;text-transform:uppercase;text-align:center;
-  color:#60605e;font-weight:500;white-space:nowrap;position:relative;z-index:3}
-.arrangement{opacity:0;animation:appear 1.6s cubic-bezier(.16,1,.3,1) .06s both}
+  color:#656867;font-weight:500;white-space:nowrap;position:relative;z-index:3;
+  transform-origin:50% 50%;will-change:transform,opacity;backface-visibility:hidden;
+  transform:translate3d(0,0,0) scale(1);opacity:1}
+.arrangement{opacity:0;animation:appear 1.35s cubic-bezier(.16,1,.3,1) .08s both}
 @keyframes appear{from{opacity:0;filter:blur(8px);transform:translateY(calc(-3vh + 10px))}
  to{opacity:1;filter:blur(0);transform:translateY(-3vh)}}
 @media(max-width:620px){
-  .journey{min-height:154svh}
+  .journey{min-height:208svh}
   .grain{opacity:.025}
   .ambient{background:radial-gradient(circle 280px at var(--pointer-x) var(--pointer-y),#ffffffaf 0%,#dce8e710 48%,transparent 100%)}
 }
 @media(prefers-reduced-motion:reduce){
   .arrangement{opacity:1;animation:none;transform:translateY(-3vh)}
+  h1{transform:none!important;opacity:1!important;letter-spacing:.38em!important}
+  .object{transform:none!important;opacity:1!important;filter:none!important}
   .rotator{transform:none!important}
   .ambient,.shadow{will-change:auto}
 }
@@ -116,21 +122,24 @@ h1{margin:-2px 0 0;padding-left:.38em;font-size:clamp(10px,1.2vw,12px);
 const source=document.getElementById('source');
 const rotator=document.getElementById('rotator');
 const shadow=document.getElementById('shadow');
+const heading=document.querySelector('h1');
 const object=document.getElementById('object');
 const view=document.getElementById('view');
 const sides=document.getElementById('sides');
 const reduced=window.matchMedia('(prefers-reduced-motion:reduce)').matches;
 const pointerFine=window.matchMedia('(hover:hover) and (pointer:fine)').matches;
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
-let pointerX=0,pointerY=0,scrollP=0,rx=0,ry=0,lastT=0;
+let pointerX=0,pointerY=0,scrollP=0,rx=0,ry=0,lastT=0,screenWidth=innerWidth;
+const smooth=(a,b,t)=>{const x=clamp((t-a)/(b-a),0,1);return x*x*(3-2*x)};
+const scaleTarget=()=>screenWidth<430?3.05:screenWidth<650?3.40:screenWidth<900?4.45:5.55;
 const fragment=document.createDocumentFragment();
-for(let i=22;i>=0;i--){
+for(let i=38;i>=0;i--){
  const layer=document.createElement('div');
  layer.className='edge';
- layer.style.setProperty('--edge-z',(-i*.26).toFixed(2)+'px');
- layer.style.setProperty('--edge-x',(-i*.048).toFixed(2)+'px');
- layer.style.setProperty('--edge-y',(i*.035).toFixed(2)+'px');
- layer.style.filter='brightness('+(0.62+(22-i)*.016).toFixed(3)+')';
+ layer.style.setProperty('--edge-z',(-i*.52).toFixed(2)+'px');
+ layer.style.setProperty('--edge-x',(-i*.071).toFixed(2)+'px');
+ layer.style.setProperty('--edge-y',(i*.052).toFixed(2)+'px');
+ layer.style.filter='brightness('+(0.48+(38-i)*.014).toFixed(3)+')';
  fragment.appendChild(layer);
 }
 sides.replaceWith(fragment);
@@ -174,7 +183,7 @@ function captureScroll(){
 }
 captureScroll();
 addEventListener('scroll',captureScroll,{passive:true});
-addEventListener('resize',captureScroll,{passive:true});
+addEventListener('resize',()=>{screenWidth=innerWidth;captureScroll()},{passive:true});
 if(!reduced){
  if(pointerFine){
   view.addEventListener('pointermove',(e)=>{
@@ -194,21 +203,38 @@ if(!reduced){
  const root=document.documentElement.style;
  let frameCounter=0;
  const animate=(time)=>{
-  const dt=lastT?Math.min(.06,(time-lastT)/1000):.016;lastT=time;
-  const blend=1-Math.exp(-dt*4.3);
-  // Controlled perspective: no bouncing / floating or unrelated rotating ornaments.
-  const ambientX=Math.sin(time*.00042)*1.0;
-  const ambientY=Math.sin(time*.00028)*1.3;
-  const targetX=-pointerY*9+scrollP*7+ambientX;
-  const targetY=pointerX*13+scrollP*24+ambientY;
+  const dt=lastT?Math.min(.075,(time-lastT)/1000):.016;
+  lastT=time;
+  const blend=1-Math.exp(-dt*5.4);
+  // Physical movement in three acts: inspect the object, turn it, reveal the statement.
+  const turn=smooth(.08,.76,scrollP);
+  const disappear=smooth(.42,.77,scrollP);
+  const reveal=smooth(.24,.83,scrollP);
+  const idleX=Math.sin(time*.00031)*.75;
+  const idleY=Math.sin(time*.00021)*1.1;
+  const targetX=-pointerY*(12-6*disappear)+7*turn+idleX*(1-disappear);
+  const targetY=pointerX*(24-14*disappear)+83*turn+idleY*(1-disappear);
   rx+=(targetX-rx)*blend;
   ry+=(targetY-ry)*blend;
-  rotator.style.transform='rotateX('+rx.toFixed(2)+'deg) rotateY('+ry.toFixed(2)+'deg)';
-  shadow.style.transform='translateX(calc(-50% + '+(-ry*.2).toFixed(2)+'px)) scale('+(1+Math.abs(ry)*.003).toFixed(3)+')';
-  shadow.style.opacity=clamp(.42-Math.abs(rx)*.007,.19,.42).toFixed(2);
-  if((frameCounter++%2)===0){
-   root.setProperty('--pointer-x',(50+pointerX*13+scrollP*5).toFixed(2)+'%');
-   root.setProperty('--pointer-y',(45+pointerY*9).toFixed(2)+'%');
+  rotator.style.transform='rotateX('+rx.toFixed(2)+'deg) rotateY('+ry.toFixed(2)+'deg) translateZ(0)';
+  const departureY=-Math.min(screenWidth<650?165:230,innerHeight*.29)*smooth(.3,.79,scrollP);
+  const departureX=(screenWidth<650?12:40)*turn;
+  const objectScale=1+.13*smooth(.10,.38,scrollP)-.23*smooth(.46,.84,scrollP);
+  object.style.transform='translate3d('+departureX.toFixed(1)+'px,'+departureY.toFixed(1)+'px,0) scale('+objectScale.toFixed(4)+')';
+  object.style.opacity=(1-disappear).toFixed(3);
+  object.style.filter=disappear>.03?'blur('+(disappear*7).toFixed(2)+'px)':'none';
+  shadow.style.transform='translateX(calc(-50% + '+(-ry*.31).toFixed(2)+'px)) scale('+(1+.09*turn).toFixed(3)+')';
+  shadow.style.opacity=clamp(.42-.36*disappear,.01,.42).toFixed(3);
+  // The same Coming soon text moves into the visual centre while the mark exits.
+  const initialTextOffset=heading.offsetHeight*.5+object.offsetHeight*.5;
+  const copyY=-(initialTextOffset+Math.min(innerHeight*.038,34))*reveal;
+  const copyScale=1+(scaleTarget()-1)*reveal;
+  heading.style.transform='translate3d('+((pointerX*2)*(1-reveal)).toFixed(1)+'px,'+copyY.toFixed(1)+'px,0) scale('+copyScale.toFixed(4)+')';
+  heading.style.letterSpacing=(.38-.19*reveal).toFixed(4)+'em';
+  heading.style.color=reveal>.05?'rgb('+Math.round(101-94*reveal)+','+Math.round(104-97*reveal)+','+Math.round(103-96*reveal)+')':'#656867';
+  if((frameCounter++%3)===0){
+   root.setProperty('--pointer-x',(50+pointerX*13+turn*4).toFixed(2)+'%');
+   root.setProperty('--pointer-y',(45+pointerY*11).toFixed(2)+'%');
   }
   requestAnimationFrame(animate);
  };
