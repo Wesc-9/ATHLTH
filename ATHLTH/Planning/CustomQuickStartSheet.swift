@@ -261,6 +261,19 @@ struct CustomQuickStartSheet: View {
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var socialMode: SocialWorkoutParticipationMode = .physical
 
+    init(
+        trainingDeviceProvider: TrainingDeviceProvider,
+        watchConnected: Bool,
+        initialActivity: CustomQuickWorkoutActivity = .hiit,
+        onStart: @escaping (CustomQuickWorkoutConfiguration,
+                            CustomQuickStartDestination) -> Void
+    ) {
+        self.trainingDeviceProvider = trainingDeviceProvider
+        self.watchConnected = watchConnected
+        self.onStart = onStart
+        _activity = State(initialValue: initialActivity)
+    }
+
     private let ink = ATHLTHTheme.primaryText
     private let muted = ATHLTHTheme.mutedText
     private let accent = ATHLTHTheme.accentDeep
