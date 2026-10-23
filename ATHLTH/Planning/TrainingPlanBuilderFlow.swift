@@ -513,6 +513,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: weekPlanningApproach) { _, _ in saveResumableDraft() }
         .onChange(of: guidedDayCursor) { _, _ in
             selectedPlanWeekIndex = guidedCurrentWeek
+            expandedWeekPreviewDays.insert(
+                weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
+            )
             saveResumableDraft()
         }
         .onChange(of: firstGuidedWeekDecisionMade) { _, _ in saveResumableDraft() }
@@ -3968,10 +3971,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
     }
 
+    /// Guided mode and quick week mode render exactly the same expandable
+    /// workout card and phase-detail engine. Only navigation and creation
+    /// actions differ: guided mode advances one explicitly planned day at a time.
     private var guidedCurrentDayCard: some View {
-        VStack(alignment: .leading, spacing: 15) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
-                Text(ATHLTHLocalization.choose(english: "WEEK", norwegian: "UKE") + " \(guidedCurrentWeek + 1) / \(weekCount)")
+                Text(ATHLTHLocalization.choose(english: "WEEK", norwegian: "UKE") +
+                    " \(guidedCurrentWeek + 1) / \(weekCount)")
                     .font(.caption.weight(.semibold))
                 Spacer()
                 Text(ATHLTHLocalization.choose(english: "DAY", norwegian: "DAG") +
@@ -3979,6 +3986,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .font(.caption.weight(.semibold))
             }
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
             HStack(spacing: 4) {
                 ForEach(0..<7, id: \.self) { index in
                     Capsule()
@@ -3987,7 +3995,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .frame(height: 5)
                 }
             }
+
             guidedWeekNavigator
+
             if let previousGuidedEdits {
                 Button {
                     weekDayEdits = previousGuidedEdits
@@ -3998,157 +4008,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         systemImage: "arrow.uturn.backward")
                 }
                 .buttonStyle(.bordered)
-                .accessibilityHint(ATHLTHLocalization.choose(
-                    english: "Restore the plan before the last transfer",
-                    norwegian: "Gjenopprett planen før siste flytting"))
             }
-            stepIntro(
-                eyebrow: guidedCurrentDate.formatted(.dateTime.weekday(.wide).day().month(.wide)),
-                title: ATHLTHLocalization.choose(english: "Plan this day", norwegian: "Planlegg denne dagen"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Build a full session, choose one from the library, or plan recovery.",
-                    norwegian: "Bygg en full økt, velg en fra biblioteket eller legg inn hvile."
-                ),
-                icon: "calendar.day.timeline.left"
-            )
-            ATHLTHPlanWeekApproachCard(
-                icon: "mappin.and.ellipse",
-                title: weekDayEdits[weekDayKey(guidedCurrentWeekday,
-                    weekIndex: guidedCurrentWeek)]?.trainingPlace?.name ??
-                    ATHLTHLocalization.choose(
-                        english: "Training place (optional)",
-                        norwegian: "Treningssted (valgfritt)"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Find a gym, hotel, sports ground, address or favorite.",
-                    norwegian: "Finn senter, hotell, idrettsanlegg, adresse eller favoritt.")
-            ) {
-                selectedPlanWeekIndex = guidedCurrentWeek
-                editingTrainingPlaceDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
-            }
-            if weekDayEdits[weekDayKey(guidedCurrentWeekday,
-                                        weekIndex: guidedCurrentWeek)]?.detailedWorkout == nil {
-                guidedSmartPlanningCard
-            }
-            if let edit = weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)],
-               edit.isRestDay == true {
-                builderPanel {
-                    Label(
-                        edit.isRestDay == true
-                            ? ATHLTHLocalization.choose(english: "Rest day chosen", norwegian: "Hviledag valgt")
-                            : (edit.detailedWorkout?.title ?? ATHLTHLocalization.choose(english: "Workout chosen", norwegian: "Økt valgt")),
-                        systemImage: "moon.stars.fill"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    if let workout = edit.detailedWorkout {
-                        Text("\(workout.blocks.count) " + ATHLTHLocalization.choose(english: "blocks", norwegian: "blokker") +
-                             " · \(workout.durationMinutes) min")
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        if let count = edit.additionalDetailedWorkouts?.count, count > 0 {
-                            Text("+ \(count) " + ATHLTHLocalization.choose(english: "additional workouts", norwegian: "ekstra økter"))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                    }
-                }
-            }
-            if let day = weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)],
-               day.isRestDay != true,
-               let primary = day.detailedWorkout {
-                builderPanel {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Label(ATHLTHLocalization.choose(
-                                english: "Today's sessions", norwegian: "Dagens økter"),
-                                  systemImage: "list.bullet.rectangle")
-                                .font(.headline)
-                            Spacer()
-                            Text("\(1 + (day.additionalDetailedWorkouts?.count ?? 0)) " +
-                                 ATHLTHLocalization.choose(english: "sessions", norwegian: "økter"))
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        ForEach(Array(([primary] + (day.additionalDetailedWorkouts ?? [])).enumerated()),
-                                id: \.offset) { index, workout in
-                            guidedWorkoutSessionCard(
-                                workout, index: index,
-                                totalCount: 1 + (day.additionalDetailedWorkouts?.count ?? 0)
-                            )
-                        }
-                    }
-                }
-            }
-            if weekDayEdits[weekDayKey(guidedCurrentWeekday,
-                                       weekIndex: guidedCurrentWeek)]?.detailedWorkout == nil {
-            quickDayChoiceGrid(for: guidedCurrentWeekday)
-            ATHLTHPlanWeekApproachCard(
-                icon: "plus.circle",
-                title: ATHLTHLocalization.choose(english: "Build planned workout", norwegian: "Bygg planlagt økt"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Exercises, sets, intervals, rest and cool-down.",
-                    norwegian: "Øvelser, sett, intervaller, pauser og nedtrapping."
-                )
-            ) {
-                selectedPlanWeekIndex = guidedCurrentWeek
-                addingExtraWorkout = false
-                composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
-            }
-            ATHLTHPlanWeekApproachCard(
-                icon: "books.vertical",
-                title: ATHLTHLocalization.choose(english: "Choose a complete workout", norwegian: "Velg komplett økt fra bibliotek"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Use an existing multi-exercise workout and edit your planned copy.",
-                    norwegian: "Hent en lagret økt med alle øvelsene og tilpass kopien i planen."
-                )
-            ) {
-                selectedPlanWeekIndex = guidedCurrentWeek
-                selectingExtraFromLibrary = false
-                selectingLibraryDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
-            }
-            }
-            if weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)]?.detailedWorkout != nil {
-                ATHLTHPlanWeekApproachCard(
-                    icon: "plus.square.on.square",
-                    title: ATHLTHLocalization.choose(english: "Add another workout", norwegian: "Legg til en økt til"),
-                    subtitle: ATHLTHLocalization.choose(
-                        english: "Plan a second session on the same date.",
-                        norwegian: "Planlegg en ekstra økt samme dag."
-                    )
-                ) {
-                    selectedPlanWeekIndex = guidedCurrentWeek
-                    addingExtraWorkout = true
-                    composingAdvancedDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
-                }
-                Button(ATHLTHLocalization.choose(
-                    english: "Add another from library", norwegian: "Legg til en ekstra fra bibliotek"
-                )) {
-                    selectedPlanWeekIndex = guidedCurrentWeek
-                    selectingExtraFromLibrary = true
-                    selectingLibraryDay = WeekDayEditorSelection(id: guidedCurrentWeekday)
-                }
-                .font(.subheadline.weight(.medium))
-            }
-            if weekDayEdits[weekDayKey(guidedCurrentWeekday,
-                                       weekIndex: guidedCurrentWeek)]?.detailedWorkout == nil {
-            ATHLTHPlanWeekApproachCard(
-                icon: "moon.stars",
-                title: ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "No workout planned for this date.",
-                    norwegian: "Ingen treningsøkt denne dagen."
-                )
-            ) {
-                selectedPlanWeekIndex = guidedCurrentWeek
-                setRestDay(guidedCurrentWeekday)
-            }
-            }
+
+            weeklyPreviewDayCard(guidedCurrentWeekday, guided: true)
+
             Text(ATHLTHLocalization.choose(
-                english: "Your work is saved as a draft. Tap Edit workout to change any detail.",
-                norwegian: "Endringene lagres som utkast. Trykk Rediger økt for å endre alle detaljer."
+                english: "The same workout details are available in week view. Changes are saved in your draft.",
+                norwegian: "Du ser de samme øktdetaljene i ukeoversikten. Endringene lagres som utkast."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .onAppear {
+            selectedPlanWeekIndex = guidedCurrentWeek
+            expandedWeekPreviewDays.insert(
+                weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
+            )
         }
     }
 
@@ -5197,18 +5072,23 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
-    private func weeklyPreviewDayCard(_ day: Int) -> some View {
-        let restDay = isPreviewRestDay(day)
+    private func weeklyPreviewDayCard(_ day: Int, guided: Bool = false) -> some View {
+        let edit = weekDayEdits[weekDayKey(day)]
+        let unplanned = guided &&
+            edit?.isRestDay != true &&
+            edit?.detailedWorkout?.isValid != true &&
+            !(edit?.additionalDetailedWorkouts ?? []).contains(where: .isValid)
+        let restDay = guided ? edit?.isRestDay == true : isPreviewRestDay(day)
         let expanded = expandedWeekPreviewDays.contains(weekDayKey(day))
-        let workouts = previewWorkouts(for: day)
+        let workouts = unplanned ? [] : previewWorkouts(for: day)
 
         return VStack(alignment: .leading, spacing: 0) {
             Button {
                 togglePreviewDay(day)
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: restDay
-                        ? "moon.stars.fill" : effectiveWorkoutKind(for: day).systemImage)
+                    Image(systemName: unplanned ? "calendar.badge.plus" :
+                        restDay ? "moon.stars.fill" : effectiveWorkoutKind(for: day).systemImage)
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(restDay
                             ? ATHLTHTheme.recoveryBlue : ATHLTHTheme.accentDeep)
@@ -5224,14 +5104,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
-                        Text(restDay
-                            ? ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag")
-                            : effectiveWorkoutTitle(for: day))
+                        Text(unplanned
+                            ? ATHLTHLocalization.choose(
+                                english: "Plan this day", norwegian: "Planlegg denne dagen")
+                            : restDay
+                                ? ATHLTHLocalization.choose(
+                                    english: "Rest day", norwegian: "Hviledag")
+                                : effectiveWorkoutTitle(for: day))
                             .font(.system(size: 17, weight: .semibold))
                             .foregroundStyle(ATHLTHPlanDesign.ink)
                             .lineLimit(2)
 
-                        if !restDay {
+                        if unplanned {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Choose a workout or schedule recovery",
+                                norwegian: "Velg en økt eller legg inn hvile"
+                            ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        } else if !restDay {
                             Text(effectiveWorkoutKind(for: day).title + " · " +
                                  "\(effectiveWorkoutMinutes(for: day)) min")
                                 .font(.caption)
@@ -5264,7 +5155,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(
                 fullDayName(day) + ", " +
-                (restDay
+                (unplanned ? ATHLTHLocalization.choose(
+                    english: "Not planned yet", norwegian: "Ikke planlagt"
+                ) : restDay
                     ? ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag")
                     : effectiveWorkoutTitle(for: day))
             )
@@ -5277,7 +5170,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 Divider()
                     .overlay(ATHLTHPlanDesign.warmDivider)
                     .padding(.horizontal, 14)
-                weeklyPreviewDayDetails(day, restDay: restDay, workouts: workouts)
+                weeklyPreviewDayDetails(
+                    day, restDay: restDay, workouts: workouts,
+                    guided: guided, unplanned: unplanned
+                )
                     .padding(.horizontal, 14)
                     .padding(.top, 12)
                     .padding(.bottom, 14)
@@ -5289,10 +5185,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func weeklyPreviewDayDetails(
-        _ day: Int, restDay: Bool, workouts: [ATHLTHPlanStructuredWorkoutBlueprint]
+        _ day: Int, restDay: Bool, workouts: [ATHLTHPlanStructuredWorkoutBlueprint],
+        guided: Bool = false, unplanned: Bool = false
     ) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            if restDay {
+            if unplanned {
+                Label(ATHLTHLocalization.choose(
+                    english: "Choose an activity, build a workout or use a saved one.",
+                    norwegian: "Velg en aktivitet, bygg en økt eller hent en lagret økt."
+                ), systemImage: "calendar.badge.plus")
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else if restDay {
                 Label(ATHLTHLocalization.choose(
                     english: "No workout planned for this date.",
                     norwegian: "Ingen treningsøkt er planlagt denne dagen."
@@ -5321,9 +5225,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .padding(.bottom, 4)
                 }
                 ForEach(Array(workouts.enumerated()), id: \.offset) { entry in
-                    weeklyPreviewWorkoutDetail(entry.element, day: day, index: entry.offset)
+                    weeklyPreviewWorkoutDetail(
+                        entry.element, day: day, index: entry.offset,
+                        guided: guided, totalCount: workouts.count
+                    )
                 }
             }
+            if guided {
+                guidedDayPlanningActions(day, unplanned: unplanned, restDay: restDay,
+                                         hasWorkout: !workouts.isEmpty)
+            } else {
             HStack(spacing: 9) {
                 if !restDay {
                     Button {
@@ -5352,11 +5263,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .buttonStyle(.borderedProminent)
                 .tint(ATHLTHTheme.accentDeep)
             }
+            }
         }
     }
 
     private func weeklyPreviewWorkoutDetail(
-        _ workout: ATHLTHPlanStructuredWorkoutBlueprint, day: Int, index: Int
+        _ workout: ATHLTHPlanStructuredWorkoutBlueprint, day: Int, index: Int,
+        guided: Bool = false, totalCount: Int = 1
     ) -> some View {
         VStack(alignment: .leading, spacing: 9) {
             if index > 0 {
@@ -5384,7 +5297,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     weeklyPreviewPhaseDetail(phase)
                 }
             }
-            if index > 0 {
+            if guided {
+                guidedSessionControls(workout: workout, day: day, index: index,
+                                      totalCount: totalCount)
+            }
+            if index > 0 && !guided {
                 Button {
                     editPreviewWorkout(day, index: index)
                 } label: {
@@ -5397,6 +5314,193 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .foregroundStyle(ATHLTHTheme.accentDeep)
             }
         }
+    }
+
+    /// Guided-only controls live inside the same expandable card the week
+    /// overview uses. Quick choices no longer duplicate an entire page.
+    private func guidedDayPlanningActions(
+        _ day: Int, unplanned: Bool, restDay: Bool, hasWorkout: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if unplanned {
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Quick choice", norwegian: "Hurtigvalg"
+                    ))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(QuickDayOption.allCases) { option in
+                                Button {
+                                    selectedPlanWeekIndex = guidedCurrentWeek
+                                    chooseQuickWorkout(option, on: day)
+                                } label: {
+                                    Label(option.title, systemImage: option.symbol)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                        .padding(.horizontal, 11)
+                                        .frame(height: 38)
+                                        .background(ATHLTHPlanDesign.selectedSurface,
+                                                    in: Capsule())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+            }
+            HStack(spacing: 8) {
+                Button {
+                    selectedPlanWeekIndex = guidedCurrentWeek
+                    quickStudioOption = nil
+                    editingWorkoutIndex = 0
+                    addingExtraWorkout = hasWorkout
+                    composingAdvancedDay = WeekDayEditorSelection(id: day)
+                } label: {
+                    Label(hasWorkout
+                        ? ATHLTHLocalization.choose(
+                            english: "Add workout", norwegian: "Legg til økt")
+                        : ATHLTHLocalization.choose(
+                            english: "Build workout", norwegian: "Bygg økt"),
+                          systemImage: hasWorkout ? "plus.circle" : "plus.square.on.square")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+
+                Button {
+                    selectedPlanWeekIndex = guidedCurrentWeek
+                    selectingExtraFromLibrary = hasWorkout
+                    selectingLibraryDay = WeekDayEditorSelection(id: day)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "My workouts", norwegian: "Mine økter"),
+                          systemImage: "books.vertical")
+                        .font(.caption.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHPlanDesign.ink)
+            }
+            HStack {
+                if unplanned {
+                    Button {
+                        selectedPlanWeekIndex = guidedCurrentWeek
+                        setRestDay(day)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Rest day", norwegian: "Hviledag"),
+                            systemImage: "moon.stars")
+                    }
+                } else {
+                    Button {
+                        selectedPlanWeekIndex = guidedCurrentWeek
+                        openPreviewDayActions(day)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "More day options", norwegian: "Flere dagsvalg"),
+                            systemImage: "ellipsis.circle")
+                    }
+                }
+                Spacer()
+                Button {
+                    selectedPlanWeekIndex = guidedCurrentWeek
+                    editingTrainingPlaceDay = WeekDayEditorSelection(id: day)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Training place", norwegian: "Treningssted"),
+                        systemImage: "mappin.and.ellipse")
+                }
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .buttonStyle(.plain)
+            if let place = weekDayEdits[weekDayKey(day)]?.trainingPlace {
+                Label(place.name, systemImage: "mappin.circle")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+        }
+    }
+
+    private func guidedSessionControls(
+        workout: ATHLTHPlanStructuredWorkoutBlueprint,
+        day: Int, index: Int, totalCount: Int
+    ) -> some View {
+        HStack(spacing: 9) {
+            Menu {
+                Button(ATHLTHLocalization.choose(
+                    english: "No fixed start time", norwegian: "Uten fast starttid"
+                )) {
+                    setGuidedWorkoutStart(index: index, minute: nil)
+                }
+                ForEach(0..<48, id: \.self) { slot in
+                    let minute = slot * 30
+                    Button(String(format: "%02d:%02d", minute / 60, minute % 60)) {
+                        setGuidedWorkoutStart(index: index, minute: minute)
+                    }
+                }
+            } label: {
+                Label(workout.startMinuteOfDay.map {
+                    String(format: "%02d:%02d", $0 / 60, $0 % 60)
+                } ?? ATHLTHLocalization.choose(
+                    english: "Start time", norwegian: "Starttid"
+                ), systemImage: "clock")
+            }
+            .buttonStyle(.bordered)
+            .tint(ATHLTHPlanDesign.ink)
+
+            Menu {
+                Button {
+                    moveGuidedWorkout(from: index, by: -1)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Move up", norwegian: "Flytt opp"),
+                        systemImage: "arrow.up")
+                }
+                .disabled(index == 0)
+                Button {
+                    moveGuidedWorkout(from: index, by: 1)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Move down", norwegian: "Flytt ned"),
+                        systemImage: "arrow.down")
+                }
+                .disabled(index >= totalCount - 1)
+                Divider()
+                ForEach(1...7, id: \.self) { destination in
+                    if destination != day {
+                        Button {
+                            moveGuidedWorkout(to: destination, index: index)
+                        } label: {
+                            Label(fullDayName(destination), systemImage: "calendar")
+                        }
+                    }
+                }
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Move", norwegian: "Flytt"),
+                    systemImage: "arrow.up.arrow.down")
+            }
+            .buttonStyle(.bordered)
+            .tint(ATHLTHPlanDesign.ink)
+
+            Spacer(minLength: 0)
+
+            Button {
+                selectedPlanWeekIndex = guidedCurrentWeek
+                editPreviewWorkout(day, index: index)
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Edit", norwegian: "Rediger"),
+                    systemImage: "square.and.pencil")
+            }
+            .buttonStyle(.bordered)
+            .tint(ATHLTHTheme.accentDeep)
+        }
+        .font(.caption2.weight(.semibold))
     }
 
     private func weeklyPreviewPhaseDetail(_ section: WeekWorkoutPreviewPhase) -> some View {
