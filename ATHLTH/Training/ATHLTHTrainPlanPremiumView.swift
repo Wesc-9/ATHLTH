@@ -1469,13 +1469,13 @@ struct ATHLTHTrainPlanPremiumView: View {
                     }
                     .padding(.top, 7)
                 } label: {
+                    let workoutCount = week.days.flatMap(\.sessions)
+                        .filter { !$0.isExplicitRestDay }.count
                     HStack {
                         Text(tr("Week \(index + 1)", "Uke \(index + 1)"))
                             .font(.subheadline.weight(.semibold))
                         Spacer()
-                        Text("\(week.days.flatMap(\.sessions).filter {
-                            !$0.isExplicitRestDay
-                        }.count) " + tr("workouts", "økter"))
+                        Text("\(workoutCount) " + tr("workouts", "økter"))
                             .font(.caption)
                             .foregroundStyle(secondaryInk)
                             .padding(.trailing, 7)
