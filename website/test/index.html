@@ -45,7 +45,7 @@ body{margin:0;color:var(--black);background:var(--paper);overflow-x:hidden;
 .rotator{position:relative;width:100%;height:100%;transform-style:preserve-3d;
   will-change:transform;transform:rotateX(0deg) rotateY(0deg)}
 .mark{position:absolute;inset:0;width:100%;height:100%;transform-style:preserve-3d}
-.face,.edge,.lip,.edge-light{position:absolute;left:11.35%;top:11.35%;width:77.3%;height:77.3%;
+.face,.edge,.lip,.edge-light{position:absolute;left:calc((100% - var(--shape-width,77.3%)) / 2);top:calc((100% - var(--shape-height,60%)) / 2);width:var(--shape-width,77.3%);height:var(--shape-height,60%);
   -webkit-mask-image:var(--silhouette);mask-image:var(--silhouette);
   -webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;
   -webkit-mask-size:100% 100%;mask-size:100% 100%;
@@ -161,7 +161,8 @@ function makeMask(){
   const cropped=document.createElement('canvas');cropped.width=cw;cropped.height=ch;
   cropped.getContext('2d').drawImage(canvas,cropX,cropY,cw,ch,0,0,cw,ch);
   document.documentElement.style.setProperty('--silhouette','url("'+cropped.toDataURL('image/png')+'")');
-  document.getElementById('mark').style.aspectRatio='1';
+  document.documentElement.style.setProperty('--shape-width',(cw/w*100).toFixed(4)+'%');
+  document.documentElement.style.setProperty('--shape-height',(ch/h*100).toFixed(4)+'%');
   document.body.classList.add('has-mask');
  }catch(error){/* The original black logo image stays visible on fallback browsers. */}
 }
