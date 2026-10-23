@@ -164,6 +164,39 @@ final class AdvancedPlanWorkoutBlueprintTests: XCTestCase {
         XCTAssertEqual(weeks[0].days[0].sessions.first?.workoutBlocks?.count, 1)
     }
 
+    func testCopyingPlannedWorkoutPreservesOriginalOnBusyDay() throws {
+        var edit = ATHLTHPlanWeekDayEdit()
+        let second = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Evening intervals", kind: .running,
+            durationMinutes: 35, routeID: nil,
+            blocks: [makeRunBlock()]
+        )
+        edit.additionalDetailedWorkouts = [second]
+
+        let existing = try XCTUnwrap(makeWeek(1).days[0].sessions.first)
+        let result = edit.scheduledSessions(from: [existing])
+        XCTAssertEqual(result.count, 2)
+        XCTAssertEqual(result[0].id, existing.id)
+        XCTAssertEqual(result[0].title, existing.title)
+        XCTAssertEqual(result[1].title, "Evening intervals")
+        XCTAssertNotEqual(result[0].id, result[1].id)
+    }
+
+    func testCopyingWorkoutOntoRestDayCreatesOnlyOneSession() {
+        let source = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Evening intervals", kind: .running,
+            durationMinutes: 35, routeID: nil, blocks: [makeRunBlock()]
+        )
+        let edit = ATHLTHPlanWeekDayEdit(
+            kind: .running, title: source.title,
+            durationMinutes: source.durationMinutes,
+            detailedWorkout: source
+        )
+        let result = edit.scheduledSessions(from: [])
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.title, source.title)
+    }
+
     func testNoDetailsMeansOriginalBasicSessionsRemainUnmodified() {
         var weeks = [makeWeek(1)]
         let before = weeks
