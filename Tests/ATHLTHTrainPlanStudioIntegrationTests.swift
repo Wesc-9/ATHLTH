@@ -26,6 +26,29 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
     }
 
     @MainActor
+    func testSavingWorkoutTemplateUpdatesInPlaceAndAllowsIndependentCopy() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let original = workout(name: "Interval run")
+        let id = store.saveSharedWorkout(original)
+        XCTAssertEqual(store.savedWorkoutTemplates.filter { $0.id == id }.count, 1)
+
+        var updated = original
+        updated.title = "Interval run – revised"
+        updated.durationMinutes = 60
+        XCTAssertTrue(store.updateSavedWorkoutTemplate(updated, id: id))
+        let saved = try XCTUnwrap(store.savedWorkoutTemplates.first { $0.id == id })
+        XCTAssertEqual(saved.title, "Interval run – revised")
+        XCTAssertEqual(saved.durationMinutes, 60)
+        XCTAssertEqual(store.savedWorkoutTemplates.filter { $0.id == id }.count, 1)
+
+        let newID = store.saveSharedWorkout(updated)
+        XCTAssertNotEqual(newID, id)
+        XCTAssertEqual(store.savedWorkoutTemplates.count, 2)
+    }
+
+    @MainActor
     func testNewWorkoutPersistsInChosenDayAndChangesPlanVersion() throws {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
