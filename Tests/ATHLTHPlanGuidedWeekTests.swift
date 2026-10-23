@@ -28,6 +28,35 @@ final class ATHLTHPlanGuidedWeekTests: XCTestCase {
         }
     }
 
+    func testGuidedDayRequiresExplicitRestOrValidWorkout() {
+        XCTAssertFalse(ATHLTHGuidedPlanDayPolicy.isPlanned(nil))
+
+        var placeOnly = ATHLTHPlanWeekDayEdit()
+        XCTAssertFalse(ATHLTHGuidedPlanDayPolicy.isPlanned(placeOnly))
+        placeOnly.kind = .running
+        placeOnly.title = "Suggested run"
+        XCTAssertFalse(ATHLTHGuidedPlanDayPolicy.isPlanned(placeOnly),
+                       "Metadata without a complete workout must not unlock Next.")
+
+        var invalid = workout("Incomplete")
+        invalid.blocks = []
+        placeOnly.detailedWorkout = invalid
+        XCTAssertFalse(ATHLTHGuidedPlanDayPolicy.isPlanned(placeOnly))
+
+        placeOnly.detailedWorkout = workout("Full workout")
+        XCTAssertTrue(ATHLTHGuidedPlanDayPolicy.isPlanned(placeOnly))
+        placeOnly.detailedWorkout = nil
+
+        placeOnly.isRestDay = true
+        XCTAssertTrue(ATHLTHGuidedPlanDayPolicy.isPlanned(placeOnly))
+    }
+
+    func testGuidedDayAcceptsAdditionalValidWorkout() {
+        var day = ATHLTHPlanWeekDayEdit()
+        day.additionalDetailedWorkouts = [workout("Second session")]
+        XCTAssertTrue(ATHLTHGuidedPlanDayPolicy.isPlanned(day))
+    }
+
     func testCopyRetainsTwoWorkoutsRestDaysAndIndependentIDs() throws {
         let start = try XCTUnwrap(Calendar.current.date(
             from: DateComponents(year: 2026, month: 10, day: 17)
