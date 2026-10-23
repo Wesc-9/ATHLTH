@@ -94,6 +94,21 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         XCTAssertEqual([restored].expandedForExecution().count, 1)
     }
 
+    func testDragIdentityIsNotPartOfPersistedRecipeEquality() throws {
+        var original = exercise("Hip thrust")
+        original.editorDragID = UUID()
+        let data = try JSONEncoder().encode(original)
+        let decoded = try JSONDecoder().decode(WorkoutTemplateBlock.self, from: data)
+
+        XCTAssertEqual(original, decoded)
+        XCTAssertEqual(original.hashValue, decoded.hashValue)
+        XCTAssertNotEqual(original.editorDragID, decoded.editorDragID)
+
+        // A new drag token must never change the underlying workout.
+        original.editorDragID = UUID()
+        XCTAssertEqual(original, decoded)
+    }
+
     func testGroupFieldsSurviveEncoding() throws {
         var block = exercise("Bench press")
         block.groupID = UUID()
