@@ -124,6 +124,7 @@ enum ATHLTHUnifiedWorkout {
             $0.kind == .run && $0.cardioActivity != .walking
         }
         let hasStrength = blocks.contains { $0.kind == .exercise }
+        let hasCycling = blocks.contains { $0.activityTag == "cycling" }
         let wellness = blocks.compactMap(\.wellnessKind)
         let wellnessKind: WorkoutKind = wellness.allSatisfy({ $0 == .meditation })
             ? .recovery : .mobility
@@ -135,13 +136,19 @@ enum ATHLTHUnifiedWorkout {
             blocks.filter { $0.kind == .run }.allSatisfy { $0.cardioActivity == nil }
         let effectiveWalking = hasWalking || legacyWalking
         let effectiveRunning = hasRunning && !legacyWalking
-        workout.kind = (hasStrength && hasCardio) || (effectiveWalking && effectiveRunning)
+        // A cycling step is a timed non-running activity, not a strength
+        // exercise. Until WorkoutKind has a dedicated cycling case, use
+        // custom with an explicit cycling category instead of mislabelling it.
+        let cyclingOnly = hasCycling && !hasCardio && !hasStrength && wellness.isEmpty
+        workout.kind = hasCycling || (hasStrength && hasCardio) ||
+            (effectiveWalking && effectiveRunning)
             ? .custom
             : effectiveWalking && !effectiveRunning ? .walking
             : effectiveRunning ? .running
             : !wellness.isEmpty ? wellnessKind
             : (plannedKind == .mobility ? .mobility : .strength)
-        workout.workoutCategory = workout.kind == .custom ? "hybrid" :
+        workout.workoutCategory = cyclingOnly ? "cycling" :
+            workout.kind == .custom ? "hybrid" :
             workout.kind == .walking ? "walking" :
             workout.kind == .running ? "running" :
             (workout.kind == .mobility ? "mobility" :
