@@ -18,6 +18,27 @@ struct ATHLTHTrainPlanPremiumView: View {
     @AppStorage("athlth.planWorkspace.advancedMode")
     private var advanced = false
     @State private var selectedWeekIndex: Int?
+    @State private var selectedDetailSection: PlanDetailSection = .structure
+    @State private var showingEntirePlan = false
+    @State private var showingWorkoutLibrary = false
+    @State private var showingCopyDay = false
+    @State private var copyingSourceDayID: UUID?
+    @State private var copyTargetWeekIndex = 0
+    @State private var copyTargetDayIDs: Set<UUID> = []
+    @State private var copyFeedback: String?
+    private enum PlanDetailSection: String, CaseIterable, Identifiable {
+        case structure, details, route, coach, history
+        var id: Self { self }
+        var title: String {
+            switch self {
+            case .structure: return ATHLTHLocalization.choose(english: "Structure", norwegian: "Øktstruktur")
+            case .details: return ATHLTHLocalization.choose(english: "Details", norwegian: "Detaljer")
+            case .route: return ATHLTHLocalization.choose(english: "Route", norwegian: "Rute")
+            case .coach: return ATHLTHLocalization.choose(english: "Coach notes", norwegian: "Trenertips")
+            case .history: return ATHLTHLocalization.choose(english: "History", norwegian: "Historikk")
+            }
+        }
+    }
     @State private var showingCreation = false
     @State private var creationDraftID: UUID?
     @State private var creationResumesDraft = true
@@ -286,45 +307,23 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private var planContent: some View {
         VStack(alignment: .leading, spacing: 18) {
-            header
-            workspaceNavigation
-            ForEach(unfinishedPlanDrafts) { checkpoint in
-                continuePlanDraftCard(checkpoint)
-            }
             if browsingMyPlans {
+                header
+                workspaceNavigation
                 savedPlansOverview
                 actionButton(
                     title: tr("Create another plan", "Opprett ny treningsplan"),
                     icon: "plus"
-                ) {
-                    beginNewPlanCreation()
-                }
+                ) { beginNewPlanCreation() }
             } else if let plan {
-                if session.activePlan?.id != plan.id {
-                    HStack(spacing: 9) {
-                        Image(systemName: "info.circle")
-                        Text(tr("Viewing a saved or upcoming plan",
-                                "Du ser på en lagret eller kommende plan"))
-                        Spacer(minLength: 3)
-                        if let activeID = session.activePlan?.id {
-                            Button(tr("Active plan", "Aktiv plan")) {
-                                focusedPlanID = activeID
-                                selectedWeekIndex = nil
-                                selectedDayID = nil
-                            }
-                            .fontWeight(.semibold)
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(secondaryInk)
-                    .padding(12)
-                    .background(soft, in: RoundedRectangle(cornerRadius: 12))
-                }
-                overview(plan)
-                weekWorkspace(plan)
-
+                premiumPlanDashboard(plan)
             } else {
+                header
+                workspaceNavigation
                 firstPlanInvitation
+            }
+            ForEach(unfinishedPlanDrafts) { checkpoint in
+                continuePlanDraftCard(checkpoint)
             }
         }
         .foregroundStyle(graphite)
@@ -354,12 +353,14 @@ struct ATHLTHTrainPlanPremiumView: View {
         .onChange(of: plan?.id) { _, _ in
             selectedWeekIndex = nil
             selectedDayID = nil
+            selectedDetailSection = .structure
             if let plan {
                 advanced = plan.builderProfile?.mode == .advanced
             }
         }
         .onChange(of: selectedWeekIndex) { _, _ in
             selectedDayID = nil
+            selectedDetailSection = .structure
         }
         .onChange(of: showingCreation) { _, showing in
             if !showing { refreshUnfinishedPlanDraft() }
@@ -418,6 +419,39 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .sheet(isPresented: $showingMyPlans) {
             MyTrainingPlansLibraryView()
+        }
+        .sheet(isPresented: $showingWorkoutLibrary) {
+            NavigationStack {
+                ScrollView {
+                    ATHLTHTrainLibraryPremiumView(
+                        onOpenPlan: { showingWorkoutLibrary = false },
+                        startWithWorkouts: true
+                    )
+                    .padding(16)
+                }
+                .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(tr("Close", "Lukk")) {
+                            showingWorkoutLibrary = false
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingCopyDay) {
+            if let plan, let copyingSourceDayID {
+                planCopyDaySheet(plan: plan, sourceDayID: copyingSourceDayID)
+            }
+        }
+        .alert(tr("Copy workout", "Kopier økt"),
+               isPresented: Binding(
+                   get: { copyFeedback != nil },
+                   set: { if !$0 { copyFeedback = nil } }
+               )) {
+            Button("OK") { copyFeedback = nil }
+        } message: {
+            Text(copyFeedback ?? "")
         }
         .sheet(isPresented: $showingTemplates) {
             TrainingPlanLibrarySheet()
