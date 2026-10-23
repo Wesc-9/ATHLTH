@@ -2415,16 +2415,21 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func timelineDraggableSection(_ section: TimelineSection) -> some View {
-        timelineSectionContent(section)
+        let hovering = hoveredSectionID == section.id &&
+            draggingSectionID != section.id
+        return timelineSectionContent(section)
+            .padding(.top, hovering ? 12 : 0)
             .contentShape(RoundedRectangle(cornerRadius: 20))
-                        .overlay {
-                if hoveredSectionID == section.id &&
-                    draggingSectionID != section.id {
-                    RoundedRectangle(cornerRadius: 20)
-                        .strokeBorder(studioAccent.opacity(0.6), lineWidth: 1.4)
+            .overlay(alignment: .top) {
+                if hovering {
+                    Capsule()
+                        .fill(studioAccent)
+                        .frame(height: 3)
+                        .padding(.horizontal, 10)
                         .allowsHitTesting(false)
                 }
             }
+            .animation(.easeInOut(duration: 0.16), value: hoveredSectionID)
             .onDrag {
                 draggingSectionID = section.id
                 hoveredSectionID = nil
@@ -2586,7 +2591,21 @@ struct WorkoutTemplateBuilderView: View {
                     }) { member in
                         let index = member.index
                         builderBlockRow(index, nested: true)
-                                                        .contentShape(Rectangle())
+                            .padding(.top,
+                                hoveredGroupMemberID == member.id &&
+                                draggingGroupMemberID != member.id ? 9 : 0)
+                            .overlay(alignment: .top) {
+                                if hoveredGroupMemberID == member.id &&
+                                    draggingGroupMemberID != member.id {
+                                    Capsule()
+                                        .fill(studioAccent)
+                                        .frame(height: 2)
+                                        .allowsHitTesting(false)
+                                }
+                            }
+                            .animation(.easeInOut(duration: 0.16),
+                                       value: hoveredGroupMemberID)
+                            .contentShape(Rectangle())
                             .onDrag {
                                 draggingGroupMemberID = blocks[index].editorDragID
                                 hoveredGroupMemberID = nil
