@@ -114,6 +114,13 @@
       .ring--second{width:110vw}
       .micro-light{margin-top:21px}
     }
+    @media(max-height:570px){
+      .stage{min-height:0}
+      .mark-wrap{width:min(64vh,350px)}
+      h1{margin-top:3px;font-size:clamp(17px,4.5vh,26px)}
+      .micro-light{margin-top:12px}
+      .world::after{top:calc(50% + 95px)}
+    }
     @media(prefers-reduced-motion:reduce){
       *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
       .micro-light{opacity:1}
@@ -169,7 +176,7 @@
             </defs>
             <g mask="url(#authentic-silhouette)">
               <rect x="0" y="0" width="1024" height="1024" fill="url(#chrome)"/>
-              <rect class="mark-shine" x="-1300" y="-300" width="1000" height="1600" fill="url(#moving-gloss)" transform="rotate(-16 512 512)"/>
+              <g transform="rotate(-16 512 512)"><rect class="mark-shine" x="-1300" y="-300" width="1000" height="1600" fill="url(#moving-gloss)"/></g>
               <rect class="mark-specular" x="-1350" y="-200" width="800" height="1450" fill="url(#rim-gloss)"/>
             </g>
           </svg>
@@ -182,7 +189,6 @@
   <script>
     (() => {
       const stage = document.getElementById('stage');
-      const lockup = document.getElementById('lockup');
       const reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
       const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
       if (!finePointer.matches || reduce.matches) return;
