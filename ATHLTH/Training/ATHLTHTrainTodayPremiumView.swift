@@ -811,63 +811,82 @@ struct ATHLTHTrainTodayPremiumView: View {
     private var suggestedWorkoutSection: some View {
         let suggestions = suggestedWorkouts
         if !suggestions.isEmpty {
-            VStack(alignment: .leading, spacing: 11) {
+            VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("WORKOUT LIBRARY", "FRA ØKTBIBLIOTEKET"))
-                            .font(.caption2.weight(.semibold))
-                            .tracking(1.5)
-                            .foregroundStyle(champagne)
-                        Text(tr("Find a workout", "Finn en økt"))
-                            .font(.system(size: 24, weight: .regular, design: .serif))
-                            .foregroundStyle(ink)
-                    }
-                    Spacer()
-                    Button(action: onOpenLibrary) {
-                        HStack(spacing: 3) {
-                            Text(tr("See all", "Se alle"))
-                            Image(systemName: "arrow.up.right")
-                        }
-                        .font(.caption.weight(.semibold))
+                    Text(tr("Popular from the library", "Populært fra biblioteket"))
+                        .font(.system(size: 22, weight: .regular, design: .serif))
                         .foregroundStyle(ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.80)
+                    Spacer(minLength: 6)
+                    Button(action: onOpenLibrary) {
+                        HStack(spacing: 5) {
+                            Text(tr("See all", "Se alle"))
+                            Image(systemName: "chevron.right")
+                        }
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(muted)
                     }
                     .buttonStyle(.plain)
                 }
-                ForEach(suggestions) { entry in
-                    Button {
-                        onChooseSuggestedWorkout(entry)
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: entry.systemImage)
-                                .font(.system(size: 20, weight: .regular))
-                                .foregroundStyle(champagne)
-                                .frame(width: 48, height: 48)
-                                .background(
-                                    Color(red: 0.96, green: 0.94, blue: 0.91),
-                                    in: RoundedRectangle(cornerRadius: 14)
-                                )
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(entry.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ink)
-                                    .lineLimit(1)
-                                Text(suggestionSubtitle(entry))
-                                    .font(.caption)
+                HStack(alignment: .top, spacing: 10) {
+                    ForEach(suggestions.prefix(2)) { entry in
+                        Button {
+                            onChooseSuggestedWorkout(entry)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(suggestionImage(for: entry))
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 65, height: 76)
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(entry.title)
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(ink)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                    Text(suggestionSubtitle(entry))
+                                        .font(.system(size: 11))
+                                        .foregroundStyle(muted)
+                                        .lineLimit(2)
+                                        .multilineTextAlignment(.leading)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 11, weight: .semibold))
                                     .foregroundStyle(muted)
-                                    .lineLimit(1)
                             }
-                            Spacer(minLength: 4)
-                            Image(systemName: "chevron.right")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(muted)
+                            .padding(7)
+                            .frame(maxWidth: .infinity, minHeight: 90,
+                                   alignment: .leading)
+                            .background(.white,
+                                in: RoundedRectangle(cornerRadius: 16))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .strokeBorder(hairline.opacity(0.8),
+                                                  lineWidth: 0.65)
+                            }
+                            .contentShape(RoundedRectangle(cornerRadius: 16))
                         }
-                        .padding(13)
-                        .premiumTrainSurface(line: hairline)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .frame(maxWidth: .infinity)
                     }
-                    .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    private func suggestionImage(
+        for entry: WorkoutTemplateCatalogEntry
+    ) -> String {
+        switch entry.category.lowercased() {
+        case "strength", "gym": return "StrengthQuickHero"
+        case "walking", "hiking": return "GoalWalking"
+        case "recovery", "mobility", "yoga": return "GoalRecovery"
+        case "running", "cardio", "interval": return "GoalRunning"
+        default: return "TrainHero"
         }
     }
 
@@ -933,82 +952,95 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private var quickTrainSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 9) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "bolt.fill")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(champagne)
-
                 Text("Quick Train")
-                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .font(.system(size: 26, weight: .regular, design: .serif))
                     .foregroundStyle(ink)
-
-                Spacer()
-
-                Text(tr("Start anytime", "Start når som helst"))
-                    .font(.caption2.weight(.medium))
+                Spacer(minLength: 4)
+                Text(tr("Start a workout now", "Start en økt nå"))
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(muted)
+                    .lineLimit(1)
             }
 
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 12) {
-                    quickChoice("figure.run", tr("Run", "Løping"), kind: .running)
-                    quickChoice("figure.walk", tr("Walk", "Gå"), kind: .walking)
-                }
-                HStack(spacing: 12) {
-                    quickChoice("dumbbell.fill", tr("Strength", "Styrke"), kind: .strength)
-                    quickChoice("square.grid.2x2.fill", tr("Other", "Andre"), kind: .custom)
-                }
+            HStack(spacing: 9) {
+                quickPhotoChoice(
+                    asset: "GoalRunning", icon: "figure.run",
+                    title: tr("Running", "Løping"), kind: .running
+                )
+                quickPhotoChoice(
+                    asset: "GoalWalking", icon: "figure.walk",
+                    title: tr("Walking", "Gåtur"), kind: .walking
+                )
+                quickPhotoChoice(
+                    asset: "StrengthQuickHero", icon: "dumbbell.fill",
+                    title: tr("Strength", "Styrke"), kind: .strength
+                )
+                // Cycling remains a Custom Quick Start selection until it
+                // has a dedicated first-class workout kind. The picker is
+                // explicit; never silently start an unrelated workout.
+                quickPhotoChoice(
+                    asset: "TrainHero", icon: "bicycle",
+                    title: tr("Cycling", "Sykling"), kind: .custom
+                )
             }
         }
-        .padding(14)
-        // Match the warm white surfaces used by the rest of "I dag".
-        .premiumTrainSurface(line: hairline)
     }
 
-    private func quickChoice(
-        _ icon: String,
-        _ title: String,
-        kind: WorkoutKind
+    private func quickPhotoChoice(
+        asset: String, icon: String, title: String, kind: WorkoutKind
     ) -> some View {
         Button {
-            // Friends are selected explicitly in the workout setup, not in
-            // Quick Train. Never inherit a hidden selection from an older view.
             social.quickTrainFriendIDs.removeAll()
             social.discardPreparedQuickTrainFriends()
             onQuickTrain(kind)
         } label: {
-            HStack(spacing: 10) {
-                Image(systemName: icon)
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(ink)
-                    .frame(width: 35, height: 35)
-                    .background(
-                        Color(red: 0.96, green: 0.94, blue: 0.91),
-                        in: RoundedRectangle(cornerRadius: 11, style: .continuous)
-                    )
+            ZStack(alignment: .bottomLeading) {
+                GeometryReader { geometry in
+                    Image(asset)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: 123)
+                        .clipped()
+                }
+                .frame(height: 123)
 
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ink)
-                    .lineLimit(1)
+                LinearGradient(
+                    colors: [
+                        .black.opacity(0.04), .black.opacity(0.16),
+                        .black.opacity(0.79)
+                    ], startPoint: .top, endPoint: .bottom
+                )
 
-                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 5) {
+                    Image(systemName: icon)
+                        .font(.system(size: 17, weight: .semibold))
+                    Spacer(minLength: 8)
+                    Text(title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                .foregroundStyle(.white)
+                .padding(10)
             }
-            .padding(.horizontal, 11)
-            .frame(maxWidth: .infinity, minHeight: 68)
-            .background(
-                Color(red: 0.986, green: 0.978, blue: 0.963),
-                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 15, style: .continuous)
-                    .stroke(hairline.opacity(0.55), lineWidth: 0.8)
-                    .allowsHitTesting(false)
-            }
-            .contentShape(Rectangle())
+            .frame(height: 123)
+            .frame(maxWidth: .infinity)
+            .clipShape(RoundedRectangle(cornerRadius: 15))
+            .contentShape(RoundedRectangle(cornerRadius: 15))
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
         .accessibilityLabel(title)
+        .accessibilityHint(
+            kind == .custom
+                ? tr("Select cycling in the workout setup",
+                     "Velg sykling i treningsoppsettet")
+                : tr("Open workout setup", "Åpne treningsoppsett")
+        )
     }
 
     private var ghostRaceSection: some View {
