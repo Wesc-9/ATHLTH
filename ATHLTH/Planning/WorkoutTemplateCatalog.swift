@@ -134,6 +134,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var phase: WorkoutPhaseKind? = nil
     var targetPaceSecondsPerKilometer: Double? = nil
     var targetHeartRateZone: Int? = nil
+    /// Planned treadmill gradient in percent: never treated as measured data.
+    var treadmillInclinePercent: Double? = nil
     // Optional fields preserve compatibility with all existing saved workouts.
     var setCount: Int? = nil
     var restBetweenSetsSeconds: TimeInterval? = nil
@@ -173,6 +175,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.phase == rhs.phase &&
         lhs.targetPaceSecondsPerKilometer == rhs.targetPaceSecondsPerKilometer &&
         lhs.targetHeartRateZone == rhs.targetHeartRateZone &&
+        lhs.treadmillInclinePercent == rhs.treadmillInclinePercent &&
         lhs.setCount == rhs.setCount &&
         lhs.restBetweenSetsSeconds == rhs.restBetweenSetsSeconds &&
         lhs.groupID == rhs.groupID &&
@@ -200,6 +203,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(phase)
         hasher.combine(targetPaceSecondsPerKilometer)
         hasher.combine(targetHeartRateZone)
+        hasher.combine(treadmillInclinePercent)
         hasher.combine(setCount)
         hasher.combine(restBetweenSetsSeconds)
         hasher.combine(groupID)
@@ -235,6 +239,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case phase
         case targetPaceSecondsPerKilometer = "target_pace_seconds_per_km"
         case targetHeartRateZone = "target_hr_zone"
+        case treadmillInclinePercent = "treadmill_incline_percent"
         case setCount = "set_count"
         case restBetweenSetsSeconds = "rest_between_sets_seconds"
         case groupID = "group_id"
@@ -306,6 +311,10 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         if let targetHeartRateZone, (1...5).contains(targetHeartRateZone) {
             parts.append("Puls sone \(targetHeartRateZone)")
         }
+        if let treadmillInclinePercent, treadmillInclinePercent.isFinite,
+           (0...20).contains(treadmillInclinePercent) {
+            parts.append(String(format: "%.1f %% stigning", treadmillInclinePercent))
+        }
 
         if let loadNote,
            !loadNote.trimmingCharacters(
@@ -353,6 +362,7 @@ extension Array where Element == WorkoutTemplateBlock {
             item.exerciseSnapshot = source.exerciseSnapshot
             item.wellnessKind = source.wellnessKind
             item.activityTag = source.activityTag
+            item.treadmillInclinePercent = source.treadmillInclinePercent
             output.append(item)
         }
 
@@ -3064,6 +3074,30 @@ struct WorkoutTemplateBuilderView: View {
                 .tint(studioAccent)
                 if blocks[index].isIndoor != true {
                     routeSection
+                } else {
+                    Toggle(
+                        tr("Treadmill incline target", "Målstigning på tredemølle"),
+                        isOn: Binding(
+                            get: { blocks[index].treadmillInclinePercent != nil },
+                            set: { blocks[index].treadmillInclinePercent = $0 ? 0 : nil }
+                        )
+                    )
+                    .tint(studioAccent)
+                    if blocks[index].treadmillInclinePercent != nil {
+                        Stepper(
+                            value: Binding(
+                                get: { blocks[index].treadmillInclinePercent ?? 0 },
+                                set: { blocks[index].treadmillInclinePercent = $0 }
+                            ),
+                            in: 0...20, step: 0.5
+                        ) {
+                            Text(String(
+                                format: "%.1f %% stigning",
+                                blocks[index].treadmillInclinePercent ?? 0
+                            ))
+                            .font(.subheadline.weight(.medium))
+                        }
+                    }
                 }
                 Toggle(ATHLTHLocalization.choose(english: "Target pace", norwegian: "Måltempo"),
                        isOn: Binding(
@@ -3826,6 +3860,7 @@ struct WorkoutTemplateBuilderView: View {
             copy.exerciseID = block.exerciseID
             copy.wellnessKind = block.wellnessKind
             copy.activityTag = block.activityTag
+            copy.treadmillInclinePercent = block.treadmillInclinePercent
             copy.editorDragID = block.editorDragID
             return copy
         }
