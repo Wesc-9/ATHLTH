@@ -228,6 +228,7 @@ enum ATHLTHUnifiedWorkout {
             targetHeartRateZone: target.intensity.heartRateZone
         )
         block.treadmillInclinePercent = target.treadmillInclinePercent
+        if target.treadmillInclinePercent != nil { block.isIndoor = true }
         return block
     }
 }
