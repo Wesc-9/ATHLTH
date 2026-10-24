@@ -1317,18 +1317,10 @@ struct AdvancedPlannerView: View {
         in week: TrainingPlanWeek,
         plan: TrainingPlan
     ) -> Date? {
-        guard let startDate = plan.startDate else {
-            return nil
-        }
-
-        let offset =
-            max(week.weekNumber - 1, 0) * 7 +
-            max(day.dayIndex - 1, 0)
-
-        return Calendar.current.date(
-            byAdding: .day,
-            value: offset,
-            to: Calendar.current.startOfDay(for: startDate)
+        TrainingPlanSchedule.dayDate(
+            in: plan,
+            week: week,
+            day: day
         )
     }
 
