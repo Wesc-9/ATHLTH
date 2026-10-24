@@ -5,6 +5,8 @@ struct PlannedWorkoutDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
@@ -56,6 +58,12 @@ struct PlannedWorkoutDetailView: View {
 
     private var isCompleted: Bool {
         isHealthCompleted || isStrengthCompleted || isManuallyCompleted
+    }
+
+    private var anotherWorkoutIsActive: Bool {
+        strengthWorkout.activeWorkout != nil ||
+            phoneWorkout.active != nil ||
+            workoutMirroring.hasActiveMirroredWorkout
     }
 
     var body: some View {
@@ -461,7 +469,19 @@ struct PlannedWorkoutDetailView: View {
         }
         .buttonStyle(.borderedProminent)
         .tint(ATHLTHTheme.accentDeep)
-        .disabled(isCompleted)
+        .disabled(isCompleted || anotherWorkoutIsActive)
+
+        if anotherWorkoutIsActive && !isCompleted {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Finish or continue the active session before starting another.",
+                    norwegian: "Fortsett eller avslutt den aktive økten før du starter en ny."
+                ),
+                systemImage: "info.circle"
+            )
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
     }
 
     private func notesCard(_ notes: String) -> some View {
