@@ -131,7 +131,7 @@ struct ATHLTHTrainProgressReferenceView: View {
         let duration = eligible.reduce(0) { $0 + $1.duration }
         guard distance > 0 else { return nil }
         let seconds = duration / (distance / 1_000)
-        return (120...1_200).contains(seconds) ? seconds : nil
+        return (120.0...1_200.0).contains(seconds) ? seconds : nil
     }
     private var strengthVolume: Double { lifts.reduce(0) { $0 + $1.totalVolumeKilograms } }
     private var strengthSets: Int { lifts.reduce(0) { $0 + $1.totalWorkingSets } }
@@ -582,7 +582,7 @@ struct ATHLTHTrainProgressReferenceView: View {
             guard let km = workout.distanceKilometers, km >= 0.5,
                   workout.duration > 0 else { return nil }
             let seconds = workout.duration / km
-            guard (120...1_200).contains(seconds) else { return nil }
+            guard (120.0...1_200.0).contains(seconds) else { return nil }
             return PacePoint(date: workout.startDate, pace: seconds / 60)
         }
         .sorted { $0.date < $1.date }
