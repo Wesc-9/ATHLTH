@@ -1,0 +1,94 @@
+name: ATHLTH 1.9.1 Hybrid Engine XCTest
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v1.9.1
+    paths:
+      - .github/workflows/hybrid-engine-tests.yml
+      - ATHLTH/Training/ATHLTHHybridWorkoutLaunchPlan.swift
+      - ATHLTH/Training/ATHLTHLiveWorkoutEngineRouter.swift
+      - ATHLTH/Strength/StrengthWorkoutStore.swift
+      - ATHLTH/Planning/ATHLTHUnifiedWorkout.swift
+      - ATHLTH/Views/ProductRootTabView.swift
+      - Tests/ATHLTHPlannedHybridLaunchTests.swift
+      - Tests/ATHLTHUnifiedMixedWorkoutPlanTests.swift
+      - Tests/ATHLTHLiveWorkoutEngineRouterTests.swift
+
+concurrency:
+  group: athlth-v191-hybrid-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  hybrid-xctest:
+    runs-on: xcode-27
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode 27
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install XcodeGen and tools
+        run: |
+          brew install xcodegen
+          brew install imagemagick
+
+      - name: Prepare simulator build
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/optimize_hero_assets.sh
+          python3 scripts/prepare_repdb_offline.py
+          cp project.yml project-hybrid-tests.yml
+          python3 - project-hybrid-tests.yml <<'PY'
+          from pathlib import Path
+          import sys
+          path = Path(sys.argv[1])
+          contents = path.read_text()
+          contents = contents.replace(
+              "      - target: ATHLTHWatchApp\n        embed: true\n", ""
+          )
+          path.write_text(contents)
+          PY
+          xcodegen generate --spec project-hybrid-tests.yml
+
+      - name: Run targeted hybrid regression tests on iPhone Simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          DEVICE_MATRIX="$RUNNER_TEMP/athlth-test-simulators.txt"
+          xcrun simctl list devices available -j \
+            | python3 scripts/select_iphone_simulators.py > "$DEVICE_MATRIX"
+          test -s "$DEVICE_MATRIX"
+          UDID=$(head -n 1 "$DEVICE_MATRIX" | cut -d'|' -f2)
+          test -n "$UDID"
+          echo "Running hybrid XCTest on simulator $UDID"
+          xcodebuild \
+            -project ATHLTH.xcodeproj \
+            -scheme ATHLTH \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -derivedDataPath "$RUNNER_TEMP/HybridDerivedData" \
+            -resultBundlePath "$RUNNER_TEMP/HybridTests.xcresult" \
+            -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
+            -only-testing:ATHLTHTests/ATHLTHLiveWorkoutEngineRouterTests \
+            -only-testing:ATHLTHTests/ATHLTHUnifiedMixedWorkoutPlanTests \
+            CODE_SIGNING_ALLOWED=NO \
+            test
+
+      - name: Upload test result on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-v191-hybrid-xcresult
+          path: ${{ runner.temp }}/HybridTests.xcresult
+          retention-days: 3
+          if-no-files-found: ignore
