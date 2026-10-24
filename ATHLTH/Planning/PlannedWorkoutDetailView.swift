@@ -4,6 +4,7 @@ import SwiftUI
 struct PlannedWorkoutDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
@@ -15,8 +16,7 @@ struct PlannedWorkoutDetailView: View {
     @State private var showingStructuredWorkout = false
 
     private var currentWorkout: PlannedSession {
-        guard let plan = session.activePlan,
-              plan.id == planID
+        guard let plan = session.trainingPlan(withID: planID)
         else {
             return workout
         }
@@ -41,8 +41,21 @@ struct PlannedWorkoutDetailView: View {
         )
     }
 
+    private var isStrengthCompleted: Bool {
+        strengthWorkout.workoutHistory.contains {
+            $0.isFinished && $0.plannedSessionID == currentWorkout.id
+        }
+    }
+
+    private var isSkipped: Bool {
+        session.isPlanSessionSkipped(
+            planID: planID,
+            sessionID: currentWorkout.id
+        )
+    }
+
     private var isCompleted: Bool {
-        isHealthCompleted || isManuallyCompleted
+        isHealthCompleted || isStrengthCompleted || isManuallyCompleted
     }
 
     var body: some View {
@@ -469,7 +482,7 @@ struct PlannedWorkoutDetailView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle("Completion")
 
-                if isHealthCompleted {
+                if isHealthCompleted || isStrengthCompleted {
                     HStack(spacing: 12) {
                         Image(systemName: "heart.circle.fill")
                             .font(.title2)
@@ -479,7 +492,16 @@ struct PlannedWorkoutDetailView: View {
                             Text("Completed")
                                 .font(.headline)
 
-                            Text("Matched automatically from Apple Health.")
+                            Text(isStrengthCompleted
+                                ? ATHLTHLocalization.choose(
+                                    english: "Linked to a completed ATHLTH strength workout.",
+                                    norwegian: "Knyttet til en fullført styrkeøkt i ATHLTH."
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Matched to a timed Apple Health workout.",
+                                    norwegian: "Knyttet til en tidsfestet økt fra Apple Health."
+                                )
+                            )
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
@@ -547,6 +569,36 @@ struct PlannedWorkoutDetailView: View {
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if !isCompleted {
+                    Button {
+                        session.setPlanSessionSkipped(
+                            planID: planID,
+                            sessionID: currentWorkout.id,
+                            skipped: !isSkipped
+                        )
+                    } label: {
+                        Label(
+                            isSkipped
+                                ? ATHLTHLocalization.choose(
+                                    english: "Restore planned workout",
+                                    norwegian: "Gjenopprett planlagt økt"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Skip this workout",
+                                    norwegian: "Hopp over denne økten"
+                                ),
+                            systemImage: isSkipped
+                                ? "arrow.uturn.backward"
+                                : "forward.end"
+                        )
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 42)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
