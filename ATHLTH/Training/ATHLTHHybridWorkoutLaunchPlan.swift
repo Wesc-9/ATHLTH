@@ -62,7 +62,14 @@ enum ATHLTHHybridWorkoutLaunchPlan {
             // Legacy planner stores interval templates and PlannedExercise
             // independently. Project them into the same canonical phase order
             // without replacing per-set data with derived snapshots.
-            let projected = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+            // Project the running template separately. When strength and
+            // running are projected together, between-set strength rests
+            // share the .rest/.recovery representation and must NOT become
+            // extra treadmill intervals. The strength phase keeps its own
+            // rest metadata through PlannedExercise.
+            var runningOnly = workout
+            runningOnly.exercises = []
+            let projected = ATHLTHUnifiedWorkout.editorBlocks(from: runningOnly)
             var parts: [PlannedSession] = []
             for phase: WorkoutPhaseKind in [.warmup, .main, .cooldown] {
                 let phaseExercises = workout.exercises.filter { exercise in
