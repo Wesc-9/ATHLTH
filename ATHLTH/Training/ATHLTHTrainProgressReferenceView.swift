@@ -88,6 +88,15 @@ struct ATHLTHTrainProgressReferenceView: View {
         var id: String { name + month.description }
     }
 
+    private struct RecentSession: Identifiable {
+        let id: String
+        let date: Date
+        let icon: String
+        let title: String
+        let subtitle: String
+        let value: String
+    }
+
     private let ink = ATHLTHTheme.primaryText
     private let muted = ATHLTHTheme.mutedText
     private let positive = ATHLTHTheme.vitality
@@ -135,6 +144,36 @@ struct ATHLTHTrainProgressReferenceView: View {
     }
     private var strengthVolume: Double { lifts.reduce(0) { $0 + $1.totalVolumeKilograms } }
     private var strengthSets: Int { lifts.reduce(0) { $0 + $1.totalWorkingSets } }
+    private var recentSessions: [RecentSession] {
+        let recorded = rangeWorkouts.map { workout in
+            RecentSession(
+                id: "health-" + workout.id.uuidString,
+                date: workout.startDate,
+                icon: workout.activity.icon,
+                title: workout.activity == .running
+                    ? tr("Running", "Løping")
+                    : workout.activity == .strength
+                        ? tr("Strength", "Styrke")
+                        : workout.activity.rawValue,
+                subtitle: workout.startDate.formatted(date: .abbreviated, time: .omitted),
+                value: workout.activity == .running
+                    ? workout.paceMinutesPerKilometer.map { paceText($0 * 60) } ?? workout.duration.shortDuration
+                    : workout.duration.shortDuration
+            )
+        }
+        let strengthOnly = unlinkedLifts.map { workout in
+            RecentSession(
+                id: "strength-" + workout.id.uuidString,
+                date: workout.startedAt,
+                icon: "dumbbell",
+                title: workout.title,
+                subtitle: workout.startedAt.formatted(date: .abbreviated, time: .omitted),
+                value: String(format: "%.0f kg", workout.totalVolumeKilograms)
+            )
+        }
+        return (recorded + strengthOnly).sorted { $0.date > $1.date }
+    }
+
     private var runningRecords: [HealthPersonalRecord] {
         healthRecords.filter {
             $0.kind == .longestRun ||
@@ -530,29 +569,16 @@ struct ATHLTHTrainProgressReferenceView: View {
                     title: tr("Recent sessions", "Siste økter"),
                     accessory: tr("See all", "Se alle")
                 ) {
-                    let rows = rangeWorkouts.sorted { $0.startDate > $1.startDate }
-                    if rows.isEmpty && lifts.isEmpty {
+                    if recentSessions.isEmpty {
                         emptyLine(tr("Completed workouts will appear here.", "Fullførte økter vises her."))
                     } else {
-                        ForEach(rows.prefix(3)) { workout in
+                        ForEach(recentSessions.prefix(3)) { item in
                             compactRow(
-                                icon: workout.activity.icon,
-                                title: workout.activity.rawValue,
-                                subtitle: workout.startDate.formatted(date: .abbreviated, time: .omitted),
-                                value: workout.activity == .running
-                                    ? workout.paceMinutesPerKilometer.map { paceText($0 * 60) } ?? "—"
-                                    : workout.duration.shortDuration
+                                icon: item.icon,
+                                title: item.title,
+                                subtitle: item.subtitle,
+                                value: item.value
                             )
-                        }
-                        if rows.isEmpty {
-                            ForEach(lifts.prefix(3)) { workout in
-                                compactRow(
-                                    icon: "dumbbell",
-                                    title: workout.title,
-                                    subtitle: workout.startedAt.formatted(date: .abbreviated, time: .omitted),
-                                    value: "\(Int(workout.totalVolumeKilograms.rounded())) kg"
-                                )
-                            }
                         }
                     }
                 }
