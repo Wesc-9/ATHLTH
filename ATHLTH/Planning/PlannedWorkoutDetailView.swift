@@ -447,6 +447,7 @@ struct PlannedWorkoutDetailView: View {
     }
 
 
+    @ViewBuilder
     private var structuredWorkoutStartButton:
         some View {
         Button {
