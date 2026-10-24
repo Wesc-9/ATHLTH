@@ -523,6 +523,15 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
             .count
     }
 
+    /// Used by the partial-finish confirmation. Only uncompleted sets
+    /// are counted; planned targets never become recorded achievements.
+    var remainingSetCount: Int {
+        exercises
+            .flatMap(\.sets)
+            .filter { !$0.isCompleted }
+            .count
+    }
+
     var totalVolumeKilograms: Double {
         exercises
             .flatMap(\.sets)
