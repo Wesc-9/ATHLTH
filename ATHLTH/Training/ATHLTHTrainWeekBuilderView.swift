@@ -695,6 +695,11 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                         information
                         if advanced {
                             detailedStructureEntry
+                            // The interval recipe remains the sole running source;
+                            // never offer a parallel editor for a structured hybrid.
+                            if draft.kind == .running && draft.workoutBlocks.isEmpty {
+                                advancedIntervalEntry
+                            }
                             if !ATHLTHUnifiedWorkout.editorBlocks(from: draft).isEmpty {
                                 detailedBlocksSummary
                             }
@@ -1028,6 +1033,35 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 Spacer(minLength: 3)
                 Image(systemName: "chevron.right")
                     .font(.caption)
+            }
+            .foregroundStyle(ink)
+            .padding(15)
+            .editorSurface(line: line)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var advancedIntervalEntry: some View {
+        Button {
+            showIntervalComposer = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "figure.run.circle")
+                    .font(.title3)
+                    .foregroundStyle(bronze)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Interval studio", "Intervallstudio"))
+                        .font(.subheadline.weight(.semibold))
+                    Text(tr(
+                        "Set pace, incline and recovery per effort, with a Spotify playlist for each phase",
+                        "Velg fart, stigning og pauser per drag, og spilleliste for hver del"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
             }
             .foregroundStyle(ink)
             .padding(15)
