@@ -137,8 +137,17 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .sheet(isPresented: $showingInvitationLobby) {
-            PlannedWorkoutLobbyView(workout: currentWorkout)
-                .presentationDetents([.medium, .large])
+            PlannedWorkoutLobbyView(
+                workout: currentWorkout,
+                onStartWorkout: { selected, device in
+                    // The real recording engine belongs to Home. Do not
+                    // create an independent timer or duplicate workout.
+                    showingInvitationLobby = false
+                    dismiss()
+                    onStartWorkout?(selected, device)
+                }
+            )
+            .presentationDetents([.large])
         }
     }
 
