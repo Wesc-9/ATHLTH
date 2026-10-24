@@ -5806,11 +5806,14 @@ struct SessionEditorView: View {
     private var workoutBasicsSection: some View {
                 Section {
                     TextField(
-                        ATHLTHLocalization.choose(
-                            english: "Workout name (required)",
-                            norwegian: "Øktnavn (obligatorisk)"
-                        ),
+                        automaticWorkoutTitle,
                         text: $title
+                    )
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Workout name (optional)",
+                            norwegian: "Øktnavn (valgfritt)"
+                        )
                     )
 
                     Picker(ATHLTHLocalization.choose(english: "Type", norwegian: "Type"), selection: $kind) {
@@ -8869,13 +8872,38 @@ struct SessionEditorView: View {
         }
     }
 
-    private var canAdd: Bool {
-        let cleanTitle = title
+    // Show the suggested title as the TextField placeholder until the
+    // athlete enters a custom name. Reuse this exact value when saving so
+    // calendar, history and invitations never receive a blank title.
+    private var automaticWorkoutTitle: String {
+        if kind == .running {
+            if selectedRunningWorkouts.count == 1 {
+                let templateTitle = selectedRunningWorkouts[0].title
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !templateTitle.isEmpty {
+                    return templateTitle
+                }
+            }
+
+            if runEnvironment == .treadmill {
+                return ATHLTHLocalization.choose(
+                    english: "Indoor running – treadmill",
+                    norwegian: "Løping innendørs – tredemølle"
+                )
+            }
+        }
+
+        return kind.title
+    }
+
+    private var resolvedWorkoutTitle: String {
+        let enteredTitle = title
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        return enteredTitle.isEmpty ? automaticWorkoutTitle : enteredTitle
+    }
 
-        guard !cleanTitle.isEmpty else { return false }
-
-        return true
+    private var canAdd: Bool {
+        !resolvedWorkoutTitle.isEmpty
     }
 
     private func addExercise(_ exercise: Exercise) {
@@ -9041,16 +9069,9 @@ struct SessionEditorView: View {
             return
         }
 
-        let wasEmpty = selectedRunningWorkouts.isEmpty
         selectedRunningWorkouts.append(workout)
-
-        if wasEmpty,
-           title == "New Workout" ||
-           title == "Running Workout" ||
-           title == "Walk" {
-            title = workout.title
-        }
-
+        // The suggested title updates through automaticWorkoutTitle; do
+        // not write it into the field or replace a user-entered title.
         syncRunningMetricsFromSelection()
     }
 
@@ -9586,7 +9607,7 @@ struct SessionEditorView: View {
         return PlannedSession(
             id: existingWorkout?.id ??
                 (preserveSourceID ? initialSourceWorkout?.id ?? UUID() : UUID()),
-            title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: resolvedWorkoutTitle,
             kind: kind,
             scheduledStart:
                 isStandalone
