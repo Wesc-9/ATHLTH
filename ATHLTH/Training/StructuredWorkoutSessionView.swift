@@ -449,6 +449,12 @@ struct StructuredWorkoutSessionView: View {
                         systemImage: "heart"
                     )
                 }
+                if let incline = block.treadmillInclinePercent {
+                    Label(
+                        String(format: "%.1f %%", incline),
+                        systemImage: "mountain.2"
+                    )
+                }
             }
             .font(.caption.weight(.medium))
             .foregroundStyle(.white.opacity(0.72))
