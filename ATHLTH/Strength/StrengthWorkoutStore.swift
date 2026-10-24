@@ -1277,6 +1277,100 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    /// Reorder by stable IDs from drag-and-drop without requiring Edit mode.
+    /// Saving a new order does not change the saved plan, completed set IDs,
+    /// active set, or the underlying Watch recording.
+    @discardableResult
+    func moveActiveExercise(_ draggedID: UUID, before targetID: UUID) -> Bool {
+        guard var workout = activeWorkout,
+              draggedID != targetID,
+              let from = workout.exercises.firstIndex(where: { $0.id == draggedID }),
+              workout.exercises.contains(where: { $0.id == targetID })
+        else { return false }
+
+        let currentID = currentExercise?.id
+        let moved = workout.exercises.remove(at: from)
+        guard let destination = workout.exercises.firstIndex(where: {
+            $0.id == targetID
+        }) else { return false }
+        workout.exercises.insert(moved, at: destination)
+        currentExerciseIndex = workout.exercises.firstIndex(where: {
+            $0.id == currentID
+        }) ?? 0
+        activeWorkout = workout
+        persistCheckpointNow()
+        return true
+    }
+
+    /// Completed sets are history evidence: never delete them from an
+    /// in-progress workout. Active running timed sets must be ended first.
+    func canRemoveActiveExercise(_ id: UUID) -> Bool {
+        guard let workout = activeWorkout,
+              let item = workout.exercises.first(where: { $0.id == id }),
+              item.sets.allSatisfy({ !$0.isCompleted })
+        else { return false }
+        return !(currentExercise?.id == id &&
+                 currentTimedSetCountdown?.isRunning == true)
+    }
+
+    @discardableResult
+    func removeActiveExercise(_ id: UUID) -> Bool {
+        guard canRemoveActiveExercise(id),
+              var workout = activeWorkout,
+              let index = workout.exercises.firstIndex(where: { $0.id == id })
+        else { return false }
+
+        let previouslySelectedID = currentExercise?.id
+        let removed = workout.exercises.remove(at: index)
+        for set in removed.sets {
+            cardioWatchCaptures.removeValue(forKey: set.id)
+            watchCaptureNeedsBaseline.remove(set.id)
+        }
+
+        // Preserve the selected exercise when another row disappears.
+        // If it was removed, choose an unfinished exercise first.
+        let preferred = workout.exercises.firstIndex(where: {
+            $0.id == previouslySelectedID
+        })
+        let next = workout.exercises.firstIndex(where: { !$0.isCompleted })
+        currentExerciseIndex = preferred ?? next ??
+            max(min(index, workout.exercises.count - 1), 0)
+        currentSetIndex = workout.exercises.indices.contains(currentExerciseIndex)
+            ? (workout.exercises[currentExerciseIndex].sets.firstIndex(where: {
+                !$0.isCompleted
+            }) ?? 0) : 0
+
+        if previouslySelectedID == id {
+            timedSetCountdown = nil
+            restStartedAt = nil
+            restEndsAt = nil
+        }
+        activeWorkout = workout
+        reloadDraftFromCurrentSet()
+        persistCheckpointNow()
+        return true
+    }
+
+    /// Bar weight is metadata for the exercise's bar, not an additional load
+    /// to add on top of the already-total kg recorded for each set.
+    @discardableResult
+    func setActiveExerciseBarWeight(_ id: UUID, kilograms: Double?) -> Bool {
+        guard var workout = activeWorkout,
+              let index = workout.exercises.firstIndex(where: { $0.id == id }),
+              kilograms == nil ||
+                (kilograms!.isFinite && (0...40).contains(kilograms!))
+        else { return false }
+        workout.exercises[index].barWeightKilograms = kilograms
+        activeWorkout = workout
+        if currentExercise?.id == id,
+           let kilograms, currentSetRecordsWeight,
+           draftWeightKilograms < kilograms {
+            setDraft(weightKilograms: kilograms)
+        }
+        persistCheckpointNow()
+        return true
+    }
+
     /// Current-set-only timer; never changes the workout or advances sets by itself.
     var currentTimedSetCountdown: StrengthTimedSetCountdown? {
         guard let timedSetCountdown,
