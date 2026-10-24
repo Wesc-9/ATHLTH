@@ -615,6 +615,72 @@ final class TrainingContinuityTests: XCTestCase {
         XCTAssertEqual(recorded.totalCompletedSets, 1)
     }
 
+    @MainActor
+    func testOnlyEntirelyFinishedStrengthWorkoutsCompletePlanSessions() {
+        let owner = UUID()
+        defer { clear(owner) }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: nil)
+        let exercise = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Squat",
+            instructions: [],
+            primaryMuscles: ["Quads"],
+            secondaryMuscles: [],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        store.appendExercise(
+            exercise,
+            sets: 2,
+            reps: 8,
+            loadKind: .weightKilograms,
+            targetWeightKilograms: 40
+        )
+
+        XCTAssertFalse(store.activeWorkout?.isFullyCompleted ?? true)
+        store.completeCurrentSet(
+            reps: 8,
+            weightKilograms: 40,
+            rpe: 7
+        )
+        store.finish()
+
+        let partial = store.workoutHistory.first
+        XCTAssertEqual(partial?.totalCompletedSets, 1)
+        XCTAssertEqual(partial?.remainingSetCount, 1)
+        XCTAssertFalse(partial?.isFullyCompleted ?? true)
+
+        // An empty recording also cannot fulfill a planned session.
+        store.startFreestyle(watchSessionID: nil)
+        store.finish()
+        let empty = store.workoutHistory.first { $0.totalCompletedSets == 0 }
+        XCTAssertNotNil(empty)
+        XCTAssertFalse(empty?.isFullyCompleted ?? true)
+
+        // All recorded sets must be complete when the recording ends.
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(
+            exercise,
+            sets: 1,
+            reps: 8,
+            loadKind: .weightKilograms,
+            targetWeightKilograms: 40
+        )
+        store.completeCurrentSet(
+            reps: 8,
+            weightKilograms: 40,
+            rpe: 7
+        )
+        store.finish()
+        XCTAssertTrue(store.workoutHistory.contains(\.isFullyCompleted))
+    }
+
     private func clear(_ userID: UUID) {
         for name in TrainingBackupPayload.names + ["strengthActive", "phoneActive"] {
             UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key(name, userID: userID))
