@@ -343,6 +343,138 @@ final class TrainingContinuityTests: XCTestCase {
         XCTAssertFalse(CoachHistoryPermission.isEnabled(userID: owner))
     }
 
+    @MainActor
+    func testLiveSwapOfNextSetPreservesCompletedAndLaterPlannedSets() {
+        let owner = UUID()
+        defer { clear(owner) }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+
+        let barbell = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Barbell Bench Press",
+            instructions: [],
+            primaryMuscles: ["Chest"],
+            secondaryMuscles: ["Triceps"],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        let dumbbell = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Dumbbell Bench Press",
+            instructions: [],
+            primaryMuscles: ["Chest"],
+            secondaryMuscles: ["Triceps"],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(
+            barbell,
+            sets: 3,
+            reps: 8,
+            targetWeightKilograms: 60
+        )
+        store.completeCurrentSet(
+            reps: 8,
+            weightKilograms: 60,
+            rpe: 7
+        )
+
+        let originalCompletedID = store.activeWorkout?
+            .exercises.first?.sets.first?.id
+        let originalFinalID = store.activeWorkout?
+            .exercises.first?.sets.last?.id
+
+        store.substituteCurrentExercise(
+            with: dumbbell,
+            scope: .nextSetOnly
+        )
+
+        let exercises = store.activeWorkout?.exercises ?? []
+        XCTAssertEqual(exercises.count, 3)
+        XCTAssertEqual(exercises[0].exercise.name, "Barbell Bench Press")
+        XCTAssertEqual(exercises[0].sets.map(\.id), [originalCompletedID].compactMap { $0 })
+        XCTAssertEqual(exercises[0].sets.first?.completedWeightKilograms, 60)
+        XCTAssertEqual(exercises[1].exercise.name, "Dumbbell Bench Press")
+        XCTAssertEqual(exercises[1].sets.count, 1)
+        XCTAssertNil(exercises[1].sets.first?.plannedWeightKilograms)
+        XCTAssertNil(exercises[1].sets.first?.plannedResistanceLevel)
+        XCTAssertNil(exercises[1].plannedExerciseID)
+        XCTAssertEqual(exercises[2].exercise.name, "Barbell Bench Press")
+        XCTAssertEqual(exercises[2].sets.map(\.id), [originalFinalID].compactMap { $0 })
+        XCTAssertEqual(exercises[2].sets.first?.plannedWeightKilograms, 60)
+    }
+
+    @MainActor
+    func testLiveSwapOfAllRemainingDoesNotCarryOldEquipmentLoad() {
+        let owner = UUID()
+        defer { clear(owner) }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        let original = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Barbell Press",
+            instructions: [],
+            primaryMuscles: ["Chest"],
+            secondaryMuscles: [],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        let replacement = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Machine Chest Press",
+            instructions: [],
+            primaryMuscles: ["Chest"],
+            secondaryMuscles: [],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(
+            original,
+            sets: 3,
+            reps: 10,
+            targetWeightKilograms: 50
+        )
+        store.completeCurrentSet(
+            reps: 10,
+            weightKilograms: 50,
+            rpe: 7
+        )
+
+        store.substituteCurrentExercise(
+            with: replacement,
+            scope: .allRemaining
+        )
+
+        let exercises = store.activeWorkout?.exercises ?? []
+        XCTAssertEqual(exercises.count, 2)
+        XCTAssertEqual(exercises[0].sets.count, 1)
+        XCTAssertEqual(exercises[0].sets.first?.completedWeightKilograms, 50)
+        XCTAssertEqual(exercises[1].sets.count, 2)
+        XCTAssertTrue(exercises[1].sets.allSatisfy {
+            $0.plannedWeightKilograms == nil &&
+            $0.plannedResistanceLevel == nil &&
+            !$0.isCompleted
+        })
+    }
+
     private func clear(_ userID: UUID) {
         for name in TrainingBackupPayload.names + ["strengthActive", "phoneActive"] {
             UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key(name, userID: userID))
