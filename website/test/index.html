@@ -18,9 +18,9 @@
   color-scheme:dark;
   --background:#050507;
   --foreground:#f9f9fb;
-  --silver-hi:#fafafb;
-  --silver-mid:#d8d9dd;
-  --silver-lo:#9699a1;
+  --silver-hi:#f5f5f7;
+  --silver-mid:#e1e2e6;
+  --silver-lo:#b5b8c0;
   --pulse:#e4e9f0;
   --ease:cubic-bezier(.16,1,.3,1);
 }
@@ -107,9 +107,9 @@ body.enhanced .coming span{opacity:0;filter:blur(10px);transform:translateY(12px
 body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
 @keyframes heartbeat{
   0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
-  8%{transform:scale(1.045);filter:drop-shadow(0 0 22px rgba(255,255,255,.35))}
+  8%{transform:scale(1.028);filter:drop-shadow(0 0 12px rgba(255,255,255,.23))}
   16%{transform:scale(1)}
-  24%{transform:scale(1.03);filter:drop-shadow(0 0 16px rgba(255,255,255,.25))}
+  24%{transform:scale(1.016);filter:drop-shadow(0 0 9px rgba(255,255,255,.17))}
   40%{transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
 }
 @keyframes wave{
@@ -162,10 +162,10 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
             </linearGradient>
           </defs>
           <g fill="none" stroke-linecap="round" stroke-linejoin="round">
-            <path id="path-a" d="M22 296 L92 296 Q106 296 114 281 L234 34 Q248 8 262 34 L370 252" stroke="url(#silver)" stroke-width="2"></path>
-            <path id="path-b" d="M246 220 L304 372 Q312 392 327 376 L386 302 Q393 296 408 296 L478 296" stroke="url(#silver)" stroke-width="2"></path>
-            <path id="sweep-a" d="M22 296 L92 296 Q106 296 114 281 L234 34 Q248 8 262 34 L370 252" stroke="url(#sweep)" stroke-width="2" opacity="0"></path>
-            <path id="sweep-b" d="M246 220 L304 372 Q312 392 327 376 L386 302 Q393 296 408 296 L478 296" stroke="url(#sweep)" stroke-width="2" opacity="0"></path>
+            <path id="path-a" d="M22 296 L92 296 C102 296 107 294 115 278 L234 34 C244 13 252 13 262 34 L370 252" stroke="url(#silver)" stroke-width="2"></path>
+            <path id="path-b" d="M246 220 L304 372 C312 393 319 390 329 377 L386 302 C392 294 400 296 408 296 L478 296" stroke="url(#silver)" stroke-width="2"></path>
+            <path id="sweep-a" d="M22 296 L92 296 C102 296 107 294 115 278 L234 34 C244 13 252 13 262 34 L370 252" stroke="url(#sweep)" stroke-width="2" opacity="0"></path>
+            <path id="sweep-b" d="M246 220 L304 372 C312 393 319 390 329 377 L386 302 C392 294 400 296 408 296 L478 296" stroke="url(#sweep)" stroke-width="2" opacity="0"></path>
           </g>
         </svg>
       </div>
@@ -254,7 +254,7 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
     right.style.transform='scaleX('+silk(clamp((p-.28)/.15))+')';
 
     const fill=silk(clamp((p-.4)/.22));
-    const width=2+fill*30;
+    const width=2+fill*23;
     [a,b,sa,sb].forEach(el=>el.setAttribute('stroke-width',width.toFixed(3)));
     left.style.opacity=String(1-fill*.75);
     right.style.opacity=String(1-fill*.75);
