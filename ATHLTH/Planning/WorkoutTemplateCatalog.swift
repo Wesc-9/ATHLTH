@@ -311,7 +311,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         if let targetHeartRateZone, (1...5).contains(targetHeartRateZone) {
             parts.append("Puls sone \(targetHeartRateZone)")
         }
-        if let treadmillInclinePercent, treadmillInclinePercent.isFinite,
+        if isIndoor == true, let treadmillInclinePercent,
+           treadmillInclinePercent.isFinite,
            (0...20).contains(treadmillInclinePercent) {
             parts.append(String(format: "%.1f %% stigning", treadmillInclinePercent))
         }
@@ -3069,7 +3070,10 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 Toggle(tr("Outdoor activity", "Utendørs"), isOn: Binding(
                     get: { blocks[index].isIndoor != true },
-                    set: { blocks[index].isIndoor = !$0 }
+                    set: { outdoor in
+                        blocks[index].isIndoor = !outdoor
+                        if outdoor { blocks[index].treadmillInclinePercent = nil }
+                    }
                 ))
                 .tint(studioAccent)
                 if blocks[index].isIndoor != true {
