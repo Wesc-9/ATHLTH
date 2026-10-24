@@ -667,6 +667,19 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
         }
+        // The current set is a stable bottom surface. Scrolling exercise
+        // media/instructions never scrolls away load, reps or the main action.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if let workout = strength.activeWorkout,
+               let exercise = strength.currentExercise,
+               !workout.exercises.allSatisfy({ $0.isCompleted }),
+               !strength.currentExerciseAllSetsCompleted,
+               !strength.isFreeTrainingBetweenExercises,
+               exercise.isEmbeddedRunningInterval != true,
+               canLogOnIPhone(workout) {
+                compactLiveStrengthDock(exercise: exercise)
+            }
+        }
         // Keep Spotify/coach controls visible directly beneath the live
         // navigation bar instead of hiding them below long set-entry cards.
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -5209,6 +5222,234 @@ struct ActiveStrengthWorkoutView: View {
                         "Bruk forrige økt som referanse og juster etter dagsform."
                 )
         }
+    }
+
+    /// The focused set stays in a single compact surface at the bottom of
+    /// the device, independent of scrolling and the instruction gallery.
+    /// Larger horizontal buttons replace the unstable vertical chevrons.
+    @ViewBuilder
+    private func compactLiveStrengthDock(
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        VStack(spacing: 10) {
+            if strength.isResting, let end = strength.restEndsAt {
+                HStack(alignment: .center, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "REST · REMAINING",
+                            norwegian: "PAUSE · GJENSTÅR"
+                        ))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        Text(end, style: .timer)
+                            .font(.system(size: 34, weight: .semibold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .contentTransition(.numericText())
+                    }
+                    Spacer()
+                    Button {
+                        strength.skipRest()
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Continue", norwegian: "Fortsett"
+                        ), systemImage: "play.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 46)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                }
+            } else {
+                HStack(spacing: 8) {
+                    Text(ATHLTHLocalization.format(
+                        english: "Set %d / %d",
+                        norwegian: "Sett %d / %d",
+                        strength.currentSet?.setNumber ?? 1,
+                        max(exercise.sets.count, 1)
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Spacer()
+                    if StrengthBarbellExercisePolicy.usesBar(exercise),
+                       currentStrengthLoadKind == .weightKilograms {
+                        Menu {
+                            ForEach([0.0, 5.0, 10.0, 15.0, 20.0, 25.0],
+                                    id: \.self) { mass in
+                                Button(String(format: "%.0f kg", mass)) {
+                                    _ = strength.setActiveExerciseBarWeight(
+                                        exercise.id, kilograms: mass
+                                    )
+                                }
+                            }
+                        } label: {
+                            Label(String(format: "%g kg", exercise.barWeightKilograms ?? 20),
+                                  systemImage: "scalemass")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Bar weight, included in the total",
+                            norwegian: "Stangvekt, inkludert i totalvekten"
+                        ))
+                    }
+                }
+
+                HStack(spacing: 10) {
+                    if currentStrengthLoadKind == .resistanceLevel {
+                        compactLiveIntegerMetric(
+                            title: ATHLTHLocalization.choose(
+                                english: "Resistance", norwegian: "Motstand"),
+                            value: draftResistanceBinding, step: 1
+                        )
+                    } else if strength.currentSetRecordsWeight {
+                        compactLiveDecimalMetric(
+                            title: ATHLTHLocalization.choose(
+                                english: "Total kg", norwegian: "Totalvekt"),
+                            value: draftWeightBinding, step: 2.5
+                        )
+                    }
+                    if currentStrengthTargetKind == .time {
+                        compactLiveIntegerMetric(
+                            title: ATHLTHLocalization.choose(
+                                english: "Seconds", norwegian: "Sekunder"),
+                            value: draftDurationBinding, step: 15
+                        )
+                    } else {
+                        compactLiveIntegerMetric(
+                            title: ATHLTHLocalization.choose(
+                                english: "Reps", norwegian: "Reps"),
+                            value: draftRepsBinding, step: 1
+                        )
+                    }
+                }
+
+                Button {
+                    if currentStrengthTargetKind == .time &&
+                       strength.currentTimedSetCountdown?.isRunning != true {
+                        strength.startOrResumeTimedSet()
+                    } else {
+                        strength.completeCurrentDraftSet()
+                    }
+                } label: {
+                    Label(
+                        currentStrengthTargetKind == .time &&
+                        strength.currentTimedSetCountdown?.isRunning != true
+                            ? ATHLTHLocalization.choose(
+                                english: "Start set", norwegian: "Start sett"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Complete set", norwegian: "Fullfør sett"
+                            ),
+                        systemImage: currentStrengthTargetKind == .time &&
+                            strength.currentTimedSetCountdown?.isRunning != true
+                            ? "play.fill" : "checkmark.circle.fill"
+                    )
+                    .font(.subheadline.weight(.bold))
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHPlanDesign.ink)
+
+                if strength.hasNextExercise {
+                    Button {
+                        strength.skipRest()
+                        strength.moveToNextExercise()
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Next exercise",
+                            norwegian: "Neste øvelse"
+                        ), systemImage: "arrow.right")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .buttonStyle(.plain)
+                    .frame(minHeight: 27)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Skips ahead without completing unrecorded sets",
+                        norwegian: "Går videre uten å registrere resterende sett"
+                    ))
+                }
+            }
+        }
+        .padding(.horizontal, 17)
+        .padding(.top, 13)
+        .padding(.bottom, 8)
+        .frame(maxWidth: .infinity)
+        .background {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(ATHLTHPlanDesign.surface)
+                .ignoresSafeArea(edges: .bottom)
+                .shadow(color: .black.opacity(0.11), radius: 17, y: -4)
+        }
+        .overlay(alignment: .top) {
+            Capsule()
+                .fill(ATHLTHPlanDesign.outline.opacity(0.65))
+                .frame(height: 1)
+        }
+    }
+
+    private func compactLiveDecimalMetric(
+        title: String, value: Binding<Double>, step: Double
+    ) -> some View {
+        compactLiveMetric(
+            title: title,
+            display: String(format: "%.1f", value.wrappedValue),
+            decrement: { value.wrappedValue = max(0, value.wrappedValue - step) },
+            increment: { value.wrappedValue = min(999, value.wrappedValue + step) }
+        )
+    }
+
+    private func compactLiveIntegerMetric(
+        title: String, value: Binding<Int>, step: Int
+    ) -> some View {
+        compactLiveMetric(
+            title: title,
+            display: "\(value.wrappedValue)",
+            decrement: { value.wrappedValue = max(0, value.wrappedValue - step) },
+            increment: { value.wrappedValue = min(7_200, value.wrappedValue + step) }
+        )
+    }
+
+    private func compactLiveMetric(
+        title: String, display: String,
+        decrement: @escaping () -> Void,
+        increment: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 6) {
+            Text(title)
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            HStack(spacing: 3) {
+                Button(action: decrement) {
+                    Image(systemName: "minus")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 40, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                Text(display)
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                    .frame(maxWidth: .infinity)
+                Button(action: increment) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 40, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            .background(ATHLTHPlanDesign.warmSurface,
+                        in: RoundedRectangle(cornerRadius: 15))
+        }
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
     }
 
     private func focusedSetEntry(
