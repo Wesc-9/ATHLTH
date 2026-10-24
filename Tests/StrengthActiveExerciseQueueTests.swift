@@ -87,7 +87,7 @@ final class StrengthActiveExerciseQueueTests: XCTestCase {
         store.startFreestyle(watchSessionID: nil)
         store.appendExercise(exercise("Smithmaskin knebøy"), sets: 1, reps: 10)
         let id = try XCTUnwrap(store.currentExercise?.id)
-        store.setDraft(weightKilograms: 60, reps: 10)
+        store.setDraft(reps: 10, weightKilograms: 60)
         XCTAssertTrue(store.setActiveExerciseBarWeight(id, kilograms: 20))
         XCTAssertEqual(store.draftWeightKilograms, 60, accuracy: 0.001)
         store.completeCurrentDraftSet()
