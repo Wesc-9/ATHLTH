@@ -285,6 +285,9 @@ struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
     var recovery: RunningStepTarget?
     var notes: String?
     var repetitionOverrides: [RunningRepetitionOverride]? = nil
+    // Planning-only cue for this phase. Playback changes require explicit
+    // runtime authorization and must not start music from a preview.
+    var spotifyPlaylist: SpotifyPlaylistReference? = nil
 
     func override(for repetition: Int) -> RunningRepetitionOverride? {
         repetitionOverrides?.first { $0.repetition == repetition }
@@ -308,7 +311,8 @@ struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
         work: RunningStepTarget,
         recovery: RunningStepTarget? = nil,
         notes: String? = nil,
-        repetitionOverrides: [RunningRepetitionOverride]? = nil
+        repetitionOverrides: [RunningRepetitionOverride]? = nil,
+        spotifyPlaylist: SpotifyPlaylistReference? = nil
     ) {
         self.id = id
         self.kind = kind
@@ -318,6 +322,7 @@ struct RunningWorkoutBlock: Identifiable, Codable, Hashable {
         self.recovery = recovery
         self.notes = notes
         self.repetitionOverrides = repetitionOverrides
+        self.spotifyPlaylist = spotifyPlaylist
     }
 }
 
