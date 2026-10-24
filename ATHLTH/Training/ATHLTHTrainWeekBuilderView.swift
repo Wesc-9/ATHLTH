@@ -579,6 +579,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @State private var showSharedWorkoutTemplates = false
     @State private var showIntervalComposer = false
     @State private var showDetailedComposer = false
+    @State private var showingSpotifyPlaylistPicker = false
     @State private var showRemoveDetailedStructure = false
     @State private var scheduled = false
     @State private var clockTime = Date()
@@ -670,6 +671,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             .onChange(of: draft.kind) { _, _ in persistLocalDraft() }
             .onChange(of: draft.workoutBlocks) { _, _ in persistLocalDraft() }
             .onChange(of: draft.notes) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.spotifyPlaylist) { _, _ in persistLocalDraft() }
+            .onChange(of: draft.spotifyAutoplayOnStart) { _, _ in persistLocalDraft() }
             .onChange(of: draft.durationMinutes) { _, _ in persistLocalDraft() }
             .onChange(of: draft.exercises.count) { _, _ in persistLocalDraft() }
             .onChange(of: scheduled) { _, _ in persistLocalDraft() }
@@ -710,6 +713,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                         } else if draft.kind == .running || draft.kind == .walking {
                             runningEditing
                         }
+                        musicPlanningSection
                         notesEditing
                     }
                     .frame(maxWidth: 720, alignment: .leading)
@@ -774,6 +778,12 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                         draft.title = template.title
                     }
                 }
+            }
+            .sheet(isPresented: $showingSpotifyPlaylistPicker) {
+                SpotifyPlaylistPickerView(
+                    title: tr("Workout playlist", "Spilleliste for økten"),
+                    selection: $draft.spotifyPlaylist
+                )
             }
             .sheet(isPresented: $showDetailedComposer) {
                 WorkoutTemplateBuilderView(
@@ -1529,6 +1539,62 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     private func paceLabel(_ value: Double) -> String {
         let s = Int(value)
         return "\(s / 60):\(String(format: "%02d", s % 60))/km"
+    }
+
+    // This is the existing workout-level Spotify override, already honored
+    // by WorkoutLaunchCoordinator. Switching music at individual drag
+    // boundaries needs live-engine support and is not silently enabled.
+    private var musicPlanningSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionTitle(tr("Music for this workout", "Musikk til denne økten"))
+            Button {
+                showingSpotifyPlaylistPicker = true
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "music.note.list")
+                        .font(.system(size: 19, weight: .semibold))
+                        .foregroundStyle(bronze)
+                        .frame(width: 29)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(draft.spotifyPlaylist?.name ??
+                             tr("Choose Spotify playlist", "Velg Spotify-spilleliste"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                        Text(tr(
+                            "Applies to this workout, including its intervals",
+                            "Gjelder hele denne økten, inkludert intervallene"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                }
+                .padding(15)
+                .editorSurface(line: line)
+            }
+            .buttonStyle(.plain)
+
+            Toggle(
+                tr("Start linked playlist with workout",
+                   "Start valgt spilleliste med økten"),
+                isOn: Binding(
+                    get: { draft.spotifyAutoplayOnStart == true },
+                    set: { draft.spotifyAutoplayOnStart = $0 }
+                )
+            )
+            .tint(bronze)
+            .font(.subheadline)
+            Text(tr(
+                "Spotify playback only starts when you enable it, and requires an authorized Spotify connection.",
+                "Musikken starter bare når du har aktivert dette og Spotify er tilkoblet."
+            ))
+            .font(.caption)
+            .foregroundStyle(muted)
+            .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private var notesEditing: some View {
