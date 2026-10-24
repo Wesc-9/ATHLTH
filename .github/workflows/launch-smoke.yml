@@ -36,6 +36,11 @@ on:
       - project.yml
       - scripts/optimize_hero_assets.sh
       - .github/workflows/launch-smoke.yml
+      - .github/workflows/hybrid-engine-tests.yml
+      - Tests/ATHLTHPlannedHybridLaunchTests.swift
+      - Tests/ATHLTHUnifiedMixedWorkoutPlanTests.swift
+      - Tests/ATHLTHLiveWorkoutEngineRouterTests.swift
+      - Tests/StrengthActiveExerciseQueueTests.swift
       - .github/launch-trigger
 
 concurrency:
