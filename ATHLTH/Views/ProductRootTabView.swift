@@ -5786,9 +5786,15 @@ struct ATHLTHTrainView: View {
         NavigationStack {
             Group {
                 if selectedSection == 2 {
-                    // Progress owns its full-bleed hero, filters and scroll.
-                    // Returning to Train always selects the Today section.
-                    ATHLTHTrainProgressReferenceView(
+                    // Keep the same Today / Plan / Progress navigation visible
+                    // while the independent, full-bleed Progress screen scrolls.
+                    VStack(spacing: 0) {
+                        premiumTrainTabs
+                            .padding(.horizontal, 17)
+                            .padding(.top, 12)
+                            .padding(.bottom, 8)
+                            .background(ATHLTHPlanDesign.warmCanvas)
+                        ATHLTHTrainProgressReferenceView(
                         onReturnToToday: {
                             withAnimation(.easeInOut(duration: 0.2)) {
                                 selectedSection = 0
@@ -5797,7 +5803,8 @@ struct ATHLTHTrainView: View {
                         onOpenPlan: {
                             selectedSection = 1
                         }
-                    )
+                        )
+                    }
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
