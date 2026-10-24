@@ -34,6 +34,7 @@ final class ATHLTHUnifiedMixedWorkoutPlanTests: XCTestCase {
         return planned
     }
 
+    @MainActor
     private func fourByFour() -> PlannedSession {
         var workout = PlannedSession(
             id: UUID(),
@@ -53,6 +54,7 @@ final class ATHLTHUnifiedMixedWorkoutPlanTests: XCTestCase {
         return workout
     }
 
+    @MainActor
     func testIntervalPrescriptionsSurvivePhaseAwareSupplementaryExercises() {
         var workout = fourByFour()
         workout.exercises = [
@@ -92,6 +94,7 @@ final class ATHLTHUnifiedMixedWorkoutPlanTests: XCTestCase {
         XCTAssertEqual(steps.filter { $0.kind == .exercise }.count, 3)
     }
 
+    @MainActor
     func testExercisePlacementRoundTripsWithoutChangingRunRecipe() throws {
         var workout = fourByFour()
         workout.exercises = [
@@ -107,6 +110,7 @@ final class ATHLTHUnifiedMixedWorkoutPlanTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testExistingRunOnlyWorkoutKeepsItsOriginalOrderedSteps() {
         let workout = fourByFour()
         let steps = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
