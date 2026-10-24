@@ -667,6 +667,12 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var sharedSourceOwnerID: UUID? = nil
     var sharedSourceSessionID: UUID? = nil
 
+    // An optional link to a finished ATHLTH recording when this session
+    // was explicitly created with "Planlegg resten". Old plans decode with
+    // nil and the source recording is never altered by the follow-up.
+    var followUpSourceWorkoutID: UUID? = nil
+    var followUpSourceSetIDs: [UUID]? = nil
+
     var resolvedRunningWorkouts: [RunningWorkoutTemplate] {
         if let runningWorkouts,
            !runningWorkouts.isEmpty {
