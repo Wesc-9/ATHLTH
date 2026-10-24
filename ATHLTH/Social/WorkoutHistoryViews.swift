@@ -1026,7 +1026,9 @@ struct PostWorkoutReviewView: View {
             ScrollView {
                 VStack(spacing: 14) {
                     summaryCard
-                    resultStrip
+                    if workout.activity != .strength {
+                        resultStrip
+                    }
                     if let recorded = completedPhoneStepResults, !recorded.isEmpty {
                         recordedIntervalsReviewCard(recorded)
                     }
@@ -1323,7 +1325,22 @@ struct PostWorkoutReviewView: View {
         .athlthPlanCard(radius: 19)
     }
 
+    @ViewBuilder
     private var summaryCard: some View {
+        if workout.activity == .strength {
+            ATHLTHStrengthCompletedHeroCard(
+                profile: completionMuscleProfile,
+                duration: workout.duration,
+                exerciseCount: workout.strengthExerciseCount,
+                volumeKilograms: workout.strengthTotalVolumeKilograms,
+                height: 350
+            )
+        } else {
+            nonStrengthSummaryCard
+        }
+    }
+
+    private var nonStrengthSummaryCard: some View {
         ZStack(alignment: .bottomLeading) {
             summaryBackground
 
