@@ -97,16 +97,14 @@ enum TrainingPlanSchedule {
 
         for planned in sessions {
             guard let scheduled = planned.scheduledStart,
-                  calendar.isDate(scheduled, inSameDayAs: date),
-                  calendar.dateComponents(
-                    [.hour, .minute],
-                    from: scheduled
-                  ).hour != 0 ||
-                    calendar.dateComponents(
-                        [.hour, .minute],
-                        from: scheduled
-                    ).minute != 0
-            else {
+                  calendar.isDate(scheduled, inSameDayAs: date)
+            else { continue }
+
+            let clock = calendar.dateComponents([.hour, .minute], from: scheduled)
+            // A midnight scheduledStart commonly means "date only" after
+            // rescheduling and is not strong evidence of a timed workout.
+            guard clock.hour != 0 || clock.minute != 0 else { continue }
+            guard sessions.filter({ $0.kind == planned.kind }).count == 1 else {
                 continue
             }
 
