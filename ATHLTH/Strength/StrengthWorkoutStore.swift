@@ -1435,6 +1435,7 @@ final class StrengthWorkoutStore: ObservableObject {
     /// HealthKit recording and Apple Watch ownership stay with the parent
     /// strength workout, preventing a second workout or duplicate calories.
     func advanceEmbeddedIntervalIfNeeded(at date: Date = Date()) {
+        guard controlsEmbeddedHybridClockOnIPhone else { return }
         var advanced = 0
         // Date anchoring catches up after screen lock, foreground suspension
         // or a temporary Bluetooth handoff. Never count a paused phase.
