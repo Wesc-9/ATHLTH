@@ -591,7 +591,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     VStack(alignment: .leading, spacing: 7) {
                         mainWorkoutHeadline(context)
                         if focus(context) != .workout {
-                            TimelineView(.periodic(from: .now, by: 15)) { tick in
+                            TimelineView(.periodic(from: .now, by: 1)) { tick in
                                 if ATHLTHLiveActivityDisplayPolicy.isRecent(
                                     updatedAt: context.state.updatedAt,
                                     now: tick.date
@@ -919,7 +919,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
                 if let end = context.state.strengthRestEndsAt {
-                    TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                    TimelineView(.periodic(from: .now, by: 1)) { timeline in
                         let remaining = end.timeIntervalSince(timeline.date)
                         Text(remaining > 0
                             ? duration(ceil(remaining))
@@ -942,7 +942,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 )
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
-                TimelineView(.periodic(from: .now, by: 5)) { timeline in
+                TimelineView(.periodic(from: .now, by: 1)) { timeline in
                     let remaining = ATHLTHLiveActivityDisplayPolicy
                         .remainingTimedSet(
                             secondsAtSnapshot:
@@ -1182,7 +1182,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
             )
         } else if metric == .strengthRest,
                   let ends = context.state.strengthRestEndsAt {
-            TimelineView(.periodic(from: .now, by: 5)) { timeline in
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
                 let remaining = ceil(ends.timeIntervalSince(timeline.date))
                 compactIslandText(
                     remaining > 0
@@ -1196,7 +1196,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                 )
             }
         } else if metric == .strengthTimedSet {
-            TimelineView(.periodic(from: .now, by: 5)) { timeline in
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
                 let left = ATHLTHLiveActivityDisplayPolicy.remainingTimedSet(
                     secondsAtSnapshot:
                         context.state.strengthTimedSetSecondsAtSnapshot,
