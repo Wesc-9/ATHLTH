@@ -1333,7 +1333,7 @@ struct PostWorkoutReviewView: View {
                 duration: workout.duration,
                 exerciseCount: workout.strengthExerciseCount,
                 volumeKilograms: workout.strengthTotalVolumeKilograms,
-                height: 350
+                height: 300
             )
         } else {
             nonStrengthSummaryCard
