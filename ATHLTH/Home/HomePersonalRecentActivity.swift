@@ -1654,7 +1654,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                     workout: workout,
                     strengthWorkout: strengthWorkout,
                     phoneWorkout: phoneWorkout,
-                    height: isStrength ? 205 : 114,
+                    height: 114,
                     precomputedStrengthProfile: isStrength ? muscleProfile : nil
                 )
             }
@@ -1950,7 +1950,7 @@ private struct HomeFollowingHorizontalWorkoutCard: View {
                 HomeFollowingWorkoutArtwork(
                     item: item,
                     activity: activity,
-                    height: isStrength ? 205 : 114
+                    height: 114
                 )
             }
             .buttonStyle(.plain)
@@ -2327,7 +2327,7 @@ private struct HomePersonalFeaturedWorkoutCard:
                     strengthWorkout,
                 phoneWorkout:
                     phoneWorkout,
-                height: workout.activity == .strength ? 245 : 154
+                height: 154
             )
 
             VStack(
