@@ -1,0 +1,972 @@
+import SwiftUI
+import Charts
+
+/// Reference-led ATHLTH Progress. Every number is derived from completed
+/// Apple Health / ATHLTH records. The luminous ring is visual framing only:
+/// it never claims a synthetic fitness or strength score.
+struct ATHLTHTrainProgressReferenceView: View {
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var session: AppSessionStore
+
+    let onReturnToToday: () -> Void
+    let onOpenPlan: () -> Void
+
+    @State private var area: Area = .general
+    @State private var period: Period = .threeMonths
+    @State private var snapshot: HealthProgressSnapshot?
+    @State private var allHealthWorkouts: [WorkoutSummary] = []
+    @State private var healthRecords: [HealthPersonalRecord] = []
+    @State private var isLoading = false
+
+    private enum Area: String, CaseIterable, Identifiable {
+        case general, running, strength
+        var id: Self { self }
+        var title: String {
+            switch self {
+            case .general: return ATHLTHLocalization.choose(english: "General", norwegian: "Generelt")
+            case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+            case .strength: return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+            }
+        }
+        var artwork: String {
+            switch self {
+            case .general: return "ProgressHero"
+            case .running: return "GoalRunning"
+            case .strength: return "StrengthPostWorkoutHero"
+            }
+        }
+    }
+
+    private enum Period: String, CaseIterable, Identifiable {
+        case week, month, threeMonths, year
+        var id: Self { self }
+        var title: String {
+            switch self {
+            case .week: return ATHLTHLocalization.choose(english: "7 days", norwegian: "7 dager")
+            case .month: return ATHLTHLocalization.choose(english: "1 month", norwegian: "1 måned")
+            case .threeMonths: return ATHLTHLocalization.choose(english: "Last 3 months", norwegian: "Siste 3 mnd")
+            case .year: return ATHLTHLocalization.choose(english: "1 year", norwegian: "1 år")
+            }
+        }
+        var start: Date {
+            let calendar = Calendar.current
+            switch self {
+            case .week: return calendar.date(byAdding: .day, value: -7, to: .now) ?? .now
+            case .month: return calendar.date(byAdding: .month, value: -1, to: .now) ?? .now
+            case .threeMonths: return calendar.date(byAdding: .month, value: -3, to: .now) ?? .now
+            case .year: return calendar.date(byAdding: .year, value: -1, to: .now) ?? .now
+            }
+        }
+        var grouping: HealthProgressGrouping {
+            switch self {
+            case .week: return .day
+            case .month, .threeMonths: return .week
+            case .year: return .month
+            }
+        }
+    }
+
+    private struct Stat: Identifiable {
+        let label: String
+        let value: String
+        let icon: String
+        let change: Double?
+        var id: String { label }
+    }
+
+    private struct PacePoint: Identifiable {
+        let date: Date
+        let pace: Double
+        var id: Date { date }
+    }
+
+    private struct LiftPoint: Identifiable {
+        let name: String
+        let month: Date
+        let kg: Double
+        var id: String { name + month.description }
+    }
+
+    private let ink = ATHLTHTheme.primaryText
+    private let muted = ATHLTHTheme.mutedText
+    private let positive = ATHLTHTheme.vitality
+
+    private var rangeWorkouts: [WorkoutSummary] {
+        allHealthWorkouts.filter { $0.startDate >= period.start && $0.startDate <= .now }
+    }
+    private var runs: [WorkoutSummary] {
+        rangeWorkouts.filter { $0.activity == .running }
+            .sorted { $0.startDate > $1.startDate }
+    }
+    private var lifts: [StrengthWorkoutLog] {
+        strength.workoutHistory.filter {
+            $0.isFinished && $0.startedAt >= period.start && $0.startedAt <= .now
+        }
+        .sorted { $0.startedAt > $1.startedAt }
+    }
+    // HealthKit may also contain ATHLTH strength logs. Count each recorded
+    // workout once rather than doubling the overall training total.
+    private var unlinkedLifts: [StrengthWorkoutLog] {
+        let healthIDs = Set(rangeWorkouts.map(\.id))
+        return lifts.filter {
+            guard let id = $0.healthMetrics.healthKitWorkoutUUID else { return true }
+            return !healthIDs.contains(id)
+        }
+    }
+    private var generalCount: Int { rangeWorkouts.count + unlinkedLifts.count }
+    private var runningDistance: Double {
+        runs.compactMap(\.distanceMeters).reduce(0, +) / 1_000
+    }
+    private var runTime: TimeInterval { runs.reduce(0) { $0 + $1.duration } }
+    private var generalDuration: TimeInterval {
+        rangeWorkouts.reduce(0) { $0 + $1.duration } +
+        unlinkedLifts.reduce(0) {
+            $0 + max(($1.endedAt ?? $1.startedAt).timeIntervalSince($1.startedAt), 0)
+        }
+    }
+    private var runningPace: Double? {
+        let eligible = runs.filter { ($0.distanceMeters ?? 0) >= 500 && $0.duration > 0 }
+        let distance = eligible.compactMap(\.distanceMeters).reduce(0, +)
+        let duration = eligible.reduce(0) { $0 + $1.duration }
+        guard distance > 0 else { return nil }
+        let seconds = duration / (distance / 1_000)
+        return (120...1_200).contains(seconds) ? seconds : nil
+    }
+    private var strengthVolume: Double { lifts.reduce(0) { $0 + $1.totalVolumeKilograms } }
+    private var strengthSets: Int { lifts.reduce(0) { $0 + $1.totalWorkingSets } }
+    private var runningRecords: [HealthPersonalRecord] {
+        healthRecords.filter {
+            $0.kind == .longestRun ||
+            $0.kind == .bestRunningAveragePace ||
+            $0.kind.rawValue.hasPrefix("fastest")
+        }
+    }
+    private var timeDescription: String {
+        period.title
+    }
+    private var totalCalories: Double {
+        rangeWorkouts.compactMap(\.activeEnergyKilocalories).reduce(0, +)
+    }
+    private var strengthExerciseCount: Int {
+        Set(lifts.flatMap { $0.exercises.map { $0.exercise.name.lowercased() } }).count
+    }
+    private var heroValue: String {
+        switch area {
+        case .general: return String(generalCount)
+        case .running: return String(format: "%.1f", runningDistance)
+        case .strength:
+            return strengthVolume >= 1_000
+                ? String(format: "%.1f", strengthVolume / 1_000)
+                : String(Int(strengthVolume.rounded()))
+        }
+    }
+    private var heroUnit: String {
+        switch area {
+        case .general: return ATHLTHLocalization.choose(english: "RECORDED SESSIONS", norwegian: "REGISTRERTE ØKTER")
+        case .running: return ATHLTHLocalization.choose(english: "DISTANCE · KM", norwegian: "DISTANSE · KM")
+        case .strength:
+            return strengthVolume >= 1_000
+                ? ATHLTHLocalization.choose(english: "TRAINING VOLUME · TONNES", norwegian: "TRENING—VOLUM · TONN")
+                : ATHLTHLocalization.choose(english: "TRAINING VOLUME · KG", norwegian: "TRENING—VOLUM · KG")
+        }
+    }
+    private var heroSubline: String {
+        switch area {
+        case .general:
+            return ATHLTHLocalization.choose(english: "Completed in selected period", norwegian: "Gjennomført i valgt periode")
+        case .running:
+            return ATHLTHLocalization.choose(english: "\(runs.count) recorded runs", norwegian: "\(runs.count) registrerte løpeøkter")
+        case .strength:
+            return ATHLTHLocalization.choose(english: "\(lifts.count) completed strength sessions", norwegian: "\(lifts.count) fullførte styrkeøkter")
+        }
+    }
+
+    var body: some View {
+        ATHLTHPinnedHeroLayout(
+            accent: ATHLTHTheme.champagne.opacity(0.23),
+            softTransition: true,
+            immersiveTransition: true,
+            scrollFadeTransition: true,
+            sheetOverlapOverride: 34
+        ) {
+            hero
+        } content: {
+            LazyVStack(alignment: .leading, spacing: 12) {
+                areaPicker
+                    .padding(.bottom, 3)
+
+                statsCard
+
+                switch area {
+                case .general:
+                    generalContent
+                case .running:
+                    runningContent
+                case .strength:
+                    strengthContent
+                }
+
+                if isLoading {
+                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 12)
+                }
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Recorded values come from Apple Health and completed ATHLTH sessions. Estimates are not shown as measurements.",
+                    norwegian: "Tallene kommer fra Apple Health og fullførte ATHLTH-økter. Estimater vises ikke som målte verdier."
+                ))
+                .font(.system(size: 11))
+                .foregroundStyle(muted)
+                .padding(.horizontal, 5)
+                .padding(.top, 4)
+            }
+            .padding(.horizontal, 15)
+            .padding(.top, 3)
+            .padding(.bottom, 34)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .refreshable {
+            await refreshAll()
+        }
+        .task(id: period) {
+            await loadPeriod()
+        }
+        .task {
+            await loadHistory()
+        }
+    }
+
+    private var hero: some View {
+        GeometryReader { proxy in
+            ZStack {
+                ATHLTHTheme.accentDeep
+                Image(area.artwork)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: proxy.size.width, height: proxy.size.height)
+                    .clipped()
+                    .accessibilityHidden(true)
+
+                LinearGradient(
+                    colors: [
+                        Color.black.opacity(0.38),
+                        Color.black.opacity(0.03),
+                        Color.black.opacity(0.25),
+                        Color.black.opacity(0.31)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+
+                VStack(spacing: 0) {
+                    HStack {
+                        Button(action: onReturnToToday) {
+                            Label("Train", systemImage: "chevron.left")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 13)
+                                .frame(minHeight: 36)
+                                .background(.black.opacity(0.32), in: Capsule())
+                                .overlay(Capsule().strokeBorder(.white.opacity(0.30), lineWidth: 0.8))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Back to Today in Train",
+                            norwegian: "Tilbake til I dag i Train"
+                        ))
+
+                        Spacer()
+
+                        Menu {
+                            ForEach(Period.allCases) { option in
+                                Button {
+                                    withAnimation(.easeInOut(duration: 0.2)) { period = option }
+                                } label: {
+                                    if period == option {
+                                        Label(option.title, systemImage: "checkmark")
+                                    } else {
+                                        Text(option.title)
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(timeDescription)
+                                Image(systemName: "chevron.down")
+                                    .font(.system(size: 9, weight: .semibold))
+                            }
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 36)
+                            .background(.black.opacity(0.33), in: Capsule())
+                            .overlay(Capsule().strokeBorder(.white.opacity(0.27), lineWidth: 0.8))
+                        }
+                    }
+                    .padding(.horizontal, 17)
+                    .padding(.top, 56)
+
+                    Text(ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremgang"))
+                        .font(.system(size: 32, weight: .regular, design: .serif))
+                        .tracking(-0.8)
+                        .foregroundStyle(.white)
+                        .shadow(color: .black.opacity(0.32), radius: 5, y: 2)
+                        .padding(.top, 12)
+
+                    Spacer(minLength: 2)
+
+                    ZStack {
+                        Circle()
+                            .fill(.black.opacity(0.21))
+                            .background {
+                                Circle().fill(.ultraThinMaterial).opacity(0.32)
+                            }
+                        Circle()
+                            .strokeBorder(.white.opacity(0.21), lineWidth: 6)
+                        Circle()
+                            .strokeBorder(
+                                AngularGradient(
+                                    colors: [
+                                        .white.opacity(0.98),
+                                        ATHLTHTheme.champagne.opacity(0.83),
+                                        .white.opacity(0.14),
+                                        .white.opacity(0.95)
+                                    ],
+                                    center: .center
+                                ),
+                                lineWidth: 3
+                            )
+                            .shadow(color: .white.opacity(0.77), radius: 11)
+
+                        VStack(spacing: 5) {
+                            Text(heroUnit)
+                                .font(.system(size: 10, weight: .medium))
+                                .tracking(1.0)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(2)
+
+                            Text(heroValue)
+                                .font(.system(size: 48, weight: .light, design: .serif))
+                                .monospacedDigit()
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.63)
+
+                            Text(heroSubline)
+                                .font(.system(size: 11))
+                                .multilineTextAlignment(.center)
+                                .foregroundStyle(.white.opacity(0.88))
+                                .lineLimit(2)
+
+                            Image(systemName: "chart.bar.fill")
+                                .font(.system(size: 15, weight: .medium))
+                                .padding(.top, 2)
+                        }
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 15)
+                    }
+                    .frame(width: 177, height: 177)
+                    .accessibilityElement(children: .combine)
+
+                    Spacer(minLength: 24)
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
+        }
+        .frame(height: 336)
+    }
+
+    private var areaPicker: some View {
+        HStack(spacing: 3) {
+            ForEach(Area.allCases) { selection in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        area = selection
+                    }
+                } label: {
+                    Text(selection.title)
+                        .font(.system(size: 13, weight: area == selection ? .semibold : .medium))
+                        .foregroundStyle(area == selection ? ink : muted)
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 42)
+                        .background(
+                            area == selection ? Color.white.opacity(0.97) : .clear,
+                            in: Capsule()
+                        )
+                        .shadow(color: area == selection ? .black.opacity(0.08) : .clear, radius: 6, y: 3)
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(area == selection ? .isSelected : [])
+            }
+        }
+        .padding(5)
+        .background(ATHLTHTheme.cardWarm.opacity(0.83), in: Capsule())
+        .overlay(Capsule().strokeBorder(ATHLTHTheme.border, lineWidth: 0.9))
+    }
+
+    private var activeStats: [Stat] {
+        switch area {
+        case .general:
+            return [
+                Stat(label: tr("Sessions", "Økter"), value: "\(generalCount)", icon: "calendar", change: snapshot?.workoutChangePercent),
+                Stat(label: tr("Training time", "Treningstid"), value: generalDuration.shortDuration, icon: "clock", change: snapshot?.trainingDurationChangePercent),
+                Stat(label: tr("Calories", "Kalorier"), value: totalCalories > 0 ? "\(Int(totalCalories.rounded()).formatted())" : "—", icon: "flame", change: nil),
+                Stat(label: tr("Distance", "Distanse"), value: String(format: "%.1f km", rangeWorkouts.compactMap(\.distanceMeters).reduce(0, +) / 1_000), icon: "location", change: snapshot?.workoutDistanceChangePercent)
+            ]
+        case .running:
+            return [
+                Stat(label: tr("Runs", "Løpeøkter"), value: "\(runs.count)", icon: "figure.run", change: nil),
+                Stat(label: tr("Distance", "Distanse"), value: String(format: "%.1f km", runningDistance), icon: "location", change: nil),
+                Stat(label: tr("Average pace", "Snittempo"), value: runningPace.map(paceText) ?? "—", icon: "stopwatch", change: nil),
+                Stat(label: tr("Running time", "Løpetid"), value: runTime.shortDuration, icon: "clock", change: nil)
+            ]
+        case .strength:
+            return [
+                Stat(label: tr("Strength sessions", "Styrkeøkter"), value: "\(lifts.count)", icon: "dumbbell", change: nil),
+                Stat(label: tr("Volume", "Treningsvolum"), value: strengthVolume >= 1000 ? String(format: "%.1f t", strengthVolume / 1000) : "\(Int(strengthVolume.rounded())) kg", icon: "chart.bar", change: nil),
+                Stat(label: tr("Working sets", "Arbeidssett"), value: "\(strengthSets)", icon: "square.stack.3d.up", change: nil),
+                Stat(label: tr("Exercises", "Øvelser"), value: "\(strengthExerciseCount)", icon: "figure.strengthtraining.traditional", change: nil)
+            ]
+        }
+    }
+
+    private var statsCard: some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(Array(activeStats.enumerated()), id: \.element.id) { index, item in
+                if index > 0 {
+                    Rectangle().fill(ATHLTHTheme.divider).frame(width: 0.7).padding(.vertical, 3)
+                }
+                VStack(alignment: .leading, spacing: 6) {
+                    Image(systemName: item.icon)
+                        .font(.system(size: 17, weight: .light))
+                        .foregroundStyle(ink.opacity(0.75))
+                        .frame(height: 19)
+                    Text(item.value)
+                        .font(.system(size: 17, weight: .semibold, design: .serif))
+                        .foregroundStyle(ink)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.56)
+                    Text(item.label)
+                        .font(.system(size: 10))
+                        .foregroundStyle(muted)
+                        .lineLimit(2)
+                        .frame(height: 25, alignment: .topLeading)
+                    if let change = item.change, change.isFinite {
+                        Label(
+                            String(format: "%+.0f%%", change),
+                            systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right"
+                        )
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(change >= 0 ? positive : muted)
+                        .lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 7)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 17)
+        .referenceProgressCard()
+    }
+
+    private var generalContent: some View {
+        VStack(spacing: 12) {
+            section(
+                title: tr("Body & health", "Kropp & helse"),
+                subtitle: tr("Latest available readings", "Sist registrerte verdier")
+            ) {
+                HStack(spacing: 6) {
+                    healthMetric(tr("Sleep", "Søvn"),
+                                 value: health.sleep.totalAsleep > 0 ? health.sleep.totalAsleep.shortDuration : "—",
+                                 icon: "moon")
+                    healthMetric("HRV",
+                                 value: health.heart.hrvMilliseconds.map { "\(Int($0.rounded())) ms" } ?? "—",
+                                 icon: "heart")
+                    healthMetric(tr("Resting HR", "Hvilepuls"),
+                                 value: health.heart.restingHeartRate.map { "\(Int($0.rounded())) bpm" } ?? "—",
+                                 icon: "heart.text.square")
+                    healthMetric(tr("Readiness", "Dagsform"),
+                                 value: health.recovery.score.map(String.init) ?? "—",
+                                 icon: "waveform.path.ecg")
+                }
+            }
+
+            NavigationLink {
+                ProgressPersonalRecordsView(
+                    healthRecords: healthRecords,
+                    strengthRecords: strength.personalRecords,
+                    repRecords: strength.repPersonalRecords
+                )
+            } label: {
+                section(
+                    title: tr("Personal records", "Personlige rekorder"),
+                    accessory: tr("See all", "Se alle")
+                ) {
+                    HStack(spacing: 8) {
+                        recordTile(
+                            title: tr("Running", "Løping"),
+                            value: runningRecords.first?.formattedValue ?? "—",
+                            detail: runningRecords.first?.kind.title ?? tr("No record yet", "Ingen rekord ennå"),
+                            icon: "figure.run"
+                        )
+                        recordTile(
+                            title: tr("Strength", "Styrke"),
+                            value: strength.personalRecords.first?.value ?? "—",
+                            detail: strength.personalRecords.first?.title ?? tr("No record yet", "Ingen rekord ennå"),
+                            icon: "dumbbell"
+                        )
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                WorkoutHistoryView(startDate: period.start, endDate: .now)
+            } label: {
+                section(
+                    title: tr("Recent sessions", "Siste økter"),
+                    accessory: tr("See all", "Se alle")
+                ) {
+                    let rows = rangeWorkouts.sorted { $0.startDate > $1.startDate }
+                    if rows.isEmpty && lifts.isEmpty {
+                        emptyLine(tr("Completed workouts will appear here.", "Fullførte økter vises her."))
+                    } else {
+                        ForEach(rows.prefix(3)) { workout in
+                            compactRow(
+                                icon: workout.activity.icon,
+                                title: workout.activity.rawValue,
+                                subtitle: workout.startDate.formatted(date: .abbreviated, time: .omitted),
+                                value: workout.activity == .running
+                                    ? workout.paceMinutesPerKilometer.map { paceText($0 * 60) } ?? "—"
+                                    : workout.duration.shortDuration
+                            )
+                        }
+                        if rows.isEmpty {
+                            ForEach(lifts.prefix(3)) { workout in
+                                compactRow(
+                                    icon: "dumbbell",
+                                    title: workout.title,
+                                    subtitle: workout.startedAt.formatted(date: .abbreviated, time: .omitted),
+                                    value: "\(Int(workout.totalVolumeKilograms.rounded())) kg"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            if let active = session.activePlan {
+                Button(action: onOpenPlan) {
+                    HStack {
+                        Label(tr("Plan progress", "Fremgang i treningsplan"), systemImage: "calendar")
+                        Spacer()
+                        Text(active.title).lineLimit(1)
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(ink)
+                    .padding(18)
+                    .referenceProgressCard()
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private var pacePoints: [PacePoint] {
+        runs.compactMap { workout in
+            guard let km = workout.distanceKilometers, km >= 0.5,
+                  workout.duration > 0 else { return nil }
+            let seconds = workout.duration / km
+            guard (120...1_200).contains(seconds) else { return nil }
+            return PacePoint(date: workout.startDate, pace: seconds / 60)
+        }
+        .sorted { $0.date < $1.date }
+    }
+
+    private var runningContent: some View {
+        VStack(spacing: 12) {
+            section(
+                title: tr("Average pace development", "Utvikling i snittempo"),
+                subtitle: tr("Measured runs · min/km", "Registrerte løpeøkter · min/km")
+            ) {
+                if pacePoints.isEmpty {
+                    emptyLine(tr("Record a run to see your pace trend.", "Registrer en løpeøkt for å se tempoutviklingen."))
+                } else {
+                    Chart(pacePoints) { point in
+                        LineMark(
+                            x: .value("Dato", point.date),
+                            y: .value("min/km", point.pace)
+                        )
+                        .interpolationMethod(.catmullRom)
+                        .foregroundStyle(positive)
+                        .lineStyle(StrokeStyle(lineWidth: 2.3, lineCap: .round))
+                        PointMark(
+                            x: .value("Dato", point.date),
+                            y: .value("min/km", point.pace)
+                        )
+                        .foregroundStyle(positive)
+                        .symbolSize(20)
+                    }
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: 4)) {
+                            AxisValueLabel(format: .dateTime.day().month(.abbreviated))
+                        }
+                    }
+                    .chartYAxis {
+                        AxisMarks(position: .leading)
+                    }
+                    .frame(height: 181)
+                }
+            }
+
+            HStack(alignment: .top, spacing: 9) {
+                NavigationLink {
+                    RunningProgressDetailView(workouts: runs, records: runningRecords)
+                } label: {
+                    section(title: tr("Key sessions", "Nøkkeløkter"),
+                            accessory: tr("See all", "Se alle")) {
+                        if runs.isEmpty {
+                            emptyLine(tr("No runs yet", "Ingen løpeøkter ennå"))
+                        } else {
+                            ForEach(runs.prefix(3)) { run in
+                                compactRow(
+                                    icon: "figure.run",
+                                    title: run.isIndoor == true
+                                        ? tr("Indoor run", "Løping inne")
+                                        : tr("Running", "Løping"),
+                                    subtitle: run.startDate.formatted(date: .abbreviated, time: .omitted),
+                                    value: run.distanceKilometers.map { String(format: "%.1f km", $0) } ?? run.duration.shortDuration
+                                )
+                            }
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    ProgressPersonalRecordsView(
+                        healthRecords: runningRecords,
+                        strengthRecords: [],
+                        repRecords: []
+                    )
+                } label: {
+                    section(title: tr("Personal records", "Personlige rekorder"),
+                            accessory: tr("See all", "Se alle")) {
+                        if runningRecords.isEmpty {
+                            emptyLine(tr("No running records yet", "Ingen løperekorder ennå"))
+                        } else {
+                            ForEach(runningRecords.prefix(3)) { record in
+                                recordLine(record.kind.title, value: record.formattedValue)
+                            }
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+            ATHLTHRunningSpeedProgressCard()
+        }
+    }
+
+    private var liftPoints: [LiftPoint] {
+        let calendar = Calendar.current
+        let byExercise = lifts.flatMap { log in
+            log.exercises.flatMap { exercise in
+                exercise.sets.compactMap { set -> (String, Date, Double)? in
+                    guard set.countsTowardTrainingLoad,
+                          let weight = set.completedWeightKilograms,
+                          weight > 0 else { return nil }
+                    return (exercise.exercise.name, log.startedAt, weight)
+                }
+            }
+        }
+        let popular = Dictionary(grouping: byExercise, by: { $0.0.lowercased() })
+            .sorted { $0.value.count > $1.value.count }
+            .prefix(4)
+            .map(\.key)
+        let filtered = byExercise.filter { popular.contains($0.0.lowercased()) }
+        let grouped = Dictionary(grouping: filtered) {
+            "\($0.0.lowercased())|\(calendar.dateInterval(of: .month, for: $0.1)?.start.timeIntervalSince1970 ?? 0)"
+        }
+        return grouped.values.compactMap { group -> LiftPoint? in
+            guard let first = group.first,
+                  let date = calendar.dateInterval(of: .month, for: first.1)?.start,
+                  let peak = group.map(\.2).max() else { return nil }
+            return LiftPoint(name: first.0, month: date, kg: peak)
+        }
+        .sorted { $0.month < $1.month }
+    }
+
+    private var strengthContent: some View {
+        VStack(spacing: 12) {
+            section(
+                title: tr("Main lift development", "Utvikling i hovedløft"),
+                subtitle: tr("Highest completed working weight per month · kg", "Tyngste fullførte arbeidsvekt per måned · kg")
+            ) {
+                if liftPoints.isEmpty {
+                    emptyLine(tr("Complete weighted sets to see your lift history.", "Fullfør vektsett for å se løfteutviklingen."))
+                } else {
+                    Chart(liftPoints) { point in
+                        BarMark(
+                            x: .value("Øvelse", point.name),
+                            y: .value("kg", point.kg)
+                        )
+                        .position(by: .value("Måned", point.month))
+                        .foregroundStyle(by: .value("Måned", point.month))
+                        .cornerRadius(2)
+                    }
+                    .chartYAxis { AxisMarks(position: .leading) }
+                    .chartXAxis {
+                        AxisMarks { AxisValueLabel() }
+                    }
+                    .frame(height: 185)
+                }
+            }
+
+            NavigationLink {
+                StrengthProgressDetailView(
+                    workouts: lifts,
+                    records: strength.personalRecords,
+                    repRecords: strength.repPersonalRecords
+                )
+            } label: {
+                section(title: tr("Main lifts", "Hovedløft"),
+                        accessory: tr("See all", "Se alle")) {
+                    if liftPoints.isEmpty {
+                        emptyLine(tr("Your exercises appear after completed sets.", "Øvelsene vises etter fullførte sett."))
+                    } else {
+                        let peak = Dictionary(grouping: liftPoints, by: \.name)
+                            .compactMap { key, values -> (String, Double)? in
+                                guard let weight = values.map(\.kg).max() else { return nil }
+                                return (key, weight)
+                            }
+                            .sorted { $0.1 > $1.1 }
+                        ForEach(peak.prefix(4), id: \.0) { entry in
+                            compactRow(
+                                icon: "dumbbell",
+                                title: entry.0,
+                                subtitle: tr("Heaviest completed set", "Tyngste fullførte sett"),
+                                value: "\(Int(entry.1.rounded())) kg"
+                            )
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                ProgressPersonalRecordsView(
+                    healthRecords: [],
+                    strengthRecords: strength.personalRecords,
+                    repRecords: strength.repPersonalRecords
+                )
+            } label: {
+                section(title: tr("Personal records", "Personlige rekorder"),
+                        accessory: tr("See all", "Se alle")) {
+                    let records = strength.personalRecords
+                    if records.isEmpty {
+                        emptyLine(tr("No strength records yet", "Ingen styrkerekorder ennå"))
+                    } else {
+                        ForEach(records.prefix(3)) { record in
+                            recordLine(record.title, value: record.value)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func section<Content: View>(
+        title: String,
+        subtitle: String? = nil,
+        accessory: String? = nil,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 21, weight: .medium, design: .serif))
+                        .foregroundStyle(ink)
+                    if let subtitle {
+                        Text(subtitle)
+                            .font(.system(size: 10))
+                            .foregroundStyle(muted)
+                    }
+                }
+                Spacer(minLength: 4)
+                if let accessory {
+                    HStack(spacing: 4) {
+                        Text(accessory)
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.system(size: 11))
+                    .foregroundStyle(muted)
+                }
+            }
+            content()
+        }
+        .padding(15)
+        .referenceProgressCard()
+    }
+
+    private func healthMetric(_ title: String, value: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Image(systemName: icon)
+                .font(.system(size: 15, weight: .light))
+                .foregroundStyle(ink)
+            Text(title)
+                .font(.system(size: 10))
+                .foregroundStyle(muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
+            Text(value)
+                .font(.system(size: 13, weight: .semibold, design: .serif))
+                .foregroundStyle(ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(9)
+        .background(ATHLTHTheme.surfaceStone.opacity(0.57),
+                    in: RoundedRectangle(cornerRadius: 11))
+    }
+
+    private func recordTile(title: String, value: String, detail: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Label(title, systemImage: icon)
+                .font(.system(size: 10))
+                .foregroundStyle(muted)
+            Text(detail)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ink)
+                .lineLimit(2)
+            Text(value)
+                .font(.system(size: 22, weight: .medium, design: .serif))
+                .foregroundStyle(ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.68)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(ATHLTHTheme.surfaceStone.opacity(0.65),
+                    in: RoundedRectangle(cornerRadius: 13))
+    }
+
+    private func compactRow(icon: String, title: String, subtitle: String, value: String) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: icon)
+                .font(.system(size: 15))
+                .foregroundStyle(ink.opacity(0.8))
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(ink)
+                    .lineLimit(1)
+                Text(subtitle)
+                    .font(.system(size: 10))
+                    .foregroundStyle(muted)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Text(value)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Image(systemName: "chevron.right")
+                .font(.system(size: 9))
+                .foregroundStyle(muted)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func recordLine(_ title: String, value: String) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: "trophy").foregroundStyle(ATHLTHTheme.premiumGold)
+            Text(title).lineLimit(1)
+            Spacer(minLength: 2)
+            Text(value)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .font(.system(size: 12))
+        .foregroundStyle(ink)
+        .padding(.vertical, 6)
+    }
+
+    private func emptyLine(_ message: String) -> some View {
+        Text(message)
+            .font(.caption)
+            .foregroundStyle(muted)
+            .frame(maxWidth: .infinity, minHeight: 70)
+    }
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
+    private func paceText(_ seconds: Double) -> String {
+        let rounded = Int(seconds.rounded())
+        guard rounded > 0 else { return "—" }
+        return String(format: "%d:%02d /km", rounded / 60, rounded % 60)
+    }
+
+    private func refreshAll() async {
+        await loadHistory()
+        await loadPeriod()
+    }
+
+    private func loadHistory() async {
+        guard health.healthDataAvailable, health.hasRequestedAuthorization else {
+            allHealthWorkouts = health.workouts
+            healthRecords = []
+            return
+        }
+        allHealthWorkouts = (try? await health.workoutHistory()) ?? health.workouts
+        healthRecords = (try? await health.personalRecords()) ?? []
+    }
+
+    private func loadPeriod() async {
+        guard health.healthDataAvailable, health.hasRequestedAuthorization else {
+            snapshot = nil
+            return
+        }
+        isLoading = true
+        defer { isLoading = false }
+        let start = period.start
+        let previousStart = Calendar.current.date(
+            byAdding: .second,
+            value: -Int(Date().timeIntervalSince(start)),
+            to: start
+        ) ?? start
+        snapshot = try? await health.progressSnapshot(
+            startDate: start,
+            endDate: .now,
+            previousStartDate: previousStart,
+            previousEndDate: start,
+            grouping: period.grouping
+        )
+    }
+}
+
+private extension View {
+    func referenceProgressCard() -> some View {
+        background(
+            ATHLTHTheme.card,
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(ATHLTHTheme.border, lineWidth: 0.8)
+        }
+        .shadow(color: .black.opacity(0.035), radius: 9, y: 3)
+    }
+}
