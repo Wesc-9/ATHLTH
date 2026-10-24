@@ -14,7 +14,12 @@ struct StrengthFollowUpPlannerView: View {
     @State private var selectedDay: Date =
         Calendar.current.startOfDay(for: Date().addingTimeInterval(86_400))
     @State private var hasClockTime = false
-    @State private var selectedTime = Date()
+    @State private var selectedTime = Calendar.current.date(
+        bySettingHour: 18,
+        minute: 0,
+        second: 0,
+        of: Date()
+    ) ?? Date()
     @State private var createdSessionID: UUID?
 
     init(workout: StrengthWorkoutLog) {
@@ -53,7 +58,8 @@ struct StrengthFollowUpPlannerView: View {
         return remainder.makeFollowUp(
             scheduledStart: scheduledStart,
             selectedSetIDs: selectedSetIDs,
-            onlyRemainderForSetIDs: onlyRemainderIDs
+            onlyRemainderForSetIDs: onlyRemainderIDs,
+            hasExplicitTime: hasClockTime
         )
     }
 
@@ -214,7 +220,7 @@ struct StrengthFollowUpPlannerView: View {
                     norwegian: "Dato"
                 ),
                 selection: $selectedDay,
-                in: Date()...,
+                in: Calendar.current.startOfDay(for: Date())...,
                 displayedComponents: .date
             )
             .datePickerStyle(.compact)
@@ -288,7 +294,8 @@ struct StrengthFollowUpPlannerView: View {
                               from: workout,
                               on: scheduledStart,
                               selectedSetIDs: selectedSetIDs,
-                              onlyRemainderForSetIDs: onlyRemainderIDs
+                              onlyRemainderForSetIDs: onlyRemainderIDs,
+                              hasExplicitTime: hasClockTime
                           )
                     else { return }
                     createdSessionID = created.id
