@@ -1395,7 +1395,7 @@ final class StrengthWorkoutStore: ObservableObject {
         }
     }
 
-    func startOrResumeTimedSet() {
+    func startOrResumeTimedSet(at date: Date = Date()) {
         guard let workout = activeWorkout,
               let exercise = currentExercise,
               let set = currentSet,
@@ -1403,7 +1403,7 @@ final class StrengthWorkoutStore: ObservableObject {
               !set.isCompleted
         else { return }
 
-        let now = Date()
+        let now = date
         if var countdown = currentTimedSetCountdown {
             guard !countdown.isRunning else { return }
             countdown.resumedAt = now
@@ -1466,10 +1466,10 @@ final class StrengthWorkoutStore: ObservableObject {
         }
     }
 
-    func pauseTimedSet() {
+    func pauseTimedSet(at date: Date = Date()) {
         guard var countdown = currentTimedSetCountdown,
               countdown.isRunning else { return }
-        let now = Date()
+        let now = date
         countdown.secondsAtPause =
             countdown.secondsAtPause - max(now.timeIntervalSince(countdown.resumedAt ?? now), 0)
         countdown.resumedAt = nil
@@ -1747,7 +1747,13 @@ final class StrengthWorkoutStore: ObservableObject {
                                         restSeconds:
                                             set.restSeconds,
                                         isWarmUp:
-                                            set.isWarmUp
+                                            set.isWarmUp,
+                                        hybridPhaseTitle:
+                                            set.hybridPhaseTitle,
+                                        hybridPhaseKind:
+                                            set.hybridPhaseKind,
+                                        hybridTargetHeartRateZone:
+                                            set.hybridTargetHeartRateZone
                                     )
                                 },
                             isCompleted:
@@ -1758,7 +1764,9 @@ final class StrengthWorkoutStore: ObservableObject {
                                         where: {
                                             !$0.isCompleted
                                         }
-                                    )
+                                    ),
+                            isEmbeddedRunningInterval:
+                                item.isEmbeddedRunningInterval
                         )
                     },
             startedAt:
