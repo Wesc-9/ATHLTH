@@ -4888,6 +4888,47 @@ struct ATHLTHTrainView: View {
             alignment: .leading
         )
 
+        NavigationLink {
+            ATHLTHProgressView()
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "chart.xyaxis.line")
+                    .font(.system(size: 17, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 33, height: 33)
+                    .background(ATHLTHTheme.accentSoft, in: Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Progress",
+                        norwegian: "Fremgang"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "General · Running · Strength",
+                        norwegian: "Generelt · Løping · Styrke"
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 11)
+            .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 18))
+            .overlay {
+                RoundedRectangle(cornerRadius: 18)
+                    .stroke(ATHLTHTheme.border, lineWidth: 0.8)
+            }
+        }
+        .buttonStyle(.plain)
+
         if let plan = session.activePlan {
             todaysPlanCard(plan)
         } else {
@@ -8875,6 +8916,7 @@ private enum ProgressPeriod: String, CaseIterable, Identifiable {
 }
 
 struct ATHLTHProgressView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goalStore: GoalStore
@@ -9086,6 +9128,7 @@ struct ATHLTHProgressView: View {
         )
         .overlay(alignment: .topLeading) {
             Button {
+                dismiss()
                 NotificationCenter.default.post(
                     name: Notification.Name("athlthReturnToTrainFromProgress"),
                     object: nil
