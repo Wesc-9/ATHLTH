@@ -228,14 +228,14 @@ struct ActiveStrengthWorkoutView: View {
                         entries:
                             exerciseLibrary
                                 .allExercises
-                    ) { selected in
+                    ) { selected, scope in
                         strength
                             .substituteCurrentExercise(
-                                with:
-                                    selected.exercise
+                                with: selected.exercise,
+                                scope: scope
                             )
-                        showingExerciseSwap =
-                            false
+                        showingExerciseSwap = false
+                        loadDefaultsFromCurrentSet()
                     }
                 }
             }
@@ -4856,9 +4856,11 @@ private struct StrengthExerciseSwapView: View {
 
     let current: StrengthExerciseLog
     let entries: [ExerciseLibraryEntry]
-    let onSelect: (ExerciseLibraryEntry) -> Void
+    let onSelect: (ExerciseLibraryEntry, StrengthExerciseSubstitutionScope) -> Void
 
     @State private var searchText = ""
+    @State private var substitutionScope: StrengthExerciseSubstitutionScope =
+        .allRemaining
 
     private var currentMuscles: Set<String> {
         Set(
@@ -4968,6 +4970,49 @@ private struct StrengthExerciseSwapView: View {
                     )
                 } else {
                     List {
+                        Section {
+                            Picker(
+                                ATHLTHLocalization.choose(
+                                    english: "Replace sets",
+                                    norwegian: "Bytt sett"
+                                ),
+                                selection: $substitutionScope
+                            ) {
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "All remaining",
+                                        norwegian: "Alle gjenstående"
+                                    )
+                                )
+                                .tag(StrengthExerciseSubstitutionScope.allRemaining)
+
+                                Text(
+                                    ATHLTHLocalization.choose(
+                                        english: "Next set only",
+                                        norwegian: "Bare neste sett"
+                                    )
+                                )
+                                .tag(StrengthExerciseSubstitutionScope.nextSetOnly)
+                            }
+                            .pickerStyle(.segmented)
+
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Completed sets stay unchanged. Confirm the new equipment load before starting.",
+                                    norwegian: "Fullførte sett beholdes. Bekreft belastningen for det nye utstyret før du starter."
+                                )
+                            )
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        } header: {
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Scope",
+                                    norwegian: "Omfang"
+                                )
+                            )
+                        }
+
                         Section(
                             ATHLTHLocalization.choose(
                                 english: "Same muscle groups",
@@ -4976,7 +5021,7 @@ private struct StrengthExerciseSwapView: View {
                         ) {
                             ForEach(candidates) { entry in
                                 Button {
-                                    onSelect(entry)
+                                    onSelect(entry, substitutionScope)
                                 } label: {
                                     VStack(
                                         alignment: .leading,
