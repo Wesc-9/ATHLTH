@@ -25,6 +25,7 @@ struct ATHLTHTrophyCoreView: View {
     var size: CGFloat = 112
     var showLabel = false
     var showActivityIconInside = true
+    var revealRarity: TrophyRarity? = nil
     var inscription: TrophyInscription? = nil
     var athleteName: String? = nil
 
@@ -40,7 +41,8 @@ struct ATHLTHTrophyCoreView: View {
                     ATHLTHMetalMedalArtwork(
                         trophy: trophy,
                         size: size,
-                        showActivityIcon: showActivityIconInside
+                        showActivityIcon: showActivityIconInside,
+                        rarityOverride: revealRarity
                     )
                     .frame(width: size, height: size * 1.10)
                 }
@@ -48,7 +50,7 @@ struct ATHLTHTrophyCoreView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(
                 trophy.isUnlocked
-                    ? "\(trophy.title), \(trophy.stageLabel), \(trophy.isPrestigeTrophy ? "gullpokal" : ATHLTHMedalMetal(rarity: trophy.displayRarity).title)"
+                    ? "\(trophy.title), \(trophy.stageLabel), \(trophy.isPrestigeTrophy ? "gullpokal" : ATHLTHMedalMetal(rarity: revealRarity ?? trophy.displayRarity).title)"
                     : "\(trophy.title), \(ATHLTHLocalization.choose(english: "Locked", norwegian: "Låst"))"
             )
 
@@ -65,7 +67,7 @@ struct ATHLTHTrophyCoreView: View {
                          ? ATHLTHLocalization.choose(
                              english: "Prestige trophy", norwegian: "Prestisjepokal"
                            )
-                         : ATHLTHMedalMetal(rarity: trophy.displayRarity).title)
+                         : ATHLTHMedalMetal(rarity: revealRarity ?? trophy.displayRarity).title)
                         .font(.caption2.weight(.medium))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
