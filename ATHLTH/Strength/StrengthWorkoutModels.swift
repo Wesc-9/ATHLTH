@@ -548,6 +548,10 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     var appendedWorkoutTitle: String? = nil
     var appendedWorkoutID: UUID? = nil
     var isEmbeddedRunningInterval: Bool? = nil
+    /// Selected unloaded bar/machine bar mass (kg), already included in
+    /// the total planned and completed set weight. Never add it again to
+    /// volume or personal-record calculations. Nil means unspecified.
+    var barWeightKilograms: Double? = nil
 
     var isCompleted: Bool {
         completedAt != nil
