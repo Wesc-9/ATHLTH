@@ -211,7 +211,7 @@ enum ATHLTHUnifiedWorkout {
         sequence: Int,
         notes: String? = nil
     ) -> WorkoutTemplateBlock {
-        WorkoutTemplateBlock(
+        var block = WorkoutTemplateBlock(
             sequence: sequence,
             kind: target.measure == .time && phase == .recovery ? .rest : .run,
             title: title,
@@ -227,5 +227,7 @@ enum ATHLTHUnifiedWorkout {
                 target.intensity.paceMinSecondsPerKilometer,
             targetHeartRateZone: target.intensity.heartRateZone
         )
+        block.treadmillInclinePercent = target.treadmillInclinePercent
+        return block
     }
 }
