@@ -673,6 +673,10 @@ struct PlannedSession: Identifiable, Codable, Hashable {
     var followUpSourceWorkoutID: UUID? = nil
     var followUpSourceSetIDs: [UUID]? = nil
 
+    // nil inherits legacy behavior; false means date only, even though a
+    // calendar day is internally represented by its midnight Date value.
+    var scheduledTimeIsExplicit: Bool? = nil
+
     var resolvedRunningWorkouts: [RunningWorkoutTemplate] {
         if let runningWorkouts,
            !runningWorkouts.isEmpty {
