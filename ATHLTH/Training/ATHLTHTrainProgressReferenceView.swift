@@ -409,8 +409,8 @@ struct ATHLTHTrainProgressReferenceView: View {
         switch area {
         case .general:
             return [
-                Stat(label: tr("Sessions", "Økter"), value: "\(generalCount)", icon: "calendar", change: snapshot?.workoutChangePercent),
-                Stat(label: tr("Training time", "Treningstid"), value: generalDuration.shortDuration, icon: "clock", change: snapshot?.trainingDurationChangePercent),
+                Stat(label: tr("Sessions", "Økter"), value: "\(generalCount)", icon: "calendar", change: nil),
+                Stat(label: tr("Training time", "Treningstid"), value: generalDuration.shortDuration, icon: "clock", change: nil),
                 Stat(label: tr("Calories", "Kalorier"), value: totalCalories > 0 ? "\(Int(totalCalories.rounded()).formatted())" : "—", icon: "flame", change: nil),
                 Stat(label: tr("Distance", "Distanse"), value: String(format: "%.1f km", rangeWorkouts.compactMap(\.distanceMeters).reduce(0, +) / 1_000), icon: "location", change: snapshot?.workoutDistanceChangePercent)
             ]
@@ -433,8 +433,8 @@ struct ATHLTHTrainProgressReferenceView: View {
 
     private var statsCard: some View {
         HStack(alignment: .top, spacing: 0) {
-            ForEach(Array(activeStats.enumerated()), id: \.element.id) { index, item in
-                if index > 0 {
+            ForEach(activeStats) { item in
+                if item.id != activeStats.first?.id {
                     Rectangle().fill(ATHLTHTheme.divider).frame(width: 0.7).padding(.vertical, 3)
                 }
                 VStack(alignment: .leading, spacing: 6) {
@@ -489,7 +489,7 @@ struct ATHLTHTrainProgressReferenceView: View {
                                  value: health.heart.restingHeartRate.map { "\(Int($0.rounded())) bpm" } ?? "—",
                                  icon: "heart.text.square")
                     healthMetric(tr("Readiness", "Dagsform"),
-                                 value: health.recovery.score.map(String.init) ?? "—",
+                                 value: health.recovery.score.map { String($0) } ?? "—",
                                  icon: "waveform.path.ecg")
                 }
             }
@@ -745,7 +745,8 @@ struct ATHLTHTrainProgressReferenceView: View {
                                 return (key, weight)
                             }
                             .sorted { $0.1 > $1.1 }
-                        ForEach(peak.prefix(4), id: \.0) { entry in
+                        ForEach(Array(peak.indices.prefix(4)), id: \.self) { index in
+                            let entry = peak[index]
                             compactRow(
                                 icon: "dumbbell",
                                 title: entry.0,
