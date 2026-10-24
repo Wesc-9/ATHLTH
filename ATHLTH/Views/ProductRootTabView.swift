@@ -4763,7 +4763,6 @@ struct ATHLTHTrainView: View {
     }
 
     @ViewBuilder
-    @ViewBuilder
     private var activeTrainingCard: some View {
         if let active = strengthWorkout.activeWorkout {
             Button {
