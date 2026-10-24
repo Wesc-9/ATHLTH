@@ -11,6 +11,10 @@ struct ATHLTHStrengthCompletedHeroCard: View {
     let height: CGFloat
     var compact = false
     var showsCompletionLabel = true
+    // The result, activity feed and detail screen use the same layered artwork.
+    var showsMetrics = true
+    var detailMetadata: String? = nil
+    var cornerRadius: CGFloat? = nil
 
     private let ink = Color(red: 0.14, green: 0.15, blue: 0.16)
     private let secondaryInk = Color(red: 0.35, green: 0.38, blue: 0.42)
@@ -54,7 +58,9 @@ struct ATHLTHStrengthCompletedHeroCard: View {
             let cardHeight = geometry.size.height
             let cardWidth = geometry.size.width
             let small = compact || cardHeight < 250
-            let footerHeight: CGFloat = small ? 46 : 75
+            let tight = cardHeight < 170
+            let displaysMetrics = showsMetrics && !tight
+            let footerHeight: CGFloat = displaysMetrics ? (small ? 46 : 75) : 0
 
             ZStack(alignment: .topLeading) {
                 Image("StrengthFeedGym")
@@ -97,17 +103,31 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         activationTint: muscleAccent
                     )
                     .frame(
-                        width: min(cardWidth * 0.88, 390),
-                        height: cardHeight * 0.98
+                        width: tight ? min(cardWidth * 0.60, 210) : min(cardWidth * 0.88, 390),
+                        height: cardHeight * (tight ? 0.94 : 0.98)
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
                            alignment: .topTrailing)
-                    .padding(.trailing, small ? 2 : 12)
+                    .padding(.trailing, tight ? 6 : (small ? 2 : 12))
                     .allowsHitTesting(false)
                 }
 
                 VStack(alignment: .leading, spacing: 0) {
-                    if showsCompletionLabel {
+                    if let detailMetadata {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Label(
+                                ATHLTHLocalization.choose(english: "STRENGTH", norwegian: "STYRKE"),
+                                systemImage: "dumbbell.fill"
+                            )
+                            .font(.system(size: 10, weight: .bold))
+                            .tracking(1.2)
+                            Text(detailMetadata)
+                                .font(.system(size: 11, weight: .medium))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                        }
+                        .foregroundStyle(secondaryInk)
+                    } else if showsCompletionLabel {
                         Label(
                             ATHLTHLocalization.choose(
                                 english: "WORKOUT COMPLETE",
@@ -126,22 +146,23 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         Text(ATHLTHLocalization.choose(
                             english: "Strength", norwegian: "Styrke"
                         ))
-                        .font(.system(size: small ? 25 : 35, weight: .bold,
+                        .font(.system(size: tight ? 20 : (small ? 25 : 35), weight: .bold,
                                       design: .rounded))
                         .tracking(-0.5)
                         .foregroundStyle(ink)
 
                         Text(focus)
-                            .font(.system(size: small ? 12 : 17,
+                            .font(.system(size: tight ? 10 : (small ? 12 : 17),
                                           weight: .medium))
                             .foregroundStyle(secondaryInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.77)
                     }
-                    .frame(maxWidth: cardWidth * (small ? 0.50 : 0.49),
+                    .frame(maxWidth: cardWidth * (tight ? 0.52 : (small ? 0.50 : 0.49)),
                            alignment: .leading)
-                    .padding(.bottom, small ? 9 : 16)
+                    .padding(.bottom, tight ? 2 : (small ? 9 : 16))
 
+                    if displaysMetrics {
                     HStack(spacing: 0) {
                         metric("stopwatch", durationLabel,
                                ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"),
@@ -156,16 +177,17 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                                small: small)
                     }
                     .frame(height: footerHeight)
+                    }
                 }
                 .padding(.horizontal, small ? 13 : 20)
                 .padding(.top, small ? 12 : 19)
                 .padding(.bottom, small ? 6 : 10)
             }
             .frame(width: cardWidth, height: cardHeight)
-            .clipShape(RoundedRectangle(cornerRadius: compact ? 20 : 28,
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius ?? (compact ? 20 : 28),
                                         style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: compact ? 20 : 28,
+                RoundedRectangle(cornerRadius: cornerRadius ?? (compact ? 20 : 28),
                                  style: .continuous)
                     .strokeBorder(Color.black.opacity(0.07), lineWidth: 0.8)
             }
