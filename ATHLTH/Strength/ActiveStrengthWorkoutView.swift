@@ -299,11 +299,30 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
             .confirmationDialog(
-                "Finish the full workout?",
+                (strength.activeWorkout?.remainingSetCount ?? 0) > 0
+                    ? ATHLTHLocalization.choose(
+                        english: "Finish with incomplete sets?",
+                        norwegian: "Avslutte med gjenstående sett?"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Finish the full workout?",
+                        norwegian: "Avslutte hele treningsøkten?"
+                    ),
                 isPresented: $showingFinishConfirmation,
                 titleVisibility: .visible
             ) {
-                Button("Finish Workout", role: .destructive) {
+                Button(
+                    (strength.activeWorkout?.remainingSetCount ?? 0) > 0
+                        ? ATHLTHLocalization.choose(
+                            english: "Save Partial Workout",
+                            norwegian: "Lagre delvis økt"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Finish Workout",
+                            norwegian: "Avslutt økten"
+                        ),
+                    role: .destructive
+                ) {
                     Task {
                         await finishWorkout()
                     }
@@ -1020,16 +1039,41 @@ struct ActiveStrengthWorkoutView: View {
 
     private var finishMessage: String {
         guard let workout = strength.activeWorkout else {
-            return "Finish the ATHLTH workout."
+            return ATHLTHLocalization.choose(
+                english: "Finish the ATHLTH workout.",
+                norwegian: "Avslutt treningsøkten i ATHLTH."
+            )
+        }
+
+        let remaining = workout.remainingSetCount
+        let incompleteNote: String
+        if remaining > 0 {
+            incompleteNote = ATHLTHLocalization.choose(
+                english: "\(remaining) sets remain unfinished. Completed sets will be saved; unfinished sets will not count as completed.",
+                norwegian: "\(remaining) sett gjenstår. Fullførte sett beholdes, og ufullførte sett registreres ikke som fullført."
+            ) + " "
+        } else {
+            incompleteNote = ""
         }
 
         switch workout.captureDevice {
         case .appleWatch:
-            return "This finishes the ATHLTH log and ends the linked HealthKit workout on Apple Watch."
+            return incompleteNote + ATHLTHLocalization.choose(
+                english: "Apple Watch must confirm the end of the linked workout before it is reported saved.",
+                norwegian: "Apple Watch må bekrefte avslutningen av den tilknyttede økten før den vises som lagret."
+            )
         case .iPhone:
-            return health.canWriteWorkouts
-                ? "This finishes the ATHLTH workout on iPhone and saves it to Apple Health."
-                : "This finishes the ATHLTH workout on iPhone. It will still count toward your ATHLTH streak even without Health write access."
+            return incompleteNote + (
+                health.canWriteWorkouts
+                    ? ATHLTHLocalization.choose(
+                        english: "The workout will be saved on iPhone and in Apple Health.",
+                        norwegian: "Økten lagres på iPhone og i Apple Health."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "The ATHLTH workout will be saved on iPhone without Apple Health write access.",
+                        norwegian: "ATHLTH-økten lagres på iPhone selv uten skrivetilgang til Apple Health."
+                    )
+            )
         }
     }
 
