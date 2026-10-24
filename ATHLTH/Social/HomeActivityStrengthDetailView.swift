@@ -461,232 +461,117 @@ struct HomeActivityStrengthDetailView: View {
             .name
     }
 
-    private var workoutHeroImageURL:
-        URL? {
-        guard let entry =
-                representativeExerciseEntry
-        else {
-            return nil
-        }
-
-        return entry.imagePeakURL ??
-            entry.imageStartURL ??
-            entry.exercise.imageURL
-    }
-
-    private var workoutHeroFocusText:
-        String {
-        if let focus =
-                muscleSummary
-                    .profile
-                    .topActivations
-                    .first?
-                    .region
-                    .activityDisplayTitle {
-            return focus.uppercased()
-        }
-
-        if let bodyPart =
-                representativeExerciseEntry?
-                    .bodyPart?
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    ),
-           !bodyPart.isEmpty {
-            return bodyPart.uppercased()
-        }
-
-        return ATHLTHLocalization.choose(
-            english: "STRENGTH",
-            norwegian: "STYRKE"
+    // Both screens use the same full-resolution artwork and muscle figures.
+    // Only the detail page adds a calm, readable muscle-load explanation.
+    private var workoutHeroMetadata: String {
+        let date = workout.startDate.formatted(
+            date: .abbreviated,
+            time: .shortened
         )
-    }
-
-    private var workoutHeroMetricText:
-        String {
-        var values: [String] = [
-            workoutHeroFocusText
-        ]
-
-        if muscleSummary.totalSets > 0 {
-            values.append(
-                ATHLTHLocalization.format(
-                    english: "%d SETS",
-                    norwegian: "%d SETT",
-                    muscleSummary.totalSets
-                )
-            )
+        guard let source = resolvedStrengthWorkout?.captureDevice.title else {
+            return date
         }
-
-        if muscleSummary.totalReps > 0 {
-            values.append(
-                ATHLTHLocalization.format(
-                    english: "%d REPS",
-                    norwegian: "%d REPS",
-                    muscleSummary.totalReps
-                )
-            )
-        }
-
-        return values.joined(
-            separator: " · "
-        )
+        return date + " · " + source
     }
-
 
     private var hasMuscleHero: Bool {
         !muscleSummary.profile.activations.isEmpty
     }
 
-    private var workoutHeroHeight: CGFloat {
-        hasMuscleHero ? 430 : 196
-    }
-
-    /// A single image-based result card. The anatomical figure is part of
-    /// the hero itself, not a detached section or a second panel below it.
     private var workoutHeroCard: some View {
-        GeometryReader { viewport in
-            ZStack(alignment: .topLeading) {
-                workoutHeroArtwork
-                    .frame(width: viewport.size.width, height: workoutHeroHeight)
-                    .clipped()
-                    .overlay {
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black.opacity(0.68), location: 0),
-                                .init(color: .black.opacity(0.27), location: 0.36),
-                                .init(color: .black.opacity(0.76), location: 0.72),
-                                .init(color: .black.opacity(0.88), location: 1)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
+        VStack(spacing: 0) {
+            ATHLTHStrengthCompletedHeroCard(
+                profile: muscleSummary.profile,
+                duration: workout.duration,
+                exerciseCount: workout.strengthExerciseCount
+                    ?? resolvedStrengthWorkout?.exercises.count,
+                volumeKilograms: workout.strengthTotalVolumeKilograms
+                    ?? resolvedStrengthWorkout?.totalVolumeKilograms,
+                height: 290,
+                compact: false,
+                showsCompletionLabel: false,
+                showsMetrics: false,
+                detailMetadata: workoutHeroMetadata,
+                cornerRadius: 0
+            )
+
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .center, spacing: 10) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "MUSCLE FOCUS",
+                            norwegian: "MUSKELFOKUS"
+                        ),
+                        systemImage: "figure.strengthtraining.traditional"
+                    )
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.0)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Spacer(minLength: 0)
+
+                    if muscleSummary.totalSets > 0 {
+                        Text(
+                            ATHLTHLocalization.format(
+                                english: "%d SETS",
+                                norwegian: "%d SETT",
+                                muscleSummary.totalSets
+                            )
                         )
-                    }
-                    .allowsHitTesting(false)
-
-                VStack(alignment: .leading, spacing: 0) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "STRENGTH",
-                                norwegian: "STYRKE"
-                            ),
-                            systemImage: "dumbbell.fill"
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 7)
+                        .background(
+                            ATHLTHTheme.accentSoft,
+                            in: Capsule()
                         )
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.2)
-                        .foregroundStyle(.white.opacity(0.94))
-
-                        Text(displayTitle)
-                            .font(.title2.weight(.bold))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-
-                        HStack(spacing: 8) {
-                            Text(workout.startDate.formatted(
-                                date: .abbreviated,
-                                time: .shortened
-                            ))
-                            if let source = resolvedStrengthWorkout?.captureDevice.title {
-                                Text("·")
-                                Text(source)
-                            }
-                        }
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.85))
-                    }
-
-                    if hasMuscleHero {
-                        Spacer(minLength: 12)
-
-                        HStack(spacing: 8) {
-                            Image(systemName: "figure.strengthtraining.traditional")
-                                .font(.caption)
-                            Text(ATHLTHLocalization.choose(
-                                english: "MUSCLE FOCUS",
-                                norwegian: "MUSKELFOKUS"
-                            ))
-                            .tracking(1.4)
-                            Spacer()
-                            Text("\(muscleSummary.totalSets) " + ATHLTHLocalization.choose(
-                                english: "SETS",
-                                norwegian: "SETT"
-                            ))
-                        }
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(.white.opacity(0.92))
-
-                        HStack(alignment: .center, spacing: 12) {
-                            VStack(spacing: 2) {
-                                StrengthMuscleMapView(
-                                    profile: muscleSummary.profile,
-                                    compact: true,
-                                    presentation: .home,
-                                    activationTint: activationTint
-                                )
-                                .frame(
-                                    width: min(viewport.size.width * 0.43, 170),
-                                    height: 204
-                                )
-                                .background {
-                                    RadialGradient(
-                                        colors: [
-                                            Color.white.opacity(0.18),
-                                            Color.white.opacity(0.03),
-                                            .clear
-                                        ],
-                                        center: .center,
-                                        startRadius: 5,
-                                        endRadius: 114
-                                    )
-                                }
-                                Text(ATHLTHLocalization.choose(
-                                    english: "FRONT        BACK",
-                                    norwegian: "FORSIDE      BAKSIDE"
-                                ))
-                                .font(.system(size: 9, weight: .medium))
-                                .tracking(0.4)
-                                .foregroundStyle(.white.opacity(0.78))
-                            }
-
-                            VStack(alignment: .leading, spacing: 13) {
-                                ForEach(
-                                    Array(muscleSummary.profile.topActivations.prefix(5))
-                                ) { activation in
-                                    workoutHeroMuscleRow(activation)
-                                }
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 8)
-
-                        Text(ATHLTHLocalization.choose(
-                            english: "Muscle focus estimated from completed exercises and sets.",
-                            norwegian: "Muskelfokus anslått fra fullførte øvelser og sett."
-                        ))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.white.opacity(0.75))
-                        .padding(.top, 7)
                     }
                 }
-                .padding(16)
-                .frame(
-                    width: viewport.size.width,
-                    height: workoutHeroHeight,
-                    alignment: .topLeading
-                )
+
+                if hasMuscleHero {
+                    VStack(alignment: .leading, spacing: 13) {
+                        ForEach(
+                            Array(muscleSummary.profile.topActivations.prefix(5))
+                        ) { activation in
+                            workoutHeroMuscleRow(activation)
+                        }
+                    }
+
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Estimated from completed exercises and sets, not a direct measurement of muscle activity.",
+                            norwegian: "Anslått fra fullførte øvelser og sett, ikke en direkte måling av muskelaktivitet."
+                        )
+                    )
+                    .font(.system(size: 11))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Muscle focus appears when completed exercises have muscle information.",
+                            norwegian: "Muskelfokus vises når de fullførte øvelsene har muskelinformasjon."
+                        )
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .frame(width: viewport.size.width, height: workoutHeroHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .strokeBorder(.white.opacity(0.15), lineWidth: 1)
-            }
-            .accessibilityElement(children: .contain)
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: workoutHeroHeight)
+        .background(ATHLTHTheme.card)
+        .clipShape(
+            RoundedRectangle(cornerRadius: 27, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 27, style: .continuous)
+                .strokeBorder(ATHLTHTheme.border, lineWidth: 0.8)
+        }
+        .shadow(color: .black.opacity(0.035), radius: 12, y: 6)
+        .accessibilityElement(children: .contain)
     }
 
     private func workoutHeroMuscleRow(
@@ -696,38 +581,39 @@ struct HomeActivityStrengthDetailView: View {
             0,
             min(1, muscleSummary.profile.intensity(for: activation.region))
         )
-        return VStack(alignment: .leading, spacing: 5) {
+        return VStack(alignment: .leading, spacing: 7) {
             Text(activation.region.activityDisplayTitle)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.primaryText)
                 .lineLimit(1)
-                .minimumScaleFactor(0.75)
+                .minimumScaleFactor(0.85)
+
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(.white.opacity(0.22))
                     Capsule()
-                        .fill(LinearGradient(
-                            colors: [activationTint, ATHLTHTheme.premiumGold],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ))
+                        .fill(ATHLTHTheme.border.opacity(0.75))
+                    Capsule()
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    ATHLTHTheme.premiumGold,
+                                    Color(red: 0.34, green: 0.63, blue: 0.48)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
                         .frame(width: geometry.size.width * intensity)
                 }
             }
-            .frame(height: 5)
+            .frame(height: 6)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(
+                    english: "Relative muscle focus",
+                    norwegian: "Relativt muskelfokus"
+                )
+            )
         }
-    }
-
-    @ViewBuilder
-    private var workoutHeroArtwork: some View {
-        // Keep the original ATHLTH strength photograph as the whole canvas.
-        workoutHeroFallback
-    }
-
-    private var workoutHeroFallback: some View {
-        Image("StrengthFeedGym")
-            .resizable()
-            .scaledToFill()
     }
 
     private var hasRestFlowData: Bool {
