@@ -98,6 +98,16 @@ struct StructuredWorkoutSessionView: View {
         return blocks[currentIndex]
     }
 
+    /// The active screen follows the current block. Changing it does not
+    /// end, restart or create another workout recording.
+    private var currentLiveRoute: ATHLTHLiveWorkoutRoute? {
+        ATHLTHLiveWorkoutEngineRouter.route(
+            workoutID: workout.id,
+            blocks: blocks,
+            index: currentIndex
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -296,6 +306,23 @@ struct StructuredWorkoutSessionView: View {
         _ block: WorkoutTemplateBlock
     ) -> some View {
         VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 8) {
+                if let route = currentLiveRoute {
+                    Label(route.engine.title, systemImage: route.engine.systemImage)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                    Spacer()
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "ONE WORKOUT", norwegian: "ÉN ØKT"
+                        ),
+                        systemImage: "link"
+                    )
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.65))
+                }
+            }
+            liveTargets(for: block)
             HStack {
                 Label(block.resolvedPhase.title.uppercased(),
                       systemImage: block.resolvedPhase.symbol)
@@ -388,6 +415,84 @@ struct StructuredWorkoutSessionView: View {
                 style: .continuous
             )
         )
+    }
+
+    /// Show only the targets relevant to the active motor. These are
+    /// planned targets, never presented as measured live sensor data.
+    @ViewBuilder
+    private func liveTargets(for block: WorkoutTemplateBlock) -> some View {
+        switch ATHLTHLiveWorkoutEngineRouter.engine(for: block) {
+        case .endurance:
+            HStack(spacing: 12) {
+                if let seconds = block.durationSeconds, seconds > 0 {
+                    Label(
+                        "\(Int(seconds / 60)) min",
+                        systemImage: "clock"
+                    )
+                }
+                if let pace = block.targetPaceSecondsPerKilometer,
+                   pace > 0 {
+                    Label(
+                        String(
+                            format: "%d:%02d/km",
+                            Int(pace) / 60,
+                            Int(pace) % 60
+                        ),
+                        systemImage: "speedometer"
+                    )
+                }
+                if let zone = block.targetHeartRateZone {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Zone \(zone)", norwegian: "Sone \(zone)"
+                        ),
+                        systemImage: "heart"
+                    )
+                }
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white.opacity(0.72))
+
+        case .strength:
+            HStack(spacing: 12) {
+                if let repetitions = block.repetitions {
+                    Label(
+                        "\(repetitions) reps",
+                        systemImage: "number"
+                    )
+                }
+                if let weight = block.targetWeightKilograms {
+                    Label(
+                        String(format: "%.1f kg", weight),
+                        systemImage: "scalemass"
+                    )
+                }
+                if let seconds = block.durationSeconds {
+                    Label(
+                        "\(Int(seconds)) s",
+                        systemImage: "timer"
+                    )
+                }
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white.opacity(0.72))
+
+        case .recovery:
+            if let seconds = block.durationSeconds {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Planned pause: \(Int(seconds)) s",
+                        norwegian: "Planlagt pause: \(Int(seconds)) sek"
+                    ),
+                    systemImage: "pause.circle"
+                )
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.white.opacity(0.72))
+            }
+
+        case .mobility, .instructions:
+            EmptyView()
+        }
     }
 
     private var blockTimeline: some View {
@@ -578,10 +683,11 @@ struct StructuredWorkoutSessionView: View {
                                     english: "Complete block",
                                     norwegian: "Fullfør blokk"
                                 )
-                                : ATHLTHLocalization.choose(
-                                    english: "Complete & next",
-                                    norwegian: "Fullfør og neste"
-                                ),
+                                : (currentLiveRoute?.engine.nextActionTitle ??
+                                    ATHLTHLocalization.choose(
+                                        english: "Complete & next",
+                                        norwegian: "Fullfør og neste"
+                                    )),
                             systemImage:
                                 "checkmark.circle.fill"
                         )
