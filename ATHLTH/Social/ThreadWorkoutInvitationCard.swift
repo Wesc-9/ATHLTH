@@ -544,6 +544,18 @@ struct PlannedWorkoutLobbyView: View {
         }
     }
 
+    // Never reopen another workout's minimized lobby from this card.
+    private var matchingReadyLobbyID: UUID? {
+        guard let activeID = social.coordinatedLobbySessionID,
+              social.workoutSessions.contains(where: {
+                  $0.id == activeID &&
+                  $0.invitePayload?.workout.id == sourceWorkoutID
+              }) else {
+            return nil
+        }
+        return activeID
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 17) {
@@ -615,14 +627,14 @@ struct PlannedWorkoutLobbyView: View {
                 if isOrganizer && workout.trainTogetherMode == .physical {
                     if let friend = inviteeForReadyLobby {
                         Button {
-                            if social.coordinatedLobbySessionID != nil {
+                            if matchingReadyLobbyID != nil {
                                 social.presentCoordinatedLobby()
                             } else {
                                 Task { await openReadyLobby(with: friend) }
                             }
                         } label: {
                             Label(
-                                social.coordinatedLobbySessionID != nil
+                                matchingReadyLobbyID != nil
                                     ? ATHLTHLocalization.choose(
                                         english: "Return to ready lobby",
                                         norwegian: "Tilbake til klar-lobby"
@@ -638,7 +650,11 @@ struct PlannedWorkoutLobbyView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(ATHLTHTheme.accentDeep)
-                        .disabled(openingReadyLobby || !canLaunchWorkout)
+                        .disabled(
+                            openingReadyLobby || !canLaunchWorkout ||
+                            (social.coordinatedLobbySessionID != nil &&
+                             matchingReadyLobbyID == nil)
+                        )
                     } else {
                         Text(ATHLTHLocalization.choose(
                             english: "Your selected friend must be a mutual follow to join a live lobby.",
@@ -672,7 +688,10 @@ struct PlannedWorkoutLobbyView: View {
                             .frame(maxWidth: .infinity, minHeight: 48)
                         }
                         .buttonStyle(.bordered)
-                        .disabled(openingReadyLobby || persistedWorkout == nil)
+                        .disabled(
+                            openingReadyLobby || persistedWorkout == nil ||
+                            social.coordinatedLobbySessionID != nil
+                        )
 
                         Button {
                             startIndependently(using: .appleWatch)
@@ -691,7 +710,8 @@ struct PlannedWorkoutLobbyView: View {
                         .disabled(
                             openingReadyLobby ||
                             persistedWorkout == nil ||
-                            !watchConnection.isVerifiedForLiveLaunch
+                            !watchConnection.isVerifiedForLiveLaunch ||
+                            social.coordinatedLobbySessionID != nil
                         )
                     }
                 }
