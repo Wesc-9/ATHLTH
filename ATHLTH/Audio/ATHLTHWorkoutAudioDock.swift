@@ -39,6 +39,7 @@ struct ATHLTHWorkoutAudioDock: View {
     @State private var preferredMode: ATHLTHWorkoutAudioDockMode = .coach
     @State private var isExpanded = false
 
+    var showSpotifyLauncher: Bool = true
     let coachVisible: Bool
     let coachEnabled: Bool
     let coachPaused: Bool
@@ -59,10 +60,8 @@ struct ATHLTHWorkoutAudioDock: View {
 
     var body: some View {
         Group {
-            if ATHLTHWorkoutAudioDockPolicy.isVisible(
-                coachVisible: coachVisible,
-                spotifyConnected: spotify.isConnected
-            ) {
+            if coachVisible ||
+                (showSpotifyLauncher && spotify.isConnected) {
                 VStack(alignment: .trailing, spacing: 8) {
                     if isExpanded {
                         expandedControlBar
@@ -77,9 +76,10 @@ struct ATHLTHWorkoutAudioDock: View {
                         if coachVisible {
                             launcher(for: .coach)
                         }
-                        if ATHLTHWorkoutAudioDockPolicy.showsSpotifyLauncher(
-                            spotifyConnected: spotify.isConnected
-                        ) {
+                        if showSpotifyLauncher &&
+                            ATHLTHWorkoutAudioDockPolicy.showsSpotifyLauncher(
+                                spotifyConnected: spotify.isConnected
+                            ) {
                             launcher(for: .spotify)
                         }
                     }
@@ -465,7 +465,7 @@ struct ATHLTHWorkoutAudioDock: View {
 
 
 /// Vector Spotify glyph. No external logo files or network image dependencies.
-private struct ATHLTHSpotifyGlyph: View {
+struct ATHLTHSpotifyGlyph: View {
     var body: some View {
         GeometryReader { proxy in
             let side = min(proxy.size.width, proxy.size.height)
