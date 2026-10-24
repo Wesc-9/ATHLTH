@@ -1684,6 +1684,8 @@ final class StrengthWorkoutStore: ObservableObject {
                 set?.hybridPhaseKind,
             embeddedRunningTargetHeartRateZone:
                 set?.hybridTargetHeartRateZone,
+            embeddedRunningTargetPaceSecondsPerKilometer:
+                set?.hybridTargetPaceSecondsPerKilometer,
             isResting: isResting,
             restEndsAt: restEndsAt,
             currentExerciseComplete:
@@ -1753,7 +1755,9 @@ final class StrengthWorkoutStore: ObservableObject {
                                         hybridPhaseKind:
                                             set.hybridPhaseKind,
                                         hybridTargetHeartRateZone:
-                                            set.hybridTargetHeartRateZone
+                                            set.hybridTargetHeartRateZone,
+                                        hybridTargetPaceSecondsPerKilometer:
+                                            set.hybridTargetPaceSecondsPerKilometer
                                     )
                                 },
                             isCompleted:
