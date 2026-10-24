@@ -2919,323 +2919,338 @@ struct TrophyDetailView: View {
     }
 }
 
+/// Quiet, collectible ATHLTH achievement moment. Native layouts keep the
+/// earned medal, verification and accessibility correct for every award.
 struct TrophyUnlockRevealView: View {
     @EnvironmentObject private var trophies: TrophyStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
-    @Environment(
-        \.accessibilityReduceMotion
-    ) private var reduceMotion
-    @Environment(
-        \.accessibilityReduceTransparency
-    ) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     let unlock: TrophyUnlockRecord
+    @State private var revealed = false
+    @State private var inscription: TrophyInscription?
 
     private var trophy: TrophyProgressItem? {
         trophies.trophies.first { $0.id == unlock.trophyID }
     }
 
+    private var metal: ATHLTHMedalMetal {
+        ATHLTHMedalMetal(rarity: unlock.rarity)
+    }
+
+    private var accent: Color { metal.highlights[0] }
+
     private var athleteName: String {
-        let username =
-            session.profile.username
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
+        let username = session.profile.username.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !username.isEmpty { return username }
+        let display = session.profile.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        return display.isEmpty ? "ATHLTH ATHLETE" : display
+    }
 
-        if !username.isEmpty {
-            return username
+    private var description: String {
+        if unlock.trophyID == "strength.total-volume" {
+            return ATHLTHLocalization.choose(
+                english: "For consistent progress in strength training.",
+                norwegian: "For konsekvent progresjon i styrketrening."
+            )
         }
-
-        let displayName =
-            session.profile.displayName
-                .trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-
-        return displayName.isEmpty
-            ? "ATHLTH ATHLETE"
-            : displayName
+        switch unlock.category {
+        case .strength:
+            return ATHLTHLocalization.choose(english: "A new strength milestone.",
+                                             norwegian: "En ny milepæl i styrketreningen.")
+        case .consistency:
+            return ATHLTHLocalization.choose(english: "For your commitment and progress.",
+                                             norwegian: "For innsats og fremgang over tid.")
+        case .walking, .endurance:
+            return ATHLTHLocalization.choose(english: "For reaching a new milestone.",
+                                             norwegian: "For en ny milepæl på veien videre.")
+        case .recovery:
+            return ATHLTHLocalization.choose(english: "For making recovery count.",
+                                             norwegian: "For å prioritere restitusjonen.")
+        case .goals:
+            return ATHLTHLocalization.choose(english: "For reaching your next goal.",
+                                             norwegian: "For å ha nådd et nytt mål.")
+        case .challenges:
+            return ATHLTHLocalization.choose(english: "For your challenge achievement.",
+                                             norwegian: "For en prestasjon i en utfordring.")
+        case .signature:
+            return ATHLTHLocalization.choose(english: "An exceptional achievement.",
+                                             norwegian: "En ekstraordinær prestasjon.")
+        }
     }
 
-    @State private var revealed = false
-    @State private var inscription:
-        TrophyInscription?
-
-    private var showsParticles:
-        Bool
-    {
-        settings.achievementEffects !=
-            .off &&
-        !reduceMotion
-    }
-
-    private var fullRevealMotion:
-        Bool
-    {
-        settings.achievementEffects ==
-            .full &&
-        !reduceMotion
-    }
-
-    private var reducedRevealMotion:
-        Bool
-    {
-        settings.achievementEffects ==
-            .reduced &&
-        !reduceMotion
+    private var verification: String {
+        if unlock.verificationSource == .athlth {
+            return ATHLTHLocalization.choose(english: "Verified by ATHLTH",
+                                             norwegian: "Verifisert av ATHLTH")
+        }
+        return ATHLTHLocalization.choose(
+            english: "Verified via \(unlock.verificationSource.title)",
+            norwegian: "Verifisert via \(unlock.verificationSource.title)"
+        )
     }
 
     var body: some View {
-        ZStack {
+        GeometryReader { proxy in
+            let compact = proxy.size.height < 700
+            let medalSize = min(proxy.size.width * (compact ? 0.55 : 0.65),
+                                compact ? 214 : 278)
+
+            ZStack {
+                backdrop
+
+                VStack(spacing: 0) {
+                    ScrollView(.vertical) {
+                        content(compact: compact, medalSize: medalSize)
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: max(proxy.size.height - (compact ? 92 : 110), 0))
+                    }
+                    .scrollIndicators(.hidden)
+                    .scrollBounceBehavior(.basedOnSize)
+
+                    Button {
+                        trophies.dismissCurrentReveal()
+                    } label: {
+                        HStack(spacing: 15) {
+                            Spacer()
+                            Text(ATHLTHLocalization.choose(english: "Continue",
+                                                           norwegian: "Fortsett"))
+                                .font(.system(size: 17, weight: .semibold))
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 16, weight: .medium))
+                            Spacer()
+                        }
+                        .foregroundStyle(Color(red: 0.12, green: 0.11, blue: 0.10))
+                        .frame(maxWidth: .infinity, minHeight: compact ? 54 : 60)
+                        .background(Color(red: 0.99, green: 0.98, blue: 0.96),
+                                    in: Capsule())
+                        .shadow(color: accent.opacity(0.13), radius: 17, y: 6)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("trophy-unlock-continue")
+                    .padding(.horizontal, 28)
+                    .padding(.top, compact ? 8 : 12)
+                    .padding(.bottom, compact ? 10 : 16)
+                }
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height)
+        }
+        .preferredColorScheme(.dark)
+        .onAppear {
+            if !reduceMotion && settings.achievementEffects != .off {
+                withAnimation(.easeOut(duration: 0.6)) { revealed = true }
+            } else {
+                revealed = true
+            }
+            AchievementUnlockFeedback.play(
+                rarity: unlock.rarity,
+                soundEnabled: settings.achievementUnlockSoundsEnabled,
+                hapticsEnabled: settings.achievementUnlockHapticsEnabled
+            )
+        }
+        .task(id: unlock.stageKey) {
+            guard unlock.isPrestigeTrophy, let trophy, trophy.isUnlocked else {
+                inscription = nil
+                return
+            }
+            if let cached = trophies.inscription(for: trophy.id) {
+                inscription = cached
+                return
+            }
+            let result = await TrophyInscriptionAIService.shared.inscription(
+                trophyID: trophy.id, username: athleteName,
+                achievementTitle: trophy.title, achievementDetail: trophy.subtitle,
+                unlockedAt: unlock.unlockedAt
+            )
+            inscription = result.inscription
+            if result.isPersisted {
+                trophies.cacheInscription(result.inscription, for: trophy.id)
+            }
+        }
+    }
+
+    private func content(compact: Bool, medalSize: CGFloat) -> some View {
+        VStack(spacing: 0) {
+            VStack(spacing: 4) {
+                ATHLTHMarkShape()
+                    .fill(accent.opacity(0.94))
+                    .frame(width: 33, height: 25)
+                Text("ATHLTH")
+                    .font(.system(size: 10, weight: .medium))
+                    .tracking(4)
+                    .foregroundStyle(.white.opacity(0.90))
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("ATHLTH")
+            .padding(.top, compact ? 14 : 28)
+
+            Spacer(minLength: compact ? 12 : 26)
+
+            VStack(spacing: 13) {
+                Text(ATHLTHLocalization.choose(
+                    english: unlock.isPrestigeTrophy
+                        ? "NEW ATHLTH TROPHY" : "NEW ATHLTH ACHIEVEMENT",
+                    norwegian: unlock.isPrestigeTrophy
+                        ? "NY ATHLTH-POKAL" : "NY ATHLTH-UTMERKELSE"
+                ))
+                    .font(.system(size: 10.5, weight: .medium))
+                    .tracking(2.5)
+                    .foregroundStyle(accent.opacity(0.95))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+
+                Capsule().fill(accent.opacity(0.75))
+                    .frame(width: 25, height: 1)
+            }
+
+            Spacer(minLength: compact ? 12 : 26)
+
+            Group {
+                if let trophy {
+                    ATHLTHTrophyCoreView(
+                        trophy: trophy,
+                        size: medalSize,
+                        revealRarity: unlock.rarity,
+                        inscription: inscription,
+                        athleteName: athleteName
+                    )
+                } else {
+                    ATHLTHMedalHexagon()
+                        .fill(LinearGradient(colors: metal.highlights,
+                                             startPoint: .topLeading,
+                                             endPoint: .bottomTrailing))
+                        .overlay {
+                            Image(systemName: unlock.category.medalSystemImage)
+                                .font(.system(size: medalSize * 0.3))
+                                .foregroundStyle(.black.opacity(0.62))
+                        }
+                        .frame(width: medalSize, height: medalSize)
+                }
+            }
+            .shadow(color: accent.opacity(0.18), radius: 26, y: 8)
+            .scaleEffect(revealed ? 1 : 0.97)
+            .opacity(revealed ? 1 : 0)
+            .accessibilityIdentifier("trophy-unlock-artwork")
+
+            Spacer(minLength: compact ? 16 : 23)
+
+            VStack(spacing: compact ? 8 : 11) {
+                Text(unlock.title)
+                    .font(.system(size: compact ? 28 : 36, weight: .bold))
+                    .tracking(-0.8)
+                    .foregroundStyle(.white)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.68)
+                    .accessibilityAddTraits(.isHeader)
+
+                Text(unlock.stageTitle.uppercased())
+                    .font(.system(size: compact ? 11 : 12, weight: .medium))
+                    .tracking(4.3)
+                    .foregroundStyle(accent)
+
+                Capsule().fill(.white.opacity(0.20))
+                    .frame(width: 34, height: 1)
+                    .padding(.top, compact ? 2 : 7)
+
+                Text(description)
+                    .font(.system(size: compact ? 13 : 15))
+                    .foregroundStyle(.white.opacity(0.69))
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineSpacing(3)
+                    .padding(.top, 5)
+            }
+            .frame(maxWidth: .infinity)
+
+            Spacer(minLength: compact ? 14 : 25)
+
+            HStack(spacing: 16) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: compact ? 22 : 25))
+                    .foregroundStyle(accent)
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(verification)
+                        .font(.system(size: compact ? 13 : 14, weight: .medium))
+                        .foregroundStyle(.white.opacity(0.89))
+                    Text(unlock.unlockedAt.formatted(
+                        .dateTime.day().month(.wide).year()
+                    ))
+                        .font(.system(size: compact ? 12 : 13))
+                        .foregroundStyle(.white.opacity(0.54))
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 22)
+            .frame(maxWidth: .infinity, minHeight: compact ? 65 : 75)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(.white.opacity(reduceTransparency ? 0.11 : 0.045))
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(.white.opacity(0.12), lineWidth: 0.8)
+            }
+            .padding(.horizontal, 24)
+
+            Spacer(minLength: compact ? 8 : 16)
+        }
+        .padding(.horizontal, 16)
+    }
+
+    private var backdrop: some View {
+        GeometryReader { proxy in
             ZStack {
                 LinearGradient(
                     colors: [
-                        Color(
-                            red: 0.025,
-                            green: 0.027,
-                            blue: 0.030
-                        ),
-                        Color(
-                            red: 0.075,
-                            green: 0.073,
-                            blue: 0.068
-                        ),
-                        Color.black
+                        Color(red: 0.094, green: 0.084, blue: 0.078),
+                        Color(red: 0.071, green: 0.065, blue: 0.061),
+                        Color(red: 0.02, green: 0.022, blue: 0.026)
                     ],
-                    startPoint:
-                        .topLeading,
-                    endPoint:
-                        .bottomTrailing
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
 
-                RadialGradient(
-                    colors: [
-                        unlock.category
-                            .trophyAccent
-                            .opacity(0.22),
-                        unlock.category
-                            .trophyAccent
-                            .opacity(0.055),
-                        Color.clear
-                    ],
-                    center:
-                        UnitPoint(
-                            x: 0.54,
-                            y: 0.42
-                        ),
-                    startRadius: 20,
-                    endRadius: 360
-                )
+                if !reduceTransparency {
+                    RadialGradient(
+                        colors: [accent.opacity(0.18),
+                                 accent.opacity(0.045), .clear],
+                        center: .center,
+                        startRadius: 12,
+                        endRadius: proxy.size.width * 0.66
+                    )
+                    .frame(width: proxy.size.width * 1.35,
+                           height: proxy.size.width * 1.4)
+                    .offset(y: -proxy.size.height * 0.10)
 
-                RadialGradient(
-                    colors: [
-                        Color.white
-                            .opacity(0.095),
-                        Color.clear
-                    ],
-                    center:
-                        UnitPoint(
-                            x: 0.50,
-                            y: 0.30
-                        ),
-                    startRadius: 8,
-                    endRadius: 280
-                )
+                    Rectangle()
+                        .fill(LinearGradient(
+                            colors: [.clear, accent.opacity(0.24),
+                                     accent.opacity(0.09), .clear],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ))
+                        .frame(width: proxy.size.width * 1.6, height: 92)
+                        .blur(radius: 35)
+                        .rotationEffect(.degrees(24))
+                        .offset(y: -proxy.size.height * 0.16)
+                }
 
                 LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.20),
-                        Color.clear,
-                        Color.black.opacity(0.44)
-                    ],
+                    colors: [.clear, .black.opacity(0.09),
+                             .black.opacity(0.55)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             }
-            .ignoresSafeArea()
-
-            if showsParticles {
-                AchievementParticleBurst(
-                    rarity:
-                        unlock.rarity,
-                    reduced:
-                        settings
-                            .achievementEffects ==
-                            .reduced
-                )
-                .opacity(
-                    revealed
-                        ? 1
-                        : 0
-                )
-            }
-
-            VStack(spacing: 24) {
-                Text(
-                    unlock.isPrestigeTrophy
-                        ? "NEW ATHLTH TROPHY"
-                        : "NEW ATHLTH ACHIEVEMENT"
-                )
-                    .font(.caption.bold())
-                    .tracking(2.2)
-                    .foregroundStyle(.white.opacity(0.72))
-
-                if let trophy {
-                    ATHLTHTrophyCoreView(
-                        trophy: trophy,
-                        size: 220,
-                        inscription:
-                            inscription,
-                        athleteName:
-                            athleteName
-                    )
-                    .scaleEffect(
-                        revealed
-                            ? 1
-                            : fullRevealMotion
-                                ? 0.72
-                                : reducedRevealMotion
-                                    ? 0.94
-                                    : 1
-                    )
-                    .opacity(
-                        revealed
-                            ? 1
-                            : 0
-                    )
-                    .rotation3DEffect(
-                        .degrees(
-                            revealed ||
-                            !fullRevealMotion
-                                ? 0
-                                : -18
-                        ),
-                        axis:
-                            (
-                                x: 0,
-                                y: 1,
-                                z: 0
-                            )
-                    )
-                    .animation(
-                        fullRevealMotion
-                            ? .spring(
-                                response:
-                                    0.7,
-                                dampingFraction:
-                                    0.72
-                            )
-                            : .easeOut(
-                                duration:
-                                    0.16
-                            ),
-                        value:
-                            revealed
-                    )
-                }
-
-                VStack(spacing: 6) {
-                    Text(unlock.title)
-                        .font(.largeTitle.bold())
-                    Text(unlock.stageTitle)
-                        .font(.title3.weight(.semibold))
-                        .foregroundStyle(unlock.category.trophyAccent)
-
-                    Label(
-                        "ATHLTH · VERIFIED · \(unlock.verificationSource.title.uppercased())",
-                        systemImage: "checkmark.seal.fill"
-                    )
-                    .font(.caption.bold())
-                    .tracking(0.8)
-                    .foregroundStyle(.white.opacity(0.66))
-                    .padding(.top, 6)
-
-                    Text(
-                        unlock.unlockedAt.formatted(
-                            .dateTime.day().month(.wide).year()
-                        )
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.white.opacity(0.48))
-                }
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-
-                Button("Continue") {
-                    trophies.dismissCurrentReveal()
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(.white)
-                .foregroundStyle(.black)
-                .padding(.top, 8)
-            }
-            .padding(28)
+            .frame(width: proxy.size.width, height: proxy.size.height)
+            .clipped()
         }
-        .onAppear {
-            revealed = true
-            AchievementUnlockFeedback
-                .play(
-                    rarity:
-                        unlock.rarity,
-                    soundEnabled:
-                        settings
-                            .achievementUnlockSoundsEnabled,
-                    hapticsEnabled:
-                        settings
-                            .achievementUnlockHapticsEnabled
-                )
-        }
-        .task(id: unlock.stageKey) {
-            guard unlock.isPrestigeTrophy,
-                  let trophy,
-                  trophy.isUnlocked
-            else {
-                inscription = nil
-                return
-            }
-
-            if let cached =
-                    trophies
-                        .inscription(
-                            for:
-                                trophy.id
-                        ) {
-                inscription =
-                    cached
-                return
-            }
-
-            let resolution =
-                await TrophyInscriptionAIService
-                    .shared
-                    .inscription(
-                        trophyID:
-                            trophy.id,
-                        username:
-                            athleteName,
-                        achievementTitle:
-                            trophy.title,
-                        achievementDetail:
-                            trophy.subtitle,
-                        unlockedAt:
-                            unlock.unlockedAt
-                    )
-            inscription =
-                resolution.inscription
-
-            if resolution.isPersisted {
-                trophies
-                    .cacheInscription(
-                        resolution
-                            .inscription,
-                        for:
-                            trophy.id
-                    )
-            }
-        }
-
+        .ignoresSafeArea()
+        .accessibilityHidden(true)
     }
 }
 
