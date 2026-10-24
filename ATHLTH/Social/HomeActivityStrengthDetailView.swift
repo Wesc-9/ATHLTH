@@ -86,8 +86,11 @@ struct HomeActivityStrengthDetailView: View {
                 // composited into the photograph, never a second card.
                 workoutHeroCard
 
-                // Same location presentation engine as run/treadmill/history.
-                // Indoor strength shows a private venue check-in, not a map.
+                // Training results come directly after the hero; venue
+                // check-in is secondary and should never push stats down.
+                overviewCard
+
+                // Reuse the existing private location/check-in flow.
                 ATHLTHWorkoutLocationSection(
                     workout: workout,
                     hasRecordedGPS: recordedGPSDetail.map {
@@ -101,8 +104,6 @@ struct HomeActivityStrengthDetailView: View {
                         )
                     }
                 }
-
-                overviewCard
 
                 if hasRestFlowData {
                     restFlowDisclosure
@@ -193,84 +194,15 @@ struct HomeActivityStrengthDetailView: View {
     }
 
     private var overviewCard: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 14
-        ) {
-            HStack {
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Workout at a glance",
-                            norwegian:
-                                "Økta i tall"
-                        )
-                    )
-                    .font(
-                        .headline.weight(
-                            .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-
-                    Text(
-                        workout.startDate
-                            .formatted(
-                                date:
-                                    .abbreviated,
-                                time:
-                                    .shortened
-                            )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                }
-
-                Spacer()
-
-                if let source =
-                    resolvedStrengthWorkout?
-                        .captureDevice
-                        .title {
-                    Label(
-                        source,
-                        systemImage:
-                            source ==
-                                "Apple Watch"
-                                ? "applewatch"
-                                : "iphone"
-                    )
-                    .font(
-                        .caption2.weight(
-                            .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .padding(
-                        .horizontal,
-                        9
-                    )
-                    .padding(
-                        .vertical,
-                        6
-                    )
-                    .background(
-                        ATHLTHTheme
-                            .surfaceStone,
-                        in: Capsule()
-                    )
-                }
-            }
+        VStack(alignment: .leading, spacing: 14) {
+            Text(
+                ATHLTHLocalization.choose(
+                    english: "Workout at a glance",
+                    norwegian: "Økta i tall"
+                )
+            )
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
 
             ATHLTHWorkoutMetricGrid(
                 metrics: [
@@ -338,127 +270,6 @@ struct HomeActivityStrengthDetailView: View {
                 lineWidth: 1
             )
         }
-    }
-
-    private var representativeExerciseEntry:
-        ExerciseLibraryEntry? {
-        guard let strengthWorkout =
-                resolvedStrengthWorkout
-        else {
-            return nil
-        }
-
-        let performed =
-            strengthWorkout.exercises
-                .filter {
-                    $0.isCompleted ||
-                    $0.sets.contains(
-                        where: \.isCompleted
-                    )
-                }
-                .sorted { lhs, rhs in
-                    let lhsSets =
-                        lhs.sets
-                            .filter(
-                                \.countsTowardTrainingLoad
-                            )
-                            .count
-                    let rhsSets =
-                        rhs.sets
-                            .filter(
-                                \.countsTowardTrainingLoad
-                            )
-                            .count
-
-                    return lhsSets > rhsSets
-                }
-
-        guard !performed.isEmpty else {
-            return nil
-        }
-
-        let catalog =
-            exerciseLibrary
-                .allExercises
-
-        for loggedExercise in performed {
-            if let plannedID =
-                    loggedExercise
-                        .plannedExerciseID,
-               let exact =
-                    catalog.first(
-                        where: {
-                            $0.id ==
-                                plannedID
-                        }
-                    ) {
-                return exact
-            }
-
-            let loggedName =
-                loggedExercise
-                    .exercise
-                    .name
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    )
-
-            guard !loggedName.isEmpty else {
-                continue
-            }
-
-            if let named =
-                catalog.first(
-                    where: { entry in
-                        entry.canonicalName
-                            .localizedCaseInsensitiveCompare(
-                                loggedName
-                            ) ==
-                            .orderedSame ||
-                        entry.name
-                            .localizedCaseInsensitiveCompare(
-                                loggedName
-                            ) ==
-                            .orderedSame
-                    }
-                ) {
-                return named
-            }
-        }
-
-        return nil
-    }
-
-    private var representativeExerciseName:
-        String? {
-        guard let strengthWorkout =
-                resolvedStrengthWorkout
-        else {
-            return nil
-        }
-
-        return strengthWorkout.exercises
-            .filter {
-                $0.isCompleted ||
-                $0.sets.contains(
-                    where: \.isCompleted
-                )
-            }
-            .max { lhs, rhs in
-                lhs.sets
-                    .filter(
-                        \.countsTowardTrainingLoad
-                    )
-                    .count <
-                rhs.sets
-                    .filter(
-                        \.countsTowardTrainingLoad
-                    )
-                    .count
-            }?
-            .exercise
-            .name
     }
 
     // Both screens use the same full-resolution artwork and muscle figures.
