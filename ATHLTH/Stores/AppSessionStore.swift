@@ -2413,7 +2413,8 @@ final class AppSessionStore: ObservableObject {
         from workout: StrengthWorkoutLog,
         on scheduledStart: Date,
         selectedSetIDs: Set<UUID>? = nil,
-        onlyRemainderForSetIDs: Set<UUID> = []
+        onlyRemainderForSetIDs: Set<UUID> = [],
+        hasExplicitTime: Bool = false
     ) -> PlannedSession? {
         guard workout.isFinished,
               workout.remainingSetCount > 0,
@@ -2430,7 +2431,8 @@ final class AppSessionStore: ObservableObject {
         guard let followUp = remainder.makeFollowUp(
             scheduledStart: scheduledStart,
             selectedSetIDs: selectedSetIDs,
-            onlyRemainderForSetIDs: onlyRemainderForSetIDs
+            onlyRemainderForSetIDs: onlyRemainderForSetIDs,
+            hasExplicitTime: hasExplicitTime
         ) else { return nil }
 
         addStandalonePlannedSession(followUp)
