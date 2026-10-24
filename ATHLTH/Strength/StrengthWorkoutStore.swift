@@ -2559,6 +2559,56 @@ final class StrengthWorkoutStore: ObservableObject {
         return true
     }
 
+    /// Start a planned strength+treadmill session as ONE durable recording.
+    /// All parts were validated before a Watch workout is launched. This
+    /// invokes only the established StrengthWorkoutStore capture lifecycle,
+    /// not a second standalone run or StructuredWorkoutSession recorder.
+    @discardableResult
+    func startPlannedHybrid(
+        session: PlannedSession,
+        validatedParts: [PlannedSession],
+        watchSessionID: UUID?,
+        trackingMode: StrengthTrackingMode,
+        captureDevice: WorkoutCaptureDevice
+    ) -> Bool {
+        guard activeWorkout == nil,
+              !validatedParts.isEmpty,
+              validatedParts.allSatisfy({ $0.id == session.id }),
+              ATHLTHHybridWorkoutLaunchPlan.parts(for: session) != nil
+        else { return false }
+
+        var root = session
+        root.kind = .strength
+        root.exercises = []
+        root.workoutBlocks = nil
+        root.runningWorkout = nil
+        root.runningWorkouts = nil
+        start(
+            session: root,
+            watchSessionID: watchSessionID,
+            trackingMode: trackingMode,
+            captureDevice: captureDevice
+        )
+
+        for part in validatedParts {
+            guard appendWorkoutDuringSession(part) else {
+                // Never leave a partially constructed hybrid marked live.
+                discardActiveWorkout()
+                return false
+            }
+        }
+
+        guard activeWorkout?.plannedSessionID == session.id,
+              activeWorkout?.exercises.isEmpty == false,
+              activeWorkout?.watchSessionID == watchSessionID
+        else {
+            discardActiveWorkout()
+            return false
+        }
+        // Keep original identity, history target and single Watch capture.
+        return true
+    }
+
     func start(
         session: PlannedSession,
         watchSessionID: UUID?,
