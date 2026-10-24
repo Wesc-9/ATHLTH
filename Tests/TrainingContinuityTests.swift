@@ -524,6 +524,97 @@ final class TrainingContinuityTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testRemainingStrengthSetsCanBePlannedWithoutRewritingResults() throws {
+        let owner = UUID()
+        defer { clear(owner) }
+
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: nil)
+        let exercise = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Bench Press",
+            instructions: [],
+            primaryMuscles: ["Chest"],
+            secondaryMuscles: [],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        store.appendExercise(
+            exercise,
+            sets: 3,
+            reps: 8,
+            loadKind: .weightKilograms,
+            targetWeightKilograms: 60
+        )
+        store.completeCurrentSet(
+            reps: 8,
+            weightKilograms: 60,
+            rpe: 7
+        )
+
+        var recorded = try XCTUnwrap(store.activeWorkout)
+        // Recorded repetitions alone are not proof that the set finished.
+        recorded.exercises[0].sets[1].completedReps = 5
+        let original = recorded
+        let remainder = StrengthWorkoutRemainder(workout: recorded)
+
+        XCTAssertEqual(remainder.sourceWorkoutID, recorded.id)
+        XCTAssertEqual(remainder.setCount, 2)
+        XCTAssertEqual(remainder.exercises.count, 1)
+        let pending = try XCTUnwrap(remainder.exercises.first?.sets.first)
+        XCTAssertEqual(pending.proposedReps(), 8)
+        XCTAssertEqual(pending.proposedReps(onlyRemainder: true), 3)
+        XCTAssertEqual(pending.plannedWeightKilograms, 60)
+        XCTAssertEqual(pending.sourceSetID, recorded.exercises[0].sets[1].id)
+        XCTAssertEqual(recorded, original)
+        XCTAssertEqual(recorded.totalCompletedSets, 1)
+    }
+
+    @MainActor
+    func testRemainingStrengthSetsExcludeCompletedAndHandleTimedTargets() throws {
+        let owner = UUID()
+        defer { clear(owner) }
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: nil)
+
+        let exercise = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Plank",
+            instructions: [],
+            primaryMuscles: ["Core"],
+            secondaryMuscles: [],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        store.appendExercise(
+            exercise,
+            sets: 2,
+            reps: nil,
+            targetKind: .time,
+            targetDurationSeconds: 60
+        )
+        var recorded = try XCTUnwrap(store.activeWorkout)
+        recorded.exercises[0].sets[0].completedAt = Date()
+        recorded.exercises[0].sets[0].completedDurationSeconds = 60
+        recorded.exercises[0].sets[1].completedDurationSeconds = 20
+
+        let remainder = StrengthWorkoutRemainder(workout: recorded)
+        let pending = try XCTUnwrap(remainder.exercises.first?.sets.first)
+        XCTAssertEqual(remainder.setCount, 1)
+        XCTAssertEqual(pending.proposedDurationSeconds(), 60)
+        XCTAssertEqual(pending.proposedDurationSeconds(onlyRemainder: true), 40)
+        XCTAssertEqual(recorded.totalCompletedSets, 1)
+    }
+
     private func clear(_ userID: UUID) {
         for name in TrainingBackupPayload.names + ["strengthActive", "phoneActive"] {
             UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key(name, userID: userID))
