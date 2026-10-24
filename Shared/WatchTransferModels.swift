@@ -1200,6 +1200,11 @@ struct WatchStrengthSetPlan: Codable, Hashable {
     var targetRPE: Double? = nil
     var targetRIR: Double? = nil
     var isWarmUp: Bool? = nil
+    // Per-set phase metadata lets a disconnected Watch advance a timed
+    // treadmill sequence without losing the next interval's instructions.
+    var hybridPhaseTitle: String? = nil
+    var hybridPhaseKind: String? = nil
+    var hybridTargetHeartRateZone: Int? = nil
 }
 
 struct WatchStrengthExerciseSummary: Codable, Hashable {
@@ -1216,6 +1221,7 @@ struct WatchStrengthExerciseSummary: Codable, Hashable {
     var setPlans: [WatchStrengthSetPlan]? = nil
     var isCompleted: Bool? = nil
     var firstPendingSetIndex: Int? = nil
+    var isEmbeddedRunningInterval: Bool? = nil
 }
 
 /// Absolute-date countdown snapshot. No display ticks are transmitted over WatchConnectivity.
@@ -1289,6 +1295,31 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     /// Empty/free sessions carry draft defaults, not an exercise to perform.
     var hasExercisePrescription: Bool { exerciseCount > 0 }
 
+}
+
+/// The Watch may independently advance only time-based treadmill phases
+/// embedded in its existing strength recording. It never starts HealthKit,
+/// guesses distance or completes ordinary strength sets automatically.
+enum ATHLTHHybridWatchIntervalPolicy {
+    static func shouldAutoAdvance(
+        _ snapshot: WatchStrengthSessionSnapshot?,
+        workoutState: WatchWorkoutMirrorState,
+        at date: Date = Date()
+    ) -> Bool {
+        guard workoutState == .running,
+              let snapshot,
+              snapshot.inputMode != .iPhone,
+              snapshot.isEmbeddedRunningInterval == true,
+              snapshot.targetKindRaw == "time",
+              !snapshot.isResting,
+              !snapshot.currentExerciseComplete,
+              snapshot.setIndex >= 0,
+              snapshot.setIndex < snapshot.setCount,
+              let countdown = snapshot.timedSetCountdown,
+              countdown.isRunning
+        else { return false }
+        return countdown.remaining(at: date) <= 0
+    }
 }
 
 /// The iPhone owns exercise scheduling while a paired Watch records the
