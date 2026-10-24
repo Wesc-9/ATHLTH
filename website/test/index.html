@@ -90,36 +90,31 @@ body{
 .logo-mark.is-beating .logo-svg{animation:heartbeat 2.4s ease-in-out infinite}
 .logo-mark.is-beating::before{animation:wave 2.4s ease-out infinite}
 .logo-mark.is-beating::after{animation:wave 2.4s ease-out .28s infinite}
-.brand{
-  margin:clamp(25px,4.5vmin,37px) 0 0;
-  padding-left:.42em;
-  color:rgba(248,248,250,.94);
+.text-slot{
+  display:grid;place-items:center;
+  margin-top:clamp(25px,4.5vmin,37px);
+  min-height:25px;
+  width:100%;
+  text-align:center;
+}
+.brand,.coming{
+  grid-area:1 / 1;
+  margin:0;
+  padding-left:.34em;
+  color:rgba(248,248,250,.92);
   font-size:clamp(12px,1.55vmin,15px);
-  font-weight:500;letter-spacing:.42em;line-height:1.45;
-  text-align:center;white-space:nowrap;
-  will-change:opacity,transform,filter;
+  font-weight:500;
+  letter-spacing:.34em;
+  line-height:1.6;
+  white-space:nowrap;
+  transform:translateZ(0);
+  will-change:opacity,filter;
 }
-.brand-divider{
-  width:84px;height:1px;margin:14px 0 0;
-  background:linear-gradient(90deg,transparent,rgba(239,240,245,.3) 30%,rgba(239,240,245,.42) 50%,rgba(239,240,245,.3) 70%,transparent);
-  transform-origin:center;will-change:opacity,transform;
-}
-body.enhanced .brand,body.enhanced .brand-divider{opacity:0}
 .coming{
-  margin:14px 0 0;
-  padding-left:.8em;white-space:nowrap;
-  font-size:clamp(.625rem,1.3vmin,.78rem);
-  font-weight:500;line-height:1.5;
-  color:rgba(209,210,216,.75);
-  letter-spacing:.7em;text-align:center;
+  opacity:0;
+  color:rgba(224,224,230,.76);
 }
-.coming span{
-  display:inline-block;opacity:1;
-  filter:blur(0);transform:translateY(0);
-  will-change:opacity,filter,transform;
-}
-body.enhanced .coming span{opacity:0;filter:blur(10px);transform:translateY(12px)}
-body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
+body:not(.enhanced) .coming{display:none}
 @keyframes heartbeat{
   0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
   8%{transform:scale(1.028);filter:drop-shadow(0 0 12px rgba(255,255,255,.23))}
@@ -136,20 +131,19 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
   .logo-mark{width:clamp(9rem,41vw,12.5rem)}
   .center{transform:translateY(-1.6svh)}
   .ecg-line{width:52vw}
-  .brand{margin-top:26px}
-  .coming{margin-top:13px}
+  .text-slot{margin-top:26px}
+  .brand,.coming{font-size:12px;letter-spacing:.32em;padding-left:.32em}
 }
 @media(prefers-reduced-motion:reduce){
   .journey{height:100svh;min-height:360px}
-  .logo-mark,.halo,.ecg-line,.coming,.coming span,.dust,.logo-svg{
+  .logo-mark,.halo,.ecg-line,.brand,.coming,.dust,.logo-svg{
     animation:none!important;transition:none!important;will-change:auto!important;
   }
   .logo-mark::before,.logo-mark::after{animation:none!important;opacity:0!important}
   .dust{display:none!important}
   .halo{transform:translate(-50%,-50%) scale(1)!important;opacity:1!important}
-  .brand,.brand-divider{opacity:1!important;filter:none!important;transform:none!important;will-change:auto!important}
-  .coming,.coming span{letter-spacing:.7em!important;opacity:1!important;filter:none!important;transform:none!important}
-  body.enhanced .coming span{opacity:1!important;filter:none!important;transform:none!important}
+  .brand{opacity:0!important;filter:none!important;transform:none!important;will-change:auto!important}
+  .coming{display:block!important;opacity:1!important;filter:none!important;transform:none!important;will-change:auto!important}
   .ecg-line{transform:scaleX(1)!important;opacity:.22!important}
 }
 </style>
@@ -186,9 +180,10 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
           </g>
         </svg>
       </div>
-      <h1 class="brand" id="brand">ATHLTH</h1>
-      <div class="brand-divider" id="brand-divider" aria-hidden="true"></div>
-      <p class="coming" id="coming">COMING SOON</p>
+      <div class="text-slot" aria-live="off">
+        <h1 class="brand" id="brand">ATHLTH</h1>
+        <p class="coming" id="coming">COMING SOON</p>
+      </div>
     </div>
   </section>
 </main>
@@ -203,7 +198,6 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
   const right=document.getElementById('line-right');
   const coming=document.getElementById('coming');
   const brand=document.getElementById('brand');
-  const brandDivider=document.getElementById('brand-divider');
   const dustField=document.getElementById('dust-field');
   const a=document.getElementById('path-a');
   const b=document.getElementById('path-b');
@@ -219,19 +213,6 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
   const lenA=a.getTotalLength(),lenB=b.getTotalLength();
   [a,sa].forEach(el=>{el.style.strokeDasharray=String(lenA);el.style.strokeDashoffset=String(lenA);});
   [b,sb].forEach(el=>{el.style.strokeDasharray=String(lenB);el.style.strokeDashoffset=String(lenB);});
-  const chars=Array.from(coming.textContent||'COMING SOON');
-  const letters=[];
-  coming.textContent='';
-  const textNodes=document.createDocumentFragment();
-  chars.forEach((ch)=>{
-    const el=document.createElement('span');
-    el.textContent=ch===' '?'\u00a0':ch;
-    el.setAttribute('aria-hidden','true');
-    textNodes.appendChild(el);
-    letters.push(el);
-  });
-  coming.appendChild(textNodes);
-  coming.setAttribute('aria-label','Coming soon');
   const seeds=[];
   for(let i=0;i<26;i++){
     const random=n=>{
@@ -308,20 +289,13 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
       });
     }
     mark.classList.toggle('is-beating',p>.6&&!still);
-    const brandReveal=still?1:silk(clamp((p-.59)/.22));
-    const dividerReveal=still?1:silk(clamp((p-.7)/.18));
-    brand.style.opacity=String(brandReveal);
-    brand.style.filter='blur('+((1-brandReveal)*5).toFixed(2)+'px)';
-    brand.style.transform='translateY('+((1-brandReveal)*7).toFixed(2)+'px)';
-    brandDivider.style.opacity=String(dividerReveal);
-    brandDivider.style.transform='scaleX('+(.85+dividerReveal*.15).toFixed(3)+')';
-    letters.forEach((el,i)=>{
-      const t=still?1:silk(clamp((p-.7-i*.022)/.1));
-      el.style.opacity=String(t);
-      el.style.filter='blur('+((1-t)*10).toFixed(3)+'px)';
-      el.style.transform='translateY('+((1-t)*12).toFixed(3)+'px)';
-    });
-    coming.style.letterSpacing=(1.6-ease(clamp((p-.7)/.3))*.9).toFixed(4)+'em';
+    // One fixed text position: ATHLTH fades out as COMING SOON fades in.
+    // Reverse scrolling reverses the transition naturally.
+    const swap=still?1:silk(clamp((p-.66)/.22));
+    brand.style.opacity=String(1-swap);
+    coming.style.opacity=String(swap);
+    brand.style.filter='blur('+(swap*2).toFixed(2)+'px)';
+    coming.style.filter='blur('+((1-swap)*2).toFixed(2)+'px)';
   }
   if(motion.matches){
     render(1,timeOrigin,true);
