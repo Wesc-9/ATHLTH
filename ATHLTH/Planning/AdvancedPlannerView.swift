@@ -5578,7 +5578,8 @@ struct SessionEditorView: View {
         _selectedPartnerID = State(initialValue: partnerID)
         _partnerPlanningExpanded = State(initialValue: true)
         _directPartnerID = State(initialValue: partnerID)
-        _physicalMeetup = State(initialValue: physicalMeetup)
+        // Scheduling with a friend always means an in-person meetup.
+        _physicalMeetup = State(initialValue: true)
         if let initialWorkoutStart {
             _scheduledTime = State(initialValue: initialWorkoutStart)
         }
