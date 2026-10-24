@@ -2365,6 +2365,15 @@ final class StrengthWorkoutStore: ObservableObject {
                     $0.isCompleted
                 }
 
+        // Barbell/Smith exercises start with a conventional 20 kg bar,
+        // but the athlete can select a lighter/heavier bar from live controls.
+        // Set weights remain the total load, bar included.
+        if StrengthBarbellExercisePolicy.usesBarEquipment(
+            name: exercise.snapshot.name,
+            equipment: exercise.snapshot.equipment
+        ) {
+            log.barWeightKilograms = 20
+        }
         workout.exercises.append(log)
         activeWorkout = workout
 
