@@ -180,6 +180,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var strengthSession:
         WatchStrengthSessionSnapshot?
     @Published private(set) var strengthActionPending = false
+    // Optimistic weight edits stay authoritative briefly while the iPhone
+    // acknowledges the newest value. Without this, delayed snapshots undo
+    // consecutive taps and the Digital Crown appears to bounce.
+    private var pendingStrengthWeight: (
+        workoutID: UUID, value: Double, changedAt: Date
+    )?
     @Published private(set) var liveSurfaceConfiguration:
         ATHLTHLiveWorkoutSurfaceConfiguration =
             ATHLTHLiveWorkoutPreferencesStore.load()
@@ -1145,14 +1151,28 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             incoming: snapshot, after: previous
         ) else { return }
 
+        var accepted = snapshot
+        if let pending = pendingStrengthWeight {
+            if pending.workoutID != snapshot.workoutID {
+                pendingStrengthWeight = nil
+            } else if abs(snapshot.draftWeightKilograms - pending.value) < 0.001 {
+                pendingStrengthWeight = nil
+            } else if Date().timeIntervalSince(pending.changedAt) < 2.0 {
+                // Do not replace a just-edited 60 kg with an older 57.5 kg
+                // while connectivity delivers the intermediate snapshot.
+                accepted.draftWeightKilograms = pending.value
+            } else {
+                pendingStrengthWeight = nil
+            }
+        }
         publish {
-            self.strengthSession = snapshot
+            self.strengthSession = accepted
             self.strengthActionPending = false
         }
 
         handleStrengthCoachTransition(
             from: previous,
-            to: snapshot
+            to: accepted
         )
         persistWorkoutRecoveryState()
         if kind == .strength && mirroringActive {
@@ -2043,8 +2063,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             snapshot.draftDurationSeconds = next
         }
         if let weightKilograms {
-            snapshot.draftWeightKilograms =
-                max(weightKilograms, 0)
+            let total = min(max(weightKilograms, 0), 999)
+            snapshot.draftWeightKilograms = total
+            pendingStrengthWeight = (
+                workoutID: snapshot.workoutID,
+                value: total,
+                changedAt: Date()
+            )
         }
         if let resistanceLevel {
             snapshot.draftResistanceLevel =
