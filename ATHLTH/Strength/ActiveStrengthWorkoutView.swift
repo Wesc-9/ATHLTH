@@ -11292,6 +11292,7 @@ private struct StrengthActiveExerciseQueueView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
     @State private var showingExerciseLibrary = false
+    @State private var showingAppendWorkout = false
     @State private var showingCustomExerciseEditor = false
     @State private var addingWarmUp = false
     @State private var pendingExercise: ExerciseLibraryEntry?
@@ -11649,6 +11650,14 @@ private struct StrengthActiveExerciseQueueView: View {
                             ), systemImage: "flame")
                         }
                         Button {
+                            showingAppendWorkout = true
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Add saved workout",
+                                norwegian: "Legg til lagret treningsøkt"
+                            ), systemImage: "rectangle.stack.badge.plus")
+                        }
+                        Button {
                             addingWarmUp = false
                             showingCustomExerciseEditor = true
                         } label: {
@@ -11682,6 +11691,14 @@ private struct StrengthActiveExerciseQueueView: View {
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(28)
         .presentationBackground(ATHLTHPlanDesign.canvas)
+        .sheet(isPresented: $showingAppendWorkout) {
+            ActiveHybridWorkoutPicker { planned, startNow in
+                strength.appendWorkoutDuringSession(
+                    planned, startNow: startNow
+                )
+            }
+            .environmentObject(appSession)
+        }
         .sheet(isPresented: $showingExerciseLibrary) {
             NavigationStack {
                 ExerciseLibraryView(
