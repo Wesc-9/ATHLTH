@@ -877,6 +877,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     durationWasEditedManually = true
                     draft.runningWorkout = template.runningWorkout
                     draft.runningWorkouts = template.runningWorkouts
+                    draft.spotifyPlaylist = template.spotifyPlaylist
+                    draft.spotifyAutoplayOnStart = template.spotifyAutoplayOnStart
                     showSharedWorkoutTemplates = false
                 }
             }
