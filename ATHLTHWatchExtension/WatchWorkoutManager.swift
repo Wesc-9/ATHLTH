@@ -2240,6 +2240,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        let completedAt = Date()
+        let actualDuration = snapshot.targetKindRaw == "time"
+            ? snapshot.timedSetCountdown.map {
+                Int(min(max($0.elapsed(at: completedAt).rounded(), 0), 7_200))
+            } ?? snapshot.draftDurationSeconds
+            : snapshot.draftDurationSeconds
         let sent =
             sendStrengthCommand(
                 WatchStrengthCommand(
@@ -2255,14 +2261,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     restSeconds:
                         snapshot
                             .draftRestSeconds,
-                    durationSeconds:
-                        snapshot
-                            .draftDurationSeconds,
+                    durationSeconds: actualDuration,
                     resistanceLevel:
                         snapshot
                             .draftResistanceLevel,
                     addRestSeconds: nil,
-                    sentAt: Date(),
+                    sentAt: completedAt,
                     rpe:
                         snapshot.draftRPE,
                     rir:
