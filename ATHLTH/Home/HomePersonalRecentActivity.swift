@@ -1654,7 +1654,7 @@ private struct HomePersonalHorizontalWorkoutCard:
                     workout: workout,
                     strengthWorkout: strengthWorkout,
                     phoneWorkout: phoneWorkout,
-                    height: 114,
+                    height: isStrength ? 205 : 114,
                     precomputedStrengthProfile: isStrength ? muscleProfile : nil
                 )
             }
@@ -2327,7 +2327,7 @@ private struct HomePersonalFeaturedWorkoutCard:
                     strengthWorkout,
                 phoneWorkout:
                     phoneWorkout,
-                height: 154
+                height: workout.activity == .strength ? 245 : 154
             )
 
             VStack(
@@ -4046,7 +4046,7 @@ private struct HomePersonalHistoryCard:
                     strengthWorkout,
                 phoneWorkout:
                     phoneWorkout,
-                height: 148
+                height: workout.activity == .strength ? 236 : 148
             )
 
             VStack(
@@ -5477,26 +5477,18 @@ private struct HomePersonalWorkoutVisual:
         }
     }
 
-    @ViewBuilder
-    private var strengthBackground:
-        some View {
-        if HomeStrengthRecentCardMetrics.showsPhoto(for: muscleProfile) {
-            HomeStrengthRecentPhotoArtwork(
-                duration: workout.duration,
-                exerciseCount: workout.strengthExerciseCount,
-                completedSetCount: strengthWorkout?.exercises
-                    .flatMap(\.sets)
-                    .filter { $0.isCompleted }
-                    .count,
-                height: height
-            )
-        } else {
-            // Preserve the existing muscle-group card unchanged.
-            HomeStrengthMuscleArtwork(
-                profile: muscleProfile,
-                height: height
-            )
-        }
+    private var strengthBackground: some View {
+        ATHLTHStrengthCompletedHeroCard(
+            profile: muscleProfile,
+            duration: workout.duration,
+            exerciseCount: workout.strengthExerciseCount
+                ?? strengthWorkout?.exercises.count,
+            volumeKilograms: workout.strengthTotalVolumeKilograms
+                ?? strengthWorkout?.totalVolumeKilograms,
+            height: height,
+            compact: height < 250,
+            showsCompletionLabel: height >= 220
+        )
     }
 
     private var routeMap:
