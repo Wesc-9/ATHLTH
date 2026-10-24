@@ -115,7 +115,7 @@ body{
   color:rgba(224,224,230,.76);
 }
 body:not(.enhanced) .coming{display:none}
-/* Keep ATHLTH hidden until its entrance is driven by the animation. */
+/* ATHLTH begins at zero opacity, then fades in smoothly from page load. */
 body.enhanced .brand{opacity:0}
 @keyframes heartbeat{
   0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
@@ -291,10 +291,9 @@ body.enhanced .brand{opacity:0}
       });
     }
     mark.classList.toggle('is-beating',p>.6&&!still);
-    // Let the symbol draw first, then gently reveal ATHLTH.
-    // It remains in the same position while fading into COMING SOON.
-    // Scrolling backwards naturally reverses both stages.
-    const reveal=still?0:silk(clamp((p-.35)/.17));
+    // ATHLTH fades in from page load while the symbol draws.
+    // The existing scroll-driven crossfade to COMING SOON is unchanged.
+    const reveal=still?0:silk(clamp((now-timeOrigin)/1450));
     const swap=still?1:silk(clamp((p-.72)/.20));
     brand.style.opacity=String(reveal*(1-swap));
     coming.style.opacity=String(swap);
