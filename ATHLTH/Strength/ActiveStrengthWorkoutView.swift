@@ -4658,7 +4658,7 @@ struct ActiveStrengthWorkoutView: View {
         _ exercise: StrengthExerciseLog
     ) -> some View {
         let primary = focusedExerciseRegions(
-            exercise.exercise.primaryMuscles ?? [],
+            exercise.exercise.primaryMuscles,
             fallbackName: exercise.exercise.name
         )
         let secondary = focusedExerciseRegions(
@@ -4695,8 +4695,8 @@ struct ActiveStrengthWorkoutView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 142)
             }
-            if let primaryMuscles = exercise.exercise.primaryMuscles,
-               !primaryMuscles.isEmpty {
+            if !exercise.exercise.primaryMuscles.isEmpty {
+                let primaryMuscles = exercise.exercise.primaryMuscles
                 Text(ATHLTHLocalization.choose(
                     english: "Primary: ", norwegian: "Primær: "
                 ) + primaryMuscles.joined(separator: " · "))
