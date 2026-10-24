@@ -4283,6 +4283,7 @@ struct ATHLTHTrainView: View {
     @State private var showingGhostHub = false
     @State private var showingLibrary = false
     @State private var showingPlanManagement = false
+    @State private var selectedStandaloneWorkout: PlannedSession?
 
     init(
         navigationRequest:
@@ -4416,6 +4417,9 @@ struct ATHLTHTrainView: View {
                 isPresented: $showingGhostHub
             ) {
                 GhostRaceHubView()
+            }
+            .sheet(item: $selectedStandaloneWorkout) { workout in
+                SessionEditorView(workout: workout)
             }
             .sheet(item: $selectedPlanWorkout) { selection in
                 PlannedWorkoutDetailView(
@@ -4852,480 +4856,67 @@ struct ATHLTHTrainView: View {
 
     @ViewBuilder
     private var todayContent: some View {
-        HStack(
-            alignment: .top,
-            spacing: 14
-        ) {
-            VStack(
-                alignment: .leading,
-                spacing: 6
-            ) {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "TODAY",
-                        norwegian: "I DAG"
-                    )
-                )
-                .font(.caption2.weight(.bold))
-                .tracking(2.4)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english: "Ready for today?",
-                        norwegian: "Klar for i dag?"
-                    )
-                )
-                .font(
-                    .system(
-                        size: 29,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-
-                Text(
-                    session.activePlan == nil
-                        ? ATHLTHLocalization.choose(
-                            english:
-                                "Train freely, or build a plan around what you want to achieve.",
-                            norwegian:
-                                "Tren fritt, eller bygg en plan rundt det du vil oppnå."
-                        )
-                        : ATHLTHLocalization.choose(
-                            english:
-                                "Today's sessions, quick starts and training tools in one place.",
-                            norwegian:
-                                "Dagens økter, hurtigstart og treningsverktøy samlet på ett sted."
-                        )
-                )
-                .font(.subheadline)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
-            }
-
-            Spacer(minLength: 4)
-
-            VStack(spacing: 1) {
-                Text(
-                    Date.now.formatted(
-                        .dateTime.day()
-                    )
-                )
-                .font(
-                    .system(
-                        size: 22,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-
-                Text(
-                    Date.now.formatted(
-                        .dateTime.weekday(
-                            .abbreviated
-                        )
-                    )
-                    .uppercased()
-                )
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .bold,
-                        design: .rounded
-                    )
-                )
-                .tracking(0.8)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-            }
-            .frame(
-                width: 54,
-                height: 58
-            )
-            .background(
-                Color.white.opacity(0.72),
-                in: RoundedRectangle(
-                    cornerRadius: 17,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 17,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white.opacity(0.82),
-                    lineWidth: 0.8
-                )
-            }
-            .shadow(
-                color:
-                    Color.black.opacity(0.035),
-                radius: 9,
-                y: 4
-            )
-        }
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
-        )
-
-        NavigationLink {
-            ATHLTHProgressView()
-        } label: {
-            HStack(spacing: 10) {
-                Image(systemName: "chart.xyaxis.line")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 33, height: 33)
-                    .background(ATHLTHTheme.accentSoft, in: Circle())
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Progress",
-                        norwegian: "Fremgang"
-                    ))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "General · Running · Strength",
-                        norwegian: "Generelt · Løping · Styrke"
-                    ))
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                }
-
-                Spacer()
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
-            .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 18))
-            .overlay {
-                RoundedRectangle(cornerRadius: 18)
-                    .stroke(ATHLTHTheme.border, lineWidth: 0.8)
-            }
-        }
-        .buttonStyle(.plain)
-
+        // Active-session continuation remains above all new content.
         activeTrainingCard
 
-        if let plan = session.activePlan {
-            todaysPlanCard(plan)
-        } else {
-            noActivePlanCard
-        }
-
-        VStack(
-            alignment: .leading,
-            spacing: 13
-        ) {
-            HStack(
-                alignment: .firstTextBaseline
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "QUICK START",
-                            norwegian: "HURTIGSTART"
-                        )
-                    )
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.8)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Move now",
-                            norwegian: "Kom i gang"
-                        )
-                    )
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
+        ATHLTHTrainTodayRebuildView(
+            onOpenSession: { workout, standalone in
+                if standalone {
+                    selectedStandaloneWorkout = workout
+                } else if let planID = session.activePlan?.id {
+                    selectedPlanWorkout = PlannedWorkoutSelection(
+                        planID: planID,
+                        workout: workout,
+                        isHealthCompleted: false
                     )
                 }
-
-                Spacer()
-
-                Text(quickStartDeviceTitle)
-                    .font(
-                        .system(
-                            size: 10.5,
-                            weight: .medium
-                        )
+            },
+            onStartSession: { workout in
+                if workout.isStructuredWorkout {
+                    selectedStructuredWorkout = workout
+                } else if workout.kind == .strength {
+                    selectedStrengthSession = workout
+                } else if let plan = session.activePlan,
+                          TrainingPlanSchedule.sessions(
+                            in: plan,
+                            on: Date()
+                          ).contains(where: { $0.id == workout.id }) {
+                    selectedPlanWorkout = PlannedWorkoutSelection(
+                        planID: plan.id,
+                        workout: workout,
+                        isHealthCompleted: false
                     )
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .multilineTextAlignment(
-                        .trailing
-                    )
-                    .lineLimit(2)
-            }
-
-            HStack(spacing: 8) {
-                quickStartTile(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Run",
-                            norwegian: "Løp"
-                        ),
-                    subtitle:
-                        ATHLTHLocalization.choose(
-                            english: "Free run",
-                            norwegian: "Fri løping"
-                        ),
-                    icon: "figure.run",
-                    enabled:
-                        quickStartAvailable(
-                            .running
-                        )
-                ) {
-                    handleQuickStart(.running)
+                } else if let template = workout.resolvedRunningWorkouts.first {
+                    pendingRunningTemplate = template
+                } else {
+                    handleQuickStart(workout.kind)
                 }
-
-                quickStartTile(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Walk",
-                            norwegian: "Gå"
-                        ),
-                    subtitle:
-                        ATHLTHLocalization.choose(
-                            english: "Free walk",
-                            norwegian: "Fri gange"
-                        ),
-                    icon: "figure.walk",
-                    enabled:
-                        quickStartAvailable(
-                            .walking
-                        )
-                ) {
-                    handleQuickStart(.walking)
-                }
-
-                quickStartTile(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Strength",
-                            norwegian: "Styrke"
-                        ),
-                    subtitle:
-                        ATHLTHLocalization.choose(
-                            english: "Gym / Home",
-                            norwegian: "Gym / hjemme"
-                        ),
-                    icon: "dumbbell.fill",
-                    enabled:
-                        quickStartAvailable(
-                            .strength
-                        )
-                ) {
-                    handleQuickStart(.strength)
-                }
-
-                quickStartTile(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Custom",
-                            norwegian: "Egen"
-                        ),
-                    subtitle:
-                        quickStartCustomSubtitle,
-                    icon: "plus",
-                    enabled:
-                        customQuickStartAvailable
-                ) {
+            },
+            onQuickStart: { kind in
+                handleQuickStart(kind)
+            },
+            onCustomQuick: {
+                if customQuickStartAvailable {
                     showingCustomQuickStart = true
+                } else {
+                    watchTransferError = ATHLTHLocalization.choose(
+                        english: "Connect Apple Watch for custom Quick Train.",
+                        norwegian: "Koble til Apple Watch for egendefinert Quick Train."
+                    )
                 }
-            }
-        }
-        .padding(15)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.84),
-                    ATHLTHTheme.accentSoft.opacity(0.20)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 24,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.88),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(0.025),
-            radius: 12,
-            y: 5
-        )
-
-        HStack(spacing: 10) {
-            Button {
+            },
+            onOpenPlan: {
+                selectedSection = 1
+            },
+            onOpenGhost: {
                 showingGhostHub = true
-            } label: {
-                trainUtilityTile(
-                    icon: "figure.run.circle",
-                    title: "Ghost",
-                    subtitle: ATHLTHLocalization.choose(
-                        english: "Race your best",
-                        norwegian: "Konkurrer mot deg selv"
-                    )
-                )
             }
-            .buttonStyle(.plain)
-
-            Button {
-                showingLibrary = true
-            } label: {
-                trainUtilityTile(
-                    icon: "square.stack.3d.up",
-                    title: ATHLTHLocalization.choose(
-                        english: "Library",
-                        norwegian: "Bibliotek"
-                    ),
-                    subtitle: ATHLTHLocalization.choose(
-                        english: "Plans and workouts",
-                        norwegian: "Planer og økter"
-                    )
-                )
-            }
-            .buttonStyle(.plain)
-        }
-
-        if !session.savedWorkoutTemplates.isEmpty {
-            ATHLTHCard {
-                ATHLTHSectionHeader(
-                    title: "Saved Workouts",
-                    actionTitle: "From you & friends"
-                )
-
-                VStack(spacing: 13) {
-                    ForEach(session.savedWorkoutTemplates.prefix(4)) { workout in
-                        HStack(spacing: 12) {
-                            Image(systemName: workout.kind.systemImage)
-                                .foregroundStyle(ATHLTHTheme.accent)
-                                .frame(width: 36, height: 36)
-                                .background(
-                                    ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 11)
-                                )
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(workout.title)
-                                    .font(.subheadline.weight(.semibold))
-                                Text(todaySessionSummary(workout))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-
-                            if workout.isStructuredWorkout {
-                                Button("Start") {
-                                    selectedStructuredWorkout =
-                                        workout
-                                }
-                                .buttonStyle(.borderedProminent)
-                                .controlSize(.small)
-                                .tint(ATHLTHTheme.accentDeep)
-                            } else if workout.kind == .strength {
-                                Button("Start") {
-                                    selectedStrengthSession = workout
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            } else {
-                                Text("Saved")
-                                    .font(.caption2.weight(.semibold))
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                            }
-                        }
-                    }
-                }
-                .padding(.top, 10)
-            }
-        }
-
-
+        )
     }
 
     @ViewBuilder
     private var planContent: some View {
-        if let plan = session.activePlan {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Your training plan",
-                            norwegian: "Din treningsplan"
-                        ))
-                        .font(.system(size: 24, weight: .medium, design: .serif))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text(plan.title)
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .lineLimit(1)
-                    }
-                    Spacer()
-                    Button {
-                        showingPlanManagement = true
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 40, height: 40)
-                            .background(ATHLTHTheme.card, in: Circle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Manage training plans",
-                        norwegian: "Administrer treningsplaner"
-                    ))
-                }
-                AdvancedPlannerView(showsEmptyState: false)
-            }
-        } else {
-            TrainingPlanManagerView()
-        }
+        ATHLTHTrainPlanRebuildView()
     }
 
     private func trainUtilityTile(
