@@ -283,9 +283,15 @@ struct StrengthFollowUpPlannerView: View {
                     // immediately before the single confirmed save.
                     guard session.signedIn,
                           existingFollowUp == nil,
-                          createdSessionID == nil else { return }
-                    session.addStandalonePlannedSession(proposedWorkout)
-                    createdSessionID = proposedWorkout.id
+                          createdSessionID == nil,
+                          let created = session.scheduleStrengthFollowUp(
+                              from: workout,
+                              on: scheduledStart,
+                              selectedSetIDs: selectedSetIDs,
+                              onlyRemainderForSetIDs: onlyRemainderIDs
+                          )
+                    else { return }
+                    createdSessionID = created.id
                 } label: {
                     Label(
                         ATHLTHLocalization.choose(
