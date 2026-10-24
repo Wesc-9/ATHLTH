@@ -199,6 +199,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private var workoutSession: HKWorkoutSession?
     private var workoutBuilder: HKLiveWorkoutBuilder?
+    private var collectingHybridTreadmillDistance = false
     private var routeBuilder: HKWorkoutRouteBuilder?
     private var workoutLocation: CLLocation?
     private var workoutLocationMetadataAttached = false
@@ -1174,6 +1175,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             from: previous,
             to: accepted
         )
+        synchronizeHybridTreadmillSensors()
         persistWorkoutRecoveryState()
         if kind == .strength && mirroringActive {
             // Reflect iPhone-initiated exercise and rest changes immediately
@@ -2035,6 +2037,26 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 liveGhost
                     .estimatedTimeDeltaSeconds
         )
+    }
+
+    /// A single strength HealthKit session keeps recording throughout hybrid
+    /// phases. Enable extra *sample collection*, not a second workout, only
+    /// during treadmill phases. Data are measured only when HealthKit actually
+    /// supplies walking/running distance; a belt-speed target is never a sample.
+    private func synchronizeHybridTreadmillSensors() {
+        guard kind == .strength,
+              let source = workoutBuilder?.dataSource,
+              let distanceType = HKObjectType.quantityType(
+                  forIdentifier: .distanceWalkingRunning
+              ) else { return }
+        let shouldCollect = strengthSession?.isEmbeddedRunningInterval == true
+        guard shouldCollect != collectingHybridTreadmillDistance else { return }
+        if shouldCollect {
+            source.enableCollection(for: distanceType, predicate: nil)
+        } else {
+            source.disableCollection(for: distanceType)
+        }
+        collectingHybridTreadmillDistance = shouldCollect
     }
 
     func updateStrengthDraft(
@@ -3169,6 +3191,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             workoutSession = recovered
             workoutBuilder = builder
+            collectingHybridTreadmillDistance = false
             finishing = false
             kind = recoveredKind
             startedAt =
@@ -3179,6 +3202,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             restorePersistedWorkoutState(
                 expectedKind: recoveredKind
             )
+            synchronizeHybridTreadmillSensors()
 
             if configuration.locationType ==
                 .outdoor,
@@ -3569,6 +3593,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         stopTimer()
         workoutSession = nil
         workoutBuilder = nil
+        collectingHybridTreadmillDistance = false
         routeBuilder = nil
         workoutLocation = nil
         workoutLocationMetadataAttached = false
@@ -3799,6 +3824,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             workoutSession = session
             workoutBuilder = builder
+            collectingHybridTreadmillDistance = false
+            synchronizeHybridTreadmillSensors()
             finishing = false
 
             let startDate = Date()
@@ -7221,6 +7248,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 return .distanceWalkingRunning
             case .cycling:
                 return .distanceCycling
+            case .strength where collectingHybridTreadmillDistance:
+                return .distanceWalkingRunning
             case .strength, .hiit, .functional, .rowing, .stairClimbing, .yoga, .other:
                 return nil
             }
