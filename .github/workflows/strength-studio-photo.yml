@@ -22,15 +22,17 @@ jobs:
           set -euo pipefail
           python3 -m pip install --quiet Pillow
           curl --fail --location --retry 3 --max-time 90 \
-            'https://images.unsplash.com/photo-1775993703558-e7afab02b7bd?auto=format&fit=crop&fm=jpg&q=88&w=2800' \
+            'https://images.unsplash.com/photo-1757924284732-4189190321cf?auto=format&fit=crop&fm=jpg&q=88&w=2800' \
             -o /tmp/athlth-gym-download.jpg
           python3 - <<'PY'
-          from PIL import Image, ImageOps
+          from PIL import Image, ImageOps, ImageEnhance
           from pathlib import Path
           original = Image.open('/tmp/athlth-gym-download.jpg')
           if original.width < 2000 or original.height < 1000:
               raise SystemExit(f'HD photo required, received {original.size}')
           photo = ImageOps.fit(original.convert('RGB'), (2400, 1350), centering=(0.5, 0.5), method=Image.Resampling.LANCZOS)
+          photo = ImageEnhance.Color(photo).enhance(0.82)
+          photo = ImageEnhance.Brightness(photo).enhance(1.08)
           target = Path('ATHLTH/Assets.xcassets/StrengthFeedGym.imageset/gym.jpg')
           photo.save(target, 'JPEG', quality=88, optimize=True, progressive=True)
           if target.stat().st_size < 150_000:
@@ -38,9 +40,9 @@ jobs:
           print(f'ATHLTH strength studio: {photo.size}, {target.stat().st_size} bytes')
           PY
           cat > ATHLTH/Assets.xcassets/StrengthFeedGym.imageset/PHOTO_SOURCE.txt <<'EOF'
-          Image: Dumbbell rack in a well-lit gym
-          Photographer: Palak Pitroda / Unsplash
-          Source: https://unsplash.com/photos/dumbbell-rack-in-a-well-lit-gym-EZ94bPuaxW4
+          Image: Modern gym with treadmills and large windows
+          Photographer: Aalo Lens / Unsplash
+          Source: https://unsplash.com/photos/modern-gym-with-treadmills-and-large-windows-uYnHRrm63uo
           License: Unsplash License (free commercial use)
           Bundled for offline use, 2400 x 1350 JPEG.
           EOF
