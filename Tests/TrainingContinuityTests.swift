@@ -381,6 +381,7 @@ final class TrainingContinuityTests: XCTestCase {
             barbell,
             sets: 3,
             reps: 8,
+            loadKind: .weightKilograms,
             targetWeightKilograms: 60
         )
         store.completeCurrentSet(
@@ -450,6 +451,7 @@ final class TrainingContinuityTests: XCTestCase {
             original,
             sets: 3,
             reps: 10,
+            loadKind: .weightKilograms,
             targetWeightKilograms: 50
         )
         store.completeCurrentSet(
@@ -473,6 +475,53 @@ final class TrainingContinuityTests: XCTestCase {
             $0.plannedResistanceLevel == nil &&
             !$0.isCompleted
         })
+    }
+
+    @MainActor
+    func testPartiallyFinishedStrengthLogPreservesUnfinishedSets() {
+        let owner = UUID()
+        defer { clear(owner) }
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: nil)
+
+        let exercise = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Bench Press",
+            instructions: [],
+            primaryMuscles: ["Chest"],
+            secondaryMuscles: [],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        store.appendExercise(
+            exercise,
+            sets: 3,
+            reps: 8,
+            loadKind: .weightKilograms,
+            targetWeightKilograms: 60
+        )
+        XCTAssertEqual(store.activeWorkout?.remainingSetCount, 3)
+
+        store.completeCurrentSet(
+            reps: 8,
+            weightKilograms: 60,
+            rpe: 7
+        )
+        XCTAssertEqual(store.activeWorkout?.remainingSetCount, 2)
+        store.finish()
+        XCTAssertNil(store.activeWorkout)
+        XCTAssertEqual(store.completedWorkout?.remainingSetCount, 2)
+        XCTAssertEqual(store.completedWorkout?.totalCompletedSets, 1)
+        XCTAssertEqual(store.workoutHistory.count, 1)
+        XCTAssertEqual(store.workoutHistory.first?.remainingSetCount, 2)
+        XCTAssertEqual(
+            store.workoutHistory.first?.exercises.first?.sets.first?.completedWeightKilograms,
+            60
+        )
     }
 
     private func clear(_ userID: UUID) {
