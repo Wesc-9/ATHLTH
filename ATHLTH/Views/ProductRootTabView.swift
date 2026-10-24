@@ -4401,6 +4401,27 @@ struct ATHLTHHomeView: View {
                 return
             }
 
+            // A mixed planned recipe must never start as a run-only or
+            // strength-only workout and silently drop the other motor.
+            if ATHLTHHybridWorkoutLaunchPlan.isCandidate(persisted) {
+                guard let validatedParts =
+                    ATHLTHHybridWorkoutLaunchPlan.parts(for: persisted)
+                else {
+                    await social.markCurrentJoinedWorkoutLaunchFailed()
+                    homeWatchTransferError = ATHLTHLocalization.choose(
+                        english: "Mixed sessions currently require timed treadmill intervals and strength. Outdoor GPS or distance-only runs are not supported in one recording yet.",
+                        norwegian: "Kombinerte økter støtter foreløpig tidsstyrte tredemølleintervaller og styrke. Utendørs GPS og distansebaserte drag kan ikke kombineres i ett opptak ennå."
+                    )
+                    return
+                }
+                startHomePlannedStrengthWorkout(
+                    persisted,
+                    device: device,
+                    hybridParts: validatedParts
+                )
+                return
+            }
+
             switch persisted.kind {
             case .strength:
                 if device == .iPhone && persisted.isStructuredWorkout {
@@ -4732,7 +4753,8 @@ struct ATHLTHHomeView: View {
 
     private func startHomePlannedStrengthWorkout(
         _ workout: PlannedSession,
-        device: WorkoutCaptureDevice
+        device: WorkoutCaptureDevice,
+        hybridParts: [PlannedSession]? = nil
     ) {
         guard strengthWorkout.activeWorkout == nil else {
             return
@@ -4766,13 +4788,38 @@ struct ATHLTHHomeView: View {
                     try await watchConnection
                         .startWorkoutOnWatch(.strength)
 
+                    let launched: Bool
+                    if let hybridParts {
+                        launched = strengthWorkout.startPlannedHybrid(
+                            session: workout,
+                            validatedParts: hybridParts,
+                            watchSessionID: UUID(),
+                            trackingMode: trackingMode,
+                            captureDevice: .appleWatch
+                        )
+                    } else {
+                        strengthWorkout.start(
+                            session: workout,
+                            watchSessionID: UUID(),
+                            trackingMode: trackingMode,
+                            captureDevice: .appleWatch
+                        )
+                        launched = true
+                    }
+                    guard launched else {
+                        throw NSError(
+                            domain: "ATHLTH.HybridLaunch",
+                            code: 1,
+                            userInfo: [
+                                NSLocalizedDescriptionKey:
+                                    ATHLTHLocalization.choose(
+                                        english: "Could not prepare the combined workout. The workout was not recorded.",
+                                        norwegian: "Kunne ikke klargjøre kombinasjonsøkten. Økten ble ikke registrert."
+                                    )
+                            ]
+                        )
+                    }
                     session.beginTrainingStatus(for: workout)
-                    strengthWorkout.start(
-                        session: workout,
-                        watchSessionID: UUID(),
-                        trackingMode: trackingMode,
-                        captureDevice: .appleWatch
-                    )
                     _ = await social.confirmCurrentJoinedWorkoutStarted()
                     WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
@@ -4788,13 +4835,33 @@ struct ATHLTHHomeView: View {
                 }
             }
         } else {
+            let launched: Bool
+            if let hybridParts {
+                launched = strengthWorkout.startPlannedHybrid(
+                    session: workout,
+                    validatedParts: hybridParts,
+                    watchSessionID: nil,
+                    trackingMode: trackingMode,
+                    captureDevice: .iPhone
+                )
+            } else {
+                strengthWorkout.start(
+                    session: workout,
+                    watchSessionID: nil,
+                    trackingMode: trackingMode,
+                    captureDevice: .iPhone
+                )
+                launched = true
+            }
+            guard launched else {
+                homeDirectStartInProgress = false
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "Could not prepare the combined workout. No recording was started.",
+                    norwegian: "Kunne ikke klargjøre kombinasjonsøkten. Ingen registrering ble startet."
+                )
+                return
+            }
             session.beginTrainingStatus(for: workout)
-            strengthWorkout.start(
-                session: workout,
-                watchSessionID: nil,
-                trackingMode: trackingMode,
-                captureDevice: .iPhone
-            )
             Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
             WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
