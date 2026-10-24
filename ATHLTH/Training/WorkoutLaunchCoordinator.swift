@@ -383,6 +383,18 @@ enum WorkoutLaunchCoordinator {
         workoutMirroring:
             WorkoutMirroringStore? = nil
     ) async throws {
+        // A new start must never overwrite an active iPhone workout.
+        guard phoneWorkout.active == nil else {
+            throw NSError(
+                domain: "ATHLTH.WorkoutLaunch",
+                code: 40,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "An iPhone workout is already active. Continue or finish it before starting another."
+                ]
+            )
+        }
+
         if ATHLTHDeviceRole.isIPad {
             let envelope =
                 WorkoutDeviceRelayEnvelope(
@@ -702,6 +714,18 @@ enum WorkoutLaunchCoordinator {
         workoutMirroring:
             WorkoutMirroringStore? = nil
     ) async throws {
+        // A new start must never overwrite an active iPhone workout.
+        guard phoneWorkout.active == nil else {
+            throw NSError(
+                domain: "ATHLTH.WorkoutLaunch",
+                code: 40,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "An iPhone workout is already active. Continue or finish it before starting another."
+                ]
+            )
+        }
+
         if ATHLTHDeviceRole.isIPad {
             let envelope =
                 WorkoutDeviceRelayEnvelope(
@@ -867,6 +891,17 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore
     ) async throws -> Bool {
+        guard strengthWorkout.activeWorkout == nil else {
+            throw NSError(
+                domain: "ATHLTH.WorkoutLaunch",
+                code: 41,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "A strength session is already active. Continue or finish it before starting another."
+                ]
+            )
+        }
+
         var inviteAdvancedConfiguration =
             advancedConfiguration
         inviteAdvancedConfiguration.spotifyPlaylist = nil
