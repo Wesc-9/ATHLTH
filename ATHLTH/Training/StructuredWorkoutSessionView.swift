@@ -74,6 +74,7 @@ struct StructuredWorkoutSessionView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var social: SocialStore
 
     let workout: PlannedSession
     var linkedPlanID: UUID? = nil
@@ -202,6 +203,10 @@ struct StructuredWorkoutSessionView: View {
                 if !hasStarted {
                     startedAt = Date()
                     hasStarted = true
+                    // This view itself is the iPhone interval/strength
+                    // recorder. A ready lobby is only marked started when
+                    // its first real recording screen becomes active.
+                    Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
                 }
                 updateScreenAwakeState()
             }
