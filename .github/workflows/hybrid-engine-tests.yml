@@ -97,3 +97,31 @@ jobs:
           path: ${{ runner.temp }}/HybridTests.xcresult
           retention-days: 3
           if-no-files-found: ignore
+  
+  # The iPhone-only XCTest configuration removes the Watch embed target.
+  # Compile the actual watchOS application as a separate release gate.
+  watch-hybrid-build:
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+          xcodebuild -version
+      - name: Generate full Watch project
+        run: |
+          brew install xcodegen
+          xcodegen generate --spec project.yml
+      - name: Build real ATHLTH Watch target for watchOS Simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -project ATHLTH.xcodeproj \
+            -target ATHLTHWatchApp \
+            -configuration Debug \
+            -sdk watchsimulator \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
