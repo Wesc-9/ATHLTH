@@ -7450,6 +7450,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         switch state {
         case .running:
+            // Also honor system-initiated resume (Siri, workout UI, or
+            // recovery). Explicit resume() already updated the clock, so
+            // this only fills gaps without duplicating journal commands.
+            if previousState == .paused,
+               strengthSession?.isEmbeddedRunningInterval == true,
+               let countdown = strengthSession?.timedSetCountdown,
+               !countdown.isRunning, countdown.remaining(at: date) > 0 {
+                startOrResumeTimedStrengthSet(allowIPhoneOnly: true)
+            }
             publishState(.running)
             persistWorkoutRecoveryState()
 
@@ -7489,6 +7498,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
 
         case .paused:
+            // Cover pauses originating outside our own pause button.
+            if previousState == .running,
+               strengthSession?.isEmbeddedRunningInterval == true,
+               strengthSession?.timedSetCountdown?.isRunning == true {
+                pauseTimedStrengthSet(allowIPhoneOnly: true)
+            }
             publishState(.paused)
             persistWorkoutRecoveryState()
 
