@@ -417,9 +417,16 @@ struct ActiveStrengthWorkoutView: View {
                     $showingPlateCalculator
             ) {
                 StrengthPlateCalculatorView(
-                    targetWeightKilograms:
-                        strength
-                            .draftWeightKilograms
+                    targetWeightKilograms: strength.draftWeightKilograms,
+                    initialBarWeightKilograms:
+                        strength.currentExercise?.barWeightKilograms ?? 20,
+                    onBarWeightChange: { kilograms in
+                        if let active = strength.currentExercise {
+                            _ = strength.setActiveExerciseBarWeight(
+                                active.id, kilograms: kilograms
+                            )
+                        }
+                    }
                 )
             }
             .confirmationDialog(
@@ -10906,8 +10913,8 @@ private struct StrengthPlateCalculatorView: View {
 
     @State private var targetWeight:
         Double
-    @State private var barWeight:
-        Double = 20
+    @State private var barWeight: Double = 20
+    var onBarWeightChange: ((Double) -> Void)? = nil
 
     private let plates:
         [Double] = [
@@ -10924,9 +10931,12 @@ private struct StrengthPlateCalculatorView: View {
         Set<Double>
 
     init(
-        targetWeightKilograms:
-            Double
+        targetWeightKilograms: Double,
+        initialBarWeightKilograms: Double = 20,
+        onBarWeightChange: ((Double) -> Void)? = nil
     ) {
+        self.onBarWeightChange = onBarWeightChange
+        _barWeight = State(initialValue: initialBarWeightKilograms)
         _targetWeight = State(
             initialValue:
                 max(
@@ -11047,12 +11057,14 @@ private struct StrengthPlateCalculatorView: View {
                         ),
                         selection: $barWeight
                     ) {
-                        Text("20 kg")
-                            .tag(20.0)
-                        Text("15 kg")
-                            .tag(15.0)
-                        Text("10 kg")
-                            .tag(10.0)
+                        ForEach([0.0, 5.0, 10.0, 15.0, 20.0, 25.0],
+                                id: \.self) { kg in
+                            Text(String(format: "%.0f kg", kg))
+                                .tag(kg)
+                        }
+                    }
+                    .onChange(of: barWeight) { _, selected in
+                        onBarWeightChange?(selected)
                     }
                 }
 
