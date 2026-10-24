@@ -43,6 +43,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingExerciseInstructions = false
     @State private var showingWorkoutReview = false
     @State private var showingExerciseQueue = false
+    @State private var showingSpotifyControls = false
     @State private var showingNextExerciseDetails = false
     @State private var showingOmitRemainingSetsConfirmation = false
     @State private var showingTrainingPlacePicker = false
@@ -176,6 +177,21 @@ struct ActiveStrengthWorkoutView: View {
                             norwegian: "Øvelser og rekkefølge"
                         ))
                     }
+
+                    if spotify.isConnected {
+                        Button {
+                            showingSpotifyControls = true
+                        } label: {
+                            ATHLTHSpotifyGlyph()
+                                .frame(width: 30, height: 30)
+                                .frame(width: 38, height: 40)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Spotify controls",
+                            norwegian: "Spotify-kontroller"
+                        ))
+                    }
                 }
 
                 ToolbarItemGroup(
@@ -252,6 +268,63 @@ struct ActiveStrengthWorkoutView: View {
             .sheet(isPresented: $showingExerciseQueue) {
                 StrengthActiveExerciseQueueView()
                     .environmentObject(strength)
+            }
+            .sheet(isPresented: $showingSpotifyControls) {
+                VStack(spacing: 18) {
+                    HStack(spacing: 11) {
+                        ATHLTHSpotifyGlyph().frame(width: 38, height: 38)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Spotify").font(.headline)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Workout playback",
+                                norwegian: "Musikk under treningen"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Spacer()
+                    }
+                    HStack(spacing: 12) {
+                        Button {
+                            Task {
+                                await spotify.handleIPhoneAudioDockCommand(
+                                    spotify.isPlaying ? .pause : .resume
+                                )
+                            }
+                        } label: {
+                            Label(
+                                spotify.isPlaying
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Pause", norwegian: "Pause"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Play", norwegian: "Spill"
+                                    ),
+                                systemImage: spotify.isPlaying
+                                    ? "pause.fill" : "play.fill"
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHPlanDesign.ink)
+                        Button {
+                            Task {
+                                await spotify.handleIPhoneAudioDockCommand(.next)
+                            }
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Next track",
+                                norwegian: "Neste låt"
+                            ), systemImage: "forward.end.fill")
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .padding(22)
+                .presentationDetents([.height(205)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(ATHLTHPlanDesign.surface)
             }
             .sheet(isPresented: $showingExerciseLibrary) {
                 NavigationStack {
@@ -685,6 +758,7 @@ struct ActiveStrengthWorkoutView: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             if let workout = strength.activeWorkout {
                 ATHLTHWorkoutAudioDock(
+                    showSpotifyLauncher: false,
                     coachVisible:
                         workout.advancedConfiguration?.audioCoach.enabled == true,
                     coachEnabled:
@@ -4578,6 +4652,117 @@ struct ActiveStrengthWorkoutView: View {
             focusedExerciseLibraryEntry(exercise)?.exercise.videoURL
     }
 
+    /// The same native front/back atlas used by ATHLTH Insights, scoped to
+    /// the selected exercise rather than accumulated training history.
+    private func focusedExerciseMuscleDetail(
+        _ exercise: StrengthExerciseLog
+    ) -> some View {
+        let primary = focusedExerciseRegions(
+            exercise.exercise.primaryMuscles,
+            fallbackName: exercise.exercise.name
+        )
+        let secondary = focusedExerciseRegions(
+            exercise.exercise.secondaryMuscles,
+            fallbackName: nil
+        ).subtracting(primary)
+        let regions = primary.union(secondary)
+        let profile = StrengthMuscleProfile(
+            activations: regions.map {
+                StrengthMuscleActivation(
+                    region: $0,
+                    score: primary.contains($0) ? 4.5 : 2.1
+                )
+            },
+            primaryRegions: primary,
+            secondaryRegions: secondary
+        )
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "figure.strengthtraining.traditional")
+                Text(ATHLTHLocalization.choose(
+                    english: "Muscles used",
+                    norwegian: "Muskelgrupper som trenes"
+                ))
+                .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            if !regions.isEmpty {
+                StrengthMuscleMapView(
+                    profile: profile,
+                    compact: true,
+                    activationTint: ATHLTHTheme.vitality
+                )
+                .frame(maxWidth: .infinity)
+                .frame(height: 142)
+            }
+            if !exercise.exercise.primaryMuscles.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Primary: ", norwegian: "Primær: "
+                ) + exercise.exercise.primaryMuscles.joined(separator: " · "))
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            }
+            if !exercise.exercise.secondaryMuscles.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Secondary: ", norwegian: "Sekundær: "
+                ) + exercise.exercise.secondaryMuscles.joined(separator: " · "))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHPlanDesign.warmSurface,
+                    in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func focusedExerciseRegions(
+        _ labels: [String],
+        fallbackName: String?
+    ) -> Set<StrengthMuscleRegion> {
+        var regions: Set<StrengthMuscleRegion> = []
+        for name in labels {
+            let lower = name.lowercased()
+            for region in StrengthMuscleRegion.allCases {
+                let raw = region.rawValue.lowercased()
+                if lower == raw || lower == region.title.lowercased() {
+                    regions.insert(region)
+                }
+            }
+            if lower.contains("quad") || lower.contains("forside lår") {
+                regions.insert(.quads)
+            }
+            if lower.contains("glute") || lower.contains("setemus") {
+                regions.insert(.glutes)
+            }
+            if lower.contains("hamstring") || lower.contains("bakside lår") {
+                regions.insert(.hamstrings)
+            }
+            if lower.contains("chest") || lower.contains("bryst") {
+                regions.insert(.chest)
+            }
+            if lower.contains("back") || lower.contains("rygg") {
+                regions.insert(.upperBack)
+            }
+            if lower.contains("shoulder") || lower.contains("skulder") {
+                regions.insert(.frontDelts)
+            }
+            if lower.contains("calf") || lower.contains("legg") {
+                regions.insert(.calves)
+            }
+            if lower.contains("tricep") { regions.insert(.triceps) }
+            if lower.contains("bicep") { regions.insert(.biceps) }
+        }
+        if regions.isEmpty, let fallbackName {
+            regions.formUnion(
+                StrengthMuscleProfileBuilder.fallbackRegions(
+                    forExerciseName: fallbackName
+                )
+            )
+        }
+        return regions
+    }
+
     private func focusedExerciseInstructionDisclosure(
         _ exercise: StrengthExerciseLog
     ) -> some View {
@@ -4727,6 +4912,7 @@ struct ActiveStrengthWorkoutView: View {
                     alignment: .leading,
                     spacing: 12
                 ) {
+                    focusedExerciseMuscleDetail(exercise)
                     if let demoURL {
                         VStack(alignment: .leading, spacing: 8) {
                             Label(
@@ -11607,6 +11793,15 @@ private struct StrengthActiveExerciseQueueView: View {
                                         .buttonStyle(.bordered)
                                         .controlSize(.small)
                                     }
+
+                                    Image(systemName: "line.3.horizontal")
+                                        .font(.system(size: 16, weight: .semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                        .frame(width: 27, height: 42)
+                                        .accessibilityLabel(ATHLTHLocalization.choose(
+                                            english: "Hold and drag to reorder",
+                                            norwegian: "Hold og dra for å flytte øvelsen"
+                                        ))
                                 }
                                 if StrengthBarbellExercisePolicy.usesBar(exercise) {
                                     HStack(spacing: 8) {
