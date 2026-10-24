@@ -1169,46 +1169,25 @@ final class AppSessionStore: ObservableObject {
             calendar.startOfDay(for: $0)
         }
 
-        var occurrences: [TrainingPlanSessionOccurrence] = []
-
-        for (weekIndex, week) in plan.weeks.enumerated() {
-            for day in week.days {
-                for plannedSession in day.sessions {
-                    let fallbackDate: Date
-                    if let start {
-                        fallbackDate =
-                            calendar.date(
-                                byAdding: .day,
-                                value:
-                                    weekIndex * 7 +
-                                    max(day.dayIndex - 1, 0),
-                                to: start
-                            ) ?? start
-                    } else {
-                        fallbackDate = plannedSession.scheduledStart
-                            ?? plan.createdAt
-                    }
-
-                    occurrences.append(
-                        TrainingPlanSessionOccurrence(
-                            planID: plan.id,
-                            session: plannedSession,
-                            date:
-                                plannedSession.scheduledStart
-                                    .map {
-                                        calendar.startOfDay(for: $0)
-                                    }
-                                    ?? fallbackDate,
-                            weekNumber: weekIndex + 1
-                        )
-                    )
-                }
-            }
+        let occurrences = TrainingPlanSchedule.occurrences(
+            in: plan,
+            calendar: calendar
+        )
+        var verifiedHealthIDs = Set<UUID>()
+        for (day, dailyOccurrences) in Dictionary(
+            grouping: occurrences,
+            by: { calendar.startOfDay(for: $0.date) }
+        ) {
+            verifiedHealthIDs.formUnion(
+                TrainingPlanSchedule.confidentHealthCompletionIDs(
+                    sessions: dailyOccurrences.map(\.session),
+                    healthWorkouts: healthWorkouts,
+                    on: day,
+                    calendar: calendar
+                )
+            )
         }
 
-        var unusedHealth = healthWorkouts.sorted {
-            $0.startDate < $1.startDate
-        }
         var completedIDs = Set<UUID>()
         var skippedIDs = Set<UUID>()
 
@@ -1241,20 +1220,8 @@ final class AppSessionStore: ObservableObject {
                 continue
             }
 
-            if let matchIndex = unusedHealth.firstIndex(
-                where: { workout in
-                    calendar.isDate(
-                        workout.startDate,
-                        inSameDayAs: occurrence.date
-                    ) &&
-                    Self.healthWorkout(
-                        workout,
-                        matches: planned
-                    )
-                }
-            ) {
+            if verifiedHealthIDs.contains(planned.id) {
                 completedIDs.insert(planned.id)
-                unusedHealth.remove(at: matchIndex)
             }
         }
 
@@ -1597,12 +1564,8 @@ final class AppSessionStore: ObservableObject {
             return false
         }
 
-        let weekday = calendar.component(
-            .weekday,
-            from: target
-        )
-        let targetDayNumber =
-            ((weekday + 5) % 7) + 1
+        // Plan days are offsets from the program start, not weekdays.
+        let targetDayNumber = (dayOffset % 7) + 1
         guard let targetDayIndex =
                 plan.weeks[targetWeekIndex]
                     .days
