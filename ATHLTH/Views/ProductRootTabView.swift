@@ -818,6 +818,7 @@ struct ATHLTHHomeView: View {
                     // frosted capsule. Keeps all destinations and counters.
                     HStack(spacing: 0) {
                         HomeHeroUtilityButtons(
+                            weather: homeWeather.snapshot,
                             challengeInviteUnreadCount:
                                 social.inboxEvents.filter {
                                     $0.kind == "challenge_invite" &&
@@ -834,7 +835,7 @@ struct ATHLTHHomeView: View {
                             ATHLTHProfileView()
                         } label: {
                             homeProfileShortcut
-                                .frame(width: 44, height: 44)
+                                .frame(width: 52, height: 52)
                                 .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -845,7 +846,7 @@ struct ATHLTHHomeView: View {
                         )
                     }
                     .padding(.horizontal, 5)
-                    .background(Color.black.opacity(0.27), in: Capsule())
+                    .background(Color.black.opacity(0.08), in: Capsule())
                     .background(.ultraThinMaterial, in: Capsule())
                     .overlay {
                         Capsule()
@@ -1498,7 +1499,7 @@ struct ATHLTHHomeView: View {
                         }
                 }
             }
-            .frame(width: 38, height: 38)
+            .frame(width: 46, height: 46)
             .clipShape(Circle())
             .overlay {
                 Circle()
@@ -1507,7 +1508,7 @@ struct ATHLTHHomeView: View {
         } else {
             Circle()
                 .fill(.ultraThinMaterial)
-                .frame(width: 38, height: 38)
+                .frame(width: 46, height: 46)
                 .overlay {
                     Image(systemName: "person.fill")
                         .font(.system(size: 15, weight: .semibold))
@@ -5587,6 +5588,7 @@ private struct HomeHeroUtilityButtons: View {
     @EnvironmentObject private var messaging:
         MessagingStore
 
+    let weather: HomeWeatherSnapshot?
     let challengeInviteUnreadCount: Int
     let pendingWorkoutImportCount: Int
     let onSearch: () -> Void
@@ -5604,6 +5606,26 @@ private struct HomeHeroUtilityButtons: View {
 
     var body: some View {
         HStack(spacing: 0) {
+            if let weather, weather.temperatureCelsius.isFinite {
+                HStack(spacing: 4) {
+                    Image(systemName: weather.symbolName)
+                        .symbolRenderingMode(.hierarchical)
+                        .font(.system(size: 13, weight: .medium))
+                    Text("\(Int(weather.temperatureCelsius.rounded()))°")
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                }
+                .foregroundStyle(.white)
+                .frame(width: 67, height: 36)
+                .background(Color.black.opacity(0.15), in: Capsule())
+                .overlay {
+                    Capsule().strokeBorder(.white.opacity(0.24), lineWidth: 0.7)
+                }
+                .accessibilityLabel(
+                    "\(Int(weather.temperatureCelsius.rounded())) grader" +
+                    (weather.locationName.map { ", \($0)" } ?? "")
+                )
+            }
+
             heroButton(
                 icon: "magnifyingglass",
                 action: onSearch
@@ -5654,9 +5676,14 @@ private struct HomeHeroUtilityButtons: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
+                .frame(width: 34, height: 34)
+                .background(Color.black.opacity(0.18), in: Circle())
+                .overlay {
+                    Circle().strokeBorder(.white.opacity(0.24), lineWidth: 0.7)
+                }
+                .frame(width: 42, height: 44)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -5668,9 +5695,14 @@ private struct HomeHeroUtilityButtons: View {
     ) -> some View {
         ZStack(alignment: .topTrailing) {
             Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
+                .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
-                .frame(width: 44, height: 44)
+                .frame(width: 34, height: 34)
+                .background(Color.black.opacity(0.18), in: Circle())
+                .overlay {
+                    Circle().strokeBorder(.white.opacity(0.24), lineWidth: 0.7)
+                }
+                .frame(width: 42, height: 44)
                 .contentShape(Rectangle())
 
             if count > 0 {
@@ -5683,7 +5715,7 @@ private struct HomeHeroUtilityButtons: View {
                     .overlay {
                         Capsule().strokeBorder(.white.opacity(0.9), lineWidth: 0.8)
                     }
-                    .offset(x: -1, y: -1)
+                    .offset(x: -3, y: -1)
                     .allowsHitTesting(false)
             }
         }
