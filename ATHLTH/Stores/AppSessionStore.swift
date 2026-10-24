@@ -2405,6 +2405,38 @@ final class AppSessionStore: ObservableObject {
         replaceTrainingPlan(plan)
     }
 
+    /// Explicitly schedule the uncompleted strength work as a separate
+    /// standalone session. The original recording and training plan are not
+    /// edited; repeated taps return the existing follow-up.
+    @discardableResult
+    func scheduleStrengthFollowUp(
+        from workout: StrengthWorkoutLog,
+        on scheduledStart: Date,
+        selectedSetIDs: Set<UUID>? = nil,
+        onlyRemainderForSetIDs: Set<UUID> = []
+    ) -> PlannedSession? {
+        guard workout.isFinished,
+              workout.remainingSetCount > 0,
+              scheduledStart >= Calendar.current.startOfDay(for: Date())
+        else { return nil }
+
+        if let existing = standalonePlannedSessions.first(where: {
+            $0.followUpSourceWorkoutID == workout.id
+        }) {
+            return existing
+        }
+
+        let remainder = StrengthWorkoutRemainder(workout: workout)
+        guard let followUp = remainder.makeFollowUp(
+            scheduledStart: scheduledStart,
+            selectedSetIDs: selectedSetIDs,
+            onlyRemainderForSetIDs: onlyRemainderForSetIDs
+        ) else { return nil }
+
+        addStandalonePlannedSession(followUp)
+        return followUp
+    }
+
     func addStandalonePlannedSession(
         _ session: PlannedSession
     ) {
