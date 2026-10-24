@@ -106,6 +106,14 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Community", systemImage: "person.3.fill") }
                 .tag(4)
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: Notification.Name("athlthReturnToTrainFromProgress")
+            )
+        ) { _ in
+            trainNavigationRequest = nil
+            selectedTab = 2
+        }
         .tint(ATHLTHTheme.accentDeep)
         .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .toolbarBackground(.visible, for: .tabBar)
@@ -8872,7 +8880,8 @@ struct ATHLTHProgressView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var trophyStore: TrophyStore
 
-    @State private var period: ProgressPeriod = .week
+    @State private var period: ProgressPeriod = .threeMonths
+    @State private var selectedScope: ATHLTHProgressScope = .general
     @State private var progressSnapshot: HealthProgressSnapshot?
     @State private var consistencySnapshot: HealthProgressSnapshot?
     @State private var personalRecords: [HealthPersonalRecord] = []
@@ -8883,109 +8892,168 @@ struct ATHLTHProgressView: View {
 
     private let green = ATHLTHTheme.accent
     private let blue = Color(red: 0.20, green: 0.56, blue: 0.96)
-    private let purple = Color(red: 0.42, green: 0.36, blue: 0.95)
-    private let canvas = Color(red: 0.965, green: 0.972, blue: 0.968)
-
-    var body: some View {
-        let useImmersiveProgressHero =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
-        return NavigationStack {
+    private let purple = Color(red: 0.42, green: 0.36, blue: 0    var body: some View {
+        NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: green.opacity(0.60),
+                accent: ATHLTHTheme.accent.opacity(0.24),
                 softTransition: true,
-                immersiveTransition: useImmersiveProgressHero,
+                immersiveTransition: true,
                 scrollFadeTransition: true
             ) {
-                ATHLTHTabHero(
-                    imageName: "ProgressHero",
-                    title: "Progress",
-                    subtitle: "See your training, consistency and health trends.",
-                    height:
-                        useImmersiveProgressHero
-                            ? 226
-                            : 190,
-                    alignment: .leading,
-                    focalOffsetX:
-                        useImmersiveProgressHero
-                            ? 4
-                            : 18,
-                    focalOffsetY:
-                        useImmersiveProgressHero
-                            ? 6
-                            : 16,
-                    titleFontSize:
-                        useImmersiveProgressHero
-                            ? 31
-                            : 30,
-                    copyWidthFraction:
-                        useImmersiveProgressHero
-                            ? 0.66
-                            : 0.80,
-                    immersiveCopy: useImmersiveProgressHero
-                )
+                premiumHero
             } content: {
-                LazyVStack(spacing: 14) {
-                    if health.hasRequestedAuthorization &&
-                        (health.hasTrainingHealthData || progressHasHealthData) {
-                        periodPicker
+                LazyVStack(spacing: 13) {
+                    ATHLTHPremiumProgressScopePicker(selection: $selectedScope)
 
-                        weeklyOverview
+                    ATHLTHPremiumProgressStats(stats: premiumStats)
 
+                    switch selectedScope {
+                    case .general:
                         if let snapshot = progressSnapshot {
                             ProgressTrendCard(
                                 snapshot: snapshot,
                                 metric: $trendMetric
                             )
+                            ProgressConsistencyCard(
+                                snapshot: consistencySnapshot
+                            )
+                        } else {
+                            progressWithoutHealthCard
                         }
 
-                        ProgressConsistencyCard(
-                            snapshot: consistencySnapshot
-                        )
-
                         ProgressPerformanceCard(
-                            runningWorkouts:
-                                selectedPeriodRunningWorkouts,
-                            strengthWorkouts:
-                                selectedPeriodStrengthWorkouts,
+                            runningWorkouts: selectedPeriodRunningWorkouts,
+                            strengthWorkouts: selectedPeriodStrengthWorkouts,
                             healthRecords: personalRecords,
-                            strengthRecords:
-                                strengthWorkout.personalRecords,
-                            repRecords:
-                                strengthWorkout.repPersonalRecords
+                            strengthRecords: strengthWorkout.personalRecords,
+                            repRecords: strengthWorkout.repPersonalRecords
                         )
-
                         personalRecordsCard
                         achievementsCard
-                    } else {
-                        progressWithoutHealthCard
 
-                        ProgressPerformanceCard(
-                            runningWorkouts: [],
-                            strengthWorkouts:
-                                selectedPeriodStrengthWorkouts,
-                            healthRecords: personalRecords,
-                            strengthRecords:
-                                strengthWorkout.personalRecords,
-                            repRecords:
-                                strengthWorkout.repPersonalRecords
+                    case .running:
+                        ATHLTHPremiumRunningChart(
+                            workouts: selectedPeriodRunningWorkouts
                         )
 
-                        personalRecordsCard
-                        achievementsCard
+                        NavigationLink {
+                            RunningProgressDetailView(
+                                workouts: selectedPeriodRunningWorkouts,
+                                records: runningRecords
+                            )
+                        } label: {
+                            premiumDetailDestination(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Running sessions",
+                                    norwegian: "Løpeøkter"
+                                ),
+                                subtitle: ATHLTHLocalization.choose(
+                                    english: "History, distance and individual results",
+                                    norwegian: "Historikk, distanse og resultater"
+                                ),
+                                icon: "figure.run"
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        NavigationLink {
+                            ProgressPersonalRecordsView(
+                                healthRecords: runningRecords,
+                                strengthRecords: [],
+                                repRecords: []
+                            )
+                        } label: {
+                            ATHLTHPremiumProgressRecords(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Running records",
+                                    norwegian: "Personlige rekorder"
+                                ),
+                                items: runningRecords.map {
+                                    ATHLTHPremiumProgressRecordItem(
+                                        title: $0.kind.title,
+                                        value: $0.formattedValue,
+                                        subtitle: $0.date.formatted(
+                                            date: .abbreviated,
+                                            time: .omitted
+                                        )
+                                    )
+                                }
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                    case .strength:
+                        ATHLTHPremiumStrengthChart(
+                            workouts: selectedPeriodStrengthWorkouts
+                        )
+
+                        NavigationLink {
+                            StrengthProgressDetailView(
+                                workouts: selectedPeriodStrengthWorkouts,
+                                records: strengthWorkout.personalRecords,
+                                repRecords: strengthWorkout.repPersonalRecords
+                            )
+                        } label: {
+                            premiumDetailDestination(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Strength sessions and exercises",
+                                    norwegian: "Styrkeøkter og øvelser"
+                                ),
+                                subtitle: ATHLTHLocalization.choose(
+                                    english: "Completed sets, volume and performance",
+                                    norwegian: "Gjennomførte sett, volum og utvikling"
+                                ),
+                                icon: "dumbbell"
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        NavigationLink {
+                            ProgressPersonalRecordsView(
+                                healthRecords: [],
+                                strengthRecords: strengthWorkout.personalRecords,
+                                repRecords: strengthWorkout.repPersonalRecords
+                            )
+                        } label: {
+                            ATHLTHPremiumProgressRecords(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Strength records",
+                                    norwegian: "Personlige rekorder"
+                                ),
+                                items: strengthWorkout.personalRecords.map {
+                                    ATHLTHPremiumProgressRecordItem(
+                                        title: $0.title,
+                                        value: $0.value,
+                                        subtitle: $0.date.formatted(
+                                            date: .abbreviated,
+                                            time: .omitted
+                                        )
+                                    )
+                                }
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    if progressLoading {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else if let progressError, selectedScope == .general {
+                        Label(progressError, systemImage: "info.circle")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 14)
-                .padding(.bottom, 30)
+                .padding(.top, 16)
+                .padding(.bottom, 32)
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
             .refreshable {
                 async let selected: Void = loadProgressData()
-                async let support: Void = loadSupportingProgressData()
-                _ = await (selected, support)
+                async let supporting: Void = loadSupportingProgressData()
+                _ = await (selected, supporting)
             }
             .toolbar(.hidden, for: .navigationBar)
         }
@@ -9001,6 +9069,251 @@ struct ATHLTHProgressView: View {
             await trophyStore.refresh(
                 health: health,
                 strength: strengthWorkout,
+                goals: goalStore
+            )
+        }
+    }
+
+    private var premiumHero: some View {
+        ATHLTHPremiumProgressHero(
+            scope: selectedScope,
+            value: heroValue,
+            metricLabel: ATHLTHLocalization.choose(
+                english: "Sessions in period",
+                norwegian: "Økter i perioden"
+            ),
+            secondaryLabel: heroSubtitle
+        )
+        .overlay(alignment: .topLeading) {
+            Button {
+                NotificationCenter.default.post(
+                    name: Notification.Name("athlthReturnToTrainFromProgress"),
+                    object: nil
+                )
+            } label: {
+                Label("Train", systemImage: "chevron.left")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 13)
+                    .frame(height: 33)
+                    .background(Color.black.opacity(0.29), in: Capsule())
+                    .overlay {
+                        Capsule().stroke(Color.white.opacity(0.30), lineWidth: 0.7)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english: "Return to the Train tab",
+                    norwegian: "Gå tilbake til Train-fanen"
+                )
+            )
+            .padding(.top, 59)
+            .padding(.leading, 16)
+        }
+        .overlay(alignment: .topTrailing) {
+            Menu {
+                ForEach(ProgressPeriod.allCases) { option in
+                    Button {
+                        period = option
+                    } label: {
+                        if period == option {
+                            Label(periodLabel(option), systemImage: "checkmark")
+                        } else {
+                            Text(periodLabel(option))
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 5) {
+                    Image(systemName: "calendar")
+                    Text(periodLabel(period))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 11)
+                .frame(height: 33)
+                .background(Color.black.opacity(0.29), in: Capsule())
+                .overlay {
+                    Capsule().stroke(Color.white.opacity(0.30), lineWidth: 0.7)
+                }
+            }
+            .padding(.top, 59)
+            .padding(.trailing, 16)
+        }
+    }
+
+    private func periodLabel(_ period: ProgressPeriod) -> String {
+        switch period {
+        case .week:
+            return ATHLTHLocalization.choose(english: "7 days", norwegian: "7 dager")
+        case .month:
+            return ATHLTHLocalization.choose(english: "1 month", norwegian: "1 måned")
+        case .threeMonths:
+            return ATHLTHLocalization.choose(english: "3 months", norwegian: "3 måneder")
+        case .year:
+            return ATHLTHLocalization.choose(english: "1 year", norwegian: "1 år")
+        }
+    }
+
+    private var heroValue: String {
+        switch selectedScope {
+        case .general:
+            return "\(progressSnapshot?.workoutCount ?? selectedPeriodStrengthWorkouts.count)"
+        case .running:
+            return "\(selectedPeriodRunningWorkouts.count)"
+        case .strength:
+            return "\(selectedPeriodStrengthWorkouts.count)"
+        }
+    }
+
+    private var heroSubtitle: String {
+        switch selectedScope {
+        case .general:
+            guard progressSnapshot != nil else {
+                return ATHLTHLocalization.choose(
+                    english: "Logged strength sessions",
+                    norwegian: "Registrerte styrkeøkter"
+                )
+            }
+            return ATHLTHLocalization.choose(
+                english: "From Apple Health",
+                norwegian: "Registrert i Apple Health"
+            )
+        case .running:
+            return String(
+                format: "%.1f km registrert",
+                selectedPeriodRunningWorkouts
+                    .compactMap(\.distanceMeters)
+                    .reduce(0, +) / 1_000
+            )
+        case .strength:
+            return ATHLTHLocalization.choose(
+                english: "Completed strength sessions",
+                norwegian: "Fullførte styrkeøkter"
+            )
+        }
+    }
+
+    private var premiumStats: [ATHLTHPremiumProgressStat] {
+        switch selectedScope {
+        case .general:
+            return [
+                .init(
+                    title: "Økter",
+                    value: heroValue,
+                    icon: "calendar"
+                ),
+                .init(
+                    title: "Treningstid",
+                    value: progressSnapshot?.trainingDuration.shortDuration ?? "—",
+                    icon: "clock"
+                ),
+                .init(
+                    title: "Distanse",
+                    value: progressSnapshot.map {
+                        String(format: "%.1f km", $0.workoutDistanceMeters / 1_000)
+                    } ?? "—",
+                    icon: "location"
+                ),
+                .init(
+                    title: "Aktive dager",
+                    value: progressSnapshot.map {
+                        "\($0.activeWorkoutDays.count)"
+                    } ?? "—",
+                    icon: "calendar.badge.checkmark"
+                )
+            ]
+        case .running:
+            let valid = selectedPeriodRunningWorkouts.filter {
+                ($0.distanceMeters ?? 0) >= 500 && $0.duration > 0
+            }
+            let distance = valid.compactMap(\.distanceMeters).reduce(0, +)
+            let duration = valid.reduce(0) { $0 + $1.duration }
+            let pace = distance > 0
+                ? duration / (distance / 1_000)
+                : 0
+            let paceText = pace >= 120 && pace <= 1_200
+                ? String(format: "%d:%02d /km", Int(pace) / 60, Int(pace) % 60)
+                : "—"
+            return [
+                .init(title: "Løpeøkter", value: heroValue, icon: "figure.run"),
+                .init(
+                    title: "Distanse",
+                    value: String(
+                        format: "%.1f km",
+                        selectedPeriodRunningWorkouts
+                            .compactMap(\.distanceMeters)
+                            .reduce(0, +) / 1_000
+                    ),
+                    icon: "point.topleft.down.to.point.bottomright.curvepath"
+                ),
+                .init(title: "Snittempo", value: paceText, icon: "stopwatch"),
+                .init(title: "Løpetid", value: selectedPeriodRunningWorkouts.reduce(0) {
+                    $0 + $1.duration
+                }.shortDuration, icon: "clock")
+            ]
+        case .strength:
+            let sessions = selectedPeriodStrengthWorkouts
+            let volume = sessions.reduce(0) { $0 + $1.totalVolumeKilograms }
+            let totalSets = sessions.reduce(0) { $0 + $1.totalWorkingSets }
+            let minutes = sessions.reduce(0.0) {
+                $0 + max(0, ($1.endedAt ?? $1.startedAt).timeIntervalSince($1.startedAt))
+            }
+            return [
+                .init(title: "Styrkeøkter", value: heroValue, icon: "dumbbell"),
+                .init(
+                    title: "Treningsvolum",
+                    value: volume >= 1_000
+                        ? String(format: "%.1f t", volume / 1_000)
+                        : "\(Int(volume.rounded())) kg",
+                    icon: "scalemass"
+                ),
+                .init(title: "Arbeidssett", value: "\(totalSets)", icon: "square.stack.3d.up"),
+                .init(title: "Treningstid", value: minutes.shortDuration, icon: "clock")
+            ]
+        }
+    }
+
+    private var runningRecords: [HealthPersonalRecord] {
+        personalRecords.filter {
+            $0.kind == .longestRun ||
+            $0.kind.rawValue.hasPrefix("fastest")
+        }
+    }
+
+    private func premiumDetailDestination(
+        title: String,
+        subtitle: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon)
+                .font(.system(size: 20, weight: .light))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 40, height: 40)
+                .background(ATHLTHTheme.accentSoft, in: Circle())
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.system(size: 20, weight: .medium, design: .serif))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 8)
+            Image(systemName: "arrow.up.right")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .progressReferenceCard()
+    }
+
+gthWorkout,
                 goals: goalStore
             )
         }
