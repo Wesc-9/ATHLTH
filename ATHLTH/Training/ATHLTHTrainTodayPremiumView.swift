@@ -65,7 +65,8 @@ struct ATHLTHTrainTodayPremiumView: View {
     private let hairline = ATHLTHPlanDesign.warmDivider
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 23) {
+        VStack(alignment: .leading, spacing: 19) {
+            todayAgendaStrip
             // The athlete's next real workout owns the first screen. No
             // fabricated weekly statistics or redundant greeting.
             if let plan {
@@ -92,6 +93,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             // Quick Train is always directly below the principal workout,
             // using precisely the same launch callbacks as before.
             quickTrainSection
+            futurePlanningAction
             suggestedWorkoutSection
 
             if let plan {
@@ -132,6 +134,111 @@ struct ATHLTHTrainTodayPremiumView: View {
                 "Kun denne ufullførte økten endres. Du kan når som helst gjenopprette den opprinnelige økten."
             ))
         }
+    }
+
+    // The factual first-screen agenda: scheduled sessions are distinct from
+    // HealthKit recordings, and a day without a plan is not labelled a rest day.
+    private var todayAgendaStrip: some View {
+        let planned = sessions.filter { !$0.isExplicitRestDay }
+        let done = planned.filter { completedIDs.contains($0.id) }.count
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(tr("TODAY'S OVERVIEW", "DAGENS OVERSIKT"))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.6)
+                        .foregroundStyle(champagne)
+                    Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                        .font(.system(size: 24, weight: .regular, design: .serif))
+                        .foregroundStyle(ink)
+                }
+                Spacer(minLength: 0)
+                if hasActiveWorkout {
+                    Label(
+                        tr("Workout active", "Aktiv økt"),
+                        systemImage: "waveform.path"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ink)
+                } else if planned.isEmpty && hasRecordedWorkoutToday {
+                    Label(
+                        tr("Workout recorded", "Økt registrert"),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.vitality)
+                }
+            }
+
+            if !planned.isEmpty {
+                HStack(spacing: 7) {
+                    ForEach(planned) { workout in
+                        Capsule()
+                            .fill(
+                                completedIDs.contains(workout.id)
+                                    ? ATHLTHTheme.vitality
+                                    : champagne.opacity(0.65)
+                            )
+                            .frame(height: 5)
+                    }
+                }
+                Text(
+                    "\(done) / \(planned.count) " +
+                    tr("planned workouts complete", "planlagte økter fullført")
+                )
+                .font(.caption)
+                .foregroundStyle(muted)
+            } else {
+                Text(sessions.contains(where: \.isExplicitRestDay)
+                    ? tr("Recovery is scheduled today.", "I dag er det planlagt restitusjon.")
+                    : tr("No scheduled workout. Choose a quick session or plan ahead.",
+                         "Ingen planlagt økt. Start en rask økt eller planlegg fremover."))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(17)
+        .premiumTrainSurface(line: hairline)
+    }
+
+    private var futurePlanningAction: some View {
+        Button {
+            if plan != nil {
+                onOpenPlan()
+            } else {
+                onCreatePlan()
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(champagne)
+                    .frame(width: 33)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tr("Plan your next workouts", "Planlegg kommende økter"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(tr(
+                        "Build a week, choose a day, or reuse your workouts",
+                        "Bygg en uke, velg en dag eller gjenbruk lagrede økter"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.up.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ink)
+            }
+            .padding(16)
+            .premiumTrainSurface(line: hairline)
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(tr(
+            "Open training plan studio",
+            "Åpne treningsplanstudio"
+        ))
     }
 
     private var primaryWorkout: PlannedSession? {
@@ -332,10 +439,10 @@ struct ATHLTHTrainTodayPremiumView: View {
                         Image(workoutImage(for: workout.kind))
                             .resizable()
                             .scaledToFill()
-                            .frame(width: geometry.size.width, height: 416)
+                            .frame(width: geometry.size.width, height: 368)
                             .clipped()
                     }
-                    .frame(height: 416)
+                    .frame(height: 368)
 
                     LinearGradient(
                         stops: [
@@ -373,12 +480,12 @@ struct ATHLTHTrainTodayPremiumView: View {
                         .minimumScaleFactor(0.72)
 
                         // The light floating control plate overlaps the photo.
-                        Spacer().frame(height: 111)
+                        Spacer().frame(height: 93)
                     }
                     .padding(.horizontal, 22)
                     .padding(.bottom, 20)
                 }
-                .frame(height: 416)
+                .frame(height: 368)
                 .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 15) {
