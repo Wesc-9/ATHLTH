@@ -5421,6 +5421,60 @@ struct ActiveStrengthWorkoutView: View {
 
                 }
 
+                if let active = strength.currentExercise,
+                   StrengthBarbellExercisePolicy.usesBar(active),
+                   currentStrengthLoadKind == .weightKilograms,
+                   strength.currentSetRecordsWeight {
+                    HStack(spacing: 9) {
+                        Image(systemName: "scalemass")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Bar weight",
+                                norwegian: "Stangvekt"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Included in total weight",
+                                norwegian: "Inkludert i totalvekten"
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Menu {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Not set", norwegian: "Ikke valgt"
+                            )) {
+                                _ = strength.setActiveExerciseBarWeight(
+                                    active.id, kilograms: nil
+                                )
+                            }
+                            ForEach([0.0, 5.0, 10.0, 15.0, 20.0, 25.0],
+                                    id: \.self) { kg in
+                                Button(String(format: "%.0f kg", kg)) {
+                                    _ = strength.setActiveExerciseBarWeight(
+                                        active.id, kilograms: kg
+                                    )
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 5) {
+                                Text(active.barWeightKilograms.map {
+                                    String(format: "%.0f kg", $0)
+                                } ?? ATHLTHLocalization.choose(
+                                    english: "Choose",
+                                    norwegian: "Velg"
+                                ))
+                                Image(systemName: "chevron.up.chevron.down")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+                    }
+                    .padding(.vertical, 5)
+                }
+
                 if currentStrengthTargetKind == .time {
                     timedSetCountdownCard
                 }
