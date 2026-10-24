@@ -155,4 +155,114 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
         ]
         XCTAssertNil(ATHLTHHybridWorkoutLaunchPlan.parts(for: session))
     }
+    @MainActor
+    func testWatchReceivesEveryEmbeddedTreadmillPhaseWithoutNewRecording() throws {
+        let planned = try plannedHybrid()
+        let parts = try XCTUnwrap(ATHLTHHybridWorkoutLaunchPlan.parts(for: planned))
+        let store = StrengthWorkoutStore()
+        let watchID = UUID()
+        XCTAssertTrue(store.startPlannedHybrid(
+            session: planned, validatedParts: parts, watchSessionID: watchID,
+            trackingMode: .advanced, captureDevice: .appleWatch
+        ))
+        let workoutID = try XCTUnwrap(store.activeWorkout?.id)
+        let run = try XCTUnwrap(store.activeWorkout?.exercises.first {
+            $0.isEmbeddedRunningInterval == true && $0.sets.count > 1
+        })
+        XCTAssertTrue(store.selectExerciseForNow(run.id))
+        let watch = try XCTUnwrap(store.watchSnapshot)
+        let exercise = try XCTUnwrap(watch.exerciseQueue?.first {
+            $0.index == watch.exerciseIndex
+        })
+        let plans = try XCTUnwrap(exercise.setPlans)
+        XCTAssertEqual(watch.workoutID, workoutID)
+        XCTAssertEqual(watch.plannedSessionID, planned.id)
+        XCTAssertEqual(store.activeWorkout?.watchSessionID, watchID)
+        XCTAssertEqual(exercise.isEmbeddedRunningInterval, true)
+        XCTAssertEqual(plans.count, run.sets.count)
+        for (plan, source) in zip(plans, run.sets) {
+            XCTAssertEqual(plan.durationSeconds, source.plannedDurationSeconds)
+            XCTAssertEqual(plan.hybridPhaseTitle, source.hybridPhaseTitle)
+            XCTAssertEqual(plan.hybridPhaseKind, source.hybridPhaseKind)
+            XCTAssertEqual(plan.hybridTargetHeartRateZone, source.hybridTargetHeartRateZone)
+        }
+    }
+
+    @MainActor
+    func testWatchCompletesOnlyActiveEmbeddedRunningIntervals() throws {
+        let planned = try plannedHybrid()
+        let parts = try XCTUnwrap(ATHLTHHybridWorkoutLaunchPlan.parts(for: planned))
+        let store = StrengthWorkoutStore()
+        XCTAssertTrue(store.startPlannedHybrid(
+            session: planned, validatedParts: parts, watchSessionID: UUID(),
+            trackingMode: .advanced, captureDevice: .appleWatch
+        ))
+        let run = try XCTUnwrap(store.activeWorkout?.exercises.first {
+            $0.isEmbeddedRunningInterval == true
+        })
+        XCTAssertTrue(store.selectExerciseForNow(run.id))
+        var watch = try XCTUnwrap(store.watchSnapshot)
+        let beganAt = Date(timeIntervalSince1970: 1_000)
+        watch.timedSetCountdown = WatchTimedStrengthCountdown(
+            targetSeconds: 60, secondsAtPause: 60, resumedAt: beganAt
+        )
+        let before = beganAt.addingTimeInterval(59)
+        let after = beganAt.addingTimeInterval(61)
+
+        XCTAssertFalse(ATHLTHHybridWatchIntervalPolicy.shouldAutoAdvance(
+            watch, workoutState: .running, at: before
+        ))
+        XCTAssertTrue(ATHLTHHybridWatchIntervalPolicy.shouldAutoAdvance(
+            watch, workoutState: .running, at: after
+        ))
+        XCTAssertFalse(ATHLTHHybridWatchIntervalPolicy.shouldAutoAdvance(
+            watch, workoutState: .paused, at: after
+        ))
+        watch.inputMode = .iPhone
+        XCTAssertFalse(ATHLTHHybridWatchIntervalPolicy.shouldAutoAdvance(
+            watch, workoutState: .running, at: after
+        ))
+        watch.inputMode = .both
+        watch.isResting = true
+        XCTAssertFalse(ATHLTHHybridWatchIntervalPolicy.shouldAutoAdvance(
+            watch, workoutState: .running, at: after
+        ))
+        watch.isResting = false
+        watch.isEmbeddedRunningInterval = false
+        XCTAssertFalse(ATHLTHHybridWatchIntervalPolicy.shouldAutoAdvance(
+            watch, workoutState: .running, at: after
+        ))
+    }
+
+    @MainActor
+    func testOfflineWatchPauseResumePreservesEventClock() throws {
+        let planned = try plannedHybrid()
+        let parts = try XCTUnwrap(ATHLTHHybridWorkoutLaunchPlan.parts(for: planned))
+        let store = StrengthWorkoutStore()
+        XCTAssertTrue(store.startPlannedHybrid(
+            session: planned, validatedParts: parts, watchSessionID: UUID(),
+            trackingMode: .advanced, captureDevice: .appleWatch
+        ))
+        let run = try XCTUnwrap(store.activeWorkout?.exercises.first {
+            $0.isEmbeddedRunningInterval == true
+        })
+        XCTAssertTrue(store.selectExerciseForNow(run.id))
+        let initial = try XCTUnwrap(store.currentTimedSetCountdown)
+        let started = try XCTUnwrap(initial.resumedAt)
+        let stopped = started.addingTimeInterval(12)
+        let resumed = started.addingTimeInterval(120)
+
+        store.pauseTimedSet(at: stopped)
+        let paused = try XCTUnwrap(store.currentTimedSetCountdown)
+        XCTAssertNil(paused.resumedAt)
+        XCTAssertEqual(paused.remaining(at: resumed),
+                       Double(initial.targetSeconds - 12), accuracy: 0.001)
+        store.startOrResumeTimedSet(at: resumed)
+        let continued = try XCTUnwrap(store.currentTimedSetCountdown)
+        XCTAssertEqual(continued.resumedAt, resumed)
+        XCTAssertEqual(continued.remaining(at: resumed),
+                       Double(initial.targetSeconds - 12), accuracy: 0.001)
+        XCTAssertEqual(store.activeWorkout?.plannedSessionID, planned.id)
+    }
+
 }
