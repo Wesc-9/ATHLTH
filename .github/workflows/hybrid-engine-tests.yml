@@ -1,10 +1,10 @@
-name: ATHLTH 1.9.1 Hybrid Engine XCTest
+name: ATHLTH 1.9.2 Hybrid Engine XCTest
 
 on:
   workflow_dispatch:
   push:
     branches:
-      - release/v1.9.1
+      - release/v1.9.2
     paths:
       - .github/workflows/hybrid-engine-tests.yml
       - .github/workflows/launch-smoke.yml
@@ -26,7 +26,7 @@ on:
       - Shared/WatchTransferModels.swift
 
 concurrency:
-  group: athlth-v191-hybrid-tests-${{ github.ref }}
+  group: athlth-v192-hybrid-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
