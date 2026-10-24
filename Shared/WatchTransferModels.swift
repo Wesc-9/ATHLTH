@@ -1237,6 +1237,13 @@ struct WatchTimedStrengthCountdown: Codable, Hashable {
         } ?? 0), 0)
     }
 
+    /// Actual elapsed active time, including overtime, across Watch pauses.
+    /// A planned duration is never substituted for a set finished early.
+    func elapsed(at date: Date = Date()) -> TimeInterval {
+        let active = resumedAt.map { max(date.timeIntervalSince($0), 0) } ?? 0
+        return max(TimeInterval(targetSeconds) - secondsAtPause + active, 0)
+    }
+
     var isRunning: Bool { resumedAt != nil }
 }
 
