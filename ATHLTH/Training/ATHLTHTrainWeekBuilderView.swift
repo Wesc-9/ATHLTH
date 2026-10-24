@@ -105,10 +105,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                             }
                         }
                         .buttonStyle(.plain)
-                        daySelector(week)
-                        if let day = currentDay {
-                            detailForDay(day, plan: plan)
-                        }
+                        daySelector(week, plan: plan)
                     } else {
                         ContentUnavailableView(
                             tr("Program not available", "Fant ikke treningsplanen"),
@@ -263,29 +260,71 @@ struct ATHLTHTrainWeekBuilderView: View {
         }
     }
 
-    private func daySelector(_ week: TrainingPlanWeek) -> some View {
-        HStack(spacing: 5) {
+    /// Full-width day cards are legible on small iPhones and let the athlete
+    /// open a day in place, without a dense seven-column calendar.
+    private func daySelector(_ week: TrainingPlanWeek, plan: TrainingPlan) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(tr("YOUR DAYS", "DAG FOR DAG"))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.6)
+                .foregroundStyle(bronze)
+                .padding(.top, 5)
+
             ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                 let chosen = currentDay?.id == day.id
+                let workouts = day.sessions.filter { !$0.isExplicitRestDay }
                 Button {
-                    selectedDayID = day.id
-                } label: {
-                    VStack(spacing: 7) {
-                        Text(dayName(day.dayIndex))
-                            .font(.system(size: 10, weight: .semibold))
-                        Text(dayDate(day.dayIndex).formatted(.dateTime.day()))
-                            .font(.system(size: 20, weight: .regular, design: .serif))
-                        Capsule()
-                            .fill(day.sessions.isEmpty ? Color.clear : bronze)
-                            .frame(width: 15, height: 3)
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedDayID = day.id
                     }
-                    .foregroundStyle(chosen ? .white : ink)
-                    .frame(maxWidth: .infinity, minHeight: 74)
-                    .background(chosen ? ink : .white,
-                                in: RoundedRectangle(cornerRadius: 12))
+                } label: {
+                    HStack(spacing: 12) {
+                        VStack(spacing: 3) {
+                            Text(dayName(day.dayIndex))
+                                .font(.system(size: 10, weight: .semibold))
+                            Text(dayDate(day.dayIndex).formatted(.dateTime.day()))
+                                .font(.system(size: 25, weight: .regular, design: .serif))
+                        }
+                        .foregroundStyle(chosen ? .white : ink)
+                        .frame(width: 58, height: 61)
+                        .background(
+                            chosen ? ink : paper,
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(workouts.first?.title ?? tr("Rest and recovery", "Hvile og restitusjon"))
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(2)
+                                .multilineTextAlignment(.leading)
+                            Text(workouts.isEmpty
+                                ? tr("No workout scheduled", "Ingen planlagt økt")
+                                : "\(workouts.count) " + tr("workouts", "økter") +
+                                  " · " + workouts.compactMap { $0.durationMinutes }
+                                    .reduce(0, +).description + " min")
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                        }
+                        Spacer(minLength: 0)
+                        Image(systemName: chosen ? "chevron.up" : "chevron.down")
+                            .foregroundStyle(bronze)
+                    }
+                    .foregroundStyle(ink)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, minHeight: 89)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 17))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 17)
+                            .strokeBorder(chosen ? bronze : line,
+                                          lineWidth: chosen ? 1.2 : 0.8)
+                    }
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(chosen ? .isSelected : [])
+
+                if chosen {
+                    detailForDay(day, plan: plan)
+                        .padding(.bottom, 6)
+                }
             }
         }
     }
