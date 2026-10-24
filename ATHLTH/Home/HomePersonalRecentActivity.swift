@@ -1950,7 +1950,7 @@ private struct HomeFollowingHorizontalWorkoutCard: View {
                 HomeFollowingWorkoutArtwork(
                     item: item,
                     activity: activity,
-                    height: 114
+                    height: isStrength ? 205 : 114
                 )
             }
             .buttonStyle(.plain)
@@ -3272,10 +3272,14 @@ private struct HomeFollowingWorkoutArtwork:
     var body: some View {
         Group {
             if activity == .strength {
-                HomeStrengthMuscleArtwork(
-                    profile:
-                        strengthMuscleProfile,
-                    height: height
+                ATHLTHStrengthCompletedHeroCard(
+                    profile: strengthMuscleProfile,
+                    duration: HomeRecentCardFormat.number(item, key: "duration_seconds") ?? 0,
+                    exerciseCount: HomeRecentCardFormat.integer(item, key: "exercise_count"),
+                    volumeKilograms: HomeRecentCardFormat.number(item, key: "volume_kg"),
+                    height: height,
+                    compact: true,
+                    showsCompletionLabel: false
                 )
             } else {
                 genericArtwork
