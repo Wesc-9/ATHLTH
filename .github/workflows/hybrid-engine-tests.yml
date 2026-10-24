@@ -19,6 +19,10 @@ on:
       - ATHLTH/Strength/ActiveStrengthWorkoutView.swift
       - ATHLTH/Strength/StrengthWorkoutModels.swift
       - ATHLTH/Exercises/ExerciseLibraryViews.swift
+      - ATHLTHWatchExtension/WatchWorkoutManager.swift
+      - ATHLTHWatchExtension/WatchStrengthTimedSetPage.swift
+      - ATHLTH/Watch/ATHLTHStrengthWatchSyncObserver.swift
+      - Shared/WatchTransferModels.swift
 
 concurrency:
   group: athlth-v191-hybrid-tests-${{ github.ref }}
@@ -125,3 +129,29 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             build
 
+
+  watch-hybrid-compile:
+    runs-on: xcode-27
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode 27
+        run: |
+          sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
+          xcodebuild -version
+      - name: Install project generator
+        run: brew install xcodegen
+      - name: Compile Apple Watch hybrid recording engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodegen generate --spec project.yml
+          xcodebuild \
+            -project ATHLTH.xcodeproj \
+            -scheme ATHLTHWatchApp \
+            -configuration Debug \
+            -sdk watchsimulator \
+            -destination 'generic/platform=watchOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/WatchHybridDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
