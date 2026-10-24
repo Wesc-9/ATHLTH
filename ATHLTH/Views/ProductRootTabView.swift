@@ -4850,6 +4850,7 @@ struct ATHLTHTrainView: View {
         }
     }
 
+    @ViewBuilder
     private var todayContent: some View {
         HStack(
             alignment: .top,
