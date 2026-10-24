@@ -5,19 +5,72 @@ import Foundation
 /// Conversion below is an editor bridge for plan-generated workout suggestions,
 /// not an alternative format used during execution.
 enum ATHLTHUnifiedWorkout {
+    /// Every planner produces the same chronological phases. The run
+    /// template continues to own its intervals, recovery, zone and pace
+    /// targets; complementary exercises are inserted without modifying it.
+    /// This is a non-destructive projection for previews and future engine
+    /// handoffs. We do not run both a projected timeline and its source
+    /// template as two separate recordings.
     static func editorBlocks(from workout: PlannedSession) -> [WorkoutTemplateBlock] {
         if !workout.resolvedWorkoutBlocks.isEmpty {
             return workout.resolvedWorkoutBlocks
         }
 
         var blocks: [WorkoutTemplateBlock] = []
+        let runTemplates = workout.resolvedRunningWorkouts
 
-        // A suggested strength session is expanded into individually editable
-        // sets, so every load / repetition / recovery is visible on the timeline.
-        for exercise in workout.exercises {
+        appendExercises(
+            workout.exercises, phase: .warmup, to: &blocks
+        )
+        appendRunning(
+            runTemplates, phase: .warmup, to: &blocks
+        )
+        appendRunning(
+            runTemplates, phase: .main, to: &blocks
+        )
+        appendExercises(
+            workout.exercises, phase: .main, to: &blocks
+        )
+        appendRunning(
+            runTemplates, phase: .cooldown, to: &blocks
+        )
+        appendExercises(
+            workout.exercises, phase: .cooldown, to: &blocks
+        )
+
+        if blocks.isEmpty,
+           (workout.kind == .running || workout.kind == .walking),
+           (workout.targetDistanceKilometers != nil ||
+            workout.durationMinutes != nil) {
+            blocks.append(WorkoutTemplateBlock(
+                sequence: 1, kind: .run, title: workout.kind.title,
+                exerciseSlug: nil,
+                distanceMeters: workout.targetDistanceKilometers.map { $0 * 1_000 },
+                repetitions: nil,
+                durationSeconds: workout.targetDistanceKilometers == nil
+                    ? workout.durationMinutes.map { Double($0 * 60) } : nil,
+                targetWeightKilograms: nil, loadNote: nil,
+                notes: workout.notes, phase: .main,
+                targetPaceSecondsPerKilometer: workout.targetPaceSecondsPerKilometer
+            ))
+        }
+        return blocks
+    }
+
+    private static func appendExercises(
+        _ exercises: [PlannedExercise],
+        phase: WorkoutPhaseKind,
+        to blocks: inout [WorkoutTemplateBlock]
+    ) {
+        for exercise in exercises {
+            let assigned = exercise.workoutPhase ??
+                (exercise.isWarmUpExercise ? .warmup : .main)
+            guard assigned == phase else { continue }
             let targets = exercise.resolvedSetTargets
             for (index, target) in targets.enumerated() {
-                let work = WorkoutTemplateBlock(
+                let setPhase: WorkoutPhaseKind = (target.isWarmUp == true ||
+                    target.setType == .warmUp) ? .warmup : phase
+                var work = WorkoutTemplateBlock(
                     sequence: blocks.count + 1,
                     kind: .exercise,
                     title: exercise.embeddedExercise.name,
@@ -29,25 +82,25 @@ enum ATHLTHUnifiedWorkout {
                         target.weightKilograms ?? exercise.targetWeightKilograms,
                     loadNote: nil,
                     notes: target.notes ?? exercise.notes,
-                    phase: (target.isWarmUp ?? false) ? .warmup : .main
+                    phase: setPhase
                 )
-                var linkedWork = work
-                linkedWork.exerciseID = exercise.exerciseID
-                linkedWork.exerciseSnapshot = exercise.embeddedExercise
-                blocks.append(linkedWork)
+                work.exerciseID = exercise.exerciseID
+                work.exerciseSnapshot = exercise.embeddedExercise
+                blocks.append(work)
 
                 if index < targets.count - 1 {
-                    let pauseSeconds = target.restSeconds ??
+                    let restSeconds = target.restSeconds ??
                         exercise.restSeconds ?? 60
-                    if pauseSeconds > 0 {
+                    if restSeconds > 0 {
                         blocks.append(WorkoutTemplateBlock(
-                            sequence: blocks.count + 1, kind: .rest,
+                            sequence: blocks.count + 1,
+                            kind: .rest,
                             title: ATHLTHLocalization.choose(
                                 english: "Between sets", norwegian: "Mellom sett"
                             ),
                             exerciseSlug: nil, distanceMeters: nil,
                             repetitions: nil,
-                            durationSeconds: Double(pauseSeconds),
+                            durationSeconds: Double(restSeconds),
                             targetWeightKilograms: nil,
                             loadNote: nil, notes: nil, phase: .recovery
                         ))
@@ -55,23 +108,29 @@ enum ATHLTHUnifiedWorkout {
                 }
             }
         }
+    }
 
-        // Turn old plan-generated running intervals into the same ordered
-        // structure, including per-effort overrides and explicit recoveries.
-        for template in workout.resolvedRunningWorkouts {
+    private static func appendRunning(
+        _ templates: [RunningWorkoutTemplate],
+        phase: WorkoutPhaseKind,
+        to blocks: inout [WorkoutTemplateBlock]
+    ) {
+        for template in templates {
             for interval in template.blocks {
+                let blockPhase: WorkoutPhaseKind
+                switch interval.kind {
+                case .warmup: blockPhase = .warmup
+                case .cooldown: blockPhase = .cooldown
+                case .recovery, .work, .steady: blockPhase = .main
+                }
+                guard blockPhase == phase else { continue }
                 for repetition in 1...min(max(interval.repetitions, 1), 60) {
                     let target = interval.resolvedWork(at: repetition)
-                    let phase: WorkoutPhaseKind
-                    switch interval.kind {
-                    case .warmup: phase = .warmup
-                    case .cooldown: phase = .cooldown
-                    case .recovery: phase = .recovery
-                    case .work, .steady: phase = .main
-                    }
+                    let stepPhase: WorkoutPhaseKind =
+                        interval.kind == .recovery ? .recovery : blockPhase
                     blocks.append(step(
                         target, title: interval.title,
-                        phase: phase, sequence: blocks.count + 1,
+                        phase: stepPhase, sequence: blocks.count + 1,
                         notes: interval.notes
                     ))
                     if let rest = interval.resolvedRecovery(after: repetition) {
@@ -86,25 +145,6 @@ enum ATHLTHUnifiedWorkout {
                 }
             }
         }
-
-        if blocks.isEmpty,
-           workout.kind == .running || workout.kind == .walking,
-           workout.targetDistanceKilometers != nil ||
-           workout.durationMinutes != nil {
-            blocks.append(WorkoutTemplateBlock(
-                sequence: 1, kind: .run, title: workout.kind.title,
-                exerciseSlug: nil,
-                distanceMeters: workout.targetDistanceKilometers.map { $0 * 1_000 },
-                repetitions: nil,
-                durationSeconds: workout.targetDistanceKilometers == nil
-                    ? workout.durationMinutes.map { Double($0 * 60) } : nil,
-                targetWeightKilograms: nil, loadNote: nil,
-                notes: workout.notes, phase: .main,
-                targetPaceSecondsPerKilometer: workout.targetPaceSecondsPerKilometer
-            ))
-        }
-
-        return blocks
     }
 
     /// Strip parallel exercise and running representations when accepting a
