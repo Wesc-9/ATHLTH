@@ -28,7 +28,7 @@ struct WatchStrengthTimedSetPage: View {
     private func runningPhaseLabel(_ phase: String?) -> String {
         switch phase?.lowercased() {
         case "warmup": return tr("WARM-UP", "OPPVARMING")
-        case "work", "effort", "interval": return tr("WORK INTERVAL", "HOVEDDRAG")
+        case "main", "work", "effort", "interval": return tr("WORK INTERVAL", "HOVEDDRAG")
         case "recovery", "rest": return tr("RECOVERY", "PAUSE")
         case "cooldown": return tr("COOL-DOWN", "NEDJOGGING")
         default: return tr("RUNNING", "LØPING")
@@ -137,15 +137,25 @@ struct WatchStrengthTimedSetPage: View {
                         .tint(WatchTheme.premiumGold)
                         .accessibilityLabel(tr("Phase progress", "Fremdrift i delen"))
 
-                        if isRunning, !compact,
-                           let beltSpeed = session.manualTreadmillSpeedKilometersPerHour,
-                           beltSpeed.isFinite, beltSpeed > 0 {
-                            Text(String(format: tr(
-                                "SET SPEED %.1f km/h", "OPPGITT FART %.1f km/t"
-                            ), beltSpeed))
-                                .font(.system(size: 8, weight: .semibold))
-                                .foregroundStyle(WatchTheme.textSecondary)
-                                .lineLimit(1)
+                        if isRunning, !compact {
+                            if let pace = session.embeddedRunningTargetPaceSecondsPerKilometer,
+                               pace.isFinite, (60...3_600).contains(pace) {
+                                Text(String(format: tr(
+                                    "TARGET PACE %d:%02d min/km",
+                                    "MÅLTEMPO %d:%02d min/km"
+                                ), Int(pace) / 60, Int(pace) % 60))
+                                    .font(.system(size: 8, weight: .semibold))
+                                    .foregroundStyle(WatchTheme.textSecondary)
+                                    .lineLimit(1)
+                            } else if let beltSpeed = session.manualTreadmillSpeedKilometersPerHour,
+                                      beltSpeed.isFinite, beltSpeed > 0 {
+                                Text(String(format: tr(
+                                    "SET SPEED %.1f km/h", "OPPGITT FART %.1f km/t"
+                                ), beltSpeed))
+                                    .font(.system(size: 8, weight: .semibold))
+                                    .foregroundStyle(WatchTheme.textSecondary)
+                                    .lineLimit(1)
+                            }
                         }
 
                         Spacer(minLength: 1)
