@@ -2,6 +2,20 @@ import CoreLocation
 import Foundation
 import SwiftUI
 
+/// XCTest launches ATHLTH as a host process for model and persistence tests.
+/// Do not initialize the complete production scene, HealthKit mirroring or
+/// network connections just to establish the XCTest runner connection.
+/// This branch is only active when XCTest passes its test-host environment.
+private enum ATHLTHUnitTestHost {
+    static let isRunning: Bool = {
+        let environment = ProcessInfo.processInfo.environment
+        return environment["XCTestConfigurationFilePath"] != nil ||
+            environment["XCTestBundlePath"] != nil ||
+            environment["XCTestSessionIdentifier"] != nil ||
+            environment["ATHLTH_UNIT_TEST_HOST"] == "1"
+    }()
+}
+
 @main
 struct ATHLTHApp: App {
     @UIApplicationDelegateAdaptor(ATHLTHAppDelegate.self)
@@ -11,14 +25,22 @@ struct ATHLTHApp: App {
         // Scene state is deliberately owned by a View rather than captured by
         // WindowGroup. SwiftUI may evaluate the WindowGroup content closure
         // on its AsyncRenderer executor.
-        ATHLTHKeyboardCoordinator.shared.install()
+        if !ATHLTHUnitTestHost.isRunning {
+            ATHLTHKeyboardCoordinator.shared.install()
+        }
     }
 
     var body: some Scene {
         WindowGroup { @Sendable in
             // Explicitly non-actor-inheriting: SwiftUI can evaluate this
             // capture-free factory on its asynchronous renderer executor.
-            ATHLTHSceneRootView()
+            if ATHLTHUnitTestHost.isRunning {
+                // Unit tests exercise real models through @testable import;
+                // their host does not need production app startup side effects.
+                Color.clear
+            } else {
+                ATHLTHSceneRootView()
+            }
         }
     }
 }
