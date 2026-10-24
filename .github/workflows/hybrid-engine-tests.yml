@@ -15,6 +15,10 @@ on:
       - Tests/ATHLTHPlannedHybridLaunchTests.swift
       - Tests/ATHLTHUnifiedMixedWorkoutPlanTests.swift
       - Tests/ATHLTHLiveWorkoutEngineRouterTests.swift
+      - Tests/StrengthActiveExerciseQueueTests.swift
+      - ATHLTH/Strength/ActiveStrengthWorkoutView.swift
+      - ATHLTH/Strength/StrengthWorkoutModels.swift
+      - ATHLTH/Exercises/ExerciseLibraryViews.swift
 
 concurrency:
   group: athlth-v191-hybrid-tests-${{ github.ref }}
@@ -81,6 +85,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHPlannedHybridLaunchTests \
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutEngineRouterTests \
             -only-testing:ATHLTHTests/ATHLTHUnifiedMixedWorkoutPlanTests \
+            -only-testing:ATHLTHTests/StrengthActiveExerciseQueueTests \
             CODE_SIGNING_ALLOWED=NO \
             test
 
