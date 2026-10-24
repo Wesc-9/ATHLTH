@@ -50,7 +50,7 @@ struct PlannedWorkoutDetailView: View {
     }
 
     private var isStrengthCompleted: Bool {
-        matchingFinishedStrengthLogs.contains(\.isFullyCompleted)
+        matchingFinishedStrengthLogs.contains(where: \.isFullyCompleted)
     }
 
     private var isSkipped: Bool {
