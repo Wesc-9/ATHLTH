@@ -931,7 +931,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             let workout = destination.workout
             if let plan = session.trainingPlan(withID: destination.planID),
                let dayID = workoutDayID(workout, plan: plan) {
-                if plan.builderProfile?.mode == .advanced {
+                if advanced {
                     ATHLTHTrainWorkoutBuilderView(
                         planID: plan.id,
                         dayID: dayID,
@@ -2337,108 +2337,67 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private func premiumWorkoutStructure(_ workout: PlannedSession) -> some View {
         let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-        let targetZones = Array(Set(blocks.compactMap(\.targetHeartRateZone))).sorted()
-        let phasePlaylists = workout.resolvedRunningWorkouts
-            .flatMap(\.blocks)
-            .compactMap { block -> (String, SpotifyPlaylistReference)? in
-                guard let playlist = block.spotifyPlaylist else { return nil }
-                return (block.title, playlist)
-            }
-        return VStack(alignment: .leading, spacing: 13) {
-            if blocks.isEmpty {
-                Label(tr("No detailed steps have been registered.",
-                         "Økten har ingen detaljerte blokker ennå."),
-                      systemImage: "list.bullet")
-                    .font(.subheadline)
-                    .foregroundStyle(secondaryInk)
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(soft, in: RoundedRectangle(cornerRadius: 12))
-            } else {
-                HStack(alignment: .top, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Label(tr("Workout structure", "Øktstruktur"),
-                              systemImage: "list.number")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(graphite)
-                        ForEach(Array(blocks.prefix(16).enumerated()),
-                                id: \.offset) { index, block in
-                            premiumStructureBlock(block, preceding:
-                                index == 0 ? nil : blocks[index - 1])
-                        }
-                        if blocks.count > 16 {
-                            Text(tr("\(blocks.count - 16) more steps",
-                                    "\(blocks.count - 16) flere steg"))
-                                .font(.caption)
-                                .foregroundStyle(secondaryInk)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                    if !targetZones.isEmpty ||
-                       blocks.contains(where: { $0.targetPaceSecondsPerKilometer != nil }) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Label(tr("Targets", "Mål"),
-                                  systemImage: "chart.bar.fill")
-                                .font(.caption.weight(.semibold))
-                            if !targetZones.isEmpty {
-                                Text(tr("Heart-rate zone", "Pulssone") + " " +
-                                     targetZones.map(String.init).joined(separator: ", "))
-                                    .font(.caption)
-                                    .foregroundStyle(secondaryInk)
-                            }
-                            if let pace = blocks.compactMap(
-                                \.targetPaceSecondsPerKilometer).first,
-                               pace > 0 {
-                                Text(String(format: "%d:%02d min/km",
-                                            Int(pace) / 60, Int(pace) % 60))
-                                    .font(.caption)
-                                    .foregroundStyle(secondaryInk)
-                            }
-                        }
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(soft, in: RoundedRectangle(cornerRadius: 12))
-                    }
-                }
-            }
-            if !phasePlaylists.isEmpty {
-                VStack(alignment: .leading, spacing: 9) {
-                    Label(tr("Planned music", "Planlagt musikk"),
-                          systemImage: "music.note.list")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(graphite)
-                    ForEach(Array(phasePlaylists.enumerated()), id: \.offset) { item in
-                        HStack(spacing: 9) {
-                            Image(systemName: "music.note")
-                                .foregroundStyle(warmGold)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(item.element.0)
-                                    .font(.caption.weight(.semibold))
-                                Text(item.element.1.name)
-                                    .font(.caption)
-                                    .foregroundStyle(secondaryInk)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                    }
-                    Text(tr(
-                        "Playlist preferences are saved with their phases; automatic switching is not enabled.",
-                        "Spillelistene er lagret per del. Automatisk bytte mellom delene er ikke aktivert."
-                    ))
-                    .font(.caption2)
-                    .foregroundStyle(secondaryInk)
-                }
-                .padding(12)
-                .background(soft, in: RoundedRectangle(cornerRadius: 14))
-            }
-            if let duration = workout.durationMinutes, duration > 0 {
-                Label(tr("Estimated total", "Forventet totaltid") +
-                      " · \(duration) min", systemImage: "clock")
+        let visible = advanced ? blocks : Array(blocks.prefix(4))
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(tr("Workout timeline", "Øktens tidslinje"),
+                      systemImage: "list.number")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(graphite)
+                Spacer(minLength: 5)
+                Text("\(blocks.count) " + tr("blocks", "blokker"))
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+            }
+            if blocks.isEmpty {
+                Label(
+                    tr("No detailed steps have been registered.",
+                       "Ingen detaljerte øktblokker ennå."),
+                    systemImage: "square.stack.3d.up"
+                )
+                .font(.subheadline)
+                .foregroundStyle(secondaryInk)
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(soft, in: RoundedRectangle(cornerRadius: 12))
+            } else {
+                VStack(alignment: .leading, spacing: 9) {
+                    ForEach(Array(visible.enumerated()), id: \.offset) { index, block in
+                        premiumStructureBlock(
+                            block,
+                            preceding: index == 0 ? nil : visible[index - 1]
+                        )
+                    }
+                }
+                if blocks.count > visible.count {
+                    Button {
+                        advanced = true
+                    } label: {
+                        Label(
+                            tr("Show every workout detail", "Vis alle øktdetaljene"),
+                            systemImage: "arrow.down.right.and.arrow.up.left"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(graphite)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(soft, in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            if let minutes = workout.durationMinutes, minutes > 0 {
+                Label(tr("Planned duration", "Planlagt varighet") +
+                      " · \(minutes) min", systemImage: "clock")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(secondaryInk)
+            }
+            if let playlist = workout.spotifyPlaylist {
+                Label(playlist.name, systemImage: "music.note.list")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(secondaryInk)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func premiumStructureBlock(
@@ -2501,6 +2460,21 @@ struct ATHLTHTrainPlanPremiumView: View {
                 premiumFact(tr("Target distance", "Måldistanse"),
                             String(format: "%.1f km", distance),
                             symbol: "figure.run")
+            }
+            if let playlist = workout.spotifyPlaylist {
+                premiumFact(
+                    tr("Spotify playlist", "Spotify-spilleliste"),
+                    playlist.name,
+                    symbol: "music.note.list"
+                )
+            }
+            if workout.spotifyAutoplayOnStart != nil {
+                premiumFact(
+                    tr("Start music with workout", "Start musikk med økten"),
+                    workout.spotifyAutoplayOnStart == true
+                        ? tr("On", "På") : tr("Off", "Av"),
+                    symbol: "play.circle"
+                )
             }
             if let scheduled = workout.scheduledStart {
                 premiumFact(tr("Planned time", "Planlagt tidspunkt"),
