@@ -360,18 +360,8 @@ struct ATHLTHHomeDashboardHero: View {
                     alignment: .leading
                 )
 
-                weatherBadge
-                    .frame(
-                        width: min(160, max(78, proxy.size.width - 225)),
-                        alignment: .leading
-                    )
-                    .padding(.leading, 16)
-                    .padding(.top, 64)
-                    .frame(
-                        maxWidth: .infinity,
-                        maxHeight: .infinity,
-                        alignment: .topLeading
-                    )
+                // Weather is rendered beside search in the Home toolbar,
+                // not twice or against the left side of the hero.
             }
         }
         .frame(height: resolvedHeight)
