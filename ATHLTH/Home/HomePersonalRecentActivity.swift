@@ -4335,8 +4335,26 @@ private struct HomePersonalWorkoutVisual:
 
 private struct HomePersonalActivityDestination:
     View {
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var showingFollowUpPlanner = false
+
     let workout: SocialPublishableWorkout
     let strengthWorkout: StrengthWorkoutLog?
+
+    private var unfinishedStrengthWorkout: StrengthWorkoutLog? {
+        guard let strengthWorkout,
+              strengthWorkout.isFinished,
+              !StrengthWorkoutRemainder(workout: strengthWorkout).isEmpty
+        else { return nil }
+        return strengthWorkout
+    }
+
+    private var existingFollowUp: PlannedSession? {
+        guard let source = unfinishedStrengthWorkout else { return nil }
+        return session.standalonePlannedSessions.first {
+            $0.followUpSourceWorkoutID == source.id
+        }
+    }
 
     var body: some View {
         Group {
@@ -4347,21 +4365,65 @@ private struct HomePersonalActivityDestination:
                 HomeActivityRunDetailView(
                     workout: workout,
                     initialDetail: nil,
-                    initialAIInsight:
-                        nil
+                    initialAIInsight: nil
                 )
 
             case .strength:
                 HomeActivityStrengthDetailView(
                     workout: workout,
-                    strengthWorkout:
-                        strengthWorkout
+                    strengthWorkout: strengthWorkout
                 )
 
             default:
-                WorkoutHistoryDetailView(
-                    workout: workout
-                )
+                WorkoutHistoryDetailView(workout: workout)
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if unfinishedStrengthWorkout != nil {
+                VStack(spacing: 0) {
+                    if let followUp = existingFollowUp {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Remaining sets scheduled for \(followUp.scheduledStart?.formatted(date: .abbreviated, time: .omitted) ?? "")",
+                                norwegian: "Gjenstående sett er planlagt \(followUp.scheduledStart?.formatted(date: .abbreviated, time: .omitted) ?? "")"
+                            ),
+                            systemImage: "calendar.badge.checkmark"
+                        )
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(13)
+                    } else {
+                        Button {
+                            showingFollowUpPlanner = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Plan the rest",
+                                    norwegian: "Planlegg resten"
+                                ),
+                                systemImage: "calendar.badge.plus"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(13)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.white)
+                        .background(
+                            ATHLTHTheme.accentDeep,
+                            in: RoundedRectangle(cornerRadius: 15)
+                        )
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.vertical, 8)
+                .background(ATHLTHTheme.canvasTop.opacity(0.97))
+            }
+        }
+        .sheet(isPresented: $showingFollowUpPlanner) {
+            if let source = unfinishedStrengthWorkout {
+                StrengthFollowUpPlannerView(workout: source)
+                    .environmentObject(session)
             }
         }
     }
