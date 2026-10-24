@@ -164,7 +164,7 @@ struct ActiveStrengthWorkoutView: View {
                         Button {
                             showingExerciseQueue = true
                         } label: {
-                            Image(systemName: "list.number")
+                            Image(systemName: "list.bullet")
                                 .font(.system(size: 16, weight: .semibold))
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                 .frame(width: 40, height: 40)
@@ -1793,44 +1793,6 @@ struct ActiveStrengthWorkoutView: View {
                 workout
             )
 
-            HStack(spacing: 9) {
-                Image(systemName: exercise.isEmbeddedRunningInterval == true
-                      ? "figure.run" : "dumbbell.fill")
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(exercise.isEmbeddedRunningInterval == true
-                     ? ATHLTHLocalization.choose(
-                        english: "Treadmill mode",
-                        norwegian: "Møllemodus"
-                     )
-                     : ATHLTHLocalization.choose(
-                        english: "Strength mode",
-                        norwegian: "Styrkemodus"
-                     ))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                Spacer(minLength: 2)
-                Button {
-                    showingAppendWorkout = true
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Add / switch workout",
-                            norwegian: "Legg til / bytt økt"
-                        ),
-                        systemImage: "arrow.left.arrow.right"
-                    )
-                    .font(.caption.weight(.bold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .frame(minHeight: 44)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 12)
-            .background(
-                ATHLTHTheme.champagneSoft.opacity(0.55),
-                in: RoundedRectangle(cornerRadius: 16)
-            )
-
             if workoutComplete {
                 focusedBetweenExerciseRestCard(workout)
             }
@@ -2019,25 +1981,13 @@ struct ActiveStrengthWorkoutView: View {
                         }
                     }
                 } else if strength.isResting {
-                    VStack(spacing: 12) {
-                        focusedSetRest(
-                            exercise: exercise
-                        )
-
-                        if let latest =
-                                latestCompletedSet(
-                                    in: exercise
-                                ) {
-                            postSetResultButton(
-                                exercise: exercise,
-                                set: latest
-                            )
-                        }
-                    }
+                    // Rest countdown and continuation stay visible in the
+                    // bottom dock even when the athlete scrolls the hero.
+                    EmptyView()
                 } else {
-                    focusedSetEntry(
-                        exercise: exercise
-                    )
+                    // Live set registration is now anchored outside ScrollView
+                    // to keep the current set visible at every scroll offset.
+                    EmptyView()
                 }
                 }
             }
@@ -5467,11 +5417,9 @@ struct ActiveStrengthWorkoutView: View {
                             }
                         } label: {
                             HStack(spacing: 5) {
-                                Text(active.barWeightKilograms.map {
-                                    String(format: "%.0f kg", $0)
-                                } ?? ATHLTHLocalization.choose(
-                                    english: "Choose",
-                                    norwegian: "Velg"
+                                Text(String(
+                                    format: "%.0f kg",
+                                    active.barWeightKilograms ?? 20
                                 ))
                                 Image(systemName: "chevron.up.chevron.down")
                             }
@@ -11270,11 +11218,16 @@ private struct StrengthQueueArtwork: View {
 /// Explicit detection prevents a bar-weight control on dumbbells,
 /// resistance machines and bodyweight exercises. Smith machine bars can
 /// vary, so their mass is always selected by the athlete.
-private enum StrengthBarbellExercisePolicy {
+enum StrengthBarbellExercisePolicy {
     static func usesBar(_ exercise: StrengthExerciseLog) -> Bool {
-        let terms = ([exercise.exercise.name,
-                      exercise.exercise.displayName] +
-                     exercise.exercise.equipment).joined(separator: " ").lowercased()
+        usesBarEquipment(
+            name: exercise.exercise.name,
+            equipment: exercise.exercise.equipment
+        )
+    }
+
+    static func usesBarEquipment(name: String, equipment: [String]) -> Bool {
+        let terms = ([name] + equipment).joined(separator: " ").lowercased()
         if ["dumbbell", "manual", "kettlebell", "hantel", "cable",
             "kabel", "bodyweight"].contains(where: terms.contains) {
             return false
@@ -11442,10 +11395,9 @@ private struct StrengthActiveExerciseQueueView: View {
                                             }
                                         } label: {
                                             HStack(spacing: 4) {
-                                                Text(exercise.barWeightKilograms.map {
-                                                    String(format: "%.0f kg", $0)
-                                                } ?? ATHLTHLocalization.choose(
-                                                    english: "Select", norwegian: "Velg"
+                                                Text(String(
+                                                    format: "%.0f kg",
+                                                    exercise.barWeightKilograms ?? 20
                                                 ))
                                                 Image(systemName: "chevron.up.chevron.down")
                                             }
