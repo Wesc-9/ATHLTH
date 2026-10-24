@@ -2982,7 +2982,8 @@ struct TrophyUnlockRevealView: View {
     }
 
     private var verification: String {
-        if unlock.verificationSource == .athlth {
+        if unlock.verificationSource == .athlth ||
+           unlock.verificationSource == .mixed {
             return ATHLTHLocalization.choose(english: "Verified by ATHLTH",
                                              norwegian: "Verifisert av ATHLTH")
         }
