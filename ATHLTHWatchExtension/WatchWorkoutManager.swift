@@ -180,11 +180,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var strengthSession:
         WatchStrengthSessionSnapshot?
     @Published private(set) var strengthActionPending = false
-    // Optimistic weight edits stay authoritative briefly while the iPhone
-    // acknowledges the newest value. Without this, delayed snapshots undo
-    // consecutive taps and the Digital Crown appears to bounce.
+    // Keep the newest Crown edit visible while iPhone acknowledgements are
+    // in flight. Scope it to one set: never carry a pending load into the
+    // next set or exercise when an authoritative snapshot advances the queue.
     private var pendingStrengthWeight: (
-        workoutID: UUID, value: Double, changedAt: Date
+        workoutID: UUID, exerciseIndex: Int, setIndex: Int,
+        value: Double, changedAt: Date
     )?
     @Published private(set) var liveSurfaceConfiguration:
         ATHLTHLiveWorkoutSurfaceConfiguration =
@@ -1154,13 +1155,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         var accepted = snapshot
         if let pending = pendingStrengthWeight {
-            if pending.workoutID != snapshot.workoutID {
+            if pending.workoutID != snapshot.workoutID ||
+                pending.exerciseIndex != snapshot.exerciseIndex ||
+                pending.setIndex != snapshot.setIndex {
                 pendingStrengthWeight = nil
             } else if abs(snapshot.draftWeightKilograms - pending.value) < 0.001 {
                 pendingStrengthWeight = nil
-            } else if Date().timeIntervalSince(pending.changedAt) < 2.0 {
-                // Do not replace a just-edited 60 kg with an older 57.5 kg
-                // while connectivity delivers the intermediate snapshot.
+            } else if Date().timeIntervalSince(pending.changedAt) < 5.0 {
+                // WatchConnectivity can deliver intermediate snapshots after
+                // several Crown detents; do not bounce back to an older load.
                 accepted.draftWeightKilograms = pending.value
             } else {
                 pendingStrengthWeight = nil
@@ -2089,6 +2092,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             snapshot.draftWeightKilograms = total
             pendingStrengthWeight = (
                 workoutID: snapshot.workoutID,
+                exerciseIndex: snapshot.exerciseIndex,
+                setIndex: snapshot.setIndex,
                 value: total,
                 changedAt: Date()
             )
@@ -3690,6 +3695,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.treadmillInclinePercent = nil
             self.structuredStepIndex = 0
             self.strengthSession = nil
+            self.pendingStrengthWeight = nil
             self.strengthActionPending = false
             self.liveSurfaceContext = .empty
             self.completedResult = nil
