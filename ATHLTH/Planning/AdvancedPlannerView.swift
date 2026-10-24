@@ -7252,6 +7252,18 @@ struct SessionEditorView: View {
                                     .foregroundStyle(ATHLTHPlanDesign.ink)
                                     .lineLimit(2)
 
+                                if kind == .running &&
+                                   !selectedRunningWorkouts.isEmpty {
+                                    let placement = planned.workoutPhase ??
+                                        (planned.isWarmUpExercise ? .warmup : .main)
+                                    Label(
+                                        placement.title.uppercased(),
+                                        systemImage: placement.symbol
+                                    )
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                }
+
                                 if planned.isWarmUpExercise {
                                     Label(
                                         ATHLTHLocalization.choose(
@@ -7385,6 +7397,45 @@ struct SessionEditorView: View {
                             )
                         }
                         .tint(ATHLTHTheme.accentDeep)
+                    }
+
+                    if kind == .running && !selectedRunningWorkouts.isEmpty {
+                        HStack(spacing: 8) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Position in workout",
+                                norwegian: "Plassering i økten"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            Spacer()
+                            Menu {
+                                ForEach(
+                                    [WorkoutPhaseKind.warmup, .main, .cooldown],
+                                    id: \.self
+                                ) { phase in
+                                    Button {
+                                        var updated = plannedExercises[index]
+                                        updated.workoutPhase = phase
+                                        if phase == .warmup {
+                                            updated.setEntireExerciseWarmUp(true)
+                                        } else if updated.isWarmUpExercise {
+                                            updated.setEntireExerciseWarmUp(false)
+                                        }
+                                        plannedExercises[index] = updated
+                                    } label: {
+                                        Label(phase.title, systemImage: phase.symbol)
+                                    }
+                                }
+                            } label: {
+                                HStack(spacing: 5) {
+                                    Text((planned.workoutPhase ??
+                                          (planned.isWarmUpExercise ? .warmup : .main)).title)
+                                    Image(systemName: "chevron.up.chevron.down")
+                                }
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            }
+                        }
                     }
 
                     if index > 0 && editorMode == .advanced {
@@ -8566,6 +8617,17 @@ struct SessionEditorView: View {
                 } else {
                     ForEach(Array(selectedRunningWorkouts.enumerated()), id: \.element.id) { index, workout in
                         VStack(alignment: .leading, spacing: 11) {
+                            // Place the interval summary at the top of its
+                            // own card, above editing controls and phase targets.
+                            let recipeDescription = workout.summary
+                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                            if !recipeDescription.isEmpty {
+                                Text(recipeDescription)
+                                    .font(.subheadline)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+
                             HStack(spacing: 11) {
                                 Image(systemName: workout.type.systemImage)
                                     .font(.title3)
