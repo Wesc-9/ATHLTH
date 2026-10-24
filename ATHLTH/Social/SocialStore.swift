@@ -1297,6 +1297,12 @@ final class SocialStore: ObservableObject {
                 participantID: participant.id,
                 captureDevice: captureDevice
             )
+            // Keep the recording-device choice made inside the ready
+            // lobby for the actual scheduled-workout launch.
+            if workoutSessions.first(where: { $0.id == sessionID })?
+                .creatorID == currentUserID {
+                creatorCaptureDevices[sessionID] = captureDevice
+            }
             try await refreshWorkoutLobby(
                 sessionID: sessionID
             )
