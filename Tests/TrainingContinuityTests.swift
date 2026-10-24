@@ -47,6 +47,43 @@ final class TrainingContinuityTests: XCTestCase {
     }
 
     @MainActor
+    func testRepeatedStrengthStartKeepsUnfinishedWorkout() {
+        let owner = UUID()
+        defer { clear(owner) }
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: nil)
+
+        let firstID = store.activeWorkout?.id
+        XCTAssertNotNil(firstID)
+
+        // A second button tap must not silently discard the first log.
+        store.startFreestyle(watchSessionID: nil)
+        XCTAssertEqual(store.activeWorkout?.id, firstID)
+
+        let planned = PlannedSession(
+            id: UUID(),
+            title: "Second session",
+            kind: .strength,
+            scheduledStart: nil,
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: nil,
+            runningWorkout: nil
+        )
+        store.start(
+            session: planned,
+            watchSessionID: nil,
+            trackingMode: .simple,
+            captureDevice: .iPhone
+        )
+        XCTAssertEqual(store.activeWorkout?.id, firstID)
+    }
+
+    @MainActor
     func testBasicStrengthKeepsBasicModeWhenAddingExercise() {
         let owner = UUID()
         defer { clear(owner) }
