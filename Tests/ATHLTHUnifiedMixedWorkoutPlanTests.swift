@@ -118,4 +118,81 @@ final class ATHLTHUnifiedMixedWorkoutPlanTests: XCTestCase {
         XCTAssertEqual(steps.last?.resolvedPhase, .cooldown)
         XCTAssertEqual(steps.filter { $0.kind == .exercise }.count, 0)
     }
+
+    func testPlanStudioTreadmillInclineSurvivesGroupedIntervalsAndSaving() throws {
+        let groupID = UUID()
+        var work = WorkoutTemplateBlock(
+            sequence: 1,
+            kind: .run,
+            title: "4-minute treadmill effort",
+            exerciseSlug: nil,
+            distanceMeters: nil,
+            repetitions: nil,
+            durationSeconds: 240,
+            targetWeightKilograms: nil,
+            loadNote: nil,
+            notes: nil,
+            phase: .main,
+            targetPaceSecondsPerKilometer: 285,
+            targetHeartRateZone: 4
+        )
+        work.isIndoor = true
+        work.groupID = groupID
+        work.groupKind = .intervals
+        work.groupRounds = 4
+        work.treadmillInclinePercent = 2.5
+
+        var recovery = WorkoutTemplateBlock(
+            sequence: 2,
+            kind: .rest,
+            title: "2-minute recovery",
+            exerciseSlug: nil,
+            distanceMeters: nil,
+            repetitions: nil,
+            durationSeconds: 120,
+            targetWeightKilograms: nil,
+            loadNote: nil,
+            notes: nil,
+            phase: .recovery
+        )
+        recovery.groupID = groupID
+        recovery.groupKind = .intervals
+        recovery.groupRounds = 4
+
+        let saved = try JSONDecoder().decode(
+            [WorkoutTemplateBlock].self,
+            from: JSONEncoder().encode([work, recovery])
+        )
+        XCTAssertEqual(saved[0].treadmillInclinePercent, 2.5)
+        XCTAssertTrue(saved[0].targetText?.contains("2.5 %") == true)
+
+        let execution = saved.expandedForExecution()
+        XCTAssertEqual(execution.filter { $0.kind == .run }.count, 4)
+        XCTAssertEqual(execution.filter { $0.kind == .rest }.count, 3)
+        XCTAssertTrue(execution.filter { $0.kind == .run }
+            .allSatisfy { $0.treadmillInclinePercent == 2.5 })
+        XCTAssertTrue(execution.filter { $0.kind == .rest }
+            .allSatisfy { $0.treadmillInclinePercent == nil })
+    }
+
+    func testLegacyPlanBlocksDecodeWithoutInclineTarget() throws {
+        let old = WorkoutTemplateBlock(
+            sequence: 1,
+            kind: .run,
+            title: "Original outdoors",
+            exerciseSlug: nil,
+            distanceMeters: 5_000,
+            repetitions: nil,
+            durationSeconds: nil,
+            targetWeightKilograms: nil,
+            loadNote: nil,
+            notes: nil
+        )
+        let recovered = try JSONDecoder().decode(
+            WorkoutTemplateBlock.self,
+            from: JSONEncoder().encode(old)
+        )
+        XCTAssertNil(recovered.treadmillInclinePercent)
+        XCTAssertEqual(recovered.title, "Original outdoors")
+    }
 }
