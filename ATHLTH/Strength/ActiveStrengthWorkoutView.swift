@@ -607,14 +607,16 @@ struct ActiveStrengthWorkoutView: View {
                 updateScreenAwakeState()
                 if phase == .background {
                     strength.checkpoint()
-                } else if phase == .active {
+                } else if phase == .active &&
+                          strength.controlsEmbeddedHybridClockOnIPhone {
                     strength.advanceEmbeddedIntervalIfNeeded()
                 }
             }
             .onReceive(
                 Timer.publish(every: 1, on: .main, in: .common).autoconnect()
             ) { timestamp in
-                if strength.currentExercise?.isEmbeddedRunningInterval == true {
+                if strength.controlsEmbeddedHybridClockOnIPhone &&
+                    strength.currentExercise?.isEmbeddedRunningInterval == true {
                     strength.advanceEmbeddedIntervalIfNeeded(at: timestamp)
                 }
             }
@@ -627,8 +629,9 @@ struct ActiveStrengthWorkoutView: View {
                 if let workout = strength.activeWorkout,
                    workout.captureDevice == .appleWatch,
                    strength.currentExercise?.isEmbeddedRunningInterval == true,
-                   workoutMirroring.snapshot?.kind == .strength ||
-                   workoutMirroring.snapshot?.kind == .functional {
+                   strength.controlsEmbeddedHybridClockOnIPhone,
+                   (workoutMirroring.snapshot?.kind == .strength ||
+                    workoutMirroring.snapshot?.kind == .functional) {
                     if newState == .paused {
                         strength.pauseTimedSet()
                     } else if previousState == .paused &&
