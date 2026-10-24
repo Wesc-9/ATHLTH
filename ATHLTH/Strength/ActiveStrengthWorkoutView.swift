@@ -5428,11 +5428,29 @@ struct ActiveStrengthWorkoutView: View {
                         .font(.system(size: 10, weight: .semibold))
                         .tracking(1.2)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        Text(end, style: .timer)
-                            .font(.system(size: 34, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            .contentTransition(.numericText())
+                        TimelineView(.periodic(from: .now, by: 1)) { context in
+                            let remaining = end.timeIntervalSince(context.date)
+                            Text(remaining > 0
+                                 ? max(0, remaining).clockDuration
+                                 : "+" + max(0, -remaining).clockDuration)
+                                .font(.system(
+                                    size: 34, weight: .semibold, design: .rounded
+                                ))
+                                .monospacedDigit()
+                                .foregroundStyle(remaining > 0
+                                    ? ATHLTHPlanDesign.ink
+                                    : ATHLTHPlanDesign.accentInk)
+                                .contentTransition(.numericText())
+                                .accessibilityLabel(remaining > 0
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Time remaining in rest",
+                                        norwegian: "Tid igjen av pausen"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Extra rest time",
+                                        norwegian: "Ekstra pausetid"
+                                    ))
+                        }
                     }
                     Spacer()
                     Button {
@@ -5581,10 +5599,16 @@ struct ActiveStrengthWorkoutView: View {
     ) -> some View {
         compactLiveMetric(
             title: title,
-            display: String(format: "%.1f", value.wrappedValue),
             decrement: { value.wrappedValue = max(0, value.wrappedValue - step) },
             increment: { value.wrappedValue = min(999, value.wrappedValue + step) }
-        )
+        ) {
+            TextField(
+                "0",
+                value: value,
+                format: .number.precision(.fractionLength(0...1))
+            )
+            .keyboardType(.decimalPad)
+        }
     }
 
     private func compactLiveIntegerMetric(
@@ -5592,16 +5616,19 @@ struct ActiveStrengthWorkoutView: View {
     ) -> some View {
         compactLiveMetric(
             title: title,
-            display: "\(value.wrappedValue)",
             decrement: { value.wrappedValue = max(0, value.wrappedValue - step) },
             increment: { value.wrappedValue = min(7_200, value.wrappedValue + step) }
-        )
+        ) {
+            TextField("0", value: value, format: .number)
+                .keyboardType(.numberPad)
+        }
     }
 
-    private func compactLiveMetric(
-        title: String, display: String,
+    private func compactLiveMetric<Content: View>(
+        title: String,
         decrement: @escaping () -> Void,
-        increment: @escaping () -> Void
+        increment: @escaping () -> Void,
+        @ViewBuilder input: () -> Content
     ) -> some View {
         VStack(spacing: 6) {
             Text(title)
@@ -5615,13 +5642,18 @@ struct ActiveStrengthWorkoutView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                Text(display)
+                input()
                     .font(.system(size: 23, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .multilineTextAlignment(.center)
                     .lineLimit(1)
                     .minimumScaleFactor(0.65)
                     .frame(maxWidth: .infinity)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Enter a number or use the minus and plus buttons",
+                        norwegian: "Skriv inn tall eller bruk minus- og plussknappene"
+                    ))
                 Button(action: increment) {
                     Image(systemName: "plus")
                         .font(.system(size: 14, weight: .semibold))
