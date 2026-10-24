@@ -1,6 +1,6 @@
 # ATHLTH: én planleggingsmotor, tilpassede live-motorer
 
-Status: 1.9.1 – planprosjeksjon og UI-ruting implementert; sensorbasert hybridopptak ikke aktivert.
+Status: 1.9.1 – planprosjeksjon, UI-ruting og begrenset fellesopptak for planlagt styrke + tidsstyrt tredemølle er koblet inn i kalendervisningen. Kode-/simulatortester er satt opp; fysisk Watch-verifikasjon gjenstår.
 
 ## Ett felles øktoppsett
 
@@ -36,7 +36,25 @@ Overgangen mellom trinn må bevare PlannedSession.id, samlet tidslinje og
 opptaksidentitet. Et bytte av kort eller motor er **ikke** autorisasjon til
 å starte en ny HealthKit-trening eller lagre en egen treningsøkt.
 
-## Sensor- og opptakskoordinator (ikke implementert)
+## Delvis aktivert opptak (1.9.1)
+
+`ATHLTHHybridWorkoutLaunchPlan` validerer hele planen *før* start.
+For en planlagt kalenderøkt med både styrke og tidsstyrte
+tredemølleblokker lager den en faseordnet serie som sendes til
+`StrengthWorkoutStore.startPlannedHybrid`. Den eksisterende
+`StrengthWorkoutStore` eier opptaket og bytter internt mellom styrkesett og
+innebygde løpeintervaller, med samme `plannedSessionID` og `watchSessionID`.
+Én start på Apple Watch bruker foreløpig HealthKit-styrketype og blir
+derfor **ikke** en fullverdig GPS-/løpe-HealthKit-motor.
+
+Ustøttede kombinasjoner, som GPS-ruter eller distansebaserte drag, avvises
+fremfor å starte en run-only-økt og miste styrkedelen.
+
+Testjobber (ingen TestFlight-opplasting):
+- `.github/workflows/launch-smoke.yml` – iPhone simulator build/launch
+- `.github/workflows/hybrid-engine-tests.yml` – målrettede XCTest-suiter
+
+## Fremtidig sensor- og opptakskoordinator (ikke implementert)
 
 Én sentral runtime-koordinator skal eie:
 
