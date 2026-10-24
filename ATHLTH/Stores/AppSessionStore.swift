@@ -1210,17 +1210,22 @@ final class AppSessionStore: ObservableObject {
                 continue
             }
 
-            if strengthHistory.contains(
-                where: {
-                    $0.isFinished &&
-                    $0.plannedSessionID == planned.id
-                }
-            ) {
+            let matchingStrengthLogs = strengthHistory.filter {
+                $0.isFinished && $0.plannedSessionID == planned.id
+            }
+            if matchingStrengthLogs.contains(where: \.isFullyCompleted) {
                 completedIDs.insert(planned.id)
                 continue
             }
 
-            if verifiedHealthIDs.contains(planned.id) {
+            // A partial strength workout also creates a HealthKit workout.
+            // Never use that Health record to turn an unfinished plan into
+            // a completed one. Manually confirmed completion is handled above.
+            let nativePartialStrengthLog =
+                planned.kind == .strength &&
+                !matchingStrengthLogs.isEmpty
+            if verifiedHealthIDs.contains(planned.id) &&
+                !nativePartialStrengthLog {
                 completedIDs.insert(planned.id)
             }
         }
