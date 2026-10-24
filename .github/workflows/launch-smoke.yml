@@ -118,6 +118,12 @@ jobs:
 
           cat "$DEVICE_MATRIX"
 
+          # The previous build step places the simulator .app in DerivedData.
+          # Resolve it explicitly: this step uses `set -u` and cannot rely on
+          # an undeclared APP shell variable.
+          APP="$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator/ATHLTH.app"
+          test -d "$APP"
+
           cleanup_device() {
             local udid="$1"
             # These are registered runner-owned simulators, not temporary
