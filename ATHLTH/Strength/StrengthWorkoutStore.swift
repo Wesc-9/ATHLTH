@@ -1321,6 +1321,7 @@ final class StrengthWorkoutStore: ObservableObject {
         else { return false }
 
         let previouslySelectedID = currentExercise?.id
+        let previouslySelectedSetID = currentSet?.id
         let removed = workout.exercises.remove(at: index)
         for set in removed.sets {
             cardioWatchCaptures.removeValue(forKey: set.id)
@@ -1337,6 +1338,8 @@ final class StrengthWorkoutStore: ObservableObject {
             max(min(index, workout.exercises.count - 1), 0)
         currentSetIndex = workout.exercises.indices.contains(currentExerciseIndex)
             ? (workout.exercises[currentExerciseIndex].sets.firstIndex(where: {
+                $0.id == previouslySelectedSetID
+            }) ?? workout.exercises[currentExerciseIndex].sets.firstIndex(where: {
                 !$0.isCompleted
             }) ?? 0) : 0
 
