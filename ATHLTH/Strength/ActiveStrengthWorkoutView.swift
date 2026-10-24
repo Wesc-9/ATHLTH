@@ -4662,7 +4662,7 @@ struct ActiveStrengthWorkoutView: View {
             fallbackName: exercise.exercise.name
         )
         let secondary = focusedExerciseRegions(
-            exercise.exercise.secondaryMuscles,
+            exercise.exercise.secondaryMuscles ?? [],
             fallbackName: nil
         ).subtracting(primary)
         let regions = primary.union(secondary)
@@ -4703,10 +4703,11 @@ struct ActiveStrengthWorkoutView: View {
                 .font(.caption.weight(.medium))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
             }
-            if !exercise.exercise.secondaryMuscles.isEmpty {
+            if let secondaryMuscles = exercise.exercise.secondaryMuscles,
+               !secondaryMuscles.isEmpty {
                 Text(ATHLTHLocalization.choose(
                     english: "Secondary: ", norwegian: "Sekundær: "
-                ) + exercise.exercise.secondaryMuscles.joined(separator: " · "))
+                ) + secondaryMuscles.joined(separator: " · "))
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
