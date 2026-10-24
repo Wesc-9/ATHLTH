@@ -3034,38 +3034,7 @@ struct ATHLTHHomeView: View {
     private func homeTodaySessions(
         in plan: TrainingPlan
     ) -> [PlannedSession] {
-        let calendar = Calendar.current
-        let weekday = calendar.component(.weekday, from: Date())
-        let dayIndex = ((weekday + 5) % 7) + 1
-
-        let week: TrainingPlanWeek?
-
-        if let startDate = plan.startDate {
-            let start = calendar.startOfDay(for: startDate)
-            let today = calendar.startOfDay(for: Date())
-            let days = max(
-                calendar.dateComponents(
-                    [.day],
-                    from: start,
-                    to: today
-                ).day ?? 0,
-                0
-            )
-            let weekIndex = min(
-                days / 7,
-                max(plan.weeks.count - 1, 0)
-            )
-            week = plan.weeks.indices.contains(weekIndex)
-                ? plan.weeks[weekIndex]
-                : plan.weeks.first
-        } else {
-            week = plan.weeks.first
-        }
-
-        return week?
-            .days
-            .first(where: { $0.dayIndex == dayIndex })?
-            .sessions ?? []
+        TrainingPlanSchedule.sessions(in: plan, on: Date())
     }
 
     private func homeSessionSummary(
@@ -5907,6 +5876,15 @@ struct ATHLTHTrainView: View {
             planID: plan.id,
             sessions: sessions
         )
+        let strengthCompletedIDs = Set(
+            strengthWorkout.workoutHistory.compactMap { log -> UUID? in
+                guard log.isFinished,
+                      let plannedID = log.plannedSessionID,
+                      sessions.contains(where: { $0.id == plannedID })
+                else { return nil }
+                return plannedID
+            }
+        )
 
         ATHLTHCard {
             HStack(spacing: 10) {
@@ -5965,6 +5943,8 @@ struct ATHLTHTrainView: View {
                             planID: plan.id,
                             isHealthCompleted:
                                 healthCompletedIDs.contains(workout.id),
+                            isStrengthCompleted:
+                                strengthCompletedIDs.contains(workout.id),
                             isManuallyCompleted:
                                 manuallyCompletedIDs.contains(workout.id),
                             isFirst: index == 0,
@@ -6046,11 +6026,17 @@ struct ATHLTHTrainView: View {
         _ workout: PlannedSession,
         planID: UUID,
         isHealthCompleted: Bool,
+        isStrengthCompleted: Bool,
         isManuallyCompleted: Bool,
         isFirst: Bool,
         isLast: Bool
     ) -> some View {
-        let isCompleted = isHealthCompleted || isManuallyCompleted
+        let isCompleted =
+            isHealthCompleted || isStrengthCompleted || isManuallyCompleted
+        let isSkipped = session.isPlanSessionSkipped(
+            planID: planID,
+            sessionID: workout.id
+        )
 
         Button {
             selectedPlanWorkout = PlannedWorkoutSelection(
@@ -6118,7 +6104,8 @@ struct ATHLTHTrainView: View {
                     Text(
                         todayPlanStatus(
                             workout,
-                            isCompleted: isCompleted
+                            isCompleted: isCompleted,
+                            isSkipped: isSkipped
                         )
                     )
                     .font(.caption.weight(isCompleted ? .semibold : .regular))
@@ -6131,6 +6118,10 @@ struct ATHLTHTrainView: View {
 
                     if isHealthCompleted {
                         Label("Health", systemImage: "heart.fill")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    } else if isStrengthCompleted {
+                        Text("ATHLTH")
                             .font(.system(size: 9, weight: .medium))
                             .foregroundStyle(ATHLTHTheme.mutedText)
                     } else if isManuallyCompleted {
@@ -6165,10 +6156,18 @@ struct ATHLTHTrainView: View {
 
     private func todayPlanStatus(
         _ workout: PlannedSession,
-        isCompleted: Bool
+        isCompleted: Bool,
+        isSkipped: Bool
     ) -> String {
         if isCompleted {
-            return "Completed"
+            return ATHLTHLocalization.choose(
+                english: "Completed", norwegian: "Fullført"
+            )
+        }
+        if isSkipped {
+            return ATHLTHLocalization.choose(
+                english: "Skipped", norwegian: "Hoppet over"
+            )
         }
 
         if let scheduledStart = workout.scheduledStart {
@@ -6200,85 +6199,17 @@ struct ATHLTHTrainView: View {
     private func healthCompletedTodaySessionIDs(
         _ sessions: [PlannedSession]
     ) -> Set<UUID> {
-        let calendar = Calendar.current
-        var unusedWorkouts = health.workouts
-            .filter { calendar.isDateInToday($0.startDate) }
-            .sorted { $0.startDate < $1.startDate }
-
-        var result = Set<UUID>()
-
-        for session in sessions {
-            guard let matchIndex = unusedWorkouts.firstIndex(where: {
-                healthWorkout($0, matches: session)
-            }) else {
-                continue
-            }
-
-            result.insert(session.id)
-            unusedWorkouts.remove(at: matchIndex)
-        }
-
-        return result
-    }
-
-    private func healthWorkout(
-        _ workout: WorkoutSummary,
-        matches session: PlannedSession
-    ) -> Bool {
-        switch session.kind {
-        case .running:
-            return workout.activity == .running
-        case .walking:
-            return workout.activity == .walking || workout.activity == .hiking
-        case .strength:
-            return workout.activity == .strength
-        case .mobility:
-            return workout.activity == .yoga || workout.activity == .coreTraining
-        case .recovery:
-            return false
-        case .custom:
-            return workout.activity == .hiit ||
-                workout.activity == .rowing ||
-                workout.activity == .cycling ||
-                workout.activity == .stairClimbing ||
-                workout.activity == .other
-        }
+        TrainingPlanSchedule.confidentHealthCompletionIDs(
+            sessions: sessions,
+            healthWorkouts: health.workouts,
+            on: Date()
+        )
     }
 
     private func todaySessions(
         in plan: TrainingPlan
     ) -> [PlannedSession] {
-        let calendar = Calendar.current
-        let weekday = calendar.component(.weekday, from: Date())
-        let dayIndex = ((weekday + 5) % 7) + 1
-
-        let week: TrainingPlanWeek?
-        if let startDate = plan.startDate {
-            let start = calendar.startOfDay(for: startDate)
-            let today = calendar.startOfDay(for: Date())
-            let days = max(
-                calendar.dateComponents(
-                    [.day],
-                    from: start,
-                    to: today
-                ).day ?? 0,
-                0
-            )
-            let weekIndex = min(
-                days / 7,
-                max(plan.weeks.count - 1, 0)
-            )
-            week = plan.weeks.indices.contains(weekIndex)
-                ? plan.weeks[weekIndex]
-                : plan.weeks.first
-        } else {
-            week = plan.weeks.first
-        }
-
-        return week?
-            .days
-            .first(where: { $0.dayIndex == dayIndex })?
-            .sessions ?? []
+        TrainingPlanSchedule.sessions(in: plan, on: Date())
     }
 
     private func todaySessionSummary(
