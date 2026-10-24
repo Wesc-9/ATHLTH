@@ -9277,12 +9277,6 @@ struct ATHLTHProgressView: View {
         .progressReferenceCard()
     }
 
-gthWorkout,
-                goals: goalStore
-            )
-        }
-    }
-
     private var progressWithoutHealthCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
