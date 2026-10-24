@@ -185,7 +185,11 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
             XCTAssertEqual(plan.hybridPhaseTitle, source.hybridPhaseTitle)
             XCTAssertEqual(plan.hybridPhaseKind, source.hybridPhaseKind)
             XCTAssertEqual(plan.hybridTargetHeartRateZone, source.hybridTargetHeartRateZone)
+            XCTAssertEqual(plan.hybridTargetPaceSecondsPerKilometer,
+                           source.hybridTargetPaceSecondsPerKilometer)
         }
+        XCTAssertEqual(watch.embeddedRunningTargetPaceSecondsPerKilometer,
+                       run.sets[0].hybridTargetPaceSecondsPerKilometer)
     }
 
     @MainActor
