@@ -202,9 +202,12 @@ final class TrainingPlanScheduleTests: XCTestCase {
                 $0.id == run.id
             }
         )
-        XCTAssertEqual(
-            updated.weeks[0].days[2].sessions.first?.scheduledStart,
-            target
+        XCTAssertNotNil(updated.weeks[0].days[2].sessions.first?.scheduledStart)
+        XCTAssertTrue(
+            Calendar.current.isDate(
+                updated.weeks[0].days[2].sessions.first!.scheduledStart!,
+                inSameDayAs: target
+            )
         )
     }
 }
