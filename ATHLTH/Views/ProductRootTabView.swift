@@ -4490,6 +4490,9 @@ struct ATHLTHHomeView: View {
             ghostUpdates: treadmill ? nil : workout.ghostUpdates,
             autoPauseEnabled: autoPause
         )
+        // The coordinated lobby authorizes this individual recording.
+        // Only acknowledge the start after the real iPhone engine begins.
+        Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
         watchConnection.updateLocalWorkoutActivity(
             isActive: true,
             title: workout.title
@@ -4711,10 +4714,12 @@ struct ATHLTHHomeView: View {
                         spotify: spotifyPlayback
                     )
 
-                // No success modal: the Home card/live mirror becomes the
-                // confirmation that the planned workout has started.
+                // An authorized coordinated start only becomes "started"
+                // once HealthKit has actually accepted the Watch workout.
+                _ = await social.confirmCurrentJoinedWorkoutStarted()
                 homeWatchTransferMessage = nil
             } catch {
+                await social.markCurrentJoinedWorkoutLaunchFailed()
                 homeWatchTransferError =
                     error.localizedDescription
             }
@@ -4764,6 +4769,7 @@ struct ATHLTHHomeView: View {
                         trackingMode: trackingMode,
                         captureDevice: .appleWatch
                     )
+                    _ = await social.confirmCurrentJoinedWorkoutStarted()
                     WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
                         session: session,
@@ -4772,6 +4778,7 @@ struct ATHLTHHomeView: View {
                     )
                     showingHomeStrengthWorkout = true
                 } catch {
+                    await social.markCurrentJoinedWorkoutLaunchFailed()
                     homeWatchTransferError =
                         error.localizedDescription
                 }
@@ -4784,6 +4791,7 @@ struct ATHLTHHomeView: View {
                 trackingMode: trackingMode,
                 captureDevice: .iPhone
             )
+            Task { _ = await social.confirmCurrentJoinedWorkoutStarted() }
             WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
                         workout: workout,
                         session: session,
