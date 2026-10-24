@@ -681,6 +681,98 @@ final class TrainingContinuityTests: XCTestCase {
         XCTAssertTrue(store.workoutHistory.contains(\.isFullyCompleted))
     }
 
+    @MainActor
+    func testSchedulingRemainingStrengthIsExplicitLinkedAndIdempotent() throws {
+        let owner = UUID()
+        defer { clear(owner) }
+        let suite = "StrengthFollowUpTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let profile = UserProfile(
+            id: UUID(),
+            userID: owner,
+            username: "followup-test",
+            displayName: "Follow-up Test",
+            bio: "",
+            avatarURL: nil,
+            presence: TrainingPresence(
+                state: .available,
+                workoutTitle: nil,
+                startedAt: nil,
+                visibility: .friends
+            )
+        )
+        let session = AppSessionStore(profile: profile, defaults: defaults)
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.startFreestyle(watchSessionID: nil)
+
+        let exercise = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Squat",
+            instructions: [],
+            primaryMuscles: ["Quads"],
+            secondaryMuscles: [],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        store.appendExercise(
+            exercise,
+            sets: 3,
+            reps: 8,
+            loadKind: .weightKilograms,
+            targetWeightKilograms: 40
+        )
+        store.completeCurrentSet(
+            reps: 8,
+            weightKilograms: 40,
+            rpe: 7
+        )
+        store.finish()
+
+        var original = try XCTUnwrap(store.workoutHistory.first)
+        original.exercises[0].sets[1].completedReps = 5
+        let missingSet = original.exercises[0].sets[1].id
+        let date = Calendar.current.date(from: DateComponents(
+            year: 2030, month: 10, day: 29
+        ))!
+
+        // A read-only preview must not schedule anything.
+        let preview = StrengthWorkoutRemainder(workout: original)
+            .makeFollowUp(
+                scheduledStart: date,
+                selectedSetIDs: [missingSet],
+                onlyRemainderForSetIDs: [missingSet]
+            )
+        XCTAssertEqual(preview?.exercises.first?.reps, 3)
+        XCTAssertTrue(session.standalonePlannedSessions.isEmpty)
+
+        let first = try XCTUnwrap(session.scheduleStrengthFollowUp(
+            from: original,
+            on: date,
+            selectedSetIDs: [missingSet],
+            onlyRemainderForSetIDs: [missingSet]
+        ))
+        XCTAssertEqual(first.exercises.count, 1)
+        XCTAssertEqual(first.exercises[0].sets, 1)
+        XCTAssertEqual(first.exercises[0].reps, 3)
+        XCTAssertEqual(first.followUpSourceWorkoutID, original.id)
+        XCTAssertEqual(first.followUpSourceSetIDs, [missingSet])
+        XCTAssertEqual(session.standalonePlannedSessions.count, 1)
+
+        let repeated = try XCTUnwrap(session.scheduleStrengthFollowUp(
+            from: original,
+            on: date.addingTimeInterval(24 * 60 * 60)
+        ))
+        XCTAssertEqual(repeated.id, first.id)
+        XCTAssertEqual(session.standalonePlannedSessions.count, 1)
+        XCTAssertEqual(store.workoutHistory.first?.totalCompletedSets, 1)
+    }
+
     private func clear(_ userID: UUID) {
         for name in TrainingBackupPayload.names + ["strengthActive", "phoneActive"] {
             UserDefaults.standard.removeObject(forKey: AccountLocalStorage.key(name, userID: userID))
