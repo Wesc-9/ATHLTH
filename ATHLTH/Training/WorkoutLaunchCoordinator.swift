@@ -383,6 +383,20 @@ enum WorkoutLaunchCoordinator {
         workoutMirroring:
             WorkoutMirroringStore? = nil
     ) async throws {
+        guard !watchConnection.workoutLaunchInProgress else {
+            throw AppleWatchWorkoutLaunchError.launchAlreadyInProgress
+        }
+        if workoutMirroring?.hasActiveMirroredWorkout == true {
+            throw NSError(
+                domain: "ATHLTH.WorkoutLaunch",
+                code: 42,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Continue the active Apple Watch workout before starting another."
+                ]
+            )
+        }
+
         // A new start must never overwrite an active iPhone workout.
         guard phoneWorkout.active == nil else {
             throw NSError(
@@ -714,6 +728,20 @@ enum WorkoutLaunchCoordinator {
         workoutMirroring:
             WorkoutMirroringStore? = nil
     ) async throws {
+        guard !watchConnection.workoutLaunchInProgress else {
+            throw AppleWatchWorkoutLaunchError.launchAlreadyInProgress
+        }
+        if workoutMirroring?.hasActiveMirroredWorkout == true {
+            throw NSError(
+                domain: "ATHLTH.WorkoutLaunch",
+                code: 42,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Continue the active Apple Watch workout before starting another."
+                ]
+            )
+        }
+
         // A new start must never overwrite an active iPhone workout.
         guard phoneWorkout.active == nil else {
             throw NSError(
@@ -891,6 +919,9 @@ enum WorkoutLaunchCoordinator {
         watchConnection: AppleWatchConnectionStore,
         spotify: SpotifyPlaybackStore
     ) async throws -> Bool {
+        guard !watchConnection.workoutLaunchInProgress else {
+            throw AppleWatchWorkoutLaunchError.launchAlreadyInProgress
+        }
         guard strengthWorkout.activeWorkout == nil else {
             throw NSError(
                 domain: "ATHLTH.WorkoutLaunch",
