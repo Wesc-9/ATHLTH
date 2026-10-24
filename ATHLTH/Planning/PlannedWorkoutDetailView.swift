@@ -63,11 +63,12 @@ struct PlannedWorkoutDetailView: View {
     private var isCompleted: Bool {
         // A partly finished ATHLTH strength workout may also exist in
         // Apple Health. Its HealthKit record must not complete the plan.
-        let healthCounts = currentWorkout.kind != .strength ||
-            matchingFinishedStrengthLogs.isEmpty
-                ? isHealthCompleted
-                : false
-        return healthCounts || isStrengthCompleted || isManuallyCompleted
+        let nativeStrengthLogOverridesHealth =
+            currentWorkout.kind == .strength &&
+            !matchingFinishedStrengthLogs.isEmpty
+        return isStrengthCompleted ||
+            isManuallyCompleted ||
+            (isHealthCompleted && !nativeStrengthLogOverridesHealth)
     }
 
     private var anotherWorkoutIsActive: Bool {
