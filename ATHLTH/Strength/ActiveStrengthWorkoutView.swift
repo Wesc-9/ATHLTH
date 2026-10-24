@@ -11201,9 +11201,45 @@ private struct StrengthQueueArtwork: View {
     }
 }
 
+/// Explicit detection prevents a bar-weight control on dumbbells,
+/// resistance machines and bodyweight exercises. Smith machine bars can
+/// vary, so their mass is always selected by the athlete.
+private enum StrengthBarbellExercisePolicy {
+    static func usesBar(_ exercise: StrengthExerciseLog) -> Bool {
+        let terms = ([exercise.exercise.name,
+                      exercise.exercise.displayName] +
+                     exercise.exercise.equipment).joined(separator: " ").lowercased()
+        if ["dumbbell", "manual", "kettlebell", "hantel", "cable",
+            "kabel", "bodyweight"].contains(where: terms.contains) {
+            return false
+        }
+        return ["barbell", "smith", "vektstang", "stang",
+                "benkpress", "deadlift", "markløft",
+                "skivestang"].contains(where: terms.contains)
+    }
+}
+
 private struct StrengthActiveExerciseQueueView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var appSession: AppSessionStore
+    @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+
+    @State private var showingExerciseLibrary = false
+    @State private var showingCustomExerciseEditor = false
+    @State private var addingWarmUp = false
+    @State private var pendingExercise: ExerciseLibraryEntry?
+    @State private var justCreatedExercise: ExerciseLibraryEntry?
+    @State private var pendingRemovalID: UUID?
+    @State private var showingRemovalBlocked = false
+
+    private func requestRemoval(_ id: UUID) {
+        guard strength.canRemoveActiveExercise(id) else {
+            showingRemovalBlocked = true
+            return
+        }
+        pendingRemovalID = id
+    }
 
     var body: some View {
         NavigationStack {
@@ -11311,6 +11347,55 @@ private struct StrengthActiveExerciseQueueView: View {
                                         .controlSize(.small)
                                     }
                                 }
+                                if StrengthBarbellExercisePolicy.usesBar(exercise) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "scalemass")
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Bar weight",
+                                            norwegian: "Stangvekt"
+                                        ))
+                                        .font(.caption.weight(.medium))
+                                        Spacer()
+                                        Menu {
+                                            Button(ATHLTHLocalization.choose(
+                                                english: "Not set", norwegian: "Ikke valgt"
+                                            )) {
+                                                _ = strength.setActiveExerciseBarWeight(
+                                                    exercise.id, kilograms: nil
+                                                )
+                                            }
+                                            ForEach([0.0, 5.0, 10.0, 15.0, 20.0, 25.0],
+                                                    id: \.self) { kg in
+                                                Button(String(format: "%.0f kg", kg)) {
+                                                    _ = strength.setActiveExerciseBarWeight(
+                                                        exercise.id, kilograms: kg
+                                                    )
+                                                }
+                                            }
+                                        } label: {
+                                            HStack(spacing: 4) {
+                                                Text(exercise.barWeightKilograms.map {
+                                                    String(format: "%.0f kg", $0)
+                                                } ?? ATHLTHLocalization.choose(
+                                                    english: "Select", norwegian: "Velg"
+                                                ))
+                                                Image(systemName: "chevron.up.chevron.down")
+                                            }
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                        }
+                                    }
+                                    if exercise.barWeightKilograms != nil {
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Bar included in total kg, never added twice.",
+                                            norwegian: "Stangen inngår i totalvekten og legges ikke til to ganger."
+                                        ))
+                                        .font(.caption2)
+                                        .foregroundStyle(.secondary)
+                                    }
+                                }
+
                                 DisclosureGroup(
                                     ATHLTHLocalization.choose(
                                         english: "View planned sets",
@@ -11377,6 +11462,62 @@ private struct StrengthActiveExerciseQueueView: View {
                                 }
                                 .padding(.vertical, 9)
                                 .listRowBackground(ATHLTHTheme.card)
+                                // Drag the exercise itself; no Edit button
+                                // or mutation to the saved training plan.
+                                .draggable(exercise.id.uuidString)
+                                .dropDestination(for: String.self) { ids, _ in
+                                    guard let id = ids.first.flatMap(UUID.init(uuidString:))
+                                    else { return false }
+                                    return strength.moveActiveExercise(
+                                        id, before: exercise.id
+                                    )
+                                }
+                                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                                    Button(role: .destructive) {
+                                        requestRemoval(exercise.id)
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Delete",
+                                                norwegian: "Slett"
+                                            ),
+                                            systemImage: "trash"
+                                        )
+                                    }
+                                }
+                                .contextMenu {
+                                    Button {
+                                        _ = strength.setWarmUpExercise(
+                                            exercise.id,
+                                            isWarmUp: !exercise.isWarmUpExercise
+                                        )
+                                    } label: {
+                                        Label(
+                                            exercise.isWarmUpExercise
+                                                ? ATHLTHLocalization.choose(
+                                                    english: "Make main exercise",
+                                                    norwegian: "Flytt til hoveddel"
+                                                )
+                                                : ATHLTHLocalization.choose(
+                                                    english: "Mark as warm-up",
+                                                    norwegian: "Marker som oppvarming"
+                                                ),
+                                            systemImage: "flame"
+                                        )
+                                    }
+                                    .disabled(exercise.sets.contains(where: \.isCompleted))
+                                    Button(role: .destructive) {
+                                        requestRemoval(exercise.id)
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Delete exercise",
+                                                norwegian: "Slett øvelse"
+                                            ),
+                                            systemImage: "trash"
+                                        )
+                                    }
+                                }
                             }
                             .onMove { from, to in
                                 strength.reorderActiveExercises(
@@ -11387,8 +11528,8 @@ private struct StrengthActiveExerciseQueueView: View {
                         } footer: {
                             Text(
                                 ATHLTHLocalization.choose(
-                                    english: "Tap Train now or use Edit to reorder. Completed sets stay saved.",
-                                    norwegian: "Trykk «Tren nå», eller bruk Rediger for å flytte øvelser. Fullførte sett beholdes."
+                                    english: "Press and drag an exercise to change order, or swipe left to delete an unrecorded exercise. Completed sets are protected.",
+                                    norwegian: "Hold og dra en øvelse for å endre rekkefølgen, eller sveip mot venstre for å slette en øvelse uten registrerte sett. Fullførte sett beholdes."
                                 )
                             )
                         }
@@ -11424,7 +11565,40 @@ private struct StrengthActiveExerciseQueueView: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    EditButton()
+                    Menu {
+                        Button {
+                            addingWarmUp = false
+                            showingExerciseLibrary = true
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Add exercise", norwegian: "Legg til øvelse"
+                            ), systemImage: "dumbbell.fill")
+                        }
+                        Button {
+                            addingWarmUp = true
+                            showingExerciseLibrary = true
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Add warm-up", norwegian: "Legg til oppvarming"
+                            ), systemImage: "flame")
+                        }
+                        Button {
+                            addingWarmUp = false
+                            showingCustomExerciseEditor = true
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Create my exercise", norwegian: "Opprett egen øvelse"
+                            ), systemImage: "plus.square.on.square")
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Add an exercise, warm-up or custom exercise",
+                        norwegian: "Legg til øvelse, oppvarming eller egen øvelse"
+                    ))
                 }
             }
         }
@@ -11442,6 +11616,88 @@ private struct StrengthActiveExerciseQueueView: View {
         .presentationDragIndicator(.visible)
         .presentationCornerRadius(28)
         .presentationBackground(ATHLTHPlanDesign.canvas)
+        .sheet(isPresented: $showingExerciseLibrary) {
+            NavigationStack {
+                ExerciseLibraryView(
+                    selectionTitle: ATHLTHLocalization.choose(
+                        english: addingWarmUp ? "Add warm-up" : "Add exercise",
+                        norwegian: addingWarmUp ? "Legg til oppvarming" : "Legg til øvelse"
+                    )
+                ) { entry in
+                    showingExerciseLibrary = false
+                    pendingExercise = entry
+                }
+            }
+        }
+        .sheet(isPresented: $showingCustomExerciseEditor) {
+            CustomExerciseEditorView(onSaved: { entry in
+                justCreatedExercise = entry
+            })
+            .environmentObject(exerciseLibrary)
+            .environmentObject(appSession)
+        }
+        .onChange(of: showingCustomExerciseEditor) { _, visible in
+            if !visible, let created = justCreatedExercise {
+                justCreatedExercise = nil
+                pendingExercise = created
+            }
+        }
+        .sheet(item: $pendingExercise) { entry in
+            FreestyleExercisePrescriptionView(
+                entry: entry,
+                initialWarmUp: addingWarmUp
+            ) { sets, reps, targetKind, duration, loadKind, weight,
+                resistance, rest, warmUpSets in
+                strength.appendExercise(
+                    entry.exercise,
+                    sets: sets,
+                    reps: reps,
+                    targetKind: targetKind,
+                    targetDurationSeconds: duration,
+                    loadKind: loadKind,
+                    targetWeightKilograms: weight,
+                    targetResistanceLevel: resistance,
+                    restSeconds: rest,
+                    warmUpSets: warmUpSets
+                )
+            }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Remove exercise from this workout?",
+                norwegian: "Slette øvelsen fra denne økten?"
+            ),
+            isPresented: Binding(
+                get: { pendingRemovalID != nil },
+                set: { if !$0 { pendingRemovalID = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Delete exercise", norwegian: "Slett øvelse"
+            ), role: .destructive) {
+                if let id = pendingRemovalID {
+                    _ = strength.removeActiveExercise(id)
+                }
+                pendingRemovalID = nil
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Only this active workout is changed. Your saved training plan is untouched.",
+                norwegian: "Bare den aktive økten endres. Treningsplanen din beholdes."
+            ))
+        }
+        .alert(ATHLTHLocalization.choose(
+            english: "Recorded sets are protected",
+            norwegian: "Registrerte sett er beskyttet"
+        ), isPresented: $showingRemovalBlocked) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "An exercise with completed sets or a running timed set cannot be deleted. Finish the active timer before removing an unrecorded exercise.",
+                norwegian: "Øvelser med fullførte sett eller et pågående tidssett kan ikke slettes. Avslutt tidtakingen før du fjerner en øvelse uten registrerte sett."
+            ))
+        }
     }
 }
 
