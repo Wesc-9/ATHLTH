@@ -43,10 +43,14 @@ struct PlannedWorkoutDetailView: View {
         )
     }
 
-    private var isStrengthCompleted: Bool {
-        strengthWorkout.workoutHistory.contains {
+    private var matchingFinishedStrengthLogs: [StrengthWorkoutLog] {
+        strengthWorkout.workoutHistory.filter {
             $0.isFinished && $0.plannedSessionID == currentWorkout.id
         }
+    }
+
+    private var isStrengthCompleted: Bool {
+        matchingFinishedStrengthLogs.contains(\.isFullyCompleted)
     }
 
     private var isSkipped: Bool {
@@ -57,7 +61,13 @@ struct PlannedWorkoutDetailView: View {
     }
 
     private var isCompleted: Bool {
-        isHealthCompleted || isStrengthCompleted || isManuallyCompleted
+        // A partly finished ATHLTH strength workout may also exist in
+        // Apple Health. Its HealthKit record must not complete the plan.
+        let healthCounts = currentWorkout.kind != .strength ||
+            matchingFinishedStrengthLogs.isEmpty
+                ? isHealthCompleted
+                : false
+        return healthCounts || isStrengthCompleted || isManuallyCompleted
     }
 
     private var anotherWorkoutIsActive: Bool {
