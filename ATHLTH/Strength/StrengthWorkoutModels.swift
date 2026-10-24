@@ -540,6 +540,13 @@ struct StrengthWorkoutLog: Identifiable, Codable, Hashable {
             }
     }
 
+    /// Finishing a recording is not proof that every planned set was done.
+    /// Require at least one recorded set so an empty/aborted workout never
+    /// fulfills an entire planned strength session.
+    var isFullyCompleted: Bool {
+        isFinished && totalCompletedSets > 0 && remainingSetCount == 0
+    }
+
     var isFinished: Bool {
         endedAt != nil
     }
