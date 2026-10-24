@@ -5968,12 +5968,21 @@ struct SessionEditorView: View {
                         }
                     }
 
-                    TextField(
-                        ATHLTHLocalization.choose(english: "Notes", norwegian: "Notater"),
-                        text: $notes,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...6)
+                    // Avoid repeating an imported run template's summary
+                    // immediately before its card. The actual notes stay saved.
+                    if selectedRunningWorkouts.count != 1 ||
+                       notes.trimmingCharacters(in: .whitespacesAndNewlines) !=
+                        selectedRunningWorkouts[0].summary
+                            .trimmingCharacters(in: .whitespacesAndNewlines) {
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Notes", norwegian: "Notater"
+                            ),
+                            text: $notes,
+                            axis: .vertical
+                        )
+                        .lineLimit(2...6)
+                    }
                 } header: {
                     HStack(spacing: 12) {
                         Text(ATHLTHLocalization.choose(english: "Workout", norwegian: "Økt"))
@@ -6129,17 +6138,26 @@ struct SessionEditorView: View {
     // Keep the potentially large dynamic list outside the parent Form's
     // result builder. This also avoids Swift compiler type-check timeouts
     // when the standalone editor grows new controls.
+    // Reuse the common ordered planning recipe without prematurely
+    // replacing either live run or strength measurement engine.
+    private var workoutPlanningPreviewBlocks: [WorkoutTemplateBlock] {
+        if !workoutBlocks.isEmpty { return workoutBlocks }
+        guard !plannedExercises.isEmpty,
+              !selectedRunningWorkouts.isEmpty else { return [] }
+        return ATHLTHUnifiedWorkout.editorBlocks(from: composeSession())
+    }
+
     @ViewBuilder
     private var workoutStructurePreviewSection: some View {
-        if !workoutBlocks.isEmpty {
+        if !workoutPlanningPreviewBlocks.isEmpty {
             Section(ATHLTHLocalization.choose(
                 english: "Workout Structure", norwegian: "Øktstruktur"
             )) {
                 HStack {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: "\(workoutBlocks.count) blocks",
-                            norwegian: "\(workoutBlocks.count) blokker"
+                            english: "\(workoutPlanningPreviewBlocks.count) blocks",
+                            norwegian: "\(workoutPlanningPreviewBlocks.count) blokker"
                         ),
                         systemImage: "list.number"
                     )
@@ -6151,7 +6169,7 @@ struct SessionEditorView: View {
                     }
                 }
 
-                ForEach(Array(workoutBlocks.prefix(5))) { block in
+                ForEach(Array(workoutPlanningPreviewBlocks.prefix(5))) { block in
                     HStack(spacing: 10) {
                         Image(systemName: block.kind.systemImage)
                             .foregroundStyle(
@@ -6174,10 +6192,10 @@ struct SessionEditorView: View {
                     }
                 }
 
-                if workoutBlocks.count > 5 {
+                if workoutPlanningPreviewBlocks.count > 5 {
                     Text(ATHLTHLocalization.choose(
-                        english: "+\(workoutBlocks.count - 5) more blocks",
-                        norwegian: "+\(workoutBlocks.count - 5) blokker til"
+                        english: "+\(workoutPlanningPreviewBlocks.count - 5) more blocks",
+                        norwegian: "+\(workoutPlanningPreviewBlocks.count - 5) blokker til"
                     ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
