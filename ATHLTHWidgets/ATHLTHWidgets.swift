@@ -1134,7 +1134,10 @@ struct ATHLTHWorkoutLiveActivity: Widget {
 
     @ViewBuilder
     private func compactElapsedClock(_ context: Context) -> some View {
-        TimelineView(.periodic(from: .now, by: 15)) { tick in
+        // Keep snapshot freshness checks on a one-second cadence. The
+        // anchored system timer renders its digits independently of network
+        // and Watch snapshot delivery, without requiring a new HK update.
+        TimelineView(.periodic(from: .now, by: 1)) { tick in
             if ATHLTHLiveActivityDisplayPolicy.isRecent(
                 updatedAt: context.state.updatedAt,
                 now: tick.date
