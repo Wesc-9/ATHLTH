@@ -30,6 +30,8 @@ on:
     paths:
       - ATHLTH/**/*.swift
       - ATHLTHWidgets/**/*.swift
+      - ATHLTHWatchExtension/**/*.swift
+      - ATHLTHWatchApp/**/*.swift
       - Shared/ATHLTHBrandMark.swift
       - ATHLTH/Assets.xcassets/**
       - Shared/**/*.swift
