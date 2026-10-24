@@ -8691,6 +8691,7 @@ private struct FreestyleExercisePrescriptionView: View {
 
     init(
         entry: ExerciseLibraryEntry,
+        initialWarmUp: Bool = false,
         onAdd: @escaping (
             Int,
             Int?,
@@ -8722,7 +8723,10 @@ private struct FreestyleExercisePrescriptionView: View {
             initialValue: isTreadmill
                 ? StrengthTreadmillWarmUpDefaults.sets : 3
         )
-        _warmUpSets = State(initialValue: isTreadmill ? 1 : 0)
+        _warmUpSets = State(initialValue:
+            initialWarmUp ? (isTreadmill ? 1 : 3) :
+                (isTreadmill ? 1 : 0)
+        )
         _targetKind = State(initialValue: initialTarget)
         _durationSeconds = State(
             initialValue: isTreadmill
