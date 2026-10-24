@@ -4658,7 +4658,7 @@ struct ActiveStrengthWorkoutView: View {
         _ exercise: StrengthExerciseLog
     ) -> some View {
         let primary = focusedExerciseRegions(
-            exercise.exercise.primaryMuscles,
+            exercise.exercise.primaryMuscles ?? [],
             fallbackName: exercise.exercise.name
         )
         let secondary = focusedExerciseRegions(
