@@ -312,4 +312,19 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(phoneStore.activeWorkout?.totalCompletedSets ?? 0, 1)
     }
 
+    func testWatchHybridPhaseRecordsElapsedNotJustPlannedDuration() {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        var timer = WatchTimedStrengthCountdown(
+            targetSeconds: 240, secondsAtPause: 240, resumedAt: start
+        )
+        XCTAssertEqual(timer.elapsed(at: start.addingTimeInterval(90)), 90, accuracy: 0.001)
+        let pausedAt = start.addingTimeInterval(90)
+        timer.secondsAtPause = timer.remaining(at: pausedAt)
+        timer.resumedAt = nil
+        XCTAssertEqual(timer.elapsed(at: start.addingTimeInterval(600)), 90, accuracy: 0.001)
+        timer.resumedAt = start.addingTimeInterval(600)
+        XCTAssertEqual(timer.elapsed(at: start.addingTimeInterval(750)), 240, accuracy: 0.001)
+        XCTAssertEqual(timer.elapsed(at: start.addingTimeInterval(775)), 265, accuracy: 0.001)
+    }
+
 }
