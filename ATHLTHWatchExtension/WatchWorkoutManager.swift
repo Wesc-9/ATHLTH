@@ -2127,9 +2127,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     /// Timed strength work uses a date anchor, not display tick counts.
     /// These operations are journaled like other set-scoped Watch actions.
-    func startOrResumeTimedStrengthSet() {
+    func startOrResumeTimedStrengthSet(allowIPhoneOnly: Bool = false) {
         guard var snapshot = strengthSession,
-              snapshot.inputMode != .iPhone,
+              (allowIPhoneOnly || snapshot.inputMode != .iPhone),
               snapshot.targetKindRaw == "time",
               !snapshot.isResting,
               !snapshot.currentExerciseComplete
@@ -2158,9 +2158,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         persistWorkoutRecoveryState()
     }
 
-    func pauseTimedStrengthSet() {
+    func pauseTimedStrengthSet(allowIPhoneOnly: Bool = false) {
         guard var snapshot = strengthSession,
-              snapshot.inputMode != .iPhone,
+              (allowIPhoneOnly || snapshot.inputMode != .iPhone),
               var timer = snapshot.timedSetCountdown,
               timer.isRunning else { return }
         let now = Date()
@@ -2491,6 +2491,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             next.index
         updated.exerciseName =
             next.name
+        updated.isEmbeddedRunningInterval = next.isEmbeddedRunningInterval
         updated.primaryMuscles =
             next.primaryMuscles
         updated.setIndex = next.firstPendingSetIndex ?? 0
@@ -2798,6 +2799,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         let plan = plans[setIndex]
+        snapshot.isEmbeddedRunningInterval = exercise.isEmbeddedRunningInterval
+        snapshot.embeddedRunningPhaseTitle = plan.hybridPhaseTitle
+        snapshot.embeddedRunningPhaseKind = plan.hybridPhaseKind
+        snapshot.embeddedRunningTargetHeartRateZone = plan.hybridTargetHeartRateZone
 
         if let reps = plan.reps {
             snapshot.draftReps =
@@ -3521,6 +3526,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     func pause() {
         guard state == .running else { return }
+        // A paused HealthKit recording must also freeze the current hybrid
+        // treadmill interval. Journal the exact Watch event for offline replay.
+        if strengthSession?.isEmbeddedRunningInterval == true,
+           strengthSession?.timedSetCountdown?.isRunning == true {
+            pauseTimedStrengthSet(allowIPhoneOnly: true)
+        }
         manualPauseActive = true
         automaticPauseActive = false
         autoPauseDetector.reset(
@@ -3531,6 +3542,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     func resume() {
         guard state == .paused else { return }
+        // Resume the existing countdown, never start a new set or HKWorkout.
+        if strengthSession?.isEmbeddedRunningInterval == true,
+           let countdown = strengthSession?.timedSetCountdown,
+           !countdown.isRunning,
+           countdown.remaining() > 0 {
+            startOrResumeTimedStrengthSet(allowIPhoneOnly: true)
+        }
         manualPauseActive = false
         autoPauseDetector.reset(
             enabled: automaticPauseEnabled
@@ -3944,6 +3962,34 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    /// Watch-owned clock for embedded treadmill phases. The phone can be
+    /// locked or out of range: durable Watch commands replay each completion
+    /// into the original strength workout without creating another recording.
+    private func advanceEmbeddedHybridIntervalIfNeeded(at date: Date) {
+        guard ATHLTHHybridWatchIntervalPolicy.shouldAutoAdvance(
+            strengthSession,
+            workoutState: mirrorState(for: state),
+            at: date
+        ),
+        let before = strengthSession,
+        let watchStartedAt = startedAt,
+        let plannedStartedAt = before.startedAt,
+        abs(watchStartedAt.timeIntervalSince(plannedStartedAt)) <= 180
+        else { return }
+
+        completeStrengthSet()
+        guard let after = strengthSession,
+              after.workoutID == before.workoutID,
+              after.exerciseIndex == before.exerciseIndex,
+              after.setIndex > before.setIndex,
+              after.isEmbeddedRunningInterval == true,
+              after.targetKindRaw == "time",
+              !after.isResting,
+              !after.currentExerciseComplete
+        else { return }
+        startOrResumeTimedStrengthSet()
+    }
+
     private func startTimer() {
         stopTimer()
 
@@ -3973,6 +4019,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     )
 
                 self.recordRunningMinuteIfDue()
+                self.advanceEmbeddedHybridIntervalIfNeeded(at: Date())
                 self.evaluateStructuredRunningWorkout()
                 self.evaluateWorkoutTargetAlerts()
                 self.evaluateFuelAudioCoach()
