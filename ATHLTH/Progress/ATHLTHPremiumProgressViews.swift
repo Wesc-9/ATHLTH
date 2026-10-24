@@ -75,7 +75,11 @@ struct ATHLTHPremiumProgressHero: View {
                     ZStack {
                         Circle()
                             .fill(Color.black.opacity(0.20))
-                            .background(.ultraThinMaterial.opacity(0.20), in: Circle())
+                            .background {
+                                Circle()
+                                    .fill(.ultraThinMaterial)
+                                    .opacity(0.20)
+                            }
 
                         Circle()
                             .stroke(Color.white.opacity(0.25), lineWidth: 7)
