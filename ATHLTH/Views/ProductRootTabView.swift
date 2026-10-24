@@ -4369,6 +4369,7 @@ struct ATHLTHHomeView: View {
             guard let persisted = session.standalonePlannedSessions.first(
                 where: { $0.id == workout.id }
             ), !persisted.isExplicitRestDay else {
+                await social.markCurrentJoinedWorkoutLaunchFailed()
                 homeWatchTransferError = ATHLTHLocalization.choose(
                     english: "This scheduled workout is no longer available.",
                     norwegian: "Denne planlagte økten er ikke lenger tilgjengelig."
@@ -4382,6 +4383,7 @@ struct ATHLTHHomeView: View {
                   !watchConnection.hasActiveWatchWorkout,
                   !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
             else {
+                await social.markCurrentJoinedWorkoutLaunchFailed()
                 homeWatchTransferError = ATHLTHLocalization.choose(
                     english: "Finish your current workout before starting another.",
                     norwegian: "Avslutt økten som pågår før du starter en ny."
@@ -4391,6 +4393,7 @@ struct ATHLTHHomeView: View {
 
             if device == .appleWatch &&
                 !watchConnection.isVerifiedForLiveLaunch {
+                await social.markCurrentJoinedWorkoutLaunchFailed()
                 homeWatchTransferError = ATHLTHLocalization.choose(
                     english: "Apple Watch is unavailable. Start with iPhone instead.",
                     norwegian: "Apple Watch er ikke tilgjengelig. Start med iPhone i stedet."
@@ -4414,6 +4417,7 @@ struct ATHLTHHomeView: View {
                     startHomeStandalonePhoneEndurance(persisted)
                 }
             case .mobility, .recovery, .custom:
+                await social.markCurrentJoinedWorkoutLaunchFailed()
                 homeWatchTransferError = ATHLTHLocalization.choose(
                     english: "This activity cannot be started from the calendar yet.",
                     norwegian: "Denne aktiviteten kan foreløpig ikke startes fra kalenderen."
