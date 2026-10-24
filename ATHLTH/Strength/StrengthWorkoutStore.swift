@@ -2401,7 +2401,7 @@ final class StrengthWorkoutStore: ObservableObject {
             let setTargets =
                 planned.resolvedSetTargets
 
-            return StrengthExerciseLog(
+            var log = StrengthExerciseLog(
                 id: UUID(),
                 plannedExerciseID: planned.id,
                 exercise: planned.embeddedExercise,
@@ -2460,6 +2460,13 @@ final class StrengthWorkoutStore: ObservableObject {
                 targetHeartRateZone:
                     planned.targetHeartRateZone
             )
+            if StrengthBarbellExercisePolicy.usesBarEquipment(
+                name: planned.embeddedExercise.name,
+                equipment: planned.embeddedExercise.equipment
+            ) {
+                log.barWeightKilograms = 20
+            }
+            return log
         }
 
     }
