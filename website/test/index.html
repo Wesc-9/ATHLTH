@@ -93,7 +93,7 @@ body{
 }
 .specular{
   transform:translateZ(2px);opacity:.32;mix-blend-mode:screen;
-  background:linear-gradient(calc(116deg + var(--scene-progress) * 16deg),transparent 21%,rgba(214,222,225,.18) 39%,transparent 49%,transparent 100%);
+  background:linear-gradient(var(--specular-angle,116deg),transparent 21%,rgba(214,222,225,.18) 39%,transparent 49%,transparent 100%);
 }
 .source{
   position:absolute;inset:0;display:block;width:100%;height:100%;object-fit:contain;
@@ -233,6 +233,7 @@ h1{
     root.setProperty('--light-x',(50+pointerX*8+progress*4).toFixed(2)+'%');
     root.setProperty('--light-y',(43+pointerY*6-progress*2).toFixed(2)+'%');
     root.setProperty('--scene-progress',progress.toFixed(3));
+    root.setProperty('--specular-angle',(116+progress*16).toFixed(2)+'deg');
     frame=requestAnimationFrame(animate);
   }
   frame=requestAnimationFrame(animate);
