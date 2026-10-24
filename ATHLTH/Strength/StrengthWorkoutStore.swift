@@ -1262,6 +1262,10 @@ final class StrengthWorkoutStore: ObservableObject {
         advancedConfiguration:
             StrengthAdvancedConfiguration? = nil
     ) {
+        // Never discard an unfinished strength log on a second launch request.
+        // The coordinator is responsible for resuming or ending it first.
+        guard activeWorkout == nil else { return }
+
         let exerciseLogs = session.exercises.map { planned in
             let setCount = max(planned.sets, 1)
 
