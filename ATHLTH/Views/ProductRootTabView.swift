@@ -3099,6 +3099,11 @@ struct ATHLTHHomeView: View {
         guard !homeDirectStartInProgress else {
             return true
         }
+        guard phoneWorkout.active == nil,
+              strengthWorkout.activeWorkout == nil,
+              !workoutMirroring.hasActiveMirroredWorkout
+        else { return false }
+
 
         switch workout.kind {
         case .strength:
@@ -4268,6 +4273,7 @@ struct ATHLTHTrainView: View {
         PlannedSession?
     @State private var showingGhostHub = false
     @State private var showingLibrary = false
+    @State private var showingPlanManagement = false
 
     init(
         navigationRequest:
@@ -4350,6 +4356,32 @@ struct ATHLTHTrainView: View {
                 .padding(.bottom, 30)
                 .frame(maxWidth: 900)
                 .frame(maxWidth: .infinity)
+            }
+            .sheet(isPresented: $showingPlanManagement) {
+                NavigationStack {
+                    ScrollView {
+                        TrainingPlanManagerView()
+                            .padding(18)
+                    }
+                    .background(ATHLTHPremiumCanvas(
+                        accent: ATHLTHTheme.accent.opacity(0.24)
+                    ))
+                    .navigationTitle(ATHLTHLocalization.choose(
+                        english: "Manage plans",
+                        norwegian: "Administrer planer"
+                    ))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Done",
+                                norwegian: "Ferdig"
+                            )) {
+                                showingPlanManagement = false
+                            }
+                        }
+                    }
+                }
             }
             .navigationDestination(
                 isPresented: $showingLibrary
@@ -4722,6 +4754,94 @@ struct ATHLTHTrainView: View {
     }
 
     @ViewBuilder
+    @ViewBuilder
+    private var activeTrainingCard: some View {
+        if let active = strengthWorkout.activeWorkout {
+            Button {
+                showingStrengthWorkout = true
+            } label: {
+                activeTrainingRow(
+                    title: active.title,
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Strength workout in progress",
+                        norwegian: "Styrkeøkt pågår"
+                    ),
+                    icon: "dumbbell.fill"
+                )
+            }
+            .buttonStyle(.plain)
+        } else if phoneWorkout.active != nil {
+            Button {
+                phoneWorkout.presentWorkout()
+            } label: {
+                activeTrainingRow(
+                    title: ATHLTHLocalization.choose(
+                        english: "Continue your workout",
+                        norwegian: "Fortsett treningsøkten"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "iPhone workout in progress",
+                        norwegian: "Treningsøkt på iPhone pågår"
+                    ),
+                    icon: "play.circle.fill"
+                )
+            }
+            .buttonStyle(.plain)
+        } else if workoutMirroring.hasActiveMirroredWorkout {
+            Button {
+                workoutMirroring.presentWorkout()
+            } label: {
+                activeTrainingRow(
+                    title: ATHLTHLocalization.choose(
+                        english: "Continue workout",
+                        norwegian: "Fortsett treningsøkten"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Apple Watch workout in progress",
+                        norwegian: "Treningsøkt på Apple Watch pågår"
+                    ),
+                    icon: "applewatch"
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private func activeTrainingRow(
+        title: String,
+        subtitle: String,
+        icon: String
+    ) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.vitality)
+                .frame(width: 44, height: 44)
+                .background(ATHLTHTheme.vitalitySoft, in: RoundedRectangle(cornerRadius: 13))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            Spacer(minLength: 6)
+            Image(systemName: "arrow.up.right")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+        }
+        .padding(15)
+        .background(
+            ATHLTHTheme.surfaceSage.opacity(0.96),
+            in: RoundedRectangle(cornerRadius: 22)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .stroke(ATHLTHTheme.vitality.opacity(0.14), lineWidth: 1)
+        }
+    }
+
     private var todayContent: some View {
         HStack(
             alignment: .top,
@@ -4898,6 +5018,8 @@ struct ATHLTHTrainView: View {
         }
         .buttonStyle(.plain)
 
+        activeTrainingCard
+
         if let plan = session.activePlan {
             todaysPlanCard(plan)
         } else {
@@ -5066,128 +5188,38 @@ struct ATHLTHTrainView: View {
             y: 5
         )
 
-        Button {
-            showingGhostHub = true
-        } label: {
-            HStack(alignment: .center, spacing: 18) {
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("GHOST TRAINING")
-                        .font(.caption.weight(.bold))
-                        .tracking(3.0)
-                        .foregroundStyle(
-                            Color.white.opacity(0.72)
-                        )
-
-                    Text("Compete with yourself.")
-                        .font(
-                            .system(
-                                size: 27,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
-
-                    Text(
-                        "Replay a previous run, chase a target time, race a route or challenge a friend."
+        HStack(spacing: 10) {
+            Button {
+                showingGhostHub = true
+            } label: {
+                trainUtilityTile(
+                    icon: "figure.run.circle",
+                    title: "Ghost",
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Race your best",
+                        norwegian: "Konkurrer mot deg selv"
                     )
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        Color.white.opacity(0.74)
-                    )
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                }
-
-                Spacer(minLength: 6)
-
-                ZStack {
-                    Circle()
-                        .fill(
-                            Color.white.opacity(0.13)
-                        )
-                        .frame(width: 82, height: 82)
-
-                    Circle()
-                        .fill(
-                            Color.white.opacity(0.96)
-                        )
-                        .frame(width: 50, height: 50)
-
-                    Image(systemName: "figure.run")
-                        .font(
-                            .system(
-                                size: 25,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            Color(
-                                red: 0.25,
-                                green: 0.28,
-                                blue: 0.34
-                            )
-                        )
-                }
-                .accessibilityHidden(true)
-            }
-            .padding(.horizontal, 22)
-            .padding(.vertical, 22)
-            .frame(
-                maxWidth: .infinity,
-                minHeight: 168,
-                alignment: .leading
-            )
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color(
-                            red: 0.06,
-                            green: 0.07,
-                            blue: 0.10
-                        ),
-                        Color(
-                            red: 0.15,
-                            green: 0.18,
-                            blue: 0.24
-                        )
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                ),
-                in: RoundedRectangle(
-                    cornerRadius: 30,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 30,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white.opacity(0.06),
-                    lineWidth: 0.8
                 )
             }
-            .contentShape(
-                RoundedRectangle(
-                    cornerRadius: 30,
-                    style: .continuous
+            .buttonStyle(.plain)
+
+            Button {
+                showingLibrary = true
+            } label: {
+                trainUtilityTile(
+                    icon: "square.stack.3d.up",
+                    title: ATHLTHLocalization.choose(
+                        english: "Library",
+                        norwegian: "Bibliotek"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Plans and workouts",
+                        norwegian: "Planer og økter"
+                    )
                 )
-            )
+            }
+            .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-            "Ghost Training. Compete with yourself."
-        )
-        .accessibilityHint(
-            "Open Ghost Training to replay a previous run, chase a target time, race a route or challenge a friend."
-        )
 
         if !session.savedWorkoutTemplates.isEmpty {
             ATHLTHCard {
@@ -5248,130 +5280,73 @@ struct ATHLTHTrainView: View {
 
     @ViewBuilder
     private var planContent: some View {
-        if session.activePlan != nil {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("YOUR PLAN")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.8)
-                            .foregroundStyle(
-                                ATHLTHTheme.mutedText
-                            )
+        if let plan = session.activePlan {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 12) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your training plan",
+                            norwegian: "Din treningsplan"
+                        ))
+                        .font(.system(size: 24, weight: .medium, design: .serif))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
 
-                        Text("Plan first. Tools second.")
-                            .font(.title3.weight(.bold))
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
+                        Text(plan.title)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineLimit(1)
                     }
-
                     Spacer()
-
                     Button {
-                        showingLibrary = true
+                        showingPlanManagement = true
                     } label: {
-                        Label(
-                            "Library",
-                            systemImage: "square.grid.2x2.fill"
-                        )
-                        .font(.caption.weight(.semibold))
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 40, height: 40)
+                            .background(ATHLTHTheme.card, in: Circle())
                     }
                     .buttonStyle(.plain)
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Manage training plans",
+                        norwegian: "Administrer treningsplaner"
+                    ))
                 }
-
-                AdvancedPlannerView(
-                    showsEmptyState: false
-                )
-
-                HStack(spacing: 10) {
-                    Rectangle()
-                        .fill(
-                            ATHLTHTheme.accent.opacity(0.12)
-                        )
-                        .frame(height: 1)
-
-                    Text("PLAN TOOLS")
-                        .font(.system(size: 9, weight: .bold))
-                        .tracking(1.4)
-                        .foregroundStyle(
-                            ATHLTHTheme.mutedText
-                        )
-
-                    Rectangle()
-                        .fill(
-                            ATHLTHTheme.accent.opacity(0.12)
-                        )
-                        .frame(height: 1)
-                }
-                .padding(.vertical, 2)
-
-                TrainingPlanManagerView()
+                AdvancedPlannerView(showsEmptyState: false)
             }
         } else {
-            VStack(alignment: .leading, spacing: 16) {
-                TrainingPlanManagerView()
+            TrainingPlanManagerView()
+        }
+    }
 
-                Button {
-                    showingLibrary = true
-                } label: {
-                    HStack(spacing: 13) {
-                        Image(
-                            systemName:
-                                "square.grid.2x2.fill"
-                        )
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .frame(width: 44, height: 44)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 13,
-                                style: .continuous
-                            )
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 3
-                        ) {
-                            Text("Browse the Library")
-                                .font(.headline)
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-
-                            Text(
-                                "Find a plan, workout, exercise or route."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-
-                        Spacer()
-
-                        Image(
-                            systemName: "chevron.right"
-                        )
-                        .font(.caption.bold())
-                        .foregroundStyle(.tertiary)
-                    }
-                    .padding(15)
-                    .background(
-                        Color.white.opacity(0.72),
-                        in: RoundedRectangle(
-                            cornerRadius: 20,
-                            style: .continuous
-                        )
-                    )
-                }
-                .buttonStyle(.plain)
+    private func trainUtilityTile(
+        icon: String,
+        title: String,
+        subtitle: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 33, height: 33)
+                .background(ATHLTHTheme.accentSoft, in: Circle())
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                Text(subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(2)
             }
+            Spacer(minLength: 0)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, minHeight: 67)
+        .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 19))
+        .overlay {
+            RoundedRectangle(cornerRadius: 19)
+                .stroke(ATHLTHTheme.border, lineWidth: 0.8)
         }
     }
 
@@ -5492,7 +5467,10 @@ struct ATHLTHTrainView: View {
     }
 
     private var customQuickStartAvailable: Bool {
-        watchConnection.isReady
+        watchConnection.isReady &&
+            phoneWorkout.active == nil &&
+            strengthWorkout.activeWorkout == nil &&
+            !workoutMirroring.hasActiveMirroredWorkout
     }
 
     private var quickStartCustomSubtitle: String {
@@ -5527,7 +5505,11 @@ struct ATHLTHTrainView: View {
     }
 
     private func quickStartAvailable(_ kind: WorkoutKind) -> Bool {
-        guard phoneWorkout.active == nil else { return false }
+        guard phoneWorkout.active == nil,
+              strengthWorkout.activeWorkout == nil,
+              !workoutMirroring.hasActiveMirroredWorkout,
+              !watchConnection.workoutLaunchInProgress
+        else { return false }
 
         switch kind {
         case .running, .walking:
@@ -5540,6 +5522,14 @@ struct ATHLTHTrainView: View {
     }
 
     private func handleQuickStart(_ kind: WorkoutKind) {
+        guard quickStartAvailable(kind) else {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "A workout is already active. Continue or finish it before starting a new one.",
+                norwegian: "En økt pågår allerede. Fortsett eller avslutt den før du starter en ny."
+            )
+            return
+        }
+
         switch kind {
         case .running:
             showingRunQuickStart = true
