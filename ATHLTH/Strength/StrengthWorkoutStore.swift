@@ -5,6 +5,11 @@ enum StrengthDraftMutationOrigin {
     case watch
 }
 
+enum StrengthExerciseSubstitutionScope: String, CaseIterable {
+    case allRemaining
+    case nextSetOnly
+}
+
 @MainActor
 final class StrengthWorkoutStore: ObservableObject {
     @Published private(set) var activeWorkout: StrengthWorkoutLog? { didSet { scheduleCheckpointPersist() } }
@@ -1973,122 +1978,98 @@ final class StrengthWorkoutStore: ObservableObject {
         activeWorkout = workout
     }
 
+    /// Scope only affects the active recording. The saved training plan is
+    /// never rewritten by a live substitution.
     func substituteCurrentExercise(
-        with exercise: Exercise
+        with exercise: Exercise,
+        scope: StrengthExerciseSubstitutionScope = .allRemaining
     ) {
         guard var workout = activeWorkout,
-              workout.exercises.indices
-                .contains(
-                    currentExerciseIndex
-                )
-        else {
-            return
-        }
+              workout.exercises.indices.contains(currentExerciseIndex)
+        else { return }
 
-        let source =
-            workout.exercises[
-                currentExerciseIndex
-            ]
-        let previous =
-            source.exercise.name
-        let completedSets =
-            source.sets.filter(\.isCompleted)
-        let remainingSets =
-            source.sets.filter {
-                !$0.isCompleted
-            }
+        let source = workout.exercises[currentExerciseIndex]
+        let completed = source.sets.filter(\.isCompleted)
+        let remaining = source.sets.filter { !$0.isCompleted }
+        guard !remaining.isEmpty else { return }
 
-        if completedSets.isEmpty {
-            workout.exercises[
-                currentExerciseIndex
-            ].exercise = exercise.snapshot
-            workout.exercises[
-                currentExerciseIndex
-            ].substitutedFromExerciseName =
-                previous
+        let selected = scope == .nextSetOnly
+            ? Array(remaining.prefix(1))
+            : remaining
+        let untouched = scope == .nextSetOnly
+            ? Array(remaining.dropFirst())
+            : []
+        let replacementLoadKind = exercise.snapshot.defaultStrengthLoadKind
 
-            activeWorkout = workout
-            reloadDraftFromCurrentSet()
-            return
-        }
-
-        guard !remainingSets.isEmpty else {
-            return
-        }
-
-        workout.exercises[
-            currentExerciseIndex
-        ].sets = completedSets
-        workout.exercises[
-            currentExerciseIndex
-        ].completedAt = Date()
-
-        let replacementSets =
-            remainingSets
-                .enumerated()
-                .map {
-                    offset,
-                    set in
-
-                    StrengthSetLog(
-                        id: UUID(),
-                        setNumber:
-                            offset + 1,
-                        plannedReps:
-                            set.plannedReps,
-                        plannedWeightKilograms:
-                            set.plannedWeightKilograms,
-                        completedReps: nil,
-                        completedWeightKilograms:
-                            nil,
-                        rpe: nil,
-                        completedAt: nil,
-                        restSeconds:
-                            set.restSeconds,
-                        rir: nil,
-                        isWarmUp:
-                            set.isWarmUp,
-                        targetKind:
-                            set.targetKind,
-                        plannedDurationSeconds:
-                            set.plannedDurationSeconds,
-                        loadKind:
-                            set.loadKind,
-                        plannedResistanceLevel:
-                            set.plannedResistanceLevel
-                    )
-                }
-
-        let replacement =
-            StrengthExerciseLog(
+        // Never carry a barbell target onto dumbbells or a machine. The
+        // replacement's actual load must be entered for its own equipment.
+        let replacementSets = selected.enumerated().map { offset, set in
+            StrengthSetLog(
                 id: UUID(),
-                plannedExerciseID: nil,
-                exercise: exercise.snapshot,
-                sets: replacementSets,
+                setNumber: offset + 1,
+                plannedReps: set.plannedReps,
+                plannedWeightKilograms: nil,
+                completedReps: nil,
+                completedWeightKilograms: nil,
+                rpe: nil,
                 completedAt: nil,
-                restSecondsOverride:
-                    source.restSecondsOverride,
-                groupID: source.groupID,
-                groupStyle:
-                    source.groupStyle,
-                substitutedFromExerciseName:
-                    previous
+                restSeconds: set.restSeconds,
+                rir: nil,
+                isWarmUp: set.isWarmUp,
+                targetKind: set.targetKind,
+                plannedDurationSeconds: set.plannedDurationSeconds,
+                loadKind: replacementLoadKind,
+                plannedResistanceLevel: nil
             )
+        }
 
-        let insertionIndex =
-            min(
-                currentExerciseIndex + 1,
-                workout.exercises.count
-            )
-        workout.exercises.insert(
-            replacement,
-            at: insertionIndex
+        let replacement = StrengthExerciseLog(
+            id: UUID(),
+            plannedExerciseID: nil,
+            exercise: exercise.snapshot,
+            sets: replacementSets,
+            completedAt: nil,
+            restSecondsOverride: source.restSecondsOverride,
+            groupID: source.groupID,
+            groupStyle: source.groupStyle,
+            substitutedFromExerciseName: source.exercise.name
         )
 
-        currentExerciseIndex =
-            insertionIndex
+        let insertionIndex: Int
+        if completed.isEmpty {
+            // No completed history yet: replace the original in place.
+            insertionIndex = currentExerciseIndex
+            workout.exercises.remove(at: currentExerciseIndex)
+        } else {
+            // Completed sets stay attached to their original exercise.
+            workout.exercises[currentExerciseIndex].sets = completed
+            workout.exercises[currentExerciseIndex].completedAt = Date()
+            insertionIndex = currentExerciseIndex + 1
+        }
+        workout.exercises.insert(replacement, at: insertionIndex)
+
+        if !untouched.isEmpty {
+            // "Next set only" keeps later planned sets on the original
+            // exercise, with their original IDs and targets.
+            let continuation = StrengthExerciseLog(
+                id: UUID(),
+                plannedExerciseID: source.plannedExerciseID,
+                exercise: source.exercise,
+                sets: untouched,
+                completedAt: nil,
+                restSecondsOverride: source.restSecondsOverride,
+                groupID: source.groupID,
+                groupStyle: source.groupStyle,
+                substitutedFromExerciseName: source.substitutedFromExerciseName
+            )
+            workout.exercises.insert(continuation, at: insertionIndex + 1)
+        }
+
+        currentExerciseIndex = insertionIndex
         currentSetIndex = 0
         restEndsAt = nil
+        draftWeightKilograms = 20
+        draftResistanceLevel = 5
         activeWorkout = workout
         reloadDraftFromCurrentSet()
     }
