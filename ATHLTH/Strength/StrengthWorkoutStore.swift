@@ -1129,6 +1129,8 @@ final class StrengthWorkoutStore: ObservableObject {
         advancedConfiguration:
             StrengthAdvancedConfiguration? = nil
     ) {
+        guard activeWorkout == nil else { return }
+
         activeWorkout = StrengthWorkoutLog(
             id: UUID(),
             plannedSessionID: nil,
