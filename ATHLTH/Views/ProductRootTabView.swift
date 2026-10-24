@@ -8855,7 +8855,10 @@ struct ATHLTHProgressView: View {
 
     private let green = ATHLTHTheme.accent
     private let blue = Color(red: 0.20, green: 0.56, blue: 0.96)
-    private let purple = Color(red: 0.42, green: 0.36, blue: 0    var body: some View {
+    private let purple = Color(red: 0.42, green: 0.36, blue: 0.95)
+    private let canvas = Color(red: 0.965, green: 0.972, blue: 0.968)
+
+    var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
                 accent: ATHLTHTheme.accent.opacity(0.24),
