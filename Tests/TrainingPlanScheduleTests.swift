@@ -149,6 +149,118 @@ final class TrainingPlanScheduleTests: XCTestCase {
         )
     }
 
+    func testPartialStrengthLogDoesNotCompletePlanProgress() throws {
+        let suite = "TrainingPlanScheduleTests.progress.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let owner = UUID()
+        defer {
+            for name in TrainingBackupPayload.names +
+                ["strengthActive", "phoneActive"] {
+                UserDefaults.standard.removeObject(
+                    forKey: AccountLocalStorage.key(name, userID: owner)
+                )
+            }
+        }
+
+        let profile = UserProfile(
+            id: UUID(),
+            userID: owner,
+            username: "partial-progress-test",
+            displayName: "Partial Progress Test",
+            bio: "",
+            avatarURL: nil,
+            presence: TrainingPresence(
+                state: .available,
+                workoutTitle: nil,
+                startedAt: nil,
+                visibility: .friends
+            )
+        )
+        let app = AppSessionStore(profile: profile, defaults: defaults)
+        let exercise = Exercise(
+            id: UUID(),
+            origin: .custom,
+            ownerID: owner,
+            name: "Bench Press",
+            instructions: [],
+            primaryMuscles: ["Chest"],
+            secondaryMuscles: [],
+            equipment: [],
+            imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
+        )
+        let planned = PlannedSession(
+            id: UUID(),
+            title: "Strength day",
+            kind: .strength,
+            scheduledStart: nil,
+            durationMinutes: 45,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [
+                PlannedExercise(
+                    id: UUID(),
+                    exerciseID: exercise.id,
+                    embeddedExercise: exercise.snapshot,
+                    sets: 2,
+                    reps: 8,
+                    targetWeightKilograms: 40,
+                    targetRPE: nil,
+                    restSeconds: 90,
+                    notes: nil
+                )
+            ],
+            notes: nil
+        )
+        let program = plan(
+            starting: day(2026, 10, 21),
+            session: planned,
+            weekCount: 1
+        )
+        let store = StrengthWorkoutStore()
+        store.switchAccount(owner)
+        store.start(
+            session: planned,
+            watchSessionID: nil,
+            trackingMode: .simple,
+            captureDevice: .iPhone
+        )
+        store.completeCurrentSet(
+            reps: 8,
+            weightKilograms: 40,
+            rpe: 7
+        )
+        store.finish()
+
+        let partial = try XCTUnwrap(store.workoutHistory.first)
+        let reference = day(2026, 10, 23)
+        let progress = app.trainingPlanProgress(
+            program,
+            healthWorkouts: [],
+            strengthHistory: [partial],
+            referenceDate: reference
+        )
+        XCTAssertEqual(progress.totalSessions, 1)
+        XCTAssertEqual(progress.completedSessions, 0)
+        XCTAssertEqual(progress.missed.count, 1)
+
+        var complete = partial
+        complete.exercises[0].sets[1].completedReps = 8
+        complete.exercises[0].sets[1].completedAt = Date()
+        let completedProgress = app.trainingPlanProgress(
+            program,
+            healthWorkouts: [],
+            strengthHistory: [complete],
+            referenceDate: reference
+        )
+        XCTAssertTrue(complete.isFullyCompleted)
+        XCTAssertEqual(completedProgress.completedSessions, 1)
+        XCTAssertTrue(completedProgress.missed.isEmpty)
+    }
+
     func testDateOnlyWorkoutCannotClaimUnrelatedAppleHealthActivity() {
         let start = day(2026, 10, 21)
         let sessions = [workout(scheduledStart: start)]
