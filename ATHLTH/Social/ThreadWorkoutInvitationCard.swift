@@ -449,13 +449,18 @@ struct ThreadWorkoutInvitationCard: View {
 struct PlannedWorkoutLobbyView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
 
     let workout: PlannedSession
+    // Home retains ownership of the real iPhone/Watch workout engines.
+    var onStartWorkout: ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
 
     @State private var messages: [DirectMessageRecord] = []
     @State private var isRefreshing = false
     @State private var hasLoaded = false
     @State private var loadError: String?
+    @State private var openingReadyLobby = false
+    @State private var launchError: String?
 
     private let service = SupabaseMessagingService()
 
@@ -512,12 +517,40 @@ struct PlannedWorkoutLobbyView: View {
         invitedAthletes.filter { $0.decision == .accepted }.count
     }
 
+    private var canLaunchWorkout: Bool {
+        onStartWorkout != nil &&
+        (workout.kind == .running || workout.kind == .walking ||
+         workout.kind == .strength)
+    }
+
+    private var isOrganizer: Bool {
+        organizerID == session.profile.userID
+    }
+
+    private var inviteeForReadyLobby: SocialProfileCard? {
+        guard isOrganizer,
+              workout.trainTogetherMode == .physical,
+              let invitedPartnerID = workout.invitedPartnerID else {
+            return nil
+        }
+        return social.trainingPartners.first {
+            $0.userID == invitedPartnerID
+        }
+    }
+
+    private var persistedWorkout: PlannedSession? {
+        session.standalonePlannedSessions.first {
+            $0.id == workout.id && !$0.isExplicitRestDay
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 17) {
                 headerCard
                 workoutCard
                 participantsCard
+                startOptionsCard
                 Text(ATHLTHLocalization.choose(
                     english: "Your workout is in your calendar whether friends accept, decline or do not respond. You can train on your own.",
                     norwegian: "Økten ligger i kalenderen din uansett om venner godtar, avslår eller ikke svarer. Du kan gjennomføre økten alene."
@@ -538,6 +571,10 @@ struct PlannedWorkoutLobbyView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task(id: sourceWorkoutID) {
             await refresh()
+            if workout.invitedPartnerID != nil &&
+               inviteeForReadyLobby == nil {
+                await social.refresh()
+            }
             // A calendar sheet can open before Community loads its profiles.
             // Resolve names once when a relevant participant is missing.
             if (organizerID != session.profile.userID &&
@@ -557,6 +594,185 @@ struct PlannedWorkoutLobbyView: View {
                 await refresh()
             }
         }
+    }
+
+    /// A planned invitation is not an active recording. The shared
+    /// ready lobby is created only when the organizer explicitly opens it.
+    /// This reuses the app's server-authorized ready and 3-2-1 workflow.
+    private var startOptionsCard: some View {
+        ATHLTHTrainTogetherSurface {
+            VStack(alignment: .leading, spacing: 13) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Ready to train?",
+                        norwegian: "Klar for økten?"
+                    ),
+                    systemImage: "person.2.circle"
+                )
+                .font(.headline)
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                if isOrganizer && workout.trainTogetherMode == .physical {
+                    if let friend = inviteeForReadyLobby {
+                        Button {
+                            if social.coordinatedLobbySessionID != nil {
+                                social.presentCoordinatedLobby()
+                            } else {
+                                Task { await openReadyLobby(with: friend) }
+                            }
+                        } label: {
+                            Label(
+                                social.coordinatedLobbySessionID != nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Return to ready lobby",
+                                        norwegian: "Tilbake til klar-lobby"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Open ready lobby",
+                                        norwegian: "Åpne klar-lobby"
+                                    ),
+                                systemImage: "person.2.fill"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 52)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(ATHLTHTheme.accentDeep)
+                        .disabled(openingReadyLobby || !canLaunchWorkout)
+                    } else {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your selected friend must be a mutual follow to join a live lobby.",
+                            norwegian: "Vennen må følge deg gjensidig for å delta i en felles startlobby."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "A start invitation opens a shared lobby. Each person chooses a device, taps Ready and can wait for the synchronized 3-2-1 start. The organizer can also start independently.",
+                        norwegian: "Vennen får en startinvitasjon til en felles lobby. Begge velger enhet og trykker Klar, og kan vente på felles 3–2–1-start. Arrangøren kan også starte alene."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                if canLaunchWorkout {
+                    HStack(spacing: 9) {
+                        Button {
+                            startIndependently(using: .iPhone)
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Start on iPhone",
+                                    norwegian: "Start på iPhone"
+                                ),
+                                systemImage: "iphone"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(openingReadyLobby || persistedWorkout == nil)
+
+                        Button {
+                            startIndependently(using: .appleWatch)
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Start on Watch",
+                                    norwegian: "Start på Watch"
+                                ),
+                                systemImage: "applewatch"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(
+                            openingReadyLobby ||
+                            persistedWorkout == nil ||
+                            !watchConnection.isVerifiedForLiveLaunch
+                        )
+                    }
+                }
+
+                if openingReadyLobby {
+                    ProgressView(ATHLTHLocalization.choose(
+                        english: "Opening lobby…",
+                        norwegian: "Åpner lobby…"
+                    ))
+                }
+                if let launchError {
+                    Label(launchError, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+    }
+
+    private func startIndependently(using device: WorkoutCaptureDevice) {
+        guard let persistedWorkout, canLaunchWorkout,
+              !openingReadyLobby,
+              social.coordinatedLobbySessionID == nil else {
+            return
+        }
+        onStartWorkout?(persistedWorkout, device)
+    }
+
+    @MainActor
+    private func openReadyLobby(with friend: SocialProfileCard) async {
+        guard !openingReadyLobby, canLaunchWorkout,
+              social.coordinatedLobbySessionID == nil,
+              let persistedWorkout,
+              persistedWorkout.invitedPartnerID == friend.userID else {
+            return
+        }
+        openingReadyLobby = true
+        launchError = nil
+
+        // Invitation scheduling must not start a recorder. Starting the
+        // ready lobby creates a distinct real-time participation session.
+        let approved = await social.beginWorkoutWithFriends(
+            title: persistedWorkout.title,
+            kind: persistedWorkout.kind,
+            friends: [friend],
+            creatorName: session.profile.displayName,
+            creatorUsername: session.profile.username,
+            invitePayload: SocialWorkoutInvitePayload(
+                workout: persistedWorkout,
+                participationMode: .physical,
+                maxParticipants: 2,
+                startIndependently: false
+            ),
+            creatorCaptureDevice: .iPhone
+        )
+
+        openingReadyLobby = false
+        guard approved else {
+            if let reason = social.errorMessage {
+                launchError = reason
+            }
+            return
+        }
+        guard let current = session.standalonePlannedSessions.first(where: {
+            $0.id == persistedWorkout.id
+        }) else {
+            await social.markCurrentJoinedWorkoutLaunchFailed()
+            launchError = ATHLTHLocalization.choose(
+                english: "This planned workout is no longer available.",
+                norwegian: "Denne planlagte økten finnes ikke lenger."
+            )
+            return
+        }
+
+        let recordingDevice: WorkoutCaptureDevice
+        if let joinedID = social.currentJoinedWorkoutSessionID {
+            recordingDevice = social.proposedCreatorCaptureDevice(for: joinedID)
+        } else {
+            recordingDevice = .iPhone
+        }
+        onStartWorkout?(current, recordingDevice)
     }
 
     private var headerCard: some View {
