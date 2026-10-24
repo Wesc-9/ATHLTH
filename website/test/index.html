@@ -90,8 +90,23 @@ body{
 .logo-mark.is-beating .logo-svg{animation:heartbeat 2.4s ease-in-out infinite}
 .logo-mark.is-beating::before{animation:wave 2.4s ease-out infinite}
 .logo-mark.is-beating::after{animation:wave 2.4s ease-out .28s infinite}
+.brand{
+  margin:clamp(25px,4.5vmin,37px) 0 0;
+  padding-left:.42em;
+  color:rgba(248,248,250,.94);
+  font-size:clamp(12px,1.55vmin,15px);
+  font-weight:500;letter-spacing:.42em;line-height:1.45;
+  text-align:center;white-space:nowrap;
+  will-change:opacity,transform,filter;
+}
+.brand-divider{
+  width:84px;height:1px;margin:14px 0 0;
+  background:linear-gradient(90deg,transparent,rgba(239,240,245,.3) 30%,rgba(239,240,245,.42) 50%,rgba(239,240,245,.3) 70%,transparent);
+  transform-origin:center;will-change:opacity,transform;
+}
+body.enhanced .brand,body.enhanced .brand-divider{opacity:0}
 .coming{
-  margin:clamp(3rem,9vmin,5.5rem) 0 0;
+  margin:14px 0 0;
   padding-left:.8em;white-space:nowrap;
   font-size:clamp(.625rem,1.3vmin,.78rem);
   font-weight:500;line-height:1.5;
@@ -121,7 +136,8 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
   .logo-mark{width:clamp(9rem,41vw,12.5rem)}
   .center{transform:translateY(-1.6svh)}
   .ecg-line{width:52vw}
-  .coming{margin-top:clamp(2.9rem,8vmin,4.5rem)}
+  .brand{margin-top:26px}
+  .coming{margin-top:13px}
 }
 @media(prefers-reduced-motion:reduce){
   .journey{height:100svh;min-height:360px}
@@ -131,6 +147,7 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
   .logo-mark::before,.logo-mark::after{animation:none!important;opacity:0!important}
   .dust{display:none!important}
   .halo{transform:translate(-50%,-50%) scale(1)!important;opacity:1!important}
+  .brand,.brand-divider{opacity:1!important;filter:none!important;transform:none!important;will-change:auto!important}
   .coming,.coming span{letter-spacing:.7em!important;opacity:1!important;filter:none!important;transform:none!important}
   body.enhanced .coming span{opacity:1!important;filter:none!important;transform:none!important}
   .ecg-line{transform:scaleX(1)!important;opacity:.22!important}
@@ -169,6 +186,8 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
           </g>
         </svg>
       </div>
+      <h1 class="brand" id="brand">ATHLTH</h1>
+      <div class="brand-divider" id="brand-divider" aria-hidden="true"></div>
       <p class="coming" id="coming">COMING SOON</p>
     </div>
   </section>
@@ -183,6 +202,8 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
   const left=document.getElementById('line-left');
   const right=document.getElementById('line-right');
   const coming=document.getElementById('coming');
+  const brand=document.getElementById('brand');
+  const brandDivider=document.getElementById('brand-divider');
   const dustField=document.getElementById('dust-field');
   const a=document.getElementById('path-a');
   const b=document.getElementById('path-b');
@@ -287,6 +308,13 @@ body.enhanced .coming span[style]{opacity:var(--letter-opacity,0)}
       });
     }
     mark.classList.toggle('is-beating',p>.6&&!still);
+    const brandReveal=still?1:silk(clamp((p-.59)/.22));
+    const dividerReveal=still?1:silk(clamp((p-.7)/.18));
+    brand.style.opacity=String(brandReveal);
+    brand.style.filter='blur('+((1-brandReveal)*5).toFixed(2)+'px)';
+    brand.style.transform='translateY('+((1-brandReveal)*7).toFixed(2)+'px)';
+    brandDivider.style.opacity=String(dividerReveal);
+    brandDivider.style.transform='scaleX('+(.85+dividerReveal*.15).toFixed(3)+')';
     letters.forEach((el,i)=>{
       const t=still?1:silk(clamp((p-.7-i*.022)/.1));
       el.style.opacity=String(t);
