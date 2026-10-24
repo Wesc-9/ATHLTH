@@ -54,6 +54,38 @@ Testjobber (ingen TestFlight-opplasting):
 - `.github/workflows/launch-smoke.yml` – iPhone simulator build/launch
 - `.github/workflows/hybrid-engine-tests.yml` – målrettede XCTest-suiter
 
+## Apple Watch: tidsstyrt hybrid i 1.9.1
+
+For en **validert innendørs styrke + tidsstyrt tredemølleøkt** forblir
+`WatchWorkoutManager` eier av **én** løpende HealthKit-styrkeøkt.
+En ny `ATHLTHHybridWatchIntervalPolicy` lar Watch fullføre og gå videre
+til neste tidsstyrte løpefase når planlagt tid er utløpt, uten å be iPhone
+starte ny økt. iPhone mottar setthendelser via eksisterende
+`WatchStrengthCommand`-journal og lagrer resultatet i samme
+`StrengthWorkoutLog` med uendret plan- og Watch-identitet.
+
+Watch-køen inneholder mål for hvert drag (varighet, fase, puls-sone,
+måltempo). Manuell møllefart og estimert distanse behandles fortsatt
+**ikke** som sensorbasert måling. Pause/gjenoppta på Watch stopper også
+den aktuelle fasens nedtelling; ved sein levering bruker iPhone
+hendelsestidspunktet fra Watch.
+
+Sikkerhetsgrenser:
+- Watch avanserer ikke reps-baserte styrkesett automatisk.
+- Watch avanserer ikke hybrid-timer ved pauset HealthKit-økt eller når
+  økten styres i «kun iPhone»-modus.
+- Overgang til en annen øvelse er fremdeles en bevisst handling.
+- Sammenkoblede GPS-/distansebaserte løp og styrke er fortsatt ikke
+  støttet gjennom denne innendørsmotoren.
+- Et fullstendig nytt HealthKit-opptakssystem for vilkårlig bytte mellom
+  alle idretter/motorer er **ikke** implementert.
+
+Regresjonstester dekker Watch-preskripsjon, intervalldriver, pause-
+og gjenoppta-klokke, samt samlet opptaksidentitet. CI bygger både
+målrettede iPhone-simulatortester og et separat Watch-simulatormål.
+**Fysisk Watch-verifikasjon og reelle bortfall av forbindelse gjenstår**
+før en hybridrelease kan anses endelig godkjent.
+
 ## Fremtidig sensor- og opptakskoordinator (ikke implementert)
 
 Én sentral runtime-koordinator skal eie:
