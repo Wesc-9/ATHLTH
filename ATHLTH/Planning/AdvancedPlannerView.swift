@@ -11,6 +11,7 @@ struct AdvancedPlannerView: View {
     @State private var selectedWorkout: PlannedSession?
     @State private var showingSessionEditor = false
     @State private var showingStandaloneSessionEditor = false
+    @State private var editingStandaloneSession: PlannedSession?
     @State private var showingPlanEditor = false
     @State private var showingAllPlans = false
     @State private var showingProgramCreation = false
@@ -83,6 +84,9 @@ struct AdvancedPlannerView: View {
             SessionEditorView(
                 standaloneDate: Date()
             )
+        }
+        .sheet(item: $editingStandaloneSession) { workout in
+            SessionEditorView(workout: workout)
         }
         .sheet(isPresented: $showingPlanEditor) {
             if let plan = displayedPlan {
@@ -349,32 +353,51 @@ struct AdvancedPlannerView: View {
                     )
                     .lineLimit(1)
 
-                if let date =
-                        workout.scheduledStart {
+                if let date = workout.scheduledStart {
                     Text(
-                        date.formatted(
-                            .dateTime
-                                .weekday(
-                                    .abbreviated
-                                )
-                                .day()
-                                .month(
-                                    .abbreviated
-                                )
-                                .hour()
-                                .minute()
-                        )
+                        workout.scheduledTimeIsExplicit == false
+                            ? date.formatted(
+                                .dateTime.weekday(.abbreviated)
+                                    .day().month(.abbreviated)
+                            )
+                            : date.formatted(
+                                .dateTime.weekday(.abbreviated)
+                                    .day().month(.abbreviated)
+                                    .hour().minute()
+                            )
                     )
                     .font(.caption2)
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+
+                if workout.followUpSourceWorkoutID != nil {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Follow-up from previous workout",
+                            norwegian: "Oppfølging fra tidligere økt"
+                        ),
+                        systemImage: "link"
                     )
+                    .font(.system(size: 9.5))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
             }
 
             Spacer()
 
             Menu {
+                Button {
+                    editingStandaloneSession = workout
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Edit",
+                            norwegian: "Rediger"
+                        ),
+                        systemImage: "pencil"
+                    )
+                }
+
                 Button(
                     role: .destructive
                 ) {
@@ -4324,13 +4347,13 @@ struct SessionEditorView: View {
     }
 
     init(
-        planID: UUID,
+        planID: UUID? = nil,
         workout: PlannedSession
     ) {
         self.dayID = nil
         self.planID = planID
         self.existingWorkout = workout
-        self.isStandalone = false
+        self.isStandalone = planID == nil
 
         _title = State(initialValue: workout.title)
         _kind = State(initialValue: workout.kind)
@@ -4356,7 +4379,9 @@ struct SessionEditorView: View {
         )
         _selectedRouteID = State(initialValue: workout.routeID)
         _scheduledTimeEnabled = State(
-            initialValue: workout.scheduledStart != nil
+            initialValue:
+                workout.scheduledStart != nil &&
+                (workout.scheduledTimeIsExplicit ?? true)
         )
         _scheduledTime = State(
             initialValue: workout.scheduledStart ?? Date()
@@ -4583,7 +4608,12 @@ struct SessionEditorView: View {
                             }
                         } else {
                             Button("–") {
-                                scheduledTime = Date()
+                                scheduledTime = Calendar.current.date(
+                                    bySettingHour: 18,
+                                    minute: 0,
+                                    second: 0,
+                                    of: scheduledTime
+                                ) ?? scheduledTime
                                 scheduledTimeEnabled = true
                             }
                             .font(.headline)
@@ -6517,7 +6547,9 @@ struct SessionEditorView: View {
             kind: kind,
             scheduledStart:
                 isStandalone
-                    ? scheduledTime
+                    ? (scheduledTimeEnabled
+                        ? scheduledTime
+                        : Calendar.current.startOfDay(for: scheduledTime))
                     : scheduledTimeEnabled
                         ? scheduledTime
                         : nil,
@@ -6569,7 +6601,16 @@ struct SessionEditorView: View {
                     ? nil
                     : workoutBlocks,
             workoutCategory:
-                workoutCategory
+                workoutCategory,
+            sharedSourceOwnerID: existingWorkout?.sharedSourceOwnerID,
+            sharedSourceSessionID: existingWorkout?.sharedSourceSessionID,
+            followUpSourceWorkoutID:
+                existingWorkout?.followUpSourceWorkoutID,
+            followUpSourceSetIDs:
+                existingWorkout?.followUpSourceSetIDs,
+            scheduledTimeIsExplicit:
+                isStandalone ? scheduledTimeEnabled
+                    : existingWorkout?.scheduledTimeIsExplicit
         )
 
         if isStandalone {
