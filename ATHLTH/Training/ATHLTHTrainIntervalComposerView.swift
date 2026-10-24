@@ -30,6 +30,8 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var inclineEnabled = false
     @State private var inclinePercent = 0.0
     @State private var notes = ""
+    @State private var phasePlaylist: SpotifyPlaylistReference?
+    @State private var showingPhasePlaylistPicker = false
     @State private var heartRateTargetEnabled = false
     @State private var heartRateZone = 4
     @State private var ghostEnabled: Bool
@@ -177,6 +179,12 @@ struct ATHLTHTrainIntervalComposerView: View {
                 }
             }
         }
+        .sheet(isPresented: $showingPhasePlaylistPicker) {
+            SpotifyPlaylistPickerView(
+                title: tr("Playlist for this phase", "Spilleliste for denne delen"),
+                selection: $phasePlaylist
+            )
+        }
         .sheet(item: $editingRepetition) { selection in
             if let block = blocks.first(where: { $0.id == selection.blockID }) {
                 ATHLTHIntervalRepetitionEditorView(
@@ -300,6 +308,12 @@ struct ATHLTHTrainIntervalComposerView: View {
                         Text(summary(block))
                             .font(.caption)
                             .foregroundStyle(muted)
+                        if let playlist = block.spotifyPlaylist {
+                            Label(playlist.name, systemImage: "music.note")
+                                .font(.caption2.weight(.medium))
+                                .foregroundStyle(bronze)
+                                .lineLimit(1)
+                        }
                     }
                     Spacer()
                     Button {
@@ -475,6 +489,35 @@ struct ATHLTHTrainIntervalComposerView: View {
             }
 
             phaseTargetControls
+
+            Button {
+                showingPhasePlaylistPicker = true
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "music.note.list")
+                        .foregroundStyle(bronze)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tr("Playlist for this phase", "Spilleliste for denne delen"))
+                            .font(.subheadline.weight(.semibold))
+                        Text(phasePlaylist?.name ?? tr("Choose a Spotify playlist", "Velg Spotify-spilleliste"))
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                            .lineLimit(1)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                }
+                .foregroundStyle(ink)
+                .padding(12)
+                .background(paper, in: RoundedRectangle(cornerRadius: 12))
+            }
+            .buttonStyle(.plain)
+            Text(tr(
+                "The playlist is saved with this phase. Automatic music switching between phases is not enabled.",
+                "Spillelisten lagres med denne delen. Automatisk musikkbytte mellom deler er ikke aktivert."
+            ))
+            .font(.caption2)
+            .foregroundStyle(muted)
 
             TextField(tr("Optional instructions", "Valgfri beskrivelse"),
                       text: $notes,
@@ -706,6 +749,7 @@ struct ATHLTHTrainIntervalComposerView: View {
         heartRateTargetEnabled = block.work.intensity.heartRateZone != nil
         heartRateZone = block.work.intensity.heartRateZone ?? 4
         notes = block.notes ?? ""
+        phasePlaylist = block.spotifyPlaylist
     }
 
     private func addBlock() {
@@ -740,7 +784,8 @@ struct ATHLTHTrainIntervalComposerView: View {
             work: work, recovery: recovery,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? nil : notes,
-            repetitionOverrides: priorOverrides?.filter { $0.repetition <= (kind == .work ? repetitions : 1) }
+            repetitionOverrides: priorOverrides?.filter { $0.repetition <= (kind == .work ? repetitions : 1) },
+            spotifyPlaylist: phasePlaylist
         )
         if let id = editingBlockID, let index = blocks.firstIndex(where: { $0.id == id }) {
             blocks[index] = entry
@@ -750,6 +795,7 @@ struct ATHLTHTrainIntervalComposerView: View {
         editingBlockID = nil
         isComposerExpanded = false
         notes = ""
+        phasePlaylist = nil
         activityName = ""
     }
 
