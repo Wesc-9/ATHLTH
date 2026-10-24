@@ -2338,6 +2338,12 @@ struct ATHLTHTrainPlanPremiumView: View {
     private func premiumWorkoutStructure(_ workout: PlannedSession) -> some View {
         let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
         let targetZones = Array(Set(blocks.compactMap(\.targetHeartRateZone))).sorted()
+        let phasePlaylists = workout.resolvedRunningWorkouts
+            .flatMap(\.blocks)
+            .compactMap { block -> (String, SpotifyPlaylistReference)? in
+                guard let playlist = block.spotifyPlaylist else { return nil }
+                return (block.title, playlist)
+            }
         return VStack(alignment: .leading, spacing: 13) {
             if blocks.isEmpty {
                 Label(tr("No detailed steps have been registered.",
@@ -2395,6 +2401,36 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .background(soft, in: RoundedRectangle(cornerRadius: 12))
                     }
                 }
+            }
+            if !phasePlaylists.isEmpty {
+                VStack(alignment: .leading, spacing: 9) {
+                    Label(tr("Planned music", "Planlagt musikk"),
+                          systemImage: "music.note.list")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(graphite)
+                    ForEach(Array(phasePlaylists.enumerated()), id: \.offset) { item in
+                        HStack(spacing: 9) {
+                            Image(systemName: "music.note")
+                                .foregroundStyle(warmGold)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(item.element.0)
+                                    .font(.caption.weight(.semibold))
+                                Text(item.element.1.name)
+                                    .font(.caption)
+                                    .foregroundStyle(secondaryInk)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                    }
+                    Text(tr(
+                        "Playlist preferences are saved with their phases; automatic switching is not enabled.",
+                        "Spillelistene er lagret per del. Automatisk bytte mellom delene er ikke aktivert."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(secondaryInk)
+                }
+                .padding(12)
+                .background(soft, in: RoundedRectangle(cornerRadius: 14))
             }
             if let duration = workout.durationMinutes, duration > 0 {
                 Label(tr("Estimated total", "Forventet totaltid") +
