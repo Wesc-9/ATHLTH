@@ -1808,9 +1808,16 @@ private enum ATHLTHAIDraftValidationError: LocalizedError {
 
 struct CustomExerciseEditorView: View {
     let editing: ExerciseLibraryEntry?
+    /// Allows the active-workout queue to use a newly created exercise
+    /// immediately, without requiring a second search in the library.
+    var onSaved: ((ExerciseLibraryEntry) -> Void)? = nil
 
-    init(editing: ExerciseLibraryEntry? = nil) {
+    init(
+        editing: ExerciseLibraryEntry? = nil,
+        onSaved: ((ExerciseLibraryEntry) -> Void)? = nil
+    ) {
         self.editing = editing
+        self.onSaved = onSaved
         _name = State(initialValue: editing?.exercise.name ?? "")
         _primaryMuscles = State(initialValue: Set(
             ExerciseMuscleGroup.allCases.filter {
@@ -2372,8 +2379,13 @@ struct CustomExerciseEditorView: View {
                     )
                 }
                 library.updateCustomExercise(updated)
+                if let entry = library.customExercises.first(where: {
+                    $0.id == editing.id
+                }) {
+                    onSaved?(entry)
+                }
             } else {
-                _ = library.createCustomExercise(
+                let created = library.createCustomExercise(
                     ownerID: session.profile.userID,
                     name: name,
                     instructions: splitLines(instructions),
@@ -2384,6 +2396,7 @@ struct CustomExerciseEditorView: View {
                     imageData: selectedImageData,
                     videoURL: video
                 )
+                onSaved?(created)
             }
             didSaveExercise = true
             importedVideoURL = nil
