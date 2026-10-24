@@ -648,6 +648,11 @@ struct PlannedExercise: Identifiable, Codable, Hashable {
     // value for reps/time, load, rest and effort.
     var setTargets: [PlannedExerciseSetTarget]? = nil
 
+    // Optional phase for mixed running/strength recipes. Existing sessions
+    // without a phase continue using the usual warm-up-set / main defaults.
+    // This is persisted in plans, messages and backups without migration.
+    var workoutPhase: WorkoutPhaseKind? = nil
+
     var hasIndividualSetTargets: Bool {
         guard let setTargets else {
             return false
