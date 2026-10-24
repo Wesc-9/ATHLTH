@@ -115,6 +115,8 @@ body{
   color:rgba(224,224,230,.76);
 }
 body:not(.enhanced) .coming{display:none}
+/* Keep ATHLTH hidden until its entrance is driven by the animation. */
+body.enhanced .brand{opacity:0}
 @keyframes heartbeat{
   0%,100%{transform:scale(1);filter:drop-shadow(0 0 0 transparent)}
   8%{transform:scale(1.028);filter:drop-shadow(0 0 12px rgba(255,255,255,.23))}
@@ -289,12 +291,14 @@ body:not(.enhanced) .coming{display:none}
       });
     }
     mark.classList.toggle('is-beating',p>.6&&!still);
-    // One fixed text position: ATHLTH fades out as COMING SOON fades in.
-    // Reverse scrolling reverses the transition naturally.
-    const swap=still?1:silk(clamp((p-.66)/.22));
-    brand.style.opacity=String(1-swap);
+    // Let the symbol draw first, then gently reveal ATHLTH.
+    // It remains in the same position while fading into COMING SOON.
+    // Scrolling backwards naturally reverses both stages.
+    const reveal=still?0:silk(clamp((p-.35)/.17));
+    const swap=still?1:silk(clamp((p-.72)/.20));
+    brand.style.opacity=String(reveal*(1-swap));
     coming.style.opacity=String(swap);
-    brand.style.filter='blur('+(swap*2).toFixed(2)+'px)';
+    brand.style.filter='blur('+((1-reveal)*3+swap*2).toFixed(2)+'px)';
     coming.style.filter='blur('+((1-swap)*2).toFixed(2)+'px)';
   }
   if(motion.matches){
