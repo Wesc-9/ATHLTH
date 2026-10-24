@@ -22,9 +22,17 @@ struct ATHLTHTrainTodayRebuildView: View {
         session.standalonePlannedSessions(on: Date())
     }
 
-    private var allToday: [(session: PlannedSession, standalone: Bool)] {
-        let plan = plannedToday.map { (session: $0, standalone: false) }
-        let standalone = standaloneToday.map { (session: $0, standalone: true) }
+    private struct TodayEntry: Identifiable {
+        let session: PlannedSession
+        let standalone: Bool
+        var id: UUID { session.id }
+    }
+
+    private var allToday: [TodayEntry] {
+        let plan = plannedToday.map { TodayEntry(session: $0, standalone: false) }
+        let standalone = standaloneToday.map {
+            TodayEntry(session: $0, standalone: true)
+        }
         return (plan + standalone).sorted {
             ($0.session.scheduledStart ?? .distantFuture) <
                 ($1.session.scheduledStart ?? .distantFuture)
@@ -59,7 +67,7 @@ struct ATHLTHTrainTodayRebuildView: View {
                         sectionLabel(ATHLTHLocalization.choose(
                             english: "ALSO TODAY", norwegian: "OGSÅ I DAG"
                         ))
-                        ForEach(allToday.dropFirst(), id: \.session.id) { item in
+                        ForEach(allToday.dropFirst()) { item in
                             compactWorkout(item.session, standalone: item.standalone)
                         }
                     }
