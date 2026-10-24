@@ -4695,10 +4695,11 @@ struct ActiveStrengthWorkoutView: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: 142)
             }
-            if !exercise.exercise.primaryMuscles.isEmpty {
+            if let primaryMuscles = exercise.exercise.primaryMuscles,
+               !primaryMuscles.isEmpty {
                 Text(ATHLTHLocalization.choose(
                     english: "Primary: ", norwegian: "Primær: "
-                ) + exercise.exercise.primaryMuscles.joined(separator: " · "))
+                ) + primaryMuscles.joined(separator: " · "))
                 .font(.caption.weight(.medium))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
             }
