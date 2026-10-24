@@ -5673,51 +5673,57 @@ struct ATHLTHTrainView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    premiumTrainBrandHeader
-                    premiumTrainTabs
-
-                    switch selectedSection {
-                    case 1:
-                        AnyView(ATHLTHTrainPlanPremiumView(
-                            highlightedPlanID: highlightedTrainPlanID,
-                            onStartWorkout: { planID, workout in
-                                openTodayPrimaryWorkout(
-                                    workout,
-                                    planID: planID,
-                                    isHealthCompleted: false
-                                )
+            Group {
+                if selectedSection == 2 {
+                    // Progress owns its full-bleed hero, filters and scroll.
+                    // Returning to Train always selects the Today section.
+                    ATHLTHTrainProgressReferenceView(
+                        onReturnToToday: {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                selectedSection = 0
                             }
-                        ))
-                    case 2:
-                        AnyView(ATHLTHTrainProgressPremiumView {
+                        },
+                        onOpenPlan: {
                             selectedSection = 1
-                        })
-                    default:
-                        unfinishedWorkoutRecoveryCards
-                        activeTrainWorkoutCard
-                        AnyView(premiumTodayScreen)
+                        }
+                    )
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 16) {
+                            premiumTrainBrandHeader
+                            premiumTrainTabs
+
+                            if selectedSection == 1 {
+                                ATHLTHTrainPlanPremiumView(
+                                    highlightedPlanID: highlightedTrainPlanID,
+                                    onStartWorkout: { planID, workout in
+                                        openTodayPrimaryWorkout(
+                                            workout,
+                                            planID: planID,
+                                            isHealthCompleted: false
+                                        )
+                                    }
+                                )
+                            } else {
+                                unfinishedWorkoutRecoveryCards
+                                activeTrainWorkoutCard
+                                premiumTodayScreen
+                            }
+                        }
+                        .padding(.horizontal, 17)
+                        .padding(.top, 18)
+                        .padding(.bottom, 36)
+                        .containerRelativeFrame(.horizontal) { @Sendable availableWidth, _ in
+                            min(availableWidth, 760)
+                        }
+                        .frame(maxWidth: .infinity)
                     }
+                    .scrollIndicators(.hidden)
+                    .background(
+                        ATHLTHPlanDesign.warmCanvas.ignoresSafeArea()
+                    )
                 }
-                .padding(.horizontal, 17)
-                .padding(.top, 18)
-                .padding(.bottom, 36)
-                // A vertical ScrollView may let scaled images or long
-                // labels propose a width wider than the device. Always
-                // measure against the scroll container, never its content.
-                // SwiftUI may evaluate this pure sizing closure on its
-                // AsyncRenderer. Do not inherit this view's MainActor.
-                .containerRelativeFrame(.horizontal) { @Sendable availableWidth, _ in
-                    min(availableWidth, 760)
-                }
-                .frame(maxWidth: .infinity)
             }
-            .scrollIndicators(.hidden)
-            .background(
-                ATHLTHPlanDesign.warmCanvas
-                    .ignoresSafeArea()
-            )
             // Keep root Train navigation metadata small regardless of which
             // Today/Plan/Progress section is selected.
             .athlthStablePresentationBoundary()
