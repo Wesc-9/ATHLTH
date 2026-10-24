@@ -289,22 +289,30 @@ struct HomeActivityStrengthDetailView: View {
         !muscleSummary.profile.activations.isEmpty
     }
 
+    private var workoutHeroHeight: CGFloat { 290 }
+
     private var workoutHeroCard: some View {
         VStack(spacing: 0) {
-            ATHLTHStrengthCompletedHeroCard(
-                profile: muscleSummary.profile,
-                duration: workout.duration,
-                exerciseCount: workout.strengthExerciseCount
-                    ?? resolvedStrengthWorkout?.exercises.count,
-                volumeKilograms: workout.strengthTotalVolumeKilograms
-                    ?? resolvedStrengthWorkout?.totalVolumeKilograms,
-                height: 290,
-                compact: false,
-                showsCompletionLabel: false,
-                showsMetrics: false,
-                detailMetadata: workoutHeroMetadata,
-                cornerRadius: 0
-            )
+            // Bound the shared artwork to the available viewport width; this
+            // prevents its aspect-fill image from widening the detail scroll.
+            GeometryReader { viewport in
+                ATHLTHStrengthCompletedHeroCard(
+                    profile: muscleSummary.profile,
+                    duration: workout.duration,
+                    exerciseCount: workout.strengthExerciseCount
+                        ?? resolvedStrengthWorkout?.exercises.count,
+                    volumeKilograms: workout.strengthTotalVolumeKilograms
+                        ?? resolvedStrengthWorkout?.totalVolumeKilograms,
+                    height: workoutHeroHeight,
+                    compact: false,
+                    showsCompletionLabel: false,
+                    showsMetrics: false,
+                    detailMetadata: workoutHeroMetadata,
+                    cornerRadius: 0
+                )
+                .frame(width: viewport.size.width, height: workoutHeroHeight)
+            }
+            .frame(height: workoutHeroHeight)
 
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .center, spacing: 10) {
