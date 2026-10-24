@@ -86,6 +86,30 @@ målrettede iPhone-simulatortester og et separat Watch-simulatormål.
 **Fysisk Watch-verifikasjon og reelle bortfall av forbindelse gjenstår**
 før en hybridrelease kan anses endelig godkjent.
 
+## 1.9.1 – Watch-hybrid kobling (implementert i kode, fysisk test gjenstår)
+
+- **Én aktiv HealthKit-økt**: planlagt styrke og tidsstyrte innendørs
+  tredemøllefaser deler Watch-opptaket og samme parent workout-ID.
+  Watch-treningen er fortsatt kategorisert som tradisjonell styrke, ikke
+  en selvstendig GPS-løpeøkt.
+- **Én klokke som eier automatiske faseoverganger**: for Watch-opptak
+  med Watch/begge som inndata håndterer Watch ferdigstilling av løpedrag.
+  iPhone forsøker ikke samtidig å fullføre det samme draget. Ved iPhone-
+  styrte eller iPhone-opptatte økter brukes iPhone-klokken.
+- **Pause og gjenoppta**: Watch journalfører handlingene med hendelsestid,
+  slik at iPhone kan rekonstruere nedtellingen etter brudd i forbindelse.
+  Også systemutløste HealthKit-pauser behandles.
+- **Fasedetaljer**: tittel, type, planlagt varighet, pulssone og måltempo
+  følger med til Apple Watch, og oppdateres ved fasebytte. Måltempo er
+  aldri deklarert som målt fart.
+- **Målt distanse**: under innebygde møllefaser kan Watch abonnere på
+  faktiske `distanceWalkingRunning`-samples. Hvis HealthKit ikke leverer
+  disse under et styrkeopptak, forblir den målte distansen ukjent; appen
+  skal ikke erstatte den med fart × tid uten å merke estimatet.
+- Automatiske XCTest-regresjoner og watchOS-simulatorbygg kontrollerer
+  koden; **fysisk Apple Watch-akseptansetest er fortsatt et eget krav**.
+  Ikke dokumenter dette som fullført sensorbasert universal-motor.
+
 ## Fremtidig sensor- og opptakskoordinator (ikke implementert)
 
 Én sentral runtime-koordinator skal eie:
