@@ -678,7 +678,7 @@ final class TrainingContinuityTests: XCTestCase {
             rpe: 7
         )
         store.finish()
-        XCTAssertTrue(store.workoutHistory.contains(\.isFullyCompleted))
+        XCTAssertTrue(store.workoutHistory.contains(where: \.isFullyCompleted))
     }
 
     @MainActor
