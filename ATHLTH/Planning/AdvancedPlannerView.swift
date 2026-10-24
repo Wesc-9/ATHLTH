@@ -5433,6 +5433,7 @@ struct SessionEditorView: View {
     @State private var showingSavedWorkoutPicker = false
     @State private var showingRecoveryRestPlanner = false
     @State private var selectedPartnerID: UUID?
+    @State private var partnerPlanningExpanded = false
     @State private var showingAllTrainingPartners = false
     @State private var allowInviteeExercises = false
     @State private var directPartnerID: UUID?
@@ -5575,6 +5576,7 @@ struct SessionEditorView: View {
     ) {
         self.init(standaloneDate: standaloneDate)
         _selectedPartnerID = State(initialValue: partnerID)
+        _partnerPlanningExpanded = State(initialValue: true)
         _directPartnerID = State(initialValue: partnerID)
         _physicalMeetup = State(initialValue: physicalMeetup)
         if let initialWorkoutStart {
@@ -5627,8 +5629,7 @@ struct SessionEditorView: View {
                 ? .treadmill : .outdoor
         )
         _meetingPoint = State(initialValue: workout.meetingPoint)
-        _physicalMeetup = State(initialValue:
-            workout.trainTogetherMode != .sameWorkout)
+        _physicalMeetup = State(initialValue: true)
         _allowInviteeExercises = State(initialValue: workout.allowInviteeExercises == true)
         _reminderMinutesBefore = State(initialValue: workout.reminderMinutesBefore ?? 0)
         _plannedExercises = State(initialValue: workout.exercises)
@@ -5799,6 +5800,7 @@ struct SessionEditorView: View {
     private func beginPartnerPlanningFromSource() {
         title = ""
         prioritizePartnerPlanning = true
+        partnerPlanningExpanded = true
         hasSelectedWorkoutSource = true
     }
 
@@ -7614,16 +7616,22 @@ struct SessionEditorView: View {
 
     private var partnerPlanningSection: some View {
         Section {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 12) {
-                    Image(systemName: "person.2.fill")
-                        .font(.system(size: 19, weight: .semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.accent)
-                        .frame(width: 48, height: 48)
-                        .background(ATHLTHPlanDesign.selectedSurface,
-                                    in: RoundedRectangle(cornerRadius: 16))
+            VStack(alignment: .leading, spacing: 12) {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        partnerPlanningExpanded.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 19, weight: .semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accent)
+                            .frame(width: 48, height: 48)
+                            .background(
+                                ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 16)
+                            )
 
-                    VStack(alignment: .leading, spacing: 3) {
                         Text(ATHLTHLocalization.choose(
                             english: "Plan with a friend",
                             norwegian: "Planlegg med en venn"
@@ -7631,59 +7639,45 @@ struct SessionEditorView: View {
                         .font(.subheadline.weight(.bold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
 
-                        Text(ATHLTHLocalization.choose(
-                            english: "Invite someone to share this workout",
-                            norwegian: "Inviter noen til å dele denne økten"
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        Spacer(minLength: 0)
+
+                        if !partnerPlanningExpanded,
+                           let selectedPartnerID,
+                           let friend = social.trainingPartners.first(where: {
+                               $0.userID == selectedPartnerID
+                           }) {
+                            Text(friend.resolvedName)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(1)
+                        }
+
+                        Image(systemName: partnerPlanningExpanded
+                              ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
-                    Spacer(minLength: 0)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Expand or collapse friend planning",
+                    norwegian: "Vis eller skjul planlegging med en venn"
+                ))
 
-                trainingPartnerQuickPicker
+                if partnerPlanningExpanded {
+                    trainingPartnerQuickPicker
 
-                if selectedPartnerID != nil {
-                    Picker(
-                        ATHLTHLocalization.choose(
-                            english: "Training mode",
-                            norwegian: "Hvordan trener dere?"
-                        ),
-                        selection: $physicalMeetup
-                    ) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Meet in person",
-                            norwegian: "Trene fysisk sammen"
-                        )).tag(true)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Same workout",
-                            norwegian: "Trene samme økt"
-                        )).tag(false)
+                    if selectedPartnerID != nil {
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Allow guest to add exercises",
+                                norwegian: "La invitert legge til øvelser"
+                            ),
+                            isOn: $allowInviteeExercises
+                        )
+                        .tint(ATHLTHPlanDesign.accent)
                     }
-                    .pickerStyle(.segmented)
-
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Allow guest to add exercises",
-                            norwegian: "La invitert legge til øvelser"
-                        ),
-                        isOn: $allowInviteeExercises
-                    )
-                    .tint(ATHLTHPlanDesign.accent)
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "Shared changes must be approved by the organizer.",
-                        norwegian: "Felles endringer må godkjennes av arrangøren."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                } else {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose a mutual friend to send an invitation in Messages.",
-                        norwegian: "Velg en venn dere følger gjensidig for å sende invitasjon i meldinger."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
             }
             .padding(.vertical, 9)
@@ -9689,13 +9683,12 @@ struct SessionEditorView: View {
                 kind == .running && runEnvironment == .treadmill
                     ? "treadmill"
                     : (workoutCategory == "treadmill" ? nil : workoutCategory),
-            meetingPoint: physicalMeetup ? meetingPoint : nil,
+            meetingPoint: selectedPartnerID != nil ? meetingPoint : nil,
             reminderMinutesBefore: scheduledTimeEnabled && reminderMinutesBefore > 0
                 ? reminderMinutesBefore : nil,
             trainTogetherMode: onPreparedWorkout != nil
                 ? initialSourceWorkout?.trainTogetherMode
-                : selectedPartnerID == nil ? nil :
-                    (physicalMeetup ? .physical : .sameWorkout),
+                : selectedPartnerID == nil ? nil : .physical,
             invitedPartnerID: onPreparedWorkout != nil
                 ? initialSourceWorkout?.invitedPartnerID : selectedPartnerID,
             allowInviteeExercises: onPreparedWorkout != nil
@@ -9756,8 +9749,8 @@ struct SessionEditorView: View {
                     shareVersion: 2
                 )
                 let body = ATHLTHLocalization.choose(
-                    english: (physicalMeetup ? "Let's meet and train! " : "Let's do the same workout! ") + "\(workout.title) · \(scheduled). Accept or decline the invitation below.",
-                    norwegian: (physicalMeetup ? "Vil du trene fysisk sammen? " : "Vil du trene samme økt? ") + "\(workout.title) · \(scheduled). Godta eller avslå invitasjonen nedenfor."
+                    english: "Let's meet and train! \(workout.title) · \(scheduled). Accept or decline the invitation below.",
+                    norwegian: "Vil du trene fysisk sammen? \(workout.title) · \(scheduled). Godta eller avslå invitasjonen nedenfor."
                 )
                 let sent = await messaging.send(
                     to: partnerID,
@@ -9879,9 +9872,8 @@ struct SessionEditorView: View {
         reminderMinutesBefore = draft.workout.reminderMinutesBefore ?? 0
         scheduledTimeEnabled = draft.scheduledTimeEnabled
         selectedPartnerID = directPartnerID ?? draft.selectedPartnerID
-        if directPartnerID == nil {
-            physicalMeetup = draft.physicalMeetup ?? physicalMeetup
-        }
+        // Legacy draft modes are normalized to in-person invitations.
+        physicalMeetup = true
         editorMode = SessionEditorMode(rawValue: draft.editorModeRaw) ?? editorMode
         targetPaceEnabled = draft.targetPaceEnabled
         heartRateTargetEnabled = draft.heartRateTargetEnabled
