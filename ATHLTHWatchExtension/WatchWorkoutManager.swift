@@ -2803,6 +2803,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         snapshot.embeddedRunningPhaseTitle = plan.hybridPhaseTitle
         snapshot.embeddedRunningPhaseKind = plan.hybridPhaseKind
         snapshot.embeddedRunningTargetHeartRateZone = plan.hybridTargetHeartRateZone
+        snapshot.embeddedRunningTargetPaceSecondsPerKilometer =
+            plan.hybridTargetPaceSecondsPerKilometer
 
         if let reps = plan.reps {
             snapshot.draftReps =
