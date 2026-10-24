@@ -122,9 +122,12 @@ struct ATHLTHMetalMedalArtwork: View {
     let trophy: TrophyProgressItem
     let size: CGFloat
     var showActivityIcon: Bool = true
+    // Unlock animations must display the metal of the newly earned stage,
+    // even when the trophy series already has a higher unlocked level.
+    var rarityOverride: TrophyRarity? = nil
 
     private var metal: ATHLTHMedalMetal {
-        ATHLTHMedalMetal(rarity: trophy.displayRarity)
+        ATHLTHMedalMetal(rarity: rarityOverride ?? trophy.displayRarity)
     }
     private var unlocked: Bool { trophy.isUnlocked }
 
