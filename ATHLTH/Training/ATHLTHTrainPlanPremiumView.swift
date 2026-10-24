@@ -502,14 +502,16 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private var studioEmptyState: some View {
         VStack(alignment: .leading, spacing: 11) {
-            Image("GoalMountain")
-                .resizable()
-                .scaledToFill()
-                .frame(height: 172)
-                .frame(maxWidth: .infinity)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 19))
-                .accessibilityHidden(true)
+            GeometryReader { imageBounds in
+                Image("GoalMountain")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: imageBounds.size.width, height: 172)
+                    .clipped()
+            }
+            .frame(height: 172)
+            .clipShape(RoundedRectangle(cornerRadius: 19))
+            .accessibilityHidden(true)
             Text(tr("Your plan starts here", "Her starter treningsplanen din"))
                 .font(.system(size: 25, weight: .regular, design: .serif))
                 .foregroundStyle(graphite)
