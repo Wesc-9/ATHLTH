@@ -1422,6 +1422,15 @@ final class StrengthWorkoutStore: ObservableObject {
         persistCheckpointNow()
     }
 
+    /// Exactly one clock may advance a timed hybrid phase. Watch-owned
+    /// workouts replay their own durable set commands; iPhone must not race
+    /// the Watch after a mirror delay, screen lock or disconnection.
+    var controlsEmbeddedHybridClockOnIPhone: Bool {
+        guard let workout = activeWorkout else { return false }
+        return workout.captureDevice != .appleWatch ||
+            workout.advancedConfiguration?.inputMode == .iPhone
+    }
+
     /// Date-anchored embedded running intervals. Only the phase advances:
     /// HealthKit recording and Apple Watch ownership stay with the parent
     /// strength workout, preventing a second workout or duplicate calories.
