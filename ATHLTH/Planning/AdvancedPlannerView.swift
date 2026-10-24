@@ -5448,6 +5448,7 @@ struct SessionEditorView: View {
     @State private var showingInvitationError = false
 
     @State private var plannedExercises: [PlannedExercise] = []
+    @State private var exerciseInsertPhase: WorkoutPhaseKind = .main
     @State private var exerciseBeingEdited: PlannedExercise?
     @State private var showingExerciseLibrary = false
 
@@ -5945,55 +5946,6 @@ struct SessionEditorView: View {
                         }
                         .padding(.vertical, 6)
 
-                        Toggle(ATHLTHLocalization.choose(
-                            english: "Estimated running pace", norwegian: "Estimert løpetempo"
-                        ), isOn: $targetPaceEnabled)
-                        .tint(ATHLTHPlanDesign.accentInk)
-
-                        if targetPaceEnabled {
-                            Stepper(
-                                ATHLTHLocalization.choose(english: "Speed", norwegian: "Hastighet")
-                                    + ": " + String(format: "%.1f km/t", targetRunningSpeedBinding.wrappedValue),
-                                value: targetRunningSpeedBinding, in: 3...25, step: 0.1
-                            )
-                            HStack {
-                                Text(ATHLTHLocalization.choose(english: "Pace", norwegian: "Tempo"))
-                                Spacer()
-                                Stepper(value: $targetPaceMinutes, in: 2...20) {
-                                    Text(String(format: "%d:%02d min/km", targetPaceMinutes, targetPaceSeconds))
-                                        .monospacedDigit()
-                                }
-                            }
-                            Stepper(
-                                ATHLTHLocalization.choose(english: "Pace seconds", norwegian: "Sekunder i tempo")
-                                    + ": \(targetPaceSeconds)",
-                                value: $targetPaceSeconds, in: 0...55, step: 5
-                            )
-                        }
-                        if !selectedRunningWorkouts.isEmpty {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Estimated totals include warm-up, intervals, recoveries and cool-down. Per-step pace takes priority; missing pace uses the selected pace or a conservative estimate.",
-                                norwegian: "Estimatet inkluderer oppvarming, intervaller, pauser og nedjogg. Tempo per drag prioriteres; manglende tempo beregnes med valgt tempo eller et forsiktig anslag."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-
-                            Button {
-                                distanceWasAdjustedManually = false
-                                durationWasAdjustedManually = false
-                                syncRunningMetricsFromSelection()
-                            } label: {
-                                Label(ATHLTHLocalization.choose(
-                                    english: "Use estimated distance and duration",
-                                    norwegian: "Bruk beregnet distanse og varighet"
-                                ), systemImage: "arrow.clockwise")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .padding(.vertical, 9)
-                            }
-                            .buttonStyle(.plain)
-                        }
                     }
 
                     if kind == .running {
@@ -6070,18 +6022,22 @@ struct SessionEditorView: View {
                             }
                             .buttonStyle(.plain)
 
-                            Button {
-                                kind = .strength
-                                showingExerciseLibrary = true
-                            } label: {
-                                compactAddTile(
-                                    icon: "dumbbell.fill",
-                                    title: ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"),
-                                    subtitle: ATHLTHLocalization.choose(english: "From library", norwegian: "Fra biblioteket"),
-                                    background: ATHLTHPlanDesign.warmSurface
-                                )
+                            if kind == .running && !selectedRunningWorkouts.isEmpty {
+                                exercisePlacementMenu
+                            } else {
+                                Button {
+                                    exerciseInsertPhase = .main
+                                    showingExerciseLibrary = true
+                                } label: {
+                                    compactAddTile(
+                                        icon: "dumbbell.fill",
+                                        title: ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse"),
+                                        subtitle: ATHLTHLocalization.choose(english: "From library", norwegian: "Fra biblioteket"),
+                                        background: ATHLTHPlanDesign.warmSurface
+                                    )
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.vertical, 3)
@@ -6089,6 +6045,33 @@ struct SessionEditorView: View {
                 .listRowBackground(ATHLTHPlanDesign.surface)
                 .listRowSeparator(.hidden)
             }
+        }
+    }
+
+    // Add a supplementary exercise without replacing the selected run
+    // or resetting interval prescriptions. Position is carried into the
+    // single chronological workout timeline on save.
+    private var exercisePlacementMenu: some View {
+        Menu {
+            ForEach([WorkoutPhaseKind.warmup, .main, .cooldown], id: \.self) { phase in
+                Button {
+                    exerciseInsertPhase = phase
+                    showingExerciseLibrary = true
+                } label: {
+                    Label(phase.title, systemImage: phase.symbol)
+                }
+            }
+        } label: {
+            compactAddTile(
+                icon: "dumbbell.fill",
+                title: ATHLTHLocalization.choose(
+                    english: "Exercise", norwegian: "Øvelse"
+                ),
+                subtitle: ATHLTHLocalization.choose(
+                    english: "Choose placement", norwegian: "Velg plassering"
+                ),
+                background: ATHLTHPlanDesign.warmSurface
+            )
         }
     }
 
@@ -8919,7 +8902,12 @@ struct SessionEditorView: View {
             progression: StrengthProgressionRule.none
         )
 
-        plannedExercises.append(planned)
+        var inserted = planned
+        inserted.workoutPhase = exerciseInsertPhase
+        if exerciseInsertPhase == .warmup {
+            inserted.setEntireExerciseWarmUp(true)
+        }
+        plannedExercises.append(inserted)
     }
 
     private func duplicatePlannedExercise(
@@ -8993,8 +8981,10 @@ struct SessionEditorView: View {
                     }
             )
 
+        var phasedDuplicate = duplicate
+        phasedDuplicate.workoutPhase = source.workoutPhase
         plannedExercises.insert(
-            duplicate,
+            phasedDuplicate,
             at:
                 min(
                     index + 1,
@@ -9243,7 +9233,7 @@ struct SessionEditorView: View {
                     return replacement
                 }
 
-            return PlannedExercise(
+            var cloned = PlannedExercise(
                 id: UUID(),
                 exerciseID:
                     exercise.exerciseID,
@@ -9299,6 +9289,8 @@ struct SessionEditorView: View {
                         )
                     }
             )
+            cloned.workoutPhase = exercise.workoutPhase
+            return cloned
         }
     }
 
