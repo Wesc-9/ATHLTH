@@ -762,6 +762,16 @@ final class TrainingContinuityTests: XCTestCase {
         XCTAssertEqual(first.exercises[0].reps, 3)
         XCTAssertEqual(first.followUpSourceWorkoutID, original.id)
         XCTAssertEqual(first.followUpSourceSetIDs, [missingSet])
+        XCTAssertEqual(first.scheduledTimeIsExplicit, false)
+        XCTAssertEqual(session.standalonePlannedSessions.count, 1)
+
+        let explicitTimePreview =
+            StrengthWorkoutRemainder(workout: original).makeFollowUp(
+                scheduledStart: date.addingTimeInterval(18 * 3600),
+                selectedSetIDs: [missingSet],
+                hasExplicitTime: true
+            )
+        XCTAssertEqual(explicitTimePreview?.scheduledTimeIsExplicit, true)
         XCTAssertEqual(session.standalonePlannedSessions.count, 1)
 
         let repeated = try XCTUnwrap(session.scheduleStrengthFollowUp(
