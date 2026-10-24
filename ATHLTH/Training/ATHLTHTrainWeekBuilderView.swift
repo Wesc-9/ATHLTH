@@ -739,7 +739,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                             detailedStructureEntry
                             // The interval recipe remains the sole running source;
                             // never offer a parallel editor for a structured hybrid.
-                            if draft.kind == .running && draft.workoutBlocks.isEmpty {
+                            if draft.kind == .running && draft.resolvedWorkoutBlocks.isEmpty {
                                 advancedIntervalEntry
                             }
                             if !ATHLTHUnifiedWorkout.editorBlocks(from: draft).isEmpty {
