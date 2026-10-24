@@ -343,10 +343,10 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         case .startTimedSet:
             // The authoritative store guards against duplicate starts,
             // completed sets and non-time-based exercises.
-            strengthWorkout.startOrResumeTimedSet()
+            strengthWorkout.startOrResumeTimedSet(at: command.sentAt)
 
         case .pauseTimedSet:
-            strengthWorkout.pauseTimedSet()
+            strengthWorkout.pauseTimedSet(at: command.sentAt)
 
         case .resetTimedSet:
             strengthWorkout.resetTimedSet()
