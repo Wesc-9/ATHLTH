@@ -269,4 +269,47 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
         XCTAssertEqual(store.activeWorkout?.plannedSessionID, planned.id)
     }
 
+    @MainActor
+    func testHybridPhaseClockHasOneOwnerAcrossPhoneAndWatch() throws {
+        let session = try plannedHybrid()
+        let parts = try XCTUnwrap(ATHLTHHybridWorkoutLaunchPlan.parts(for: session))
+
+        let watchStore = StrengthWorkoutStore()
+        XCTAssertTrue(watchStore.startPlannedHybrid(
+            session: session, validatedParts: parts,
+            watchSessionID: UUID(), trackingMode: .advanced,
+            captureDevice: .appleWatch
+        ))
+        let watchRun = try XCTUnwrap(watchStore.activeWorkout?.exercises.first {
+            $0.isEmbeddedRunningInterval == true
+        })
+        XCTAssertTrue(watchStore.selectExerciseForNow(watchRun.id))
+        XCTAssertFalse(watchStore.controlsEmbeddedHybridClockOnIPhone)
+        let watchClock = try XCTUnwrap(watchStore.currentTimedSetCountdown)
+        let watchStart = try XCTUnwrap(watchClock.resumedAt)
+        watchStore.advanceEmbeddedIntervalIfNeeded(
+            at: watchStart.addingTimeInterval(TimeInterval(watchClock.targetSeconds + 2))
+        )
+        // Watch-owned intervals are committed exclusively by Watch commands.
+        XCTAssertEqual(watchStore.activeWorkout?.totalCompletedSets, 0)
+
+        let phoneStore = StrengthWorkoutStore()
+        XCTAssertTrue(phoneStore.startPlannedHybrid(
+            session: session, validatedParts: parts,
+            watchSessionID: nil, trackingMode: .advanced,
+            captureDevice: .iPhone
+        ))
+        let phoneRun = try XCTUnwrap(phoneStore.activeWorkout?.exercises.first {
+            $0.isEmbeddedRunningInterval == true
+        })
+        XCTAssertTrue(phoneStore.selectExerciseForNow(phoneRun.id))
+        XCTAssertTrue(phoneStore.controlsEmbeddedHybridClockOnIPhone)
+        let phoneClock = try XCTUnwrap(phoneStore.currentTimedSetCountdown)
+        let phoneStart = try XCTUnwrap(phoneClock.resumedAt)
+        phoneStore.advanceEmbeddedIntervalIfNeeded(
+            at: phoneStart.addingTimeInterval(TimeInterval(phoneClock.targetSeconds + 2))
+        )
+        XCTAssertGreaterThanOrEqual(phoneStore.activeWorkout?.totalCompletedSets ?? 0, 1)
+    }
+
 }
