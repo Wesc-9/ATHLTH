@@ -2298,6 +2298,10 @@ struct ATHLTHHomeView: View {
 
         let workout = homeTodaySessions(in: plan)
             .first {
+                !session.isPlanSessionSkipped(
+                    planID: plan.id,
+                    sessionID: $0.id
+                ) &&
                 !homeIsPlanSessionCompleted(
                     planID: plan.id,
                     workout: $0
@@ -2319,7 +2323,12 @@ struct ATHLTHHomeView: View {
             return (0, 0)
         }
 
-        let workouts = homeTodaySessions(in: plan)
+        let workouts = homeTodaySessions(in: plan).filter {
+            !session.isPlanSessionSkipped(
+                planID: plan.id,
+                sessionID: $0.id
+            )
+        }
         let completed = workouts.filter {
             homeIsPlanSessionCompleted(
                 planID: plan.id,
