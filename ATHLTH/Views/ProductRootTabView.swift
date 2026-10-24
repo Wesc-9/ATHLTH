@@ -2355,7 +2355,7 @@ struct ATHLTHHomeView: View {
         }
 
         return strengthWorkout.workoutHistory.contains {
-            $0.isFinished &&
+            $0.isFullyCompleted &&
             $0.plannedSessionID == workout.id
         }
     }
@@ -5876,13 +5876,29 @@ struct ATHLTHTrainView: View {
         )
         let strengthCompletedIDs = Set(
             strengthWorkout.workoutHistory.compactMap { log -> UUID? in
-                guard log.isFinished,
+                guard log.isFullyCompleted,
                       let plannedID = log.plannedSessionID,
                       sessions.contains(where: { $0.id == plannedID })
                 else { return nil }
                 return plannedID
             }
         )
+        // A partially finished strength workout may also have a HealthKit
+        // workout. That automatic match cannot complete the planned sets.
+        let incompleteStrengthIDs = Set(
+            strengthWorkout.workoutHistory.compactMap { log -> UUID? in
+                guard log.isFinished,
+                      !log.isFullyCompleted,
+                      let plannedID = log.plannedSessionID,
+                      sessions.contains(where: {
+                          $0.id == plannedID && $0.kind == .strength
+                      })
+                else { return nil }
+                return plannedID
+            }
+        ).subtracting(strengthCompletedIDs)
+        let healthConfirmedIDs =
+            healthCompletedIDs.subtracting(incompleteStrengthIDs)
 
         ATHLTHCard {
             HStack(spacing: 10) {
@@ -5940,7 +5956,7 @@ struct ATHLTHTrainView: View {
                             workout,
                             planID: plan.id,
                             isHealthCompleted:
-                                healthCompletedIDs.contains(workout.id),
+                                healthConfirmedIDs.contains(workout.id),
                             isStrengthCompleted:
                                 strengthCompletedIDs.contains(workout.id),
                             isManuallyCompleted:
