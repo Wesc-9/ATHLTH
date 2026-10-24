@@ -101,7 +101,8 @@ struct StrengthWorkoutRemainder {
     func makeFollowUp(
         scheduledStart: Date,
         selectedSetIDs: Swift.Set<UUID>? = nil,
-        onlyRemainderForSetIDs: Swift.Set<UUID> = []
+        onlyRemainderForSetIDs: Swift.Set<UUID> = [],
+        hasExplicitTime: Bool = false
     ) -> PlannedSession? {
         var planned: [PlannedExercise] = []
         var linkedSetIDs: [UUID] = []
@@ -195,7 +196,8 @@ struct StrengthWorkoutRemainder {
             exercises: planned,
             notes: nil,
             followUpSourceWorkoutID: sourceWorkoutID,
-            followUpSourceSetIDs: linkedSetIDs
+            followUpSourceSetIDs: linkedSetIDs,
+            scheduledTimeIsExplicit: hasExplicitTime
         )
     }
 }
