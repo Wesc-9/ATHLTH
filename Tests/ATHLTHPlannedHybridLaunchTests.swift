@@ -291,7 +291,13 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
             at: watchStart.addingTimeInterval(TimeInterval(watchClock.targetSeconds + 2))
         )
         // Watch-owned intervals are committed exclusively by Watch commands.
-        XCTAssertEqual(watchStore.activeWorkout?.totalCompletedSets, 0)
+        // Hybrid running phases are deliberately excluded from the strength
+        // totalCompletedSets metric; inspect the actual timed phase records.
+        let watchCompletedPhases = watchStore.activeWorkout?.exercises
+            .flatMap(\.sets)
+            .filter { $0.hybridPhaseKind != nil && $0.isCompleted }
+            .count
+        XCTAssertEqual(watchCompletedPhases, 0)
 
         let phoneStore = StrengthWorkoutStore()
         XCTAssertTrue(phoneStore.startPlannedHybrid(
@@ -309,7 +315,11 @@ final class ATHLTHPlannedHybridLaunchTests: XCTestCase {
         phoneStore.advanceEmbeddedIntervalIfNeeded(
             at: phoneStart.addingTimeInterval(TimeInterval(phoneClock.targetSeconds + 2))
         )
-        XCTAssertGreaterThanOrEqual(phoneStore.activeWorkout?.totalCompletedSets ?? 0, 1)
+        let phoneCompletedPhases = phoneStore.activeWorkout?.exercises
+            .flatMap(\.sets)
+            .filter { $0.hybridPhaseKind != nil && $0.isCompleted }
+            .count ?? 0
+        XCTAssertGreaterThanOrEqual(phoneCompletedPhases, 1)
     }
 
     func testWatchHybridPhaseRecordsElapsedNotJustPlannedDuration() {
