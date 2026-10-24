@@ -97,8 +97,7 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         activationTint: muscleAccent
                     )
                     .frame(
-                        width: min(cardWidth * (small ? 0.55 : 0.57),
-                                   small ? 235 : 300),
+                        width: min(cardWidth * 0.88, 390),
                         height: cardHeight * 0.98
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
