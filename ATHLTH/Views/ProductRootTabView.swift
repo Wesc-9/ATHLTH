@@ -6478,7 +6478,95 @@ struct ATHLTHTrainView: View {
     // Train's local navigation borrows the warm, translucent Home header style.
     // Keep this switcher distinct from the app-wide bottom tab bar.
     private var premiumTrainBrandHeader: some View {
-        HStack(spacing: 10) {
+        Group {
+            if selectedSection == 0 {
+                todayTrainHeroHeader
+            } else {
+                compactTrainHeader
+            }
+        }
+    }
+
+    /// Today alone has the immersive training photograph. The same capsule
+    /// remains available on Plan and Fremdrift, without repeating a large
+    /// decorative hero above their task-oriented content.
+    private var todayTrainHeroHeader: some View {
+        ZStack(alignment: .topLeading) {
+            GeometryReader { geometry in
+                Image("GoalEndurance")
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFill()
+                    .frame(width: geometry.size.width,
+                           height: geometry.size.height)
+                    .clipped()
+                    .accessibilityHidden(true)
+            }
+
+            // Ivory on the text side echoes Home without flattening the photo.
+            LinearGradient(
+                stops: [
+                    .init(color: Color.white.opacity(0.96), location: 0),
+                    .init(color: Color.white.opacity(0.73), location: 0.31),
+                    .init(color: Color.white.opacity(0.16), location: 0.74),
+                    .init(color: .clear, location: 1)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            .allowsHitTesting(false)
+
+            LinearGradient(
+                colors: [.clear, Color.white.opacity(0.30)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .allowsHitTesting(false)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    trainLibraryButton
+                    premiumTrainTabs
+                }
+
+                Spacer(minLength: 14)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "TRAINING", norwegian: "TRENING"
+                    ))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2.0)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Today", norwegian: "I dag"
+                    ))
+                    .font(.system(size: 32, weight: .regular, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                    Text(Date.now.formatted(
+                        .dateTime.weekday(.wide).day().month(.wide)
+                    ))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+            }
+            .padding(14)
+        }
+        .frame(height: 208)
+        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.62), lineWidth: 0.8)
+        }
+    }
+
+    private var compactTrainHeader: some View {
+        HStack(spacing: 8) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(ATHLTHLocalization.choose(
                     english: "TRAINING", norwegian: "TRENING"
@@ -6489,31 +6577,36 @@ struct ATHLTHTrainView: View {
 
                 Text(selectedSection == 1
                     ? ATHLTHLocalization.choose(english: "Plan", norwegian: "Plan")
-                    : selectedSection == 2
-                        ? ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremdrift")
-                        : ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"))
-                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                    : ATHLTHLocalization.choose(
+                        english: "Progress", norwegian: "Fremdrift"
+                    ))
+                    .font(.system(size: 24, weight: .semibold, design: .serif))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
             }
+            .lineLimit(1)
+            .minimumScaleFactor(0.78)
 
-            Spacer(minLength: 4)
+            Spacer(minLength: 3)
 
-            Button {
-                showingLibrary = true
-            } label: {
-                Image(systemName: "square.grid.2x2")
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .frame(width: 44, height: 44)
-                    .background(.regularMaterial, in: Circle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Training library", norwegian: "Treningsbibliotek"
-            ))
-
+            trainLibraryButton
             premiumTrainTabs
         }
+    }
+
+    private var trainLibraryButton: some View {
+        Button {
+            showingLibrary = true
+        } label: {
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .frame(width: 44, height: 44)
+                .background(.regularMaterial, in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Training library", norwegian: "Treningsbibliotek"
+        ))
     }
 
     private var premiumTrainTabs: some View {
