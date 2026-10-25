@@ -165,4 +165,67 @@ final class ATHLTHWorkoutDurationEstimatorTests: XCTestCase {
             notes: nil
         )
     }
+    func testMixedWarmupMainCooldownCountsAllSpecifiedTimeAndPauses() {
+        var warmCycling = block(.note, "Bike warm-up", seconds: 600)
+        warmCycling.activityTag = "cycling"
+        warmCycling.phase = .warmup
+        var warmMobility = block(.exercise, "Warm-up mobility", seconds: 300)
+        warmMobility.phase = .warmup
+        var mainStrength = block(.exercise, "Strength", seconds: 1_200)
+        mainStrength.phase = .main
+        var runIntervals = block(.run, "Four running intervals", seconds: 240)
+        runIntervals.phase = .main
+        runIntervals.groupRounds = 4
+        runIntervals.groupKind = .interval
+        runIntervals.groupID = UUID()
+        var rest = block(.rest, "Recovery", seconds: 120)
+        rest.phase = .main
+        var walk = block(.run, "Walk down", seconds: 300)
+        walk.phase = .cooldown
+        var stretch = block(.exercise, "Stretch", seconds: 300)
+        stretch.phase = .cooldown
+
+        // The expanded runtime recipe is authoritative. Repetitions are
+        // represented here as independent work/rest steps to test totals
+        // without relying on editor-specific interval-group serialization.
+        let timeline = [
+            warmCycling, warmMobility, mainStrength,
+            runIntervals, rest, runIntervals, rest,
+            runIntervals, rest, runIntervals,
+            walk, stretch
+        ].enumerated().map { index, step -> WorkoutTemplateBlock in
+            var copy = step
+            copy.sequence = index + 1
+            // These represent the four actual work steps, not four groups.
+            copy.groupRounds = nil
+            copy.groupKind = nil
+            copy.groupID = nil
+            return copy
+        }
+        // 10+5 warmup, 20 strength, 4x4 run + 3x2 pause, 5+5 cooldown
+        // = 67 min, rounded to the planner's nearest upper 5-min bucket.
+        XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: timeline), 70)
+    }
+
+    func testUnspecifiedCyclingAndRestDoNotUndercountWorkout() {
+        let run = block(.run, "Run", seconds: 600)
+        var cycling = block(.note, "Bike")
+        cycling.activityTag = "cycling"
+        XCTAssertNil(ATHLTHWorkoutDurationEstimator.minutes(for: [run, cycling]))
+
+        let untimedRest = block(.rest, "Open-ended rest")
+        XCTAssertNil(ATHLTHWorkoutDurationEstimator.minutes(
+            for: [run, untimedRest]
+        ))
+    }
+
+    func testInvalidOrOverLimitDurationsAreNotFakedAsFourHours() {
+        XCTAssertNil(ATHLTHWorkoutDurationEstimator.minutes(
+            for: [block(.run, "Infinite duration", seconds: .infinity)]
+        ))
+        XCTAssertNil(ATHLTHWorkoutDurationEstimator.minutes(
+            for: [block(.run, "Five hour run", seconds: 18_000)]
+        ))
+    }
+
 }
