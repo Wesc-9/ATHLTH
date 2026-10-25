@@ -33,22 +33,105 @@ struct ATHLTHTrainTodayRebuildView: View {
         let standalone = standaloneToday.map {
             TodayEntry(session: $0, standalone: true)
         }
-        return (plan + standalone).sorted {
-            ($0.session.scheduledStart ?? .distantFuture) <
-                ($1.session.scheduledStart ?? .distantFuture)
+        return (plan + standalone).sorted { lhs, rhs in
+            let left = sortKey(for: lhs, now: Date())
+            let right = sortKey(for: rhs, now: Date())
+            if left.priority != right.priority {
+                return left.priority < right.priority
+            }
+            if left.time != right.time {
+                return left.time < right.time
+            }
+            return lhs.id.uuidString < rhs.id.uuidString
         }
     }
 
-    private func recordedStatus(_ workout: PlannedSession) -> String? {
-        let logs = strength.workoutHistory.filter {
-            $0.plannedSessionID == workout.id && $0.isFinished
+    /// Prioritize an upcoming, actionable session instead of the first row
+    /// in a calendar, which may already have been completed or skipped.
+    private func sortKey(
+        for entry: TodayEntry,
+        now: Date
+    ) -> (priority: Int, time: Date) {
+        if isSkipped(entry) || isCompleted(entry) || isPartlyCompleted(entry) {
+            return (3, effectiveStart(entry.session))
         }
-        if logs.contains(where: { $0.isFullyCompleted }) {
+        let time = effectiveStart(entry.session)
+        if time >= now { return (0, time) }
+        return (1, time)
+    }
+
+    private func effectiveStart(_ workout: PlannedSession) -> Date {
+        let calendar = Calendar.current
+        if workout.scheduledTimeIsExplicit != false,
+           let scheduled = workout.scheduledStart {
+            let clock = calendar.dateComponents([.hour, .minute], from: scheduled)
+            if clock.hour != 0 || clock.minute != 0 {
+                return scheduled
+            }
+        }
+        // Date-only sessions use the established default planning hour.
+        return calendar.date(
+            bySettingHour: 18,
+            minute: 0,
+            second: 0,
+            of: Date()
+        ) ?? Date()
+    }
+
+    private func isSkipped(_ entry: TodayEntry) -> Bool {
+        guard !entry.standalone, let planID = session.activePlan?.id else {
+            return false
+        }
+        return session.isPlanSessionSkipped(
+            planID: planID, sessionID: entry.id
+        )
+    }
+
+    private func isCompleted(_ entry: TodayEntry) -> Bool {
+        if !entry.standalone, let planID = session.activePlan?.id,
+           session.isPlanSessionManuallyCompleted(
+                planID: planID, sessionID: entry.id
+           ) {
+            return true
+        }
+        return strength.workoutHistory.contains {
+            $0.plannedSessionID == entry.id && $0.isFullyCompleted
+        }
+    }
+
+    private func isPartlyCompleted(_ entry: TodayEntry) -> Bool {
+        !isCompleted(entry) && strength.workoutHistory.contains {
+            $0.plannedSessionID == entry.id && $0.isFinished
+        }
+    }
+
+    private var actionableToday: [TodayEntry] {
+        allToday.filter {
+            !isSkipped($0) && !isCompleted($0) && !isPartlyCompleted($0)
+        }
+    }
+
+    private var otherToday: [TodayEntry] {
+        let featuredID = actionableToday.first?.id
+        return allToday.filter { $0.id != featuredID }
+    }
+
+    private func recordedStatus(
+        _ workout: PlannedSession,
+        standalone: Bool
+    ) -> String? {
+        let entry = TodayEntry(session: workout, standalone: standalone)
+        if isSkipped(entry) {
+            return ATHLTHLocalization.choose(
+                english: "Skipped", norwegian: "Hoppet over"
+            )
+        }
+        if isCompleted(entry) {
             return ATHLTHLocalization.choose(
                 english: "Completed", norwegian: "Gjennomført"
             )
         }
-        if !logs.isEmpty {
+        if isPartlyCompleted(entry) {
             return ATHLTHLocalization.choose(
                 english: "Partly completed", norwegian: "Delvis gjennomført"
             )
@@ -60,20 +143,23 @@ struct ATHLTHTrainTodayRebuildView: View {
         VStack(alignment: .leading, spacing: 19) {
             introduction
 
-            if let featured = allToday.first {
+            if let featured = actionableToday.first {
                 featuredWorkout(featured.session, standalone: featured.standalone)
-                if allToday.count > 1 {
-                    VStack(alignment: .leading, spacing: 9) {
-                        sectionLabel(ATHLTHLocalization.choose(
-                            english: "ALSO TODAY", norwegian: "OGSÅ I DAG"
-                        ))
-                        ForEach(allToday.dropFirst()) { item in
-                            compactWorkout(item.session, standalone: item.standalone)
-                        }
+            } else if allToday.isEmpty {
+                unscheduledDay
+            } else {
+                dayCompleted
+            }
+
+            if !otherToday.isEmpty {
+                VStack(alignment: .leading, spacing: 9) {
+                    sectionLabel(ATHLTHLocalization.choose(
+                        english: "OTHER SESSIONS", norwegian: "ANDRE ØKTER"
+                    ))
+                    ForEach(otherToday) { item in
+                        compactWorkout(item.session, standalone: item.standalone)
                     }
                 }
-            } else {
-                unscheduledDay
             }
 
             quickTrain
@@ -157,7 +243,9 @@ struct ATHLTHTrainTodayRebuildView: View {
                 .tracking(1)
                 .foregroundStyle(ATHLTHTheme.accentDeep)
                 Spacer()
-                if let status = recordedStatus(workout) {
+                if let status = recordedStatus(
+                    workout, standalone: standalone
+                ) {
                     Text(status)
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -269,6 +357,14 @@ struct ATHLTHTrainTodayRebuildView: View {
                         .lineLimit(1)
                 }
                 Spacer(minLength: 3)
+                if let status = recordedStatus(
+                    workout, standalone: standalone
+                ) {
+                    Text(status)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .lineLimit(1)
+                }
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -281,6 +377,28 @@ struct ATHLTHTrainTodayRebuildView: View {
             )
         }
         .buttonStyle(.plain)
+    }
+
+    private var dayCompleted: some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(ATHLTHLocalization.choose(
+                english: "Nothing else planned today",
+                norwegian: "Ingen flere økter står for tur i dag"
+            ))
+            .font(.headline)
+            .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(ATHLTHLocalization.choose(
+                english: "Your completed and skipped sessions are listed below.",
+                norwegian: "Gjennomførte og hoppede økter finner du nedenfor."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(
+            Color.white, in: RoundedRectangle(cornerRadius: 21)
+        )
     }
 
     private var unscheduledDay: some View {
@@ -302,8 +420,8 @@ struct ATHLTHTrainTodayRebuildView: View {
                     .font(.headline)
                     .foregroundStyle(ATHLTHTheme.primaryText)
                     Text(ATHLTHLocalization.choose(
-                        english: "Enjoy a rest day or plan something new.",
-                        norwegian: "Ta en hviledag, eller planlegg noe nytt."
+                        english: "Choose a workout to plan or start freely.",
+                        norwegian: "Planlegg en økt, eller tren fritt."
                     ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
