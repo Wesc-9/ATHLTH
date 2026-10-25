@@ -4,6 +4,7 @@ import SwiftUI
 /// Plans feed this view, while launching still goes through ATHLTHTrainView.
 struct ATHLTHTrainTodayPremiumView: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var session: AppSessionStore
     @ObservedObject var workoutCatalog: WorkoutTemplateCatalogStore
 
     let plan: TrainingPlan?
@@ -58,7 +59,10 @@ struct ATHLTHTrainTodayPremiumView: View {
     }
     let onQuickTrain: (WorkoutKind) -> Void
     let onQuickCycling: () -> Void
+    let onQuickCustom: (CustomQuickWorkoutActivity) -> Void
     let onGhostRace: () -> Void
+
+    @State private var quickActivityTapCounts: [String: Int] = [:]
 
 
     private let ink = ATHLTHPlanDesign.ink
@@ -108,6 +112,11 @@ struct ATHLTHTrainTodayPremiumView: View {
         .task {
             reloadCheckIn()
             await workoutCatalog.refresh()
+        }
+        .task(id: session.profile.userID) {
+            quickActivityTapCounts =
+                UserDefaults.standard.dictionary(forKey: quickActivityStorageKey)
+                    as? [String: Int] ?? [:]
         }
         .onReceive(NotificationCenter.default.publisher(
             for: Notification.Name("athlth.dailyCheckInDidUpdate")
@@ -1061,101 +1070,164 @@ struct ATHLTHTrainTodayPremiumView: View {
         .premiumTrainSurface(line: hairline)
     }
 
+    // Click history reflects intentional entry choices, not completed
+    // workout statistics. Ordering is per ATHLTH account on this device.
+    private enum QuickActivity: String, CaseIterable, Identifiable {
+        case running, walking, strength, cycling, yoga, custom
+        var id: String { rawValue }
+
+        var image: String {
+            switch self {
+            case .running: return "GoalRunning"
+            case .walking: return "GoalWalking"
+            case .strength: return "StrengthQuickHero"
+            case .cycling: return "TrainHero"
+            case .yoga: return "GoalRelax"
+            case .custom: return "GoalAdventure"
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .running: return "figure.run"
+            case .walking: return "figure.walk"
+            case .strength: return "dumbbell.fill"
+            case .cycling: return "bicycle"
+            case .yoga: return "figure.yoga"
+            case .custom: return "slider.horizontal.3"
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .running:
+                return ATHLTHLocalization.choose(english: "Run", norwegian: "Løping")
+            case .walking:
+                return ATHLTHLocalization.choose(english: "Walk", norwegian: "Gå")
+            case .strength:
+                return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+            case .cycling:
+                return ATHLTHLocalization.choose(english: "Cycling", norwegian: "Sykling")
+            case .yoga: return "Yoga"
+            case .custom:
+                return ATHLTHLocalization.choose(
+                    english: "Custom", norwegian: "Egendefinert"
+                )
+            }
+        }
+    }
+
+    private var quickActivityStorageKey: String {
+        "athlth.train.today.quickTaps." + String(describing: session.profile.userID)
+    }
+
+    private var sortedQuickActivities: [QuickActivity] {
+        let defaults = QuickActivity.allCases
+        return defaults.sorted { first, second in
+            let firstCount = quickActivityTapCounts[first.rawValue, default: 0]
+            let secondCount = quickActivityTapCounts[second.rawValue, default: 0]
+            if firstCount != secondCount { return firstCount > secondCount }
+            return (defaults.firstIndex(of: first) ?? 0) <
+                (defaults.firstIndex(of: second) ?? 0)
+        }
+    }
+
+    private func recordQuickActivityTap(_ activity: QuickActivity) {
+        var counts = quickActivityTapCounts
+        counts[activity.rawValue] = min(
+            counts[activity.rawValue, default: 0] + 1, 100_000
+        )
+        quickActivityTapCounts = counts
+        UserDefaults.standard.set(counts, forKey: quickActivityStorageKey)
+    }
+
+    private func openQuickActivity(_ activity: QuickActivity) {
+        recordQuickActivityTap(activity)
+        social.quickTrainFriendIDs.removeAll()
+        social.discardPreparedQuickTrainFriends()
+        switch activity {
+        case .running: onQuickTrain(.running)
+        case .walking: onQuickTrain(.walking)
+        case .strength: onQuickTrain(.strength)
+        case .cycling: onQuickCycling()
+        case .yoga: onQuickCustom(.yoga)
+        case .custom: onQuickCustom(.other)
+        }
+    }
+
     private var quickTrainSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Image(systemName: "bolt.fill")
                     .font(.system(size: 19, weight: .semibold))
                     .foregroundStyle(champagne)
-                Text("Quick Train")
+                Text(tr("Start a workout", "Start en økt"))
                     .font(.system(size: 26, weight: .regular, design: .serif))
                     .foregroundStyle(ink)
                 Spacer(minLength: 4)
-                Text(tr("Start a workout now", "Start en økt nå"))
+                Text(tr("Personalized shortcuts", "Dine hurtigvalg"))
                     .font(.caption.weight(.medium))
                     .foregroundStyle(muted)
                     .lineLimit(1)
             }
 
-            HStack(spacing: 9) {
-                quickPhotoChoice(
-                    asset: "GoalRunning", icon: "figure.run",
-                    title: tr("Running", "Løping"), kind: .running
-                )
-                quickPhotoChoice(
-                    asset: "GoalWalking", icon: "figure.walk",
-                    title: tr("Walking", "Gåtur"), kind: .walking
-                )
-                quickPhotoChoice(
-                    asset: "StrengthQuickHero", icon: "dumbbell.fill",
-                    title: tr("Strength", "Styrke"), kind: .strength
-                )
-                // Cycling remains a Custom Quick Start selection until it
-                // has a dedicated first-class workout kind. The picker is
-                // explicit; never silently start an unrelated workout.
-                quickPhotoChoice(
-                    asset: "TrainHero", icon: "bicycle",
-                    title: tr("Cycling", "Sykling"), kind: .custom
-                )
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 9),
+                    GridItem(.flexible(), spacing: 9)
+                ],
+                spacing: 9
+            ) {
+                ForEach(sortedQuickActivities) { activity in
+                    quickPhotoChoice(activity)
+                }
             }
         }
     }
 
-    private func quickPhotoChoice(
-        asset: String, icon: String, title: String, kind: WorkoutKind
-    ) -> some View {
+    private func quickPhotoChoice(_ activity: QuickActivity) -> some View {
         Button {
-            social.quickTrainFriendIDs.removeAll()
-            social.discardPreparedQuickTrainFriends()
-            if kind == .custom {
-                onQuickCycling()
-            } else {
-                onQuickTrain(kind)
-            }
+            openQuickActivity(activity)
         } label: {
             ZStack(alignment: .bottomLeading) {
                 GeometryReader { geometry in
-                    Image(asset)
+                    Image(activity.image)
                         .resizable()
                         .scaledToFill()
-                        .frame(width: geometry.size.width, height: 123)
+                        .frame(width: geometry.size.width, height: 92)
                         .clipped()
                 }
-                .frame(height: 123)
+                .frame(height: 92)
 
                 LinearGradient(
                     colors: [
-                        .black.opacity(0.04), .black.opacity(0.16),
-                        .black.opacity(0.79)
+                        .black.opacity(0.03), .black.opacity(0.12),
+                        .black.opacity(0.74)
                     ], startPoint: .top, endPoint: .bottom
                 )
 
-                VStack(alignment: .leading, spacing: 5) {
-                    Image(systemName: icon)
-                        .font(.system(size: 17, weight: .semibold))
-                    Spacer(minLength: 8)
-                    Text(title)
-                        .font(.system(size: 12, weight: .semibold))
+                HStack(alignment: .bottom, spacing: 6) {
+                    Image(systemName: activity.icon)
+                        .font(.system(size: 16, weight: .semibold))
+                    Text(activity.title)
+                        .font(.system(size: 13, weight: .semibold))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                        .minimumScaleFactor(0.8)
+                    Spacer(minLength: 0)
                 }
                 .foregroundStyle(.white)
-                .padding(10)
+                .padding(11)
             }
-            .frame(height: 123)
+            .frame(height: 92)
             .frame(maxWidth: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 15))
             .contentShape(RoundedRectangle(cornerRadius: 15))
         }
         .buttonStyle(.plain)
-        .frame(maxWidth: .infinity)
-        .accessibilityLabel(title)
-        .accessibilityHint(
-            kind == .custom
-                ? tr("Select cycling in the workout setup",
-                     "Velg sykling i treningsoppsettet")
-                : tr("Open workout setup", "Åpne treningsoppsett")
-        )
+        .accessibilityLabel(activity.title)
+        .accessibilityHint(tr(
+            "Open workout setup", "Åpner treningsoppsett"
+        ))
     }
 
     private var ghostRaceSection: some View {
