@@ -32,6 +32,7 @@ struct ATHLTHTrainPlanRebuildView: View {
         }
     }
     @State private var selectedWorkout: PlannedSession?
+    @State private var workoutPendingQuickEdit: PlannedSession?
     @State private var selectedStandaloneWorkout: PlannedSession?
     @State private var workoutPendingMove: PlannedSession?
     @State private var workoutPendingSkip: PlannedSession?
@@ -124,6 +125,16 @@ struct ATHLTHTrainPlanRebuildView: View {
                     allowsStartingWorkout: false
                 )
                 .environmentObject(session)
+            }
+        }
+        .sheet(item: $workoutPendingQuickEdit) { workout in
+            if let plan {
+                ATHLTHPlanQuickExerciseEditSheet(
+                    planID: plan.id,
+                    workout: workout
+                )
+                .environmentObject(session)
+                .environmentObject(strength)
             }
         }
         .sheet(item: $selectedStandaloneWorkout) { workout in
@@ -530,6 +541,22 @@ struct ATHLTHTrainPlanRebuildView: View {
                                 }
 
                                 if editable {
+                                    if workout.kind == .strength,
+                                       !workout.exercises.isEmpty,
+                                       workout.resolvedWorkoutBlocks.isEmpty {
+                                        Button {
+                                            workoutPendingQuickEdit = workout
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Quick edit",
+                                                    norwegian: "Hurtigrediger sett"
+                                                ),
+                                                systemImage: "slider.horizontal.3"
+                                            )
+                                        }
+                                    }
+
                                     if skipped {
                                         Button {
                                             session.setPlanSessionSkipped(
