@@ -13,6 +13,8 @@ struct PlannedWorkoutDetailView: View {
     let planID: UUID
     let workout: PlannedSession
     let isHealthCompleted: Bool
+    // Plan is for reviewing/editing; workout launch stays on Today.
+    var allowsStartingWorkout: Bool = true
 
     @State private var showingEditor = false
     @State private var showingStructuredWorkout = false
@@ -96,7 +98,9 @@ struct PlannedWorkoutDetailView: View {
 
                     if currentWorkout.isStructuredWorkout {
                         structuredWorkoutCard
-                        structuredWorkoutStartButton
+                        if allowsStartingWorkout {
+                            structuredWorkoutStartButton
+                        }
                     }
 
                     if let notes = cleanNotes {
