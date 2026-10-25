@@ -95,11 +95,11 @@ enum TrainingPlanSchedule {
         return plan.weeks.contains { week in
             week.days.contains { day in
                 guard day.isRestDay == true,
-                      let dayDate = dayDate(
+                      let plannedDate = dayDate(
                         in: plan, week: week, day: day, calendar: calendar
                       )
                 else { return false }
-                return calendar.isDate(dayDate, inSameDayAs: date)
+                return calendar.isDate(plannedDate, inSameDayAs: date)
             }
         }
     }
