@@ -58,3 +58,16 @@ Denne oversikten er en samling av tilgjengelige godkjente beslutninger, ikke en 
 - Nye skjermer må bygges uten Swift-feil og fungere med eksisterende plan.
 - Ingen endring av fremmede faner, treningsmotorens målinger eller release-grenen.
 - De opprinnelige illustrasjonene må kontrolleres visuelt mot godkjent design før UI regnes som endelig.
+
+## Implementeringsstatus – 25. oktober 2026, fasevis
+- **I dag:** ny datadrevet overflate brukes fra `ATHLTHTrainView`; planlagt hovedøkt, flere økter, Quick Train, hviledag og trygg øktstart er koblet til eksisterende koordinatorer. Godkjent skulpturell hero er fortsatt en egen visuell sluttkontroll.
+- **Plan:** ny datadrevet ukeoversikt og fullbredde dagkort er i bruk, med åpne dager, lesbare øktblokker, enkeltøkter, kopier uke, flytt/hopp over og detaljvisning uten startknapp. Valgt uke og åpne dager huskes nå mellom fanevisninger via `SceneStorage`.
+- **Fase 2, hurtigredigering:** styrkeøkter med enkle øvelseslister kan justere sett, reps eller settvarighet og pauser fra dagkortet. Endringer lagres kun ved bekreftelse. Eksisterende resultatdata, belastning, superset-/gruppeidentitet og øvrige øktdetaljer beholdes. Strukturerte blandingsøkter må fortsatt bruke full editor.
+- **Oversikt:** ukens antall økter inkluderer nå separat planlagte enkeltøkter på samme dato.
+- **Ikke ferdig:** egen ny blokkbasert felles økteditor med flyttbare grupper, alle treningsformer og avanserte per-drag-mål. Avtalt rulleposisjon ved retur er ennå ikke fullt implementert. Watch-kombinasjonsmotor krever fortsatt verifisering. Ingen TestFlight for disse `main`-endringene.
+
+## Faste kontroller videre
+- Ingen automatisk endring av fullførte/historiske økter.
+- Hurtigredigering må kontrollere at øktforekomsten fortsatt er uendret og ikke er registrert fullført ved lagring.
+- Uke- og dagvalg må bevares ved modaler, navigasjon og fanebytte; rulleposisjon trenger egen kontroll.
+- Verifiser Swift-build, regresjonstester og fysisk layout før noe kan beskrives som ferdig.
