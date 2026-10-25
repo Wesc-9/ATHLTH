@@ -369,6 +369,98 @@ final class TrainingPlanScheduleTests: XCTestCase {
         ))
     }
 
+    func testExplicitRestDayIsOptionalReversibleAndProtectsTheCalendar() {
+        let suite = "TrainRestDayTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let profile = UserProfile(
+            id: UUID(),
+            userID: UUID(),
+            username: "rest-day-test",
+            displayName: "Rest Day Test",
+            bio: "",
+            avatarURL: nil,
+            presence: TrainingPresence(
+                state: .available,
+                workoutTitle: nil,
+                startedAt: nil,
+                visibility: .friends
+            )
+        )
+        let store = AppSessionStore(profile: profile, defaults: defaults)
+        let start = day(2030, 1, 2)
+        let run = workout()
+        let program = plan(starting: start, session: run)
+        let restID = program.weeks[0].days[1].id
+        let plannedID = program.weeks[0].days[0].id
+        let restDate = TrainingPlanSchedule.dayDate(
+            in: program, week: program.weeks[0],
+            day: program.weeks[0].days[1]
+        )!
+
+        XCTAssertTrue(store.addTrainingPlan(program))
+        XCTAssertFalse(TrainingPlanSchedule.isRestDay(
+            in: program, on: restDate
+        ))
+
+        // A day with workouts is not an empty day.
+        XCTAssertFalse(store.setPlanDayRestStatus(
+            planID: program.id, dayID: plannedID, isRestDay: true
+        ))
+
+        XCTAssertTrue(store.setPlanDayRestStatus(
+            planID: program.id, dayID: restID, isRestDay: true
+        ))
+        let marked = store.trainingPlan(withID: program.id)!
+        XCTAssertTrue(TrainingPlanSchedule.isRestDay(
+            in: marked, on: restDate
+        ))
+        XCTAssertTrue(TrainingPlanSchedule.sessions(
+            in: marked, on: restDate
+        ).isEmpty)
+        XCTAssertEqual(TrainingPlanSchedule.occurrences(in: marked).count, 1)
+
+        // Existing rest days are protected against moves and additions.
+        XCTAssertFalse(store.movePlanSession(
+            planID: program.id, sessionID: run.id, to: restDate
+        ))
+        store.addSession(workout(), toDay: restID, inPlan: program.id)
+        XCTAssertTrue(
+            store.trainingPlan(withID: program.id)!
+                .weeks[0].days[1].sessions.isEmpty
+        )
+
+        // Removing rest does not change any performed workouts.
+        XCTAssertTrue(store.setPlanDayRestStatus(
+            planID: program.id, dayID: restID, isRestDay: false
+        ))
+        let restored = store.trainingPlan(withID: program.id)!
+        XCTAssertFalse(TrainingPlanSchedule.isRestDay(
+            in: restored, on: restDate
+        ))
+        XCTAssertTrue(store.movePlanSession(
+            planID: program.id, sessionID: run.id, to: restDate
+        ))
+    }
+
+    func testLegacyPlanDayWithoutRestFieldRemainsUnplanned() throws {
+        let oldDay = TrainingPlanDay(
+            id: UUID(), dayIndex: 3, title: "Wednesday", sessions: []
+        )
+        let encoded = try JSONEncoder().encode(oldDay)
+        var legacy = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: encoded) as? [String: Any]
+        )
+        legacy.removeValue(forKey: "isRestDay")
+        let payload = try JSONSerialization.data(withJSONObject: legacy)
+        let decoded = try JSONDecoder().decode(
+            TrainingPlanDay.self, from: payload
+        )
+        XCTAssertNil(decoded.isRestDay)
+        XCTAssertTrue(decoded.sessions.isEmpty)
+    }
+
     func testMovingWorkoutUsesPlanRelativeDayNotWeekday() {
         let suite = "TrainingPlanScheduleTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
