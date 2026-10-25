@@ -704,6 +704,10 @@ struct TrainingPlanDay: Identifiable, Codable, Hashable {
     var dayIndex: Int
     var title: String
     var sessions: [PlannedSession]
+
+    // Explicitly chosen rest day. nil/false means unplanned, not rest.
+    // Optional preserves decoding of all existing training plans.
+    var isRestDay: Bool? = nil
 }
 
 struct TrainingPlanWeek: Identifiable, Codable, Hashable {
