@@ -6728,7 +6728,8 @@ struct ATHLTHTrainView: View {
                     restEndsAt: strengthWorkout.restEndsAt
                 ),
                 elapsed: { max(0, $0.timeIntervalSince(workout.startedAt)) },
-                elapsedCaption: "Siden start"
+                elapsedCaption: "Siden start",
+                restEndsAt: strengthWorkout.restEndsAt
             ) {
                 strengthWorkout.acknowledgeRecoveredWorkout()
                 showingStrengthWorkout = true
@@ -6825,6 +6826,7 @@ struct ATHLTHTrainView: View {
         detail: String?,
         elapsed: @escaping (Date) -> TimeInterval,
         elapsedCaption: String,
+        restEndsAt: Date? = nil,
         onContinue: @escaping () -> Void
     ) -> some View {
         Button(action: onContinue) {
@@ -6870,6 +6872,14 @@ struct ATHLTHTrainView: View {
                                 .monospacedDigit()
                             Text(elapsedCaption)
                                 .font(.system(size: 9))
+                            if let restEndsAt, restEndsAt > context.date {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Rest", norwegian: "Pause"
+                                ) + " \(Int(ceil(restEndsAt.timeIntervalSince(context.date)))) s")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .monospacedDigit()
+                            }
                         }
                     }
                     Image(systemName: "play.fill")
