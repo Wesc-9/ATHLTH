@@ -33,6 +33,41 @@ enum ATHLTHWorkoutPhasePlacement {
         }
         return position
     }
+    /// Rebuild only the immutable sequence field without discarding any
+    /// exercise, intensity, cycling or interval-group metadata.
+    static func renumbered(
+        _ block: WorkoutTemplateBlock,
+        sequence: Int
+    ) -> WorkoutTemplateBlock {
+        var next = WorkoutTemplateBlock(
+            sequence: sequence, kind: block.kind,
+            title: block.title, exerciseSlug: block.exerciseSlug,
+            distanceMeters: block.distanceMeters,
+            repetitions: block.repetitions,
+            durationSeconds: block.durationSeconds,
+            targetWeightKilograms: block.targetWeightKilograms,
+            loadNote: block.loadNote, notes: block.notes,
+            phase: block.phase,
+            targetPaceSecondsPerKilometer: block.targetPaceSecondsPerKilometer,
+            targetHeartRateZone: block.targetHeartRateZone
+        )
+        next.targetEffortRPE = block.targetEffortRPE
+        next.treadmillInclinePercent = block.treadmillInclinePercent
+        next.setCount = block.setCount
+        next.restBetweenSetsSeconds = block.restBetweenSetsSeconds
+        next.groupID = block.groupID
+        next.groupKind = block.groupKind
+        next.groupRounds = block.groupRounds
+        next.cardioActivity = block.cardioActivity
+        next.isIndoor = block.isIndoor
+        next.exerciseSnapshot = block.exerciseSnapshot
+        next.exerciseID = block.exerciseID
+        next.wellnessKind = block.wellnessKind
+        next.activityTag = block.activityTag
+        next.editorDragID = block.editorDragID
+        return next
+    }
+
     /// Move a selected activity (or its entire interval/superset group) to
     /// another part of the workout. Phase and physical timeline order must
     /// change together so previews, execution and Watch get one recipe.
@@ -70,10 +105,9 @@ enum ATHLTHWorkoutPhasePlacement {
         // within the repetitions or recovery steps of an adjacent group.
         let destination = insertionIndex(for: phase, in: remaining)
         remaining.insert(contentsOf: members, at: destination)
-        for index in remaining.indices {
-            remaining[index].sequence = index + 1
+        return remaining.enumerated().map { index, item in
+            renumbered(item, sequence: index + 1)
         }
-        return remaining
     }
 
 }

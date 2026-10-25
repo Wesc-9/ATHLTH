@@ -4130,34 +4130,7 @@ struct WorkoutTemplateBuilderView: View {
 
     private func resequence() {
         blocks = blocks.enumerated().map { index, block in
-            var copy = WorkoutTemplateBlock(
-                sequence: index + 1,
-                kind: block.kind, title: block.title,
-                exerciseSlug: block.exerciseSlug,
-                distanceMeters: block.distanceMeters,
-                repetitions: block.repetitions,
-                durationSeconds: block.durationSeconds,
-                targetWeightKilograms: block.targetWeightKilograms,
-                loadNote: block.loadNote,
-                notes: block.notes,
-                phase: block.phase,
-                targetPaceSecondsPerKilometer: block.targetPaceSecondsPerKilometer,
-                targetHeartRateZone: block.targetHeartRateZone
-            )
-            copy.setCount = block.setCount
-            copy.restBetweenSetsSeconds = block.restBetweenSetsSeconds
-            copy.groupID = block.groupID
-            copy.groupKind = block.groupKind
-            copy.groupRounds = block.groupRounds
-            copy.cardioActivity = block.cardioActivity
-            copy.isIndoor = block.isIndoor
-            copy.exerciseSnapshot = block.exerciseSnapshot
-            copy.exerciseID = block.exerciseID
-            copy.wellnessKind = block.wellnessKind
-            copy.activityTag = block.activityTag
-            copy.treadmillInclinePercent = block.treadmillInclinePercent
-            copy.editorDragID = block.editorDragID
-            return copy
+            ATHLTHWorkoutPhasePlacement.renumbered(block, sequence: index + 1)
         }
     }
 

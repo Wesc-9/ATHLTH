@@ -9,7 +9,7 @@ final class ATHLTHWorkoutPhaseRelocationTests: XCTestCase {
         phase: WorkoutPhaseKind,
         sequence: Int,
         groupID: UUID? = nil,
-        groupKind: WorkoutTemplateGroupKind? = nil,
+        groupKind: WorkoutBlockGroupKind? = nil,
         rounds: Int? = nil
     ) -> WorkoutTemplateBlock {
         var result = WorkoutTemplateBlock(
@@ -86,6 +86,28 @@ final class ATHLTHWorkoutPhaseRelocationTests: XCTestCase {
         XCTAssertEqual(result[3].groupID, id)
         XCTAssertEqual(result[2].resolvedPhase, .cooldown)
         XCTAssertEqual(result[3].resolvedPhase, .cooldown)
+    }
+
+    func testRelocatingPreservesIntensityAndTreadmillTargets() {
+        var interval = step("Run", phase: .main, sequence: 2)
+        interval.targetEffortRPE = 7
+        interval.targetHeartRateZone = 4
+        interval.targetPaceSecondsPerKilometer = 300
+        interval.treadmillInclinePercent = 1.5
+        interval.isIndoor = true
+        let id = interval.editorDragID
+        let result = ATHLTHWorkoutPhasePlacement.relocatingSelection(
+            at: 1, to: .warmup,
+            in: [step("Warmup", phase: .warmup, sequence: 1), interval]
+        )
+        let moved = result[1]
+        XCTAssertEqual(moved.targetEffortRPE, 7)
+        XCTAssertEqual(moved.targetHeartRateZone, 4)
+        XCTAssertEqual(moved.targetPaceSecondsPerKilometer, 300)
+        XCTAssertEqual(moved.treadmillInclinePercent, 1.5)
+        XCTAssertTrue(moved.isIndoor == true)
+        XCTAssertEqual(moved.editorDragID, id)
+        XCTAssertEqual(result.map(\.sequence), [1, 2])
     }
 
     func testNoOpForSamePhaseOrInvalidIndex() {
