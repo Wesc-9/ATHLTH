@@ -53,6 +53,14 @@ struct ATHLTHMovePlannedWorkoutSheet: View {
             .filter { $0.id != workout.id }
     }
 
+    private var isRestDestination: Bool {
+        guard let currentPlan = session.trainingPlan(withID: plan.id)
+        else { return false }
+        return TrainingPlanSchedule.isRestDay(
+            in: currentPlan, on: targetDay
+        )
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -93,7 +101,17 @@ struct ATHLTHMovePlannedWorkoutSheet: View {
                         .datePickerStyle(.graphical)
                         .tint(ATHLTHTheme.accentDeep)
 
-                        if plannedAtDestination.isEmpty {
+                        if isRestDestination {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "This date is a planned rest day. Remove the rest day in Plan before moving a workout here.",
+                                    norwegian: "Denne datoen er en hviledag. Fjern hviledagen i Plan før du flytter en økt hit."
+                                ),
+                                systemImage: "leaf"
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        } else if plannedAtDestination.isEmpty {
                             Label(
                                 ATHLTHLocalization.choose(
                                     english: "No other workouts planned on this day.",
@@ -147,6 +165,7 @@ struct ATHLTHMovePlannedWorkoutSheet: View {
 
                     Button {
                         guard isNewDay,
+                              !isRestDestination,
                               session.activePlan?.id == plan.id,
                               session.movePlanSession(
                                 planID: plan.id,
@@ -176,7 +195,7 @@ struct ATHLTHMovePlannedWorkoutSheet: View {
                         ATHLTHTheme.accentDeep,
                         in: RoundedRectangle(cornerRadius: 15)
                     )
-                    .disabled(!isNewDay)
+                    .disabled(!isNewDay || isRestDestination)
                 }
                 .padding(17)
             }
