@@ -539,9 +539,10 @@ struct ATHLTHTrainPlanRebuildView: View {
                         }
                     }
                     ForEach(standaloneWorkouts) { workout in
-                        Button {
-                            selectedStandaloneWorkout = workout
-                        } label: {
+                        VStack(alignment: .leading, spacing: 9) {
+                            Button {
+                                selectedStandaloneWorkout = workout
+                            } label: {
                             HStack(spacing: 10) {
                                 Image(systemName: workout.kind.systemImage)
                                     .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -568,7 +569,12 @@ struct ATHLTHTrainPlanRebuildView: View {
                             }
                             .contentShape(Rectangle())
                         }
-                        .buttonStyle(.plain)
+                            .buttonStyle(.plain)
+                            ATHLTHWorkoutPlanOutlineView(
+                                workout: workout,
+                                maxVisibleItems: 7
+                            )
+                        }
                     }
                     if isRestDay {
                         Label(
