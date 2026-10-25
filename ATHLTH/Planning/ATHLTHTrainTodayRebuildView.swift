@@ -70,7 +70,10 @@ struct ATHLTHTrainTodayRebuildView: View {
         if workout.scheduledTimeIsExplicit != false,
            let scheduled = workout.scheduledStart {
             let clock = calendar.dateComponents([.hour, .minute], from: scheduled)
-            if clock.hour != 0 || clock.minute != 0 {
+            // Explicit 00:00 is a real start time; legacy midnight without
+            // an explicit-time flag continues to use the default 18:00.
+            if workout.scheduledTimeIsExplicit == true ||
+                clock.hour != 0 || clock.minute != 0 {
                 return scheduled
             }
         }
@@ -527,8 +530,8 @@ struct ATHLTHTrainTodayRebuildView: View {
             .font(.headline)
             .foregroundStyle(ATHLTHTheme.primaryText)
             Text(ATHLTHLocalization.choose(
-                english: "Your completed and skipped sessions are listed below.",
-                norwegian: "Gjennomførte og hoppede økter finner du nedenfor."
+                english: "Completed, partly completed and skipped sessions are listed below.",
+                norwegian: "Gjennomførte, delvis gjennomførte og hoppede økter finner du nedenfor."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHTheme.mutedText)
