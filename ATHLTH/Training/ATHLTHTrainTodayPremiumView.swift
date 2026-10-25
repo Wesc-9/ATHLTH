@@ -6,6 +6,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var session: AppSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var goalStore: GoalStore
     @ObservedObject var workoutCatalog: WorkoutTemplateCatalogStore
 
@@ -75,16 +76,13 @@ struct ATHLTHTrainTodayPremiumView: View {
     private let hairline = ATHLTHTrainDesign.rule
 
     var body: some View {
-        VStack(alignment: .leading, spacing: ATHLTHTrainDesign.sectionSpacing) {
-            // A current program is context, not the hero: display one quiet,
-            // factual entry above the primary session only when it exists.
+        VStack(alignment: .leading, spacing: 16) {
             if let plan {
                 activePlanSection(plan)
             }
-            // The hero already shows the date and the active plan shows
-            // program progress. Go straight to the primary session instead
-            // of repeating another Today overview above it.
-            // A running recording takes priority over a planned-start card.
+
+            // The live recording replaces the planned hero, never creates
+            // a competing Start button or a second workout recorder.
             if hasActiveWorkout, let activeWorkoutCard {
                 activeWorkoutCard
             } else if let plan {
@@ -108,14 +106,12 @@ struct ATHLTHTrainTodayPremiumView: View {
                 adaptiveOpenDayCard
             }
 
-            // Keep the full daily agenda together, then offer the existing
-            // Quick Train setup flows without creating another recorder.
             remainingTodaySection
             quickTrainSection
-            activeGoalSection
+            todayGoalAndFocus
+
             DisclosureGroup {
                 VStack(alignment: .leading, spacing: 16) {
-                    dailyFocusSection
                     if primaryWorkout != nil {
                         suggestedWorkoutSection
                     }
@@ -123,7 +119,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                 }
                 .padding(.top, 12)
             } label: {
-                Label(tr("Inspiration and training options", "Inspirasjon og treningsvalg"),
+                Label(tr("More training options", "Flere treningsmuligheter"),
                       systemImage: "sparkles")
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(ink)
@@ -169,6 +165,25 @@ struct ATHLTHTrainTodayPremiumView: View {
                 "Only this unfinished workout changes. The original stays available to restore.",
                 "Kun denne ufullførte økten endres. Du kan når som helst gjenopprette den opprinnelige økten."
             ))
+        }
+    }
+
+    /// At ordinary text sizes the goal and daily coaching note share a
+    /// pair of quiet tiles, like the Today reference. At accessibility
+    /// sizes they stack instead of clipping text or reducing tap targets.
+    private var todayGoalAndFocus: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 10) {
+                    activeGoalSection
+                    dailyFocusSection
+                }
+            } else {
+                HStack(alignment: .top, spacing: 10) {
+                    activeGoalSection.frame(maxWidth: .infinity, alignment: .topLeading)
+                    dailyFocusSection.frame(maxWidth: .infinity, alignment: .topLeading)
+                }
+            }
         }
     }
 
