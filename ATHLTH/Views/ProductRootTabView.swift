@@ -6487,6 +6487,9 @@ struct ATHLTHTrainView: View {
         .shadow(color: Color.black.opacity(0.08), radius: 10, y: 4)
         .fixedSize(horizontal: true, vertical: false)
         .accessibilityElement(children: .contain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Train sections", norwegian: "Treningsfaner"
+        ))
     }
 
     private func premiumTrainTab(
@@ -6500,26 +6503,19 @@ struct ATHLTHTrainView: View {
                 action()
             }
         } label: {
-            VStack(spacing: 3) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 14, weight: .medium))
-                Text(title)
-                    .font(.system(size: 10, weight: selected ? .semibold : .medium))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-            }
-            .foregroundStyle(
-                selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.ink
-            )
-            .padding(.horizontal, 9)
-            .frame(minWidth: 48, minHeight: 44)
-            .background {
-                if selected {
-                    Capsule()
-                        .fill(ATHLTHTheme.premiumGold.opacity(0.20))
+            Image(systemName: systemImage)
+                .font(.system(size: 17, weight: selected ? .semibold : .regular))
+                .foregroundStyle(
+                    selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.ink
+                )
+                .frame(width: 44, height: 44)
+                .background {
+                    if selected {
+                        Circle()
+                            .fill(ATHLTHTheme.premiumGold.opacity(0.20))
+                    }
                 }
-            }
-            .contentShape(Capsule())
+                .contentShape(Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
