@@ -104,7 +104,8 @@ struct AdvancedPlannerView: View {
                 PlannedWorkoutDetailView(
                     planID: planID,
                     workout: workout,
-                    isHealthCompleted: false
+                    isHealthCompleted: false,
+                    allowsStartingWorkout: false
                 )
                 .environmentObject(session)
             }
