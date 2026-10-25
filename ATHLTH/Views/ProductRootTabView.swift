@@ -5809,7 +5809,6 @@ struct ATHLTHTrainView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             premiumTrainBrandHeader
-                            premiumTrainTabs
 
                             if selectedSection == 1 {
                                 ATHLTHTrainPlanPremiumView(
@@ -6415,109 +6414,116 @@ struct ATHLTHTrainView: View {
     }
 
 
-    // The reference-led Today design is isolated from the workout engine.
-    // The existing recording flows and plan workspace remain unchanged.
+    // Train's local navigation borrows the warm, translucent Home header style.
+    // Keep this switcher distinct from the app-wide bottom tab bar.
     private var premiumTrainBrandHeader: some View {
-        HStack(spacing: 12) {
-            // Reuse the authentic shared vector mark rather than a typed logo.
-            ATHLTHBrandMark(size: .compact)
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-            Spacer(minLength: 0)
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(ATHLTHLocalization.choose(
+                    english: "TRAINING", norwegian: "TRENING"
+                ))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(2.0)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                Text(selectedSection == 1
+                    ? ATHLTHLocalization.choose(english: "Plan", norwegian: "Plan")
+                    : ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"))
+                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+            }
+
+            Spacer(minLength: 4)
+
             Button {
                 showingLibrary = true
             } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 15, weight: .semibold))
-                    Text(ATHLTHLocalization.choose(
-                        english: "Library", norwegian: "Bibliotek"
-                    ))
-                        .font(.system(size: 13, weight: .semibold))
-                }
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                .padding(.horizontal, 14)
-                .frame(minHeight: ATHLTHPlanDesign.minTapHeight)
-                .background(ATHLTHPlanDesign.surface,
-                            in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(
-                        ATHLTHPlanDesign.outline, lineWidth: 0.8)
-                }
-                .contentShape(Capsule())
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(width: 44, height: 44)
+                    .background(.regularMaterial, in: Circle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(
-                ATHLTHLocalization.choose(
-                    english: "Training library",
-                    norwegian: "Treningsbibliotek"
-                )
-            )
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Training library", norwegian: "Treningsbibliotek"
+            ))
+
+            premiumTrainTabs
         }
     }
 
     private var premiumTrainTabs: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 2) {
             premiumTrainTab(
                 ATHLTHLocalization.choose(
-                    english: "Today",
-                    norwegian: "I dag"
+                    english: "Today", norwegian: "I dag"
                 ),
+                systemImage: "figure.run",
                 selected: selectedSection == 0
-            ) {
-                selectedSection = 0
-            }
+            ) { selectedSection = 0 }
 
             premiumTrainTab(
                 ATHLTHLocalization.choose(
-                    english: "Training plan",
-                    norwegian: "Treningsplan"
+                    english: "Plan", norwegian: "Plan"
                 ),
+                systemImage: "calendar",
                 selected: selectedSection == 1
-            ) {
-                selectedSection = 1
-            }
+            ) { selectedSection = 1 }
 
             premiumTrainTab(
                 ATHLTHLocalization.choose(
-                    english: "Progress",
-                    norwegian: "Fremgang"
+                    english: "Progress", norwegian: "Fremdrift"
                 ),
+                systemImage: "chart.bar.xaxis",
                 selected: selectedSection == 2
-            ) {
-                selectedSection = 2
-            }
+            ) { selectedSection = 2 }
         }
-        .padding(4)
-        .background(
-            ATHLTHPlanDesign.warmSurface,
-            in: RoundedRectangle(cornerRadius: 13)
-        )
+        .padding(3)
+        .background(.regularMaterial, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(Color.white.opacity(0.65), lineWidth: 1)
+        }
+        .shadow(color: Color.black.opacity(0.08), radius: 10, y: 4)
+        .fixedSize(horizontal: true, vertical: false)
+        .accessibilityElement(children: .contain)
     }
 
     private func premiumTrainTab(
         _ title: String,
+        systemImage: String,
         selected: Bool,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: premiumTabLabelSize, weight: selected ? .semibold : .medium))
-                .foregroundStyle(
-                    selected
-                        ? Color.white
-                        : ATHLTHPlanDesign.secondaryInk
-                )
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: ATHLTHPlanDesign.minTapHeight)
-                .background {
-                    if selected {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(ATHLTHPlanDesign.ink)
-                    }
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                action()
+            }
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 14, weight: .medium))
+                Text(title)
+                    .font(.system(size: 10, weight: selected ? .semibold : .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            .foregroundStyle(
+                selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.ink
+            )
+            .padding(.horizontal, 9)
+            .frame(minWidth: 48, minHeight: 44)
+            .background {
+                if selected {
+                    Capsule()
+                        .fill(ATHLTHTheme.premiumGold.opacity(0.20))
                 }
-                .contentShape(Rectangle())
+            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(title)
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
