@@ -83,7 +83,8 @@ struct ATHLTHTrainPlanRebuildView: View {
                 PlannedWorkoutDetailView(
                     planID: plan.id,
                     workout: workout,
-                    isHealthCompleted: false
+                    isHealthCompleted: false,
+                    allowsStartingWorkout: false
                 )
                 .environmentObject(session)
             }
