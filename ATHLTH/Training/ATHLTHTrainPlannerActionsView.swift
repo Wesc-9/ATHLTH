@@ -13,8 +13,8 @@ struct ATHLTHTrainSavedWorkoutPickerView: View {
     @State private var errorMessage: String?
 
     private let graphite = Color(red: 0.17, green: 0.17, blue: 0.18)
-    private let bronze = Color(red: 0.65, green: 0.53, blue: 0.37)
-    private let paper = Color(red: 0.984, green: 0.976, blue: 0.963)
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let paper = ATHLTHTrainDesign.canvas
 
     private var results: [PlannedSession] {
         let term = search.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -137,9 +137,9 @@ struct ATHLTHTrainSessionTransferView: View {
     @State private var expectedPlanVersion: Int?
     @State private var errorMessage: String?
 
-    private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
-    private let bronze = Color(red: 0.65, green: 0.53, blue: 0.37)
-    private let paper = Color(red: 0.984, green: 0.976, blue: 0.963)
+    private let ink = ATHLTHTrainDesign.ink
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let paper = ATHLTHTrainDesign.canvas
 
     private var plan: TrainingPlan? {
         session.trainingPlan(withID: planID)

@@ -1897,15 +1897,15 @@ struct WorkoutTemplateBuilderView: View {
     // from the plan, use the same tokens as the first plan-creation screen.
     private var isPlannedWorkout: Bool { onSaveToPlan != nil }
     private var studioInk: Color {
-        isPlannedWorkout ? ATHLTHPlanDesign.ink
+        isPlannedWorkout ? ATHLTHTrainDesign.ink
             : Color(red: 0.17, green: 0.17, blue: 0.18)
     }
     private var studioAccent: Color {
-        isPlannedWorkout ? ATHLTHTheme.accentDeep
+        isPlannedWorkout ? ATHLTHTrainDesign.bronze
             : Color(red: 0.65, green: 0.53, blue: 0.37)
     }
     private var studioBackground: Color {
-        isPlannedWorkout ? ATHLTHPlanDesign.canvas
+        isPlannedWorkout ? ATHLTHTrainDesign.canvas
             : Color(red: 0.986, green: 0.978, blue: 0.964)
     }
 
@@ -2876,6 +2876,28 @@ struct WorkoutTemplateBuilderView: View {
 
                 if kind == .intervals {
                     Button {
+                        if let individual = ATHLTHIntervalGroupEditing.individualSteps(
+                            in: blocks, groupID: id
+                        ) {
+                            blocks = individual
+                            collapsedGroupIDs.remove(id)
+                            allRoundsExpandedIDs.remove(id)
+                            expandedBlockIndex = firstIndex
+                        }
+                    } label: {
+                        Label(tr("Customize each effort and recovery", "Tilpass hvert drag og hver pause"),
+                              systemImage: "slider.horizontal.3")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .disabled(!ATHLTHIntervalGroupEditing.canIndividualize(in: blocks, groupID: id))
+                    Text(tr("Keeps the complete sequence and makes each effort editable on its own. Save the workout to keep your changes.",
+                            "Hele rekkefølgen beholdes, og hvert drag kan redigeres separat. Lagre økten for å beholde endringene."))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             if allRoundsExpandedIDs.contains(id) {
                                 allRoundsExpandedIDs.remove(id)
@@ -3298,7 +3320,7 @@ struct WorkoutTemplateBuilderView: View {
                 if blocks[index].durationSeconds != nil {
                     durationEntryEditor(index)
                 } else {
-                    Stepper(value: distanceBinding(index), in: 100...20000, step: 100) {
+                    Stepper(value: distanceBinding(index), in: 1...100000, step: 1) {
                         Text("\(Int(blocks[index].distanceMeters ?? 1000)) m")
                     }
                 }
@@ -3346,7 +3368,7 @@ struct WorkoutTemplateBuilderView: View {
                     Stepper(value: Binding(
                               get: { blocks[index].targetPaceSecondsPerKilometer ?? 330 },
                               set: { blocks[index].targetPaceSecondsPerKilometer = $0 }),
-                            in: 150...1200, step: 5) {
+                            in: 60...3600, step: 1) {
                         let pace = Int(blocks[index].targetPaceSecondsPerKilometer ?? 330)
                         Text(String(format: "%d:%02d/km", pace / 60, pace % 60))
                     }

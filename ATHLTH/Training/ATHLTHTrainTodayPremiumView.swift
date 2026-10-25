@@ -5,6 +5,7 @@ import SwiftUI
 struct ATHLTHTrainTodayPremiumView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var goalStore: GoalStore
     @ObservedObject var workoutCatalog: WorkoutTemplateCatalogStore
 
@@ -65,15 +66,16 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     @State private var quickActivityTapCounts: [String: Int] = [:]
     @State private var temporarilyFeaturedGoalID: UUID?
+    @ScaledMetric(relativeTo: .body) private var activityTileWidth: CGFloat = 90
 
 
-    private let ink = ATHLTHPlanDesign.ink
-    private let muted = ATHLTHPlanDesign.secondaryInk
-    private let champagne = ATHLTHPlanDesign.accentInk
-    private let hairline = ATHLTHPlanDesign.warmDivider
+    private let ink = ATHLTHTrainDesign.ink
+    private let muted = ATHLTHTrainDesign.secondary
+    private let champagne = ATHLTHTrainDesign.bronze
+    private let hairline = ATHLTHTrainDesign.rule
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 19) {
+        VStack(alignment: .leading, spacing: ATHLTHTrainDesign.sectionSpacing) {
             // A current program is context, not the hero: display one quiet,
             // factual entry above the primary session only when it exists.
             if let plan {
@@ -106,15 +108,28 @@ struct ATHLTHTrainTodayPremiumView: View {
                 adaptiveOpenDayCard
             }
 
-            // Quick Train is always directly below the principal workout,
-            // using precisely the same launch callbacks as before.
+            // Keep the full daily agenda together, then offer the existing
+            // Quick Train setup flows without creating another recorder.
+            remainingTodaySection
             quickTrainSection
             activeGoalSection
-            dailyFocusSection
-            if primaryWorkout != nil {
-                suggestedWorkoutSection
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 16) {
+                    dailyFocusSection
+                    if primaryWorkout != nil {
+                        suggestedWorkoutSection
+                    }
+                    ghostRaceSection
+                }
+                .padding(.top, 12)
+            } label: {
+                Label(tr("Inspiration and training options", "Inspirasjon og treningsvalg"),
+                      systemImage: "sparkles")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ink)
+                    .frame(minHeight: 48)
             }
-            ghostRaceSection
+            .tint(champagne)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task {
@@ -379,37 +394,27 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private var restDayCard: some View {
         Button(action: onOpenPlan) {
-            HStack(alignment: .top, spacing: 14) {
-                Image(systemName: "moon.stars.fill")
-                    .font(.title2)
-                    .foregroundStyle(ATHLTHTheme.recoveryBlue)
-                    .frame(width: 50, height: 50)
-                    .background(ATHLTHTheme.recoveryBlueSoft,
-                                in: RoundedRectangle(cornerRadius: 15))
-                VStack(alignment: .leading, spacing: 7) {
-                    Text(tr("REST DAY", "HVILEDAG"))
-                        .font(.caption.weight(.bold))
-                        .tracking(1.5)
-                    Text(tr("Recovery is on the schedule", "Restitusjon er planlagt"))
-                        .font(.headline)
-                    Text(tr(
-                        "You have no workout to complete today. View the day in your plan.",
-                        "Du har ingen treningsøkt å fullføre i dag. Se dagen i treningsplanen."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(muted)
-                }
+            HStack(alignment: .top, spacing: 16) {
+                Image(systemName: "moon.stars")
+                    .font(.title2.weight(.light))
+                    .foregroundStyle(champagne)
+                    .frame(width: 48, height: 48)
+                    .background(ATHLTHTrainDesign.paleGold.opacity(0.3), in: Circle())
+                    .accessibilityHidden(true)
+                ATHLTHTrainSectionHeading(
+                    eyebrow: tr("REST DAY", "HVILEDAG"),
+                    title: tr("Recovery is on the schedule", "Restitusjon er planlagt"),
+                    detail: tr("View the day in your training plan.", "Se dagen i treningsplanen."))
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .foregroundStyle(muted)
+                Image(systemName: "arrow.up.right").font(.caption)
+                    .foregroundStyle(champagne)
             }
-            .foregroundStyle(ink)
-            .padding(16)
-            .background(.white, in: RoundedRectangle(cornerRadius: 18))
+            .padding(20)
+            .athlthTrainPaper(emphasized: true)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
-
     // A full date on regular widths, a shorter date where labels need room.
     private func todayDateLabel(color: Color) -> some View {
         ViewThatFits(in: .horizontal) {
@@ -426,285 +431,131 @@ struct ATHLTHTrainTodayPremiumView: View {
         )
     }
 
-    private struct HeroPhase: Identifiable {
-        let phase: WorkoutPhaseKind
-        let minutes: Int?
-        var id: String { phase.rawValue }
-    }
-
-    /// Display only phases actually present in the workout. This must never
-    /// invent warmup, cooldown, reps or recovery based on a decorative mockup.
-    private func heroPhases(for workout: PlannedSession) -> [HeroPhase] {
-        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-        return WorkoutPhaseKind.allCases.compactMap { phase in
-            let matching = blocks.filter { $0.resolvedPhase == phase }
-            guard !matching.isEmpty else { return nil }
-            let seconds = matching.compactMap(\.durationSeconds)
-                .filter { $0 > 0 }
-                .reduce(0.0, +)
-            let minutes = seconds > 0
-                ? max(1, Int((seconds / 60).rounded(.up)))
-                : (blocks.count == matching.count ? workout.durationMinutes : nil)
-            return HeroPhase(phase: phase, minutes: minutes)
-        }
-    }
-
     private func workoutCard(
         _ workout: PlannedSession, plan: TrainingPlan
     ) -> some View {
         let finished = completedIDs.contains(workout.id)
-        return VStack(alignment: .leading, spacing: 10) {
-            VStack(spacing: -54) {
-                ZStack(alignment: .bottomLeading) {
-                    GeometryReader { geometry in
-                        Image(workoutImage(for: workout.kind))
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: geometry.size.width, height: 368)
-                            .clipped()
-                    }
-                    .frame(height: 368)
-
-                    LinearGradient(
-                        stops: [
-                            .init(color: .black.opacity(0.05), location: 0),
-                            .init(color: .black.opacity(0.05), location: 0.36),
-                            .init(color: .black.opacity(0.62), location: 0.96)
-                        ], startPoint: .top, endPoint: .bottom
-                    )
-
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text(Date.now.formatted(
-                            .dateTime.weekday(.wide).day().month(.wide)
-                        ).uppercased())
-                            .font(.system(size: 11, weight: .bold))
-                            .tracking(2.0)
-                            .foregroundStyle(.white.opacity(0.91))
-
-                        Text(workout.title)
-                            .font(.system(size: 43, weight: .regular, design: .serif))
-                            .foregroundStyle(.white)
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.70)
-                            .shadow(color: .black.opacity(0.20), radius: 7)
-
-                        HStack(spacing: 15) {
-                            heroMeta("clock", workout.durationMinutes.map {
-                                "\($0) min"
-                            } ?? tr("Flexible", "Fleksibel"))
-                            heroMeta(workout.kind.systemImage, workout.kind.title)
-                            if let intensity = heroIntensity(workout) {
-                                heroMeta("chart.bar.fill", intensity)
-                            }
-                        }
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.72)
-
-                        // The light floating control plate overlaps the photo.
-                        Spacer().frame(height: 93)
-                    }
-                    .padding(.horizontal, 22)
-                    .padding(.bottom, 20)
+        return VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 18) {
+                ATHLTHTrainSectionHeading(
+                    eyebrow: tr("TODAY'S WORKOUT", "DAGENS ØKT"), title: workout.title)
+                ATHLTHPlannedWorkoutSummaryView(workout: workout)
+                Divider().overlay(hairline)
+                Button {
+                    onWorkoutDetails(workout, healthCompletedIDs.contains(workout.id))
+                } label: {
+                    heroTimeline(for: workout)
                 }
-                .frame(height: 368)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-
-                VStack(alignment: .leading, spacing: 15) {
-                    Button {
-                        onWorkoutDetails(
-                            workout, healthCompletedIDs.contains(workout.id))
-                    } label: {
-                        heroTimeline(for: workout)
+                .buttonStyle(.plain)
+                .accessibilityHint(tr("Open all workout steps", "Åpne alle øktdelene"))
+                Button {
+                    if hasActiveWorkout || finished {
+                        onWorkoutDetails(workout, healthCompletedIDs.contains(workout.id))
+                    } else {
+                        onStartWorkout(workout, healthCompletedIDs.contains(workout.id))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityHint(tr(
-                        "Open all workout steps", "Åpne alle øktdelene"
-                    ))
-
-                    HStack(spacing: 12) {
-                        Button {
-                            if hasActiveWorkout || finished {
-                                onWorkoutDetails(
-                                    workout, healthCompletedIDs.contains(workout.id))
-                            } else {
-                                onStartWorkout(
-                                    workout, healthCompletedIDs.contains(workout.id))
-                            }
-                        } label: {
-                            HStack(spacing: 12) {
-                                Spacer()
-                                Image(systemName: hasActiveWorkout || finished
-                                    ? "arrow.up.right" : "play.fill")
-                                Text(finished
-                                     ? tr("View workout", "Se økten")
-                                     : hasActiveWorkout
-                                     ? tr("View planned workout", "Se planlagt økt")
-                                     : tr("Start workout", "Start økt"))
-                                Spacer()
-                            }
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .frame(minHeight: 58)
-                            .background(ink,
-                                        in: RoundedRectangle(cornerRadius: 14))
-                        }
-                        .buttonStyle(.plain)
-
-                        Menu {
-                            Button {
-                                onWorkoutDetails(workout,
-                                    healthCompletedIDs.contains(workout.id))
-                            } label: {
-                                Label(tr("View workout", "Se økten"),
-                                      systemImage: "list.bullet")
-                            }
-                            Button(action: onOpenPlan) {
-                                Label(tr("Training plan", "Treningsplan"),
-                                      systemImage: "calendar")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis")
-                                .font(.system(size: 19, weight: .semibold))
-                                .foregroundStyle(ink)
-                                .frame(width: 58, height: 58)
-                                .background(ATHLTHPlanDesign.warmSurface,
-                                            in: Circle())
-                                .overlay {
-                                    Circle().strokeBorder(
-                                        hairline.opacity(0.7), lineWidth: 0.8)
-                                }
-                        }
-                        .accessibilityLabel(tr(
-                            "Workout options", "Øktvalg"
-                        ))
-                    }
+                } label: {
+                    Label(finished ? tr("View workout", "Se økten")
+                          : hasActiveWorkout ? tr("View planned workout", "Se planlagt økt")
+                          : tr("Start workout", "Start økt"),
+                          systemImage: hasActiveWorkout || finished ? "arrow.up.right" : "play.fill")
                 }
-                .padding(16)
-                .background(.white,
-                            in: RoundedRectangle(cornerRadius: 22))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22)
-                        .strokeBorder(hairline.opacity(0.65), lineWidth: 0.7)
-                }
-                .shadow(color: ink.opacity(0.12), radius: 22, y: 10)
-                .padding(.horizontal, 13)
+                .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
+                .accessibilityHint(tr(
+                    "Choose iPhone or Apple Watch in workout setup",
+                    "Velg iPhone eller Apple Watch i øktoppsettet"))
             }
+            .padding(20)
+            .athlthTrainPaper(emphasized: true)
 
-            // All alternatives and secondary sessions remain available,
-            // rather than being hidden or silently replaced by the redesign.
             if workout.dailyAlternativeOriginal != nil {
                 undoAlternativeRow(workout)
             } else if !finished && !hasActiveWorkout,
                       let suggestion = ATHLTHDailyWorkoutAlternativeAdvisor
-                        .suggestions(for: workout,
-                                     signals: selfReportedSignals).first {
+                        .suggestions(for: workout, signals: selfReportedSignals).first {
                 alternativeRecommendationCard(for: workout, suggestion: suggestion)
             }
-
-            if sessions.filter({ !$0.isExplicitRestDay && $0.id != workout.id }).count > 0 {
-                VStack(alignment: .leading, spacing: 9) {
-                    Text(tr("ALSO TODAY", "OGSÅ I DAG"))
-                        .font(.caption2.weight(.semibold))
-                        .tracking(1.4)
-                        .foregroundStyle(muted)
-                    ForEach(sessions.filter { !$0.isExplicitRestDay && $0.id != workout.id }) { extra in
-                        Button {
-                            onWorkoutDetails(extra,
-                                healthCompletedIDs.contains(extra.id))
-                        } label: {
-                            HStack(spacing: 9) {
-                                Image(systemName: extra.kind.systemImage)
-                                Text(extra.title).lineLimit(1)
-                                Spacer()
-                                if completedIDs.contains(extra.id) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                }
-                                Image(systemName: "chevron.right")
-                            }
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ink)
-                            .padding(13)
-                            .background(.white,
-                                in: RoundedRectangle(cornerRadius: 14))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.top, 4)
-            }
         }
     }
 
-    private func heroMeta(_ icon: String, _ value: String) -> some View {
-        HStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .medium))
-            Text(value)
-                .font(.system(size: 13, weight: .medium))
+    /// Keep every scheduled session reachable even while the recorder owns
+    /// the main card. Opening details never launches a second recording.
+    private var remainingTodaySection: some View {
+        let hasUnfinishedWorkout = sessions.contains {
+            !$0.isExplicitRestDay && !completedIDs.contains($0.id)
         }
-        .foregroundStyle(.white)
-    }
-
-    private func heroIntensity(_ workout: PlannedSession) -> String? {
-        if let zone = workout.resolvedWorkoutBlocks
-            .compactMap(\.targetHeartRateZone).first {
-            return tr("Zone", "Sone") + " \(zone)"
+        let visiblePrimaryID = !hasActiveWorkout && plan != nil && hasUnfinishedWorkout
+            ? primaryWorkout?.id : nil
+        let remaining = sessions.filter {
+            !$0.isExplicitRestDay && $0.id != visiblePrimaryID
         }
-        return nil
-    }
-
-    @ViewBuilder
-    private func heroTimeline(for workout: PlannedSession) -> some View {
-        let phases = heroPhases(for: workout)
-        if phases.isEmpty {
-            HStack(spacing: 12) {
-                Image(systemName: "list.bullet")
-                Text(tr("View workout details", "Se øktens innhold"))
-                    .font(.subheadline.weight(.medium))
-                Spacer()
-                Image(systemName: "chevron.right")
-            }
-            .foregroundStyle(ink)
-            .frame(minHeight: 43)
-        } else {
-            HStack(alignment: .center, spacing: 10) {
-                Image(systemName: "list.bullet")
-                    .font(.system(size: 17, weight: .medium))
-                    .foregroundStyle(ink)
-                    .frame(width: 24)
-                HStack(alignment: .top, spacing: 4) {
-                    ForEach(phases) { item in
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 0) {
-                                Circle()
-                                    .fill(ATHLTHPlanDesign.ink.opacity(0.55))
-                                    .frame(width: 8, height: 8)
-                                Rectangle()
-                                    .fill(hairline)
-                                    .frame(height: 2)
-                            }
-                            Text(item.phase.title)
-                                .font(.system(size: 11, weight: .medium))
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.75)
-                            if let minutes = item.minutes {
-                                Text("\(minutes) min")
-                                    .font(.system(size: 11))
-                                    .foregroundStyle(muted)
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-                Image(systemName: "chevron.right")
+        return VStack(alignment: .leading, spacing: 12) {
+            if !remaining.isEmpty {
+                Text(tr("ALSO TODAY", "OGSÅ I DAG"))
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(muted)
+                    .tracking(1.4)
+                    .foregroundStyle(champagne)
+                ForEach(remaining) { workout in
+                    Button {
+                        onWorkoutDetails(workout, healthCompletedIDs.contains(workout.id))
+                    } label: {
+                        HStack(alignment: .top, spacing: 12) {
+                            Image(systemName: completedIDs.contains(workout.id)
+                                  ? "checkmark.circle.fill" : workout.kind.systemImage)
+                                .foregroundStyle(champagne)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(workout.title)
+                                    .font(.headline)
+                                    .foregroundStyle(ink)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                ATHLTHPlannedWorkoutSummaryView(workout: workout)
+                                if completedIDs.contains(workout.id) {
+                                    Text(tr("Completed", "Fullført"))
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(champagne)
+                                }
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(muted)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                        .padding(16)
+                        .premiumTrainSurface(line: hairline)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .foregroundStyle(ink)
-            .frame(minHeight: 58)
         }
     }
-
+    private func heroTimeline(for workout: PlannedSession) -> some View {
+        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        let phases = ATHLTHWorkoutTimelineOverview.sections(for: blocks)
+        return VStack(alignment: .leading, spacing: 12) {
+            if phases.isEmpty {
+                Label(tr("View workout details", "Se øktens innhold"),
+                      systemImage: "list.bullet")
+                    .font(.subheadline.weight(.medium))
+            } else {
+                ForEach(Array(phases.enumerated()), id: \.element.id) { index, section in
+                    ATHLTHTrainPhaseRow(
+                        number: index + 1, title: section.phase.title,
+                        detail: section.blocks
+                            .map { $0.title }.joined(separator: " · "),
+                        isLast: index == phases.count - 1)
+                }
+            }
+            Label(tr("All steps and targets", "Alle øktdeler og mål"),
+                  systemImage: "arrow.up.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(champagne)
+        }
+        .foregroundStyle(ink)
+        .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+        .contentShape(Rectangle())
+    }
     // The primary CTA launches the existing workout setup, never a new
     // recording engine or an unsafely reconstructed historical session.
     private var openDayChoice: ATHLTHTrainOpenDayPolicy.Choice {
@@ -733,7 +584,7 @@ struct ATHLTHTrainTodayPremiumView: View {
         let eyebrow: String
         let title: String
         let detail: String
-        let image: String
+
 
         switch choice {
         case .trainedToday:
@@ -744,7 +595,6 @@ struct ATHLTHTrainTodayPremiumView: View {
                 "Your completed workout is in your history. Explore options if you want to plan ahead.",
                 "Den fullførte økten ligger i historikken. Utforsk alternativer om du vil planlegge videre."
             )
-            image = "GoalProgress"
         case .familiar(let workout):
             let activity = familiarQuickActivity(workout)
             kind = activity
@@ -754,7 +604,6 @@ struct ATHLTHTrainTodayPremiumView: View {
                 "You completed this activity previously. Start a new session with the familiar setup.",
                 "Du har trent denne aktiviteten tidligere. Start en ny økt med det vanlige oppsettet."
             )
-            image = activity.image
         case .goal(let workout):
             let activity = familiarQuickActivity(workout)
             kind = activity
@@ -764,7 +613,6 @@ struct ATHLTHTrainTodayPremiumView: View {
                 "Your selected goal explicitly relates to this activity. Choose the workout that suits you today.",
                 "Hovedmålet ditt er knyttet til denne aktiviteten. Velg økten som passer deg i dag."
             )
-            image = activity.image
         case .favorite(let key):
             let activity = QuickActivity(rawValue: key) ?? .running
             kind = activity
@@ -774,7 +622,6 @@ struct ATHLTHTrainTodayPremiumView: View {
                 "You often open this activity. Choose your workout details before starting.",
                 "Du velger ofte denne aktiviteten. Velg øktdetaljer før du starter."
             )
-            image = activity.image
         case .library:
             kind = nil
             eyebrow = tr("EXPLORE A WORKOUT", "UTFORSK EN ØKT")
@@ -783,7 +630,6 @@ struct ATHLTHTrainTodayPremiumView: View {
                 "A workout from the existing library. Review the steps before deciding.",
                 "En økt fra treningsbiblioteket. Se gjennom innholdet før du bestemmer deg."
             )
-            image = suggestedWorkouts.first.map(suggestionImage(for:)) ?? "TrainHero"
         case .explore:
             kind = nil
             eyebrow = tr("YOUR DAY, YOUR CHOICE", "DIN DAG, DITT VALG")
@@ -792,44 +638,11 @@ struct ATHLTHTrainTodayPremiumView: View {
                 "Nothing is scheduled. Explore the library, start a familiar activity or take a rest day.",
                 "Ingen økt er planlagt. Utforsk biblioteket, start en aktivitet eller velg en hviledag."
             )
-            image = "TrainHero"
         }
 
         return VStack(alignment: .leading, spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
-                GeometryReader { geometry in
-                    Image(image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: 215)
-                        .clipped()
-                }
-                .frame(height: 215)
-                LinearGradient(
-                    stops: [
-                        .init(color: .black.opacity(0.03), location: 0),
-                        .init(color: .black.opacity(0.14), location: 0.32),
-                        .init(color: .black.opacity(0.76), location: 1)
-                    ],
-                    startPoint: .top, endPoint: .bottom
-                )
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(eyebrow)
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(1.4)
-                        .foregroundStyle(.white.opacity(0.85))
-                    Text(title)
-                        .font(.system(size: 30, weight: .regular, design: .serif))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.75)
-                }
-                .padding(19)
-            }
-            .frame(height: 215)
-            .clipShape(UnevenRoundedRectangle(
-                topLeadingRadius: 22, topTrailingRadius: 22
-            ))
+            ATHLTHTrainSectionHeading(eyebrow: eyebrow, title: title)
+                .padding(20)
 
             VStack(alignment: .leading, spacing: 13) {
                 Text(detail)
@@ -878,12 +691,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
             .padding(16)
         }
-        .background(.white, in: RoundedRectangle(cornerRadius: 22))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22)
-                .strokeBorder(hairline.opacity(0.65), lineWidth: 0.7)
-        }
-        .shadow(color: ink.opacity(0.08), radius: 16, y: 7)
+        .athlthTrainPaper(emphasized: true)
     }
 
     /// A plan-free day is not automatically a prescribed rest day. Keep
@@ -1182,8 +990,9 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .foregroundStyle(champagne)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(tr("Today's training is done", "Dagens trening er fullført"))
-                        .font(.title3.weight(.semibold))
+                        .font(ATHLTHTrainDesign.sectionTitle)
                         .foregroundStyle(ink)
+                        .fixedSize(horizontal: false, vertical: true)
                     Text(tr(
                         "Your planned sessions are complete.",
                         "De planlagte øktene dine er gjennomført."
@@ -1197,10 +1006,8 @@ struct ATHLTHTrainTodayPremiumView: View {
             Button(action: onOpenPlan) {
                 Label(tr("View your plan", "Se treningsplanen"),
                       systemImage: "calendar")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ink)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
         }
         .padding(17)
         .premiumTrainSurface(line: hairline)
@@ -1278,6 +1085,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     }
 
     private func openQuickActivity(_ activity: QuickActivity) {
+        guard !hasActiveWorkout else { return }
         recordQuickActivityTap(activity)
         social.quickTrainFriendIDs.removeAll()
         social.discardPreparedQuickTrainFriends()
@@ -1423,7 +1231,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                         }
                         Spacer(minLength: 0)
                         Button {
-                            withAnimation(.easeInOut(duration: 0.18)) {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                                 temporarilyFeaturedGoalID =
                                     temporarilyFeaturedGoalID == suggested.id
                                         ? nil : suggested.id
@@ -1569,62 +1377,33 @@ struct ATHLTHTrainTodayPremiumView: View {
                 .accessibilityLabel(tr("Explore all workouts", "Se alle treningsøkter"))
             }
 
-            // Three equal tiles per row, matching the approved
-            // two-row Home-inspired reference rather than a tall 2-column list.
+            if hasActiveWorkout {
+                Text(tr("Continue your current workout above before starting another.",
+                        "Fortsett den aktive økten over før du starter en ny."))
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            // Adaptive tiles keep readable labels on compact and larger screens.
             LazyVGrid(
-                columns: Array(
-                    repeating: GridItem(.flexible(), spacing: 8), count: 3
-                ),
+                columns: [GridItem(.adaptive(minimum: activityTileWidth), spacing: 12)],
                 spacing: 8
             ) {
                 ForEach(sortedQuickActivities) { activity in
-                    quickPhotoChoice(activity)
+                    quickPhotoChoice(activity).disabled(hasActiveWorkout)
                 }
             }
         }
     }
 
     private func quickPhotoChoice(_ activity: QuickActivity) -> some View {
-        Button {
-            openQuickActivity(activity)
-        } label: {
-            VStack(alignment: .center, spacing: 9) {
-                Image(systemName: activity.icon)
-                    .font(.system(size: 20, weight: .light))
-                    .foregroundStyle(champagne)
-                    .frame(width: 37, height: 37)
-                    .background(
-                        ATHLTHPlanDesign.warmSurface,
-                        in: RoundedRectangle(cornerRadius: 11)
-                    )
-                Text(activity.title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.73)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: .infinity)
-            }
-            .frame(maxWidth: .infinity, minHeight: 86, alignment: .center)
-            .padding(.horizontal, 7)
-            .padding(.vertical, 10)
-            .background(
-                Color.white,
-                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(hairline.opacity(0.75), lineWidth: 0.75)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 16))
+        Button { openQuickActivity(activity) } label: {
+            ATHLTHTrainActivityTile(title: activity.title, symbol: activity.icon)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(activity.title)
-        .accessibilityHint(tr(
-            "Open workout setup", "Åpner treningsoppsett"
-        ))
+        .accessibilityHint(tr("Open workout setup", "Åpner treningsoppsett"))
     }
-
     private var ghostRaceSection: some View {
         Button(action: onGhostRace) {
             ZStack(alignment: .leading) {
@@ -1760,14 +1539,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
 private extension View {
     func premiumTrainSurface(line: Color) -> some View {
-        self
-            .background(.white, in: RoundedRectangle(cornerRadius: 17))
-            .clipShape(RoundedRectangle(cornerRadius: 17))
-            .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .stroke(line.opacity(0.68), lineWidth: 0.7)
-            }
-            .shadow(color: .black.opacity(0.035), radius: 10, y: 5)
+        athlthTrainPaper()
     }
 }
 

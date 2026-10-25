@@ -879,10 +879,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .scrollIndicators(.hidden)
     }
 
-    private let sourceInk = ATHLTHPlanDesign.ink
-    private let sourceMuted = ATHLTHPlanDesign.secondaryInk
-    private let sourceGold = ATHLTHPlanDesign.accent
-    private let sourceCanvas = ATHLTHPlanDesign.canvas
+    private let sourceInk = ATHLTHTrainDesign.ink
+    private let sourceMuted = ATHLTHTrainDesign.secondary
+    private let sourceGold = ATHLTHTrainDesign.bronze
+    private let sourceCanvas = ATHLTHTrainDesign.canvas
 
     private var stepDisplayTotal: Int {
         ATHLTHPlanJourney.sequence(advanced: mode == .advanced).count
@@ -948,8 +948,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
 
                     Text(ATHLTHLocalization.choose(
-                        english: "Choose how much control you want. Both options lead to an editable training plan.",
-                        norwegian: "Velg hvor mye kontroll du ønsker. Begge alternativene gir deg en treningsplan du kan redigere."
+                        english: "Choose how much guidance and detail you want, whatever your training experience. Both plans stay editable.",
+                        norwegian: "Velg hvor mye veiledning og detaljer du ønsker, uansett treningsnivå. Begge planene kan redigeres."
                     ))
                     .font(.system(size: compact ? 12 : 14))
                     .foregroundStyle(sourceMuted)
@@ -1855,8 +1855,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
-    // The simple route deliberately has no technical settings, date picker,
-    // AI prompt or extra confirmation step. Advanced keeps the full wizard.
+    // The simple route keeps technical settings out of the primary questions.
+    // Advanced keeps the full profile and detailed week wizard.
     @State private var simpleMinutes = 30
     @State private var simpleActivities: Set<WorkoutKind> = [.walking]
     @State private var showingSimpleDays = false
@@ -1979,6 +1979,27 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
             }
 
+            DisclosureGroup {
+                VStack(alignment: .leading, spacing: 16) {
+                    DatePicker(ATHLTHLocalization.choose(english: "Start date", norwegian: "Startdato"),
+                               selection: $startDate, displayedComponents: .date)
+                    Stepper(ATHLTHLocalization.choose(
+                        english: "\(weekCount) weeks", norwegian: "\(weekCount) uker"),
+                            value: $weekCount, in: 1...52)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a period that fits your schedule. Activities, days and session length stay as selected.",
+                        norwegian: "Velg en periode som passer kalenderen din. Aktiviteter, dager og øktlengde beholdes."))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+                .padding(.top, 12)
+            } label: {
+                Label(ATHLTHLocalization.choose(english: "Start date and plan length", norwegian: "Startdato og planlengde"),
+                      systemImage: "calendar")
+                    .frame(minHeight: 48)
+            }
+            .tint(ATHLTHTrainDesign.bronze)
+
             VStack(alignment: .leading, spacing: 8) {
                 Label(
                     ATHLTHLocalization.choose(english: "Your plan", norwegian: "Planen din"),
@@ -1988,8 +2009,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 Text(simpleActivitySummary.capitalized)
                     .font(.subheadline.weight(.semibold))
                 Text(ATHLTHLocalization.choose(
-                    english: "\(selectedDays.count) times a week · \(simpleMinutes) minutes each time · 8 weeks",
-                    norwegian: "\(selectedDays.count) ganger i uken · \(simpleMinutes) minutter hver gang · 8 uker"
+                    english: "\(selectedDays.count) times a week · \(simpleMinutes) minutes each time · \(weekCount) weeks",
+                    norwegian: "\(selectedDays.count) ganger i uken · \(simpleMinutes) minutter hver gang · \(weekCount) uker"
                 ))
                 .font(.subheadline)
                 Text(ATHLTHLocalization.choose(
@@ -2006,8 +2027,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             if let conflict = conflictingPlan {
                 conflictCard(conflict)
                 Text(ATHLTHLocalization.choose(
-                    english: "You already have a plan for these dates. Go back and choose Advanced to change the dates.",
-                    norwegian: "Du har allerede en plan i denne perioden. Gå tilbake og velg Avansert hvis du vil endre datoene."
+                    english: "You already have a plan for these dates. Adjust Start date and plan length above.",
+                    norwegian: "Du har allerede en plan i denne perioden. Endre startdato og planlengde over."
                 ))
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -2123,7 +2144,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             focus = .generalFitness
             // No forced plan title: the default appears as placeholder.
         }
-        weekCount = 8
         setSimpleKinds()
     }
 
@@ -6832,7 +6852,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
 
         if mode == .basic {
-            weekCount = 8
             updateSimplePlanChoices()
         }
 

@@ -17,11 +17,11 @@ struct ATHLTHTrainBlockEditorView: View {
     @State private var showDeleteConfirmation = false
     @State private var errorMessage: String?
 
-    private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
-    private let muted = Color(red: 0.47, green: 0.45, blue: 0.43)
-    private let bronze = Color(red: 0.65, green: 0.53, blue: 0.37)
-    private let paper = Color(red: 0.986, green: 0.978, blue: 0.964)
-    private let border = Color(red: 0.88, green: 0.86, blue: 0.83)
+    private let ink = ATHLTHTrainDesign.ink
+    private let muted = ATHLTHTrainDesign.secondary
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let paper = ATHLTHTrainDesign.canvas
+    private let border = ATHLTHTrainDesign.rule
 
     init(
         planID: UUID,
@@ -176,13 +176,8 @@ struct ATHLTHTrainBlockEditorView: View {
                         Spacer()
                         Image(systemName: "checkmark")
                     }
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(height: 48)
-                    .padding(.horizontal, 16)
-                    .background(ink, in: RoundedRectangle(cornerRadius: 12))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
                 .disabled(!canSave)
                 .opacity(canSave ? 1 : 0.45)
                 .padding(.horizontal, 18)
@@ -233,21 +228,11 @@ struct ATHLTHTrainBlockEditorView: View {
     }
 
     private var heading: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(tr("THE BIGGER PICTURE", "DET STORE BILDET"))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.7)
-                .foregroundStyle(bronze)
-            Text(tr("Give this phase a purpose.", "Gi treningsperioden et mål."))
-                .font(.system(size: 29, weight: .regular, design: .serif))
-                .foregroundStyle(ink)
-            Text(tr(
-                "Keep the simple weekly planner while gaining control over longer training periods.",
-                "Planlegg flere uker samlet, uten å gjøre den daglige treningsplanleggingen vanskeligere."
-            ))
-            .font(.subheadline)
-            .foregroundStyle(muted)
-        }
+        ATHLTHTrainSectionHeading(
+            eyebrow: tr("THE BIGGER PICTURE", "DET STORE BILDET"),
+            title: tr("Give this phase a purpose.", "Gi treningsperioden et mål."),
+            detail: tr("Build longer training periods while keeping each week editable.",
+                       "Planlegg lengre treningsperioder, og behold kontrollen over hver uke."))
     }
 
     private func weekPicker(
@@ -318,11 +303,6 @@ struct ATHLTHTrainBlockEditorView: View {
 
 private extension View {
     func blockEditorSurface(border: Color) -> some View {
-        self
-            .background(.white, in: RoundedRectangle(cornerRadius: 15))
-            .overlay {
-                RoundedRectangle(cornerRadius: 15)
-                    .stroke(border, lineWidth: 0.7)
-            }
+        athlthTrainPaper()
     }
 }

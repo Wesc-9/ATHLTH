@@ -3,6 +3,22 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHPlanCreationDraftTests: XCTestCase {
+    func testSimplePlanRestoresChosenDatesAndLengthWithoutAnEightWeekReset() throws {
+        let start = Date(timeIntervalSince1970: 1_900_000_000)
+        let original = ATHLTHPlanCreationDraft(
+            title: "My walking plan", weekCount: 3, startDate: start,
+            advanced: false, source: "scratch", stage: "basics",
+            preferredDayIndexes: [2, 5], simpleMinutes: 15,
+            simpleActivityKinds: ["walking"])
+        let restored = try JSONDecoder().decode(ATHLTHPlanCreationDraft.self,
+                                               from: JSONEncoder().encode(original))
+        XCTAssertEqual(restored.weekCount, 3)
+        XCTAssertEqual(restored.startDate, start)
+        XCTAssertEqual(restored.simpleMinutes, 15)
+        XCTAssertEqual(restored.preferredDayIndexes, [2, 5])
+        XCTAssertEqual(restored.simpleActivityKinds, ["walking"])
+    }
+
     private func defaults() -> (UserDefaults, String) {
         let suite = "ATHLTHPlanCreationDraftTests.\(UUID().uuidString)"
         return (UserDefaults(suiteName: suite)!, suite)

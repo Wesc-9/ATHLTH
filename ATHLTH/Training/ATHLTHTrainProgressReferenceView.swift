@@ -1,16 +1,18 @@
 import SwiftUI
 import Charts
 
-/// Reference-led ATHLTH Progress. Every number is derived from completed
-/// Apple Health / ATHLTH records. The luminous ring is visual framing only:
-/// it never claims a synthetic fitness or strength score.
-struct ATHLTHTrainProgressReferenceView: View {
+/// Recorded history with explicit source boundaries. Planning estimates are
+/// never promoted to measurements or synthetic fitness scores.
+struct ATHLTHTrainProgressReferenceView<Header: View>: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var phone: IPhoneWorkoutStore
     @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     let onReturnToToday: () -> Void
     let onOpenPlan: () -> Void
+    let header: Header
 
     @State private var area: Area = .general
     @State private var period: Period = .threeMonths
@@ -18,6 +20,23 @@ struct ATHLTHTrainProgressReferenceView: View {
     @State private var allHealthWorkouts: [WorkoutSummary] = []
     @State private var healthRecords: [HealthPersonalRecord] = []
     @State private var isLoading = false
+    @State private var historyRequestID = UUID()
+    @State private var periodRequestID = UUID()
+    @State private var historyAccountID: UUID?
+    @State private var isHistoryLoading = true
+    @State private var isHistoryLimited = false
+    @ScaledMetric(relativeTo: .body) private var metricWidth: CGFloat = 130
+    @ScaledMetric(relativeTo: .largeTitle) private var heroFigureSize: CGFloat = 54
+
+    private struct HistoryRequest: Equatable {
+        let accountID: UUID
+        let healthWorkouts: [WorkoutSummary]
+    }
+
+    private struct PeriodRequest: Equatable {
+        let accountID: UUID
+        let period: Period
+    }
 
     private enum Area: String, CaseIterable, Identifiable {
         case general, running, strength
@@ -27,13 +46,6 @@ struct ATHLTHTrainProgressReferenceView: View {
             case .general: return ATHLTHLocalization.choose(english: "General", norwegian: "Generelt")
             case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
             case .strength: return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
-            }
-        }
-        var artwork: String {
-            switch self {
-            case .general: return "ProgressHero"
-            case .running: return "GoalRunning"
-            case .strength: return "StrengthPostWorkoutHero"
             }
         }
     }
@@ -97,8 +109,8 @@ struct ATHLTHTrainProgressReferenceView: View {
         let value: String
     }
 
-    private let ink = ATHLTHTheme.primaryText
-    private let muted = ATHLTHTheme.mutedText
+    private let ink = ATHLTHTrainDesign.ink
+    private let muted = ATHLTHTrainDesign.secondary
     private let positive = ATHLTHTheme.vitality
 
     private var rangeWorkouts: [WorkoutSummary] {
@@ -114,16 +126,34 @@ struct ATHLTHTrainProgressReferenceView: View {
         }
         .sorted { $0.startedAt > $1.startedAt }
     }
-    // HealthKit may also contain ATHLTH strength logs. Count each recorded
-    // workout once rather than doubling the overall training total.
-    private var unlinkedLifts: [StrengthWorkoutLog] {
-        let healthIDs = Set(rangeWorkouts.map(\.id))
-        return lifts.filter {
-            guard let id = $0.healthMetrics.healthKitWorkoutUUID else { return true }
-            return !healthIDs.contains(id)
+    private var completedPhoneWorkouts: [PhoneWorkout] {
+        phone.history.filter {
+            $0.end != nil && $0.start >= period.start && $0.start <= .now
         }
     }
-    private var generalCount: Int { rangeWorkouts.count + unlinkedLifts.count }
+    private var unlinkedLocalKeys: Set<String> {
+        let records = lifts.map {
+            ATHLTHRecordedWorkoutIndex.LocalRecord(
+                key: "strength-" + $0.id.uuidString,
+                healthID: $0.healthMetrics.healthKitWorkoutUUID)
+        } + completedPhoneWorkouts.map {
+            ATHLTHRecordedWorkoutIndex.LocalRecord(
+                key: "phone-" + $0.id.uuidString, healthID: $0.healthID)
+        }
+        return ATHLTHRecordedWorkoutIndex.unlinkedKeys(
+            healthIDs: Set(allHealthWorkouts.map(\.id)), localRecords: records)
+    }
+    private var unlinkedLifts: [StrengthWorkoutLog] {
+        let keys = unlinkedLocalKeys
+        return lifts.filter { keys.contains("strength-" + $0.id.uuidString) }
+    }
+    private var unlinkedPhoneWorkouts: [PhoneWorkout] {
+        let keys = unlinkedLocalKeys
+        return completedPhoneWorkouts.filter { keys.contains("phone-" + $0.id.uuidString) }
+    }
+    private var generalCount: Int {
+        rangeWorkouts.count + unlinkedLifts.count + unlinkedPhoneWorkouts.count
+    }
     private var runningDistance: Double {
         runs.compactMap(\.distanceMeters).reduce(0, +) / 1_000
     }
@@ -132,6 +162,8 @@ struct ATHLTHTrainProgressReferenceView: View {
         rangeWorkouts.reduce(0) { $0 + $1.duration } +
         unlinkedLifts.reduce(0) {
             $0 + max(($1.endedAt ?? $1.startedAt).timeIntervalSince($1.startedAt), 0)
+        } + unlinkedPhoneWorkouts.reduce(0) {
+            $0 + max($1.elapsed(at: $1.end ?? $1.start), 0)
         }
     }
     private var runningPace: Double? {
@@ -171,7 +203,19 @@ struct ATHLTHTrainProgressReferenceView: View {
                 value: String(format: "%.0f kg", workout.totalVolumeKilograms)
             )
         }
-        return (recorded + strengthOnly).sorted { $0.date > $1.date }
+        let phoneOnly = unlinkedPhoneWorkouts.map { workout in
+            RecentSession(
+                id: "phone-" + workout.id.uuidString,
+                date: workout.start,
+                icon: workout.walking ? "figure.walk" : "figure.run",
+                title: workout.workoutTitle ?? (workout.walking
+                    ? tr("Walking", "Gåing") : tr("Running", "Løping")),
+                subtitle: workout.start.formatted(date: .abbreviated, time: .omitted)
+                    + " · " + tr("Stored on iPhone", "Lagret på iPhone"),
+                value: workout.elapsed(at: workout.end ?? workout.start).shortDuration
+            )
+        }
+        return (recorded + strengthOnly + phoneOnly).sorted { $0.date > $1.date }
     }
 
     private var runningRecords: [HealthPersonalRecord] {
@@ -191,6 +235,7 @@ struct ATHLTHTrainProgressReferenceView: View {
         Set(lifts.flatMap { $0.exercises.map { $0.exercise.name.lowercased() } }).count
     }
     private var heroValue: String {
+        if isHistoryLoading && area != .strength { return "—" }
         switch area {
         case .general: return String(generalCount)
         case .running: return String(format: "%.1f", runningDistance)
@@ -211,29 +256,35 @@ struct ATHLTHTrainProgressReferenceView: View {
         }
     }
     private var heroSubline: String {
+        if isHistoryLoading && area != .strength {
+            return tr("Loading recorded history", "Henter registrert historikk")
+        }
         switch area {
         case .general:
             return ATHLTHLocalization.choose(english: "Completed in selected period", norwegian: "Gjennomført i valgt periode")
         case .running:
-            return ATHLTHLocalization.choose(english: "\(runs.count) recorded runs", norwegian: "\(runs.count) registrerte løpeøkter")
+            return ATHLTHLocalization.choose(english: "\(runs.count) runs in Apple Health", norwegian: "\(runs.count) løpeøkter i Apple Health")
         case .strength:
             return ATHLTHLocalization.choose(english: "\(lifts.count) completed strength sessions", norwegian: "\(lifts.count) fullførte styrkeøkter")
         }
     }
 
     var body: some View {
-        ATHLTHPinnedHeroLayout(
-            accent: ATHLTHTheme.champagne.opacity(0.23),
-            softTransition: true,
-            immersiveTransition: true,
-            scrollFadeTransition: true,
-            sheetOverlapOverride: 34
-        ) {
-            hero
-        } content: {
-            LazyVStack(alignment: .leading, spacing: 12) {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: ATHLTHTrainDesign.sectionSpacing) {
+                header
+                hero
                 areaPicker
                     .padding(.bottom, 3)
+
+                if isHistoryLimited {
+                    Label(tr("Some history could not be loaded. Pull down to try again.",
+                             "Noe historikk kunne ikke hentes. Dra ned for å prøve igjen."),
+                          systemImage: "arrow.clockwise")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 statsCard
 
@@ -246,13 +297,13 @@ struct ATHLTHTrainProgressReferenceView: View {
                     strengthContent
                 }
 
-                if isLoading {
+                if isLoading || isHistoryLoading {
                     ProgressView().frame(maxWidth: .infinity).padding(.vertical, 12)
                 }
 
                 Text(ATHLTHLocalization.choose(
-                    english: "Recorded values come from Apple Health and completed ATHLTH sessions. Estimates are not shown as measurements.",
-                    norwegian: "Tallene kommer fra Apple Health og fullførte ATHLTH-økter. Estimater vises ikke som målte verdier."
+                    english: "Overview includes Apple Health and completed local ATHLTH sessions. Running charts and calories use Apple Health. Strength loads are entered by you; planned duration is an estimate.",
+                    norwegian: "Oversikten inkluderer Apple Health og fullførte lokale ATHLTH-økter. Løpegrafer og kalorier bruker Apple Health. Styrkevekter registreres av deg; planlagt varighet er et estimat."
                 ))
                 .font(.system(size: 11))
                 .foregroundStyle(muted)
@@ -260,190 +311,96 @@ struct ATHLTHTrainProgressReferenceView: View {
                 .padding(.top, 4)
             }
             .padding(.horizontal, 15)
-            .padding(.top, 3)
+            .padding(.top, 18)
             .padding(.bottom, 34)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
         .refreshable {
             await refreshAll()
         }
-        .task(id: period) {
+        .task(id: PeriodRequest(accountID: session.profile.userID, period: period)) {
             await loadPeriod()
         }
-        .task {
+        .task(id: HistoryRequest(accountID: session.profile.userID,
+                                 healthWorkouts: health.workouts)) {
             await loadHistory()
         }
     }
 
     private var hero: some View {
-        GeometryReader { proxy in
-            ZStack {
-                ATHLTHTheme.accentDeep
-                Image(area.artwork)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: proxy.size.width, height: proxy.size.height)
-                    .clipped()
-                    .accessibilityHidden(true)
-
-                LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.38),
-                        Color.black.opacity(0.03),
-                        Color.black.opacity(0.25),
-                        Color.black.opacity(0.31)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                VStack(spacing: 0) {
-                    HStack {
-                        Button(action: onReturnToToday) {
-                            Label("Train", systemImage: "chevron.left")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .padding(.horizontal, 13)
-                                .frame(minHeight: 36)
-                                .background(.black.opacity(0.32), in: Capsule())
-                                .overlay(Capsule().strokeBorder(.white.opacity(0.30), lineWidth: 0.8))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityHint(ATHLTHLocalization.choose(
-                            english: "Back to Today in Train",
-                            norwegian: "Tilbake til I dag i Train"
-                        ))
-
-                        Spacer()
-
-                        Menu {
-                            ForEach(Period.allCases) { option in
-                                Button {
-                                    withAnimation(.easeInOut(duration: 0.2)) { period = option }
-                                } label: {
-                                    if period == option {
-                                        Label(option.title, systemImage: "checkmark")
-                                    } else {
-                                        Text(option.title)
-                                    }
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 5) {
-                                Text(timeDescription)
-                                Image(systemName: "chevron.down")
-                                    .font(.system(size: 9, weight: .semibold))
-                            }
-                            .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 12)
-                            .frame(minHeight: 36)
-                            .background(.black.opacity(0.33), in: Capsule())
-                            .overlay(Capsule().strokeBorder(.white.opacity(0.27), lineWidth: 0.8))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(tr("YOUR TRAINING", "TRENINGEN DIN"))
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Text(area.title)
+                        .font(.system(.largeTitle, design: .serif))
+                        .foregroundStyle(ink)
+                }
+                Spacer(minLength: 8)
+                Menu {
+                    Picker(tr("Period", "Periode"), selection: $period) {
+                        ForEach(Period.allCases) { option in
+                            Text(option.title).tag(option)
                         }
                     }
-                    .padding(.horizontal, 17)
-                    .padding(.top, 56)
-
-                    Text(ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremgang"))
-                        .font(.system(size: 32, weight: .regular, design: .serif))
-                        .tracking(-0.8)
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.32), radius: 5, y: 2)
-                        .padding(.top, 12)
-
-                    Spacer(minLength: 2)
-
-                    ZStack {
-                        Circle()
-                            .fill(.black.opacity(0.21))
-                            .background {
-                                Circle().fill(.ultraThinMaterial).opacity(0.32)
-                            }
-                        Circle()
-                            .strokeBorder(.white.opacity(0.21), lineWidth: 6)
-                        Circle()
-                            .strokeBorder(
-                                AngularGradient(
-                                    colors: [
-                                        .white.opacity(0.98),
-                                        ATHLTHTheme.champagne.opacity(0.83),
-                                        .white.opacity(0.14),
-                                        .white.opacity(0.95)
-                                    ],
-                                    center: .center
-                                ),
-                                lineWidth: 3
-                            )
-                            .shadow(color: .white.opacity(0.77), radius: 11)
-
-                        VStack(spacing: 5) {
-                            Text(heroUnit)
-                                .font(.system(size: 10, weight: .medium))
-                                .tracking(1.0)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(2)
-
-                            Text(heroValue)
-                                .font(.system(size: 48, weight: .light, design: .serif))
-                                .monospacedDigit()
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.63)
-
-                            Text(heroSubline)
-                                .font(.system(size: 11))
-                                .multilineTextAlignment(.center)
-                                .foregroundStyle(.white.opacity(0.88))
-                                .lineLimit(2)
-
-                            Image(systemName: "chart.bar.fill")
-                                .font(.system(size: 15, weight: .medium))
-                                .padding(.top, 2)
-                        }
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 15)
-                    }
-                    .frame(width: 177, height: 177)
-                    .accessibilityElement(children: .combine)
-
-                    Spacer(minLength: 24)
+                } label: {
+                    Label(timeDescription, systemImage: "calendar")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .padding(12)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
                 }
             }
-            .frame(width: proxy.size.width, height: proxy.size.height)
-            .clipped()
+            VStack(alignment: .leading, spacing: 8) {
+                Text(heroValue)
+                    .font(.system(size: heroFigureSize, weight: .light, design: .serif))
+                    .monospacedDigit()
+                    .foregroundStyle(ink)
+                Text(heroUnit)
+                    .font(.caption.weight(.semibold))
+                    .tracking(1)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(heroSubline)
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(20)
+            .referenceProgressCard()
         }
-        .frame(height: 336)
     }
-
     private var areaPicker: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             ForEach(Area.allCases) { selection in
                 Button {
-                    withAnimation(.easeInOut(duration: 0.22)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
                         area = selection
                     }
                 } label: {
                     Text(selection.title)
-                        .font(.system(size: 13, weight: area == selection ? .semibold : .medium))
-                        .foregroundStyle(area == selection ? ink : muted)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 42)
-                        .background(
-                            area == selection ? Color.white.opacity(0.97) : .clear,
-                            in: Capsule()
-                        )
-                        .shadow(color: area == selection ? .black.opacity(0.08) : .clear, radius: 6, y: 3)
+                        .font(.subheadline.weight(area == selection ? .semibold : .medium))
+                        .foregroundStyle(area == selection ? ATHLTHTrainDesign.bronze : muted)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.vertical, 14)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .overlay(alignment: .bottom) {
+                            Rectangle()
+                                .fill(area == selection ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.rule)
+                                .frame(height: area == selection ? 2 : 0.5)
+                        }
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(area == selection ? .isSelected : [])
             }
         }
-        .padding(5)
-        .background(ATHLTHTheme.cardWarm.opacity(0.83), in: Capsule())
-        .overlay(Capsule().strokeBorder(ATHLTHTheme.border, lineWidth: 0.9))
     }
-
     private var activeStats: [Stat] {
         switch area {
         case .general:
@@ -471,53 +428,35 @@ struct ATHLTHTrainProgressReferenceView: View {
     }
 
     private var statsCard: some View {
-        HStack(alignment: .top, spacing: 0) {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: metricWidth), alignment: .leading)],
+                  alignment: .leading, spacing: 20) {
             ForEach(activeStats) { item in
-                if item.id != activeStats.first?.id {
-                    Rectangle().fill(ATHLTHTheme.divider).frame(width: 0.7).padding(.vertical, 3)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    Image(systemName: item.icon)
-                        .font(.system(size: 17, weight: .light))
-                        .foregroundStyle(ink.opacity(0.75))
-                        .frame(height: 19)
-                    Text(item.value)
-                        .font(.system(size: 17, weight: .semibold, design: .serif))
-                        .foregroundStyle(ink)
-                        .monospacedDigit()
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.56)
-                    Text(item.label)
-                        .font(.system(size: 10))
-                        .foregroundStyle(muted)
-                        .lineLimit(2)
-                        .frame(height: 25, alignment: .topLeading)
-                    if let change = item.change, change.isFinite {
-                        Label(
-                            String(format: "%+.0f%%", change),
-                            systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right"
-                        )
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(change >= 0 ? positive : muted)
-                        .lineLimit(1)
+                VStack(alignment: .leading, spacing: 8) {
+                    ATHLTHTrainMetricTile(
+                        title: item.label,
+                        value: isHistoryLoading && area != .strength ? "—" : item.value,
+                        symbol: item.icon)
+                    if !isHistoryLoading, let change = item.change, change.isFinite {
+                        Label(String(format: "%+.0f%%", change),
+                              systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(change >= 0 ? positive : muted)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 7)
+                .accessibilityElement(children: .combine)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 17)
+        .padding(18)
         .referenceProgressCard()
     }
-
     private var generalContent: some View {
         VStack(spacing: 12) {
             section(
                 title: tr("Body & health", "Kropp & helse"),
-                subtitle: tr("Latest available readings", "Sist registrerte verdier")
+                subtitle: tr("Latest health data · readiness is an estimate", "Siste helsedata · dagsform er et estimat")
             ) {
-                HStack(spacing: 6) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: metricWidth))],
+                          alignment: .leading, spacing: 18) {
                     healthMetric(tr("Sleep", "Søvn"),
                                  value: health.sleep.totalAsleep > 0 ? health.sleep.totalAsleep.shortDuration : "—",
                                  icon: "moon")
@@ -542,9 +481,11 @@ struct ATHLTHTrainProgressReferenceView: View {
             } label: {
                 section(
                     title: tr("Personal records", "Personlige rekorder"),
+                    subtitle: tr("All-time records", "Rekorder fra hele historikken"),
                     accessory: tr("See all", "Se alle")
                 ) {
-                    HStack(spacing: 8) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: metricWidth))],
+                              alignment: .leading, spacing: 18) {
                         recordTile(
                             title: tr("Running", "Løping"),
                             value: runningRecords.first?.formattedValue ?? "—",
@@ -585,6 +526,8 @@ struct ATHLTHTrainProgressReferenceView: View {
             }
             .buttonStyle(.plain)
 
+            ATHLTHTrainAchievementsView(startDate: period.start)
+
             if let active = session.activePlan {
                 Button(action: onOpenPlan) {
                     HStack {
@@ -618,7 +561,7 @@ struct ATHLTHTrainProgressReferenceView: View {
         VStack(spacing: 12) {
             section(
                 title: tr("Average pace development", "Utvikling i snittempo"),
-                subtitle: tr("Measured runs · min/km", "Registrerte løpeøkter · min/km")
+                subtitle: tr("Apple Health runs · min/km", "Løpeøkter fra Apple Health · min/km")
             ) {
                 if pacePoints.isEmpty {
                     emptyLine(tr("Record a run to see your pace trend.", "Registrer en løpeøkt for å se tempoutviklingen."))
@@ -628,14 +571,14 @@ struct ATHLTHTrainProgressReferenceView: View {
                             x: .value("Dato", point.date),
                             y: .value("min/km", point.pace)
                         )
-                        .interpolationMethod(.catmullRom)
-                        .foregroundStyle(positive)
+                        .interpolationMethod(.linear)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
                         .lineStyle(StrokeStyle(lineWidth: 2.3, lineCap: .round))
                         PointMark(
                             x: .value("Dato", point.date),
                             y: .value("min/km", point.pace)
                         )
-                        .foregroundStyle(positive)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
                         .symbolSize(20)
                     }
                     .chartXAxis {
@@ -650,7 +593,7 @@ struct ATHLTHTrainProgressReferenceView: View {
                 }
             }
 
-            HStack(alignment: .top, spacing: 9) {
+            VStack(alignment: .leading, spacing: 16) {
                 NavigationLink {
                     RunningProgressDetailView(workouts: runs, records: runningRecords)
                 } label: {
@@ -682,6 +625,7 @@ struct ATHLTHTrainProgressReferenceView: View {
                     )
                 } label: {
                     section(title: tr("Personal records", "Personlige rekorder"),
+                            subtitle: tr("All-time records", "Rekorder fra hele historikken"),
                             accessory: tr("See all", "Se alle")) {
                         if runningRecords.isEmpty {
                             emptyLine(tr("No running records yet", "Ingen løperekorder ennå"))
@@ -793,6 +737,7 @@ struct ATHLTHTrainProgressReferenceView: View {
                 )
             } label: {
                 section(title: tr("Personal records", "Personlige rekorder"),
+                        subtitle: tr("All-time records", "Rekorder fra hele historikken"),
                         accessory: tr("See all", "Se alle")) {
                     let records = strength.personalRecords
                     if records.isEmpty {
@@ -818,12 +763,15 @@ struct ATHLTHTrainProgressReferenceView: View {
             HStack(alignment: .firstTextBaseline) {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(title)
-                        .font(.system(size: 21, weight: .medium, design: .serif))
+                        .font(ATHLTHTrainDesign.sectionTitle)
                         .foregroundStyle(ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
                     if let subtitle {
                         Text(subtitle)
-                            .font(.system(size: 10))
+                            .font(.caption)
                             .foregroundStyle(muted)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 4)
@@ -832,7 +780,7 @@ struct ATHLTHTrainProgressReferenceView: View {
                         Text(accessory)
                         Image(systemName: "chevron.right")
                     }
-                    .font(.system(size: 11))
+                    .font(.caption)
                     .foregroundStyle(muted)
                 }
             }
@@ -843,46 +791,28 @@ struct ATHLTHTrainProgressReferenceView: View {
     }
 
     private func healthMetric(_ title: String, value: String, icon: String) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .light))
-                .foregroundStyle(ink)
-            Text(title)
-                .font(.system(size: 10))
-                .foregroundStyle(muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
-            Text(value)
-                .font(.system(size: 13, weight: .semibold, design: .serif))
-                .foregroundStyle(ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(9)
-        .background(ATHLTHTheme.surfaceStone.opacity(0.57),
-                    in: RoundedRectangle(cornerRadius: 11))
+        ATHLTHTrainMetricTile(title: title, value: value, symbol: icon)
     }
 
     private func recordTile(title: String, value: String, detail: String, icon: String) -> some View {
         VStack(alignment: .leading, spacing: 5) {
             Label(title, systemImage: icon)
-                .font(.system(size: 10))
+                .font(.caption)
                 .foregroundStyle(muted)
             Text(detail)
-                .font(.system(size: 11, weight: .medium))
+                .font(.subheadline.weight(.medium))
                 .foregroundStyle(ink)
-                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
             Text(value)
-                .font(.system(size: 22, weight: .medium, design: .serif))
+                .font(.system(.title2, design: .serif))
                 .foregroundStyle(ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.68)
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(12)
-        .background(ATHLTHTheme.surfaceStone.opacity(0.65),
+        .background(ATHLTHTrainDesign.paleGold.opacity(0.25),
                     in: RoundedRectangle(cornerRadius: 13))
+        .accessibilityElement(children: .combine)
     }
 
     private func compactRow(icon: String, title: String, subtitle: String, value: String) -> some View {
@@ -893,25 +823,25 @@ struct ATHLTHTrainProgressReferenceView: View {
                 .frame(width: 24)
             VStack(alignment: .leading, spacing: 3) {
                 Text(title)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.subheadline.weight(.medium))
                     .foregroundStyle(ink)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Text(subtitle)
-                    .font(.system(size: 10))
+                    .font(.caption)
                     .foregroundStyle(muted)
-                    .lineLimit(1)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(value)
+                    .font(.system(.title3, design: .serif))
+                    .foregroundStyle(ink)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 4)
-            Text(value)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundStyle(ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
             Image(systemName: "chevron.right")
-                .font(.system(size: 9))
+                .font(.caption)
                 .foregroundStyle(muted)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
     }
 
     private func recordLine(_ title: String, value: String) -> some View {
@@ -951,49 +881,75 @@ struct ATHLTHTrainProgressReferenceView: View {
         await loadPeriod()
     }
 
+    @MainActor
     private func loadHistory() async {
+        let requestID = UUID()
+        historyRequestID = requestID
+        isHistoryLoading = true
+        defer {
+            if historyRequestID == requestID { isHistoryLoading = false }
+        }
+        let accountID = session.profile.userID
+        if historyAccountID != accountID {
+            allHealthWorkouts = []
+            healthRecords = []
+            historyAccountID = accountID
+        }
         guard health.healthDataAvailable, health.hasRequestedAuthorization else {
             allHealthWorkouts = health.workouts
             healthRecords = []
+            isHistoryLimited = false
             return
         }
-        allHealthWorkouts = (try? await health.workoutHistory()) ?? health.workouts
-        healthRecords = (try? await health.personalRecords()) ?? []
+        let loadedWorkouts = try? await health.workoutHistory()
+        let workouts = loadedWorkouts ?? health.workouts
+        guard !Task.isCancelled, historyRequestID == requestID,
+              session.profile.userID == accountID else { return }
+        let loadedRecords = try? await health.personalRecords()
+        let records = loadedRecords ?? []
+        guard !Task.isCancelled, historyRequestID == requestID,
+              session.profile.userID == accountID else { return }
+        allHealthWorkouts = workouts
+        healthRecords = records
+        isHistoryLimited = loadedWorkouts == nil || loadedRecords == nil
     }
-
+    @MainActor
     private func loadPeriod() async {
+        let requestID = UUID()
+        periodRequestID = requestID
+        snapshot = nil
         guard health.healthDataAvailable, health.hasRequestedAuthorization else {
-            snapshot = nil
+            isLoading = false
             return
         }
         isLoading = true
-        defer { isLoading = false }
-        let start = period.start
+        defer {
+            if periodRequestID == requestID { isLoading = false }
+        }
+        let requestedPeriod = period
+        let accountID = session.profile.userID
+        let start = requestedPeriod.start
         let previousStart = Calendar.current.date(
             byAdding: .second,
             value: -Int(Date().timeIntervalSince(start)),
             to: start
         ) ?? start
-        snapshot = try? await health.progressSnapshot(
+        let result = try? await health.progressSnapshot(
             startDate: start,
             endDate: .now,
             previousStartDate: previousStart,
             previousEndDate: start,
-            grouping: period.grouping
+            grouping: requestedPeriod.grouping
         )
+        guard !Task.isCancelled, periodRequestID == requestID,
+              period == requestedPeriod,
+              session.profile.userID == accountID else { return }
+        snapshot = result
     }
 }
 
 private extension View {
     func referenceProgressCard() -> some View {
-        background(
-            ATHLTHTheme.card,
-            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .strokeBorder(ATHLTHTheme.border, lineWidth: 0.8)
-        }
-        .shadow(color: .black.opacity(0.035), radius: 9, y: 3)
+        athlthTrainPaper()
     }
 }

@@ -1,0 +1,21 @@
+{
+  "contract": "TRAIN_1_9_3_IMPLEMENTATION.md — Visual contract and required verification",
+  "targetViewports": ["320pt", "390pt", "768pt"],
+  "accessibility": {
+    "status": "untested",
+    "evidence": "Text token contrast passes scripts/verify_train_design.mjs. Actual VoiceOver, rendered Dynamic Type and focus review require macOS/Xcode and devices."
+  },
+  "responsive": {
+    "status": "untested",
+    "evidence": "XCTest layout cases are added, but no iOS renderer or Swift/Xcode compiler is available on this Windows host."
+  },
+  "contentStates": {
+    "loading": {"status": "untested", "evidence": "History loading indicators exist in SwiftUI; rendering is pending."},
+    "empty": {"status": "untested", "evidence": "Open-day, no-plan and empty-history paths require simulator review."},
+    "error": {"status": "untested", "evidence": "History retry and existing plan validation errors require simulator review."},
+    "partial": {"status": "untested", "evidence": "Source boundaries and partial-history feedback require simulator review."},
+    "success": {"status": "untested", "evidence": "Completed workouts, copied sessions and populated history require simulator review."},
+    "permission": {"status": "untested", "evidence": "Health unavailability and Watch start availability require device review."}
+  },
+  "renderedEvidence": []
+}

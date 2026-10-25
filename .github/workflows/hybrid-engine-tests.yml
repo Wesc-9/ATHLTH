@@ -1,10 +1,11 @@
-name: ATHLTH 1.9.2 Hybrid Engine XCTest
+name: ATHLTH Train and Hybrid Engine XCTest
 
 on:
   workflow_dispatch:
   push:
     branches:
       - release/v1.9.2
+      - release/v1.9.3
     paths:
       - .github/workflows/hybrid-engine-tests.yml
       - .github/workflows/launch-smoke.yml
@@ -24,9 +25,24 @@ on:
       - ATHLTHWatchExtension/WatchStrengthTimedSetPage.swift
       - ATHLTH/Watch/ATHLTHStrengthWatchSyncObserver.swift
       - Shared/WatchTransferModels.swift
+      - ATHLTH/Training/**
+      - ATHLTH/DesignSystem/ATHLTHTrainDesign.swift
+      - ATHLTH/Planning/ATHLTHWorkoutTimelineOverview.swift
+      - ATHLTH/Planning/ATHLTHIntervalGroupEditing.swift
+      - ATHLTH/Planning/ATHLTHRunningTargetEditing.swift
+      - ATHLTH/Planning/TrainingPlanBuilderFlow.swift
+      - ATHLTH/Planning/WorkoutTemplateCatalog.swift
+      - Tests/ATHLTHIntervalGroupEditingTests.swift
+      - Tests/ATHLTHRunningTargetEditingTests.swift
+      - Tests/ATHLTHDetailedIntervalBuilderTests.swift
+      - Tests/ATHLTHPlanCreationDraftTests.swift
+      - Tests/ATHLTHRecordedWorkoutIndexTests.swift
+      - Tests/ATHLTHPlannedWorkoutPresentationTests.swift
+      - Tests/ATHLTHWorkoutTimelineOverviewTests.swift
+      - Tests/ATHLTHTrainDesignLayoutTests.swift
 
 concurrency:
-  group: athlth-v192-hybrid-tests-${{ github.ref }}
+  group: athlth-train-hybrid-tests-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -91,6 +107,21 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHLiveWorkoutEngineRouterTests \
             -only-testing:ATHLTHTests/ATHLTHUnifiedMixedWorkoutPlanTests \
             -only-testing:ATHLTHTests/StrengthActiveExerciseQueueTests \
+            -only-testing:ATHLTHTests/ATHLTHRecordedWorkoutIndexTests \
+            -only-testing:ATHLTHTests/ATHLTHPlannedWorkoutPresentationTests \
+            -only-testing:ATHLTHTests/ATHLTHWorkoutTimelineOverviewTests \
+            -only-testing:ATHLTHTests/ATHLTHIntervalGroupEditingTests \
+            -only-testing:ATHLTHTests/ATHLTHRunningTargetEditingTests \
+            -only-testing:ATHLTHTests/ATHLTHDetailedIntervalBuilderTests \
+            -only-testing:ATHLTHTests/ATHLTHPlanCreationDraftTests \
+            -only-testing:ATHLTHTests/TrainingPlanCatalogSchedulingTests \
+            -only-testing:ATHLTHTests/ATHLTHTrainDesignLayoutTests \
+            -only-testing:ATHLTHTests/ATHLTHTrainTodayLayoutTests \
+            -only-testing:ATHLTHTests/ATHLTHTrainPlanStudioIntegrationTests \
+            -only-testing:ATHLTHTests/ATHLTHWorkoutDurationEstimatorTests \
+            -only-testing:ATHLTHTests/ATHLTHWorkoutContentSummaryTests \
+            -only-testing:ATHLTHTests/StrengthWorkoutCompletionRecoveryTests \
+            -only-testing:ATHLTHTests/ATHLTHWorkoutMirrorContinuityTests \
             CODE_SIGNING_ALLOWED=NO \
             test
 
@@ -98,7 +129,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: athlth-v191-hybrid-xcresult
+          name: athlth-train-hybrid-xcresult
           path: ${{ runner.temp }}/HybridTests.xcresult
           retention-days: 3
           if-no-files-found: ignore

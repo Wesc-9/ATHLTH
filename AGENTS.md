@@ -1,6 +1,6 @@
 # ATHLTH development baseline
 
-- Active development version: **1.9.1** on `release/v1.9.1` (2026-10-24; next build 98). This is the only branch for new development. TestFlight uploads require an explicit user request.
+- Active development version: **1.9.3** on `release/v1.9.3` (2026-10-25; next build 101), created from `origin/release/v1.9.2` at `b2b77a02`. The user authorized the Train redesign on this branch. Preserve previous release branches. TestFlight uploads require an explicit user request.
 - Version **1.9.0** is locked for new development. Frozen source commit: `d55b0725ccb92a7f9258315cb8dd6b5763beb38a` (build 97). Preservation branch: `backup/v1.9.0-locked-before-v1.9.1-20261024`. Keep `release/v1.9.0` unchanged so its iPhone test and any ongoing App Store Connect processing are unaffected.
 - Version **1.8.9** is locked for new development. Frozen commit: `0feaa62d350bd4e60975d6cad00a3ea210d818aa` (build 96; same-commit iOS build, backend regressions and GitHub TestFlight upload succeeded on 2026-10-23, workflow run 39859035246). Preservation branch: `backup/v1.8.9-locked-before-v1.9.0-20261023`. Keep `release/v1.8.9` unchanged.
 - Version **1.8.8** is locked for new development. Preservation branch: `backup/v1.8.8-locked-before-v1.8.9-20261022`. Keep `release/v1.8.8` unchanged.

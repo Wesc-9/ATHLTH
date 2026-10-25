@@ -5743,7 +5743,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
-    @State private var selectedSection = 0
+    @State private var selectedSection: ATHLTHTrainSection = .today
     @State private var todayScrollPosition = ScrollPosition(edge: .top)
     @State private var planScrollPosition = ScrollPosition(edge: .top)
     @State private var floatingTrainTabsVisible = false
@@ -5793,32 +5793,26 @@ struct ATHLTHTrainView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if selectedSection == 2 {
-                    // Keep the same Today / Plan / Progress navigation visible
-                    // while the independent, full-bleed Progress screen scrolls.
-                    VStack(spacing: 0) {
-                        premiumTrainBrandHeader
-                            .padding(.horizontal, 17)
-                            .padding(.top, 12)
-                            .padding(.bottom, 8)
-                            .background(ATHLTHPlanDesign.warmCanvas)
-                        ATHLTHTrainProgressReferenceView(
+                if selectedSection == .progress {
+                    // Let the shared masthead scroll at large text sizes so
+                    // it cannot consume the entire analysis viewport.
+                    ATHLTHTrainProgressReferenceView(
                         onReturnToToday: {
-                            withAnimation(.easeInOut(duration: 0.2)) {
-                                selectedSection = 0
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                                selectedSection = .today
                             }
                         },
                         onOpenPlan: {
-                            selectedSection = 1
-                        }
-                        )
-                    }
+                            selectedSection = .plan
+                        },
+                        header: premiumTrainBrandHeader
+                    )
                 } else {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 16) {
                             premiumTrainBrandHeader
 
-                            if selectedSection == 1 {
+                            if selectedSection == .plan {
                                 ATHLTHTrainPlanPremiumView(
                                     highlightedPlanID: highlightedTrainPlanID,
                                     onStartWorkout: { planID, workout in
@@ -5843,7 +5837,7 @@ struct ATHLTHTrainView: View {
                     }
                     .scrollIndicators(.hidden)
                     .scrollPosition(
-                        selectedSection == 1
+                        selectedSection == .plan
                             ? $planScrollPosition : $todayScrollPosition
                     )
                     // Use the native iOS 18 scroll offset; do not install
@@ -5856,13 +5850,15 @@ struct ATHLTHTrainView: View {
                     .overlay(alignment: .topTrailing) {
                         if floatingTrainTabsVisible {
                             premiumTrainTabs
+                                .frame(maxWidth: ATHLTHTrainDesign.readingWidth)
+                                .frame(maxWidth: .infinity)
                                 .padding(.top, 8)
-                                .padding(.trailing, 17)
+                                .padding(.horizontal, 17)
                                 .transition(.move(edge: .top).combined(with: .opacity))
                         }
                     }
                     .background(
-                        ATHLTHPlanDesign.warmCanvas.ignoresSafeArea()
+                        ATHLTHTrainDesign.canvas.ignoresSafeArea()
                     )
                 }
             }
@@ -5926,7 +5922,7 @@ struct ATHLTHTrainView: View {
                 if let planID = newlyCreatedPlanToOpen {
                     highlightedTrainPlanID = planID
                     selectedTrainPlanWeekIndex = 0
-                    selectedSection = 1
+                    selectedSection = .plan
                     newlyCreatedPlanToOpen = nil
                 }
             }) { launch in
@@ -6474,226 +6470,33 @@ struct ATHLTHTrainView: View {
         }
     }
 
-    // Train's local navigation borrows the warm, translucent Home header style.
-    // Keep this switcher distinct from the app-wide bottom tab bar.
+    // Shared identity and named navigation across all three Train sections.
     private var premiumTrainBrandHeader: some View {
-        Group {
-            if selectedSection == 0 {
-                todayTrainHeroHeader
-            } else {
-                compactTrainHeader
-            }
-        }
-    }
-
-    /// Today alone has the immersive training photograph. The same capsule
-    /// remains available on Plan and Fremdrift, without repeating a large
-    /// decorative hero above their task-oriented content.
-    private var todayTrainHeroHeader: some View {
-        ZStack(alignment: .topLeading) {
-            GeometryReader { geometry in
-                Image("GoalEndurance")
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFill()
-                    .frame(width: geometry.size.width,
-                           height: geometry.size.height)
-                    .clipped()
-                    .accessibilityHidden(true)
-            }
-
-            // Ivory on the text side echoes Home without flattening the photo.
-            LinearGradient(
-                stops: [
-                    .init(color: Color.white.opacity(0.96), location: 0),
-                    .init(color: Color.white.opacity(0.73), location: 0.31),
-                    .init(color: Color.white.opacity(0.16), location: 0.74),
-                    .init(color: .clear, location: 1)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            .allowsHitTesting(false)
-
-            LinearGradient(
-                colors: [.clear, Color.white.opacity(0.30)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .allowsHitTesting(false)
-
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 8) {
-                    Spacer(minLength: 0)
-                    // Today's selected design has only the three
-                    // local navigation options in the floating capsule.
-                    // The library stays available from "Se alle".
-                    premiumTrainTabs
-                }
-
-                Spacer(minLength: 14)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "TRAINING", norwegian: "TRENING"
-                    ))
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2.0)
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "Today", norwegian: "I dag"
-                    ))
-                    .font(.system(size: 32, weight: .regular, design: .serif))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-
-                    Text(Date.now.formatted(
-                        .dateTime.weekday(.wide).day().month(.wide)
-                    ))
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-            }
-            .padding(14)
-        }
-        .frame(height: 208)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .strokeBorder(Color.white.opacity(0.62), lineWidth: 0.8)
-        }
-    }
-
-    private var compactTrainHeader: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(ATHLTHLocalization.choose(
-                    english: "TRAINING", norwegian: "TRENING"
-                ))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2.0)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-
-                Text(selectedSection == 1
-                    ? ATHLTHLocalization.choose(english: "Plan", norwegian: "Plan")
+        VStack(alignment: .leading, spacing: 18) {
+            ATHLTHTrainMasthead(
+                title: selectedSection == .today
+                    ? ATHLTHLocalization.choose(english: "Today", norwegian: "I dag")
+                    : selectedSection == .plan
+                    ? ATHLTHLocalization.choose(english: "Your training plan", norwegian: "Din treningsplan")
+                    : ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremgang"),
+                subtitle: selectedSection == .today
+                    ? Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide))
+                    : selectedSection == .plan
+                    ? ATHLTHLocalization.choose(
+                        english: "A considered plan. Room for every session.",
+                        norwegian: "En gjennomtenkt plan. Plass til hver økt.")
                     : ATHLTHLocalization.choose(
-                        english: "Progress", norwegian: "Fremdrift"
-                    ))
-                    .font(.system(size: 24, weight: .semibold, design: .serif))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-            }
-            .lineLimit(1)
-            .minimumScaleFactor(0.78)
-
-            Spacer(minLength: 3)
-
-            trainLibraryButton
+                        english: "The work you put in. The progress you can see.",
+                        norwegian: "Arbeidet du legger ned. Fremgangen du kan se."),
+                onLibrary: { showingLibrary = true })
             premiumTrainTabs
         }
-    }
-
-    private var trainLibraryButton: some View {
-        Button {
-            showingLibrary = true
-        } label: {
-            Image(systemName: "square.grid.2x2")
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                .frame(width: 44, height: 44)
-                .background(.regularMaterial, in: Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Training library", norwegian: "Treningsbibliotek"
-        ))
+        .padding(.bottom, 8)
     }
 
     private var premiumTrainTabs: some View {
-        HStack(spacing: 2) {
-            premiumTrainTab(
-                ATHLTHLocalization.choose(
-                    english: "Today", norwegian: "I dag"
-                ),
-                systemImage: "figure.run",
-                selected: selectedSection == 0
-            ) { selectedSection = 0 }
-
-            premiumTrainTab(
-                ATHLTHLocalization.choose(
-                    english: "Plan", norwegian: "Plan"
-                ),
-                systemImage: "calendar",
-                selected: selectedSection == 1
-            ) { selectedSection = 1 }
-
-            premiumTrainTab(
-                ATHLTHLocalization.choose(
-                    english: "Progress", norwegian: "Fremdrift"
-                ),
-                systemImage: "chart.bar.xaxis",
-                selected: selectedSection == 2
-            ) { selectedSection = 2 }
-        }
-        .padding(3)
-        .background(.regularMaterial, in: Capsule())
-        .overlay {
-            Capsule()
-                .strokeBorder(Color.white.opacity(0.65), lineWidth: 1)
-        }
-        .shadow(color: Color.black.opacity(0.08), radius: 10, y: 4)
-        .fixedSize(horizontal: true, vertical: false)
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Train sections", norwegian: "Treningsfaner"
-        ))
+        ATHLTHTrainNavigation(selection: $selectedSection)
     }
-
-    private func premiumTrainTab(
-        _ title: String,
-        systemImage: String,
-        selected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                action()
-            }
-        } label: {
-            VStack(spacing: 2) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 16, weight: selected ? .semibold : .regular))
-                // Today follows the approved Home-style reference with
-                // icons and labels; compact Plan/Progress use accessible
-                // icon-only buttons to prevent clipping on small phones.
-                if selectedSection == 0 {
-                    Text(title)
-                        .font(.system(size: 9, weight: selected ? .semibold : .medium))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.78)
-                }
-            }
-            .foregroundStyle(
-                selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.ink
-            )
-            .frame(
-                width: selectedSection == 0 ? 62 : 44,
-                height: selectedSection == 0 ? 48 : 44
-            )
-            .background {
-                if selected {
-                    Capsule()
-                        .fill(ATHLTHTheme.premiumGold.opacity(0.20))
-                }
-            }
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
     private var activeTrainWorkoutKind: WorkoutKind? {
         if let workout = phoneWorkout.active {
             return workout.walking ? .walking : .running
@@ -6846,72 +6649,71 @@ struct ATHLTHTrainView: View {
         onContinue: @escaping () -> Void
     ) -> some View {
         Button(action: onContinue) {
-            HStack(spacing: 13) {
-                Image(systemName: symbol)
-                    .font(.system(size: 22, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 49, height: 49)
-                    .background(
-                        Color(red: 0.22, green: 0.24, blue: 0.29),
-                        in: RoundedRectangle(cornerRadius: 13)
-                    )
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "WORKOUT IN PROGRESS",
-                        norwegian: "ØKT PÅGÅR"
-                    ))
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.1)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    Text(title)
-                        .font(.headline)
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
-                    Text("\(activityLabel) · \(source)")
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    if let detail {
-                        Text(detail)
-                            .font(.caption2)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .lineLimit(3)
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(spacing: 12) {
+                    Image(systemName: symbol)
+                        .font(.title2.weight(.medium))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(width: 48, height: 48)
+                        .background(ATHLTHTrainDesign.paleGold, in: Circle())
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "WORKOUT IN PROGRESS",
+                            norwegian: "ØKT PÅGÅR"
+                        ))
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.1)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        Text(title)
+                            .font(ATHLTHTrainDesign.sectionTitle)
+                            .foregroundStyle(ATHLTHTrainDesign.ink)
                             .fixedSize(horizontal: false, vertical: true)
+                        Text("\(activityLabel) · \(source)")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
                     }
                 }
-                Spacer(minLength: 0)
-                VStack(alignment: .trailing, spacing: 4) {
+                if let detail {
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Rectangle().fill(ATHLTHTrainDesign.rule).frame(height: 1)
+                VStack(alignment: .leading, spacing: 16) {
                     TimelineView(.periodic(from: .now, by: 1)) { context in
                         let seconds = Int(max(0, elapsed(context.date)))
-                        VStack(alignment: .trailing, spacing: 1) {
+                        VStack(alignment: .leading, spacing: 5) {
                             Text(String(format: "%02d:%02d", seconds / 60, seconds % 60))
-                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .font(.system(.largeTitle, design: .serif))
                                 .monospacedDigit()
                             Text(elapsedCaption)
-                                .font(.system(size: 9))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTrainDesign.secondary)
                             if let restEndsAt, restEndsAt > context.date {
                                 Text(ATHLTHLocalization.choose(
                                     english: "Rest", norwegian: "Pause"
                                 ) + " \(Int(ceil(restEndsAt.timeIntervalSince(context.date)))) s")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
                                     .monospacedDigit()
                             }
                         }
                     }
-                    Image(systemName: "play.fill")
-                    Text(ATHLTHLocalization.choose(
-                        english: "Continue", norwegian: "Fortsett"
-                    ))
+                    Label(ATHLTHLocalization.choose(
+                        english: "Continue workout", norwegian: "Fortsett økten"
+                    ), systemImage: "play.fill")
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                        .padding(.vertical, 6)
+                        .background(ATHLTHTrainDesign.ink, in: RoundedRectangle(cornerRadius: 16))
                 }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
+                .foregroundStyle(ATHLTHTrainDesign.ink)
             }
-            .padding(15)
-            .background(.white, in: RoundedRectangle(cornerRadius: 17))
-            .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .stroke(ATHLTHTheme.accentDeep.opacity(0.3), lineWidth: 1)
-            }
+            .padding(22)
+            .athlthTrainPaper(emphasized: true)
         }
         .buttonStyle(.plain)
         .accessibilityHint(ATHLTHLocalization.choose(
@@ -7021,7 +6823,7 @@ struct ATHLTHTrainView: View {
             hasRecordedWorkoutToday: hasRecordedWorkoutToday,
             todaysReadiness: readiness,
             onChooseSuggestedWorkout: { selectedSuggestedWorkout = $0 },
-            onOpenPlan: { selectedSection = 1 },
+            onOpenPlan: { selectedSection = .plan },
             onCreatePlan: { beginFreshTrainingPlan() },
             onOpenLibrary: { showingLibrary = true },
             onStartWorkout: { workout, healthCompleted in
@@ -7171,7 +6973,7 @@ struct ATHLTHTrainView: View {
             Spacer(minLength: 8)
 
             Button {
-                selectedSection = 1
+                selectedSection = .plan
             } label: {
                 VStack(spacing: 2) {
                     Image(systemName: "calendar")
@@ -8032,7 +7834,7 @@ struct ATHLTHTrainView: View {
                     Spacer()
 
                     Button {
-                        selectedSection = 1
+                        selectedSection = .plan
                     } label: {
                         HStack(spacing: 4) {
                             Text(
@@ -8163,7 +7965,7 @@ struct ATHLTHTrainView: View {
                 Spacer()
 
                 Button {
-                    selectedSection = 1
+                    selectedSection = .plan
                 } label: {
                     Text(
                         ATHLTHLocalization.choose(
@@ -11037,7 +10839,7 @@ struct ATHLTHTrainView: View {
                     Spacer()
 
                     Button {
-                        selectedSection = 1
+                        selectedSection = .plan
                     } label: {
                         HStack(spacing: 4) {
                             Text(
@@ -11773,7 +11575,7 @@ struct ATHLTHTrainView: View {
                 Spacer()
 
                 Button {
-                    selectedSection = 1
+                    selectedSection = .plan
                 } label: {
                     HStack(spacing: 5) {
                         Text("View Plan")
@@ -12174,7 +11976,7 @@ struct ATHLTHTrainView: View {
 
         switch request {
         case .plan:
-            selectedSection = 1
+            selectedSection = .plan
 
         case let .workout(planID, workoutID):
             if let plan =
@@ -12202,15 +12004,15 @@ struct ATHLTHTrainView: View {
                             .contains(workout.id)
                     )
             } else {
-                selectedSection = 1
+                selectedSection = .plan
             }
 
         case let .quick(kind):
-            selectedSection = 0
+            selectedSection = .today
             handleQuickStart(kind)
 
         case .customQuick:
-            selectedSection = 0
+            selectedSection = .today
             if customQuickStartAvailable {
                 showingCustomQuickStart = true
             } else {
@@ -12221,7 +12023,7 @@ struct ATHLTHTrainView: View {
             }
 
         case .ghost:
-            selectedSection = 0
+            selectedSection = .today
             showingGhostHub = true
         }
 

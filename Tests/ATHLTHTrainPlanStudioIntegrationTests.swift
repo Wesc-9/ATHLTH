@@ -6,6 +6,36 @@ import XCTest
 /// contract, not only its SwiftUI rendering.
 final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
     @MainActor
+    func testCopyingOneWorkoutToSameDayKeepsOtherSessionsAndOriginalIdentity() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Multiple sessions", summary: "", weekCount: 1,
+            startDate: Calendar.current.startOfDay(for: Date())))
+        let dayID = plan.weeks[0].days[0].id
+        let first = workout(name: "Morning")
+        let second = workout(name: "Evening")
+        store.addSession(first, toDay: dayID, inPlan: plan.id)
+        store.addSession(second, toDay: dayID, inPlan: plan.id)
+        let version = try XCTUnwrap(store.trainingPlan(withID: plan.id)).version
+
+        XCTAssertTrue(store.copyPlanStudioWorkout(
+            planID: plan.id, sourceWorkoutID: first.id,
+            targetDayID: dayID, expectedVersion: version))
+
+        let updated = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let sessions = updated.weeks[0].days[0].sessions
+        XCTAssertEqual(sessions.count, 3)
+        XCTAssertTrue(sessions.contains { $0.id == first.id })
+        XCTAssertTrue(sessions.contains { $0.id == second.id })
+        XCTAssertEqual(sessions.filter { $0.title == first.title }.count, 2)
+        XCTAssertEqual(Set(sessions.map(\.id)).count, 3)
+        XCTAssertFalse(store.copyPlanStudioWorkout(
+            planID: plan.id, sourceWorkoutID: first.id,
+            targetDayID: dayID, expectedVersion: version))
+    }
+
+    @MainActor
     private func makeStore() -> (AppSessionStore, UserDefaults, String) {
         let name = "ATHLTHTrainPlanStudioIntegrationTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!

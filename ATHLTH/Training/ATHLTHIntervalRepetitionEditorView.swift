@@ -8,6 +8,8 @@ struct ATHLTHIntervalRepetitionEditorView: View {
     let totalRepetitions: Int
     let environment: RunEnvironment
     let onSave: (RunningRepetitionOverride) -> Void
+    private let originalWork: RunningStepTarget
+    private let originalRecovery: RunningStepTarget?
 
     @State private var measure: RunningMeasureKind
     @State private var workSeconds: Int
@@ -46,14 +48,16 @@ struct ATHLTHIntervalRepetitionEditorView: View {
         let selected = block.override(for: repetition)
         let work = block.resolvedWork(at: repetition)
         let recovery = block.resolvedRecovery(after: repetition)
-        _measure = State(initialValue: work.measure == .distance ? .distance : .time)
-        _workSeconds = State(initialValue: max(15, Int(work.durationSeconds ?? 240)))
-        _workMeters = State(initialValue: max(100, Int(work.distanceMeters ?? 1000)))
+        self.originalWork = work
+        self.originalRecovery = recovery
+        _measure = State(initialValue: work.measure)
+        _workSeconds = State(initialValue: max(1, Int(work.durationSeconds ?? 240)))
+        _workMeters = State(initialValue: max(1, Int(work.distanceMeters ?? 1000)))
         _paceEnabled = State(initialValue: work.intensity.paceMinSecondsPerKilometer != nil)
         _paceSeconds = State(initialValue: Int(work.intensity.paceMinSecondsPerKilometer ?? 300))
         _paceAsSpeed = State(initialValue: environment == .treadmill)
         _targetSpeedKmh = State(initialValue:
-            (3_600 / max(work.intensity.paceMinSecondsPerKilometer ?? 300, 1) * 10).rounded() / 10)
+            3_600 / max(work.intensity.paceMinSecondsPerKilometer ?? 300, 1))
         _inclineEnabled = State(initialValue: work.treadmillInclinePercent != nil)
         _inclinePercent = State(initialValue: work.treadmillInclinePercent ?? 0)
         _recoveryInclineEnabled = State(initialValue: recovery?.treadmillInclinePercent != nil)
@@ -61,16 +65,16 @@ struct ATHLTHIntervalRepetitionEditorView: View {
         let recoveryPace = recovery?.intensity.paceMinSecondsPerKilometer
         _recoverySpeedEnabled = State(initialValue: recoveryPace != nil)
         _recoverySpeedKmh = State(initialValue:
-            (3_600 / max(recoveryPace ?? 600, 1) * 10).rounded() / 10)
+            3_600 / max(recoveryPace ?? 600, 1))
         _recoveryPaceSeconds = State(initialValue: Int(recoveryPace ?? 600))
         _recoveryZoneEnabled = State(initialValue: recovery?.intensity.heartRateZone != nil)
         _recoveryZone = State(initialValue: recovery?.intensity.heartRateZone ?? 2)
         _heartRateEnabled = State(initialValue: work.intensity.heartRateZone != nil)
         _heartRateZone = State(initialValue: work.intensity.heartRateZone ?? 4)
         _recoveryEnabled = State(initialValue: recovery != nil)
-        _recoveryMeasure = State(initialValue: recovery?.measure == .distance ? .distance : .time)
-        _recoverySeconds = State(initialValue: max(15, Int(recovery?.durationSeconds ?? 120)))
-        _recoveryMeters = State(initialValue: max(50, Int(recovery?.distanceMeters ?? 200)))
+        _recoveryMeasure = State(initialValue: recovery?.measure ?? .time)
+        _recoverySeconds = State(initialValue: max(1, Int(recovery?.durationSeconds ?? 120)))
+        _recoveryMeters = State(initialValue: max(1, Int(recovery?.distanceMeters ?? 200)))
         _customGhostEnabled = State(initialValue: selected?.ghostPaceSecondsPerKilometer != nil)
         _customGhostPaceSeconds = State(initialValue: Int(selected?.ghostPaceSecondsPerKilometer ?? 300))
         _notes = State(initialValue: selected?.notes ?? "")
@@ -83,13 +87,14 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                     Picker(tr("Effort target", "Dragets mål"), selection: $measure) {
                         Text(tr("Time", "Tid")).tag(RunningMeasureKind.time)
                         Text(tr("Distance", "Distanse")).tag(RunningMeasureKind.distance)
+                        Text(tr("Open", "Åpen")).tag(RunningMeasureKind.open)
                     }
                     .pickerStyle(.segmented)
                     if measure == .time {
                         Stepper(tr("Work time", "Dragtid") + ": " + clock(workSeconds),
-                                value: $workSeconds, in: 15...10800, step: 15)
-                    } else {
-                        Stepper("\(workMeters) m", value: $workMeters, in: 100...42000, step: 50)
+                                value: $workSeconds, in: 1...21600, step: 1)
+                    } else if measure == .distance {
+                        Stepper("\(workMeters) m", value: $workMeters, in: 1...100000, step: 1)
                     }
 
                     Toggle(tr("Target pace", "Måltempo"), isOn: $paceEnabled)
@@ -102,11 +107,11 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                         if paceAsSpeed {
                             Stepper(
                                 String(format: "%.1f km/t", targetSpeedKmh),
-                                value: $targetSpeedKmh, in: 3...25, step: 0.1
+                                value: $targetSpeedKmh, in: 1...40, step: 0.1
                             )
                         } else {
                             Stepper(paceLabel(paceSeconds), value: $paceSeconds,
-                                    in: 150...1200, step: 5)
+                                    in: 60...3600, step: 1)
                         }
                     }
 
@@ -139,14 +144,15 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                             Picker(tr("Recovery goal", "Pause etter draget"), selection: $recoveryMeasure) {
                                 Text(tr("Time", "Tid")).tag(RunningMeasureKind.time)
                                 Text(tr("Distance", "Distanse")).tag(RunningMeasureKind.distance)
+                                Text(tr("Open", "Åpen")).tag(RunningMeasureKind.open)
                             }
                             .pickerStyle(.segmented)
                             if recoveryMeasure == .time {
                                 Stepper(clock(recoverySeconds),
-                                        value: $recoverySeconds, in: 15...3600, step: 15)
-                            } else {
+                                        value: $recoverySeconds, in: 1...3600, step: 1)
+                            } else if recoveryMeasure == .distance {
                                 Stepper("\(recoveryMeters) m",
-                                        value: $recoveryMeters, in: 50...3000, step: 50)
+                                        value: $recoveryMeters, in: 1...10000, step: 1)
                             }
                             Toggle(tr("Target recovery speed", "Målhastighet i pausen"),
                                    isOn: $recoverySpeedEnabled)
@@ -159,7 +165,7 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                                 } else {
                                     Stepper(paceLabel(recoveryPaceSeconds),
                                             value: $recoveryPaceSeconds,
-                                            in: 180...1200, step: 5)
+                                            in: 60...3600, step: 1)
                                 }
                             }
                             Toggle(tr("Recovery incline", "Stigning i pausen"),
@@ -211,8 +217,11 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                         )
                         var work = measure == .time
                             ? RunningStepTarget.time(Double(workSeconds), intensity: intensity)
-                            : RunningStepTarget.distance(Double(workMeters), intensity: intensity)
+                            : measure == .distance
+                            ? RunningStepTarget.distance(Double(workMeters), intensity: intensity) : .open
+                        work.intensity = intensity
                         work.treadmillInclinePercent = inclineEnabled ? inclinePercent : nil
+                        work = ATHLTHRunningTargetEditing.preservingAdditionalTargets(from: originalWork, in: work)
                         let recoveryPace: Double? = recoverySpeedEnabled
                             ? (environment == .treadmill
                                 ? 3_600 / max(recoverySpeedKmh, 0.1)
@@ -229,11 +238,17 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                             repetition < totalRepetitions
                             ? (recoveryMeasure == .time
                                 ? .time(Double(recoverySeconds), intensity: recoveryIntensity)
-                                : .distance(Double(recoveryMeters), intensity: recoveryIntensity))
+                                : recoveryMeasure == .distance
+                                ? .distance(Double(recoveryMeters), intensity: recoveryIntensity) : .open)
                             : nil
                         if recovery != nil {
+                            recovery?.intensity = recoveryIntensity
                             recovery?.treadmillInclinePercent = recoveryInclineEnabled
                                 ? recoveryInclinePercent : nil
+                        }
+                        if let editedRecovery = recovery {
+                            recovery = ATHLTHRunningTargetEditing.preservingAdditionalTargets(
+                                from: originalRecovery, in: editedRecovery)
                         }
                         onSave(RunningRepetitionOverride(
                             repetition: repetition,
@@ -250,6 +265,14 @@ struct ATHLTHIntervalRepetitionEditorView: View {
                 }
             }
         }
+        .onChange(of: paceAsSpeed) { _, speed in
+            if speed {
+                targetSpeedKmh = 3_600 / Double(max(paceSeconds, 1))
+            } else {
+                paceSeconds = Int((3_600 / max(targetSpeedKmh, 0.1)).rounded())
+            }
+        }
+        .tint(ATHLTHTrainDesign.bronze)
     }
 
     private func tr(_ en: String, _ no: String) -> String {

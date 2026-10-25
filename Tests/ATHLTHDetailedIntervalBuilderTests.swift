@@ -3,6 +3,28 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHDetailedIntervalBuilderTests: XCTestCase {
+    func testIndividualTargetEditSurvivesSerializationAndWatchProjection() throws {
+        var plan = template()
+        let original = plan.blocks[1].resolvedWork(at: 3)
+        var edit = original
+        edit.durationSeconds = 47
+        edit.intensity.paceMinSecondsPerKilometer = 232
+        edit.intensity.paceMaxSecondsPerKilometer = 232
+        let updated = ATHLTHRunningTargetEditing.preservingAdditionalTargets(from: original, in: edit)
+        plan.blocks[1].repetitionOverrides = [RunningRepetitionOverride(
+            repetition: 3, work: updated,
+            recovery: .time(35, intensity: .easy))]
+        let restored = try JSONDecoder().decode(RunningWorkoutTemplate.self,
+                                               from: JSONEncoder().encode(plan))
+        let transfer = PlannedWorkoutWatchBuilder.runningTransfer(from: restored, routeAlerts: .standard)
+        let work = transfer.steps.filter { $0.phase == "work" }
+        let recovery = transfer.steps.filter { $0.phase == "recovery" }
+        XCTAssertEqual(work.map(\.durationSeconds), [240, 240, 47, 240])
+        XCTAssertEqual(work.map(\.targetPaceMinSecondsPerKilometer), [300, 300, 232, 300])
+        XCTAssertEqual(recovery.map(\.durationSeconds), [120, 120, 35])
+        XCTAssertEqual(work[2].targetHeartRateZone, 4)
+    }
+
     private func template() -> RunningWorkoutTemplate {
         let hard = RunningIntensityTarget(
             kind: .pace,

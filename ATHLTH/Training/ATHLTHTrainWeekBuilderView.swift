@@ -4,6 +4,7 @@ import SwiftUI
 /// All writes use existing AppSessionStore persistence APIs.
 struct ATHLTHTrainWeekBuilderView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -20,11 +21,11 @@ struct ATHLTHTrainWeekBuilderView: View {
     @State private var showingPeriodization = false
     @State private var planActionError: String?
 
-    private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
-    private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
-    private let bronze = Color(red: 0.65, green: 0.53, blue: 0.37)
-    private let paper = Color(red: 0.984, green: 0.976, blue: 0.963)
-    private let line = Color(red: 0.88, green: 0.86, blue: 0.83)
+    private let ink = ATHLTHTrainDesign.ink
+    private let muted = ATHLTHTrainDesign.secondary
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let paper = ATHLTHTrainDesign.canvas
+    private let line = ATHLTHTrainDesign.rule
 
     init(planID: UUID, initialWeekIndex: Int = 0) {
         self.planID = planID
@@ -206,19 +207,11 @@ struct ATHLTHTrainWeekBuilderView: View {
     }
 
     private func introduction(_ plan: TrainingPlan) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Text(tr("DESIGN YOUR WEEK", "BYGG DIN TRENING"))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.8)
-                .foregroundStyle(bronze)
-            Text(plan.title)
-                .font(.system(size: 31, weight: .regular, design: .serif))
-                .foregroundStyle(ink)
-            Text(tr("Workouts, recovery and individual targets",
-                    "Økter, restitusjon og individuelle treningsmål"))
-                .font(.caption)
-                .foregroundStyle(muted)
-        }
+        ATHLTHTrainSectionHeading(
+            eyebrow: tr("DESIGN YOUR WEEK", "BYGG DIN TRENING"),
+            title: plan.title,
+            detail: tr("Workouts, recovery and individual targets",
+                       "Økter, restitusjon og individuelle treningsmål"))
     }
 
     private func weekSelector(_ plan: TrainingPlan) -> some View {
@@ -228,9 +221,10 @@ struct ATHLTHTrainWeekBuilderView: View {
                 selectedDayID = nil
             } label: {
                 Image(systemName: "chevron.left")
-                    .frame(width: 38, height: 43)
+                    .frame(width: 48, height: 48)
             }
             .disabled(weekIndex <= 0)
+            .accessibilityLabel(tr("Previous week", "Forrige uke"))
             Spacer()
             VStack(spacing: 4) {
                 Text(tr("WEEK \(weekIndex + 1)", "UKE \(weekIndex + 1)"))
@@ -247,8 +241,9 @@ struct ATHLTHTrainWeekBuilderView: View {
                 selectedDayID = nil
             } label: {
                 Image(systemName: "chevron.right")
-                    .frame(width: 38, height: 43)
+                    .frame(width: 48, height: 48)
             }
+            .accessibilityLabel(tr("Next week", "Neste uke"))
             .disabled(weekIndex >= plan.weeks.count - 1)
         }
         .font(.subheadline)
@@ -274,7 +269,7 @@ struct ATHLTHTrainWeekBuilderView: View {
                 let chosen = currentDay?.id == day.id
                 let workouts = day.sessions.filter { !$0.isExplicitRestDay }
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                         selectedDayID = day.id
                     }
                 } label: {
@@ -666,11 +661,11 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         UserDefaults.standard.set(data, forKey: localDraftKey)
     }
 
-    private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
-    private let bronze = Color(red: 0.65, green: 0.53, blue: 0.37)
-    private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
-    private let paper = Color(red: 0.984, green: 0.976, blue: 0.963)
-    private let line = Color(red: 0.88, green: 0.86, blue: 0.83)
+    private let ink = ATHLTHTrainDesign.ink
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let muted = ATHLTHTrainDesign.secondary
+    private let paper = ATHLTHTrainDesign.canvas
+    private let line = ATHLTHTrainDesign.rule
 
     init(
         planID: UUID,
@@ -706,14 +701,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 restoreLocalDraft()
                 localDraftReady = true
             }
-            .onChange(of: draft.title) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.kind) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.workoutBlocks) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.notes) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.spotifyPlaylist) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.spotifyAutoplayOnStart) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.durationMinutes) { _, _ in persistLocalDraft() }
-            .onChange(of: draft.exercises.count) { _, _ in persistLocalDraft() }
+            .onChange(of: draft) { _, _ in persistLocalDraft() }
+            .onChange(of: durationWasEditedManually) { _, _ in persistLocalDraft() }
             .onChange(of: scheduled) { _, _ in persistLocalDraft() }
             .onChange(of: clockTime) { _, _ in persistLocalDraft() }
             .onChange(of: scenePhase) { _, phase in
@@ -926,24 +915,16 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     }
 
     private var heading: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(tr("BUILD YOUR SESSION", "BYGG DIN ØKT"))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(1.6)
-                .foregroundStyle(bronze)
-            Text(existingWorkout == nil
-                 ? tr("A workout, your way.", "Din økt. Dine valg.")
-                 : tr("Perfect the details.", "Finjuster økten."))
-                .font(.system(size: 30, weight: .regular, design: .serif))
-                .foregroundStyle(ink)
-            Text(advanced
-                 ? tr("Choose exercises, intervals and recovery in one timeline.",
-                      "Sett sammen øvelser, intervaller og pauser i én tidslinje.")
-                 : tr("Choose an exercise and save your workout.",
-                      "Velg øvelser og lagre økten din."))
-                .font(.caption)
-                .foregroundStyle(muted)
-        }
+        ATHLTHTrainSectionHeading(
+            eyebrow: tr("BUILD YOUR SESSION", "BYGG DIN ØKT"),
+            title: existingWorkout == nil
+                ? tr("A workout, your way.", "Din økt. Dine valg.")
+                : tr("Perfect the details.", "Finjuster økten."),
+            detail: advanced
+                ? tr("Choose exercises, intervals and recovery in one timeline.",
+                     "Sett sammen øvelser, intervaller og pauser i én tidslinje.")
+                : tr("Choose your activity and targets, then save the workout.",
+                     "Velg aktivitet og treningsmål, og lagre økten."))
     }
 
     private var information: some View {
@@ -978,10 +959,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     // Estimates change with sets, reps and pauses until the athlete overrides
     // the duration. Existing workouts keep their saved duration unchanged.
     private var estimatedDurationMinutes: Int? {
-        if !draft.resolvedWorkoutBlocks.isEmpty {
-            return ATHLTHWorkoutDurationEstimator.minutes(
-                for: draft.resolvedWorkoutBlocks
-            )
+        if !draft.resolvedWorkoutBlocks.isEmpty || !draft.resolvedRunningWorkouts.isEmpty {
+            return ATHLTHPlannedWorkoutPresentation.structuredMinutes(for: draft)
         }
         guard draft.kind == .strength || draft.kind == .custom,
               !draft.exercises.isEmpty else {
@@ -1041,8 +1020,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 HStack(spacing: 8) {
                     Text(durationWasEditedManually
                          ? tr("Manual duration", "Manuell varighet")
-                         : tr("Estimated from exercises and rest",
-                              "Beregnet fra øvelser og pauser"))
+                         : tr("Estimated from workout steps and rest",
+                              "Beregnet fra øktdeler og pauser"))
                         .font(.caption2)
                         .foregroundStyle(muted)
                     Spacer()
@@ -1055,6 +1034,14 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                         .foregroundStyle(bronze)
                     }
                 }
+            } else if !draft.resolvedWorkoutBlocks.isEmpty || !draft.resolvedRunningWorkouts.isEmpty {
+                Text(tr(
+                    "The workout has no complete duration estimate. Minutes above are a planning budget only.",
+                    "Økten har ikke et fullstendig varighetsestimat. Minuttene over er kun avsatt tid i planen."
+                ))
+                .font(.caption)
+                .foregroundStyle(muted)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
         .foregroundStyle(ink)
@@ -1667,13 +1654,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 Spacer()
                 Image(systemName: "checkmark")
             }
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(.white)
-            .frame(height: 49)
-            .padding(.horizontal, 16)
-            .background(ink, in: RoundedRectangle(cornerRadius: 13))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
         .padding(.horizontal, 18)
         .padding(.vertical, 12)
         .background(.white)
@@ -1747,8 +1729,9 @@ struct ATHLTHTrainWorkoutBuilderView: View {
 
     private func sectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 20, weight: .regular, design: .serif))
+            .font(ATHLTHTrainDesign.sectionTitle)
             .foregroundStyle(ink)
+            .accessibilityAddTraits(.isHeader)
     }
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -1758,11 +1741,6 @@ struct ATHLTHTrainWorkoutBuilderView: View {
 
 private extension View {
     func editorSurface(line: Color) -> some View {
-        self
-            .athlthPlanCard(radius: 13, warm: false)
-            .overlay {
-                RoundedRectangle(cornerRadius: 13)
-                    .stroke(line, lineWidth: 0.7)
-            }
+        athlthTrainPaper()
     }
 }

@@ -4,6 +4,7 @@ import SwiftUI
 /// RunningWorkoutBlock model. No new execution engine is introduced.
 struct ATHLTHTrainIntervalComposerView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
     let initial: RunningWorkoutTemplate?
@@ -18,7 +19,9 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var saveAsReusableTemplate = false
     @State private var showingReplaceStructureConfirmation = false
     @State private var measure: RunningMeasureKind = .distance
-    @State private var minutes = 5
+    @State private var workSeconds = 300
+    @State private var recoveryMeasure: RunningMeasureKind = .time
+    @State private var recoveryMeters = 200
     @State private var distanceMeters = 1000
     @State private var repetitions = 5
     @State private var pauseEnabled = true
@@ -57,11 +60,11 @@ struct ATHLTHTrainIntervalComposerView: View {
     @State private var coachCountdownEnabled: Bool
     @State private var coachCountdownSeconds: Int
 
-    private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
-    private let muted = Color(red: 0.46, green: 0.44, blue: 0.43)
-    private let bronze = Color(red: 0.65, green: 0.53, blue: 0.37)
-    private let border = Color(red: 0.88, green: 0.86, blue: 0.83)
-    private let paper = Color(red: 0.984, green: 0.976, blue: 0.963)
+    private let ink = ATHLTHTrainDesign.ink
+    private let muted = ATHLTHTrainDesign.secondary
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let border = ATHLTHTrainDesign.rule
+    private let paper = ATHLTHTrainDesign.canvas
 
     init(initial: RunningWorkoutTemplate? = nil,
          onSave: @escaping (RunningWorkoutTemplate) -> Void) {
@@ -116,7 +119,7 @@ struct ATHLTHTrainIntervalComposerView: View {
                         isComposerExpanded = true
                         Task { @MainActor in
                             await Task.yield()
-                            withAnimation(.easeInOut(duration: 0.22)) {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
                                 scroll.scrollTo("phaseComposer", anchor: .top)
                             }
                         }
@@ -136,12 +139,20 @@ struct ATHLTHTrainIntervalComposerView: View {
                     .background(ink, in: RoundedRectangle(cornerRadius: 13))
                 }
                 .buttonStyle(.plain)
-                .disabled(blocks.isEmpty ||
+                .disabled(isComposerExpanded || blocks.isEmpty ||
                           name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .opacity(blocks.isEmpty ||
+                .opacity(isComposerExpanded || blocks.isEmpty ||
                          name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0.45 : 1)
                 .padding(16)
                 .background(.white)
+                if isComposerExpanded {
+                    Text(tr("Add or save the block below, or close its editor, before saving the session.",
+                            "Legg til eller lagre blokken, eller lukk blokkredigeringen, før du lagrer økten."))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 8)
+                }
             }
             .background(paper.ignoresSafeArea())
             .navigationTitle(tr("Advanced session builder", "Avansert øktbygger"))
@@ -202,6 +213,13 @@ struct ATHLTHTrainIntervalComposerView: View {
             }
         }
         .preferredColorScheme(.light)
+        .onChange(of: speedInputEnabled) { _, speed in
+            if speed {
+                speedKilometersPerHour = 3_600 / Double(max(paceSeconds, 1))
+            } else {
+                paceSeconds = Int((3_600 / max(speedKilometersPerHour, 0.1)).rounded())
+            }
+        }
     }
 
     private var titleArea: some View {
@@ -394,7 +412,7 @@ struct ATHLTHTrainIntervalComposerView: View {
     private var blockComposer: some View {
         VStack(alignment: .leading, spacing: 0) {
             Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                     if isComposerExpanded {
                         editingBlockID = nil
                         isComposerExpanded = false
@@ -452,6 +470,7 @@ struct ATHLTHTrainIntervalComposerView: View {
             Picker(tr("Target", "Mål"), selection: $measure) {
                 Text(tr("Distance", "Distanse")).tag(RunningMeasureKind.distance)
                 Text(tr("Time", "Tid")).tag(RunningMeasureKind.time)
+                Text(tr("Open", "Åpen")).tag(RunningMeasureKind.open)
             }
             .pickerStyle(.segmented)
 
@@ -459,15 +478,23 @@ struct ATHLTHTrainIntervalComposerView: View {
                 Stepper(
                     "\(distanceMeters) m",
                     value: $distanceMeters,
-                    in: 100...42000,
-                    step: 100
+                    in: 1...100000,
+                    step: 50
                 )
                 .font(.subheadline)
-            } else {
+            } else if measure == .time {
+                HStack {
+                    Text(tr("Seconds", "Sekunder"))
+                    TextField(tr("Work time in seconds", "Dragtid i sekunder"),
+                              value: $workSeconds, format: .number)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .textFieldStyle(.roundedBorder)
+                }
                 Stepper(
-                    "\(minutes) min",
-                    value: $minutes,
-                    in: 1...180
+                    tr("Work time", "Dragtid") + " · " + clock(workSeconds),
+                    value: $workSeconds,
+                    in: 1...21600, step: 1
                 )
                 .font(.subheadline)
             }
@@ -479,8 +506,17 @@ struct ATHLTHTrainIntervalComposerView: View {
                        isOn: $pauseEnabled)
                     .tint(ATHLTHPlanDesign.accentInk)
                 if pauseEnabled && repetitions > 1 {
-                    Stepper("\(pauseSeconds) s " + tr("recovery", "pause"),
-                            value: $pauseSeconds, in: 15...900, step: 15)
+                    Picker(tr("Recovery target", "Pausemål"), selection: $recoveryMeasure) {
+                        Text(tr("Time", "Tid")).tag(RunningMeasureKind.time)
+                        Text(tr("Distance", "Distanse")).tag(RunningMeasureKind.distance)
+                        Text(tr("Open", "Åpen")).tag(RunningMeasureKind.open)
+                    }
+                    if recoveryMeasure == .time {
+                        Stepper("\(pauseSeconds) s " + tr("recovery", "pause"),
+                                value: $pauseSeconds, in: 1...3600, step: 1)
+                    } else if recoveryMeasure == .distance {
+                        Stepper("\(recoveryMeters) m", value: $recoveryMeters, in: 1...10000, step: 1)
+                    }
                 }
                 Text(tr("Edit speed and pulse zone for each effort or recovery above.",
                         "Tilpass hastighet og pulssone for hvert drag eller hver pause over."))
@@ -542,6 +578,13 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .background(paper, in: RoundedRectangle(cornerRadius: 11))
             }
             .buttonStyle(.plain)
+            .disabled(!blockInputIsValid)
+            if !blockInputIsValid {
+                Text(tr("Enter a positive time or distance and a valid pace before adding this block.",
+                        "Angi positiv tid eller distanse og gyldig tempo før du legger til blokken."))
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
                 }
                 .padding(.top, 12)
             }
@@ -570,10 +613,10 @@ struct ATHLTHTrainIntervalComposerView: View {
                 .pickerStyle(.segmented)
                 if speedInputEnabled {
                     Stepper(String(format: "%.1f km/t", speedKilometersPerHour),
-                            value: $speedKilometersPerHour, in: 3...25, step: 0.1)
+                            value: $speedKilometersPerHour, in: 1...40, step: 0.1)
                 } else {
                     Stepper(paceLabel(paceSeconds), value: $paceSeconds,
-                            in: 150...1200, step: 5)
+                            in: 60...3600, step: 1)
                 }
             }
 
@@ -728,13 +771,15 @@ struct ATHLTHTrainIntervalComposerView: View {
         repetitions = block.repetitions
         if block.work.measure == .distance {
             measure = .distance
-            distanceMeters = max(Int(block.work.distanceMeters ?? 1000), 100)
+            distanceMeters = max(Int(block.work.distanceMeters ?? 1000), 1)
         } else {
-            measure = .time
-            minutes = max(Int((block.work.durationSeconds ?? 300) / 60), 1)
+            measure = block.work.measure
+            workSeconds = max(Int((block.work.durationSeconds ?? 300).rounded()), 1)
         }
         if let recovery = block.recovery {
             pauseEnabled = true
+            recoveryMeasure = recovery.measure
+            recoveryMeters = Int(recovery.distanceMeters ?? 200)
             pauseSeconds = Int(recovery.durationSeconds ?? 120)
         } else {
             pauseEnabled = false
@@ -753,6 +798,7 @@ struct ATHLTHTrainIntervalComposerView: View {
     }
 
     private func addBlock() {
+        guard blockInputIsValid else { return }
         let resolvedPace = speedInputEnabled
             ? 3_600 / max(speedKilometersPerHour, 0.5) : Double(paceSeconds)
         let intensity = RunningIntensityTarget(
@@ -766,12 +812,16 @@ struct ATHLTHTrainIntervalComposerView: View {
         )
         var work = measure == .distance
             ? RunningStepTarget.distance(Double(distanceMeters), intensity: intensity)
-            : RunningStepTarget.time(Double(minutes * 60), intensity: intensity)
+            : measure == .time
+            ? RunningStepTarget.time(Double(workSeconds), intensity: intensity) : .open
+        work.intensity = intensity
         work.treadmillInclinePercent = inclineEnabled ? inclinePercent : nil
-        let recovery: RunningStepTarget? = kind == .work
-            && repetitions > 1 && pauseEnabled
-            ? .time(Double(pauseSeconds), intensity: .easy)
-            : nil
+        let original = editingBlockID.flatMap { id in blocks.first { $0.id == id } }
+        work = ATHLTHRunningTargetEditing.preservingAdditionalTargets(from: original?.work, in: work)
+        var recovery = original?.recovery ?? .time(Double(pauseSeconds), intensity: .easy)
+        recovery.measure = recoveryMeasure
+        recovery.durationSeconds = recoveryMeasure == .time ? Double(pauseSeconds) : nil
+        recovery.distanceMeters = recoveryMeasure == .distance ? Double(recoveryMeters) : nil
         let priorOverrides = editingBlockID.flatMap { id in
             blocks.first(where: { $0.id == id })?.repetitionOverrides
         }
@@ -781,7 +831,7 @@ struct ATHLTHTrainIntervalComposerView: View {
             title: activityName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? kind.title : activityName.trimmingCharacters(in: .whitespacesAndNewlines),
             repetitions: kind == .work ? repetitions : 1,
-            work: work, recovery: recovery,
+            work: work, recovery: kind == .work && repetitions > 1 && pauseEnabled ? recovery : nil,
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 ? nil : notes,
             repetitionOverrides: priorOverrides?.filter { $0.repetition <= (kind == .work ? repetitions : 1) },
@@ -853,6 +903,8 @@ struct ATHLTHTrainIntervalComposerView: View {
     }
 
     private func save() {
+        guard !isComposerExpanded, !blocks.isEmpty,
+              !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
         let now = Date()
         var savedBlocks = blocks
         if autoStartMainAfterWarmup, pauseAfterWarmupEnabled,
@@ -912,6 +964,19 @@ struct ATHLTHTrainIntervalComposerView: View {
         case .steady: return "figure.walk"
         case .cooldown: return "wind"
         }
+    }
+
+    private var blockInputIsValid: Bool {
+        (measure == .open || (measure == .distance ? (1...100000).contains(distanceMeters) : (1...21600).contains(workSeconds))) &&
+        (!paceEnabled || (speedInputEnabled
+            ? speedKilometersPerHour.isFinite && (1...40).contains(speedKilometersPerHour)
+            : (60...3600).contains(paceSeconds))) &&
+        (!pauseEnabled || recoveryMeasure == .open ||
+            (recoveryMeasure == .distance ? (1...10000).contains(recoveryMeters) : (1...3600).contains(pauseSeconds)))
+    }
+
+    private func clock(_ seconds: Int) -> String {
+        String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
     private func paceLabel(_ seconds: Int) -> String {

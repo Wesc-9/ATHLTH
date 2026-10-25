@@ -25,12 +25,12 @@ struct ATHLTHTrainPeriodizationView: View {
     @State private var editingBlock: TrainingPlanBlock?
     @State private var progressionBlock: TrainingPlanBlock?
 
-    private let ink = Color(red: 0.17, green: 0.17, blue: 0.18)
-    private let muted = Color(red: 0.47, green: 0.45, blue: 0.43)
-    private let bronze = Color(red: 0.66, green: 0.52, blue: 0.35)
-    private let border = Color(red: 0.88, green: 0.86, blue: 0.83)
-    private let paper = Color(red: 0.986, green: 0.978, blue: 0.964)
-    private let paleGold = Color(red: 0.96, green: 0.93, blue: 0.87)
+    private let ink = ATHLTHTrainDesign.ink
+    private let muted = ATHLTHTrainDesign.secondary
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let border = ATHLTHTrainDesign.rule
+    private let paper = ATHLTHTrainDesign.canvas
+    private let paleGold = ATHLTHTrainDesign.paleGold
 
     private enum ProgressionChoice: String, CaseIterable, Identifiable {
         case unchanged, weight, repetitions, fourWeekBlock
@@ -176,26 +176,25 @@ struct ATHLTHTrainPeriodizationView: View {
                 .tracking(1.8)
                 .foregroundStyle(bronze)
             Text(tr("Make every week count.", "Gi hver uke et formål."))
-                .font(.system(size: 30, weight: .regular, design: .serif))
+                .font(ATHLTHTrainDesign.title)
                 .foregroundStyle(ink)
+                .accessibilityAddTraits(.isHeader)
             Text(tr(
                 "Build the weeks ahead. Decide when to progress, when to hold steady and when to recover.",
                 "Bygg kommende uker, velg progresjon og legg inn roligere perioder når det passer programmet."
             ))
             .font(.subheadline)
             .foregroundStyle(muted)
-            HStack {
+            VStack(alignment: .leading, spacing: 10) {
                 Text(tr("EDITING LEVEL", "DETALJNIVÅ"))
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(1.1)
                     .foregroundStyle(muted)
-                Spacer()
-                Picker("", selection: $advanced) {
-                    Text("Basic").tag(false)
+                Picker(tr("Editing level", "Detaljnivå"), selection: $advanced) {
+                    Text(tr("Simple", "Enkel")).tag(false)
                     Text(tr("Advanced", "Avansert")).tag(true)
                 }
                 .pickerStyle(.segmented)
-                .frame(width: 170)
             }
             .padding(.top, 6)
         }
