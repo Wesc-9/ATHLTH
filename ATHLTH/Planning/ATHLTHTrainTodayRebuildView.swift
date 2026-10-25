@@ -273,6 +273,11 @@ struct ATHLTHTrainTodayRebuildView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            if let running = workout.resolvedRunningWorkouts.first,
+               !running.blocks.isEmpty {
+                runningPhaseTimeline(running)
+            }
+
             if !workout.exercises.isEmpty {
                 HStack(spacing: 6) {
                     ForEach(workout.exercises.prefix(3)) { exercise in
@@ -338,6 +343,146 @@ struct ATHLTHTrainTodayRebuildView: View {
             RoundedRectangle(cornerRadius: 24)
                 .stroke(ATHLTHTheme.premiumGold.opacity(0.24), lineWidth: 0.9)
         }
+    }
+
+    private struct RunningPhase: Identifiable {
+        let id: String
+        let title: String
+        let target: String
+    }
+
+    private func plannedRunningPhases(
+        _ workout: RunningWorkoutTemplate
+    ) -> [RunningPhase] {
+        var phases: [RunningPhase] = []
+        for block in workout.blocks {
+            let label: String
+            switch block.kind {
+            case .warmup:
+                label = ATHLTHLocalization.choose(
+                    english: "Warm-up", norwegian: "Oppvarming"
+                )
+            case .work:
+                label = ATHLTHLocalization.choose(
+                    english: "Intervals", norwegian: "Drag"
+                )
+            case .recovery:
+                label = ATHLTHLocalization.choose(
+                    english: "Recovery", norwegian: "Pause"
+                )
+            case .steady:
+                label = ATHLTHLocalization.choose(
+                    english: "Steady", norwegian: "Jevnt"
+                )
+            case .cooldown:
+                label = ATHLTHLocalization.choose(
+                    english: "Cool-down", norwegian: "Nedjogg"
+                )
+            }
+            phases.append(
+                RunningPhase(
+                    id: block.id.uuidString,
+                    title: label,
+                    target: phaseTarget(
+                        block.work,
+                        repetitions: block.repetitions
+                    )
+                )
+            )
+
+            if block.repetitions > 1, let recovery = block.recovery {
+                phases.append(
+                    RunningPhase(
+                        id: block.id.uuidString + "-recovery",
+                        title: ATHLTHLocalization.choose(
+                            english: "Recoveries", norwegian: "Pauser"
+                        ),
+                        target: phaseTarget(
+                            recovery,
+                            repetitions: block.repetitions - 1
+                        )
+                    )
+                )
+            }
+        }
+        return phases
+    }
+
+    private func phaseTarget(
+        _ step: RunningStepTarget,
+        repetitions: Int
+    ) -> String {
+        let repetitions = max(repetitions, 1)
+        let amount: String
+
+        switch step.measure {
+        case .time:
+            guard let duration = step.durationSeconds, duration > 0 else {
+                return ATHLTHLocalization.choose(
+                    english: "Open", norwegian: "Åpent"
+                )
+            }
+            let seconds = Int(duration.rounded())
+            if seconds % 60 == 0 {
+                amount = "\(seconds / 60) min"
+            } else {
+                amount = String(format: "%d:%02d", seconds / 60, seconds % 60)
+            }
+        case .distance:
+            guard let meters = step.distanceMeters, meters > 0 else {
+                return ATHLTHLocalization.choose(
+                    english: "Open", norwegian: "Åpent"
+                )
+            }
+            amount = meters >= 1_000
+                ? String(format: "%.1f km", meters / 1_000)
+                : "\(Int(meters.rounded())) m"
+        case .open:
+            return ATHLTHLocalization.choose(
+                english: "Open", norwegian: "Åpent"
+            )
+        }
+
+        return repetitions > 1 ? "\(repetitions) × \(amount)" : amount
+    }
+
+    private func runningPhaseTimeline(
+        _ workout: RunningWorkoutTemplate
+    ) -> some View {
+        let phases = Array(plannedRunningPhases(workout).prefix(4))
+        return HStack(alignment: .top, spacing: 5) {
+            ForEach(phases) { phase in
+                VStack(spacing: 6) {
+                    Text(phase.target)
+                        .font(.system(size: 10.5, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+
+                    Circle()
+                        .fill(ATHLTHTheme.premiumGold)
+                        .frame(width: 8, height: 8)
+                        .overlay {
+                            Circle()
+                                .stroke(ATHLTHTheme.accentDeep, lineWidth: 0.6)
+                        }
+
+                    Text(phase.title)
+                        .font(.system(size: 9.2, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .padding(.vertical, 10)
+        .padding(.horizontal, 6)
+        .background(
+            ATHLTHTheme.champagneSoft.opacity(0.52),
+            in: RoundedRectangle(cornerRadius: 15)
+        )
+        .accessibilityElement(children: .combine)
     }
 
     private func compactWorkout(
