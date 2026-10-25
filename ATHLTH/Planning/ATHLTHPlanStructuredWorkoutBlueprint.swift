@@ -41,12 +41,8 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
             .filter({ $0 }).count > 1 {
             return "hybrid"
         }
-        if hasRun {
-            let walkingOnly = blocks.filter { $0.kind == .run }.allSatisfy {
-                $0.cardioActivity == .walking
-            }
-            return walkingOnly ? "walking" : "running"
-        }
+        if hasRun { return "running" }
+        if hasWalking { return "walking" }
         if hasStrength { return "strength" }
         if hasCycling { return "cycling" }
         let wellness = blocks.compactMap(\.wellnessKind)
