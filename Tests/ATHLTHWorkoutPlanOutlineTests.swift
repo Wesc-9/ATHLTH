@@ -45,6 +45,41 @@ final class ATHLTHWorkoutPlanOutlineTests: XCTestCase {
         XCTAssertTrue(rows[3].detail.contains("10 min"))
     }
 
+    func testIntervalPaceRangeRetainsBothLimits() {
+        let pace = RunningIntensityTarget(
+            kind: .pace,
+            paceMinSecondsPerKilometer: 270,
+            paceMaxSecondsPerKilometer: 300,
+            heartRateZone: nil,
+            rpe: nil
+        )
+        let run = RunningWorkoutTemplate(
+            id: UUID(),
+            title: "Intervals",
+            type: .intervals,
+            summary: "",
+            blocks: [
+                RunningWorkoutBlock(
+                    kind: .work,
+                    title: "Threshold",
+                    repetitions: 4,
+                    work: .time(240, intensity: pace),
+                    recovery: .time(120)
+                )
+            ],
+            routeID: nil,
+            isBuiltIn: false,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        var planned = session(kind: .running)
+        planned.runningWorkout = run
+        let rows = ATHLTHWorkoutPlanOutline.items(for: planned)
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertTrue(rows[0].detail.contains("4:30–5:00 min/km"))
+        XCTAssertTrue(rows[1].detail.contains("3 × 2 min"))
+    }
+
     func testStrengthOutlineUsesActualExerciseTargets() {
         let exercise = Exercise(
             id: UUID(),
