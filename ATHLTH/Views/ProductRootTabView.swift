@@ -213,8 +213,8 @@ struct ProductRootTabView: View {
                 .tag(0)
 
             ATHLTHTrainView(
-                navigationRequest:
-                    $trainNavigationRequest
+                navigationRequest: $trainNavigationRequest,
+                isActive: selectedTab == 1
             )
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
@@ -5725,6 +5725,9 @@ private struct HomeHeroUtilityButtons: View {
 struct ATHLTHTrainView: View {
     @Binding private var navigationRequest:
         ATHLTHTrainNavigationRequest?
+    // True only while the global Train tab is selected.
+    private let isActive: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
@@ -5741,7 +5744,10 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
     @State private var selectedSection = 0
-    @ScaledMetric(relativeTo: .subheadline) private var premiumTabLabelSize: CGFloat = 13
+    @State private var todayScrollPosition = ScrollPosition(edge: .top)
+    @State private var planScrollPosition = ScrollPosition(edge: .top)
+    @State private var floatingTrainTabsVisible = false
+    @State private var lastTrainScrollDecisionOffset: CGFloat = 0
     @State private var highlightedTrainPlanID: UUID?
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
@@ -5777,9 +5783,11 @@ struct ATHLTHTrainView: View {
     init(
         navigationRequest:
             Binding<ATHLTHTrainNavigationRequest?> =
-            .constant(nil)
+            .constant(nil),
+        isActive: Bool = true
     ) {
         _navigationRequest = navigationRequest
+        self.isActive = isActive
     }
 
     var body: some View {
@@ -5835,6 +5843,25 @@ struct ATHLTHTrainView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .scrollIndicators(.hidden)
+                    .scrollPosition(
+                        selectedSection == 1
+                            ? $planScrollPosition : $todayScrollPosition
+                    )
+                    // Use the native iOS 18 scroll offset; do not install
+                    // competing UIKit delegates on workout/planning screens.
+                    .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                        max(0, geometry.contentOffset.y + geometry.contentInsets.top)
+                    } action: { _, offset in
+                        updateTrainCapsuleVisibility(scrollOffset: offset)
+                    }
+                    .overlay(alignment: .topTrailing) {
+                        if floatingTrainTabsVisible {
+                            premiumTrainTabs
+                                .padding(.top, 8)
+                                .padding(.trailing, 17)
+                                .transition(.move(edge: .top).combined(with: .opacity))
+                        }
+                    }
                     .background(
                         ATHLTHPlanDesign.warmCanvas.ignoresSafeArea()
                     )
@@ -6386,6 +6413,19 @@ struct ATHLTHTrainView: View {
             ) { _, _ in
                 handleNavigationRequest()
             }
+            .onChange(of: selectedSection) { _, _ in
+                floatingTrainTabsVisible = false
+                lastTrainScrollDecisionOffset = 0
+            }
+            .onChange(of: isActive) { _, active in
+                guard !active else { return }
+                // Reset *only* the viewport on leaving Train. Drafts,
+                // plan edits and any active workout remain untouched.
+                todayScrollPosition.scrollTo(edge: .top)
+                planScrollPosition.scrollTo(edge: .top)
+                floatingTrainTabsVisible = false
+                lastTrainScrollDecisionOffset = 0
+            }
             .alert("ATHLTH", isPresented: Binding(
                 get: {
                     watchTransferMessage != nil ||
@@ -6412,6 +6452,28 @@ struct ATHLTHTrainView: View {
         }
     }
 
+
+    private func updateTrainCapsuleVisibility(scrollOffset: CGFloat) {
+        if scrollOffset < 88 {
+            lastTrainScrollDecisionOffset = scrollOffset
+            if floatingTrainTabsVisible {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+                    floatingTrainTabsVisible = false
+                }
+            }
+            return
+        }
+
+        // Ignore tiny oscillations from scroll deceleration or layout changes.
+        let movement = scrollOffset - lastTrainScrollDecisionOffset
+        guard abs(movement) >= 23 else { return }
+        lastTrainScrollDecisionOffset = scrollOffset
+        let shouldAppear = movement < 0
+        guard floatingTrainTabsVisible != shouldAppear else { return }
+        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
+            floatingTrainTabsVisible = shouldAppear
+        }
+    }
 
     // Train's local navigation borrows the warm, translucent Home header style.
     // Keep this switcher distinct from the app-wide bottom tab bar.
