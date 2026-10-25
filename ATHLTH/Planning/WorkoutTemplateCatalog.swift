@@ -1939,7 +1939,9 @@ struct WorkoutTemplateBuilderView: View {
     // Infer the workout type from its actual content, instead of forcing a type
     // before the user has added any blocks.
     private var category: String {
-        if (hasRunning && hasStrength) || (hasWalking && hasActualRunning) { return "hybrid" }
+        let categories = [hasActualRunning, hasWalking, hasStrength,
+                          hasCycling, hasTimedWellness]
+        if categories.filter({ $0 }).count > 1 { return "hybrid" }
         if hasWalking { return "walking" }
         if hasRunning { return "running" }
         if hasStrength { return "strength" }

@@ -3886,7 +3886,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let hasStrength = blocks.contains { $0.kind == .exercise }
         let hasRunning = runs.contains { $0.cardioActivity != .walking }
         let hasWalking = runs.contains { $0.cardioActivity == .walking }
-        if hasStrength && !runs.isEmpty || (hasRunning && hasWalking) { return .custom }
+        let hasCycling = blocks.contains { $0.activityTag == "cycling" }
+        let hasWellness = blocks.contains { $0.wellnessKind != nil }
+        if [hasRunning, hasWalking, hasStrength, hasCycling, hasWellness]
+            .filter({ $0 }).count > 1 {
+            return .custom
+        }
         if hasRunning { return .running }
         if hasWalking { return .walking }
         // Cycling has its own category, but WorkoutKind has no cycling case.

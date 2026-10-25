@@ -120,4 +120,33 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         XCTAssertEqual(restored.groupKind, .superset)
         XCTAssertEqual(restored.groupRounds, 4)
     }
+    func testIntensityTargetsSurviveEncodingAndExpansion() throws {
+        var cycling = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: "Sykling",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 600,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .warmup
+        )
+        cycling.activityTag = "cycling"
+        cycling.targetHeartRateZone = 2
+        cycling.targetEffortRPE = 4
+
+        let encoded = try JSONEncoder().encode(cycling)
+        let decoded = try JSONDecoder().decode(WorkoutTemplateBlock.self, from: encoded)
+        XCTAssertEqual(decoded, cycling)
+        XCTAssertTrue(decoded.targetText?.contains("RPE 4/10") == true)
+        let executed = try XCTUnwrap([decoded].expandedForExecution().first)
+        XCTAssertEqual(executed.durationSeconds, 600)
+        XCTAssertEqual(executed.targetEffortRPE, 4)
+        XCTAssertEqual(executed.targetHeartRateZone, 2)
+        XCTAssertEqual(executed.phase, .warmup)
+    }
+
+    func testLegacyBlockWithoutEffortTargetDecodes() throws {
+        let old = try JSONEncoder().encode(exercise("Legacy squat"))
+        let decoded = try JSONDecoder().decode(WorkoutTemplateBlock.self, from: old)
+        XCTAssertNil(decoded.targetEffortRPE)
+    }
+
 }

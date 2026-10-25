@@ -28,9 +28,19 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
     }
 
     var category: String {
-        let hasRun = blocks.contains { $0.kind == .run }
+        let hasRun = blocks.contains {
+            $0.kind == .run && $0.cardioActivity != .walking
+        }
+        let hasWalking = blocks.contains {
+            $0.kind == .run && $0.cardioActivity == .walking
+        }
         let hasStrength = blocks.contains { $0.kind == .exercise }
-        if hasRun && hasStrength { return "hybrid" }
+        let hasCycling = blocks.contains { $0.activityTag == "cycling" }
+        let hasWellness = blocks.contains { $0.wellnessKind != nil }
+        if [hasRun, hasWalking, hasStrength, hasCycling, hasWellness]
+            .filter({ $0 }).count > 1 {
+            return "hybrid"
+        }
         if hasRun {
             let walkingOnly = blocks.filter { $0.kind == .run }.allSatisfy {
                 $0.cardioActivity == .walking
@@ -38,9 +48,7 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
             return walkingOnly ? "walking" : "running"
         }
         if hasStrength { return "strength" }
-        if blocks.contains(where: { $0.activityTag == "cycling" }) {
-            return "cycling"
-        }
+        if hasCycling { return "cycling" }
         let wellness = blocks.compactMap(\.wellnessKind)
         if !wellness.isEmpty {
             return wellness.allSatisfy { $0 == .meditation }

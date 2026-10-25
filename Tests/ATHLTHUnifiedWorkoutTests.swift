@@ -213,6 +213,46 @@ final class ATHLTHUnifiedWorkoutTests: XCTestCase {
         XCTAssertEqual(workout.workoutCategory, "hybrid")
     }
 
+
+    func testMixedWarmupCyclingMainStrengthCooldownRunIsSingleHybrid() {
+        var cycle = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: "Oppvarming på sykkel",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 600,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .warmup
+        )
+        cycle.activityTag = "cycling"
+        cycle.targetEffortRPE = 3
+        let squat = WorkoutTemplateBlock(
+            sequence: 2, kind: .exercise, title: "Knebøy",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: 8, durationSeconds: nil,
+            targetWeightKilograms: 40, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        var jog = WorkoutTemplateBlock(
+            sequence: 3, kind: .run, title: "Nedjogg",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 300,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .cooldown
+        )
+        jog.cardioActivity = .running
+        let workoutBlocks = [cycle, squat, jog]
+        let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Styrke og kondisjon", kind: .custom,
+            durationMinutes: 30, routeID: nil, blocks: workoutBlocks
+        )
+        XCTAssertTrue(blueprint.isValid)
+        XCTAssertEqual(blueprint.category, "hybrid")
+        let workout = blueprint.applying(to: nil)
+        XCTAssertEqual(workout.workoutCategory, "hybrid")
+        XCTAssertEqual(workout.resolvedWorkoutBlocks, workoutBlocks)
+        XCTAssertEqual(workout.resolvedWorkoutBlocks.map(\.resolvedPhase),
+                       [.warmup, .main, .cooldown])
+    }
+
     private func makeWorkout(kind: WorkoutKind) -> PlannedSession {
         PlannedSession(
             id: UUID(), title: "", kind: kind,
