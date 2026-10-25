@@ -459,6 +459,28 @@ struct StructuredWorkoutSessionView: View {
             .font(.caption.weight(.medium))
             .foregroundStyle(.white.opacity(0.72))
 
+        case .cycling:
+            HStack(spacing: 12) {
+                if let seconds = block.durationSeconds, seconds > 0 {
+                    Label("\(Int(seconds / 60)) min",
+                          systemImage: "clock")
+                }
+                if let zone = block.targetHeartRateZone, (1...5).contains(zone) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Zone \(zone)",
+                            norwegian: "Sone \(zone)"
+                        ),
+                        systemImage: "heart"
+                    )
+                }
+                if let effort = block.targetEffortRPE, (1...10).contains(effort) {
+                    Label("RPE \(effort)/10", systemImage: "gauge")
+                }
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(.white.opacity(0.72))
+
         case .strength:
             HStack(spacing: 12) {
                 if let repetitions = block.repetitions {
