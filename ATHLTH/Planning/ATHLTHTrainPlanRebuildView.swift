@@ -9,6 +9,7 @@ struct ATHLTHTrainPlanRebuildView: View {
     @State private var chosenWeekID: UUID?
     @State private var expandedDayIDs: Set<UUID> = []
     @State private var selectedWorkout: PlannedSession?
+    @State private var selectedStandaloneWorkout: PlannedSession?
     @State private var workoutPendingMove: PlannedSession?
     @State private var workoutPendingSkip: PlannedSession?
     @State private var dayForNewWorkout: TrainingPlanDay?
@@ -86,6 +87,10 @@ struct ATHLTHTrainPlanRebuildView: View {
                 )
                 .environmentObject(session)
             }
+        }
+        .sheet(item: $selectedStandaloneWorkout) { workout in
+            ATHLTHStandaloneWorkoutDetailView(workout: workout)
+                .environmentObject(session)
         }
         .sheet(item: $workoutPendingMove) { workout in
             if let plan {
@@ -318,9 +323,11 @@ struct ATHLTHTrainPlanRebuildView: View {
             Calendar.current.startOfDay(for: $0) >=
                 Calendar.current.startOfDay(for: Date())
         } ?? false
-        let hasStandaloneWorkout = date.map {
-            !session.standalonePlannedSessions(on: $0).isEmpty
-        } ?? false
+        let standaloneWorkouts = date.map {
+            session.standalonePlannedSessions(on: $0)
+        } ?? []
+        let hasStandaloneWorkout = !standaloneWorkouts.isEmpty
+        let dayWorkoutCount = workouts.count + standaloneWorkouts.count
         let isExpanded = expandedDayIDs.contains(day.id)
         let isToday = date.map {
             Calendar.current.isDateInToday($0)
@@ -352,7 +359,7 @@ struct ATHLTHTrainPlanRebuildView: View {
                     )
 
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(workouts.isEmpty
+                        Text(dayWorkoutCount == 0
                             ? isRestDay
                                 ? ATHLTHLocalization.choose(
                                     english: "Rest day",
@@ -362,13 +369,14 @@ struct ATHLTHTrainPlanRebuildView: View {
                                     english: "Unplanned day",
                                     norwegian: "Ledig dag"
                                 )
-                            : workouts.count == 1
-                                ? workouts[0].title
-                                : "\(workouts.count) treningsøkter")
+                            : dayWorkoutCount == 1
+                                ? (workouts.first?.title
+                                    ?? standaloneWorkouts[0].title)
+                                : "\(dayWorkoutCount) treningsøkter")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(ATHLTHTheme.primaryText)
                             .lineLimit(1)
-                        Text(workouts.isEmpty
+                        Text(dayWorkoutCount == 0
                             ? isRestDay
                                 ? ATHLTHLocalization.choose(
                                     english: "Intentional rest · not counted as a workout",
@@ -378,12 +386,46 @@ struct ATHLTHTrainPlanRebuildView: View {
                                     english: "No workout scheduled",
                                     norwegian: "Ingen økter planlagt"
                                 )
-                            : workouts.map(\.kind.title).joined(separator: " · "))
+                            : (workouts + standaloneWorkouts)
+                                .map(\.kind.title)
+                                .joined(separator: " · "))
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 3)
+                    ForEach(standaloneWorkouts) { workout in
+                        Button {
+                            selectedStandaloneWorkout = workout
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: workout.kind.systemImage)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(width: 31, height: 31)
+                                    .background(
+                                        ATHLTHTheme.champagneSoft,
+                                        in: RoundedRectangle(cornerRadius: 10)
+                                    )
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(workout.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Standalone workout · View details",
+                                        norwegian: "Enkeltøkt · Se detaljer"
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
                     if isRestDay {
                         Image(systemName: "leaf")
                             .font(.subheadline)
@@ -670,8 +712,11 @@ struct ATHLTHTrainPlanRebuildView: View {
                     }
                     .prefix(3)
             ) { workout in
-                HStack(spacing: 10) {
-                    Image(systemName: workout.kind.systemImage)
+                Button {
+                    selectedStandaloneWorkout = workout
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: workout.kind.systemImage)
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(workout.title)
@@ -690,9 +735,11 @@ struct ATHLTHTrainPlanRebuildView: View {
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                     }
                 }
-                .padding(12)
-                .background(Color.white,
-                    in: RoundedRectangle(cornerRadius: 16))
+                    .padding(12)
+                    .background(Color.white,
+                        in: RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(.top, 2)
