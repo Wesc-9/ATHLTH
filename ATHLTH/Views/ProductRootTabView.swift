@@ -6525,7 +6525,9 @@ struct ATHLTHTrainView: View {
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     Spacer(minLength: 0)
-                    trainLibraryButton
+                    // Today's selected design has only the three
+                    // local navigation options in the floating capsule.
+                    // The library stays available from "Se alle".
                     premiumTrainTabs
                 }
 
@@ -6659,19 +6661,33 @@ struct ATHLTHTrainView: View {
                 action()
             }
         } label: {
-            Image(systemName: systemImage)
-                .font(.system(size: 17, weight: selected ? .semibold : .regular))
-                .foregroundStyle(
-                    selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.ink
-                )
-                .frame(width: 44, height: 44)
-                .background {
-                    if selected {
-                        Circle()
-                            .fill(ATHLTHTheme.premiumGold.opacity(0.20))
-                    }
+            VStack(spacing: 2) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 16, weight: selected ? .semibold : .regular))
+                // Today follows the approved Home-style reference with
+                // icons and labels; compact Plan/Progress use accessible
+                // icon-only buttons to prevent clipping on small phones.
+                if selectedSection == 0 {
+                    Text(title)
+                        .font(.system(size: 9, weight: selected ? .semibold : .medium))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
                 }
-                .contentShape(Circle())
+            }
+            .foregroundStyle(
+                selected ? ATHLTHTheme.accentDeep : ATHLTHPlanDesign.ink
+            )
+            .frame(
+                width: selectedSection == 0 ? 62 : 44,
+                height: selectedSection == 0 ? 48 : 44
+            )
+            .background {
+                if selected {
+                    Capsule()
+                        .fill(ATHLTHTheme.premiumGold.opacity(0.20))
+                }
+            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
