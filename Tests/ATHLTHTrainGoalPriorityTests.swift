@@ -89,7 +89,8 @@ final class ATHLTHTrainGoalPriorityTests: XCTestCase {
 
     func testNoRecommendationWithoutKnownActivity() {
         let run = goal("Running", category: .endurance)
-        for kind: WorkoutKind? in [nil, .custom] {
+        let kinds: [WorkoutKind?] = [nil, .custom]
+        for kind in kinds {
             XCTAssertNil(ATHLTHTrainGoalPriority.recommend(
                 goals: [run], primary: nil, activity: kind, activePlanID: nil
             ))

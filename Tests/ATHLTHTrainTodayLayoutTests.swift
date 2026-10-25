@@ -237,6 +237,7 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     planPosition: "",
                     hasActiveWorkout: hasActiveWorkout,
                     activeWorkoutKind: nil,
+                    lastCompletedWorkoutKind: nil,
                     activeWorkoutCard: nil,
                     hasRecordedWorkoutToday: false,
                     todaysReadiness: nil,

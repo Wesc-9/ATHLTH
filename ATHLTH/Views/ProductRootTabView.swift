@@ -6800,6 +6800,43 @@ struct ATHLTHTrainView: View {
     }
 
     @ViewBuilder
+    /// Only *completed* sessions from the last month may steer the
+    /// no-plan recommendation; never infer an activity from an active recording.
+    private var lastCompletedTrainKind: WorkoutKind? {
+        let earliest = Date().addingTimeInterval(-30 * 86_400)
+        var completed: [(date: Date, kind: WorkoutKind)] = []
+
+        for workout in phoneWorkout.history {
+            guard let end = workout.end, end >= earliest, end <= Date() else {
+                continue
+            }
+            completed.append((end, workout.walking ? .walking : .running))
+        }
+        for workout in strengthWorkout.workoutHistory {
+            guard let end = workout.endedAt, end >= earliest, end <= Date() else {
+                continue
+            }
+            completed.append((end, .strength))
+        }
+        for workout in health.workouts {
+            guard workout.startDate >= earliest,
+                  workout.startDate <= Date() else { continue }
+            let kind: WorkoutKind
+            if workout.activity == .running {
+                kind = .running
+            } else if workout.activity == .strength {
+                kind = .strength
+            } else if workout.activity.rawValue.localizedCaseInsensitiveContains("walk") {
+                kind = .walking
+            } else {
+                continue
+            }
+            completed.append((workout.startDate, kind))
+        }
+
+        return completed.max(by: { $0.date < $1.date })?.kind
+    }
+
     private var premiumTodayScreen: some View {
         let active = session.activePlan
         let sessions = active.map { todaySessions(in: $0) } ?? []
@@ -6851,6 +6888,7 @@ struct ATHLTHTrainView: View {
             } ?? "",
             hasActiveWorkout: hasOngoingTrainWorkout,
             activeWorkoutKind: activeTrainWorkoutKind,
+            lastCompletedWorkoutKind: lastCompletedTrainKind,
             activeWorkoutCard: hasOngoingTrainWorkout
                 ? AnyView(activeTrainWorkoutCard) : nil,
             hasRecordedWorkoutToday: hasRecordedWorkoutToday,

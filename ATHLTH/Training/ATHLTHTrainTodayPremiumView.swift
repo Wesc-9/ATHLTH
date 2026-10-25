@@ -16,6 +16,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     let planPosition: String
     let hasActiveWorkout: Bool
     let activeWorkoutKind: WorkoutKind?
+    let lastCompletedWorkoutKind: WorkoutKind?
     /// Live recorder-owned content replaces the scheduled action while active.
     let activeWorkoutCard: AnyView?
     let hasRecordedWorkoutToday: Bool
@@ -97,10 +98,10 @@ struct ATHLTHTrainTodayPremiumView: View {
                 } else if let workout = primaryWorkout {
                     workoutCard(workout, plan: plan)
                 } else {
-                    openDayOverview(hasPlan: true)
+                    adaptiveOpenDayCard
                 }
             } else {
-                openDayOverview(hasPlan: false)
+                adaptiveOpenDayCard
             }
 
             // Quick Train is always directly below the principal workout,
@@ -108,7 +109,9 @@ struct ATHLTHTrainTodayPremiumView: View {
             quickTrainSection
             activeGoalSection
             dailyFocusSection
-            suggestedWorkoutSection
+            if primaryWorkout != nil {
+                suggestedWorkoutSection
+            }
             ghostRaceSection
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -698,6 +701,187 @@ struct ATHLTHTrainTodayPremiumView: View {
             .foregroundStyle(ink)
             .frame(minHeight: 58)
         }
+    }
+
+    // The primary CTA launches the existing workout setup, never a new
+    // recording engine or an unsafely reconstructed historical session.
+    private var openDayChoice: ATHLTHTrainOpenDayPolicy.Choice {
+        ATHLTHTrainOpenDayPolicy.choose(
+            hasRecordedToday: hasRecordedWorkoutToday,
+            lastCompletedKind: lastCompletedWorkoutKind,
+            activePrimaryGoal: primaryTrainGoal,
+            quickTaps: quickActivityTapCounts,
+            hasLibrarySuggestion: !suggestedWorkouts.isEmpty
+        )
+    }
+
+    private func familiarQuickActivity(_ kind: WorkoutKind) -> QuickActivity {
+        switch kind {
+        case .running: return .running
+        case .walking: return .walking
+        case .strength: return .strength
+        case .mobility: return .yoga
+        case .recovery, .custom: return .custom
+        }
+    }
+
+    private var adaptiveOpenDayCard: some View {
+        let choice = openDayChoice
+        let kind: QuickActivity?
+        let eyebrow: String
+        let title: String
+        let detail: String
+        let image: String
+
+        switch choice {
+        case .trainedToday:
+            kind = nil
+            eyebrow = tr("TRAINING RECORDED", "ØKT REGISTRERT")
+            title = tr("You've trained today", "Du har trent i dag")
+            detail = tr(
+                "Your completed workout is in your history. Explore options if you want to plan ahead.",
+                "Den fullførte økten ligger i historikken. Utforsk alternativer om du vil planlegge videre."
+            )
+            image = "GoalProgress"
+        case .familiar(let workout):
+            let activity = familiarQuickActivity(workout)
+            kind = activity
+            eyebrow = tr("BASED ON YOUR HISTORY", "BASERT PÅ HISTORIKKEN DIN")
+            title = activity.title
+            detail = tr(
+                "You completed this activity previously. Start a new session with the familiar setup.",
+                "Du har trent denne aktiviteten tidligere. Start en ny økt med det vanlige oppsettet."
+            )
+            image = activity.image
+        case .goal(let workout):
+            let activity = familiarQuickActivity(workout)
+            kind = activity
+            eyebrow = tr("CONNECTED TO YOUR GOAL", "KNYTTET TIL MÅLET DITT")
+            title = activity.title
+            detail = tr(
+                "Your selected goal explicitly relates to this activity. Choose the workout that suits you today.",
+                "Hovedmålet ditt er knyttet til denne aktiviteten. Velg økten som passer deg i dag."
+            )
+            image = activity.image
+        case .favorite(let key):
+            let activity = QuickActivity(rawValue: key) ?? .running
+            kind = activity
+            eyebrow = tr("YOUR FREQUENT CHOICE", "DITT VANLIGE VALG")
+            title = activity.title
+            detail = tr(
+                "You often open this activity. Choose your workout details before starting.",
+                "Du velger ofte denne aktiviteten. Velg øktdetaljer før du starter."
+            )
+            image = activity.image
+        case .library:
+            kind = nil
+            eyebrow = tr("EXPLORE A WORKOUT", "UTFORSK EN ØKT")
+            title = suggestedWorkouts.first?.title ?? tr("Find an activity", "Finn en aktivitet")
+            detail = tr(
+                "A workout from the existing library. Review the steps before deciding.",
+                "En økt fra treningsbiblioteket. Se gjennom innholdet før du bestemmer deg."
+            )
+            image = suggestedWorkouts.first.map(suggestionImage(for:)) ?? "TrainHero"
+        case .explore:
+            kind = nil
+            eyebrow = tr("YOUR DAY, YOUR CHOICE", "DIN DAG, DITT VALG")
+            title = tr("Find your next session", "Finn din neste økt")
+            detail = tr(
+                "Nothing is scheduled. Explore the library, start a familiar activity or take a rest day.",
+                "Ingen økt er planlagt. Utforsk biblioteket, start en aktivitet eller velg en hviledag."
+            )
+            image = "TrainHero"
+        }
+
+        return VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .bottomLeading) {
+                GeometryReader { geometry in
+                    Image(image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: geometry.size.width, height: 215)
+                        .clipped()
+                }
+                .frame(height: 215)
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.03), location: 0),
+                        .init(color: .black.opacity(0.14), location: 0.32),
+                        .init(color: .black.opacity(0.76), location: 1)
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(eyebrow)
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(1.4)
+                        .foregroundStyle(.white.opacity(0.85))
+                    Text(title)
+                        .font(.system(size: 30, weight: .regular, design: .serif))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+                }
+                .padding(19)
+            }
+            .frame(height: 215)
+            .clipShape(UnevenRoundedRectangle(
+                topLeadingRadius: 22, topTrailingRadius: 22
+            ))
+
+            VStack(alignment: .leading, spacing: 13) {
+                Text(detail)
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                HStack(spacing: 9) {
+                    Button {
+                        if let kind {
+                            openQuickActivity(kind)
+                        } else if case .library = choice,
+                                  let suggestion = suggestedWorkouts.first {
+                            onChooseSuggestedWorkout(suggestion)
+                        } else {
+                            onOpenLibrary()
+                        }
+                    } label: {
+                        HStack(spacing: 9) {
+                            Spacer(minLength: 0)
+                            Image(systemName:
+                                kind == nil ? "square.grid.2x2" : "play.fill")
+                            Text(kind == nil
+                                ? tr("Explore workouts", "Utforsk økter")
+                                : tr("Set up workout", "Velg økt"))
+                            Spacer(minLength: 0)
+                        }
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(minHeight: 52)
+                        .background(ink, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button(action: onOpenLibrary) {
+                        Image(systemName: "square.grid.2x2")
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(ink)
+                            .frame(width: 52, height: 52)
+                            .background(ATHLTHPlanDesign.warmSurface,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr("Training library", "Treningsbibliotek"))
+                }
+            }
+            .padding(16)
+        }
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(hairline.opacity(0.65), lineWidth: 0.7)
+        }
+        .shadow(color: ink.opacity(0.08), radius: 16, y: 7)
     }
 
     /// A plan-free day is not automatically a prescribed rest day. Keep
