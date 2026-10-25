@@ -55,6 +55,12 @@ struct ATHLTHTrainPlanRebuildView: View {
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
+                        Text(ATHLTHLocalization.choose(
+                            english: "Open a free day to plan a workout or mark it as a rest day.",
+                            norwegian: "Åpne en ledig dag for å planlegge en økt eller velge hviledag."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                         ForEach(week.days.sorted { $0.dayIndex < $1.dayIndex }) { day in
                             dayRow(day, week: week, plan: plan)
                         }
@@ -283,6 +289,16 @@ struct ATHLTHTrainPlanRebuildView: View {
         let workouts = date.map {
             TrainingPlanSchedule.sessions(in: plan, on: $0)
         } ?? day.sessions
+        let isRestDay = date.map {
+            TrainingPlanSchedule.isRestDay(in: plan, on: $0)
+        } ?? (day.isRestDay == true)
+        let canChangeRest = date.map {
+            Calendar.current.startOfDay(for: $0) >=
+                Calendar.current.startOfDay(for: Date())
+        } ?? false
+        let hasStandaloneWorkout = date.map {
+            !session.standalonePlannedSessions(on: $0).isEmpty
+        } ?? false
         let isExpanded = expandedDayIDs.contains(day.id)
         let isToday = date.map {
             Calendar.current.isDateInToday($0)
@@ -315,10 +331,15 @@ struct ATHLTHTrainPlanRebuildView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(workouts.isEmpty
-                            ? ATHLTHLocalization.choose(
-                                english: "Unplanned day",
-                                norwegian: "Ledig dag"
-                            )
+                            ? isRestDay
+                                ? ATHLTHLocalization.choose(
+                                    english: "Rest day",
+                                    norwegian: "Hviledag"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Unplanned day",
+                                    norwegian: "Ledig dag"
+                                )
                             : workouts.count == 1
                                 ? workouts[0].title
                                 : "\(workouts.count) treningsøkter")
@@ -326,16 +347,27 @@ struct ATHLTHTrainPlanRebuildView: View {
                             .foregroundStyle(ATHLTHTheme.primaryText)
                             .lineLimit(1)
                         Text(workouts.isEmpty
-                            ? ATHLTHLocalization.choose(
-                                english: "No workout scheduled",
-                                norwegian: "Ingen økter planlagt"
-                            )
+                            ? isRestDay
+                                ? ATHLTHLocalization.choose(
+                                    english: "Intentional rest · not counted as a workout",
+                                    norwegian: "Planlagt hvile · teller ikke som trening"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "No workout scheduled",
+                                    norwegian: "Ingen økter planlagt"
+                                )
                             : workouts.map(\.kind.title).joined(separator: " · "))
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
                             .lineLimit(1)
                     }
                     Spacer(minLength: 3)
+                    if isRestDay {
+                        Image(systemName: "leaf")
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .accessibilityHidden(true)
+                    }
                     Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
@@ -467,21 +499,83 @@ struct ATHLTHTrainPlanRebuildView: View {
                             ))
                         }
                     }
-                    Button {
-                        dayForNewWorkout = day
-                    } label: {
+                    if isRestDay {
                         Label(
                             ATHLTHLocalization.choose(
-                                english: "Add workout", norwegian: "Legg til økt"
+                                english: "Rest and recovery are intentional parts of your training plan.",
+                                norwegian: "Hvile og restitusjon er en planlagt del av treningen din."
                             ),
-                            systemImage: "plus"
+                            systemImage: "leaf"
                         )
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.vertical, 8)
+
+                        if canChangeRest {
+                            Button {
+                                _ = session.setPlanDayRestStatus(
+                                    planID: plan.id,
+                                    dayID: day.id,
+                                    isRestDay: false
+                                )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Remove rest day",
+                                        norwegian: "Fjern hviledag"
+                                    ),
+                                    systemImage: "arrow.uturn.backward"
+                                )
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .buttonStyle(.plain)
+                            .padding(.vertical, 8)
+                        }
+                    } else {
+                        if workouts.isEmpty && canChangeRest &&
+                            !hasStandaloneWorkout {
+                            Button {
+                                _ = session.setPlanDayRestStatus(
+                                    planID: plan.id,
+                                    dayID: day.id,
+                                    isRestDay: true
+                                )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Mark as rest day",
+                                        norwegian: "Sett som hviledag"
+                                    ),
+                                    systemImage: "leaf"
+                                )
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.vertical, 7)
+                            .buttonStyle(.plain)
+                        }
+
+                        if canChangeRest {
+                            Button {
+                                dayForNewWorkout = day
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Add workout",
+                                        norwegian: "Legg til økt"
+                                    ),
+                                    systemImage: "plus"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 8)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
                 .padding(.horizontal, 13)
                 .padding(.bottom, 13)
