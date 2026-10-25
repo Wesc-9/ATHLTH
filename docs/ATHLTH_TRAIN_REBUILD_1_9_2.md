@@ -71,3 +71,11 @@ Denne oversikten er en samling av tilgjengelige godkjente beslutninger, ikke en 
 - Hurtigredigering må kontrollere at øktforekomsten fortsatt er uendret og ikke er registrert fullført ved lagring.
 - Uke- og dagvalg må bevares ved modaler, navigasjon og fanebytte; rulleposisjon trenger egen kontroll.
 - Verifiser Swift-build, regresjonstester og fysisk layout før noe kan beskrives som ferdig.
+
+
+## Fase 3 – blokkredigering på aktiv `main`, 25. oktober
+- Den eksisterende økteditoren (`SessionEditorView`) har nå en redigerbar tidslinje for lagrede strukturerte blokker, i stedet for en liste som bare viser de fem første.
+- En blokk kan åpnes for navne-/målredigering og flyttes opp eller ned. Pauser og notater kan legges til. Kopiering av blokkmetadata ved flytting og sletting er isolert i `ATHLTHWorkoutBlockEditing` og har regresjonstester.
+- Øvelsesreferanser, belastning, distanser og mål videreføres når rekkefølgen endres; historiske prestasjoner berøres ikke.
+- Øvrige aktivitetsformer, avansert per-drag-tempo/pulssone og flertrinns supersettmotor krever fortsatt den planlagte samlede editoren. Det er **ikke** innført fiktive blokktyper som dagens modell ikke støtter.
+- Må kvalitetssikres med Swift-build, iPhone/iPad-visuell test og fokus på tastatur, redigering under planbytte og lagring av blandingsøkter. Ingen TestFlight er startet for disse main-endringene.
