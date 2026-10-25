@@ -421,7 +421,8 @@ struct ATHLTHTrainPlanRebuildView: View {
                         let editable = canEditOccurrence(
                             workout, planID: plan.id
                         )
-                        HStack(spacing: 6) {
+                        VStack(alignment: .leading, spacing: 9) {
+                            HStack(spacing: 6) {
                             Button {
                                 selectedWorkout = workout
                             } label: {
@@ -530,6 +531,11 @@ struct ATHLTHTrainPlanRebuildView: View {
                                 english: "Workout actions",
                                 norwegian: "Økthandlinger"
                             ))
+                            }
+                            ATHLTHWorkoutPlanOutlineView(
+                                workout: workout,
+                                maxVisibleItems: 7
+                            )
                         }
                     }
                     ForEach(standaloneWorkouts) { workout in
