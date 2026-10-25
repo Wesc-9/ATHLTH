@@ -444,6 +444,101 @@ final class TrainingPlanScheduleTests: XCTestCase {
         ))
     }
 
+    func testCopyWeekFillsOnlyUnoccupiedFutureDaysAndUsesNewSessionIDs() throws {
+        let defaults = UserDefaults(
+            suiteName: "TrainingPlanScheduleTests.copy.\(UUID().uuidString)"
+        )!
+        let profile = UserProfile(
+            id: UUID(), userID: UUID(), username: "week-copy-test",
+            displayName: "Week Copy", bio: "", avatarURL: nil,
+            presence: TrainingPresence(
+                state: .available, workoutTitle: nil,
+                startedAt: nil, visibility: .friends
+            )
+        )
+        let store = AppSessionStore(profile: profile, defaults: defaults)
+        var program = plan(
+            starting: day(2030, 1, 2), session: workout(), weekCount: 2
+        )
+        let baseDate = try XCTUnwrap(program.startDate)
+        let clock = calendar.date(
+            bySettingHour: 18, minute: 30, second: 0, of: baseDate
+        )!
+
+        var source = workout(scheduledStart: clock)
+        source.scheduledTimeIsExplicit = true
+        program.weeks[0].days[0].sessions = [source]
+        program.weeks[0].days[1].sessions = [workout()]
+        program.weeks[0].days[2].sessions = [workout()]
+        program.weeks[0].days[3].sessions = [workout()]
+
+        // Existing plan, explicit rest and standalone sessions win.
+        program.weeks[1].days[1].isRestDay = true
+        program.weeks[1].days[2].sessions = [workout()]
+        let standaloneDate = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: 10, to: baseDate
+        ))
+        let standalone = workout(scheduledStart: standaloneDate)
+        XCTAssertTrue(store.addTrainingPlan(program))
+        store.addStandalonePlannedSession(standalone)
+
+        let preview = try XCTUnwrap(ATHLTHPlanWeekCopy(
+            plan: program,
+            sourceWeekID: program.weeks[0].id,
+            destinationWeekID: program.weeks[1].id,
+            standaloneSessions: store.standalonePlannedSessions,
+            today: day(2029, 12, 1),
+            calendar: calendar
+        ))
+        XCTAssertEqual(preview.copyCount, 1)
+        XCTAssertEqual(preview.days[1].reason, .plannedRest)
+        XCTAssertEqual(preview.days[2].reason, .existingWorkout)
+        // Standalone on index 3, not index 2, so day 4 is protected.
+        XCTAssertEqual(preview.days[3].reason, .standaloneWorkout)
+
+        let copied = store.copyPlanWeekIntoFreeDays(
+            planID: program.id,
+            sourceWeekID: program.weeks[0].id,
+            destinationWeekID: program.weeks[1].id,
+            expectedVersion: program.version
+        )
+        XCTAssertEqual(copied, 1) // target day 1 only, day 4 protected
+        let after = try XCTUnwrap(store.trainingPlan(withID: program.id))
+        let first = try XCTUnwrap(after.weeks[1].days[0].sessions.first)
+        XCTAssertNotEqual(first.id, source.id)
+        XCTAssertTrue(first.scheduledTimeIsExplicit == true)
+        XCTAssertEqual(calendar.component(.hour, from: first.scheduledStart!), 18)
+        XCTAssertEqual(calendar.component(.minute, from: first.scheduledStart!), 30)
+        XCTAssertEqual(after.weeks[1].days[1].isRestDay, true)
+        XCTAssertEqual(after.weeks[1].days[2].sessions.count, 1)
+        XCTAssertTrue(after.weeks[1].days[3].sessions.isEmpty)
+        XCTAssertEqual(
+            store.copyPlanWeekIntoFreeDays(
+                planID: program.id,
+                sourceWeekID: program.weeks[0].id,
+                destinationWeekID: program.weeks[1].id,
+                expectedVersion: program.version
+            ), 0
+        )
+        XCTAssertEqual(
+            try XCTUnwrap(store.trainingPlan(withID: program.id))
+                .weeks[1].days[0].sessions.count,
+            1
+        )
+    }
+
+    func testWeekCopyKeepsDateOnlySessionsDateOnly() throws {
+        let base = day(2031, 2, 1)
+        var session = workout()
+        session.scheduledTimeIsExplicit = false
+        let copy = ATHLTHPlanWeekCopy.clone(session, on: base, calendar: calendar)
+        XCTAssertNotEqual(copy.id, session.id)
+        XCTAssertEqual(copy.scheduledTimeIsExplicit, false)
+        XCTAssertTrue(calendar.isDate(
+            try XCTUnwrap(copy.scheduledStart), inSameDayAs: base
+        ))
+    }
+
     func testLegacyPlanDayWithoutRestFieldRemainsUnplanned() throws {
         let oldDay = TrainingPlanDay(
             id: UUID(), dayIndex: 3, title: "Wednesday", sessions: []
