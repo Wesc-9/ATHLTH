@@ -4457,7 +4457,8 @@ struct ATHLTHTrainView: View {
                 GhostRaceHubView()
             }
             .sheet(item: $selectedStandaloneWorkout) { workout in
-                SessionEditorView(workout: workout)
+                ATHLTHStandaloneWorkoutDetailView(workout: workout)
+                    .environmentObject(session)
             }
             .sheet(item: $selectedPlanWorkout) { selection in
                 PlannedWorkoutDetailView(
