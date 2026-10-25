@@ -86,7 +86,21 @@ enum ATHLTHTrainLiveCardMetrics {
             let sets = exercise.sets.filter { $0.hybridPhaseKind == nil }
             let finished = sets.filter(\.isCompleted).count
             if !sets.isEmpty {
-                details.append("\(finished)/\(sets.count) sett")
+                details.append("\(finished)/\(sets.count) sett fullført")
+                // Use the actual recorder index; planned reps are a *target*,
+                // never evidence of performed repetitions.
+                if exercise.sets.indices.contains(setIndex) {
+                    let current = exercise.sets[setIndex]
+                    if current.hybridPhaseKind == nil && !current.isCompleted {
+                        let position = exercise.sets[...setIndex]
+                            .filter { $0.hybridPhaseKind == nil }.count
+                        let reps = current.plannedReps.flatMap { $0 > 0 ? $0 : nil }
+                        let label = reps.map {
+                            "Sett \(position) · mål \($0) reps"
+                        } ?? "Sett \(position)"
+                        details.append(label)
+                    }
+                }
             } else {
                 // A free strength session may have no sets yet.
                 details.append("\(workout.totalCompletedSets) sett fullført")
