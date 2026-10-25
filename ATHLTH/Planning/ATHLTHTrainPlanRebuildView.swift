@@ -394,38 +394,6 @@ struct ATHLTHTrainPlanRebuildView: View {
                             .lineLimit(1)
                     }
                     Spacer(minLength: 3)
-                    ForEach(standaloneWorkouts) { workout in
-                        Button {
-                            selectedStandaloneWorkout = workout
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: workout.kind.systemImage)
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    .frame(width: 31, height: 31)
-                                    .background(
-                                        ATHLTHTheme.champagneSoft,
-                                        in: RoundedRectangle(cornerRadius: 10)
-                                    )
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(workout.title)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "Standalone workout · View details",
-                                        norwegian: "Enkeltøkt · Se detaljer"
-                                    ))
-                                    .font(.caption2)
-                                    .foregroundStyle(ATHLTHTheme.mutedText)
-                                }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
                     if isRestDay {
                         Image(systemName: "leaf")
                             .font(.subheadline)
@@ -562,6 +530,38 @@ struct ATHLTHTrainPlanRebuildView: View {
                                 norwegian: "Økthandlinger"
                             ))
                         }
+                    }
+                    ForEach(standaloneWorkouts) { workout in
+                        Button {
+                            selectedStandaloneWorkout = workout
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: workout.kind.systemImage)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(width: 31, height: 31)
+                                    .background(
+                                        ATHLTHTheme.champagneSoft,
+                                        in: RoundedRectangle(cornerRadius: 10)
+                                    )
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(workout.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Standalone workout · View details",
+                                        norwegian: "Enkeltøkt · Se detaljer"
+                                    ))
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
                     }
                     if isRestDay {
                         Label(
