@@ -2576,7 +2576,9 @@ final class AppSessionStore: ObservableObject {
                 // overwrite existing planned sessions or completed history.
                 guard TrainingPlanSchedule.sessions(
                     in: plan, on: date
-                ).isEmpty else { return false }
+                ).isEmpty,
+                    standalonePlannedSessions(on: date).isEmpty
+                else { return false }
             }
 
             guard day.isRestDay != (isRestDay ? true : nil) else {
@@ -2664,6 +2666,15 @@ final class AppSessionStore: ObservableObject {
                         )
                 else {
                     continue
+                }
+
+                // Changing an explicit date must not silently place
+                // this workout on an intentionally planned rest day.
+                if let scheduled = updatedSession.scheduledStart,
+                   TrainingPlanSchedule.isRestDay(
+                    in: plan, on: scheduled
+                   ) {
+                    return
                 }
 
                 plan.weeks[weekIndex]
