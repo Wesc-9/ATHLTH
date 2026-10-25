@@ -6804,9 +6804,6 @@ struct ATHLTHTrainView: View {
                 sessions: sessions
             )
         } ?? []
-        let next = active.flatMap {
-            trainUpcomingWorkouts(in: $0, limit: 1).first
-        }
         let progress = active.map {
             session.trainingPlanProgress(
                 $0,
@@ -6837,8 +6834,6 @@ struct ATHLTHTrainView: View {
             sessions: sessions,
             completedIDs: completedIDs,
             healthCompletedIDs: healthIDs,
-            nextWorkoutTitle: next?.workout.title,
-            nextWorkoutDate: next?.date,
             completionFraction: progress,
             planPosition: active.map {
                 trainTodayPlanPositionText($0)

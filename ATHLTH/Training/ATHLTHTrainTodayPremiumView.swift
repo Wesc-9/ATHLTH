@@ -5,14 +5,13 @@ import SwiftUI
 struct ATHLTHTrainTodayPremiumView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var goalStore: GoalStore
     @ObservedObject var workoutCatalog: WorkoutTemplateCatalogStore
 
     let plan: TrainingPlan?
     let sessions: [PlannedSession]
     let completedIDs: Set<UUID>
     let healthCompletedIDs: Set<UUID>
-    let nextWorkoutTitle: String?
-    let nextWorkoutDate: Date?
     let completionFraction: Double
     let planPosition: String
     let hasActiveWorkout: Bool
@@ -105,6 +104,8 @@ struct ATHLTHTrainTodayPremiumView: View {
             // Quick Train is always directly below the principal workout,
             // using precisely the same launch callbacks as before.
             quickTrainSection
+            activeGoalSection
+            dailyFocusSection
             suggestedWorkoutSection
             ghostRaceSection
         }
@@ -829,46 +830,6 @@ struct ATHLTHTrainTodayPremiumView: View {
                 }
             }
 
-            if hasPlan {
-                Button(action: onOpenPlan) {
-                    HStack(alignment: .center, spacing: 12) {
-                        Image(systemName: "arrow.forward.calendar")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundStyle(champagne)
-                            .frame(width: 22)
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(nextWorkoutTitle == nil
-                                ? tr("YOUR TRAINING PLAN", "DIN TRENINGSPLAN")
-                                : tr("NEXT WORKOUT", "NESTE ØKT"))
-                                .font(.caption2.weight(.semibold))
-                                .tracking(1.1)
-                                .foregroundStyle(muted)
-                            Text(nextWorkoutTitle ?? tr("View your plan", "Se treningsplan"))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ink)
-                                .lineLimit(2)
-                            if nextWorkoutTitle != nil, let nextWorkoutDate {
-                                Text(nextWorkoutDate.formatted(
-                                    .dateTime.weekday(.wide).day().month()
-                                ))
-                                .font(.caption)
-                                .foregroundStyle(muted)
-                            }
-                        }
-                        Spacer(minLength: 4)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ink)
-                    }
-                    .padding(13)
-                    .background(
-                        Color(red: 0.974, green: 0.964, blue: 0.946),
-                        in: RoundedRectangle(cornerRadius: 13)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
         }
         .padding(17)
         .premiumTrainSurface(line: hairline)
@@ -1044,27 +1005,13 @@ struct ATHLTHTrainTodayPremiumView: View {
                 }
                 Spacer(minLength: 0)
             }
-            if let nextWorkoutTitle {
-                Button(action: onOpenPlan) {
-                    HStack(spacing: 6) {
-                        Text(tr("Next:", "Neste:") + " " + nextWorkoutTitle)
-                            .lineLimit(1)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
+            Button(action: onOpenPlan) {
+                Label(tr("View your plan", "Se treningsplanen"),
+                      systemImage: "calendar")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ink)
-                }
-                .buttonStyle(.plain)
-            } else {
-                Button(action: onOpenPlan) {
-                    Label(tr("View your plan", "Se treningsplanen"),
-                          systemImage: "calendar")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ink)
-                }
-                .buttonStyle(.plain)
             }
+            .buttonStyle(.plain)
         }
         .padding(17)
         .premiumTrainSurface(line: hairline)
@@ -1153,6 +1100,157 @@ struct ATHLTHTrainTodayPremiumView: View {
         case .yoga: onQuickCustom(.yoga)
         case .custom: onQuickCustom(.other)
         }
+    }
+
+    /// Respect the user's explicitly selected primary goal. Never invent
+    /// an automatic training-based priority without a separate preference.
+    private var visibleTrainGoal: ATHLTHGoal? {
+        if let primary = goalStore.primaryGoal, primary.status == .active {
+            return primary
+        }
+        return goalStore.activeGoals.first { $0.status == .active }
+    }
+
+    @ViewBuilder
+    private var activeGoalSection: some View {
+        if let goal = visibleTrainGoal {
+            NavigationLink {
+                GoalDetailView(goalID: goal.id)
+            } label: {
+                HStack(spacing: 13) {
+                    Image(systemName: goal.category.systemImage)
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(champagne)
+                        .frame(width: 41, height: 41)
+                        .background(ATHLTHPlanDesign.warmSurface,
+                                    in: RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(tr("ACTIVE GOAL", "AKTIVT MÅL"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.1)
+                            .foregroundStyle(muted)
+                        Text(goal.title)
+                            .font(.system(size: 18, weight: .regular, design: .serif))
+                            .foregroundStyle(ink)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                        if !goal.milestones.isEmpty {
+                            Text(tr(
+                                "\(goal.completedMilestones) of \(goal.milestones.count) milestones",
+                                "\(goal.completedMilestones) av \(goal.milestones.count) delmål"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                        } else if let deadline = goal.deadline {
+                            Text(deadline.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ink)
+                }
+                .padding(16)
+                .premiumTrainSurface(line: hairline)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(tr("Active goal", "Aktivt mål") + ": " + goal.title)
+        } else {
+            NavigationLink {
+                GoalsHubView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "target")
+                        .font(.system(size: 20))
+                        .foregroundStyle(champagne)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(tr("ACTIVE GOAL", "AKTIVT MÅL"))
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.1)
+                            .foregroundStyle(muted)
+                        Text(tr("Choose something to train toward",
+                                "Velg et mål å trene mot"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.up.right")
+                        .foregroundStyle(ink)
+                }
+                .padding(16)
+                .premiumTrainSurface(line: hairline)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var dailyFocusSection: some View {
+        let workout = primaryWorkout
+        let focusTitle: String
+        let focusBody: String
+        let focusIcon: String
+
+        if hasActiveWorkout {
+            focusTitle = tr("Stay with your session", "Fortsett økten")
+            focusBody = tr(
+                "Your workout is being recorded. Resume it from the live card above.",
+                "Økten registreres. Åpne den igjen fra livekortet over."
+            )
+            focusIcon = "waveform.path"
+        } else if let workout, !completedIDs.contains(workout.id) {
+            focusTitle = workout.title
+            focusBody = workout.durationMinutes.map {
+                tr("Planned duration: \($0) min. See workout details before you start.",
+                   "Planlagt varighet: \($0) min. Se øktdetaljene før start.")
+            } ?? tr("Review the planned steps before starting.",
+                    "Se gjennom øktens deler før du starter.")
+            focusIcon = workout.kind.systemImage
+        } else if hasRecordedWorkoutToday {
+            focusTitle = tr("Training recorded", "Trening registrert")
+            focusBody = tr(
+                "Today's workout is in your history. Plan or start another only if you want.",
+                "Dagens økt ligger i historikken. Planlegg eller start en ny hvis du ønsker."
+            )
+            focusIcon = "checkmark.circle"
+        } else if sessions.contains(where: \.isExplicitRestDay) {
+            focusTitle = tr("Scheduled recovery", "Planlagt restitusjon")
+            focusBody = tr("Your plan lists recovery today.",
+                           "Treningsplanen har restitusjon i dag.")
+            focusIcon = "leaf"
+        } else {
+            focusTitle = tr("Choose your training", "Velg dagens trening")
+            focusBody = tr(
+                "Start a familiar activity above or explore an exercise from the library.",
+                "Start en kjent aktivitet over, eller utforsk en økt fra biblioteket."
+            )
+            focusIcon = "sparkles"
+        }
+
+        return HStack(alignment: .top, spacing: 13) {
+            Image(systemName: focusIcon)
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(champagne)
+                .frame(width: 36, height: 40)
+            VStack(alignment: .leading, spacing: 6) {
+                Text(tr("TODAY'S FOCUS", "DAGENS FOKUS"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(muted)
+                Text(focusTitle)
+                    .font(.system(size: 18, weight: .regular, design: .serif))
+                    .foregroundStyle(ink)
+                    .lineLimit(2)
+                Text(focusBody)
+                    .font(.caption)
+                    .foregroundStyle(muted)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .premiumTrainSurface(line: hairline)
     }
 
     private var quickTrainSection: some View {
