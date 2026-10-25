@@ -1251,134 +1251,114 @@ struct ATHLTHTrainTodayPremiumView: View {
     @ViewBuilder
     private var activeGoalSection: some View {
         if let goal = visibleTrainGoal {
-            VStack(alignment: .leading, spacing: 12) {
+            let total = goal.milestones.count
+            let done = goal.completedMilestones
+            let fraction = total > 0
+                ? min(max(Double(done) / Double(total), 0), 1) : 0
+
+            VStack(alignment: .leading, spacing: 10) {
                 NavigationLink {
                     GoalDetailView(goalID: goal.id)
                 } label: {
-                    HStack(spacing: 13) {
-                        Image(systemName: goal.category.systemImage)
-                            .font(.system(size: 19, weight: .medium))
-                            .foregroundStyle(champagne)
-                            .frame(width: 41, height: 41)
-                            .background(ATHLTHPlanDesign.warmSurface,
-                                        in: RoundedRectangle(cornerRadius: 12))
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(temporarilyFeaturedGoalID == goal.id &&
-                                 relevantGoalSuggestion?.id == goal.id
-                                 ? tr("TODAY'S GOAL", "MÅL FOR I DAG")
-                                 : tr("ACTIVE GOAL", "AKTIVT MÅL"))
-                                .font(.system(size: 10, weight: .semibold))
-                                .tracking(1.1)
-                                .foregroundStyle(muted)
-                            Text(goal.title)
-                                .font(.system(size: 18, weight: .regular, design: .serif))
+                    VStack(alignment: .leading, spacing: 14) {
+                        HStack {
+                            Text(tr("Active goal", "Aktivt mål"))
+                                .font(.headline.weight(.semibold))
                                 .foregroundStyle(ink)
-                                .multilineTextAlignment(.leading)
-                                .lineLimit(2)
-                            if !goal.milestones.isEmpty {
-                                Text(tr(
-                                    "\(goal.completedMilestones) of \(goal.milestones.count) milestones",
-                                    "\(goal.completedMilestones) av \(goal.milestones.count) delmål"
-                                ))
+                            Spacer(minLength: 2)
+                            Image(systemName: "chevron.right")
                                 .font(.caption)
                                 .foregroundStyle(muted)
-                            } else if let deadline = goal.deadline {
-                                Text(deadline.formatted(date: .abbreviated, time: .omitted))
-                                    .font(.caption)
-                                    .foregroundStyle(muted)
+                        }
+                        HStack(spacing: 10) {
+                            ZStack {
+                                Circle()
+                                    .stroke(ATHLTHTrainDesign.paleGold, lineWidth: 6)
+                                if total > 0 {
+                                    Circle()
+                                        .trim(from: 0, to: fraction)
+                                        .stroke(champagne, style: StrokeStyle(
+                                            lineWidth: 6, lineCap: .round))
+                                        .rotationEffect(.degrees(-90))
+                                    Text("\(Int((fraction * 100).rounded()))%")
+                                        .font(.caption.weight(.bold))
+                                        .monospacedDigit()
+                                        .foregroundStyle(ink)
+                                } else {
+                                    Image(systemName: goal.category.systemImage)
+                                        .foregroundStyle(champagne)
+                                }
+                            }
+                            .frame(width: 62, height: 62)
+                            .accessibilityHidden(true)
+
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(goal.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .lineLimit(3)
+                                if total > 0 {
+                                    Text(tr("\(done) of \(total) milestones",
+                                            "\(done) av \(total) delmål"))
+                                        .font(.caption2)
+                                        .foregroundStyle(muted)
+                                } else if let deadline = goal.deadline {
+                                    Text(deadline.formatted(date: .abbreviated, time: .omitted))
+                                        .font(.caption2)
+                                        .foregroundStyle(muted)
+                                }
                             }
                         }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ink)
                     }
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(tr("Active goal", "Aktivt mål") + ": " + goal.title)
+                .accessibilityLabel(tr("Active goal", "Aktivt mål") + ": " + goal.title +
+                    (total > 0 ? ", \(Int((fraction * 100).rounded()))%" : ""))
 
-                if let suggested = relevantGoalSuggestion {
-                    Rectangle()
-                        .fill(hairline.opacity(0.72))
-                        .frame(height: 1)
-
-                    HStack(spacing: 11) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 14, weight: .medium))
-                            .foregroundStyle(champagne)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(tr("RELEVANT TODAY", "RELEVANT I DAG"))
-                                .font(.system(size: 10, weight: .semibold))
-                                .tracking(0.9)
-                                .foregroundStyle(champagne)
-                            Text(temporarilyFeaturedGoalID == suggested.id
-                                 ? tr("Your original main goal is unchanged.",
-                                      "Det opprinnelige hovedmålet er uendret.")
-                                 : suggested.title)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(ink)
-                                .lineLimit(2)
-                            if temporarilyFeaturedGoalID != suggested.id {
-                                Text(goalRecommendationReason)
-                                    .font(.caption2)
-                                    .foregroundStyle(muted)
-                                    .lineLimit(2)
-                            }
+                if let suggested = relevantGoalSuggestion,
+                   suggested.id != primaryTrainGoal?.id {
+                    Button {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                            temporarilyFeaturedGoalID =
+                                temporarilyFeaturedGoalID == suggested.id ? nil : suggested.id
                         }
-                        Spacer(minLength: 0)
-                        Button {
-                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                                temporarilyFeaturedGoalID =
-                                    temporarilyFeaturedGoalID == suggested.id
-                                        ? nil : suggested.id
-                            }
-                        } label: {
-                            Text(temporarilyFeaturedGoalID == suggested.id
-                                 ? tr("Main goal", "Hovedmål")
-                                 : tr("Show", "Vis"))
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ink)
-                                .padding(.horizontal, 12)
-                                .frame(minHeight: 40)
-                                .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
+                    } label: {
+                        Label(
                             temporarilyFeaturedGoalID == suggested.id
-                                ? tr("Show my main goal", "Vis hovedmålet mitt")
-                                : tr("Temporarily show suggested goal",
-                                     "Vis foreslått mål midlertidig")
+                                ? tr("Main goal", "Hovedmål")
+                                : tr("Relevant goal", "Relevant mål"),
+                            systemImage: "sparkles"
                         )
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(champagne)
+                        .frame(minHeight: 32)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(goalRecommendationReason)
                 }
             }
-            .padding(16)
-            .premiumTrainSurface(line: hairline)
+            .padding(14)
+            .athlthTrainPaper()
         } else {
             NavigationLink {
                 GoalsHubView()
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "target")
-                        .font(.system(size: 20))
-                        .foregroundStyle(champagne)
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(tr("ACTIVE GOAL", "AKTIVT MÅL"))
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.1)
-                            .foregroundStyle(muted)
-                        Text(tr("Choose something to train toward",
-                                "Velg et mål å trene mot"))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ink)
-                    }
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("Active goal", "Aktivt mål"))
+                        .font(.headline.weight(.semibold))
                         .foregroundStyle(ink)
+                    Image(systemName: "target")
+                        .font(.title2)
+                        .foregroundStyle(champagne)
+                    Text(tr("Choose a goal", "Velg et mål"))
+                        .font(.subheadline)
+                        .foregroundStyle(muted)
                 }
-                .padding(16)
-                .premiumTrainSurface(line: hairline)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .athlthTrainPaper()
             }
             .buttonStyle(.plain)
         }
@@ -1426,29 +1406,33 @@ struct ATHLTHTrainTodayPremiumView: View {
             focusIcon = "sparkles"
         }
 
-        return HStack(alignment: .top, spacing: 13) {
-            Image(systemName: focusIcon)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(champagne)
-                .frame(width: 36, height: 40)
-            VStack(alignment: .leading, spacing: 6) {
-                Text(tr("TODAY'S FOCUS", "DAGENS FOKUS"))
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.1)
-                    .foregroundStyle(muted)
-                Text(focusTitle)
-                    .font(.system(size: 18, weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                    .lineLimit(2)
-                Text(focusBody)
-                    .font(.caption)
-                    .foregroundStyle(muted)
-                    .fixedSize(horizontal: false, vertical: true)
+        return VStack(alignment: .leading, spacing: 13) {
+            Text(tr("Today's focus", "Dagens fokus"))
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(ink)
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: focusIcon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(champagne)
+                    .frame(width: 40, height: 40)
+                    .background(ATHLTHTrainDesign.paleGold.opacity(0.35),
+                                in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(focusTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(focusBody)
+                        .font(.caption2)
+                        .foregroundStyle(muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            Spacer(minLength: 0)
         }
-        .padding(16)
-        .premiumTrainSurface(line: hairline)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .athlthTrainPaper()
     }
 
     private var quickTrainSection: some View {
