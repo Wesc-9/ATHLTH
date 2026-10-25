@@ -2394,8 +2394,14 @@ struct WorkoutTemplateBuilderView: View {
 
     private func plannedPhaseRow(_ phase: WorkoutPhaseKind) -> some View {
         let isSelected = selectedPhase == phase
-        let steps = blocks.filter { $0.resolvedPhase == phase }
-        let knownSeconds = steps.compactMap(\.durationSeconds)
+        // Legacy independent recovery blocks remain visible under the main
+        // phase. Newly created rests inherit the selected actual phase.
+        let steps = blocks.filter {
+            $0.resolvedPhase == phase ||
+                (phase == .main && $0.resolvedPhase == .recovery)
+        }
+        let knownSeconds = steps.expandedForExecution()
+            .compactMap(\.durationSeconds)
             .filter { $0.isFinite && $0 > 0 }.reduce(0, +)
 
         return VStack(alignment: .leading, spacing: 10) {
@@ -2437,6 +2443,54 @@ struct WorkoutTemplateBuilderView: View {
             .accessibilityAddTraits(isSelected ? .isSelected : [])
 
             if isSelected {
+                // A readable live-style phase outline, derived from the
+                // very same blocks that are saved and executed in order.
+                if steps.isEmpty {
+                    Text(tr("No activities added yet", "Ingen aktiviteter lagt til ennå"))
+                        .font(.caption)
+                        .foregroundStyle(studioInk.opacity(0.62))
+                        .padding(.horizontal, 3)
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        ForEach(steps, id: \.editorDragID) { block in
+                            HStack(alignment: .top, spacing: 9) {
+                                Image(systemName: block.wellnessKind?.symbol ??
+                                    (block.activityTag == "cycling" ? "bicycle"
+                                        : block.kind.systemImage))
+                                    .font(.system(size: 13, weight: .medium))
+                                    .foregroundStyle(studioAccent)
+                                    .frame(width: 22, height: 23)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(localizedBlockTitle(block))
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundStyle(studioInk)
+                                        .lineLimit(2)
+                                    if let targets = block.targetText {
+                                        Text(targets)
+                                            .font(.system(size: 11))
+                                            .foregroundStyle(studioInk.opacity(0.66))
+                                            .fixedSize(horizontal: false, vertical: true)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        Text(tr(
+                            "Change time, intensity and order in the workout steps below.",
+                            "Endre tid, intensitet og rekkefølge i øktstegene nedenfor."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(studioInk.opacity(0.60))
+                        .padding(.top, 3)
+                    }
+                    .padding(11)
+                    .background(
+                        ATHLTHPlanDesign.surface,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                }
+
                 HStack(spacing: 7) {
                     phaseAddButton(tr("Running", "Løping"), icon: "figure.run") {
                         selectedPhase = phase
