@@ -1823,6 +1823,13 @@ struct WorkoutTemplateBuilderView: View {
     ) {
         _title = State(initialValue: initialTitle)
         _blocks = State(initialValue: initialBlocks)
+        // A newly planned workout starts at warm-up; when editing a saved
+        // sequence, open its first actual phase instead of assuming main.
+        _selectedPhase = State(initialValue:
+            onSaveToPlan == nil
+                ? .main
+                : initialBlocks.first?.resolvedPhase ?? .warmup
+        )
         _selectedRouteID = State(initialValue: initialRouteID)
         _manualDurationMinutes = State(initialValue: initialDurationOverrideMinutes)
         _durationInputText = State(initialValue: (initialDurationOverrideMinutes ??
