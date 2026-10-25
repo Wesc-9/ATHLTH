@@ -714,7 +714,15 @@ struct AdvancedPlannerView: View {
 
                                 Text(
                                     day.sessions.isEmpty
-                                        ? "Rest"
+                                        ? (day.isRestDay == true
+                                            ? ATHLTHLocalization.choose(
+                                                english: "Rest",
+                                                norwegian: "Hvile"
+                                            )
+                                            : ATHLTHLocalization.choose(
+                                                english: "Free",
+                                                norwegian: "Ledig"
+                                            ))
                                         : "\(day.sessions.count)"
                                 )
                                 .font(.system(size: 9, weight: .semibold))
@@ -787,53 +795,100 @@ struct AdvancedPlannerView: View {
 
                     Spacer()
 
-                    Button {
-                        selectedDayID = day.id
-                        showingSessionEditor = true
-                    } label: {
-                        Label("Add", systemImage: "plus")
+                    if day.isRestDay != true {
+                        Button {
+                            selectedDayID = day.id
+                            showingSessionEditor = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Add workout",
+                                    norwegian: "Legg til økt"
+                                ),
+                                systemImage: "plus"
+                            )
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.small)
+                        .tint(ATHLTHTheme.accentDeep)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .tint(ATHLTHTheme.accent)
                 }
 
                 if day.sessions.isEmpty {
-                    Button {
-                        selectedDayID = day.id
-                        showingSessionEditor = true
-                    } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title3)
-                                .foregroundStyle(ATHLTHTheme.accent)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Rest day — or add")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(
-                                        ATHLTHTheme.primaryText
-                                    )
-
-                                Text(
-                                    "Strength, run, walk, mobility and recovery can all be planned here."
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-                        }
-                        .padding(14)
-                        .background(
-                            ATHLTHTheme.accentSoft.opacity(0.55),
-                            in: RoundedRectangle(
-                                cornerRadius: 16,
-                                style: .continuous
+                    VStack(alignment: .leading, spacing: 10) {
+                        if day.isRestDay == true {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Planned rest day · not counted as training",
+                                    norwegian: "Planlagt hviledag · teller ikke som trening"
+                                ),
+                                systemImage: "leaf"
                             )
-                        )
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                            Button {
+                                _ = session.setPlanDayRestStatus(
+                                    planID: plan.id,
+                                    dayID: day.id,
+                                    isRestDay: false
+                                )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Remove rest day",
+                                        norwegian: "Fjern hviledag"
+                                    ),
+                                    systemImage: "arrow.uturn.backward"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                        } else {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Free day · choose workout or rest",
+                                norwegian: "Ledig dag · velg økt eller hviledag"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+
+                            Button {
+                                _ = session.setPlanDayRestStatus(
+                                    planID: plan.id,
+                                    dayID: day.id,
+                                    isRestDay: true
+                                )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Mark as rest day",
+                                        norwegian: "Sett som hviledag"
+                                    ),
+                                    systemImage: "leaf"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+
+                            Button {
+                                selectedDayID = day.id
+                                showingSessionEditor = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Add workout",
+                                        norwegian: "Legg til økt"
+                                    ),
+                                    systemImage: "plus"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                        }
                     }
-                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(
+                        ATHLTHTheme.champagneSoft.opacity(0.5),
+                        in: RoundedRectangle(cornerRadius: 16)
+                    )
                 } else {
                     VStack(spacing: 10) {
                         ForEach(day.sessions) { workout in
@@ -909,7 +964,15 @@ struct AdvancedPlannerView: View {
                                 ) {
                                     Text(
                                         day.sessions.isEmpty
-                                            ? "Rest"
+                                            ? (day.isRestDay == true
+                                                ? ATHLTHLocalization.choose(
+                                                    english: "Rest day",
+                                                    norwegian: "Hviledag"
+                                                )
+                                                : ATHLTHLocalization.choose(
+                                                    english: "Unplanned day",
+                                                    norwegian: "Ledig dag"
+                                                ))
                                             : day.sessions
                                                 .map(\.title)
                                                 .joined(
