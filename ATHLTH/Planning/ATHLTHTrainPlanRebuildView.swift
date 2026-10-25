@@ -439,14 +439,14 @@ struct ATHLTHTrainPlanRebuildView: View {
                                             .font(.subheadline.weight(.semibold))
                                             .foregroundStyle(ATHLTHTheme.primaryText)
                                         Text(
-                                            skipped
-                                                ? ATHLTHLocalization.choose(
-                                                    english: "Skipped",
-                                                    norwegian: "Hoppet over"
-                                                )
-                                                : workout.exercises.isEmpty
+                                            recordedPlanStatus(
+                                                for: workout,
+                                                planID: plan.id
+                                            ) ?? (
+                                                workout.exercises.isEmpty
                                                     ? workout.kind.title
                                                     : "\(workout.exercises.count) øvelser"
+                                            )
                                         )
                                         .font(.caption2)
                                         .foregroundStyle(
@@ -663,6 +663,37 @@ struct ATHLTHTrainPlanRebuildView: View {
                     lineWidth: isToday ? 1.1 : 0.75
                 )
         }
+    }
+
+    private func recordedPlanStatus(
+        for workout: PlannedSession,
+        planID: UUID
+    ) -> String? {
+        if session.isPlanSessionSkipped(
+            planID: planID, sessionID: workout.id
+        ) {
+            return ATHLTHLocalization.choose(
+                english: "Skipped", norwegian: "Hoppet over"
+            )
+        }
+        if session.isPlanSessionManuallyCompleted(
+            planID: planID, sessionID: workout.id
+        ) || strength.workoutHistory.contains(where: {
+            $0.plannedSessionID == workout.id && $0.isFullyCompleted
+        }) {
+            return ATHLTHLocalization.choose(
+                english: "Completed", norwegian: "Gjennomført"
+            )
+        }
+        if strength.workoutHistory.contains(where: {
+            $0.plannedSessionID == workout.id && $0.isFinished
+        }) {
+            return ATHLTHLocalization.choose(
+                english: "Partially completed",
+                norwegian: "Delvis gjennomført"
+            )
+        }
+        return nil
     }
 
     private func canEditOccurrence(
