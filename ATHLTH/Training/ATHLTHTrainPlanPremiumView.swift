@@ -462,11 +462,18 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
             HStack(spacing: 9) {
                 Button {
-                    beginNewPlanCreation()
+                    if let draft = unfinishedPlanDrafts.first {
+                        openDraft(draft)
+                    } else {
+                        beginNewPlanCreation()
+                    }
                 } label: {
                     Label(
-                        tr("Build new plan", "Bygg ny plan"),
-                        systemImage: "plus"
+                        unfinishedPlanDrafts.isEmpty
+                            ? tr("Build new plan", "Bygg ny plan")
+                            : tr("Continue draft", "Fortsett utkast"),
+                        systemImage: unfinishedPlanDrafts.isEmpty
+                            ? "plus" : "arrow.uturn.forward"
                     )
                     .font(.subheadline.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 52)
@@ -545,16 +552,28 @@ struct ATHLTHTrainPlanPremiumView: View {
             .frame(height: 172)
             .clipShape(RoundedRectangle(cornerRadius: 19))
             .accessibilityHidden(true)
-            Text(tr("Your plan starts here", "Her starter treningsplanen din"))
+            Text(tr("No active training plan", "Ingen aktiv treningsplan"))
                 .font(.system(size: 25, weight: .regular, design: .serif))
                 .foregroundStyle(graphite)
             Text(tr(
-                "Start with a simple weekly rhythm or build each training day from warm-up to cooldown. Existing plans and templates can be reused in the builder.",
-                "Velg enkel ukeplanlegging eller bygg hver dag fra oppvarming til nedjogg. Lagrede planer og maler kan gjenbrukes i byggeren."
+                "Choose a saved program in My plans, or build a new one. Past plans and completed workouts remain saved.",
+                "Åpne en lagret treningsplan fra Mine planer, eller bygg en ny. Tidligere planer og gjennomførte økter beholdes."
             ))
             .font(.subheadline)
             .foregroundStyle(secondaryInk)
             .fixedSize(horizontal: false, vertical: true)
+            if !session.trainingPlans.isEmpty {
+                Button {
+                    browsingMyPlans = true
+                } label: {
+                    Label(tr("Open My plans", "Åpne Mine planer"),
+                          systemImage: "square.stack")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 44)
+                        .foregroundStyle(graphite)
+                }
+                .buttonStyle(.plain)
+            }
             Button {
                 showingTemplates = true
             } label: {
@@ -983,8 +1002,9 @@ struct ATHLTHTrainPlanPremiumView: View {
                             healthWorkouts: health.workouts,
                             strengthHistory: strength.workoutHistory
                         ),
-                        simplePresentation: true,
-                        onStartWorkout: launchFromWorkoutDetails
+                        simplePresentation: true
+                        // The Plan tab is for reading and editing. Starting a
+                        // session remains a deliberate action from I dag.
                     )
                 }
             } else {
@@ -1483,10 +1503,19 @@ struct ATHLTHTrainPlanPremiumView: View {
                     )
                 }
             }
-            Button {
-                beginNewPlanCreation()
-            } label: {
-                Label(tr("New program", "Nytt program"), systemImage: "plus")
+            if unfinishedPlanDrafts.isEmpty {
+                Button {
+                    beginNewPlanCreation()
+                } label: {
+                    Label(tr("New program", "Nytt program"), systemImage: "plus")
+                }
+            } else if let draft = unfinishedPlanDrafts.first {
+                Button {
+                    openDraft(draft)
+                } label: {
+                    Label(tr("Continue draft", "Fortsett utkast"),
+                          systemImage: "arrow.uturn.forward")
+                }
             }
         } label: {
             HStack(spacing: 6) {
@@ -1715,11 +1744,20 @@ struct ATHLTHTrainPlanPremiumView: View {
                     Button { browsingMyPlans = true } label: {
                         Label(tr("My plans", "Mine planer"), systemImage: "square.stack")
                     }
-                    Button {
-                        beginNewPlanCreation()
-                    } label: {
-                        Label(tr("Create new plan", "Ny treningsplan"),
-                              systemImage: "plus")
+                    if unfinishedPlanDrafts.isEmpty {
+                        Button {
+                            beginNewPlanCreation()
+                        } label: {
+                            Label(tr("Create new plan", "Ny treningsplan"),
+                                  systemImage: "plus")
+                        }
+                    } else if let draft = unfinishedPlanDrafts.first {
+                        Button {
+                            openDraft(draft)
+                        } label: {
+                            Label(tr("Continue draft", "Fortsett utkast"),
+                                  systemImage: "arrow.uturn.forward")
+                        }
                     }
                     Divider()
                     Button(role: .destructive) {
