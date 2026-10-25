@@ -4,6 +4,7 @@ import Foundation
 /// The workout's source ID must remain stable across every motor transition.
 enum ATHLTHLiveWorkoutEngine: String, Codable, Hashable {
     case endurance
+    case cycling
     case strength
     case recovery
     case mobility
@@ -14,6 +15,9 @@ enum ATHLTHLiveWorkoutEngine: String, Codable, Hashable {
         case .endurance:
             return ATHLTHLocalization.choose(
                 english: "Run / endurance", norwegian: "Løping / utholdenhet")
+        case .cycling:
+            return ATHLTHLocalization.choose(
+                english: "Cycling", norwegian: "Sykling")
         case .strength:
             return ATHLTHLocalization.choose(
                 english: "Strength", norwegian: "Styrke")
@@ -32,6 +36,7 @@ enum ATHLTHLiveWorkoutEngine: String, Codable, Hashable {
     var systemImage: String {
         switch self {
         case .endurance: return "figure.run"
+        case .cycling: return "bicycle"
         case .strength: return "dumbbell.fill"
         case .recovery: return "timer"
         case .mobility: return "figure.cooldown"
@@ -44,6 +49,9 @@ enum ATHLTHLiveWorkoutEngine: String, Codable, Hashable {
         case .endurance:
             return ATHLTHLocalization.choose(
                 english: "Finish interval & next", norwegian: "Fullfør drag og neste")
+        case .cycling:
+            return ATHLTHLocalization.choose(
+                english: "Finish cycling & next", norwegian: "Fullfør sykling og neste")
         case .strength:
             return ATHLTHLocalization.choose(
                 english: "Finish set & next", norwegian: "Fullfør sett og neste")
@@ -94,6 +102,11 @@ enum ATHLTHLiveWorkoutEngineRouter {
         case .rest:
             return .recovery
         case .note:
+            if block.activityTag == "cycling" {
+                // Display-only timed cycling phase within the same workout;
+                // no invented speed, cadence or separate HealthKit session.
+                return .cycling
+            }
             if block.wellnessKind != nil {
                 return .mobility
             }
