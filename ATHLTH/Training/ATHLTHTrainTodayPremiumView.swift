@@ -1554,25 +1554,17 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .font(.system(size: 26, weight: .regular, design: .serif))
                     .foregroundStyle(ink)
                 Spacer(minLength: 4)
-                Button {
-                    if plan == nil {
-                        onCreatePlan()
-                    } else {
-                        onOpenPlan()
-                    }
-                } label: {
+                Button(action: onOpenLibrary) {
                     HStack(spacing: 5) {
-                        Image(systemName: "calendar.badge.plus")
-                        Text(tr("Plan", "Planlegg"))
+                        Text(tr("See all", "Se alle"))
+                        Image(systemName: "chevron.right")
                     }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ink)
-                    .padding(.horizontal, 10)
-                    .frame(minHeight: 36)
-                    .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(muted)
+                    .frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(tr("Plan a workout", "Planlegg en økt"))
+                .accessibilityLabel(tr("Explore all workouts", "Se alle treningsøkter"))
             }
 
             LazyVGrid(
@@ -1593,39 +1585,33 @@ struct ATHLTHTrainTodayPremiumView: View {
         Button {
             openQuickActivity(activity)
         } label: {
-            ZStack(alignment: .bottomLeading) {
-                GeometryReader { geometry in
-                    Image(activity.image)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: geometry.size.width, height: 92)
-                        .clipped()
-                }
-                .frame(height: 92)
-
-                LinearGradient(
-                    colors: [
-                        .black.opacity(0.03), .black.opacity(0.12),
-                        .black.opacity(0.74)
-                    ], startPoint: .top, endPoint: .bottom
-                )
-
-                HStack(alignment: .bottom, spacing: 6) {
-                    Image(systemName: activity.icon)
-                        .font(.system(size: 16, weight: .semibold))
-                    Text(activity.title)
-                        .font(.system(size: 13, weight: .semibold))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                    Spacer(minLength: 0)
-                }
-                .foregroundStyle(.white)
-                .padding(11)
+            VStack(alignment: .leading, spacing: 14) {
+                Image(systemName: activity.icon)
+                    .font(.system(size: 21, weight: .light))
+                    .foregroundStyle(champagne)
+                    .frame(width: 37, height: 37)
+                    .background(
+                        ATHLTHPlanDesign.warmSurface,
+                        in: RoundedRectangle(cornerRadius: 11)
+                    )
+                Text(activity.title)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                Spacer(minLength: 0)
             }
-            .frame(height: 92)
-            .frame(maxWidth: .infinity)
-            .clipShape(RoundedRectangle(cornerRadius: 15))
-            .contentShape(RoundedRectangle(cornerRadius: 15))
+            .frame(maxWidth: .infinity, minHeight: 105, alignment: .topLeading)
+            .padding(14)
+            .background(
+                Color.white,
+                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(hairline.opacity(0.75), lineWidth: 0.75)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 16))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(activity.title)
