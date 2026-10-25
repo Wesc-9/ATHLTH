@@ -11,7 +11,7 @@ This is the authoritative implementation checklist for the agreed Train redesign
 3. Show **Aktiv plan** only if a plan exists, compactly displaying title, current week and truthful plan progress; tap opens the plan.
 4. **Dagens økt** is the dominant action card, with the correct session title, workout-specific metadata, thumbnail, details and an accessible Start/Continue action. Do not show an extra “Neste i dag” section.
 5. **Start en økt** has a 2×3 quick-start selection: løping, gå, styrke, sykling, yoga and egendefinert. Order by the user's *previous taps* (not completed-session count); have stable default order and a way to access all activities. Do not let stored preferences block an activity.
-6. **Aktivt mål** and **Dagens fokus** below. Avoid duplicating Home's Ukens fremdrift or Friends sections.
+6. **Aktivt mål** and **Dagens fokus** below. Avoid duplicating Home's Ukens fremdrift or Friends sections. The athlete selected **C – personalized intelligent goal spotlight**: the saved primary goal stays primary. A relevant, explicitly active goal may be offered for today's verified workout category. Only a manual on-screen tap temporarily highlights it; "Hovedmål" restores the original view. No goal persistence or primary-goal mutation. Do not suggest mismatched, paused, completed or foreign-plan goals.
 7. When there is **no planned workout**, the primary card uses a situational blend of a relevant suggestion, a repeatable earlier workout and discovery – based only on available data, without inventing readiness or historical performance.
 
 ## Navigation behavior
@@ -34,9 +34,9 @@ This is the authoritative implementation checklist for the agreed Train redesign
 ## Delivery / validation tracking
 - [ ] Compact visual Train navigation integrated with the hero.
 - [ ] Smart show/hide and per-section scroll restoration.
-- [ ] Today hierarchy: active plan and dominant daily session; remove duplicate widgets.
-- [ ] 2×3 quick start, persistent tap-based sorting.
-- [ ] Active goal and daily focus.
+- [x] Today hierarchy: compact active plan and dominant daily session; removed redundant next-session panel (implemented; visual QA pending).
+- [x] 2×3 quick start, persistent tap-based sorting (implemented; build verification pending).
+- [x] Active goal and daily focus, with reversible contextual suggestion (implemented; build verification pending).
 - [ ] Contextual card when no session is scheduled.
 - [ ] Workout-type live primary card, including Watch/strength/run fallback.
 - [ ] Verify navigation transitions, no duplicates, reduced motion, long text, workout resume.

@@ -1123,6 +1123,23 @@ struct ATHLTHTrainTodayPremiumView: View {
         return workout.kind
     }
 
+    private var goalRecommendationReason: String {
+        switch goalContextKind {
+        case .running:
+            return tr("Matches today's run", "Passer til dagens løpeøkt")
+        case .walking:
+            return tr("Matches today's walk", "Passer til dagens gåøkt")
+        case .strength:
+            return tr("Matches today's strength training", "Passer til dagens styrkeøkt")
+        case .mobility:
+            return tr("Matches today's mobility work", "Passer til dagens bevegelighetstrening")
+        case .recovery:
+            return tr("Matches today's recovery", "Passer til dagens restitusjon")
+        case .custom, .none:
+            return tr("Relevant to today's workout", "Relevant for dagens trening")
+        }
+    }
+
     private var relevantGoalSuggestion: ATHLTHGoal? {
         ATHLTHTrainGoalPriority.recommend(
             goals: goalStore.activeGoals,
@@ -1211,6 +1228,12 @@ struct ATHLTHTrainTodayPremiumView: View {
                                 .font(.caption.weight(.medium))
                                 .foregroundStyle(ink)
                                 .lineLimit(2)
+                            if temporarilyFeaturedGoalID != suggested.id {
+                                Text(goalRecommendationReason)
+                                    .font(.caption2)
+                                    .foregroundStyle(muted)
+                                    .lineLimit(2)
+                            }
                         }
                         Spacer(minLength: 0)
                         Button {
