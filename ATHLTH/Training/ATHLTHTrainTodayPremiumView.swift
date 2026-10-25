@@ -179,9 +179,17 @@ struct ATHLTHTrainTodayPremiumView: View {
                     dailyFocusSection
                 }
             } else {
-                HStack(alignment: .top, spacing: 10) {
-                    activeGoalSection.frame(maxWidth: .infinity, alignment: .topLeading)
-                    dailyFocusSection.frame(maxWidth: .infinity, alignment: .topLeading)
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 10) {
+                        activeGoalSection.frame(maxWidth: .infinity, alignment: .topLeading)
+                        dailyFocusSection.frame(maxWidth: .infinity, alignment: .topLeading)
+                    }
+                    .frame(minWidth: 335)
+
+                    VStack(spacing: 10) {
+                        activeGoalSection
+                        dailyFocusSection
+                    }
                 }
             }
         }
