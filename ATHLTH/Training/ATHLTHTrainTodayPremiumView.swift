@@ -79,7 +79,9 @@ struct ATHLTHTrainTodayPremiumView: View {
             if let plan {
                 activePlanSection(plan)
             }
-            todayAgendaStrip
+            // The hero already shows the date and the active plan shows
+            // program progress. Go straight to the primary session instead
+            // of repeating another Today overview above it.
             // A running recording takes priority over a planned-start card.
             if hasActiveWorkout, let activeWorkoutCard {
                 activeWorkoutCard
