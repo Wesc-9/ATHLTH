@@ -71,5 +71,8 @@ final class ATHLTHWorkoutBlockEditingTests: XCTestCase {
             ATHLTHWorkoutBlockEditing.appending(original, kind: .exercise),
             original
         )
+        XCTAssertTrue(
+            ATHLTHWorkoutBlockEditing.appending([], kind: .note).isEmpty
+        )
     }
 }
