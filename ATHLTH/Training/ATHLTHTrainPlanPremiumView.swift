@@ -14,6 +14,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     // Embedded plan previews without that owner remain read-only for launch.
     var onStartWorkout: ((UUID, PlannedSession) -> Void)? = nil
     @State private var focusedPlanID: UUID?
+    @State private var showingPlanTools = false
 
     @AppStorage("athlth.planWorkspace.advancedMode")
     private var advanced = false
@@ -102,7 +103,10 @@ struct ATHLTHTrainPlanPremiumView: View {
            let selected = session.trainingPlans.first(where: { $0.id == id }) {
             return selected
         }
-        return session.activePlan ?? session.trainingPlans.first
+        // No active plan means no active plan. Previously the first
+        // historical/saved plan was silently displayed as the current one.
+        // A non-active plan is shown only when explicitly opened from Mine planer.
+        return session.activePlan
     }
 
     private var selectedWeek: TrainingPlanWeek? {
@@ -309,10 +313,9 @@ struct ATHLTHTrainPlanPremiumView: View {
     // A single Plan Studio entry, backed by the existing plan records and editors.
     // Simple and advanced change the amount of visible detail, not the data.
     private var planContent: some View {
-        VStack(alignment: .leading, spacing: 19) {
-            studioWelcome
-            studioEntryPoints
-
+        VStack(alignment: .leading, spacing: 17) {
+            // The selected plan is the entire purpose of this tab. Keep it
+            // above creation, mode and management controls.
             if browsingMyPlans {
                 savedPlansOverview
             } else if let plan {
@@ -321,9 +324,13 @@ struct ATHLTHTrainPlanPremiumView: View {
                 studioEmptyState
             }
 
+            // An unfinished draft is recoverable directly from the workspace.
+            // It must never silently disappear when the user changes tabs.
             ForEach(unfinishedPlanDrafts) { checkpoint in
                 continuePlanDraftCard(checkpoint)
             }
+
+            studioPlanTools
         }
         .foregroundStyle(graphite)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -372,6 +379,32 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
     }
 
+
+    private var studioPlanTools: some View {
+        DisclosureGroup(isExpanded: $showingPlanTools) {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(tr(
+                    "Choose simple weekly editing or day-by-day detail. Your plan, workouts and drafts are unchanged.",
+                    "Velg enkel ukevisning eller detaljert dag-for-dag-redigering. Planer, økter og utkast påvirkes ikke."
+                ))
+                .font(.caption)
+                .foregroundStyle(secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+                studioEntryPoints
+            }
+            .padding(.top, 13)
+        } label: {
+            Label(
+                tr("Manage and build plans", "Administrer og bygg planer"),
+                systemImage: "slider.horizontal.3"
+            )
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(graphite)
+            .frame(minHeight: 42, alignment: .leading)
+        }
+        .padding(16)
+        .athlthPlanCard(radius: 19)
+    }
 
     private var studioWelcome: some View {
         VStack(alignment: .leading, spacing: 11) {
