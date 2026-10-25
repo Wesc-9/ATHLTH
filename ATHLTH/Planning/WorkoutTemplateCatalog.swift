@@ -2124,6 +2124,9 @@ struct WorkoutTemplateBuilderView: View {
                     workoutOverview
                     durationSettings
                     if isPlannedWorkout {
+                        plannedPhaseComposer
+                    }
+                    if isPlannedWorkout {
                         workoutActions
                     }
                     timeline
@@ -2341,6 +2344,164 @@ struct WorkoutTemplateBuilderView: View {
                 Capsule().strokeBorder(isPlannedWorkout ? ATHLTHPlanDesign.outline
                                        : Color.clear, lineWidth: 0.7)
             }
+    }
+
+    /// Plan the same chronological phases that the live session executes.
+    /// Selecting a phase never creates a second workout or a separate engine.
+    private var plannedPhaseComposer: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Text(tr("WORKOUT PHASES", "ØKTENS DELER"))
+                    .font(.system(size: 11, weight: .bold))
+                    .tracking(1.3)
+                    .foregroundStyle(studioInk)
+                Spacer(minLength: 0)
+                Text(tr("One connected session", "Én sammenhengende økt"))
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(studioInk.opacity(0.60))
+            }
+
+            ForEach(
+                [WorkoutPhaseKind.warmup, .main, .cooldown]
+            ) { phase in
+                plannedPhaseRow(phase)
+            }
+
+            Text(tr(
+                "Time and intensity belong to each activity. Running, strength and cycling can be mixed in the same phase. Pauses can be inserted between steps.",
+                "Tid og intensitet settes for hver aktivitet. Løping, styrke og sykling kan blandes i samme del. Pauser kan legges mellom stegene."
+            ))
+            .font(.caption)
+            .foregroundStyle(studioInk.opacity(0.67))
+            .fixedSize(horizontal: false, vertical: true)
+            .padding(.horizontal, 3)
+        }
+        .padding(14)
+        .athlthPlanCard(radius: 21, warm: true)
+    }
+
+    private func plannedPhaseRow(_ phase: WorkoutPhaseKind) -> some View {
+        let isSelected = selectedPhase == phase
+        let steps = blocks.filter { $0.resolvedPhase == phase }
+        let knownSeconds = steps.compactMap(\.durationSeconds)
+            .filter { $0.isFinite && $0 > 0 }.reduce(0, +)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    selectedPhase = phase
+                }
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: phase.symbol)
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(isSelected ? Color.white : studioAccent)
+                        .frame(width: 39, height: 39)
+                        .background(
+                            isSelected ? studioAccent : ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(phase.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(studioInk)
+                        Text("\(steps.count) " +
+                             tr("blocks", "blokker") +
+                             (knownSeconds > 0
+                                ? " · " + shortDuration(knownSeconds) : ""))
+                            .font(.caption)
+                            .foregroundStyle(studioInk.opacity(0.64))
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: isSelected ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(studioInk.opacity(0.64))
+                }
+                .frame(minHeight: 48)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(phase.title)
+            .accessibilityAddTraits(isSelected ? .isSelected : [])
+
+            if isSelected {
+                HStack(spacing: 7) {
+                    phaseAddButton(tr("Running", "Løping"), icon: "figure.run") {
+                        selectedPhase = phase
+                        addRunBlock(activity: .running)
+                    }
+                    phaseAddButton(tr("Strength", "Styrke"), icon: "dumbbell.fill") {
+                        selectedPhase = phase
+                        openExercisePicker()
+                    }
+                    phaseAddButton(tr("Cycling", "Sykling"), icon: "bicycle") {
+                        selectedPhase = phase
+                        addCyclingBlock()
+                    }
+                }
+                Menu {
+                    Button(tr("Walking", "Gåing"), systemImage: "figure.walk") {
+                        selectedPhase = phase
+                        addRunBlock(activity: .walking)
+                    }
+                    Button(tr("Yoga", "Yoga"), systemImage: "figure.yoga") {
+                        selectedPhase = phase
+                        addWellnessBlock(.yoga)
+                    }
+                    Button(tr("Stretching", "Uttøying"),
+                           systemImage: "figure.flexibility") {
+                        selectedPhase = phase
+                        addWellnessBlock(.stretching)
+                    }
+                    Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
+                        selectedPhase = phase
+                        addRestBlock()
+                    }
+                    Button(tr("Intervals", "Intervaller"), systemImage: "repeat") {
+                        selectedPhase = phase
+                        createIntervals()
+                    }
+                } label: {
+                    Label(tr("More activities and blocks", "Flere aktiviteter og blokker"),
+                          systemImage: "plus.circle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(studioAccent)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                }
+            }
+        }
+        .padding(11)
+        .background(
+            isSelected ? ATHLTHPlanDesign.selectedSurface
+                : ATHLTHPlanDesign.surface,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(isSelected ? studioAccent.opacity(0.35)
+                    : ATHLTHPlanDesign.outline, lineWidth: 0.8)
+        }
+    }
+
+    private func phaseAddButton(
+        _ title: String, icon: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .medium))
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(studioInk)
+            .frame(maxWidth: .infinity, minHeight: 55)
+            .background(ATHLTHPlanDesign.surface,
+                        in: RoundedRectangle(cornerRadius: 11))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tr("Add", "Legg til") + " " + title)
     }
 
     private var timeline: some View {
@@ -3504,7 +3665,7 @@ struct WorkoutTemplateBuilderView: View {
             sequence: 0, kind: .note,
             title: tr("Cycling", "Sykling"),
             exerciseSlug: nil, distanceMeters: nil,
-            repetitions: nil, durationSeconds: 1800,
+            repetitions: nil, durationSeconds: selectedPhase == .main ? 1800 : 600,
             targetWeightKilograms: nil, loadNote: nil,
             notes: nil, phase: selectedPhase
         )
@@ -3708,8 +3869,11 @@ struct WorkoutTemplateBuilderView: View {
             blocks.insert(block, at: last + 1)
             expandedBlockIndex = last + 1
         } else {
-            blocks.append(block)
-            expandedBlockIndex = blocks.count - 1
+            let position = ATHLTHWorkoutPhasePlacement.insertionIndex(
+                for: block.resolvedPhase, in: blocks
+            )
+            blocks.insert(block, at: position)
+            expandedBlockIndex = position
         }
         resequence()
     }
@@ -3721,8 +3885,10 @@ struct WorkoutTemplateBuilderView: View {
         var block = WorkoutTemplateBlock(
             sequence: 0, kind: .run,
             title: activity == .walking ? tr("Walking", "Gåing") : tr("Running", "Løping"),
-            exerciseSlug: nil, distanceMeters: 1_000,
-            repetitions: nil, durationSeconds: nil,
+            exerciseSlug: nil,
+            distanceMeters: selectedPhase == .main ? 1_000 : nil,
+            repetitions: nil,
+            durationSeconds: selectedPhase == .main ? nil : 600,
             targetWeightKilograms: nil, loadNote: nil,
             notes: nil, phase: selectedPhase
         )
