@@ -48,8 +48,10 @@ final class ATHLTHWorkoutPhaseRelocationTests: XCTestCase {
         XCTAssertEqual(result[1].groupID, id)
         XCTAssertEqual(result[2].groupID, id)
         let expanded = result.expandedForExecution()
-        XCTAssertEqual(expanded.filter { $0.title == "Effort" }.count, 4)
-        XCTAssertEqual(expanded.filter { $0.title == "Recovery" }.count, 3)
+        // Executed group members receive a round suffix (e.g. "Effort · 1/4").
+        // Assert all four efforts and only the three between-round recoveries.
+        XCTAssertEqual(expanded.filter { $0.title.hasPrefix("Effort · ") }.count, 4)
+        XCTAssertEqual(expanded.filter { $0.title.hasPrefix("Recovery · ") }.count, 3)
     }
 
     func testSingleStrengthExerciseMovesAfterMainBeforeCooldown() {
