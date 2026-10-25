@@ -193,9 +193,8 @@ final class ATHLTHWorkoutDurationEstimatorTests: XCTestCase {
             runIntervals, rest, runIntervals, rest,
             runIntervals, rest, runIntervals,
             walk, stretch
-        ].enumerated().map { index, step -> WorkoutTemplateBlock in
+        ].map { step -> WorkoutTemplateBlock in
             var copy = step
-            copy.sequence = index + 1
             // These represent the four actual work steps, not four groups.
             copy.groupRounds = nil
             copy.groupKind = nil
