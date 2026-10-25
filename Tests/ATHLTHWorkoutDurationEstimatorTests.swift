@@ -176,7 +176,7 @@ final class ATHLTHWorkoutDurationEstimatorTests: XCTestCase {
         var runIntervals = block(.run, "Four running intervals", seconds: 240)
         runIntervals.phase = .main
         runIntervals.groupRounds = 4
-        runIntervals.groupKind = .interval
+        runIntervals.groupKind = .intervals
         runIntervals.groupID = UUID()
         var rest = block(.rest, "Recovery", seconds: 120)
         rest.phase = .main
