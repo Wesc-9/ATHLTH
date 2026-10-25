@@ -4296,16 +4296,48 @@ struct ATHLTHTrainView: View {
     var body: some View {
         NavigationStack {
             ATHLTHExclusiveHomeHeroLayout(
-                accent: Color.green.opacity(0.42),
+                accent: ATHLTHTheme.premiumGold.opacity(0.18),
                 showsTopSheen: false,
                 pullDownFadeBridge: true
             ) {
                 ZStack(alignment: .topTrailing) {
-                    ATHLTHExclusiveHomeHero(
-                        imageName: "TrainHero",
-                        title: "Train",
-                        subtitle: "Build a stronger, healthier you."
-                    )
+                    if selectedSection == 1 {
+                        ZStack(alignment: .bottomLeading) {
+                            LinearGradient(
+                                colors: [
+                                    Color.white,
+                                    ATHLTHTheme.champagneSoft
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("ATHLTH / TRAIN")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .tracking(2.1)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Training plan",
+                                    norwegian: "Treningsplan"
+                                ))
+                                .font(.system(
+                                    size: 24, weight: .medium, design: .serif
+                                ))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                            }
+                            .padding(.horizontal, 18)
+                            .padding(.bottom, 25)
+                        }
+                        .frame(height: 182)
+                    } else {
+                        // Preserve the existing approved hero asset in
+                        // I dag until its exact source artwork is replaced.
+                        ATHLTHExclusiveHomeHero(
+                            imageName: "TrainHero",
+                            title: "Train",
+                            subtitle: "Build a stronger, healthier you."
+                        )
+                    }
 
                     ATHLTHTrainSectionSwitcher(
                         titles: [
@@ -4333,16 +4365,22 @@ struct ATHLTHTrainView: View {
                     } label: {
                         Image(systemName: "square.grid.2x2.fill")
                             .font(.system(size: 15, weight: .semibold))
-                            .foregroundStyle(.white)
+                            .foregroundStyle(
+                                selectedSection == 1
+                                    ? ATHLTHTheme.accentDeep
+                                    : .white
+                            )
                             .frame(width: 36, height: 36)
                             .background(
-                                Color.black.opacity(0.20),
+                                selectedSection == 1
+                                    ? Color.white.opacity(0.90)
+                                    : Color.black.opacity(0.20),
                                 in: Circle()
                             )
                             .overlay {
                                 Circle()
                                     .stroke(
-                                        Color.white.opacity(0.30),
+                                        ATHLTHTheme.premiumGold.opacity(0.30),
                                         lineWidth: 0.8
                                     )
                             }
