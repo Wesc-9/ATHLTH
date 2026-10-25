@@ -5797,7 +5797,7 @@ struct ATHLTHTrainView: View {
                     // Keep the same Today / Plan / Progress navigation visible
                     // while the independent, full-bleed Progress screen scrolls.
                     VStack(spacing: 0) {
-                        premiumTrainTabs
+                        premiumTrainBrandHeader
                             .padding(.horizontal, 17)
                             .padding(.top, 12)
                             .padding(.bottom, 8)
@@ -6489,7 +6489,9 @@ struct ATHLTHTrainView: View {
 
                 Text(selectedSection == 1
                     ? ATHLTHLocalization.choose(english: "Plan", norwegian: "Plan")
-                    : ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"))
+                    : selectedSection == 2
+                        ? ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremdrift")
+                        : ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"))
                     .font(.system(size: 25, weight: .semibold, design: .serif))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
             }
