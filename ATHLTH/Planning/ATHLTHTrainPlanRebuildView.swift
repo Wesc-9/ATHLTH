@@ -6,8 +6,31 @@ struct ATHLTHTrainPlanRebuildView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
 
-    @State private var chosenWeekID: UUID?
-    @State private var expandedDayIDs: Set<UUID> = []
+    // Keep the user's place when switching between I dag and Plan.
+    // Scene storage is view-local and does not change persisted plans.
+    @SceneStorage("athlth.train.plan.lastPlanID")
+    private var rememberedPlanID = ""
+    @SceneStorage("athlth.train.plan.weekID")
+    private var rememberedWeekID = ""
+    @SceneStorage("athlth.train.plan.expandedDays")
+    private var rememberedExpandedDays = ""
+
+    private var chosenWeekID: UUID? {
+        get { UUID(uuidString: rememberedWeekID) }
+        nonmutating set { rememberedWeekID = newValue?.uuidString ?? "" }
+    }
+
+    private var expandedDayIDs: Set<UUID> {
+        get {
+            Set(rememberedExpandedDays.split(separator: ",").compactMap {
+                UUID(uuidString: String($0))
+            })
+        }
+        nonmutating set {
+            rememberedExpandedDays = newValue.map(\.uuidString)
+                .sorted().joined(separator: ",")
+        }
+    }
     @State private var selectedWorkout: PlannedSession?
     @State private var selectedStandaloneWorkout: PlannedSession?
     @State private var workoutPendingMove: PlannedSession?
@@ -20,6 +43,14 @@ struct ATHLTHTrainPlanRebuildView: View {
     @State private var showingCreatePlan = false
 
     private var plan: TrainingPlan? { session.activePlan }
+
+    private func restoreSelectionForActivePlan() {
+        let activeID = plan?.id.uuidString ?? ""
+        guard rememberedPlanID != activeID else { return }
+        rememberedPlanID = activeID
+        chosenWeekID = nil
+        expandedDayIDs = []
+    }
 
     private var selectedWeek: TrainingPlanWeek? {
         guard let plan else { return nil }
@@ -53,7 +84,7 @@ struct ATHLTHTrainPlanRebuildView: View {
                             .tracking(1.7)
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                             Spacer()
-                            Text("\(week.days.reduce(0) { $0 + $1.sessions.count }) økter")
+                            Text("\(weekWorkoutCount(week, in: plan)) økter")
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
@@ -74,7 +105,13 @@ struct ATHLTHTrainPlanRebuildView: View {
                 standaloneSection
             }
         }
-        .onChange(of: plan?.id) { _, _ in
+        .onAppear {
+            // A different active plan must never inherit day selections
+            // from the plan that was active during the previous visit.
+            restoreSelectionForActivePlan()
+        }
+        .onChange(of: plan?.id) { _, newID in
+            rememberedPlanID = newID?.uuidString ?? ""
             chosenWeekID = nil
             expandedDayIDs = []
         }
@@ -176,6 +213,21 @@ struct ATHLTHTrainPlanRebuildView: View {
         }
         .sheet(isPresented: $showingCreatePlan) {
             TrainingPlanCreationView()
+        }
+    }
+
+    private func weekWorkoutCount(
+        _ week: TrainingPlanWeek,
+        in plan: TrainingPlan
+    ) -> Int {
+        week.days.reduce(0) { count, day in
+            guard let date = TrainingPlanSchedule.dayDate(
+                in: plan, week: week, day: day
+            ) else {
+                return count + day.sessions.count
+            }
+            return count + day.sessions.count +
+                session.standalonePlannedSessions(on: date).count
         }
     }
 
