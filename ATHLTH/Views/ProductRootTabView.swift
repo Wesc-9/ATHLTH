@@ -6709,7 +6709,7 @@ struct ATHLTHTrainView: View {
                 source: "iPhone",
                 symbol: workout.walking ? "figure.walk" : "figure.run",
                 activityLabel: workout.walking ? "Gåing" : "Løping",
-                detail: workout.runEnvironment == .treadmill ? "Tredemølle" : nil,
+                detail: ATHLTHTrainLiveCardMetrics.phoneDetail(workout),
                 elapsed: { workout.elapsed(at: $0) },
                 elapsedCaption: "Aktiv tid"
             ) {
@@ -6721,7 +6721,12 @@ struct ATHLTHTrainView: View {
                 source: workout.captureDevice.title,
                 symbol: "dumbbell",
                 activityLabel: "Styrke",
-                detail: "\(workout.totalCompletedSets) sett fullført",
+                detail: ATHLTHTrainLiveCardMetrics.strengthDetail(
+                    workout,
+                    exerciseIndex: strengthWorkout.currentExerciseIndex,
+                    setIndex: strengthWorkout.currentSetIndex,
+                    restEndsAt: strengthWorkout.restEndsAt
+                ),
                 elapsed: { max(0, $0.timeIntervalSince(workout.startedAt)) },
                 elapsedCaption: "Siden start"
             ) {
@@ -6851,6 +6856,8 @@ struct ATHLTHTrainView: View {
                         Text(detail)
                             .font(.caption2)
                             .foregroundStyle(ATHLTHTheme.mutedText)
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 Spacer(minLength: 0)
