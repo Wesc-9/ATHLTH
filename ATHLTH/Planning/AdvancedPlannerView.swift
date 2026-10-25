@@ -4724,69 +4724,21 @@ struct SessionEditorView: View {
     var body: some View {
         NavigationStack {
             Form {
-                if !workoutBlocks.isEmpty {
-                    Section("Workout Structure") {
-                        HStack {
-                            Label(
-                                "\(workoutBlocks.count) blocks",
-                                systemImage:
-                                    "list.number"
-                            )
-
-                            Spacer()
-
-                            if let workoutCategory {
-                                Text(
-                                    workoutCategory.capitalized
-                                )
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                            }
-                        }
-
-                        ForEach(
-                            workoutBlocks.prefix(5)
-                        ) { block in
-                            HStack(spacing: 10) {
-                                Image(
-                                    systemName:
-                                        block.kind.systemImage
-                                )
-                                .foregroundStyle(
-                                    block.kind == .run
-                                        ? ATHLTHTheme.vitality
-                                        : ATHLTHTheme.accent
-                                )
-                                .frame(width: 24)
-
-                                VStack(
-                                    alignment: .leading,
-                                    spacing: 2
-                                ) {
-                                    Text(block.title)
-                                        .font(.subheadline)
-
-                                    if let target =
-                                        block.targetText {
-                                        Text(target)
-                                            .font(.caption2)
-                                            .foregroundStyle(
-                                                .secondary
-                                            )
-                                    }
-                                }
-
-                                Spacer()
-                            }
-                        }
-
-                        if workoutBlocks.count > 5 {
-                            Text(
-                                "+\(workoutBlocks.count - 5) more blocks"
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
+                if editorMode == .advanced || !workoutBlocks.isEmpty {
+                    Section {
+                        ATHLTHWorkoutBlockTimelineEditor(
+                            blocks: $workoutBlocks
+                        )
+                    } header: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Workout timeline",
+                            norwegian: "Øktens tidslinje"
+                        ))
+                    } footer: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Move and edit planned blocks here. Running intervals and individual exercises retain their dedicated detailed editors below. Nothing is recorded until the workout is started.",
+                            norwegian: "Flytt og rediger planlagte blokker her. Løpeintervaller og enkeltøvelser har fortsatt egne detaljredigerere nedenfor. Ingenting registreres som gjennomført før økten startes."
+                        ))
                     }
                 }
 
