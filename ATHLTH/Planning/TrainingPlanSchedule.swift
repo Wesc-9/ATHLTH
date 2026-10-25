@@ -82,6 +82,28 @@ enum TrainingPlanSchedule {
             .map(\.session)
     }
 
+    /// Rest is intentional, never inferred from an empty date. A workout
+    /// moved onto this day takes precedence if older data contains a conflict.
+    static func isRestDay(
+        in plan: TrainingPlan,
+        on date: Date,
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard sessions(in: plan, on: date, calendar: calendar).isEmpty else {
+            return false
+        }
+        return plan.weeks.contains { week in
+            week.days.contains { day in
+                guard day.isRestDay == true,
+                      let dayDate = dayDate(
+                        in: plan, week: week, day: day, calendar: calendar
+                      )
+                else { return false }
+                return calendar.isDate(dayDate, inSameDayAs: date)
+            }
+        }
+    }
+
     /// A health-only workout has no intrinsic plan identity. Only accept an
     /// automatic match when it has a specific planned clock time, exactly one
     /// candidate workout, and a compatible activity. Otherwise the user can
