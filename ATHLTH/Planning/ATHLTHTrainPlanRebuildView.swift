@@ -4,10 +4,13 @@ import SwiftUI
 /// the existing planner, workout editor and recording engines remain intact.
 struct ATHLTHTrainPlanRebuildView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var strength: StrengthWorkoutStore
 
     @State private var chosenWeekID: UUID?
     @State private var expandedDayIDs: Set<UUID> = []
     @State private var selectedWorkout: PlannedSession?
+    @State private var workoutPendingMove: PlannedSession?
+    @State private var workoutPendingSkip: PlannedSession?
     @State private var dayForNewWorkout: TrainingPlanDay?
     @State private var showingPlanLibrary = false
     @State private var showingPlanEditor = false
@@ -76,6 +79,46 @@ struct ATHLTHTrainPlanRebuildView: View {
                 )
                 .environmentObject(session)
             }
+        }
+        .sheet(item: $workoutPendingMove) { workout in
+            if let plan {
+                ATHLTHMovePlannedWorkoutSheet(plan: plan, workout: workout)
+                    .environmentObject(session)
+            }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Skip this planned workout?",
+                norwegian: "Hoppe over denne planlagte økten?"
+            ),
+            isPresented: Binding(
+                get: { workoutPendingSkip != nil },
+                set: { if !$0 { workoutPendingSkip = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Skip workout",
+                norwegian: "Hopp over økten"
+            )) {
+                if let workout = workoutPendingSkip,
+                   let planID = plan?.id,
+                   canEditOccurrence(workout, planID: planID) {
+                    session.setPlanSessionSkipped(
+                        planID: planID, sessionID: workout.id, skipped: true
+                    )
+                }
+                workoutPendingSkip = nil
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel",
+                norwegian: "Avbryt"
+            ), role: .cancel) { workoutPendingSkip = nil }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "This does not remove the workout from your plan or erase any recorded activity.",
+                norwegian: "Dette sletter ikke økten fra planen eller registrert treningshistorikk."
+            ))
         }
         .sheet(item: $dayForNewWorkout) { day in
             if let plan {
@@ -273,8 +316,8 @@ struct ATHLTHTrainPlanRebuildView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(workouts.isEmpty
                             ? ATHLTHLocalization.choose(
-                                english: "Rest / open day",
-                                norwegian: "Hvile / ledig dag"
+                                english: "Unplanned day",
+                                norwegian: "Ledig dag"
                             )
                             : workouts.count == 1
                                 ? workouts[0].title
@@ -307,30 +350,122 @@ struct ATHLTHTrainPlanRebuildView: View {
                         .fill(ATHLTHTheme.border)
                         .frame(height: 0.7)
                     ForEach(workouts) { workout in
-                        Button { selectedWorkout = workout } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: workout.kind.systemImage)
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                                    .frame(width: 31, height: 31)
-                                    .background(ATHLTHTheme.champagneSoft,
-                                        in: RoundedRectangle(cornerRadius: 10))
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(workout.title)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(ATHLTHTheme.primaryText)
-                                    Text(workout.exercises.isEmpty
-                                        ? workout.kind.title
-                                        : "\(workout.exercises.count) øvelser")
+                        let skipped = session.isPlanSessionSkipped(
+                            planID: plan.id, sessionID: workout.id
+                        )
+                        let editable = canEditOccurrence(
+                            workout, planID: plan.id
+                        )
+                        HStack(spacing: 6) {
+                            Button {
+                                selectedWorkout = workout
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: workout.kind.systemImage)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .frame(width: 31, height: 31)
+                                        .background(
+                                            ATHLTHTheme.champagneSoft,
+                                            in: RoundedRectangle(cornerRadius: 10)
+                                        )
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(workout.title)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(ATHLTHTheme.primaryText)
+                                        Text(
+                                            skipped
+                                                ? ATHLTHLocalization.choose(
+                                                    english: "Skipped",
+                                                    norwegian: "Hoppet over"
+                                                )
+                                                : workout.exercises.isEmpty
+                                                    ? workout.kind.title
+                                                    : "\(workout.exercises.count) øvelser"
+                                        )
                                         .font(.caption2)
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .foregroundStyle(
+                                            skipped
+                                                ? ATHLTHTheme.accentDeep
+                                                : ATHLTHTheme.mutedText
+                                        )
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
+
+                            Menu {
+                                Button {
+                                    selectedWorkout = workout
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "View details",
+                                            norwegian: "Se detaljer"
+                                        ),
+                                        systemImage: "doc.text.magnifyingglass"
+                                    )
+                                }
+
+                                if editable {
+                                    if skipped {
+                                        Button {
+                                            session.setPlanSessionSkipped(
+                                                planID: plan.id,
+                                                sessionID: workout.id,
+                                                skipped: false
+                                            )
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Restore",
+                                                    norwegian: "Gjenopprett"
+                                                ),
+                                                systemImage: "arrow.uturn.backward"
+                                            )
+                                        }
+                                    } else {
+                                        Button {
+                                            workoutPendingMove = workout
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Move",
+                                                    norwegian: "Flytt"
+                                                ),
+                                                systemImage: "calendar.badge.clock"
+                                            )
+                                        }
+
+                                        Button {
+                                            workoutPendingSkip = workout
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Skip",
+                                                    norwegian: "Hopp over"
+                                                ),
+                                                systemImage: "forward.end"
+                                            )
+                                        }
+                                    }
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    .frame(width: 32, height: 38)
+                                    .contentShape(Rectangle())
+                            }
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Workout actions",
+                                norwegian: "Økthandlinger"
+                            ))
                         }
-                        .buttonStyle(.plain)
                     }
                     Button {
                         dayForNewWorkout = day
@@ -362,6 +497,21 @@ struct ATHLTHTrainPlanRebuildView: View {
                         : ATHLTHTheme.border,
                     lineWidth: isToday ? 1.1 : 0.75
                 )
+        }
+    }
+
+    private func canEditOccurrence(
+        _ workout: PlannedSession,
+        planID: UUID
+    ) -> Bool {
+        guard !session.isPlanSessionManuallyCompleted(
+            planID: planID, sessionID: workout.id
+        ) else { return false }
+
+        // Plan changes must not silently rewrite a finished or partial
+        // recording; detailed re-planning belongs in a separate workflow.
+        return !strength.workoutHistory.contains {
+            $0.plannedSessionID == workout.id && $0.isFinished
         }
     }
 
