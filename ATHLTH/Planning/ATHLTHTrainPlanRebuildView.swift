@@ -33,6 +33,7 @@ struct ATHLTHTrainPlanRebuildView: View {
     }
     @State private var selectedWorkout: PlannedSession?
     @State private var workoutPendingQuickEdit: PlannedSession?
+    @State private var workoutPendingFullEdit: PlannedSession?
     @State private var selectedStandaloneWorkout: PlannedSession?
     @State private var workoutPendingMove: PlannedSession?
     @State private var workoutPendingSkip: PlannedSession?
@@ -135,6 +136,12 @@ struct ATHLTHTrainPlanRebuildView: View {
                 )
                 .environmentObject(session)
                 .environmentObject(strength)
+            }
+        }
+        .sheet(item: $workoutPendingFullEdit) { workout in
+            if let plan, canEditOccurrence(workout, planID: plan.id) {
+                SessionEditorView(planID: plan.id, workout: workout)
+                    .environmentObject(session)
             }
         }
         .sheet(item: $selectedStandaloneWorkout) { workout in
@@ -541,6 +548,18 @@ struct ATHLTHTrainPlanRebuildView: View {
                                 }
 
                                 if editable {
+                                    Button {
+                                        workoutPendingFullEdit = workout
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Edit entire workout",
+                                                norwegian: "Rediger hele økten"
+                                            ),
+                                            systemImage: "square.and.pencil"
+                                        )
+                                    }
+
                                     if workout.kind == .strength,
                                        !workout.exercises.isEmpty,
                                        workout.resolvedWorkoutBlocks.isEmpty {
