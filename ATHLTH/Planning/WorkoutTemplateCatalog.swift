@@ -134,6 +134,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var phase: WorkoutPhaseKind? = nil
     var targetPaceSecondsPerKilometer: Double? = nil
     var targetHeartRateZone: Int? = nil
+    /// Athlete-selected perceived intensity (RPE 1...10). Never a measured
+    /// physiological reading; optional so historic templates still decode.
+    var targetEffortRPE: Int? = nil
     /// Planned treadmill gradient in percent: never treated as measured data.
     var treadmillInclinePercent: Double? = nil
     // Optional fields preserve compatibility with all existing saved workouts.
@@ -175,6 +178,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.phase == rhs.phase &&
         lhs.targetPaceSecondsPerKilometer == rhs.targetPaceSecondsPerKilometer &&
         lhs.targetHeartRateZone == rhs.targetHeartRateZone &&
+        lhs.targetEffortRPE == rhs.targetEffortRPE &&
         lhs.treadmillInclinePercent == rhs.treadmillInclinePercent &&
         lhs.setCount == rhs.setCount &&
         lhs.restBetweenSetsSeconds == rhs.restBetweenSetsSeconds &&
@@ -203,6 +207,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(phase)
         hasher.combine(targetPaceSecondsPerKilometer)
         hasher.combine(targetHeartRateZone)
+        hasher.combine(targetEffortRPE)
         hasher.combine(treadmillInclinePercent)
         hasher.combine(setCount)
         hasher.combine(restBetweenSetsSeconds)
@@ -239,6 +244,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case phase
         case targetPaceSecondsPerKilometer = "target_pace_seconds_per_km"
         case targetHeartRateZone = "target_hr_zone"
+        case targetEffortRPE = "target_effort_rpe"
         case treadmillInclinePercent = "treadmill_incline_percent"
         case setCount = "set_count"
         case restBetweenSetsSeconds = "rest_between_sets_seconds"
@@ -311,6 +317,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         if let targetHeartRateZone, (1...5).contains(targetHeartRateZone) {
             parts.append("Puls sone \(targetHeartRateZone)")
         }
+        if let targetEffortRPE, (1...10).contains(targetEffortRPE) {
+            parts.append("RPE \(targetEffortRPE)/10")
+        }
         if isIndoor == true, let treadmillInclinePercent,
            treadmillInclinePercent.isFinite,
            (0...20).contains(treadmillInclinePercent) {
@@ -364,6 +373,7 @@ extension Array where Element == WorkoutTemplateBlock {
             item.wellnessKind = source.wellnessKind
             item.activityTag = source.activityTag
             item.treadmillInclinePercent = source.treadmillInclinePercent
+            item.targetEffortRPE = source.targetEffortRPE
             output.append(item)
         }
 
@@ -3278,18 +3288,20 @@ struct WorkoutTemplateBuilderView: View {
                         Text(String(format: "%d:%02d/km", pace / 60, pace % 60))
                     }
                 }
-                Picker(ATHLTHLocalization.choose(english: "Target pulse zone", norwegian: "Pulssone"),
-                       selection: Binding<Int>(
-                         get: { blocks[index].targetHeartRateZone ?? 0 },
-                         set: { blocks[index].targetHeartRateZone = $0 == 0 ? nil : $0 }
-                       )) {
-                    Text(ATHLTHLocalization.choose(english: "No target", norwegian: "Ingen")).tag(0)
-                    ForEach(1...5, id: \.self) { zone in
-                        Text("\(zone)").tag(zone)
-                    }
-                }
-
             case .exercise:
+                Toggle(
+                    tr("Timed exercise", "Tidsstyrt øvelse"),
+                    isOn: Binding(
+                        get: { blocks[index].durationSeconds != nil },
+                        set: { active in
+                            blocks[index].durationSeconds = active ? 60 : nil
+                        }
+                    )
+                )
+                .tint(studioAccent)
+                if blocks[index].durationSeconds != nil {
+                    durationEntryEditor(index)
+                }
                 if block.groupID == nil {
                     Stepper(value: Binding(
                         get: { blocks[index].setCount ?? 1 },
@@ -3355,6 +3367,50 @@ struct WorkoutTemplateBuilderView: View {
                         set: { blocks[index].notes = $0.isEmpty ? nil : $0 }
                     ), axis: .vertical)
                     .font(.caption)
+            }
+
+            if block.kind != .rest {
+                Divider().padding(.vertical, 3)
+
+                Text(tr("PLANNED INTENSITY", "PLANLAGT INTENSITET"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.1)
+                    .foregroundStyle(studioAccent)
+
+                Picker(
+                    tr("Heart rate zone", "Pulssone"),
+                    selection: Binding<Int>(
+                        get: { blocks[index].targetHeartRateZone ?? 0 },
+                        set: { blocks[index].targetHeartRateZone =
+                            (1...5).contains($0) ? $0 : nil }
+                    )
+                ) {
+                    Text(tr("No target", "Ingen")).tag(0)
+                    ForEach(1...5, id: \.self) { zone in
+                        Text("\(zone)").tag(zone)
+                    }
+                }
+
+                Picker(
+                    tr("Perceived effort", "Opplevd anstrengelse"),
+                    selection: Binding<Int>(
+                        get: { blocks[index].targetEffortRPE ?? 0 },
+                        set: { blocks[index].targetEffortRPE =
+                            (1...10).contains($0) ? $0 : nil }
+                    )
+                ) {
+                    Text(tr("No target", "Ingen")).tag(0)
+                    ForEach(1...10, id: \.self) { effort in
+                        Text("RPE \(effort)/10").tag(effort)
+                    }
+                }
+
+                Text(tr(
+                    "These are planned targets, not measured heart rate or effort.",
+                    "Dette er planlagte mål, ikke målt puls eller anstrengelse."
+                ))
+                .font(.caption2)
+                .foregroundStyle(studioInk.opacity(0.6))
             }
     }
 
