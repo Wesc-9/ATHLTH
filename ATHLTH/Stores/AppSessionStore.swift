@@ -2378,6 +2378,62 @@ final class AppSessionStore: ObservableObject {
         addWeekToTrainingPlan(planID: planID)
     }
 
+    /// Fill only free future dates in the chosen destination week.
+    /// Recheck the version and every date at commit time; a preview never
+    /// authorizes replacing an edited, occupied or explicitly rested day.
+    @discardableResult
+    func copyPlanWeekIntoFreeDays(
+        planID: UUID,
+        sourceWeekID: UUID,
+        destinationWeekID: UUID,
+        expectedVersion: Int
+    ) -> Int {
+        guard var plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion,
+              let proposal = ATHLTHPlanWeekCopy(
+                  plan: plan,
+                  sourceWeekID: sourceWeekID,
+                  destinationWeekID: destinationWeekID,
+                  standaloneSessions: standalonePlannedSessions
+              ),
+              proposal.copyCount > 0,
+              let source = plan.weeks.first(where: { $0.id == sourceWeekID }),
+              let targetIndex = plan.weeks.firstIndex(where: {
+                  $0.id == destinationWeekID
+              })
+        else { return 0 }
+
+        var copiedCount = 0
+        for candidate in proposal.days where candidate.canCopy {
+            guard let targetDayIndex = plan.weeks[targetIndex].days.firstIndex(
+                where: { $0.dayIndex == candidate.sourceDayIndex }
+            ), let sourceDay = source.days.first(where: {
+                $0.dayIndex == candidate.sourceDayIndex
+            }) else { continue }
+
+            // The preview checks calendar occurrences, rest markers and
+            // standalone sessions; this final guard also protects raw rows.
+            guard plan.weeks[targetIndex]
+                .days[targetDayIndex].sessions.isEmpty,
+                plan.weeks[targetIndex]
+                    .days[targetDayIndex].isRestDay != true
+            else { continue }
+
+            let date = Calendar.current.startOfDay(for: candidate.date)
+            let copies = sourceDay.sessions.map {
+                ATHLTHPlanWeekCopy.clone($0, on: date)
+            }
+            plan.weeks[targetIndex].days[targetDayIndex].sessions = copies
+            copiedCount += copies.count
+        }
+
+        guard copiedCount > 0 else { return 0 }
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        return copiedCount
+    }
+
     func addWeekToTrainingPlan(
         planID: UUID
     ) {
