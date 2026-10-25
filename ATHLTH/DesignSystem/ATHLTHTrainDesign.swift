@@ -83,26 +83,74 @@ struct ATHLTHTrainSectionHeading: View {
 
 struct ATHLTHTrainNavigation: View {
     @Binding var selection: ATHLTHTrainSection
+    var compact = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var highlight
 
     var body: some View {
-        HStack(spacing: 4) {
-            tab(.today, title: tr("Today", "I dag"), icon: "sun.horizon")
-            tab(.plan, title: tr("Plan", "Plan"), icon: "calendar")
-            tab(.progress, title: tr("Progress", "Fremgang"), icon: "chart.xyaxis.line")
-        }
-        .padding(5)
-        .background(ATHLTHTrainDesign.paper, in: RoundedRectangle(cornerRadius: 19))
-        .overlay {
-            RoundedRectangle(cornerRadius: 19)
-                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.65), lineWidth: 0.8)
-                .allowsHitTesting(false)
+        Group {
+            if compact {
+                HStack(spacing: 2) {
+                    compactTab(.today, title: tr("Today", "I dag"), icon: "figure.run")
+                    compactTab(.plan, title: tr("Plan", "Plan"), icon: "calendar")
+                    compactTab(.progress, title: tr("Progress", "Fremgang"), icon: "chart.bar.fill")
+                }
+                .padding(5)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 24))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 24)
+                        .strokeBorder(Color.white.opacity(0.75), lineWidth: 0.8)
+                        .allowsHitTesting(false)
+                }
+                .shadow(color: .black.opacity(0.08), radius: 13, y: 5)
+            } else {
+                HStack(spacing: 4) {
+                    tab(.today, title: tr("Today", "I dag"), icon: "sun.horizon")
+                    tab(.plan, title: tr("Plan", "Plan"), icon: "calendar")
+                    tab(.progress, title: tr("Progress", "Fremgang"), icon: "chart.xyaxis.line")
+                }
+                .padding(5)
+                .background(ATHLTHTrainDesign.paper, in: RoundedRectangle(cornerRadius: 19))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 19)
+                        .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.65), lineWidth: 0.8)
+                        .allowsHitTesting(false)
+                }
+            }
         }
         .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.86),
                    value: selection)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(tr("Train sections", "Treningsfaner"))
+    }
+
+    private func compactTab(_ section: ATHLTHTrainSection, title: String, icon: String) -> some View {
+        let selected = selection == section
+        return Button { selection = section } label: {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .semibold))
+                    .frame(height: 20)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.system(size: 10, weight: selected ? .semibold : .medium))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(selected ? Color.white : ATHLTHTrainDesign.ink)
+            .frame(width: 59, height: 48)
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(ATHLTHTrainDesign.gold)
+                        .matchedGeometryEffect(id: "train-compact-selection", in: highlight)
+                }
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 18))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private func tab(_ section: ATHLTHTrainSection, title: String, icon: String) -> some View {
