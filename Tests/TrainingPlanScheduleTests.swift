@@ -261,6 +261,54 @@ final class TrainingPlanScheduleTests: XCTestCase {
         XCTAssertTrue(completedProgress.missed.isEmpty)
     }
 
+    @MainActor
+    func testSavedTrainingPlanStartsOnlyWithoutCalendarConflict() throws {
+        let suite = "TrainSavedPlanConflictTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let profile = UserProfile(
+            id: UUID(),
+            userID: UUID(),
+            username: "saved-plan-test",
+            displayName: "Saved Plan Test",
+            bio: "",
+            avatarURL: nil,
+            presence: TrainingPresence(
+                state: .available,
+                workoutTitle: nil,
+                startedAt: nil,
+                visibility: .friends
+            )
+        )
+
+        let store = AppSessionStore(profile: profile, defaults: defaults)
+        let today = Calendar.current.startOfDay(for: Date())
+        let active = plan(starting: today, session: workout())
+        XCTAssertTrue(store.addTrainingPlan(active))
+        store.saveActivePlanAsTemplate()
+
+        let template = try XCTUnwrap(store.planTemplates.first)
+        XCTAssertNil(template.startDate)
+        XCTAssertEqual(store.trainingPlans.count, 1)
+
+        // A saved template never silently overwrites the active plan.
+        XCTAssertNil(store.usePlanTemplate(template.id, startDate: today))
+        XCTAssertEqual(store.trainingPlans.count, 1)
+        XCTAssertEqual(store.planTemplates.count, 1)
+
+        let later = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 14, to: today
+        ))
+        let future = try XCTUnwrap(
+            store.usePlanTemplate(template.id, startDate: later)
+        )
+        XCTAssertNotEqual(future.id, active.id)
+        XCTAssertEqual(future.startDate, later)
+        XCTAssertEqual(store.trainingPlans.count, 2)
+        XCTAssertNil(store.planTemplates.first?.startDate)
+    }
+
     func testDateOnlyWorkoutCannotClaimUnrelatedAppleHealthActivity() {
         let start = day(2026, 10, 21)
         let sessions = [workout(scheduledStart: start)]
