@@ -1588,7 +1588,31 @@ final class AppSessionStore: ObservableObject {
             .sessions
             .removeAll { $0.id == sessionID }
 
-        movedSession.scheduledStart = target
+        // Preserve an explicitly planned clock time when moving a workout.
+        // Date-only sessions must not accidentally gain a midnight start.
+        if let previous = movedSession.scheduledStart,
+           movedSession.scheduledTimeIsExplicit != false {
+            let components = calendar.dateComponents(
+                [.hour, .minute], from: previous
+            )
+            let hour = components.hour ?? 0
+            let minute = components.minute ?? 0
+            if hour != 0 || minute != 0 {
+                movedSession.scheduledStart = calendar.date(
+                    bySettingHour: hour,
+                    minute: minute,
+                    second: 0,
+                    of: target
+                ) ?? target
+                movedSession.scheduledTimeIsExplicit = true
+            } else {
+                movedSession.scheduledStart = target
+                movedSession.scheduledTimeIsExplicit = false
+            }
+        } else {
+            movedSession.scheduledStart = target
+            movedSession.scheduledTimeIsExplicit = false
+        }
         plan.weeks[targetWeekIndex]
             .days[targetDayIndex]
             .sessions
