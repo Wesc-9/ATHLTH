@@ -6799,7 +6799,6 @@ struct ATHLTHTrainView: View {
         trainProgramCreationLaunch = .fresh
     }
 
-    @ViewBuilder
     /// Only *completed* sessions from the last month may steer the
     /// no-plan recommendation; never infer an activity from an active recording.
     private var lastCompletedTrainKind: WorkoutKind? {
@@ -6837,6 +6836,7 @@ struct ATHLTHTrainView: View {
         return completed.max(by: { $0.date < $1.date })?.kind
     }
 
+    @ViewBuilder
     private var premiumTodayScreen: some View {
         let active = session.activePlan
         let sessions = active.map { todaySessions(in: $0) } ?? []
