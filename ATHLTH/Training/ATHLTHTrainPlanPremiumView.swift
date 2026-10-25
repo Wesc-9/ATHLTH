@@ -707,7 +707,14 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
     private func studioPlanCover(_ plan: TrainingPlan) -> some View {
-        ZStack(alignment: .bottomLeading) {
+        let completion = session.trainingPlanProgress(
+            plan, healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        ).completionFraction
+        let fraction = min(max(completion, 0), 1)
+        let percentage = Int((fraction * 100).rounded())
+
+        return ZStack(alignment: .bottomLeading) {
             GeometryReader { geometry in
                 Image(premiumPlanHeroArt(plan))
                     .resizable()
@@ -744,10 +751,32 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.white.opacity(0.85))
+
+                HStack(alignment: .firstTextBaseline) {
+                    Text(tr("Plan progress", "Planfremdrift"))
+                    Spacer(minLength: 5)
+                    Text("\(percentage) %")
+                        .monospacedDigit()
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.95))
+
+                GeometryReader { proxy in
+                    Capsule()
+                        .fill(.white.opacity(0.24))
+                        .overlay(alignment: .leading) {
+                            Capsule()
+                                .fill(ATHLTHTheme.premiumGold)
+                                .frame(width: proxy.size.width * fraction)
+                        }
+                }
+                .frame(height: 5)
+                .accessibilityLabel(tr("Plan progress", "Planfremdrift"))
+                .accessibilityValue("\(percentage) %")
             }
             .padding(19)
         }
-        .frame(height: 197)
+        .frame(height: 216)
         .clipShape(RoundedRectangle(cornerRadius: 23))
     }
 
