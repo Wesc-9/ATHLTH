@@ -274,6 +274,101 @@ final class TrainingPlanScheduleTests: XCTestCase {
         )
     }
 
+    func testMovingWorkoutKeepsExplicitTimeAndDoesNotReplaceDestinationSessions() {
+        let suite = "TrainMoveExplicitTimeTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let profile = UserProfile(
+            id: UUID(),
+            userID: UUID(),
+            username: "move-timed-test",
+            displayName: "Move Timed Test",
+            bio: "",
+            avatarURL: nil,
+            presence: TrainingPresence(
+                state: .available,
+                workoutTitle: nil,
+                startedAt: nil,
+                visibility: .friends
+            )
+        )
+        let store = AppSessionStore(profile: profile, defaults: defaults)
+        let start = day(2030, 1, 2)
+        var run = workout()
+        run.scheduledStart = Calendar.current.date(
+            bySettingHour: 18, minute: 30, second: 0, of: start
+        )
+        run.scheduledTimeIsExplicit = true
+
+        var program = plan(starting: start, session: run)
+        let existing = workout()
+        program.weeks[0].days[2].sessions.append(existing)
+        XCTAssertTrue(store.addTrainingPlan(program))
+
+        let target = day(2030, 1, 4)
+        XCTAssertTrue(store.movePlanSession(
+            planID: program.id, sessionID: run.id, to: target
+        ))
+        let updated = store.trainingPlan(withID: program.id)!
+        let targetSessions = TrainingPlanSchedule.sessions(
+            in: updated, on: target
+        )
+        XCTAssertEqual(targetSessions.count, 2)
+        XCTAssertTrue(targetSessions.contains(where: { $0.id == existing.id }))
+        let moved = targetSessions.first(where: { $0.id == run.id })!
+        XCTAssertEqual(moved.scheduledTimeIsExplicit, true)
+        let clock = Calendar.current.dateComponents(
+            [.hour, .minute], from: moved.scheduledStart!
+        )
+        XCTAssertEqual(clock.hour, 18)
+        XCTAssertEqual(clock.minute, 30)
+        XCTAssertFalse(TrainingPlanSchedule.sessions(
+            in: updated, on: start
+        ).contains(where: { $0.id == run.id }))
+    }
+
+    func testMovingDateOnlyWorkoutDoesNotAssignMidnightClockTime() {
+        let suite = "TrainMoveDateOnlyTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let profile = UserProfile(
+            id: UUID(),
+            userID: UUID(),
+            username: "move-date-only-test",
+            displayName: "Move Date Only Test",
+            bio: "",
+            avatarURL: nil,
+            presence: TrainingPresence(
+                state: .available,
+                workoutTitle: nil,
+                startedAt: nil,
+                visibility: .friends
+            )
+        )
+        let store = AppSessionStore(profile: profile, defaults: defaults)
+        let start = day(2030, 1, 2)
+        var run = workout()
+        run.scheduledStart = start
+        run.scheduledTimeIsExplicit = false
+        let program = plan(starting: start, session: run)
+        XCTAssertTrue(store.addTrainingPlan(program))
+        let target = day(2030, 1, 5)
+
+        XCTAssertTrue(store.movePlanSession(
+            planID: program.id, sessionID: run.id, to: target
+        ))
+        let updated = store.trainingPlan(withID: program.id)!
+        let moved = TrainingPlanSchedule.sessions(
+            in: updated, on: target
+        ).first!
+        XCTAssertEqual(moved.scheduledTimeIsExplicit, false)
+        XCTAssertTrue(Calendar.current.isDate(
+            moved.scheduledStart!, inSameDayAs: target
+        ))
+    }
+
     func testMovingWorkoutUsesPlanRelativeDayNotWeekday() {
         let suite = "TrainingPlanScheduleTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!
