@@ -14,6 +14,7 @@ struct ATHLTHTrainPlanRebuildView: View {
     @State private var dayForNewWorkout: TrainingPlanDay?
     @State private var showingPlanLibrary = false
     @State private var showingPlanEditor = false
+    @State private var showingWeekCopy = false
     @State private var showingStandaloneEditor = false
     @State private var showingCreatePlan = false
 
@@ -131,6 +132,15 @@ struct ATHLTHTrainPlanRebuildView: View {
                 SessionEditorView(planID: plan.id, dayID: day.id)
             }
         }
+        .sheet(isPresented: $showingWeekCopy) {
+            if let plan, let selectedWeek {
+                ATHLTHPlanWeekCopySheet(
+                    plan: plan,
+                    sourceWeekID: selectedWeek.id
+                )
+                .environmentObject(session)
+            }
+        }
         .sheet(isPresented: $showingPlanEditor) {
             NavigationStack {
                 ScrollView {
@@ -231,15 +241,27 @@ struct ATHLTHTrainPlanRebuildView: View {
 
                 Spacer()
                 Button {
-                    showingPlanEditor = true
+                    showingWeekCopy = true
                 } label: {
                     Label(ATHLTHLocalization.choose(
-                        english: "Edit plan", norwegian: "Rediger plan"
-                    ), systemImage: "slider.horizontal.3")
+                        english: "Copy week", norwegian: "Kopier uke"
+                    ), systemImage: "doc.on.doc")
                     .font(.caption.weight(.semibold))
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(ATHLTHTheme.accentDeep)
+
+                Button {
+                    showingPlanEditor = true
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.subheadline.weight(.medium))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Edit plan", norwegian: "Rediger plan"
+                ))
             }
 
             ScrollView(.horizontal, showsIndicators: false) {
