@@ -518,7 +518,7 @@ struct PlannedWorkoutDetailView: View {
             VStack(alignment: .leading, spacing: 14) {
                 sectionTitle("Completion")
 
-                if isHealthCompleted || isStrengthCompleted {
+                if isCompleted {
                     HStack(spacing: 12) {
                         Image(systemName: "heart.circle.fill")
                             .font(.title2)
@@ -533,10 +533,15 @@ struct PlannedWorkoutDetailView: View {
                                     english: "Linked to a completed ATHLTH strength workout.",
                                     norwegian: "Knyttet til en fullført styrkeøkt i ATHLTH."
                                 )
-                                : ATHLTHLocalization.choose(
-                                    english: "Matched to a timed Apple Health workout.",
-                                    norwegian: "Knyttet til en tidsfestet økt fra Apple Health."
-                                )
+                                : isManuallyCompleted
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Manually marked as complete in the training plan.",
+                                        norwegian: "Manuelt markert som fullført i treningsplanen."
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Matched to a timed Apple Health workout.",
+                                        norwegian: "Knyttet til en tidsfestet økt fra Apple Health."
+                                    )
                             )
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
