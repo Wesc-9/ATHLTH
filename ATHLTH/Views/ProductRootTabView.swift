@@ -5830,7 +5830,6 @@ struct ATHLTHTrainView: View {
                                     }
                                 )
                             } else {
-                                unfinishedWorkoutRecoveryCards
                                 premiumTodayScreen
                             }
                         }
@@ -6700,8 +6699,11 @@ struct ATHLTHTrainView: View {
 
     @ViewBuilder
     private var activeTrainWorkoutCard: some View {
-        if let workout = phoneWorkout.active,
-           !phoneWorkout.hasRecoveredActiveWorkout {
+        if phoneWorkout.hasRecoveredActiveWorkout ||
+            strengthWorkout.hasRecoveredActiveWorkout {
+            // Checkpoint review is the main card, not a second banner.
+            unfinishedWorkoutRecoveryCards
+        } else if let workout = phoneWorkout.active {
             liveTrainCard(
                 title: workout.title,
                 source: "iPhone",
@@ -6713,8 +6715,7 @@ struct ATHLTHTrainView: View {
             ) {
                 phoneWorkout.presentWorkout()
             }
-        } else if let workout = strengthWorkout.activeWorkout,
-                  !strengthWorkout.hasRecoveredActiveWorkout {
+        } else if let workout = strengthWorkout.activeWorkout {
             liveTrainCard(
                 title: workout.title,
                 source: workout.captureDevice.title,
