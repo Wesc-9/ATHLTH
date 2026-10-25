@@ -5823,7 +5823,6 @@ struct ATHLTHTrainView: View {
                                 )
                             } else {
                                 unfinishedWorkoutRecoveryCards
-                                activeTrainWorkoutCard
                                 premiumTodayScreen
                             }
                         }
@@ -6544,7 +6543,11 @@ struct ATHLTHTrainView: View {
             liveTrainCard(
                 title: workout.title,
                 source: "iPhone",
-                symbol: workout.walking ? "figure.walk" : "figure.run"
+                symbol: workout.walking ? "figure.walk" : "figure.run",
+                activityLabel: workout.walking ? "Gåing" : "Løping",
+                detail: workout.runEnvironment == .treadmill ? "Tredemølle" : nil,
+                elapsed: { workout.elapsed(at: $0) },
+                elapsedCaption: "Aktiv tid"
             ) {
                 phoneWorkout.presentWorkout()
             }
@@ -6553,7 +6556,11 @@ struct ATHLTHTrainView: View {
             liveTrainCard(
                 title: workout.title,
                 source: workout.captureDevice.title,
-                symbol: "dumbbell"
+                symbol: "dumbbell",
+                activityLabel: "Styrke",
+                detail: "\(workout.totalCompletedSets) sett fullført",
+                elapsed: { max(0, $0.timeIntervalSince(workout.startedAt)) },
+                elapsedCaption: "Siden start"
             ) {
                 strengthWorkout.acknowledgeRecoveredWorkout()
                 showingStrengthWorkout = true
@@ -6646,6 +6653,10 @@ struct ATHLTHTrainView: View {
         title: String,
         source: String,
         symbol: String,
+        activityLabel: String,
+        detail: String?,
+        elapsed: @escaping (Date) -> TimeInterval,
+        elapsedCaption: String,
         onContinue: @escaping () -> Void
     ) -> some View {
         Button(action: onContinue) {
@@ -6670,12 +6681,27 @@ struct ATHLTHTrainView: View {
                         .font(.headline)
                         .foregroundStyle(ATHLTHTheme.primaryText)
                         .lineLimit(1)
-                    Text(source)
+                    Text("\(activityLabel) · \(source)")
                         .font(.caption)
                         .foregroundStyle(ATHLTHTheme.mutedText)
+                    if let detail {
+                        Text(detail)
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
                 }
                 Spacer(minLength: 0)
-                VStack(spacing: 4) {
+                VStack(alignment: .trailing, spacing: 4) {
+                    TimelineView(.periodic(from: .now, by: 1)) { context in
+                        let seconds = Int(max(0, elapsed(context.date)))
+                        VStack(alignment: .trailing, spacing: 1) {
+                            Text(String(format: "%02d:%02d", seconds / 60, seconds % 60))
+                                .font(.system(size: 15, weight: .semibold, design: .rounded))
+                                .monospacedDigit()
+                            Text(elapsedCaption)
+                                .font(.system(size: 9))
+                        }
+                    }
                     Image(systemName: "play.fill")
                     Text(ATHLTHLocalization.choose(
                         english: "Continue", norwegian: "Fortsett"
@@ -6760,6 +6786,8 @@ struct ATHLTHTrainView: View {
                 trainTodayPlanPositionText($0)
             } ?? "",
             hasActiveWorkout: hasOngoingTrainWorkout,
+            activeWorkoutCard: hasOngoingTrainWorkout
+                ? AnyView(activeTrainWorkoutCard) : nil,
             hasRecordedWorkoutToday: hasRecordedWorkoutToday,
             todaysReadiness: readiness,
             onChooseSuggestedWorkout: { selectedSuggestedWorkout = $0 },

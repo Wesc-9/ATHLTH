@@ -15,6 +15,8 @@ struct ATHLTHTrainTodayPremiumView: View {
     let completionFraction: Double
     let planPosition: String
     let hasActiveWorkout: Bool
+    /// Live recorder-owned content replaces the scheduled action while active.
+    let activeWorkoutCard: AnyView?
     let hasRecordedWorkoutToday: Bool
     /// Already filtered for a reliable, recent HealthKit baseline by the parent.
     let todaysReadiness: RecoveryReadinessSummary?
@@ -67,9 +69,10 @@ struct ATHLTHTrainTodayPremiumView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 19) {
             todayAgendaStrip
-            // The athlete's next real workout owns the first screen. No
-            // fabricated weekly statistics or redundant greeting.
-            if let plan {
+            // A running recording takes priority over a planned-start card.
+            if hasActiveWorkout, let activeWorkoutCard {
+                activeWorkoutCard
+            } else if let plan {
                 let scheduled = sessions.filter { !$0.isExplicitRestDay }
                 if scheduled.isEmpty && sessions.contains(where: \.isExplicitRestDay) {
                     restDayCard
