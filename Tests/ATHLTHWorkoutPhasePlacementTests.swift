@@ -57,4 +57,44 @@ final class ATHLTHWorkoutPhasePlacementTests: XCTestCase {
             for: .cooldown, in: items
         ), items.count)
     }
+    func testWarmupPauseIsKeptBeforeMainWithoutASeparateRecoveryPhase() {
+        var rest = block("Pause", phase: .warmup)
+        rest.kind = .rest
+        let items = [
+            block("Easy cycling", phase: .warmup),
+            block("Intervals", phase: .main),
+            block("Cool down", phase: .cooldown)
+        ]
+        let index = ATHLTHWorkoutPhasePlacement.insertionIndex(
+            for: rest.resolvedPhase, in: items
+        )
+        XCTAssertEqual(rest.resolvedPhase, .warmup)
+        XCTAssertEqual(index, 1)
+    }
+
+    func testCooldownPauseAppendsAfterMainEvenWhenKindIsRest() {
+        var rest = block("Pause", phase: .cooldown)
+        rest.kind = .rest
+        let items = [
+            block("Easy jog", phase: .warmup),
+            block("Strength", phase: .main),
+            block("Easy cycling", phase: .cooldown)
+        ]
+        XCTAssertEqual(ATHLTHWorkoutPhasePlacement.insertionIndex(
+            for: rest.resolvedPhase, in: items
+        ), 3)
+    }
+
+    func testNewWarmupNeverSplitsAnIntervalGroup() {
+        let groupID = UUID()
+        let items = [
+            block("Intervals", phase: .main, group: groupID),
+            block("Interval rest", phase: .main, group: groupID),
+            block("Cool down", phase: .cooldown)
+        ]
+        XCTAssertEqual(ATHLTHWorkoutPhasePlacement.insertionIndex(
+            for: .warmup, in: items
+        ), 0)
+    }
+
 }
