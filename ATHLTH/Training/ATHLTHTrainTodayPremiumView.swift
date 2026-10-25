@@ -72,6 +72,11 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 19) {
+            // A current program is context, not the hero: display one quiet,
+            // factual entry above the primary session only when it exists.
+            if let plan {
+                activePlanSection(plan)
+            }
             todayAgendaStrip
             // A running recording takes priority over a planned-start card.
             if hasActiveWorkout, let activeWorkoutCard {
@@ -100,12 +105,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             // Quick Train is always directly below the principal workout,
             // using precisely the same launch callbacks as before.
             quickTrainSection
-            futurePlanningAction
             suggestedWorkoutSection
-
-            if let plan {
-                activePlanSection(plan)
-            }
             ghostRaceSection
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -1165,10 +1165,25 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .font(.system(size: 26, weight: .regular, design: .serif))
                     .foregroundStyle(ink)
                 Spacer(minLength: 4)
-                Text(tr("Personalized shortcuts", "Dine hurtigvalg"))
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(muted)
-                    .lineLimit(1)
+                Button {
+                    if plan == nil {
+                        onCreatePlan()
+                    } else {
+                        onOpenPlan()
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "calendar.badge.plus")
+                        Text(tr("Plan", "Planlegg"))
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ink)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 36)
+                    .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Plan a workout", "Planlegg en økt"))
             }
 
             LazyVGrid(
