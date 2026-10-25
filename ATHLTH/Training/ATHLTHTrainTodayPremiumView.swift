@@ -15,6 +15,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     let completionFraction: Double
     let planPosition: String
     let hasActiveWorkout: Bool
+    let activeWorkoutKind: WorkoutKind?
     /// Live recorder-owned content replaces the scheduled action while active.
     let activeWorkoutCard: AnyView?
     let hasRecordedWorkoutToday: Bool
@@ -62,6 +63,7 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onGhostRace: () -> Void
 
     @State private var quickActivityTapCounts: [String: Int] = [:]
+    @State private var temporarilyFeaturedGoalID: UUID?
 
 
     private let ink = ATHLTHPlanDesign.ink
@@ -118,6 +120,7 @@ struct ATHLTHTrainTodayPremiumView: View {
             quickActivityTapCounts =
                 UserDefaults.standard.dictionary(forKey: quickActivityStorageKey)
                     as? [String: Int] ?? [:]
+            temporarilyFeaturedGoalID = nil
         }
         .onReceive(NotificationCenter.default.publisher(
             for: Notification.Name("athlth.dailyCheckInDidUpdate")
@@ -1102,61 +1105,142 @@ struct ATHLTHTrainTodayPremiumView: View {
         }
     }
 
-    /// Respect the user's explicitly selected primary goal. Never invent
-    /// an automatic training-based priority without a separate preference.
-    private var visibleTrainGoal: ATHLTHGoal? {
+    /// The account's saved primary goal remains unchanged. Spotlighting
+    /// another goal is a reversible display-only choice for this visit.
+    private var primaryTrainGoal: ATHLTHGoal? {
         if let primary = goalStore.primaryGoal, primary.status == .active {
             return primary
         }
         return goalStore.activeGoals.first { $0.status == .active }
     }
 
+    private var goalContextKind: WorkoutKind? {
+        if hasActiveWorkout { return activeWorkoutKind }
+        guard let workout = primaryWorkout,
+              !completedIDs.contains(workout.id),
+              !workout.isExplicitRestDay
+        else { return nil }
+        return workout.kind
+    }
+
+    private var relevantGoalSuggestion: ATHLTHGoal? {
+        ATHLTHTrainGoalPriority.recommend(
+            goals: goalStore.activeGoals,
+            primary: primaryTrainGoal,
+            activity: goalContextKind,
+            activePlanID: plan?.id
+        )
+    }
+
+    private var visibleTrainGoal: ATHLTHGoal? {
+        if let suggested = relevantGoalSuggestion,
+           temporarilyFeaturedGoalID == suggested.id {
+            return suggested
+        }
+        return primaryTrainGoal
+    }
+
     @ViewBuilder
     private var activeGoalSection: some View {
         if let goal = visibleTrainGoal {
-            NavigationLink {
-                GoalDetailView(goalID: goal.id)
-            } label: {
-                HStack(spacing: 13) {
-                    Image(systemName: goal.category.systemImage)
-                        .font(.system(size: 19, weight: .medium))
-                        .foregroundStyle(champagne)
-                        .frame(width: 41, height: 41)
-                        .background(ATHLTHPlanDesign.warmSurface,
-                                    in: RoundedRectangle(cornerRadius: 12))
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(tr("ACTIVE GOAL", "AKTIVT MÅL"))
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.1)
-                            .foregroundStyle(muted)
-                        Text(goal.title)
-                            .font(.system(size: 18, weight: .regular, design: .serif))
-                            .foregroundStyle(ink)
-                            .multilineTextAlignment(.leading)
-                            .lineLimit(2)
-                        if !goal.milestones.isEmpty {
-                            Text(tr(
-                                "\(goal.completedMilestones) of \(goal.milestones.count) milestones",
-                                "\(goal.completedMilestones) av \(goal.milestones.count) delmål"
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(muted)
-                        } else if let deadline = goal.deadline {
-                            Text(deadline.formatted(date: .abbreviated, time: .omitted))
+            VStack(alignment: .leading, spacing: 12) {
+                NavigationLink {
+                    GoalDetailView(goalID: goal.id)
+                } label: {
+                    HStack(spacing: 13) {
+                        Image(systemName: goal.category.systemImage)
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundStyle(champagne)
+                            .frame(width: 41, height: 41)
+                            .background(ATHLTHPlanDesign.warmSurface,
+                                        in: RoundedRectangle(cornerRadius: 12))
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(temporarilyFeaturedGoalID == goal.id &&
+                                 relevantGoalSuggestion?.id == goal.id
+                                 ? tr("TODAY'S GOAL", "MÅL FOR I DAG")
+                                 : tr("ACTIVE GOAL", "AKTIVT MÅL"))
+                                .font(.system(size: 10, weight: .semibold))
+                                .tracking(1.1)
+                                .foregroundStyle(muted)
+                            Text(goal.title)
+                                .font(.system(size: 18, weight: .regular, design: .serif))
+                                .foregroundStyle(ink)
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(2)
+                            if !goal.milestones.isEmpty {
+                                Text(tr(
+                                    "\(goal.completedMilestones) of \(goal.milestones.count) milestones",
+                                    "\(goal.completedMilestones) av \(goal.milestones.count) delmål"
+                                ))
                                 .font(.caption)
                                 .foregroundStyle(muted)
+                            } else if let deadline = goal.deadline {
+                                Text(deadline.formatted(date: .abbreviated, time: .omitted))
+                                    .font(.caption)
+                                    .foregroundStyle(muted)
+                            }
                         }
+                        Spacer(minLength: 0)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ink)
                     }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ink)
+                    .contentShape(Rectangle())
                 }
-                .padding(16)
-                .premiumTrainSurface(line: hairline)
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Active goal", "Aktivt mål") + ": " + goal.title)
+
+                if let suggested = relevantGoalSuggestion {
+                    Rectangle()
+                        .fill(hairline.opacity(0.72))
+                        .frame(height: 1)
+
+                    HStack(spacing: 11) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 14, weight: .medium))
+                            .foregroundStyle(champagne)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(tr("RELEVANT TODAY", "RELEVANT I DAG"))
+                                .font(.system(size: 10, weight: .semibold))
+                                .tracking(0.9)
+                                .foregroundStyle(champagne)
+                            Text(temporarilyFeaturedGoalID == suggested.id
+                                 ? tr("Your original main goal is unchanged.",
+                                      "Det opprinnelige hovedmålet er uendret.")
+                                 : suggested.title)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(ink)
+                                .lineLimit(2)
+                        }
+                        Spacer(minLength: 0)
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                temporarilyFeaturedGoalID =
+                                    temporarilyFeaturedGoalID == suggested.id
+                                        ? nil : suggested.id
+                            }
+                        } label: {
+                            Text(temporarilyFeaturedGoalID == suggested.id
+                                 ? tr("Main goal", "Hovedmål")
+                                 : tr("Show", "Vis"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: 40)
+                                .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            temporarilyFeaturedGoalID == suggested.id
+                                ? tr("Show my main goal", "Vis hovedmålet mitt")
+                                : tr("Temporarily show suggested goal",
+                                     "Vis foreslått mål midlertidig")
+                        )
+                    }
+                }
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(tr("Active goal", "Aktivt mål") + ": " + goal.title)
+            .padding(16)
+            .premiumTrainSurface(line: hairline)
         } else {
             NavigationLink {
                 GoalsHubView()

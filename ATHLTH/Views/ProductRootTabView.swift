@@ -6586,6 +6586,15 @@ struct ATHLTHTrainView: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
+    private var activeTrainWorkoutKind: WorkoutKind? {
+        if let workout = phoneWorkout.active {
+            return workout.walking ? .walking : .running
+        }
+        if strengthWorkout.activeWorkout != nil { return .strength }
+        // An unconfirmed Watch-only session has no trustworthy activity kind.
+        return nil
+    }
+
     // A single live-session priority surface, independent of plan status.
     // Recovered workouts already have a dedicated checkpoint review above;
     // never show two competing resume buttons for the same session.
@@ -6841,6 +6850,7 @@ struct ATHLTHTrainView: View {
                 trainTodayPlanPositionText($0)
             } ?? "",
             hasActiveWorkout: hasOngoingTrainWorkout,
+            activeWorkoutKind: activeTrainWorkoutKind,
             activeWorkoutCard: hasOngoingTrainWorkout
                 ? AnyView(activeTrainWorkoutCard) : nil,
             hasRecordedWorkoutToday: hasRecordedWorkoutToday,

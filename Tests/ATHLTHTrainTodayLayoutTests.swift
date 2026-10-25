@@ -233,11 +233,11 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     sessions: [],
                     completedIDs: [],
                     healthCompletedIDs: [],
-                    nextWorkoutTitle: currentPlan == nil ? nil : "Strength legs",
-                    nextWorkoutDate: nil,
                     completionFraction: 0,
                     planPosition: "",
                     hasActiveWorkout: hasActiveWorkout,
+                    activeWorkoutKind: nil,
+                    activeWorkoutCard: nil,
                     hasRecordedWorkoutToday: false,
                     todaysReadiness: nil,
                     onChooseSuggestedWorkout: { _ in },
@@ -250,11 +250,15 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     onUndoAlternative: { _ in },
                     onQuickTrain: { _ in },
                     onQuickCycling: {},
+                    onQuickCustom: { _ in },
                     onGhostRace: {}
                 )
 
                 let host = UIHostingController(
-                    rootView: today.environmentObject(social)
+                    rootView: today
+                        .environmentObject(social)
+                        .environmentObject(AppSessionStore())
+                        .environmentObject(GoalStore())
                 )
                 host.loadViewIfNeeded()
                 let measured = host.sizeThatFits(
