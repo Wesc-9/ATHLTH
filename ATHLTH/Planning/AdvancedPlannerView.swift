@@ -1635,6 +1635,8 @@ struct AllTrainingPlansView: View {
     @State private var editingPlan: TrainingPlan?
     @State private var planToOpen: TrainingPlan?
     @State private var planPendingDeletion: TrainingPlan?
+    @State private var templateToSchedule: TrainingPlan?
+    @State private var templatePendingDeletion: TrainingPlan?
 
     private var activePlans: [TrainingPlan] {
         session.trainingPlans.filter {
@@ -1664,41 +1666,72 @@ struct AllTrainingPlansView: View {
             }
     }
 
+    private var unscheduledPlans: [TrainingPlan] {
+        session.trainingPlans.filter {
+            session.trainingPlanStatus($0) == .unscheduled
+        }
+    }
+
+    private var savedTemplates: [TrainingPlan] {
+        session.planTemplates.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    if session.trainingPlans.isEmpty {
+                    if session.trainingPlans.isEmpty &&
+                        savedTemplates.isEmpty {
                         ContentUnavailableView {
                             Label(
-                                "No training plans yet",
+                                ATHLTHLocalization.choose(
+                                    english: "No training plans yet",
+                                    norwegian: "Ingen treningsplaner ennå"
+                                ),
                                 systemImage: "calendar.badge.plus"
                             )
                         } description: {
-                            Text(
-                                "Create your first dated plan. ATHLTH keeps only the plan covering today active."
-                            )
+                            Text(ATHLTHLocalization.choose(
+                                english: "Create a plan or use a saved one. Only the plan covering today can be active.",
+                                norwegian: "Opprett en plan eller bruk en lagret plan. Kun planen som gjelder i dag kan være aktiv."
+                            ))
                         } actions: {
-                            Button("Create Plan") {
+                            Button(ATHLTHLocalization.choose(
+                                english: "New plan", norwegian: "Ny plan"
+                            )) {
                                 showingCreatePlan = true
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(ATHLTHTheme.accent)
+                            .tint(ATHLTHTheme.accentDeep)
                         }
                         .padding(.top, 36)
                     } else {
                         planSection(
-                            "Active",
+                            ATHLTHLocalization.choose(
+                                english: "Active plan", norwegian: "Aktiv plan"
+                            ),
                             plans: activePlans,
                             status: .active
                         )
                         planSection(
-                            "Upcoming",
+                            ATHLTHLocalization.choose(
+                                english: "Upcoming plans", norwegian: "Kommende planer"
+                            ),
                             plans: upcomingPlans,
                             status: .upcoming
                         )
+                        templateSection
                         planSection(
-                            "Completed",
+                            ATHLTHLocalization.choose(
+                                english: "Without dates", norwegian: "Uten datoer"
+                            ),
+                            plans: unscheduledPlans,
+                            status: .unscheduled
+                        )
+                        planSection(
+                            ATHLTHLocalization.choose(
+                                english: "Previous plans", norwegian: "Tidligere planer"
+                            ),
                             plans: completedPlans,
                             status: .completed
                         )
@@ -1708,16 +1741,16 @@ struct AllTrainingPlansView: View {
                 .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent: ATHLTHTheme.accent.opacity(0.45)
-                )
-            )
-            .navigationTitle("All Plans")
+            .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "My plans", norwegian: "Mine planer"
+            ))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) {
                         dismiss()
                     }
                 }
@@ -1728,7 +1761,9 @@ struct AllTrainingPlansView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .accessibilityLabel("Create training plan")
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "New training plan", norwegian: "Ny treningsplan"
+                    ))
                 }
             }
             .sheet(isPresented: $showingCreatePlan) {
@@ -1736,6 +1771,10 @@ struct AllTrainingPlansView: View {
             }
             .sheet(item: $editingPlan) { plan in
                 PlanMetadataEditorView(plan: plan)
+            }
+            .sheet(item: $templateToSchedule) { template in
+                ATHLTHPlanTemplateStartSheet(template: template)
+                    .environmentObject(session)
             }
             .sheet(item: $planToOpen) { plan in
                 NavigationStack {
@@ -1787,8 +1826,119 @@ struct AllTrainingPlansView: View {
                     "This removes the plan and its future schedule. Completed workout history is kept."
                 )
             }
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Delete saved plan?",
+                    norwegian: "Slette lagret plan?"
+                ),
+                isPresented: Binding(
+                    get: { templatePendingDeletion != nil },
+                    set: { if !$0 { templatePendingDeletion = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                Button(ATHLTHLocalization.choose(
+                    english: "Delete saved plan", norwegian: "Slett lagret plan"
+                ), role: .destructive) {
+                    if let templatePendingDeletion {
+                        session.deletePlanTemplate(templatePendingDeletion.id)
+                    }
+                    templatePendingDeletion = nil
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Cancel", norwegian: "Avbryt"
+                ), role: .cancel) {
+                    templatePendingDeletion = nil
+                }
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Only the saved template is deleted. Scheduled plans and workout history are preserved.",
+                    norwegian: "Bare den lagrede malen slettes. Planlagte økter og treningshistorikken beholdes."
+                ))
+            }
             .onAppear {
                 session.refreshActivePlanForToday()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var templateSection: some View {
+        if !savedTemplates.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Saved plans", norwegian: "Lagrede planer"
+                ))
+                .font(.headline)
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Reusable plans without fixed dates. Choose a start date when you use one.",
+                    norwegian: "Gjenbrukbare planer uten faste datoer. Du velger startdato når du tar en i bruk."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                ForEach(savedTemplates) { template in
+                    HStack(spacing: 12) {
+                        Image(systemName: "square.stack.3d.up")
+                            .font(.system(size: 18))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 42, height: 42)
+                            .background(
+                                ATHLTHTheme.champagneSoft,
+                                in: RoundedRectangle(cornerRadius: 13)
+                            )
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(template.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                            Text("\(template.weeks.count) uker")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+
+                        Spacer(minLength: 4)
+
+                        Button {
+                            templateToSchedule = template
+                        } label: {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Use", norwegian: "Bruk"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .padding(.horizontal, 11)
+                            .frame(height: 34)
+                            .background(
+                                ATHLTHTheme.champagneSoft,
+                                in: Capsule()
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Menu {
+                            Button {
+                                templatePendingDeletion = template
+                            } label: {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Delete", norwegian: "Slett"
+                                ), systemImage: "trash")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis")
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 30, height: 34)
+                        }
+                    }
+                    .padding(14)
+                    .background(
+                        Color.white.opacity(0.96),
+                        in: RoundedRectangle(cornerRadius: 20)
+                    )
+                }
             }
         }
     }
@@ -1876,13 +2026,28 @@ struct AllTrainingPlansView: View {
                     Button {
                         editingPlan = plan
                     } label: {
-                        Label("Edit", systemImage: "slider.horizontal.3")
+                        Label(ATHLTHLocalization.choose(
+                            english: "Edit", norwegian: "Rediger"
+                        ), systemImage: "slider.horizontal.3")
                     }
 
                     Button {
                         _ = session.duplicateTrainingPlan(plan.id)
                     } label: {
-                        Label("Duplicate", systemImage: "doc.on.doc")
+                        Label(ATHLTHLocalization.choose(
+                            english: "Duplicate", norwegian: "Dupliser"
+                        ), systemImage: "doc.on.doc")
+                    }
+
+                    if status == .active {
+                        Button {
+                            session.saveActivePlanAsTemplate()
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Save as reusable plan",
+                                norwegian: "Lagre som mal"
+                            ), systemImage: "square.and.arrow.down")
+                        }
                     }
 
                     Divider()
@@ -1890,7 +2055,9 @@ struct AllTrainingPlansView: View {
                     Button(role: .destructive) {
                         planPendingDeletion = plan
                     } label: {
-                        Label("Delete Plan", systemImage: "trash")
+                        Label(ATHLTHLocalization.choose(
+                            english: "Delete plan", norwegian: "Slett plan"
+                        ), systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "ellipsis")
@@ -1910,14 +2077,18 @@ struct AllTrainingPlansView: View {
             } label: {
                 Label(
                     status == .active
-                        ? "Open Current Plan"
-                        : "Open Plan",
+                        ? ATHLTHLocalization.choose(
+                            english: "Open active plan", norwegian: "Åpne aktiv plan"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "View plan", norwegian: "Se planen"
+                        ),
                     systemImage: "arrow.right"
                 )
                 .font(.caption.weight(.semibold))
             }
             .buttonStyle(.plain)
-            .foregroundStyle(ATHLTHTheme.accent)
+            .foregroundStyle(ATHLTHTheme.accentDeep)
             .padding(.top, 10)
         }
     }
@@ -1926,7 +2097,9 @@ struct AllTrainingPlansView: View {
         _ plan: TrainingPlan
     ) -> String {
         guard let startDate = plan.startDate else {
-            return "No dates"
+            return ATHLTHLocalization.choose(
+                english: "No dates", norwegian: "Uten datoer"
+            )
         }
 
         let start = startDate.formatted(
@@ -1949,10 +2122,14 @@ struct AllTrainingPlansView: View {
         _ status: TrainingPlanTimingStatus
     ) -> String {
         switch status {
-        case .active: return "ACTIVE"
-        case .upcoming: return "UPCOMING"
-        case .completed: return "COMPLETED"
-        case .unscheduled: return "UNSCHEDULED"
+        case .active:
+            return ATHLTHLocalization.choose(english: "ACTIVE", norwegian: "AKTIV")
+        case .upcoming:
+            return ATHLTHLocalization.choose(english: "UPCOMING", norwegian: "KOMMENDE")
+        case .completed:
+            return ATHLTHLocalization.choose(english: "PREVIOUS", norwegian: "TIDLIGERE")
+        case .unscheduled:
+            return ATHLTHLocalization.choose(english: "UNDATED", norwegian: "UTEN DATO")
         }
     }
 
@@ -1971,10 +2148,10 @@ struct AllTrainingPlansView: View {
         _ status: TrainingPlanTimingStatus
     ) -> Color {
         switch status {
-        case .active: return ATHLTHTheme.vitality
-        case .upcoming: return ATHLTHTheme.accent
+        case .active: return ATHLTHTheme.premiumGold
+        case .upcoming: return ATHLTHTheme.accentDeep
         case .completed: return ATHLTHTheme.mutedText
-        case .unscheduled: return .orange
+        case .unscheduled: return ATHLTHTheme.accentDeep
         }
     }
 }
