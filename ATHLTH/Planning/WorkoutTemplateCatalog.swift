@@ -3880,7 +3880,7 @@ struct WorkoutTemplateBuilderView: View {
             exerciseSlug: nil, distanceMeters: nil,
             repetitions: nil, durationSeconds: 120,
             targetWeightKilograms: nil, loadNote: nil,
-            notes: nil, phase: .main
+            notes: nil, phase: selectedPhase
         )
         run.groupID = id
         run.groupKind = .intervals
@@ -3895,7 +3895,7 @@ struct WorkoutTemplateBuilderView: View {
             exerciseSlug: nil, distanceMeters: nil,
             repetitions: nil, durationSeconds: 60,
             targetWeightKilograms: nil, loadNote: nil,
-            notes: nil, phase: .recovery
+            notes: nil, phase: selectedPhase
         )
         rest.groupID = id
         rest.groupKind = .intervals
@@ -4002,7 +4002,7 @@ struct WorkoutTemplateBuilderView: View {
             exerciseSlug: nil, distanceMeters: nil,
             repetitions: nil, durationSeconds: 60,
             targetWeightKilograms: nil, loadNote: nil,
-            notes: nil, phase: .recovery
+            notes: nil, phase: selectedPhase
         ), toGroup: groupID)
     }
 
