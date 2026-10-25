@@ -111,11 +111,9 @@ struct ATHLTHPlanWeekCopy {
         let oldClock = source.scheduledStart.map {
             calendar.dateComponents([.hour, .minute], from: $0)
         }
-        let hasClock = source.scheduledTimeIsExplicit == true ||
-            (source.scheduledTimeIsExplicit == nil &&
-             (oldClock?.hour ?? 0) != 0 ||
-             (source.scheduledTimeIsExplicit == nil &&
-              (oldClock?.minute ?? 0) != 0))
+        let legacyHasClock = (oldClock?.hour ?? 0) != 0 ||
+            (oldClock?.minute ?? 0) != 0
+        let hasClock = source.scheduledTimeIsExplicit ?? legacyHasClock
         if hasClock, let oldClock {
             copied.scheduledStart = calendar.date(
                 bySettingHour: oldClock.hour ?? 18,
