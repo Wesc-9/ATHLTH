@@ -57,7 +57,10 @@ enum ATHLTHWorkoutBlockEditing {
         // Advanced running intervals, structured strength sets and the
         // remaining sport types still use their dedicated supported builders.
         // A generic note/rest block must not masquerade as one of those.
-        guard kind == .rest || kind == .note else { return blocks }
+        // An otherwise unstructured workout must not accidentally be
+        // reclassified as a structured recording by adding a lone note.
+        guard !blocks.isEmpty,
+              kind == .rest || kind == .note else { return blocks }
         var result = blocks
         result.append(
             WorkoutTemplateBlock(
@@ -184,6 +187,7 @@ struct ATHLTHWorkoutBlockTimelineEditor: View {
                 .padding(.vertical, 7)
             }
 
+            if !blocks.isEmpty {
             Menu {
                 Button {
                     blocks = ATHLTHWorkoutBlockEditing.appending(blocks, kind: .rest)
@@ -208,6 +212,7 @@ struct ATHLTHWorkoutBlockTimelineEditor: View {
                 )
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
             }
         }
         .sheet(isPresented: $showingEditSheet) {
