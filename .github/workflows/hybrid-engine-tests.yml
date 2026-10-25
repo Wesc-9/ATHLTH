@@ -27,6 +27,8 @@ on:
       - Shared/WatchTransferModels.swift
       - ATHLTH/Training/**
       - ATHLTH/DesignSystem/ATHLTHTrainDesign.swift
+      - ATHLTH/Planning/ATHLTHWorkoutPhasePlacement.swift
+      - ATHLTH/Planning/ATHLTHWorkoutDurationEstimator.swift
       - ATHLTH/Planning/ATHLTHWorkoutTimelineOverview.swift
       - ATHLTH/Planning/ATHLTHIntervalGroupEditing.swift
       - ATHLTH/Planning/ATHLTHRunningTargetEditing.swift
@@ -38,6 +40,8 @@ on:
       - Tests/ATHLTHPlanCreationDraftTests.swift
       - Tests/ATHLTHRecordedWorkoutIndexTests.swift
       - Tests/ATHLTHPlannedWorkoutPresentationTests.swift
+      - Tests/ATHLTHWorkoutPhaseRelocationTests.swift
+      - Tests/ATHLTHWorkoutDurationEstimatorTests.swift
       - Tests/ATHLTHWorkoutTimelineOverviewTests.swift
       - Tests/ATHLTHTrainDesignLayoutTests.swift
 
@@ -119,6 +123,7 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHTrainTodayLayoutTests \
             -only-testing:ATHLTHTests/ATHLTHTrainPlanStudioIntegrationTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutDurationEstimatorTests \
+            -only-testing:ATHLTHTests/ATHLTHWorkoutPhaseRelocationTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutContentSummaryTests \
             -only-testing:ATHLTHTests/StrengthWorkoutCompletionRecoveryTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutMirrorContinuityTests \
