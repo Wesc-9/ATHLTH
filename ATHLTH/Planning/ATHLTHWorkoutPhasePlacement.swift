@@ -33,4 +33,47 @@ enum ATHLTHWorkoutPhasePlacement {
         }
         return position
     }
+    /// Move a selected activity (or its entire interval/superset group) to
+    /// another part of the workout. Phase and physical timeline order must
+    /// change together so previews, execution and Watch get one recipe.
+    static func relocatingSelection(
+        at selectedIndex: Int,
+        to phase: WorkoutPhaseKind,
+        in blocks: [WorkoutTemplateBlock]
+    ) -> [WorkoutTemplateBlock] {
+        guard blocks.indices.contains(selectedIndex) else { return blocks }
+        let selected = blocks[selectedIndex]
+        let affectedIndices = blocks.indices.filter { index in
+            if let groupID = selected.groupID {
+                return blocks[index].groupID == groupID
+            }
+            return index == selectedIndex
+        }
+
+        // Preserve the existing order when the requested phase already
+        // matches every member. This avoids unexpected jumps on reselect.
+        if affectedIndices.allSatisfy({ blocks[$0].resolvedPhase == phase }) {
+            return blocks
+        }
+
+        let members = affectedIndices.map { index -> WorkoutTemplateBlock in
+            var copy = blocks[index]
+            copy.phase = phase
+            return copy
+        }
+        let affected = Set(affectedIndices)
+        var remaining = blocks.enumerated().compactMap { index, item in
+            affected.contains(index) ? nil : item
+        }
+
+        // Insert as one indivisible section at the phase boundary, never
+        // within the repetitions or recovery steps of an adjacent group.
+        let destination = insertionIndex(for: phase, in: remaining)
+        remaining.insert(contentsOf: members, at: destination)
+        for index in remaining.indices {
+            remaining[index].sequence = index + 1
+        }
+        return remaining
+    }
+
 }

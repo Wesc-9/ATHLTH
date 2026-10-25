@@ -3087,7 +3087,7 @@ struct WorkoutTemplateBuilderView: View {
                 Menu {
                     ForEach(WorkoutPhaseKind.allCases) { phase in
                         Button {
-                            blocks[index].phase = phase
+                            moveBlockToPhase(at: index, phase: phase)
                         } label: {
                             Label(phase.title, systemImage: phase.symbol)
                         }
@@ -3159,7 +3159,7 @@ struct WorkoutTemplateBuilderView: View {
                 Divider()
                 Picker(tr("Section", "Del"), selection: Binding(
                     get: { blocks[index].resolvedPhase },
-                    set: { blocks[index].phase = $0 }
+                    set: { moveBlockToPhase(at: index, phase: $0) }
                 )) {
                     ForEach(WorkoutPhaseKind.allCases) { phase in
                         Label(phase.title, systemImage: phase.symbol).tag(phase)
@@ -3964,6 +3964,19 @@ struct WorkoutTemplateBuilderView: View {
         blocks.replaceSubrange(index...index, with: separated)
         resequence()
         expandedBlockIndex = index
+    }
+
+    /// Moving one interval effort must bring every recovery in that group.
+    /// Never leave a mixed-phase group that previews differently from live.
+    private func moveBlockToPhase(at index: Int, phase: WorkoutPhaseKind) {
+        guard blocks.indices.contains(index) else { return }
+        let selectedID = blocks[index].editorDragID
+        blocks = ATHLTHWorkoutPhasePlacement.relocatingSelection(
+            at: index, to: phase, in: blocks
+        )
+        expandedBlockIndex = blocks.firstIndex {
+            $0.editorDragID == selectedID
+        }
     }
 
     private func insertBlock(_ source: WorkoutTemplateBlock, toGroup groupID: UUID?) {
