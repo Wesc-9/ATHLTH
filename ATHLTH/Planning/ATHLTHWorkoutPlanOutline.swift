@@ -173,11 +173,21 @@ enum ATHLTHWorkoutPlanOutline {
                 english: "Zone \(zone)", norwegian: "Pulssone \(zone)"
             )
         case .pace:
-            guard let pace = target.paceMinSecondsPerKilometer ??
-                    target.paceMaxSecondsPerKilometer,
+            let minimum = target.paceMinSecondsPerKilometer
+            let maximum = target.paceMaxSecondsPerKilometer
+            guard let pace = minimum ?? maximum,
                   pace > 0 else { return "" }
-            let seconds = Int(pace.rounded())
-            return String(format: "%d:%02d min/km", seconds / 60, seconds % 60)
+
+            func formatted(_ pace: Double) -> String {
+                let seconds = Int(pace.rounded())
+                return String(format: "%d:%02d", seconds / 60, seconds % 60)
+            }
+
+            if let minimum, let maximum, minimum > 0, maximum > 0,
+               abs(maximum - minimum) > 0.5 {
+                return "\(formatted(minimum))–\(formatted(maximum)) min/km"
+            }
+            return "\(formatted(pace)) min/km"
         case .easy:
             return ATHLTHLocalization.choose(
                 english: "Easy", norwegian: "Rolig"
