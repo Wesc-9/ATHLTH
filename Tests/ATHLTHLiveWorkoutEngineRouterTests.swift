@@ -98,4 +98,32 @@ final class ATHLTHLiveWorkoutEngineRouterTests: XCTestCase {
             ATHLTHLiveWorkoutEngineRouter.engine(for: note), .mobility
         )
     }
+    func testCyclingStepUsesDedicatedDisplayButKeepsWorkoutIdentity() throws {
+        let workoutID = UUID()
+        var cycling = block("Cycling warm-up", kind: .note,
+                            sequence: 1, phase: .warmup)
+        cycling.activityTag = "cycling"
+        cycling.targetHeartRateZone = 2
+        cycling.targetEffortRPE = 4
+        let strength = block("Squats", kind: .exercise, sequence: 2)
+        let cooldown = block("Cool-down run", kind: .run,
+                             sequence: 3, phase: .cooldown)
+        let blocks = [cycling, strength, cooldown]
+        let routes = try blocks.indices.map {
+            try XCTUnwrap(ATHLTHLiveWorkoutEngineRouter.route(
+                workoutID: workoutID, blocks: blocks, index: $0
+            ))
+        }
+        XCTAssertEqual(routes.map(\.engine),
+                       [.cycling, .strength, .endurance])
+        XCTAssertTrue(routes.allSatisfy { $0.workoutID == workoutID })
+        let transition = try XCTUnwrap(
+            ATHLTHLiveWorkoutEngineRouter.transition(
+                from: routes[0], to: routes[1]
+            )
+        )
+        XCTAssertTrue(transition.preservesWorkoutIdentity)
+        XCTAssertTrue(transition.switchesEngine)
+    }
+
 }
