@@ -1453,22 +1453,17 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private var quickTrainSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "bolt.fill")
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(champagne)
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
                 Text(tr("Start a workout", "Start en økt"))
-                    .font(.system(size: 26, weight: .regular, design: .serif))
+                    .font(.system(size: 23, weight: .semibold))
                     .foregroundStyle(ink)
-                Spacer(minLength: 4)
+                Spacer(minLength: 2)
                 Button(action: onOpenLibrary) {
-                    HStack(spacing: 5) {
-                        Text(tr("See all", "Se alle"))
-                        Image(systemName: "chevron.right")
-                    }
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(muted)
-                    .frame(minHeight: 44)
+                    Label(tr("See all", "Se alle"), systemImage: "chevron.right")
+                        .labelStyle(.titleAndIcon)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(muted)
+                        .frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tr("Explore all workouts", "Se alle treningsøkter"))
@@ -1477,17 +1472,20 @@ struct ATHLTHTrainTodayPremiumView: View {
             if hasActiveWorkout {
                 Text(tr("Continue your current workout above before starting another.",
                         "Fortsett den aktive økten over før du starter en ny."))
-                    .font(.subheadline)
+                    .font(.caption)
                     .foregroundStyle(muted)
-                    .fixedSize(horizontal: false, vertical: true)
             }
-            // Adaptive tiles keep readable labels on compact and larger screens.
+
             LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: activityTileWidth), spacing: 12)],
-                spacing: 8
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: 9),
+                    count: dynamicTypeSize.isAccessibilitySize ? 2 : 3
+                ),
+                spacing: 9
             ) {
                 ForEach(sortedQuickActivities) { activity in
-                    quickPhotoChoice(activity).disabled(hasActiveWorkout)
+                    quickPhotoChoice(activity)
+                        .disabled(hasActiveWorkout)
                 }
             }
         }
@@ -1495,12 +1493,29 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private func quickPhotoChoice(_ activity: QuickActivity) -> some View {
         Button { openQuickActivity(activity) } label: {
-            ATHLTHTrainActivityTile(title: activity.title, symbol: activity.icon)
+            VStack(spacing: 11) {
+                Image(systemName: activity.icon)
+                    .font(.system(size: 26, weight: .medium))
+                    .foregroundStyle(champagne)
+                    .frame(height: 32)
+                    .accessibilityHidden(true)
+                Text(activity.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ink)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.88)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, minHeight: 93)
+            .padding(.horizontal, 5)
+            .athlthTrainPaper()
+            .contentShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.radius))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(activity.title)
         .accessibilityHint(tr("Open workout setup", "Åpner treningsoppsett"))
     }
+
     private var ghostRaceSection: some View {
         Button(action: onGhostRace) {
             ZStack(alignment: .leading) {
