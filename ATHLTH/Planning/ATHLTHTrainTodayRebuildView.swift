@@ -22,6 +22,11 @@ struct ATHLTHTrainTodayRebuildView: View {
         session.standalonePlannedSessions(on: Date())
     }
 
+    private var isPlannedRestDayToday: Bool {
+        guard let plan = session.activePlan else { return false }
+        return TrainingPlanSchedule.isRestDay(in: plan, on: Date())
+    }
+
     private struct TodayEntry: Identifiable {
         let session: PlannedSession
         let standalone: Bool
@@ -146,7 +151,11 @@ struct ATHLTHTrainTodayRebuildView: View {
             if let featured = actionableToday.first {
                 featuredWorkout(featured.session, standalone: featured.standalone)
             } else if allToday.isEmpty {
-                unscheduledDay
+                if isPlannedRestDayToday {
+                    restDayCard
+                } else {
+                    unscheduledDay
+                }
             } else {
                 dayCompleted
             }
@@ -399,6 +408,49 @@ struct ATHLTHTrainTodayRebuildView: View {
         .background(
             Color.white, in: RoundedRectangle(cornerRadius: 21)
         )
+    }
+
+    private var restDayCard: some View {
+        Button(action: onOpenPlan) {
+            HStack(alignment: .center, spacing: 13) {
+                Image(systemName: "leaf")
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 48, height: 48)
+                    .background(
+                        ATHLTHTheme.champagneSoft,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Rest day",
+                        norwegian: "Hviledag"
+                    ))
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Intentionally planned rest. It does not count as a missed workout.",
+                        norwegian: "Planlagt hvile. Dagen teller ikke som en økt du har hoppet over."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+            .padding(15)
+            .frame(maxWidth: .infinity)
+            .background(
+                Color.white,
+                in: RoundedRectangle(cornerRadius: 21)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Open your plan to edit the rest day.",
+            norwegian: "Åpner treningsplanen hvor du kan endre hviledagen."
+        ))
     }
 
     private var unscheduledDay: some View {
