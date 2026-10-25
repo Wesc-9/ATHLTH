@@ -735,8 +735,11 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                                 .foregroundStyle(bronze)
                         }
                         information
+                        // Detailed planning is a core Plan action, not a
+                        // hidden advanced-only feature. The saved timeline is
+                        // shared with live execution; no separate engine.
+                        detailedStructureEntry
                         if advanced {
-                            detailedStructureEntry
                             // The interval recipe remains the sole running source;
                             // never offer a parallel editor for a structured hybrid.
                             if draft.kind == .running && draft.resolvedWorkoutBlocks.isEmpty {
