@@ -1583,6 +1583,11 @@ final class AppSessionStore: ObservableObject {
             return false
         }
 
+        // The athlete must explicitly remove the rest-day marker before
+        // scheduling an exercise on that date.
+        guard plan.weeks[targetWeekIndex]
+            .days[targetDayIndex].isRestDay != true else { return false }
+
         plan.weeks[sourceWeekIndex]
             .days[sourceDayIndex]
             .sessions
@@ -2062,6 +2067,7 @@ final class AppSessionStore: ObservableObject {
             }) else { continue }
             for dayIndex in current.weeks[weekIndex].days.indices {
                 guard current.weeks[weekIndex].days[dayIndex].sessions.isEmpty,
+                      current.weeks[weekIndex].days[dayIndex].isRestDay != true,
                       let generatedDay = generatedWeek.days.first(where: {
                           $0.dayIndex == current.weeks[weekIndex].days[dayIndex].dayIndex
                       })
@@ -2540,6 +2546,53 @@ final class AppSessionStore: ObservableObject {
             }
     }
 
+    /// Change only the selected plan date. Empty dates remain unplanned
+    /// until the athlete explicitly marks them as rest days.
+    @discardableResult
+    func setPlanDayRestStatus(
+        planID: UUID,
+        dayID: UUID,
+        isRestDay: Bool
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID) else {
+            return false
+        }
+
+        for weekIndex in plan.weeks.indices {
+            guard let dayIndex = plan.weeks[weekIndex].days.firstIndex(
+                where: { $0.id == dayID }
+            ) else { continue }
+
+            let week = plan.weeks[weekIndex]
+            let day = week.days[dayIndex]
+            guard let date = TrainingPlanSchedule.dayDate(
+                in: plan, week: week, day: day
+            ), Calendar.current.startOfDay(for: date) >=
+                Calendar.current.startOfDay(for: Date())
+            else { return false }
+
+            if isRestDay {
+                // This includes exercises moved from another date. Never
+                // overwrite existing planned sessions or completed history.
+                guard TrainingPlanSchedule.sessions(
+                    in: plan, on: date
+                ).isEmpty else { return false }
+            }
+
+            guard day.isRestDay != (isRestDay ? true : nil) else {
+                return true
+            }
+
+            plan.weeks[weekIndex].days[dayIndex].isRestDay =
+                isRestDay ? true : nil
+            plan.version += 1
+            plan.updatedAt = Date()
+            replaceTrainingPlan(plan)
+            return true
+        }
+        return false
+    }
+
     func addSession(
         _ session: PlannedSession,
         toDay dayID: UUID
@@ -2569,6 +2622,14 @@ final class AppSessionStore: ObservableObject {
                 where: { $0.id == dayID }
             ) else {
                 continue
+            }
+
+            // A planned rest day is not an empty training slot.
+            guard plan.weeks[weekIndex].days[dayIndex].isRestDay != true
+            else { return }
+            if let explicitDate = session.scheduledStart,
+               TrainingPlanSchedule.isRestDay(in: plan, on: explicitDate) {
+                return
             }
 
             plan.weeks[weekIndex]
