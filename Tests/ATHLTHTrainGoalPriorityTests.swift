@@ -26,7 +26,7 @@ final class ATHLTHTrainGoalPriorityTests: XCTestCase {
         )
     }
 
-    func testOnlySuggestsGoalRelevantToToday'sWorkout() {
+    func testOnlySuggestsGoalRelevantToTodaysWorkout() {
         let primary = goal("Regular training", category: .consistency, primary: true)
         let run = goal("Half marathon", category: .endurance)
         let gym = goal("Squat goal", category: .strength)
