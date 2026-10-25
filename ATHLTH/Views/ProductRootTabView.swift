@@ -6921,6 +6921,7 @@ struct ATHLTHTrainView: View {
             },
             onQuickTrain: { kind in handleQuickStart(kind) },
             onQuickCycling: { startCyclingQuick() },
+            onQuickCustom: { activity in startCustomQuick(as: activity) },
             onGhostRace: { showingGhostHub = true }
         )
     }
@@ -11233,6 +11234,10 @@ struct ATHLTHTrainView: View {
     }
 
     private func startCyclingQuick() {
+        startCustomQuick(as: .cycling)
+    }
+
+    private func startCustomQuick(as activity: CustomQuickWorkoutActivity) {
         guard customQuickStartAvailable else {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "Finish the active workout before starting another.",
@@ -11240,7 +11245,7 @@ struct ATHLTHTrainView: View {
             )
             return
         }
-        customQuickInitialActivity = .cycling
+        customQuickInitialActivity = activity
         showingCustomQuickStart = true
     }
 
