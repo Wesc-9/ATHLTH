@@ -31,6 +31,7 @@ Status: partially implemented on `release/v1.9.2`. This specification records th
 - [x] Insert independent pauses and new interval groups into the selected phase
 - [x] Ordered per-phase step/target summaries
 - [x] Regression tests for phase insertion and group integrity
+- [x] Moving a grouped interval/superset to another phase now relocates the entire group in timeline order and preserves pace, HR zone, RPE and strength/cycling metadata; new regression tests added (build verification pending)
 
 ## Remaining verification and delivery
 - [ ] A complete **green** iOS build + regression run on current HEAD
