@@ -273,27 +273,12 @@ struct ATHLTHTrainTodayRebuildView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            if let running = workout.resolvedRunningWorkouts.first,
-               !running.blocks.isEmpty {
-                runningPhaseTimeline(running)
-            }
-
-            if !workout.exercises.isEmpty {
-                HStack(spacing: 6) {
-                    ForEach(workout.exercises.prefix(3)) { exercise in
-                        Text(exercise.embeddedExercise.name)
-                            .font(.system(size: 10, weight: .medium))
-                            .lineLimit(1)
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 6)
-                            .background(
-                                ATHLTHTheme.champagneSoft,
-                                in: Capsule()
-                            )
-                    }
-                }
-                .foregroundStyle(ATHLTHTheme.primaryText)
-            }
+            // Show the complete actual plan, not just the first running
+            // template or a few exercise names. Shared with Plan.
+            ATHLTHWorkoutPlanOutlineView(
+                workout: workout,
+                maxVisibleItems: 8
+            )
 
             HStack(spacing: 10) {
                 Button {
