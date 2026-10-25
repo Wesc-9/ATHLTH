@@ -1567,12 +1567,13 @@ struct ATHLTHTrainTodayPremiumView: View {
                 .accessibilityLabel(tr("Explore all workouts", "Se alle treningsøkter"))
             }
 
+            // Three equal tiles per row, matching the approved
+            // two-row Home-inspired reference rather than a tall 2-column list.
             LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 9),
-                    GridItem(.flexible(), spacing: 9)
-                ],
-                spacing: 9
+                columns: Array(
+                    repeating: GridItem(.flexible(), spacing: 8), count: 3
+                ),
+                spacing: 8
             ) {
                 ForEach(sortedQuickActivities) { activity in
                     quickPhotoChoice(activity)
@@ -1585,9 +1586,9 @@ struct ATHLTHTrainTodayPremiumView: View {
         Button {
             openQuickActivity(activity)
         } label: {
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .center, spacing: 9) {
                 Image(systemName: activity.icon)
-                    .font(.system(size: 21, weight: .light))
+                    .font(.system(size: 20, weight: .light))
                     .foregroundStyle(champagne)
                     .frame(width: 37, height: 37)
                     .background(
@@ -1595,14 +1596,16 @@ struct ATHLTHTrainTodayPremiumView: View {
                         in: RoundedRectangle(cornerRadius: 11)
                     )
                 Text(activity.title)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(ink)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.78)
-                Spacer(minLength: 0)
+                    .minimumScaleFactor(0.73)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity, minHeight: 105, alignment: .topLeading)
-            .padding(14)
+            .frame(maxWidth: .infinity, minHeight: 86, alignment: .center)
+            .padding(.horizontal, 7)
+            .padding(.vertical, 10)
             .background(
                 Color.white,
                 in: RoundedRectangle(cornerRadius: 16, style: .continuous)
