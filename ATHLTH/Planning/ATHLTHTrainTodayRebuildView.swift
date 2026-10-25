@@ -504,24 +504,57 @@ struct ATHLTHTrainTodayRebuildView: View {
                     .foregroundStyle(ATHLTHTheme.primaryText)
                 }
                 Spacer()
-                Text(ATHLTHLocalization.choose(
-                    english: "Choose iPhone or Watch at start",
-                    norwegian: "Velg iPhone eller Watch ved start"
-                ))
-                .font(.system(size: 10))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .multilineTextAlignment(.trailing)
-                .frame(maxWidth: 135)
+                Menu {
+                    Button(action: onCustomQuick) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Custom quick workout",
+                                norwegian: "Egendefinert hurtigøkt"
+                            ),
+                            systemImage: "figure.mixed.cardio"
+                        )
+                    }
+                    Button(action: onOpenPlan) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Plan a workout",
+                                norwegian: "Planlegg økt"
+                            ),
+                            systemImage: "calendar.badge.plus"
+                        )
+                    }
+                } label: {
+                    HStack(spacing: 5) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "More", norwegian: "Flere"
+                        ))
+                        Image(systemName: "chevron.down")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
             }
             HStack(spacing: 10) {
                 quickButton("Løp", icon: "figure.run", kind: .running)
                 quickButton("Gå", icon: "figure.walk", kind: .walking)
                 quickButton("Styrke", icon: "dumbbell", kind: .strength)
-                Button(action: onCustomQuick) {
-                    quickLabel("Egen", icon: "plus")
+                Button(action: onOpenPlan) {
+                    quickLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Plan",
+                            norwegian: "Planlegg"
+                        ),
+                        icon: "plus"
+                    )
                 }
                 .buttonStyle(.plain)
             }
+            Text(ATHLTHLocalization.choose(
+                english: "Choose iPhone or Watch when starting a workout.",
+                norwegian: "Velg iPhone eller Watch når du starter en økt."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
