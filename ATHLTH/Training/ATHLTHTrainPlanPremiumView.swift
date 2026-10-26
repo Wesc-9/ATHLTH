@@ -1403,139 +1403,67 @@ struct ATHLTHTrainPlanPremiumView: View {
             plan, healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
-        let percent = Int((min(max(progress.completionFraction, 0), 1) * 100).rounded())
         let currentWeekNumber = min(
             max((selectedWeekIndex ?? currentWeekIndex(plan)) + 1, 1),
             max(plan.weeks.count, 1)
         )
-        let thisWeek = selectedWeek
-        let workouts = thisWeek?.days.flatMap(\.sessions)
+        let workouts = selectedWeek?.days.flatMap(\.sessions)
             .filter { !$0.isExplicitRestDay } ?? []
         let done = workouts.filter { isPremiumPlanWorkoutCompleted($0, plan: plan) }.count
         let remaining = workouts.filter {
             !isPremiumPlanWorkoutCompleted($0, plan: plan) &&
             !session.isPlanSessionSkipped(planID: plan.id, sessionID: $0.id)
         }.count
-        let restDays = thisWeek?.days.filter { day in
+        let restDays = selectedWeek?.days.filter { day in
             day.sessions.isEmpty || day.sessions.allSatisfy(\.isExplicitRestDay)
         }.count ?? 0
 
-        return VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 24) {
-                HStack(alignment: .top, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 9) {
-                            Rectangle().fill(ATHLTHTrainDesign.gold).frame(width: 22, height: 1)
-                            Text(planLibraryStatus(plan).uppercased())
-                                .font(.caption2.weight(.semibold)).tracking(2)
-                                .foregroundStyle(ATHLTHTrainDesign.paleGold)
-                        }
-                        Text(plan.title)
-                            .font(ATHLTHTrainDesign.title)
-                            .foregroundStyle(.white)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(plan.weeks.isEmpty
-                             ? tr("No training weeks yet", "Ingen treningsuker ennå")
-                             : tr("Week", "Uke") + " \(currentWeekNumber) / \(plan.weeks.count)")
-                            .font(.subheadline.monospacedDigit())
-                            .foregroundStyle(.white.opacity(0.8))
-                        if let start = plan.startDate {
-                            Label(start.formatted(.dateTime.day().month(.wide).year()),
-                                  systemImage: "calendar")
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHTrainDesign.paleGold)
-                        }
-                    }
-                    Spacer(minLength: 0)
-                Menu {
-                    Button {
-                        editingPlan = plan
-                    } label: {
-                        Label(tr("Edit plan details", "Rediger plandetaljer"),
-                              systemImage: "slider.horizontal.3")
-                    }
-                    Button { showingEditor = true } label: {
-                        Label(tr("Edit training week", "Rediger treningsuken"),
-                              systemImage: "calendar")
-                    }
-                    Button { browsingMyPlans = true } label: {
-                        Label(tr("My plans", "Mine planer"), systemImage: "square.stack")
-                    }
-                    if unfinishedPlanDrafts.isEmpty {
-                        Button {
-                            beginNewPlanCreation()
-                        } label: {
-                            Label(tr("Create new plan", "Ny treningsplan"),
-                                  systemImage: "plus")
-                        }
-                    } else if let draft = unfinishedPlanDrafts.first {
-                        Button {
-                            openDraft(draft)
-                        } label: {
-                            Label(tr("Continue draft", "Fortsett utkast"),
-                                  systemImage: "arrow.uturn.forward")
-                        }
-                    }
-                    Divider()
-                    Button(role: .destructive) {
-                        trainingPlanPendingDeletion = plan
-                    } label: {
-                        Label(tr("Delete plan", "Slett treningsplan"),
-                              systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.headline)
-                        .foregroundStyle(graphite)
-                        .frame(width: 48, height: 48)
-                        .background(.white.opacity(0.94), in: Circle())
+        return ATHLTHTrainPlanOverviewCard(
+            title: plan.title,
+            status: planLibraryStatus(plan),
+            currentWeek: currentWeekNumber,
+            weekCount: plan.weeks.count,
+            startDate: plan.startDate,
+            completionFraction: progress.completionFraction,
+            workoutCount: workouts.count,
+            completedCount: done,
+            remainingCount: remaining,
+            restDays: restDays,
+            onOpenMyPlans: { browsingMyPlans = true }
+        ) {
+            Button {
+                editingPlan = plan
+            } label: {
+                Label(tr("Edit plan details", "Rediger plandetaljer"),
+                      systemImage: "slider.horizontal.3")
+            }
+            Button { showingEditor = true } label: {
+                Label(tr("Edit training week", "Rediger treningsuken"),
+                      systemImage: "calendar")
+            }
+            Button { browsingMyPlans = true } label: {
+                Label(tr("My plans", "Mine planer"),
+                      systemImage: "square.stack")
+            }
+            if unfinishedPlanDrafts.isEmpty {
+                Button(action: beginNewPlanCreation) {
+                    Label(tr("Create new plan", "Ny treningsplan"),
+                          systemImage: "plus")
                 }
-                    .accessibilityLabel(tr("Plan options", "Planvalg"))
-                }
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .firstTextBaseline) {
-                        Text(tr("Program completion", "Gjennomført av planen"))
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.8))
-                        Spacer()
-                        Text("\(percent) %")
-                            .font(.system(.title3, design: .serif))
-                            .monospacedDigit()
-                            .foregroundStyle(ATHLTHTrainDesign.paleGold)
-                    }
-                    ProgressView(value: min(max(progress.completionFraction, 0), 1))
-                        .tint(ATHLTHTrainDesign.gold)
-                        .accessibilityLabel(tr("Program completion", "Gjennomført av planen"))
+            } else if let draft = unfinishedPlanDrafts.first {
+                Button { openDraft(draft) } label: {
+                    Label(tr("Continue draft", "Fortsett utkast"),
+                          systemImage: "arrow.uturn.forward")
                 }
             }
-            .padding(24)
-            .background(LinearGradient(
-                colors: [ATHLTHTrainDesign.ink, ATHLTHTrainDesign.inkLift],
-                startPoint: .topLeading, endPoint: .bottomTrailing))
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: metricWidth))], spacing: 18) {
-                premiumPlanMetric("\(workouts.count)", tr("workouts this week", "økter denne uken"))
-                premiumPlanMetric("\(done)", tr("completed", "fullført"))
-                premiumPlanMetric("\(remaining)", tr("remaining", "gjenstår"))
-                premiumPlanMetric("\(restDays)", tr("days without workouts", "dager uten økter"))
+            Divider()
+            Button(role: .destructive) {
+                trainingPlanPendingDeletion = plan
+            } label: {
+                Label(tr("Delete plan", "Slett treningsplan"),
+                      systemImage: "trash")
             }
-            .padding(20)
         }
-        .clipShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.radius))
-        .athlthTrainPaper(emphasized: true)
-    }
-    private func premiumPlanMetric(_ value: String, _ label: String) -> some View {
-        VStack(spacing: 5) {
-            Text(value)
-                .font(.system(.title2, design: .serif))
-                .monospacedDigit()
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(secondaryInk)
-                .fixedSize(horizontal: false, vertical: true)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .frame(minHeight: 52)
     }
 
     private func premiumPlanActions(_ plan: TrainingPlan) -> some View {
