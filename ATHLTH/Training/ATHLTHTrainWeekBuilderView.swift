@@ -609,6 +609,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     let dayID: UUID
     let existingWorkout: PlannedSession?
     let expectedPlanVersion: Int
+    let initialQuickAdd: String?
+    let initialPhase: WorkoutPhaseKind?
 
     @State private var draft: PlannedSession
     @State private var showExerciseSearch = false
@@ -616,6 +618,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     @State private var showSharedWorkoutTemplates = false
     @State private var showIntervalComposer = false
     @State private var showDetailedComposer = false
+    @State private var didLaunchQuickComposer = false
     @State private var showingSpotifyPlaylistPicker = false
     @State private var showRemoveDetailedStructure = false
     @State private var scheduled = false
@@ -674,12 +677,16 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         planID: UUID,
         dayID: UUID,
         expectedPlanVersion: Int,
-        existingWorkout: PlannedSession? = nil
+        existingWorkout: PlannedSession? = nil,
+        initialQuickAdd: String? = nil,
+        initialPhase: WorkoutPhaseKind? = nil
     ) {
         self.planID = planID
         self.dayID = dayID
         self.existingWorkout = existingWorkout
         self.expectedPlanVersion = expectedPlanVersion
+        self.initialQuickAdd = initialQuickAdd
+        self.initialPhase = initialPhase
         _draft = State(initialValue: existingWorkout ?? PlannedSession(
             id: UUID(), title: "", kind: .strength,
             scheduledStart: nil, durationMinutes: 50,
@@ -703,6 +710,13 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 guard !localDraftReady else { return }
                 restoreLocalDraft()
                 localDraftReady = true
+                if initialQuickAdd != nil && !didLaunchQuickComposer {
+                    didLaunchQuickComposer = true
+                    Task { @MainActor in
+                        await Task.yield()
+                        showDetailedComposer = true
+                    }
+                }
             }
             .onChange(of: draft) { _, _ in persistLocalDraft() }
             .onChange(of: durationWasEditedManually) { _, _ in persistLocalDraft() }
@@ -824,6 +838,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     initialTitle: draft.title,
                     initialBlocks: ATHLTHUnifiedWorkout.editorBlocks(from: draft),
                     initialRouteID: draft.routeID,
+                    initialQuickAdd: initialQuickAdd,
+                    initialPhase: initialPhase,
                     initialDurationOverrideMinutes: durationWasEditedManually
                         ? draft.durationMinutes : nil,
                     draftContext: "plan-\(planID.uuidString)-day-\(dayID.uuidString)-workout-\(existingWorkout?.id.uuidString ?? "new")",
