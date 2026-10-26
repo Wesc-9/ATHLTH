@@ -25,6 +25,9 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
     @State private var historyAccountID: UUID?
     @State private var isHistoryLoading = true
     @State private var isHistoryLimited = false
+    @State private var measuredZoneSeconds = [Double](repeating: 0, count: 5)
+    @State private var pulseZonesLoading = false
+    @State private var zoneRequestID = UUID()
     @ScaledMetric(relativeTo: .body) private var metricWidth: CGFloat = 130
     @ScaledMetric(relativeTo: .largeTitle) private var heroFigureSize: CGFloat = 54
 
@@ -316,10 +319,104 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         }
         .task(id: PeriodRequest(accountID: session.profile.userID, period: period)) {
             await loadPeriod()
+            await loadPulseZones()
         }
         .task(id: HistoryRequest(accountID: session.profile.userID,
                                  healthWorkouts: health.workouts)) {
             await loadHistory()
+            await loadPulseZones()
+        }
+    }
+
+    private func loadPulseZones() async {
+        let requestID = UUID()
+        zoneRequestID = requestID
+        measuredZoneSeconds = [Double](repeating: 0, count: 5)
+        guard let maximum = session.onboardingProfile?.maximumHeartRateBPM,
+              (100...240).contains(maximum) else {
+            pulseZonesLoading = false
+            return
+        }
+        pulseZonesLoading = true
+        let currentArea = area
+        let currentStart = period.start
+        let source: [WorkoutSummary] = allHealthWorkouts
+            .filter { workout in
+                workout.startDate >= currentStart &&
+                workout.startDate <= Date() &&
+                (currentArea == .general ||
+                 (currentArea == .running && workout.activity == .running) ||
+                 (currentArea == .strength && workout.activity == .strength))
+            }
+            .sorted { $0.startDate > $1.startDate }
+        var totals = [Double](repeating: 0, count: 5)
+        for workout in source.prefix(12) {
+            if Task.isCancelled { return }
+            let points = await health.runningHeartRateTimeline(for: workout.id)
+            let durations = ATHLTHRunningHeartRateAnalysis.zoneDurations(
+                points, maximumBPM: Double(maximum)
+            )
+            for duration in durations where (1...5).contains(duration.zone) {
+                totals[duration.zone - 1] += duration.seconds
+            }
+        }
+        guard zoneRequestID == requestID else { return }
+        measuredZoneSeconds = totals
+        pulseZonesLoading = false
+    }
+
+    private var pulseZoneCard: some View {
+        section(
+            title: tr("Heart rate zones", "Pulssoner"),
+            subtitle: tr(
+                "Measured Apple Health coverage · latest 12 sessions",
+                "Målt tid fra Apple Health · inntil 12 siste økter"
+            )
+        ) {
+            if pulseZonesLoading {
+                ProgressView().frame(maxWidth: .infinity)
+            } else if session.onboardingProfile?.maximumHeartRateBPM == nil {
+                emptyLine(tr(
+                    "Set your maximum heart rate in your profile to see measured zones.",
+                    "Legg inn makspuls i profilen for å vise målte pulssoner."
+                ))
+            } else if measuredZoneSeconds.reduce(0, +) <= 0 {
+                emptyLine(tr(
+                    "No measured zone durations in this period.",
+                    "Ingen målte pulssonetider i denne perioden."
+                ))
+            } else {
+                let total = measuredZoneSeconds.reduce(0, +)
+                VStack(spacing: 11) {
+                    ForEach(1...5, id: \.self) { zone in
+                        let seconds = measuredZoneSeconds[zone - 1]
+                        let fraction = total > 0 ? seconds / total : 0
+                        HStack(spacing: 11) {
+                            Text(tr("Zone", "Sone") + " \(zone)")
+                                .font(.caption.weight(.semibold))
+                                .frame(width: 56, alignment: .leading)
+                            GeometryReader { proxy in
+                                Capsule()
+                                    .fill(ATHLTHTheme.champagneSoft)
+                                    .overlay(alignment: .leading) {
+                                        Capsule()
+                                            .fill(ATHLTHTheme.accentDeep)
+                                            .frame(width: max(0, proxy.size.width * fraction))
+                                    }
+                            }
+                            .frame(height: 9)
+                            Text(String(format: "%.0f%%", fraction * 100))
+                                .font(.caption.monospacedDigit())
+                                .frame(width: 40, alignment: .trailing)
+                        }
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+            }
+        }
+        .task(id: area) {
+            await loadPulseZones()
         }
     }
 
@@ -489,6 +586,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
     private var generalContent: some View {
         VStack(spacing: 12) {
             generalTrainingTrend
+            pulseZoneCard
             section(
                 title: tr("Body & health", "Kropp & helse"),
                 subtitle: tr("Latest health data · readiness is an estimate", "Siste helsedata · dagsform er et estimat")
@@ -600,6 +698,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
 
     private var runningContent: some View {
         VStack(spacing: 12) {
+            pulseZoneCard
             section(
                 title: tr("Average pace development", "Utvikling i snittempo"),
                 subtitle: tr("Apple Health runs · min/km", "Løpeøkter fra Apple Health · min/km")
@@ -705,6 +804,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
 
     private var strengthContent: some View {
         VStack(spacing: 12) {
+            pulseZoneCard
             section(
                 title: tr("Main lift development", "Utvikling i hovedløft"),
                 subtitle: tr("Highest completed working weight per month · kg", "Tyngste fullførte arbeidsvekt per måned · kg")
