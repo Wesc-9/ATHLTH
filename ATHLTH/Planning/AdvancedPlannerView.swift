@@ -6195,8 +6195,9 @@ struct SessionEditorView: View {
     // replacing either live run or strength measurement engine.
     private var workoutPlanningPreviewBlocks: [WorkoutTemplateBlock] {
         if !workoutBlocks.isEmpty { return workoutBlocks }
-        guard !plannedExercises.isEmpty,
-              !selectedRunningWorkouts.isEmpty else { return [] }
+        // A pure strength or pure running session must also get a preview.
+        // Only skip conversion when neither legacy source contains content.
+        guard !plannedExercises.isEmpty || !selectedRunningWorkouts.isEmpty else { return [] }
         return ATHLTHUnifiedWorkout.editorBlocks(from: composeSession())
     }
 
@@ -13350,7 +13351,13 @@ private struct ATHLTHReleasePlanTimeline: View {
     private let line = Color(red: 0.77, green: 0.72, blue: 0.64)
 
     var body: some View {
-        let blocks = workout.resolvedWorkoutBlocks.sorted { $0.sequence < $1.sequence }
+        // Legacy strength / running plans may have exercises or run phases
+        // without unified blocks. Convert for display only; never save a
+        // synthetic structure back to the user's plan.
+        let stored = workout.resolvedWorkoutBlocks.sorted { $0.sequence < $1.sequence }
+        let blocks = stored.isEmpty
+            ? ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+            : stored
         if !blocks.isEmpty {
             VStack(alignment: .leading, spacing: 0) {
                 ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
