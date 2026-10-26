@@ -147,3 +147,5 @@ ATHLTH 1.9.4 build 102 — retry explicitly authorized 2026-10-26 after SwiftUI 
 ATHLTH 1.9.4 build 102 — authorized retry after remaining Home Map/Route Swift compile fixes and GHCR rate-limit backoff on 2026-10-26. Require verified archive, signing and upload.
 
 ATHLTH 1.9.4 build 102 — user-authorized retry on 2026-10-26 after Home Map compiler split and Docker Hub registry fallback. Require successful archive/signing and Apple upload.
+
+ATHLTH 1.9.5 build 103 — user-approved fresh version and TestFlight retry 2026-10-26 after Explore optional callback compiler correction; require archive, signing, backend and upload verification.
