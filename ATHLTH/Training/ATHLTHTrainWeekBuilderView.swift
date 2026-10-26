@@ -1112,32 +1112,83 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     }
 
     private var detailedBlocksSummary: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: draft)
+        return VStack(alignment: .leading, spacing: 11) {
             HStack {
-                sectionTitle(tr("Workout timeline", "Øktens innhold"))
+                sectionTitle(tr("Workout timeline", "Øktens tidslinje"))
                 Spacer()
-                Text("\(ATHLTHUnifiedWorkout.editorBlocks(from: draft).count) " + tr("blocks", "blokker"))
+                Text("\(blocks.count) " + tr("blocks", "blokker"))
                     .font(.caption)
                     .foregroundStyle(muted)
             }
-            ForEach(ATHLTHUnifiedWorkout.editorBlocks(from: draft)) { block in
-                HStack(spacing: 10) {
-                    Image(systemName: block.kind.systemImage)
-                        .frame(width: 26)
-                        .foregroundStyle(bronze)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(block.title)
-                            .font(.subheadline.weight(.medium))
-                        Text(block.resolvedPhase.title
-                             + (block.targetText.map { " · " + $0 } ?? ""))
-                            .font(.caption)
-                            .foregroundStyle(muted)
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
+                    HStack(alignment: .top, spacing: 11) {
+                        VStack(spacing: 3) {
+                            Image(systemName: block.kind == .rest
+                                  ? "pause.fill" : block.kind.systemImage)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(bronze)
+                                .frame(width: 29, height: 29)
+                                .background(
+                                    Color(red: 0.94, green: 0.92, blue: 0.88),
+                                    in: Circle()
+                                )
+                            if index < blocks.count - 1 {
+                                Rectangle()
+                                    .fill(line)
+                                    .frame(width: 1, height: 17)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(block.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                            let detail = [
+                                block.resolvedPhase.title,
+                                block.kind == .rest
+                                    ? block.durationSeconds.map { "\(Int($0.rounded())) sek pause" }
+                                    : block.targetText,
+                                block.notes
+                            ].compactMap { $0 }.filter { !$0.isEmpty }
+                                .joined(separator: " · ")
+                            if !detail.isEmpty {
+                                Text(detail)
+                                    .font(.caption)
+                                    .foregroundStyle(muted)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Spacer()
+                    .padding(11)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        block.kind == .rest
+                            ? Color(red: 0.953, green: 0.934, blue: 0.901)
+                            : Color.white,
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                    .padding(.bottom, 6)
                 }
-                .padding(10)
-                .editorSurface(line: line)
             }
+            Button {
+                showDetailedComposer = true
+            } label: {
+                Label(tr("Add or edit blocks", "Legg til eller rediger blokker"),
+                      systemImage: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(bronze)
+                    .frame(maxWidth: .infinity, minHeight: 45)
+                    .background(Color.white,
+                                in: RoundedRectangle(cornerRadius: 13))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 13)
+                            .stroke(line, lineWidth: 0.8)
+                    }
+            }
+            .buttonStyle(.plain)
             Button(role: .destructive) {
                 showRemoveDetailedStructure = true
             } label: {
