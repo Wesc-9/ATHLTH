@@ -1362,10 +1362,10 @@ struct ExerciseDetailView: View {
                 if let summary = displayedSummary, !summary.isEmpty {
                     detailCard(ATHLTHLocalization.choose(
                         english: "About the exercise", norwegian: "Om øvelsen"
-                    )) {
+                    ), symbol: "dumbbell") {
                         Text(summary)
                             .font(.subheadline)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -1405,19 +1405,71 @@ struct ExerciseDetailView: View {
                         english: "How to perform",
                         norwegian: "Slik utfører du øvelsen"
                     )) {
-                        ForEach(
-                            Array(displayedInstructions.enumerated()),
-                            id: \.offset
-                        ) { index, instruction in
-                            HStack(alignment: .top, spacing: 10) {
+                        HStack {
+                            Spacer()
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    instructionsAsList.toggle()
+                                }
+                            } label: {
+                                Label(
+                                    instructionsAsList
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Show illustrations",
+                                            norwegian: "Vis med bilder"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Show as list",
+                                            norwegian: "Vis som liste"
+                                        ),
+                                    systemImage: instructionsAsList
+                                        ? "photo.on.rectangle" : "list.bullet"
+                                )
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        ForEach(Array(displayedInstructions.enumerated()), id: \.offset) {
+                            index, instruction in
+                            HStack(alignment: .top, spacing: 12) {
                                 Text("\(index + 1)")
-                                    .font(.caption.bold())
-                                    .foregroundStyle(ATHLTHTheme.accent)
-                                    .frame(width: 24, height: 24)
-                                    .background(ATHLTHTheme.accent.opacity(0.10), in: Circle())
-
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                    .frame(width: 32, height: 32)
+                                    .background(
+                                        ATHLTHTrainDesign.paleGold.opacity(0.55),
+                                        in: Circle()
+                                    )
                                 Text(instruction)
                                     .font(.subheadline)
+                                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .padding(.top, 5)
+                                if !instructionsAsList {
+                                    if index == 0 {
+                                        ExerciseArtwork(entry: currentEntry, size: 102)
+                                            .accessibilityHidden(true)
+                                    } else if index == 1,
+                                              let peakURL = currentEntry.imagePeakURL,
+                                              peakURL != currentEntry.imageStartURL {
+                                        peakExerciseArtwork(peakURL, size: 102)
+                                            .accessibilityHidden(true)
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                ATHLTHTrainDesign.paper,
+                                in: RoundedRectangle(cornerRadius: 17)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 17)
+                                    .stroke(ATHLTHTrainDesign.rule.opacity(0.45),
+                                            lineWidth: 0.7)
+                                    .allowsHitTesting(false)
                             }
                         }
                     }
@@ -1553,38 +1605,41 @@ struct ExerciseDetailView: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             if let onSelect {
                 VStack(spacing: 0) {
-                    Divider()
-                        .opacity(0.35)
-
                     Button {
                         onSelect(currentEntry)
                         dismiss()
                     } label: {
                         Label(
-                            selectionTitle ?? "Add Exercise",
+                            selectionTitle ?? ATHLTHLocalization.choose(
+                                english: "Add to workout",
+                                norwegian: "Legg til i økten"
+                            ),
                             systemImage: "plus.circle.fill"
                         )
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 50)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 62)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    ATHLTHTrainDesign.bronze,
+                                    ATHLTHTrainDesign.gold
+                                ],
+                                startPoint: .leading, endPoint: .trailing
+                            ),
+                            in: RoundedRectangle(cornerRadius: 24)
+                        )
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .tint(ATHLTHTrainDesign.bronze)
+                    .buttonStyle(.plain)
                     .padding(.horizontal, 16)
-                    .padding(.top, 10)
-                    .padding(.bottom, 8)
+                    .padding(.top, 14)
+                    .padding(.bottom, 10)
                 }
-                .background(
-                    .ultraThinMaterial
-                )
+                .background(ATHLTHTrainDesign.canvas)
                 .overlay(alignment: .top) {
                     Rectangle()
-                        .fill(
-                            Color.white
-                                .opacity(0.42)
-                        )
-                        .frame(height: 0.6)
+                        .fill(ATHLTHTrainDesign.rule.opacity(0.5))
+                        .frame(height: 0.7)
                 }
             }
         }
@@ -1718,14 +1773,34 @@ struct ExerciseDetailView: View {
 
     private func detailCard<Content: View>(
         _ title: String,
+        symbol: String? = nil,
         @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: 13) {
-            HStack(spacing: 10) {
-                Capsule()
-                    .fill(ATHLTHTrainDesign.gold)
-                    .frame(width: 3, height: 19)
-                    .accessibilityHidden(true)
+            HStack(spacing: 11) {
+                if let symbol {
+                    Image(systemName: symbol)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 42, height: 42)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    ATHLTHTrainDesign.gold,
+                                    ATHLTHTrainDesign.bronze
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            in: Circle()
+                        )
+                        .accessibilityHidden(true)
+                } else {
+                    Capsule()
+                        .fill(ATHLTHTrainDesign.gold)
+                        .frame(width: 3, height: 19)
+                        .accessibilityHidden(true)
+                }
                 Text(title)
                     .font(.system(size: 21, weight: .medium, design: .serif))
                     .foregroundStyle(ATHLTHTrainDesign.ink)
