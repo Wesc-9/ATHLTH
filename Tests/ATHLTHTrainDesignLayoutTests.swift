@@ -4,6 +4,30 @@ import XCTest
 
 final class ATHLTHTrainDesignLayoutTests: XCTestCase {
     @MainActor
+    func testProgressPaceChartUsesStableIDsAndFitsCompactScreens() {
+        let day = Date(timeIntervalSince1970: 1_800_000_000)
+        // Multiple HealthKit workouts can share a displayed timestamp. The
+        // original chart used the date as its SwiftUI row identifier.
+        let first = ATHLTHTrainProgressPaceChartView.Sample(
+            id: UUID(), date: day, minutesPerKilometer: 5.2
+        )
+        let second = ATHLTHTrainProgressPaceChartView.Sample(
+            id: UUID(), date: day, minutesPerKilometer: 5.0
+        )
+        XCTAssertNotEqual(first.id, second.id)
+        for width in [320.0, 390.0, 768.0] {
+            let chart = ATHLTHTrainProgressPaceChartView(samples: [first, second])
+            let host = UIHostingController(rootView: chart)
+            host.loadViewIfNeeded()
+            let measured = host.sizeThatFits(
+                in: CGSize(width: width, height: 600)
+            )
+            XCTAssertLessThanOrEqual(measured.width, width + 1)
+            XCTAssertGreaterThan(measured.height, 0)
+        }
+    }
+
+    @MainActor
     func testExtractedTodayCoverFitsNarrowAndLargeText() {
         for width in [320.0, 390.0, 768.0] {
             for size in [DynamicTypeSize.large, .accessibility3] {
