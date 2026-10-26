@@ -23,7 +23,7 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
 
     func testSimpleStartsWithModeAndSkipsAdvancedQuestions() {
         let stages = ATHLTHPlanJourney.sequence(advanced: false)
-        XCTAssertEqual(stages, [.mode, .basics])
+        XCTAssertEqual(stages, [.mode, .goal, .basics])
         XCTAssertFalse(stages.contains(.profile))
         XCTAssertFalse(stages.contains(.week))
         XCTAssertNil(ATHLTHPlanJourney.position(of: .review, advanced: false))
@@ -33,12 +33,14 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
     func testAdvancedKeepsAllSixPlanningStages() {
         XCTAssertEqual(
             ATHLTHPlanJourney.sequence(advanced: true),
-            [.mode, .basics, .profile, .week, .review]
+            [.mode, .goal, .basics, .profile, .week, .review]
         )
-        XCTAssertEqual(ATHLTHPlanJourney.position(of: .review, advanced: true), 5)
+        XCTAssertEqual(ATHLTHPlanJourney.position(of: .review, advanced: true), 6)
     }
 
     func testResumeReturnsToLastAllowedWizardStage() {
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("goal", advanced: true), .goal)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("goal", advanced: false), .goal)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("week", advanced: true), .week)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("review", advanced: true), .review)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("basics", advanced: false), .basics)
@@ -64,6 +66,21 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
                 )
             }
         }
+    }
+
+    func testGoalCategoriesHaveValidSelectionsAndStoredPlanMappings() {
+        for category in ATHLTHPlanGoalArea.allCases {
+            let goals = ATHLTHPlanGoalOption.options(for: category)
+            XCTAssertEqual(goals.count, 5)
+            XCTAssertEqual(Set(goals.map(\.id)).count, goals.count)
+            XCTAssertTrue(goals.allSatisfy { !$0.title.isEmpty && !$0.subtitle.isEmpty })
+        }
+        let running = ATHLTHPlanGoalOption.options(for: .running)
+        XCTAssertEqual(running[0].goal, .improveFitness)
+        XCTAssertEqual(running[1].goal, .runFaster)
+        XCTAssertEqual(running[2].focus, .endurance)
+        XCTAssertEqual(ATHLTHPlanGoalOption.options(for: .strength)[1].goal, .buildMuscle)
+        XCTAssertEqual(ATHLTHPlanGoalOption.options(for: .specific)[0].goal, .raceReady)
     }
 
     @MainActor
