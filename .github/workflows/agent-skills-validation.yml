@@ -1,0 +1,31 @@
+name: Agent skills validation
+
+on:
+  push:
+    paths:
+      - '.agents/skills/**'
+      - '.claude/skills/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'scripts/verify_agent_skills.py'
+      - '.github/workflows/agent-skills-validation.yml'
+  pull_request:
+    paths:
+      - '.agents/skills/**'
+      - '.claude/skills/**'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'scripts/verify_agent_skills.py'
+      - '.github/workflows/agent-skills-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Codex and Claude skill manifests
+        run: python3 scripts/verify_agent_skills.py
