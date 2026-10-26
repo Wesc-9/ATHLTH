@@ -6436,18 +6436,34 @@ struct ATHLTHTrainView: View {
                 }
                 .frame(minHeight: 42)
             } else {
-                VStack(alignment: .leading, spacing: 18) {
-                    ATHLTHTrainMasthead(
-                        title: ATHLTHLocalization.choose(
-                            english: "Your training plan", norwegian: "Din treningsplan"),
-                        subtitle: ATHLTHLocalization.choose(
-                            english: "A considered plan. Room for every session.",
-                            norwegian: "En gjennomtenkt plan. Plass til hver økt."),
-                        onLibrary: { showingLibrary = true }
+                // Plan follows the compact top navigation from Fremdrift.
+                // Its title and mode selector live inside the Plan workspace.
+                HStack(spacing: 8) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "TRAINING", norwegian: "TRENING"
+                    ))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2.5)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    Spacer(minLength: 4)
+                    HStack(spacing: 1) {
+                        progressHeaderTab(
+                            ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"),
+                            section: .today
+                        )
+                        progressHeaderTab("Plan", section: .plan)
+                        progressHeaderTab(
+                            ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremdrift"),
+                            section: .progress
+                        )
+                    }
+                    .padding(3)
+                    .background(
+                        ATHLTHTrainDesign.paleGold.opacity(0.27),
+                        in: RoundedRectangle(cornerRadius: 13)
                     )
-                    premiumTrainTabs
                 }
-                .padding(.bottom, 8)
+                .frame(minHeight: 42)
             }
         }
     }
