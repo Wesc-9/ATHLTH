@@ -4,6 +4,7 @@ import Foundation
 /// Both simple and advanced modes create the same persisted TrainingPlan.
 enum ATHLTHPlanJourneyStep: Int, CaseIterable {
     case mode
+    case goal
     case basics
     case source
     case profile
@@ -14,9 +15,9 @@ enum ATHLTHPlanJourneyStep: Int, CaseIterable {
 enum ATHLTHPlanJourney {
     static func sequence(advanced: Bool) -> [ATHLTHPlanJourneyStep] {
         if advanced {
-            return [.mode, .basics, .profile, .week, .review]
+            return [.mode, .goal, .basics, .profile, .week, .review]
         }
-        return [.mode, .basics]
+        return [.mode, .goal, .basics]
     }
 
     static func position(
