@@ -44,7 +44,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var startDate =
         ATHLTHTrainingPlanBuilderFlow.defaultStartDate()
 
-    @State private var focus: TrainingPlanFocus = .generalFitness
+    @State private var focus: TrainingPlanFocus = .running
+    @State private var selectedGoalArea: ATHLTHPlanGoalArea = .running
+    @State private var selectedGoalChoice = "fitness"
     @State private var secondaryFocus: TrainingPlanFocus?
     @State private var focusWeight = 70
     @State private var goal: TrainingPlanGoalType = .improveFitness
@@ -389,10 +391,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             )
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(step == .source || step == .mode ? .hidden : .visible, for: .navigationBar)
+            .toolbar(step == .source || step == .mode || step == .goal ? .hidden : .visible, for: .navigationBar)
             .toolbar {
                 #if DEBUG
-                if step != .source && step != .mode {
+                if step != .source && step != .mode && step != .goal {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showingPlanDesignLab = true } label: {
                             Image(systemName: "paintpalette")
@@ -401,7 +403,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                 }
                 #endif
-                if step != .source && step != .mode {
+                if step != .source && step != .mode && step != .goal {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(backButtonTitle) {
                             goBack()
@@ -413,6 +415,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 if !showingCreatedPlan {
                     if step == .mode {
                         AnyView(modeContinueBar)
+                    } else if step == .goal {
+                        AnyView(goalContinueBar)
                     } else if step == .source {
                         AnyView(sourceContinueBar)
                     } else {
@@ -516,6 +520,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: weekCount) { _, _ in saveResumableDraft() }
         .onChange(of: startDate) { _, _ in saveResumableDraft() }
         .onChange(of: mode) { _, _ in saveResumableDraft() }
+        .onChange(of: focus) { _, _ in saveResumableDraft() }
+        .onChange(of: goal) { _, _ in saveResumableDraft() }
+        .onChange(of: selectedGoalArea) { _, _ in saveResumableDraft() }
+        .onChange(of: selectedGoalChoice) { _, _ in saveResumableDraft() }
         .onChange(of: selectedSource) { _, _ in saveResumableDraft() }
         .onChange(of: workoutKindOverridesByDay) { _, _ in saveResumableDraft() }
         .onChange(of: workoutTitleOverridesByDay) { _, _ in saveResumableDraft() }
@@ -824,6 +832,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         switch step {
         case .mode:
             AnyView(modeChoice)
+        case .goal:
+            AnyView(goalChoice)
         case .source:
             AnyView(sourceChoice)
         case .basics:
@@ -1118,6 +1128,110 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             english: "Continue with the selected planning mode.",
             norwegian: "Fortsett med valgt planleggingsmåte."
         ))
+    }
+
+    // A dedicated reference-inspired goal screen, kept behind a stable
+    // AnyView boundary just like the other stages in this large wizard.
+    private var goalChoice: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 15) {
+                sourceChoiceHeader
+                ATHLTHPlanGoalEntryView(
+                    area: selectedGoalArea,
+                    selectedChoice: selectedGoalChoice,
+                    onChooseArea: { newArea in
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.17)) {
+                            selectGoalArea(newArea)
+                        }
+                    },
+                    onChooseGoal: { option in
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.17)) {
+                            selectGoalOption(option)
+                        }
+                    }
+                )
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 10)
+            .padding(.bottom, 26)
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+    }
+
+    private func selectGoalArea(_ newArea: ATHLTHPlanGoalArea) {
+        selectedGoalArea = newArea
+        guard let first = ATHLTHPlanGoalOption.options(for: newArea).first else {
+            return
+        }
+        selectGoalOption(first)
+    }
+
+    private func selectGoalOption(_ option: ATHLTHPlanGoalOption) {
+        selectedGoalChoice = option.id
+        focus = option.focus
+        goal = option.goal
+        // A visible user-selected objective is not silently replaced by a
+        // stale free-text note from another selection.
+        if option.id == "distance" {
+            goalDetail = ATHLTHLocalization.choose(
+                english: "Improve running distance", norwegian: "Løpe lenger"
+            )
+        } else if goalDetail == "Løpe lenger" ||
+                    goalDetail == "Improve running distance" {
+            goalDetail = ""
+        }
+
+        // Simple plans cycle through chosen activity types. Keep that
+        // existing source of truth aligned with the category selected here.
+        if mode == .basic {
+            switch option.focus {
+            case .running, .endurance:
+                simpleActivities = [.running]
+            case .strength, .hypertrophy:
+                simpleActivities = [.strength]
+            case .hybrid:
+                simpleActivities = [.running, .strength]
+            case .generalFitness, .mobilityRehab:
+                simpleActivities = [.walking, .running]
+            }
+            setSimpleKinds()
+        }
+    }
+
+    private var goalContinueBar: some View {
+        Button {
+            guard canContinue else { return }
+            goForward()
+        } label: {
+            HStack(spacing: 12) {
+                Spacer(minLength: 12)
+                Text(ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, minHeight: 55)
+            .background(
+                LinearGradient(
+                    colors: [ATHLTHTrainDesign.bronze,
+                             Color(red: 0.70, green: 0.52, blue: 0.30)],
+                    startPoint: .leading, endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 22)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!canContinue)
+        .padding(.horizontal, 18)
+        .padding(.top, 10)
+        .padding(.bottom, 9)
+        .background(ATHLTHTrainDesign.canvas.opacity(0.98))
     }
 
     private var sourceChoice: some View {
@@ -1726,6 +1840,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         switch step {
         case .mode:
             return ATHLTHLocalization.choose(english: "Planning mode", norwegian: "Detaljnivå")
+        case .goal:
+            return ATHLTHLocalization.choose(english: "Your main goal", norwegian: "Hovedmålet ditt")
         case .source:
             return ATHLTHLocalization.choose(
                 english: "Choose a starting point",
@@ -6090,6 +6206,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         switch step {
         case .mode:
             return true
+        case .goal:
+            return ATHLTHPlanGoalOption.options(for: selectedGoalArea)
+                .contains { $0.id == selectedGoalChoice }
         case .source:
             return true
         case .basics:
