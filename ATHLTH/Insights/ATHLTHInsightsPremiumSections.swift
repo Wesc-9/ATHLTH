@@ -1,6 +1,5 @@
 import SwiftUI
 import Charts
-import HealthKit
 
 /// Insights uses the same editorial navigation and colors as Train.
 /// The sections filter presentation only; none change health or workout data.
@@ -115,7 +114,6 @@ struct ATHLTHInsightsMuscleSummary {
 
 struct ATHLTHInsightsMuscleCard: View {
     let summary: ATHLTHInsightsMuscleSummary
-    private let palette = ATHLTHTrainDesign.self
 
     private var topMuscles: String {
         var seen: Set<String> = []
@@ -211,7 +209,7 @@ struct ATHLTHInsightsTrainingDay: Identifiable {
 
     var id: Date { date }
 
-    static func make(from workouts: [HKWorkout], at now: Date = Date()) -> [Self] {
+    static func make(from workouts: [WorkoutSummary], at now: Date = Date()) -> [Self] {
         let calendar = Calendar.current
         let end = calendar.startOfDay(for: now)
         let start = calendar.date(byAdding: .day, value: -6, to: end) ?? end
