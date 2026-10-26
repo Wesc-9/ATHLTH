@@ -6203,13 +6203,15 @@ struct SessionEditorView: View {
 
     @ViewBuilder
     private var workoutStructurePreviewSection: some View {
-        if !workoutPlanningPreviewBlocks.isEmpty {
+        // Capture once so the count, ordering and content are consistent during render.
+        let previewBlocks = workoutPlanningPreviewBlocks
+        if !previewBlocks.isEmpty {
             Section(ATHLTHLocalization.choose(
                 english: "Workout structure", norwegian: "Øktstruktur"
             )) {
                 HStack {
                     Label(
-                        "\(workoutPlanningPreviewBlocks.count) blokker",
+                        "\(previewBlocks.count) blokker",
                         systemImage: "list.number"
                     )
                     .font(.caption.weight(.semibold))
@@ -6221,7 +6223,7 @@ struct SessionEditorView: View {
                             .foregroundStyle(ATHLTHTheme.mutedText)
                     }
                 }
-                ForEach(Array(workoutPlanningPreviewBlocks.enumerated()), id: \.element.id) { index, block in
+                ForEach(Array(previewBlocks.enumerated()), id: \.element.id) { index, block in
                     HStack(alignment: .top, spacing: 12) {
                         VStack(spacing: 3) {
                             Image(systemName: block.kind == .rest ? "pause.fill" : block.kind.systemImage)
@@ -6229,7 +6231,7 @@ struct SessionEditorView: View {
                                 .foregroundStyle(Color(red: 0.49, green: 0.36, blue: 0.19))
                                 .frame(width: 28, height: 28)
                                 .background(Color(red: 0.94, green: 0.92, blue: 0.88), in: Circle())
-                            if index < workoutPlanningPreviewBlocks.count - 1 {
+                            if index < previewBlocks.count - 1 {
                                 Rectangle()
                                     .fill(Color(red: 0.77, green: 0.72, blue: 0.64))
                                     .frame(width: 1, height: 16)
