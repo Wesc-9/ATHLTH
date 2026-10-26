@@ -464,6 +464,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .padding(.horizontal, 4)
 
                 let week = plan.weeks[index]
+                premiumWeekDayStrip(week, plan: plan)
                 VStack(spacing: 16) {
                     ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                         // A stable root per day keeps SwiftUI row identity even
@@ -527,6 +528,60 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private func studioPlanCover(_ plan: TrainingPlan) -> some View {
         premiumPlanHeader(plan)
+    }
+
+    // Compact seven-day navigator from the approved Plan reference.
+    // Selects an existing day without creating another planning model.
+    private func premiumWeekDayStrip(
+        _ week: TrainingPlanWeek, plan: TrainingPlan
+    ) -> some View {
+        HStack(spacing: 4) {
+            ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                let date = planDayDate(day.dayIndex, plan: plan)
+                let selected = selectedDayID == day.id
+                let count = day.sessions.filter { !$0.isExplicitRestDay }.count
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                        selectedDayID = selected ? nil : day.id
+                        selectedWorkoutID = nil
+                        selectedDetailSection = .structure
+                    }
+                } label: {
+                    VStack(spacing: 6) {
+                        Text(weekday(day.dayIndex, plan: plan))
+                            .font(.system(size: 10, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        Text(date.formatted(.dateTime.day()))
+                            .font(.system(size: 16, weight: .semibold, design: .serif))
+                            .monospacedDigit()
+                        Circle()
+                            .fill(count > 0
+                                ? (selected ? Color.white : warmGold)
+                                : (selected ? Color.white.opacity(0.55) : line))
+                            .frame(width: 5, height: 5)
+                    }
+                    .foregroundStyle(selected ? Color.white : graphite)
+                    .frame(maxWidth: .infinity, minHeight: 67)
+                    .background(
+                        selected ? warmGold : Color.white.opacity(0.85),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 12)
+                            .stroke(selected ? Color.clear : line.opacity(0.55), lineWidth: 0.7)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(
+                    date.formatted(date: .complete, time: .omitted) +
+                    " · \(count) " + tr("workouts", "økter")
+                )
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(5)
+        .background(soft, in: RoundedRectangle(cornerRadius: 17))
     }
 
     private func studioDayRow(_ day: TrainingPlanDay, plan: TrainingPlan) -> some View {
