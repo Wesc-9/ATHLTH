@@ -274,88 +274,79 @@ struct ATHLTHPlanExistingChoice: View {
     var compact: Bool = false
     let action: () -> Void
 
-    private let ink = ATHLTHPlanDesign.ink
-    private let muted = ATHLTHPlanDesign.secondaryInk
-    private let gold = ATHLTHPlanDesign.accent
+    private let ink = ATHLTHTrainDesign.ink
+    private let muted = ATHLTHTrainDesign.secondary
+    private let gold = ATHLTHTrainDesign.bronze
+
+    private var imageName: String {
+        symbol == "bookmark" ? "GoalMountain" : "GoalAdventure"
+    }
 
     var body: some View {
         Button(action: action) {
-            Group {
-                if compact {
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            symbolBadge
-                            Spacer(minLength: 0)
-                            Image(systemName: "arrow.up.right")
-                                .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(muted)
-                                .accessibilityHidden(true)
-                        }
-
-                        Text(title)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundStyle(ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.82)
-                        Text(subtitle)
-                            .font(.system(size: 10))
-                            .foregroundStyle(muted)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.78)
+            ZStack(alignment: .leading) {
+                GeometryReader { bounds in
+                    HStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        Image(imageName)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: bounds.size.width * 0.76,
+                                   height: bounds.size.height)
+                            .clipped()
                     }
-                    .frame(maxWidth: .infinity, minHeight: 86, alignment: .leading)
-                } else {
-                    HStack(spacing: 10) {
-                        symbolBadge
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ink)
-                            Text(subtitle)
-                                .font(.caption)
-                                .foregroundStyle(muted)
-                        }
+                }
+                LinearGradient(
+                    colors: [.white, .white.opacity(0.92),
+                             .white.opacity(0.60), .white.opacity(0.20)],
+                    startPoint: .leading, endPoint: .trailing
+                )
+
+                VStack(alignment: .leading, spacing: compact ? 5 : 8) {
+                    HStack(alignment: .top) {
+                        Image(systemName: symbol)
+                            .font(.system(size: compact ? 18 : 20, weight: .medium))
+                            .foregroundStyle(gold)
+                            .frame(width: compact ? 38 : 44, height: compact ? 38 : 44)
+                            .background(
+                                ATHLTHTrainDesign.paleGold.opacity(0.48),
+                                in: RoundedRectangle(cornerRadius: 12)
+                            )
+                        Spacer(minLength: 0)
+                    }
+                    Text(title)
+                        .font(.system(size: compact ? 17 : 19, weight: .medium,
+                                      design: .serif))
+                        .foregroundStyle(ink)
+                        .lineLimit(1).minimumScaleFactor(0.78)
+                    HStack(alignment: .bottom, spacing: 2) {
+                        Text(subtitle)
+                            .font(.system(size: compact ? 10 : 12))
+                            .foregroundStyle(muted)
+                            .lineLimit(2).minimumScaleFactor(0.78)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(muted)
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundStyle(ink.opacity(0.75))
                     }
-                    .frame(maxWidth: .infinity, minHeight: 62)
                 }
+                .padding(compact ? 11 : 14)
             }
-            .padding(compact ? 12 : 14)
-            .background(
-                LinearGradient(
-                    colors: [.white, Color(red: 0.99, green: 0.975, blue: 0.948)],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-            )
+            .frame(maxWidth: .infinity)
+            .frame(height: compact ? 104 : 122)
+            .clipShape(RoundedRectangle(cornerRadius: 17))
             .overlay {
-                RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(ATHLTHPlanDesign.outline, lineWidth: 0.85)
+                RoundedRectangle(cornerRadius: 17)
+                    .stroke(ATHLTHTrainDesign.rule.opacity(0.42),
+                            lineWidth: 0.8)
             }
-            .shadow(color: ink.opacity(0.045), radius: 10, y: 5)
-            .contentShape(RoundedRectangle(cornerRadius: 20))
+            .shadow(color: ink.opacity(0.05), radius: 10, y: 4)
+            .contentShape(RoundedRectangle(cornerRadius: 17))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title + ". " + subtitle)
         .accessibilityHint(ATHLTHLocalization.choose(
-            english: "Open your plans.",
-            norwegian: "Åpne planene."
+            english: "Open your plans.", norwegian: "Åpne planene."
         ))
-    }
-
-    private var symbolBadge: some View {
-        Image(systemName: symbol)
-            .font(.system(size: compact ? 17 : 20, weight: .medium))
-            .foregroundStyle(gold)
-            .frame(width: compact ? 35 : 42, height: compact ? 35 : 42)
-            .background(
-                gold.opacity(0.095),
-                in: RoundedRectangle(cornerRadius: 13)
-            )
-            .accessibilityHidden(true)
     }
 }
