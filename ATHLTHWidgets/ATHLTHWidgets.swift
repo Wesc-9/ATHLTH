@@ -1979,11 +1979,58 @@ struct ATHLTHWorkoutLiveActivity: Widget {
     }
 }
 
+
+private struct ATHLTHAliveEyes: View {
+    var body: some View {
+        HStack(spacing: 3) {
+            Capsule().fill(.white).frame(width: 4, height: 9)
+            Capsule().fill(.white).frame(width: 4, height: 9)
+        }
+        .accessibilityLabel("ATHLTH Alive")
+    }
+}
+
+/// Experimental Live Activity. iOS owns the physical camera/sensor cutout;
+/// the eyes render in supported ActivityKit regions, not over the cutout.
+struct ATHLTHAliveLiveActivity: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: ATHLTHAliveActivityAttributes.self) { _ in
+            HStack(spacing: 12) {
+                ATHLTHAliveEyes()
+                Text("ATHLTH Alive")
+                    .font(.caption.weight(.medium))
+            }
+            .foregroundStyle(.white)
+            .padding()
+            .activityBackgroundTint(.black)
+            .activitySystemActionForegroundColor(.white)
+        } dynamicIsland: { _ in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.center) {
+                    ATHLTHAliveEyes()
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    Text("ATHLTH Alive")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.8))
+                }
+            } compactLeading: {
+                Capsule().fill(.white).frame(width: 4, height: 9)
+            } compactTrailing: {
+                Capsule().fill(.white).frame(width: 4, height: 9)
+            } minimal: {
+                ATHLTHAliveEyes()
+            }
+        }
+    }
+}
+
 @main
 struct ATHLTHWidgetsBundle: WidgetBundle {
     var body: some Widget {
         ATHLTHHomeWidget()
         ATHLTHLockScreenWidget()
         ATHLTHWorkoutLiveActivity()
+        ATHLTHAliveLiveActivity()
     }
 }
