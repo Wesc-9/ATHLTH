@@ -194,7 +194,12 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
         }
         .onChange(of: selectedWeekIndex) { _, _ in
-            selectedDayID = nil
+            // Keep a day selected from the full-plan overview. Only a day
+            // that is absent from the newly chosen week should be cleared.
+            if let selectedDayID,
+               selectedWeek?.days.contains(where: { $0.id == selectedDayID }) != true {
+                self.selectedDayID = nil
+            }
             selectedWorkoutID = nil
             selectedDetailSection = .structure
         }
@@ -440,13 +445,14 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 plan.weeks.count - 1)
                 let week = plan.weeks[index]
                 VStack(alignment: .leading, spacing: 12) {
+                    if showingEntirePlan {
+                        premiumAllWeeks(plan)
+                        Divider().overlay(line)
+                    }
                     referenceWeekNavigator(plan, weekIndex: index)
                     premiumWeekDayStrip(week, plan: plan)
                     if let day = premiumSelectedDay(in: week, plan: plan) {
                         referenceDayWorkspace(day, plan: plan)
-                    }
-                    if showingEntirePlan {
-                        premiumAllWeeks(plan)
                     }
                 }
                 .padding(10)
