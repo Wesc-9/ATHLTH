@@ -350,17 +350,28 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
 
         // Plan-free and unscheduled days show a compact overview.
         // Verify it and the remaining heroes fit narrow phone widths.
-        let scenarios: [TrainingPlan?] = [nil, plan]
+        let plannedWorkout = PlannedSession(
+            id: UUID(), title: "Styrke – Hele kroppen", kind: .strength,
+            scheduledStart: .now, durationMinutes: 45,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        let scenarios: [(TrainingPlan?, [PlannedSession])] = [
+            (nil, []),
+            (plan, []),
+            (plan, [plannedWorkout])
+        ]
         // Quick Train's friend strip requires the same social environment
         // injected by the production tab root.
         let social = SocialStore()
         for width in [320.0, 375.0, 430.0] {
-            for currentPlan in scenarios {
+            for (currentPlan, daySessions) in scenarios {
                 for hasActiveWorkout in [false, true] {
                 let today = ATHLTHTrainTodayPremiumView(
                     workoutCatalog: WorkoutTemplateCatalogStore(),
                     plan: currentPlan,
-                    sessions: [],
+                    sessions: daySessions,
                     completedIDs: [],
                     healthCompletedIDs: [],
                     completionFraction: 0,
