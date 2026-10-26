@@ -11019,14 +11019,19 @@ struct PlannedExerciseEditorView: View {
                 if let entry = catalogEntry,
                    let summary = exerciseLibrary.localizedExerciseSummary(entry),
                    !summary.isEmpty {
-                    Section(ATHLTHLocalization.choose(
-                        english: "About the exercise", norwegian: "Om øvelsen"
-                    )) {
-                        Text(summary)
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.vertical, 5)
+                    Section {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "About the exercise", norwegian: "Om øvelsen"
+                            ))
+                            .font(.system(size: 21, weight: .semibold, design: .serif))
+                            .foregroundStyle(ATHLTHTrainDesign.ink)
+                            Text(summary)
+                                .font(.subheadline)
+                                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.vertical, 6)
                     }
                     .listRowBackground(ATHLTHTrainDesign.paper)
                 }
@@ -11679,30 +11684,57 @@ struct PlannedExerciseEditorView: View {
                 .inline
             )
             .toolbar {
-                ToolbarItem(
-                    placement: .cancellationAction
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Cancel",
-                            norwegian: "Avbryt"
-                        )
-                    ) {
-                        dismiss()
-                    }
+                ToolbarItem(placement: .principal) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Exercise", norwegian: "Øvelse"
+                    ))
+                    .font(.system(size: 21, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
                 }
-
-                ToolbarItem(
-                    placement: .confirmationAction
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Save",
-                            norwegian: "Lagre"
-                        )
-                    ) {
-                        saveExercise()
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avbryt"
+                        ))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .padding(.horizontal, 13)
+                        .padding(.vertical, 8)
+                        .background(ATHLTHTrainDesign.paper, in: Capsule())
+                        .overlay {
+                            Capsule()
+                                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.6),
+                                              lineWidth: 0.8)
+                        }
                     }
+                    .buttonStyle(.plain)
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button {
+                        saveExercise()
+                    } label: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Save", norwegian: "Lagre"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 8)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    ATHLTHTrainDesign.bronze,
+                                    ATHLTHTrainDesign.gold
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
