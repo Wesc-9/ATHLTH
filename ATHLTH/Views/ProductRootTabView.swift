@@ -5829,7 +5829,7 @@ struct ATHLTHTrainView: View {
                                 // Let the first white card rest on the scenic cover,
                                 // without altering scroll position or recorder state.
                                 premiumTodayScreen
-                                    .padding(.top, -30)
+                                    .padding(.top, -40)
                                     .zIndex(1)
                             }
                         }
@@ -6532,6 +6532,10 @@ struct ATHLTHTrainView: View {
     /// layer: the date, navigation and scheduled workouts remain live data.
     private var todayPhotoHeader: some View {
         ATHLTHTrainTodayCoverView(day: displayedTrainDay, selection: $selectedSection)
+            // Only the Today cover reaches the phone edges. Plan and the
+            // workout cards retain the usual readable horizontal inset.
+            .padding(.horizontal, -17)
+            .padding(.top, -18)
     }
 
     private var premiumTrainTabs: some View {
