@@ -656,6 +656,20 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                 }
                 .buttonStyle(.plain)
             }
+            section(title: tr("Recent workouts", "Siste økter")) {
+                if runs.isEmpty {
+                    emptyLine(tr("No runs in this period", "Ingen løpeøkter i perioden"))
+                } else {
+                    ForEach(runs.prefix(5)) { run in
+                        compactRow(
+                            icon: "figure.run",
+                            title: run.isIndoor == true ? tr("Indoor run", "Løping inne") : tr("Running", "Løping"),
+                            subtitle: run.startDate.formatted(date: .abbreviated, time: .omitted),
+                            value: run.distanceKilometers.map { String(format: "%.1f km", $0) } ?? run.duration.shortDuration
+                        )
+                    }
+                }
+            }
             ATHLTHRunningSpeedProgressCard()
         }
     }
@@ -768,7 +782,35 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                 }
             }
             .buttonStyle(.plain)
+            latestStrengthSessions
         }
+    }
+
+    private var latestStrengthSessions: some View {
+        NavigationLink {
+            StrengthProgressDetailView(
+                workouts: lifts,
+                records: strength.personalRecords,
+                repRecords: strength.repPersonalRecords
+            )
+        } label: {
+            section(title: tr("Recent workouts", "Siste økter"),
+                    accessory: tr("See all", "Se alle")) {
+                if lifts.isEmpty {
+                    emptyLine(tr("No strength workouts in this period", "Ingen styrkeøkter i perioden"))
+                } else {
+                    ForEach(lifts.prefix(5)) { lift in
+                        compactRow(
+                            icon: "dumbbell",
+                            title: tr("Strength training", "Styrketrening"),
+                            subtitle: lift.startedAt.formatted(date: .abbreviated, time: .omitted),
+                            value: "\(lift.totalWorkingSets) " + tr("sets", "arbeidssett")
+                        )
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func section<Content: View>(
