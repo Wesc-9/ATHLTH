@@ -9143,14 +9143,30 @@ struct SessionEditorView: View {
         else { return }
 
         if let group = plannedExercises[index].supersetGroupID {
-            // Detach just this exercise. Never unlink the previous member
-            // when other exercises still belong to the same superset.
             plannedExercises[index].supersetGroupID = nil
-            let remaining = plannedExercises.indices.filter {
-                plannedExercises[$0].supersetGroupID == group
+            // Removing a middle member can split a superset into separate
+            // groups. Keep only consecutive runs of two or more exercises.
+            var runs: [[Int]] = []
+            var run: [Int] = []
+            for position in plannedExercises.indices {
+                if plannedExercises[position].supersetGroupID == group {
+                    if let last = run.last, position != last + 1 {
+                        runs.append(run)
+                        run = []
+                    }
+                    run.append(position)
+                } else if !run.isEmpty {
+                    runs.append(run)
+                    run = []
+                }
             }
-            if remaining.count == 1, let sole = remaining.first {
-                plannedExercises[sole].supersetGroupID = nil
+            if !run.isEmpty { runs.append(run) }
+            for (number, members) in runs.enumerated() {
+                let resolvedID: UUID? = members.count > 1
+                    ? (number == 0 ? group : UUID()) : nil
+                for member in members {
+                    plannedExercises[member].supersetGroupID = resolvedID
+                }
             }
         } else {
             let group = plannedExercises[index - 1].supersetGroupID ?? UUID()
