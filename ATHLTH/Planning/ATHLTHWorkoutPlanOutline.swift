@@ -212,24 +212,35 @@ enum ATHLTHWorkoutPlanOutline {
 struct ATHLTHWorkoutPlanOutlineView: View {
     let workout: PlannedSession
     var maxVisibleItems: Int = 8
+    // Opt-in for the advanced Plan experience; Today retains its compact outline.
+    var timelineStyle: Bool = false
 
     var body: some View {
         let items = ATHLTHWorkoutPlanOutline.items(for: workout)
         if !items.isEmpty {
             VStack(alignment: .leading, spacing: 9) {
-                ForEach(Array(items.prefix(maxVisibleItems))) { item in
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: item.symbol)
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 27, height: 27)
-                            .background(
-                                item.isPause ? ATHLTHTheme.champagneSoft : Color.white.opacity(0.75),
-                                in: RoundedRectangle(cornerRadius: 8)
-                            )
-                        VStack(alignment: .leading, spacing: 2) {
+                ForEach(Array(items.prefix(maxVisibleItems).enumerated()), id: \.element.id) { index, item in
+                    HStack(alignment: .top, spacing: 11) {
+                        VStack(spacing: 0) {
+                            Image(systemName: item.symbol)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundStyle(item.isPause ? Color(red: 0.49, green: 0.37, blue: 0.20) : ATHLTHTheme.accentDeep)
+                                .frame(width: 30, height: 30)
+                                .background(
+                                    item.isPause ? Color(red: 0.94, green: 0.91, blue: 0.85) : Color(red: 0.96, green: 0.95, blue: 0.92),
+                                    in: Circle()
+                                )
+                            if timelineStyle && index < min(items.count, maxVisibleItems) - 1 {
+                                Rectangle()
+                                    .fill(Color(red: 0.74, green: 0.69, blue: 0.60).opacity(0.65))
+                                    .frame(width: 1, height: 18)
+                                    .padding(.vertical, 3)
+                                    .accessibilityHidden(true)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
                             Text(item.title)
-                                .font(.system(size: 12, weight: .semibold))
+                                .font(.system(size: 13, weight: .semibold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
                                 .fixedSize(horizontal: false, vertical: true)
                             if !item.detail.isEmpty {
@@ -239,18 +250,22 @@ struct ATHLTHWorkoutPlanOutlineView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             }
                         }
+                        .padding(.top, 3)
                         Spacer(minLength: 0)
                     }
-                    .padding(.vertical, item.isPause ? 8 : 0)
-                    .padding(.horizontal, item.isPause ? 9 : 0)
+                    .padding(.vertical, item.isPause ? 8 : 5)
+                    .padding(.horizontal, 10)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(
-                        item.isPause ? ATHLTHTheme.champagneSoft : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 11)
+                        item.isPause
+                            ? Color(red: 0.97, green: 0.95, blue: 0.91)
+                            : (timelineStyle ? Color.white.opacity(0.72) : Color.clear),
+                        in: RoundedRectangle(cornerRadius: 13)
                     )
                     .overlay {
                         if item.isPause {
-                            RoundedRectangle(cornerRadius: 11)
-                                .stroke(ATHLTHTheme.premiumGold.opacity(0.35), lineWidth: 0.8)
+                            RoundedRectangle(cornerRadius: 13)
+                                .stroke(Color(red: 0.74, green: 0.66, blue: 0.52).opacity(0.48), lineWidth: 0.7)
                         }
                     }
                 }
@@ -266,7 +281,7 @@ struct ATHLTHWorkoutPlanOutlineView: View {
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                ATHLTHTheme.champagneSoft.opacity(0.56),
+                timelineStyle ? Color(red: 0.97, green: 0.96, blue: 0.94) : ATHLTHTheme.champagneSoft.opacity(0.56),
                 in: RoundedRectangle(cornerRadius: 16)
             )
             .accessibilityElement(children: .contain)
