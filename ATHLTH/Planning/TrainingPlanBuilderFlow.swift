@@ -7009,8 +7009,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 priorityMuscles:
                     orderedPriorityMuscles,
                 equipmentContext: nil,
+                // Basic no longer asks for a duration. Let each activity
+                // receive an editable suggestion from the workout builder
+                // instead of forcing an unseen 30-minute time budget.
                 weeklyTimeBudgetMinutes:
-                    weeklyTimeBudgetMinutes,
+                    mode == .basic ? nil : weeklyTimeBudgetMinutes,
                 simpleWorkoutKinds: mode == .basic ? orderedSimpleActivities : nil,
                 preferredWorkoutKindsByDay:
                     mode == .advanced ? Dictionary(
