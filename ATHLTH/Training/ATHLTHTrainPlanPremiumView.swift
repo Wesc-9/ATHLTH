@@ -647,10 +647,14 @@ struct ATHLTHTrainPlanPremiumView: View {
                 let week = plan.weeks[index]
                 VStack(spacing: 16) {
                     ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
-                        studioDayRow(day, plan: plan)
-                        if selectedDayID == day.id {
-                            premiumSelectedDayPanel(day, plan: plan)
-                                .padding(.bottom, 7)
+                        // A stable root per day keeps SwiftUI row identity even
+                        // while its editable details expand and collapse.
+                        VStack(spacing: 0) {
+                            studioDayRow(day, plan: plan)
+                            if selectedDayID == day.id {
+                                premiumSelectedDayPanel(day, plan: plan)
+                                    .padding(.bottom, 7)
+                            }
                         }
                     }
                 }
@@ -1698,7 +1702,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 tr("Edit plan", "Rediger plan"), icon: "slider.horizontal.3"
             ) { showingEditor = true }
             Menu {
-                ForEach(Array(plan.weeks.enumerated()), id: \.offset) { entry in
+                ForEach(Array(plan.weeks.enumerated()), id: \.element.id) { entry in
                     let index = entry.offset
                     Button(tr("Week \(index + 1)", "Uke \(index + 1)")) {
                         selectPremiumPlanWeek(index)
@@ -1754,7 +1758,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         VStack(alignment: .leading, spacing: 10) {
             Text(tr("Entire training plan", "Hele treningsplanen"))
                 .font(.system(size: 20, weight: .regular, design: .serif))
-            ForEach(Array(plan.weeks.enumerated()), id: \.offset) { entry in
+            ForEach(Array(plan.weeks.enumerated()), id: \.element.id) { entry in
                 let index = entry.offset
                 let week = entry.element
                 DisclosureGroup {
