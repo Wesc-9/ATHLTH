@@ -15028,6 +15028,68 @@ private enum ProgressPeriod: String, CaseIterable, Identifiable {
 }
 
 struct ATHLTHProgressView: View {
+    private enum TrainingScope: String, CaseIterable, Identifiable {
+        case all, running, strength
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .all: return "All trening"
+            case .running: return "Løping"
+            case .strength: return "Styrke"
+            }
+        }
+    }
+    @State private var trainingScope: TrainingScope = .all
+
+    private var trainingScopePicker: some View {
+        Menu {
+            ForEach(TrainingScope.allCases) { choice in
+                Button {
+                    trainingScope = choice
+                } label: {
+                    if trainingScope == choice {
+                        Label(choice.label, systemImage: "checkmark")
+                    } else {
+                        Text(choice.label)
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 8) {
+                Text(trainingScope.label)
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.semibold))
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 11)
+            .background(ATHLTHTheme.champagneSoft, in: Capsule())
+        }
+        .accessibilityLabel("Treningstype: \(trainingScope.label)")
+    }
+
+    private var progressHeader: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("TRENING")
+                .font(.caption.weight(.medium))
+                .tracking(3)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            Text("Fremdrift")
+                .font(.system(size: 40, weight: .regular, design: .serif))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            HStack(alignment: .center) {
+                Text("Se utviklingen din. Bygg videre på det som fungerer.")
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                Spacer(minLength: 8)
+                trainingScopePicker
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.vertical, 8)
+    }
+
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var goalStore: GoalStore
@@ -15059,35 +15121,28 @@ struct ATHLTHProgressView: View {
                 immersiveTransition: useImmersiveProgressHero,
                 scrollFadeTransition: true
             ) {
-                ATHLTHTabHero(
-                    imageName: "ProgressHero",
-                    title: "Progress",
-                    subtitle: "See your training, consistency and health trends.",
-                    height:
-                        useImmersiveProgressHero
-                            ? 226
-                            : 190,
-                    alignment: .leading,
-                    focalOffsetX:
-                        useImmersiveProgressHero
-                            ? 4
-                            : 18,
-                    focalOffsetY:
-                        useImmersiveProgressHero
-                            ? 6
-                            : 16,
-                    titleFontSize:
-                        useImmersiveProgressHero
-                            ? 31
-                            : 30,
-                    copyWidthFraction:
-                        useImmersiveProgressHero
-                            ? 0.66
-                            : 0.80,
-                    immersiveCopy: useImmersiveProgressHero
-                )
+                Color.clear.frame(height: 1)
             } content: {
                 LazyVStack(spacing: 14) {
+                    progressHeader
+                    periodPicker
+                    if trainingScope == .running {
+                        ProgressPerformanceCard(
+                            runningWorkouts: selectedPeriodRunningWorkouts,
+                            strengthWorkouts: [],
+                            healthRecords: personalRecords,
+                            strengthRecords: [],
+                            repRecords: []
+                        )
+                    } else if trainingScope == .strength {
+                        ProgressPerformanceCard(
+                            runningWorkouts: [],
+                            strengthWorkouts: selectedPeriodStrengthWorkouts,
+                            healthRecords: [],
+                            strengthRecords: strengthWorkout.personalRecords,
+                            repRecords: strengthWorkout.repPersonalRecords
+                        )
+                    } else {
                     if health.hasRequestedAuthorization &&
                         (health.hasTrainingHealthData || progressHasHealthData) {
                         periodPicker
@@ -15135,6 +15190,7 @@ struct ATHLTHProgressView: View {
 
                         personalRecordsCard
                         achievementsCard
+                    }
                     }
                 }
                 .padding(.horizontal, 16)
