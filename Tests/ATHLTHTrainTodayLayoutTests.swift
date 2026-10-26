@@ -309,6 +309,30 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
         ))
     }
 
+    func testTrainDayChangeHonorsCalendarDateAndDST() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        func local(_ year: Int, _ month: Int, _ day: Int, _ hour: Int) -> Date {
+            calendar.date(from: DateComponents(
+                year: year, month: month, day: day, hour: hour, minute: 30
+            ))!
+        }
+        // 2026-03-08 crosses the spring DST change. Three hours later,
+        // the day is still the same; Train must not reset day-scoped state.
+        let beforeDST = local(2026, 3, 8, 1)
+        let afterDST = local(2026, 3, 8, 4)
+        let nextDay = local(2026, 3, 9, 0)
+        XCTAssertFalse(ATHLTHTrainDayChangePolicy.needsRefresh(
+            displayedDay: beforeDST, now: afterDST, calendar: calendar
+        ))
+        XCTAssertTrue(ATHLTHTrainDayChangePolicy.needsRefresh(
+            displayedDay: beforeDST, now: nextDay, calendar: calendar
+        ))
+        XCTAssertFalse(ATHLTHTrainDayChangePolicy.needsRefresh(
+            displayedDay: nextDay, now: nextDay, calendar: calendar
+        ))
+    }
+
     @MainActor
     func testTodaySurfaceFitsCompactPhoneWidths() {
         let plan = TrainingPlan(
