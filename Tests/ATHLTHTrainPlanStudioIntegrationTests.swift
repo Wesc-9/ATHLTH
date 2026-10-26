@@ -6,6 +6,71 @@ import XCTest
 /// contract, not only its SwiftUI rendering.
 final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
     @MainActor
+    func testMovePolicyFindsOriginalWorkoutDateAcrossWeeks() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let start = Calendar.current.startOfDay(for: .now)
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Cross-week move", summary: "", weekCount: 3, startDate: start
+        ))
+        let chosenDay = plan.weeks[1].days[2]
+        let selected = workout(name: "Tuesday training")
+        store.addSession(selected, toDay: chosenDay.id, inPlan: plan.id)
+        let latest = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let original = try XCTUnwrap(ATHLTHTrainWorkoutMovePolicy.originalDate(
+            for: selected.id, in: latest
+        ))
+        let expected = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 9, to: start
+        ))
+        XCTAssertTrue(Calendar.current.isDate(
+            original, inSameDayAs: expected
+        ))
+        let bounds = try XCTUnwrap(ATHLTHTrainWorkoutMovePolicy.allowedDates(
+            startDate: latest.startDate, weekCount: latest.weeks.count,
+            now: start
+        ))
+        XCTAssertFalse(ATHLTHTrainWorkoutMovePolicy.canMove(
+            to: original, from: original, within: bounds
+        ))
+        XCTAssertTrue(ATHLTHTrainWorkoutMovePolicy.canMove(
+            to: start, from: original, within: bounds
+        ))
+        XCTAssertFalse(ATHLTHTrainWorkoutMovePolicy.canMove(
+            to: start.addingTimeInterval(-86_400), from: original, within: bounds
+        ))
+        XCTAssertNil(ATHLTHTrainWorkoutMovePolicy.originalDate(
+            for: UUID(), in: latest
+        ))
+    }
+
+    func testMovePolicyAvoidsFixedDurationAcrossDST() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let start = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 24
+        )))
+        let bounds = try XCTUnwrap(ATHLTHTrainWorkoutMovePolicy.allowedDates(
+            startDate: start, weekCount: 1, now: start, calendar: calendar
+        ))
+        let expectedEnd = try XCTUnwrap(calendar.date(
+            byAdding: .day, value: 6, to: start
+        ))
+        XCTAssertEqual(bounds.upperBound, expectedEnd)
+        XCTAssertNotEqual(
+            expectedEnd.timeIntervalSince(start),
+            6 * 24 * 3600,
+            "The 2026-10-25 time change requires calendar days, not fixed seconds."
+        )
+        XCTAssertTrue(ATHLTHTrainWorkoutMovePolicy.canMove(
+            to: expectedEnd, from: start, within: bounds, calendar: calendar
+        ))
+        XCTAssertFalse(ATHLTHTrainWorkoutMovePolicy.canMove(
+            to: start, from: start, within: bounds, calendar: calendar
+        ))
+    }
+
+    @MainActor
     func testCopyingOneWorkoutToSameDayKeepsOtherSessionsAndOriginalIdentity() throws {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
