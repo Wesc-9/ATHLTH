@@ -932,7 +932,7 @@ struct AroundYouExploreView: View {
 
     }
 
-    var body: some View {
+    private var mapAndLifecycleContent: some View {
         ZStack {
             MapReader { proxy in
                 Map(position: $mapPosition) {
@@ -1279,6 +1279,10 @@ struct AroundYouExploreView: View {
                 )
             }
         }
+    }
+
+    var body: some View {
+        mapAndLifecycleContent
         .onAppear {
             locationStore.start()
             centerOnUser()
