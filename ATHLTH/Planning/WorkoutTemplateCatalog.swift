@@ -1784,6 +1784,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var allRoundsExpandedIDs: Set<UUID> = []
     @State private var draftRestored = false
     @State private var draftActive = false
+    @State private var initialQuickAddConsumed = false
     @State private var draftFinished = false
     @State private var draftNotice = false
     @State private var showingBlockPicker = false
@@ -1801,6 +1802,7 @@ struct WorkoutTemplateBuilderView: View {
     @AppStorage("athlth.workoutBuilder.durationInput.v1")
     private var durationInputMode = "clock"
     private let draftContext: String
+    private let initialQuickAdd: String?
     private let plannedDate: Date?
     private let planCopyDays: [ATHLTHPlanCopyDay]
     private let onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)?
@@ -1813,6 +1815,8 @@ struct WorkoutTemplateBuilderView: View {
         initialTitle: String = "",
         initialBlocks: [WorkoutTemplateBlock] = [],
         initialRouteID: UUID? = nil,
+        initialQuickAdd: String? = nil,
+        initialPhase: WorkoutPhaseKind? = nil,
         initialDurationOverrideMinutes: Int? = nil,
         draftContext: String = "shared-template",
         plannedDate: Date? = nil,
@@ -1826,15 +1830,16 @@ struct WorkoutTemplateBuilderView: View {
         // A newly planned workout starts at warm-up; when editing a saved
         // sequence, open its first actual phase instead of assuming main.
         _selectedPhase = State(initialValue:
-            onSaveToPlan == nil
+            initialPhase ?? (onSaveToPlan == nil
                 ? .main
-                : initialBlocks.first?.resolvedPhase ?? .warmup
+                : initialBlocks.first?.resolvedPhase ?? .warmup)
         )
         _selectedRouteID = State(initialValue: initialRouteID)
         _manualDurationMinutes = State(initialValue: initialDurationOverrideMinutes)
         _durationInputText = State(initialValue: (initialDurationOverrideMinutes ??
             ATHLTHWorkoutDurationEstimator.minutes(for: initialBlocks)).map(String.init) ?? "")
         self.draftContext = draftContext
+        self.initialQuickAdd = initialQuickAdd
         self.plannedDate = plannedDate
         self.planCopyDays = planCopyDays
         self.onCopyToPlan = onCopyToPlan
@@ -2239,6 +2244,13 @@ struct WorkoutTemplateBuilderView: View {
                     collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
                 }
                 draftActive = true
+                // Apply one explicitly requested block after the draft is
+                // restored. Never insert it twice on sheet reappearance.
+                if !draftRestored, !initialQuickAddConsumed,
+                   let initialQuickAdd {
+                    initialQuickAddConsumed = true
+                    applyInitialQuickAdd(initialQuickAdd)
+                }
             }
             .onChange(of: blocks) { _, _ in
                 // A changed recipe updates the estimate even if the
@@ -3799,6 +3811,25 @@ struct WorkoutTemplateBuilderView: View {
 
     private var maxCopyWeekIndex: Int {
         planCopyDays.map(\.weekIndex).max() ?? 0
+    }
+
+    /// Plan chips route to the actual timeline composer, not merely a
+    /// generic workout editor. No change is persisted until Save.
+    private func applyInitialQuickAdd(_ choice: String) {
+        switch choice {
+        case "running": addRunBlock(activity: .running)
+        case "walking": addRunBlock(activity: .walking)
+        case "cycling": addCyclingBlock()
+        case "yoga": addWellnessBlock(.yoga)
+        case "meditation": addWellnessBlock(.meditation)
+        case "exercise": openExercisePicker()
+        case "workout": showingSavedWorkoutPicker = true
+        case "interval": createIntervals()
+        case "superset": createSuperset()
+        case "rest": addRestBlock()
+        case "stretching": addWellnessBlock(.stretching)
+        default: showingBlockPicker = true
+        }
     }
 
     private func addCyclingBlock() {
