@@ -351,7 +351,11 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             .sorted { $0.startDate > $1.startDate }
         var totals = [Double](repeating: 0, count: 5)
         for workout in source.prefix(12) {
-            if Task.isCancelled { return }
+            if Task.isCancelled {
+                if zoneRequestID == requestID { pulseZonesLoading = false }
+                return
+            }
+            guard zoneRequestID == requestID else { return }
             let points = await health.runningHeartRateTimeline(for: workout.id)
             let durations = ATHLTHRunningHeartRateAnalysis.zoneDurations(
                 points, maximumBPM: Double(maximum)
@@ -389,8 +393,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                 let total = measuredZoneSeconds.reduce(0, +)
                 VStack(spacing: 11) {
                     ForEach(1...5, id: \.self) { zone in
-                        let seconds = measuredZoneSeconds[zone - 1]
-                        let fraction = total > 0 ? seconds / total : 0
+                        let fraction = total > 0 ? measuredZoneSeconds[zone - 1] / total : 0
                         HStack(spacing: 11) {
                             Text(tr("Zone", "Sone") + " \(zone)")
                                 .font(.caption.weight(.semibold))
