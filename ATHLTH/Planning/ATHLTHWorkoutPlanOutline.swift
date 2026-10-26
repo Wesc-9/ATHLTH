@@ -22,7 +22,12 @@ enum ATHLTHWorkoutPlanOutline {
                 Item(
                     id: "block-\(block.id)",
                     title: block.title,
-                    detail: [block.targetText, block.notes]
+                    detail: [
+                        block.kind == .rest
+                            ? block.durationSeconds.map { "\(Int($0.rounded())) sek pause" }
+                            : block.targetText,
+                        block.notes
+                    ]
                         .compactMap { $0 }
                         .filter { !$0.isEmpty }
                         .joined(separator: " · "),
