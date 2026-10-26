@@ -6204,54 +6204,61 @@ struct SessionEditorView: View {
     private var workoutStructurePreviewSection: some View {
         if !workoutPlanningPreviewBlocks.isEmpty {
             Section(ATHLTHLocalization.choose(
-                english: "Workout Structure", norwegian: "Øktstruktur"
+                english: "Workout structure", norwegian: "Øktstruktur"
             )) {
                 HStack {
                     Label(
-                        ATHLTHLocalization.choose(
-                            english: "\(workoutPlanningPreviewBlocks.count) blocks",
-                            norwegian: "\(workoutPlanningPreviewBlocks.count) blokker"
-                        ),
+                        "\(workoutPlanningPreviewBlocks.count) blokker",
                         systemImage: "list.number"
                     )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color(red: 0.48, green: 0.36, blue: 0.20))
                     Spacer()
                     if let workoutCategory {
                         Text(workoutCategory.capitalized)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                     }
                 }
-
-                ForEach(Array(workoutPlanningPreviewBlocks.prefix(5))) { block in
-                    HStack(spacing: 10) {
-                        Image(systemName: block.kind.systemImage)
-                            .foregroundStyle(
-                                block.kind == .run
-                                    ? ATHLTHTheme.vitality
-                                    : ATHLTHTheme.accent
-                            )
-                            .frame(width: 24)
-
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(block.title)
-                                .font(.subheadline)
-                            if let target = block.targetText {
-                                Text(target)
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                ForEach(Array(workoutPlanningPreviewBlocks.enumerated()), id: \.element.id) { index, block in
+                    HStack(alignment: .top, spacing: 12) {
+                        VStack(spacing: 3) {
+                            Image(systemName: block.kind == .rest ? "pause.fill" : block.kind.systemImage)
+                                .font(.system(size: 11, weight: .semibold))
+                                .foregroundStyle(Color(red: 0.49, green: 0.36, blue: 0.19))
+                                .frame(width: 28, height: 28)
+                                .background(Color(red: 0.94, green: 0.92, blue: 0.88), in: Circle())
+                            if index < workoutPlanningPreviewBlocks.count - 1 {
+                                Rectangle()
+                                    .fill(Color(red: 0.77, green: 0.72, blue: 0.64))
+                                    .frame(width: 1, height: 16)
                             }
                         }
-                        Spacer()
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(block.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                            let description = [
+                                block.kind == .rest
+                                    ? block.durationSeconds.map { "\(Int($0.rounded())) sek pause" }
+                                    : block.targetText,
+                                block.notes
+                            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+                            if !description.isEmpty {
+                                Text(description)
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                        }
+                        Spacer(minLength: 0)
                     }
-                }
-
-                if workoutPlanningPreviewBlocks.count > 5 {
-                    Text(ATHLTHLocalization.choose(
-                        english: "+\(workoutPlanningPreviewBlocks.count - 5) more blocks",
-                        norwegian: "+\(workoutPlanningPreviewBlocks.count - 5) blokker til"
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .padding(10)
+                    .background(
+                        block.kind == .rest
+                            ? Color(red: 0.95, green: 0.93, blue: 0.89)
+                            : Color(red: 0.975, green: 0.967, blue: 0.949),
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
                 }
             }
         }
