@@ -1722,44 +1722,119 @@ struct ATHLTHTrainPlanPremiumView: View {
             "Select this day to add, edit, move or copy workouts",
             "Velg dagen for å legge til, redigere, flytte eller kopiere økter"))
     }
+    // The selected day is a distinct visual chapter of Plan:
+    // scenic image, ordered sessions, and the existing workout details.
     private func premiumSelectedDayPanel(
         _ day: TrainingPlanDay, plan: TrainingPlan
     ) -> some View {
-        let sessions = day.sessions.filter { !$0.isExplicitRestDay }
+        let sessions = day.sessions
+            .filter { !$0.isExplicitRestDay }
+            .sorted { ($0.scheduledStart ?? .distantFuture) <
+                      ($1.scheduledStart ?? .distantFuture) }
         return VStack(alignment: .leading, spacing: 14) {
+            premiumSelectedDayHero(day, plan: plan, count: sessions.count)
             if sessions.isEmpty {
                 premiumRestDayPanel(day, plan: plan)
             } else {
                 if sessions.count > 1 {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(sessions) { workout in
-                                let current = (selectedWorkoutID ?? sessions[0].id) == workout.id
-                                Button {
+                    VStack(spacing: 0) {
+                        ForEach(Array(sessions.enumerated()), id: \.element.id) { index, workout in
+                            let current = (selectedWorkoutID ?? sessions[0].id) == workout.id
+                            Button {
+                                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                                     selectedWorkoutID = workout.id
                                     selectedDetailSection = .structure
-                                } label: {
-                                    Text(workout.title)
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(current ? .white : graphite)
-                                        .padding(.horizontal, 13)
-                                        .frame(minHeight: 38)
-                                        .background(current ? graphite : soft,
-                                                    in: Capsule())
                                 }
-                                .buttonStyle(.plain)
+                            } label: {
+                                HStack(alignment: .top, spacing: 11) {
+                                    VStack(spacing: 4) {
+                                        Text(workout.scheduledStart?.formatted(
+                                            date: .omitted, time: .shortened
+                                        ) ?? tr("Plan", "Økt"))
+                                            .font(.system(size: 10, weight: .semibold))
+                                            .monospacedDigit()
+                                            .foregroundStyle(secondaryInk)
+                                        Circle()
+                                            .strokeBorder(warmGold, lineWidth: 2)
+                                            .frame(width: 11, height: 11)
+                                        if index < sessions.count - 1 {
+                                            Rectangle().fill(line)
+                                                .frame(width: 1, height: 24)
+                                        }
+                                    }
+                                    .frame(width: 48)
+                                    Image(systemName: workout.kind.systemImage)
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(warmGold)
+                                        .frame(width: 35, height: 35)
+                                        .background(soft, in: Circle())
+                                        .accessibilityHidden(true)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(workout.title)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(graphite)
+                                            .multilineTextAlignment(.leading)
+                                        ATHLTHPlannedWorkoutSummaryView(workout: workout)
+                                    }
+                                    Spacer(minLength: 3)
+                                    Image(systemName: current ? "chevron.down" : "chevron.right")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(warmGold)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(12)
+                                .background(
+                                    current ? Color.white : Color.white.opacity(0.56),
+                                    in: RoundedRectangle(cornerRadius: 14)
+                                )
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 14)
+                                        .stroke(current ? warmGold.opacity(0.48) : line.opacity(0.55),
+                                                lineWidth: 0.7)
+                                }
                             }
+                            .buttonStyle(.plain)
+                            .padding(.bottom, 7)
                         }
                     }
                 }
                 let current = sessions.first(where: {
                     $0.id == (selectedWorkoutID ?? sessions[0].id)
                 }) ?? sessions[0]
-                premiumWorkoutDetailCard(
-                    current, day: day, plan: plan
-                )
+                premiumWorkoutDetailCard(current, day: day, plan: plan)
             }
         }
+    }
+
+    private func premiumSelectedDayHero(
+        _ day: TrainingPlanDay, plan: TrainingPlan, count: Int
+    ) -> some View {
+        ZStack(alignment: .bottomLeading) {
+            Image("TrainHero")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 184)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .accessibilityHidden(true)
+            LinearGradient(
+                colors: [.black.opacity(0.02), .black.opacity(0.18), .black.opacity(0.62)],
+                startPoint: .top, endPoint: .bottom
+            )
+            VStack(alignment: .leading, spacing: 6) {
+                Text(planDayDate(day.dayIndex, plan: plan)
+                    .formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                Text("\(count) " + tr("workouts", "økter"))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(Color.white.opacity(0.88))
+            }
+            .foregroundStyle(.white)
+            .padding(19)
+        }
+        .frame(height: 184)
+        .clipShape(RoundedRectangle(cornerRadius: 19))
+        .accessibilityElement(children: .combine)
     }
 
     private func premiumRestDayPanel(
