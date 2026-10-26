@@ -99,7 +99,7 @@ struct ATHLTHPremiumProgressHero: View {
             }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 58)
+        .padding(.top, 112)
         .padding(.bottom, 18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(ATHLTHTheme.canvasTop)
