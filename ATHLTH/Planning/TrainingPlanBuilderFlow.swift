@@ -142,6 +142,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var createdPlanID: UUID?
     @State private var showingCreatedPlan = false
     @State private var showingAIBuilder = false
+    @State private var prefersAIPlanBuild = false
     @State private var didApplySuggestedStartDate = false
     @State private var showingPlanDesignLab = false
     @State private var isHydratingPlanDraft = false
@@ -392,10 +393,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             )
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(step == .source || step == .mode || step == .goal ? .hidden : .visible, for: .navigationBar)
+            .toolbar(step == .source || step == .mode || step == .goal || step == .approach ? .hidden : .visible, for: .navigationBar)
             .toolbar {
                 #if DEBUG
-                if step != .source && step != .mode && step != .goal {
+                if step != .source && step != .mode && step != .goal && step != .approach {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showingPlanDesignLab = true } label: {
                             Image(systemName: "paintpalette")
@@ -404,7 +405,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                 }
                 #endif
-                if step != .source && step != .mode && step != .goal {
+                if step != .source && step != .mode && step != .goal && step != .approach {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(backButtonTitle) {
                             goBack()
@@ -422,6 +423,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         AnyView(goalContinueBar)
                     } else if step == .basics && mode == .basic {
                         AnyView(simpleContinueBar)
+                    } else if step == .approach {
+                        AnyView(buildApproachContinueBar)
                     } else if step == .source {
                         AnyView(sourceContinueBar)
                     } else {
@@ -854,7 +857,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 AnyView(simpleScheduleStep)
             }
         case .profile:
-            AnyView(wizardScroll(AnyView(profileStep)))
+            AnyView(wizardScroll(AnyView(profileStep))) // legacy only
+        case .approach:
+            AnyView(buildApproachChoice)
         case .week:
             AnyView(wizardScroll(AnyView(
                 Group {
@@ -903,7 +908,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private let sourceCanvas = ATHLTHTrainDesign.canvas
 
     private var stepDisplayTotal: Int {
-        ATHLTHPlanJourney.sequence(advanced: mode == .advanced).count
+        ATHLTHPlanJourney.displayedCount(advanced: mode == .advanced)
     }
 
     private var stepDisplayNumber: Int {
@@ -1250,6 +1255,79 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .padding(.horizontal, 18)
         .padding(.top, 10)
         .padding(.bottom, 9)
+        .background(ATHLTHTrainDesign.canvas.opacity(0.98))
+    }
+
+    // New step four: the mode is just a route. Manually authored work and
+    // AI-generated sessions continue to use the existing TrainingPlan.
+    private var buildApproachChoice: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 15) {
+                sourceChoiceHeader
+                ATHLTHPlanBuildMethodEntryView(
+                    prefersAI: prefersAIPlanBuild,
+                    planWeeks: weekCount,
+                    trainingDays: selectedDays.count,
+                    focusTitle: selectedGoalArea.title,
+                    onSelectManual: {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                            prefersAIPlanBuild = false
+                        }
+                    },
+                    onSelectAI: {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                            prefersAIPlanBuild = true
+                        }
+                    }
+                )
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 10)
+            .padding(.bottom, 28)
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+    }
+
+    private var buildApproachContinueBar: some View {
+        Button {
+            guard canContinue else { return }
+            if prefersAIPlanBuild {
+                // Actual existing Coach service: preview, edit, then confirm
+                // before the plan is saved. Dismissing returns here.
+                showingAIBuilder = true
+            } else {
+                goForward()
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Spacer(minLength: 12)
+                Image(systemName: prefersAIPlanBuild ? "sparkles" : "calendar.badge.plus")
+                Text(ATHLTHLocalization.choose(
+                    english: prefersAIPlanBuild ? "Continue with ATHLTH AI" : "Build my week",
+                    norwegian: prefersAIPlanBuild ? "Fortsett med ATHLTH AI" : "Bygg treningsuken"
+                ))
+                .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 12)
+                Image(systemName: "arrow.right")
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 55)
+            .background(
+                LinearGradient(
+                    colors: [ATHLTHTrainDesign.bronze, Color(red: 0.69, green: 0.51, blue: 0.31)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                ),
+                in: RoundedRectangle(cornerRadius: 18)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!canContinue)
+        .padding(.horizontal, 18)
+        .padding(.vertical, 10)
         .background(ATHLTHTrainDesign.canvas.opacity(0.98))
     }
 
@@ -1872,10 +1950,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 norwegian: "Grunninfo"
             )
         case .profile:
-            return ATHLTHLocalization.choose(
-                english: "Goal & needs",
-                norwegian: "Mål og behov"
-            )
+            return ATHLTHLocalization.choose(english: "Goal & needs", norwegian: "Mål og behov")
+        case .approach:
+            return ATHLTHLocalization.choose(english: "Build method", norwegian: "Slik bygger du")
         case .week:
             return ATHLTHLocalization.choose(
                 english: "Training week",
@@ -6275,6 +6352,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             return ATHLTHPlanGoalOption.options(for: selectedGoalArea)
                 .contains { $0.id == selectedGoalChoice }
         case .source:
+            return true
+        case .approach:
             return true
         case .basics:
             return conflictingPlan == nil
