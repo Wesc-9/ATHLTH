@@ -9140,22 +9140,20 @@ struct SessionEditorView: View {
         guard index > 0,
               plannedExercises.indices.contains(index),
               plannedExercises.indices.contains(index - 1)
-        else {
-            return
-        }
+        else { return }
 
-        if plannedExercises[index].supersetGroupID != nil {
-            let group = plannedExercises[index].supersetGroupID
+        if let group = plannedExercises[index].supersetGroupID {
+            // Detach just this exercise. Never unlink the previous member
+            // when other exercises still belong to the same superset.
             plannedExercises[index].supersetGroupID = nil
-
-            if plannedExercises[index - 1].supersetGroupID == group {
-                plannedExercises[index - 1].supersetGroupID = nil
+            let remaining = plannedExercises.indices.filter {
+                plannedExercises[$0].supersetGroupID == group
+            }
+            if remaining.count == 1, let sole = remaining.first {
+                plannedExercises[sole].supersetGroupID = nil
             }
         } else {
-            let group =
-                plannedExercises[index - 1].supersetGroupID ??
-                UUID()
-
+            let group = plannedExercises[index - 1].supersetGroupID ?? UUID()
             plannedExercises[index - 1].supersetGroupID = group
             plannedExercises[index].supersetGroupID = group
         }
