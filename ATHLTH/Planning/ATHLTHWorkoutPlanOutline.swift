@@ -10,6 +10,7 @@ enum ATHLTHWorkoutPlanOutline {
         let title: String
         let detail: String
         let symbol: String
+        var isPause: Bool { symbol == "pause.circle" || symbol == "pause" || symbol == "pause.circle.fill" }
     }
 
     static func items(for workout: PlannedSession) -> [Item] {
@@ -25,7 +26,7 @@ enum ATHLTHWorkoutPlanOutline {
                         .compactMap { $0 }
                         .filter { !$0.isEmpty }
                         .joined(separator: " · "),
-                    symbol: block.kind.systemImage
+                    symbol: block.kind == .rest ? "pause.circle.fill" : block.kind.systemImage
                 )
             }
         }
@@ -218,7 +219,7 @@ struct ATHLTHWorkoutPlanOutlineView: View {
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                             .frame(width: 27, height: 27)
                             .background(
-                                Color.white.opacity(0.75),
+                                item.isPause ? ATHLTHTheme.champagneSoft : Color.white.opacity(0.75),
                                 in: RoundedRectangle(cornerRadius: 8)
                             )
                         VStack(alignment: .leading, spacing: 2) {
@@ -234,6 +235,18 @@ struct ATHLTHWorkoutPlanOutlineView: View {
                             }
                         }
                         Spacer(minLength: 0)
+                    }
+                    .padding(.vertical, item.isPause ? 8 : 0)
+                    .padding(.horizontal, item.isPause ? 9 : 0)
+                    .background(
+                        item.isPause ? ATHLTHTheme.champagneSoft : Color.clear,
+                        in: RoundedRectangle(cornerRadius: 11)
+                    )
+                    .overlay {
+                        if item.isPause {
+                            RoundedRectangle(cornerRadius: 11)
+                                .stroke(ATHLTHTheme.premiumGold.opacity(0.35), lineWidth: 0.8)
+                        }
                     }
                 }
                 if items.count > maxVisibleItems {
