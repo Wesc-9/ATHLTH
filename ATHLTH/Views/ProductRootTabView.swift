@@ -5854,8 +5854,9 @@ struct ATHLTHTrainView: View {
                     .overlay(alignment: .topTrailing) {
                         if floatingTrainTabsVisible {
                             premiumTrainTabs
-                                .frame(maxWidth: ATHLTHTrainDesign.readingWidth)
-                                .frame(maxWidth: .infinity)
+                                .frame(maxWidth: ATHLTHTrainDesign.readingWidth,
+                                       alignment: .trailing)
+                                .frame(maxWidth: .infinity, alignment: .trailing)
                                 .padding(.top, 8)
                                 .padding(.horizontal, 17)
                                 .transition(.move(edge: .top).combined(with: .opacity))
