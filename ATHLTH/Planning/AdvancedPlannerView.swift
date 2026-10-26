@@ -10571,6 +10571,7 @@ struct PlannedExerciseEditorView: View {
 
     @State private var restSeconds: Int
     @State private var useIndividualSetTargets: Bool
+    @State private var showsMuscles = false
     @State private var individualSetTargets:
         [PlannedExerciseSetTarget]
 
@@ -10862,6 +10863,61 @@ struct PlannedExerciseEditorView: View {
                                 setEditingModeIndex
                         )
 
+                        HStack(spacing: 10) {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Register as",
+                                norwegian: "Registrer som"
+                            ), systemImage: "timer")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            Spacer(minLength: 8)
+                            Picker(
+                                ATHLTHLocalization.choose(
+                                    english: "Target type", norwegian: "Måltype"
+                                ),
+                                selection: $targetKind
+                            ) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Reps", norwegian: "Reps"
+                                )).tag(StrengthExerciseTargetKind.reps)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Time", norwegian: "Tid"
+                                )).tag(StrengthExerciseTargetKind.time)
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.segmented)
+                            .frame(width: 154)
+                        }
+
+                        if targetKind == .time {
+                            if useIndividualSetTargets {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Set a duration for each set below.",
+                                    norwegian: "Angi varighet for hvert sett nedenfor."
+                                ), systemImage: "clock")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            } else {
+                                Stepper(value: $durationSeconds, in: 15...7_200, step: 5) {
+                                    HStack(spacing: 8) {
+                                        Image(systemName: "clock")
+                                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                        Text(ATHLTHLocalization.choose(
+                                            english: "Time per set",
+                                            norwegian: "Tid per sett"
+                                        ))
+                                        .font(.subheadline.weight(.medium))
+                                        Spacer()
+                                        Text(formattedDuration(durationSeconds))
+                                            .font(.subheadline.weight(.semibold))
+                                            .monospacedDigit()
+                                            .foregroundStyle(ATHLTHTrainDesign.ink)
+                                    }
+                                }
+                                .tint(ATHLTHTrainDesign.bronze)
+                            }
+                        }
+
                         Text(
                             useIndividualSetTargets
                                 ? ATHLTHLocalization.choose(
@@ -10884,41 +10940,33 @@ struct PlannedExerciseEditorView: View {
                     }
                 }
                 .listRowBackground(
-                    ATHLTHTheme.card
+                    ATHLTHTrainDesign.paper
                 )
 
                 Section {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 10) {
                         Image(systemName: "flame.fill")
-                            .font(.system(size: 19, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.premiumGold)
-                            .frame(width: 46, height: 46)
-                            .background(
-                                ATHLTHTheme.premiumGoldSoft,
-                                in: RoundedRectangle(cornerRadius: 15, style: .continuous)
-                            )
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Warm-up exercise",
-                                    norwegian: "Oppvarmingsøvelse"
-                                )
-                            )
-                            .font(.subheadline.weight(.bold))
-
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Mark every set as warm-up. These sets won't count toward training load or PRs.",
-                                    norwegian: "Marker alle sett som oppvarming. De teller ikke mot treningsbelastning eller PR."
-                                )
-                            )
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            .frame(width: 30, height: 30)
+                            .background(ATHLTHTrainDesign.paleGold.opacity(0.6),
+                                        in: RoundedRectangle(cornerRadius: 9))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Warm-up exercise",
+                                norwegian: "Oppvarmingsøvelse"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.ink)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Moves to Warm-up · excluded from PRs",
+                                norwegian: "Flyttes til Oppvarming · teller ikke mot PR"
+                            ))
+                            .font(.system(size: 11))
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                         }
-
-                        Spacer(minLength: 4)
+                        Spacer(minLength: 5)
                         Toggle(
                             ATHLTHLocalization.choose(
                                 english: "Warm-up exercise",
@@ -10927,11 +10975,15 @@ struct PlannedExerciseEditorView: View {
                             isOn: entireWarmUpBinding
                         )
                         .labelsHidden()
-                        .tint(ATHLTHTheme.premiumGold)
+                        .tint(ATHLTHTrainDesign.gold)
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Place the entire exercise in Warm-up",
+                            norwegian: "Plasser hele øvelsen under Oppvarming"
+                        ))
                     }
-                    .padding(.vertical, 5)
+                    .padding(.vertical, 2)
                 }
-                .listRowBackground(ATHLTHTheme.card)
+                .listRowBackground(ATHLTHTrainDesign.paper)
 
                 if let entry = catalogEntry,
                    let summary = exerciseLibrary.localizedExerciseSummary(entry),
@@ -10945,21 +10997,32 @@ struct PlannedExerciseEditorView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .padding(.vertical, 5)
                     }
-                    .listRowBackground(ATHLTHTheme.card)
+                    .listRowBackground(ATHLTHTrainDesign.paper)
                 }
 
                 if !original.embeddedExercise.primaryMuscles.isEmpty ||
                    !(original.embeddedExercise.secondaryMuscles ?? []).isEmpty {
-                    Section(ATHLTHLocalization.choose(
-                        english: "Muscles used", norwegian: "Muskler i bruk"
-                    )) {
-                        ExerciseMuscleOverview(
-                            primaryMuscles: original.embeddedExercise.primaryMuscles,
-                            secondaryMuscles: original.embeddedExercise.secondaryMuscles ?? []
-                        )
-                        .padding(.vertical, 6)
+                    Section {
+                        DisclosureGroup(
+                            isExpanded: $showsMuscles
+                        ) {
+                            ExerciseMuscleOverview(
+                                primaryMuscles: original.embeddedExercise.primaryMuscles,
+                                secondaryMuscles: original.embeddedExercise.secondaryMuscles ?? []
+                            )
+                            .padding(.top, 12)
+                            .padding(.bottom, 4)
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Muscles used",
+                                norwegian: "Muskler i bruk"
+                            ), systemImage: "figure.strengthtraining.traditional")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTrainDesign.ink)
+                        }
+                        .tint(ATHLTHTrainDesign.bronze)
                     }
-                    .listRowBackground(ATHLTHTheme.card)
+                    .listRowBackground(ATHLTHTrainDesign.paper)
                 }
 
                 Section(
@@ -10971,7 +11034,7 @@ struct PlannedExerciseEditorView: View {
                     targetAndLoadTypeControls
                 }
                 .listRowBackground(
-                    ATHLTHTheme.card
+                    ATHLTHTrainDesign.paper
                 )
 
                 // Cardio/machine exercises can target speed and pulse zone
@@ -11035,7 +11098,7 @@ struct PlannedExerciseEditorView: View {
                         }
                         .tint(ATHLTHPlanDesign.accentInk)
                     }
-                    .listRowBackground(ATHLTHTheme.card)
+                    .listRowBackground(ATHLTHTrainDesign.paper)
                 }
 
                 if advancedMode &&
@@ -11563,7 +11626,7 @@ struct PlannedExerciseEditorView: View {
                     .lineLimit(2...6)
                 }
                 .listRowBackground(
-                    ATHLTHTheme.card
+                    ATHLTHTrainDesign.paper
                 )
             }
             .scrollContentBackground(.hidden)
@@ -11572,6 +11635,9 @@ struct PlannedExerciseEditorView: View {
                     accent: ATHLTHTheme.premiumGold.opacity(0.13)
                 )
             )
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .tint(ATHLTHTrainDesign.bronze)
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english: "Exercise",
@@ -13346,6 +13412,15 @@ struct PlannedExerciseEditorView: View {
                 )
                 : StrengthProgressionRule
                     .none
+
+        // The phase is part of the persisted plan recipe, not a visual tag.
+        // All-warm-up exercises are placed in the Warm-up category; opting
+        // back out returns a prior warm-up exercise to the main section.
+        if updated.isWarmUpExercise {
+            updated.workoutPhase = .warmup
+        } else if original.workoutPhase == .warmup {
+            updated.workoutPhase = .main
+        }
 
         onSave(updated)
         dismiss()
