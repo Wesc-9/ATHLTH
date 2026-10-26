@@ -4,6 +4,25 @@ import XCTest
 
 final class ATHLTHTrainDesignLayoutTests: XCTestCase {
     @MainActor
+    func testExtractedTodayCoverFitsNarrowAndLargeText() {
+        for width in [320.0, 390.0, 768.0] {
+            for size in [DynamicTypeSize.large, .accessibility3] {
+                let cover = ATHLTHTrainTodayCoverView(
+                    day: .now, selection: .constant(.today)
+                )
+                .environment(\.dynamicTypeSize, size)
+                let host = UIHostingController(rootView: cover)
+                host.loadViewIfNeeded()
+                let measured = host.sizeThatFits(
+                    in: CGSize(width: width, height: 1_000)
+                )
+                XCTAssertLessThanOrEqual(measured.width, width + 1)
+                XCTAssertGreaterThan(measured.height, 0)
+            }
+        }
+    }
+
+    @MainActor
     func testCompactTodayNavigationFitsPhonesAndAccessibilityText() {
         for width in [320.0, 390.0, 768.0] {
             for textSize in [DynamicTypeSize.large, .accessibility3] {
