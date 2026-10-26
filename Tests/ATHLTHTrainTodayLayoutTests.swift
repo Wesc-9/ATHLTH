@@ -203,6 +203,79 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
         }
     }
 
+    func testBodyWeightGoalShowsMeasuredKgNotMilestonePercentage() {
+        let target = GoalTarget(
+            metric: .bodyWeightKilograms,
+            targetValue: 71,
+            unit: "kg",
+            baselineValue: 78
+        )
+        guard let result = ATHLTHTrainWeightGoalProgress.evaluate(
+            target: target, latestWeightKilograms: 73.8
+        ) else {
+            XCTFail("A finite Apple Health sample and a real baseline must produce progress")
+            return
+        }
+        XCTAssertEqual(result.achievedKilograms, 4.2, accuracy: 0.0001)
+        XCTAssertEqual(result.targetKilograms, 7, accuracy: 0.0001)
+        XCTAssertEqual(result.completionFraction, 0.6, accuracy: 0.0001)
+
+        let beyondTarget = ATHLTHTrainWeightGoalProgress.evaluate(
+            target: target, latestWeightKilograms: 68
+        )
+        XCTAssertEqual(beyondTarget?.completionFraction, 1)
+
+        let weightGain = GoalTarget(
+            metric: .bodyWeightKilograms, targetValue: 75,
+            unit: "kg", baselineValue: 70
+        )
+        let gain = ATHLTHTrainWeightGoalProgress.evaluate(
+            target: weightGain, latestWeightKilograms: 72
+        )
+        XCTAssertEqual(gain?.achievedKilograms, 2)
+        XCTAssertEqual(gain?.completionFraction, 0.4)
+
+        let movingAway = ATHLTHTrainWeightGoalProgress.evaluate(
+            target: target, latestWeightKilograms: 79
+        )
+        XCTAssertEqual(movingAway?.achievedKilograms, -1)
+        XCTAssertEqual(movingAway?.completionFraction, 0)
+    }
+
+    func testWeightGoalDoesNotInventProgressWhenHealthDataOrBaselineIsMissing() {
+        let missingBaseline = GoalTarget(
+            metric: .bodyWeightKilograms, targetValue: 71,
+            unit: "kg", baselineValue: nil
+        )
+        let valid = GoalTarget(
+            metric: .bodyWeightKilograms, targetValue: 71,
+            unit: "kg", baselineValue: 78
+        )
+        let sameWeight = GoalTarget(
+            metric: .bodyWeightKilograms, targetValue: 78,
+            unit: "kg", baselineValue: 78
+        )
+        let otherMetric = GoalTarget(
+            metric: .strengthWeightKilograms, targetValue: 100,
+            unit: "kg", baselineValue: 80
+        )
+        XCTAssertNil(ATHLTHTrainWeightGoalProgress.evaluate(
+            target: missingBaseline, latestWeightKilograms: 73.8
+        ))
+        XCTAssertNil(ATHLTHTrainWeightGoalProgress.evaluate(
+            target: valid, latestWeightKilograms: nil
+        ))
+        XCTAssertNil(ATHLTHTrainWeightGoalProgress.evaluate(
+            target: sameWeight, latestWeightKilograms: 73.8
+        ))
+        XCTAssertNil(ATHLTHTrainWeightGoalProgress.evaluate(
+            target: otherMetric, latestWeightKilograms: 90
+        ))
+        XCTAssertNil(ATHLTHTrainWeightGoalProgress.evaluate(
+            target: valid, latestWeightKilograms: .nan
+        ))
+    }
+
     @MainActor
     func testTodaySurfaceFitsCompactPhoneWidths() {
         let plan = TrainingPlan(
@@ -241,6 +314,7 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
                     activeWorkoutCard: nil,
                     hasRecordedWorkoutToday: false,
                     todaysReadiness: nil,
+                    latestHealthWeightKilograms: nil,
                     onChooseSuggestedWorkout: { _ in },
                     onOpenPlan: {},
                     onCreatePlan: {},
