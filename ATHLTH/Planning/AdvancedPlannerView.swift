@@ -10628,9 +10628,15 @@ struct PlannedExerciseEditorView: View {
             initialValue:
                 max(exercise.sets, 1)
         )
+        // Static holds such as 90/90 are time-based by default, while users
+        // can still switch to reps in the editor.
+        let isStaticHold = exercise.embeddedExercise.displayName
+            .localizedCaseInsensitiveContains("90/90")
+            || exercise.embeddedExercise.name
+                .localizedCaseInsensitiveContains("90/90")
         _targetKind = State(
-            initialValue:
-                exercise.resolvedTargetKind
+            initialValue: isStaticHold
+                ? .time : exercise.resolvedTargetKind
         )
         _reps = State(
             initialValue:
@@ -10990,12 +10996,11 @@ struct PlannedExerciseEditorView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ATHLTHTrainDesign.ink)
                             Text(ATHLTHLocalization.choose(
-                                english: "Moves to Warm-up · excluded from PRs",
-                                norwegian: "Flyttes til Oppvarming · teller ikke mot PR"
+                                english: "Placed in Warm-up",
+                                norwegian: "Plasseres i Oppvarming"
                             ))
-                            .font(.system(size: 11))
+                            .font(.system(size: 10))
                             .foregroundStyle(ATHLTHTrainDesign.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 5)
                         Toggle(
@@ -11012,7 +11017,7 @@ struct PlannedExerciseEditorView: View {
                             norwegian: "Plasser hele øvelsen under Oppvarming"
                         ))
                     }
-                    .padding(.vertical, 2)
+                    .padding(.vertical, 0)
                 }
                 .listRowBackground(ATHLTHTrainDesign.paper)
 
