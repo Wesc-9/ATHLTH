@@ -6311,6 +6311,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         title = draft.usedDefaultTitle == true ? "" : draft.title
         weekCount = draft.weekCount
         startDate = max(Calendar.current.startOfDay(for: Date()), draft.startDate)
+        if let savedArea = draft.entryGoalArea.flatMap(ATHLTHPlanGoalArea.init(rawValue:)) {
+            selectedGoalArea = savedArea
+        }
+        if let savedChoice = draft.entryGoalChoice,
+           ATHLTHPlanGoalOption.options(for: selectedGoalArea)
+                .contains(where: { $0.id == savedChoice }) {
+            selectedGoalChoice = savedChoice
+        }
+        if let savedFocus = draft.entryPlanFocus.flatMap(TrainingPlanFocus.init(rawValue:)) {
+            focus = savedFocus
+        }
+        if let savedGoal = draft.entryPlanGoal.flatMap(TrainingPlanGoalType.init(rawValue:)) {
+            goal = savedGoal
+        }
         switch draft.source {
         case "library": selectedSource = .library
         case "saved": selectedSource = .saved
@@ -6367,6 +6381,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             advanced: mode == .advanced,
             source: selectedSource.rawValue,
             stage: String(describing: step),
+            entryGoalArea: selectedGoalArea.rawValue,
+            entryGoalChoice: selectedGoalChoice,
+            entryPlanFocus: focus.rawValue,
+            entryPlanGoal: goal.rawValue,
             preferredDayIndexes: selectedDays.sorted(),
             equipmentContext: mode == .advanced ? equipment.rawValue : nil,
             weeklyTimeBudgetMinutes: mode == .advanced
