@@ -127,105 +127,142 @@ struct ATHLTHPlanEntryModeCard: View {
     var compact: Bool = false
     let onSelect: () -> Void
 
-    private let ink = ATHLTHPlanDesign.ink
-    private let muted = ATHLTHPlanDesign.secondaryInk
-    private let gold = ATHLTHPlanDesign.accent
+    private let ink = ATHLTHTrainDesign.ink
+    private let muted = ATHLTHTrainDesign.secondary
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let gold = ATHLTHTrainDesign.gold
+
+    // These images were adapted from the approved plan-entry visual and
+    // bundled in Assets.xcassets, so the first step is available offline.
+    private var photoName: String {
+        symbol == "sparkles" ? "PlanEntrySimple" : "PlanEntryAdvanced"
+    }
 
     var body: some View {
         Button(action: onSelect) {
-            VStack(alignment: .leading, spacing: compact ? 8 : 13) {
-                HStack(alignment: .center, spacing: compact ? 10 : 13) {
-                    Image(systemName: symbol)
-                        .font(.system(size: compact ? 20 : 24, weight: .medium))
-                        .foregroundStyle(selected ? gold : ink)
-                        .frame(width: compact ? 43 : 58, height: compact ? 43 : 58)
-                        .background(
-                            selected ? gold.opacity(0.095) : ink.opacity(0.04),
-                            in: RoundedRectangle(cornerRadius: compact ? 13 : 18)
-                        )
-                        .accessibilityHidden(true)
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title)
-                            .font(.system(size: compact ? 17 : 19, weight: .semibold))
-                            .foregroundStyle(ink)
-
-                        Text(subtitle)
-                            .font(.system(size: compact ? 12 : 14))
-                            .foregroundStyle(muted)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .multilineTextAlignment(.leading)
-                    }
-                    Spacer(minLength: 4)
-
-                    Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: compact ? 20 : 23, weight: .regular))
-                        .foregroundStyle(selected ? gold : muted.opacity(0.33))
-                        .accessibilityHidden(true)
-                }
-
+            VStack(spacing: 0) {
+                introduction
                 Rectangle()
-                    .fill(gold.opacity(selected ? 0.18 : 0.10))
-                    .frame(height: 0.7)
-
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: compact ? 7 : 12) {
-                        ForEach(features) { item in feature(item) }
-                    }
-
-                    VStack(alignment: .leading, spacing: compact ? 5 : 9) {
-                        ForEach(features) { item in feature(item) }
-                    }
-                }
+                    .fill(bronze.opacity(0.14))
+                    .frame(height: 0.6)
+                    .padding(.horizontal, 12)
+                featureStrip
             }
-            .padding(compact ? 12 : 16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background {
-                RoundedRectangle(cornerRadius: 23, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: selected
-                                ? [Color.white, Color(red: 0.99, green: 0.975, blue: 0.948)]
-                                : [Color.white, Color(red: 0.997, green: 0.993, blue: 0.986)],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        )
-                    )
-            }
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 19))
+            .clipShape(RoundedRectangle(cornerRadius: 19))
             .overlay {
-                RoundedRectangle(cornerRadius: 23, style: .continuous)
-                    .stroke(
-                        selected ? gold.opacity(0.90) : ATHLTHPlanDesign.outline,
-                        lineWidth: selected ? 1.3 : 0.85
+                RoundedRectangle(cornerRadius: 19)
+                    .strokeBorder(
+                        selected ? gold.opacity(0.98) :
+                            ATHLTHTrainDesign.rule.opacity(0.46),
+                        lineWidth: selected ? 1.4 : 0.75
                     )
             }
-            .shadow(
-                color: ink.opacity(selected ? 0.07 : 0.045),
-                radius: selected ? 15 : 10, y: 6
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 23))
+            .shadow(color: ink.opacity(selected ? 0.10 : 0.045),
+                    radius: selected ? 14 : 10, y: 5)
+            .contentShape(RoundedRectangle(cornerRadius: 19))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(title + ". " + subtitle)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
-        .accessibilityHint(
-            ATHLTHLocalization.choose(
-                english: "Select planning mode, then continue.",
-                norwegian: "Velg planleggingsmåte, og trykk deretter Fortsett."
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Select this planning mode, then continue.",
+            norwegian: "Velg denne planleggingsmåten, og trykk deretter Fortsett."
+        ))
+    }
+
+    private var introduction: some View {
+        ZStack(alignment: .leading) {
+            GeometryReader { bounds in
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    Image(photoName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: bounds.size.width * 0.51,
+                               height: bounds.size.height)
+                        .clipped()
+                }
+            }
+            LinearGradient(
+                stops: [
+                    .init(color: .white, location: 0),
+                    .init(color: .white.opacity(0.98), location: 0.34),
+                    .init(color: .white.opacity(0.77), location: 0.57),
+                    .init(color: .white.opacity(0.0), location: 1)
+                ],
+                startPoint: .leading, endPoint: .trailing
             )
-        )
+
+            VStack(alignment: .leading, spacing: compact ? 6 : 10) {
+                Text(title)
+                    .font(.system(size: compact ? 26 : 31,
+                                  weight: .regular, design: .serif))
+                    .foregroundStyle(ink)
+                Text(subtitle)
+                    .font(.system(size: compact ? 11.5 : 13.5))
+                    .foregroundStyle(muted)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(compact ? 3 : 4)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, compact ? 15 : 19)
+            .padding(.trailing, compact ? 118 : 145)
+
+            VStack {
+                HStack {
+                    Spacer()
+                    Image(systemName: selected ? "checkmark" : "circle")
+                        .font(.system(size: selected ? 13 : 27,
+                                      weight: .semibold))
+                        .foregroundStyle(selected ? Color.white :
+                                         ink.opacity(0.34))
+                        .frame(width: 34, height: 34)
+                        .background {
+                            if selected {
+                                Circle().fill(gold)
+                            }
+                        }
+                }
+                Spacer()
+            }
+            .padding(14)
+            .accessibilityHidden(true)
+        }
+        .frame(height: compact ? 116 : 140)
+    }
+
+    private var featureStrip: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: compact ? 6 : 9) {
+                ForEach(features) { item in
+                    feature(item)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(features) { item in feature(item) }
+            }
+        }
+        .padding(.horizontal, 11)
+        .padding(.vertical, compact ? 9 : 11)
+        .frame(maxWidth: .infinity)
+        .background(.white.opacity(0.99))
     }
 
     private func feature(_ item: Feature) -> some View {
-        HStack(spacing: compact ? 3 : 5) {
+        HStack(spacing: 5) {
             Image(systemName: item.symbol)
                 .font(.system(size: compact ? 10 : 12, weight: .semibold))
-                .foregroundStyle(gold)
+                .foregroundStyle(bronze)
                 .accessibilityHidden(true)
             Text(item.title)
-                .font(.system(size: compact ? 9 : 10, weight: .medium))
+                .font(.system(size: compact ? 9 : 10))
                 .foregroundStyle(muted)
-                .fixedSize(horizontal: true, vertical: false)
+                .lineLimit(1)
+                .minimumScaleFactor(0.70)
         }
     }
 }
