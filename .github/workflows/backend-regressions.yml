@@ -44,6 +44,10 @@ jobs:
         run: deno check supabase/functions/generate-strength-session/index.ts supabase/functions/create-audio-coach-session/index.ts supabase/functions/delete-account/index.ts supabase/functions/verify-app-store-transaction/index.ts supabase/functions/app-store-notifications/index.ts supabase/functions/recovery-sense/index.ts supabase/functions/recovery-sense-v2/index.ts supabase/functions/workout-insight/index.ts supabase/functions/generate-training-program/index.ts supabase/functions/generate-plan-adaptation/index.ts supabase/functions/post-trial-offer/index.ts scripts/harden_workout_media_cache.ts
       - name: Start disposable Supabase database
         shell: bash
+        env:
+          # Prefer Docker Hub for transient test images to avoid GHCR's
+          # shared-runner pull throttling seen on 2026-10-26.
+          SUPABASE_INTERNAL_IMAGE_REGISTRY: docker.io
         run: |
           set -euo pipefail
           # GHCR can briefly throttle public container pulls on shared
