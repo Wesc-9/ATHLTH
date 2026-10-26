@@ -972,69 +972,46 @@ struct ATHLTHHomeView: View {
                         watchConnected:
                             watchConnection.isReady
                     ) { configuration in
-                        Task { @MainActor in
-                            guard await social.beginWorkoutWithFriends(
-                                title:
-                                    configuration.title,
-                                kind: .running,
-                                friends:
-                                    configuration.friends,
-                                creatorName:
-                                    session.profile.displayName,
-                                creatorUsername:
-                                    session.profile.username,
-                                invitePayload:
-                                    configuration
-                                        .trainTogetherInvitePayload(
-                                            savedRoutes:
-                                                session.savedRoutes
-                                        ),
-                                creatorCaptureDevice:
-                                    configuration.captureDevice
-                            ) else {
-                                if let message = social.errorMessage {
-                                    homeWatchTransferError = message
-                                }
-                                return
-                            }
-
-                            do {
-                                try await WorkoutLaunchCoordinator
-                                    .startRunQuick(
-                                        configuration:
-                                            configuration,
-                                        session:
-                                            session,
-                                        settings:
-                                            settings,
-                                        gear:
-                                            gear,
-                                        phoneWorkout:
-                                            phoneWorkout,
-                                        watchConnection:
-                                            watchConnection,
-                                        spotify:
-                                            spotifyPlayback,
-                                        ghostRace:
-                                            ghostRace,
-                                        workoutMirroring:
-                                            workoutMirroring
-                                    )
-                                _ = await social
-                                    .confirmCurrentJoinedWorkoutStarted()
-                                if configuration.captureDevice == .appleWatch {
-                                    homeWatchTransferMessage = configuration.watchStartMode == .onWatch
-                                        ? configuration.watchStartMode.confirmationText
-                                        : nil
-                                }
-                            } catch {
-                                await social
-                                    .markCurrentJoinedWorkoutLaunchFailed()
-                                homeWatchTransferError =
-                                    error.localizedDescription
-                            }
-                        }
+                    
+                    guard await social.beginWorkoutWithFriends(
+                        title: configuration.title,
+                        kind: .running,
+                        friends: configuration.friends,
+                        creatorName: session.profile.displayName,
+                        creatorUsername: session.profile.username,
+                        invitePayload: configuration.trainTogetherInvitePayload(
+                            savedRoutes: session.savedRoutes
+                        ),
+                        creatorCaptureDevice: configuration.captureDevice
+                    ) else {
+                        return social.errorMessage ?? ATHLTHLocalization.choose(
+                            english: "Workout could not start. Unlock Apple Watch and try again.",
+                            norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
+                        )
                     }
+                    do {
+                        try await WorkoutLaunchCoordinator.startRunQuick(
+                            configuration: configuration,
+                            session: session,
+                            settings: settings,
+                            gear: gear,
+                            phoneWorkout: phoneWorkout,
+                            watchConnection: watchConnection,
+                            spotify: spotifyPlayback,
+                            ghostRace: ghostRace,
+                            workoutMirroring: workoutMirroring
+                        )
+                        _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        if configuration.captureDevice == .appleWatch {
+                            homeWatchTransferMessage = configuration.watchStartMode == .onWatch
+                                ? configuration.watchStartMode.confirmationText : nil
+                        }
+                        return nil
+                    } catch {
+                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                        return error.localizedDescription
+                    }
+                }
                 } else if kind == .strength {
                     WorkoutStartOptionsView(
                         session:
@@ -6013,64 +5990,47 @@ struct ATHLTHTrainView: View {
                     plannedSession: pendingPlannedEnduranceWorkout?.workout
                 ) { configuration in
                     let planOrigin = matchedPlanOriginForRun(
-                        pendingPlannedEnduranceWorkout,
-                        configuration: configuration
+                        pendingPlannedEnduranceWorkout, configuration: configuration
                     )
-                    Task { @MainActor in
-                        guard await social.beginWorkoutWithFriends(
-                            title: configuration.title,
-                            kind: .running,
-                            friends: configuration.friends,
-                            creatorName: session.profile.displayName,
-                            creatorUsername: session.profile.username,
-                            invitePayload:
-                                configuration
-                                    .trainTogetherInvitePayload(
-                                        savedRoutes:
-                                            session.savedRoutes
-                                    ),
-                            creatorCaptureDevice:
-                                configuration.captureDevice
-                        ) else {
-                            if let message = social.errorMessage {
-                                watchTransferError = message
-                            }
-                            return
+                    guard await social.beginWorkoutWithFriends(
+                        title: configuration.title,
+                        kind: .running,
+                        friends: configuration.friends,
+                        creatorName: session.profile.displayName,
+                        creatorUsername: session.profile.username,
+                        invitePayload: configuration.trainTogetherInvitePayload(
+                            savedRoutes: session.savedRoutes
+                        ),
+                        creatorCaptureDevice: configuration.captureDevice
+                    ) else {
+                        return social.errorMessage ?? ATHLTHLocalization.choose(
+                            english: "Workout could not start. Unlock Apple Watch and try again.",
+                            norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
+                        )
+                    }
+                    do {
+                        try await WorkoutLaunchCoordinator.startRunQuick(
+                            configuration: configuration,
+                            session: session,
+                            settings: settings,
+                            gear: gear,
+                            phoneWorkout: phoneWorkout,
+                            watchConnection: watchConnection,
+                            spotify: spotifyPlayback,
+                            ghostRace: ghostRace,
+                            workoutMirroring: workoutMirroring,
+                            plannedPlanID: planOrigin?.planID,
+                            plannedSessionID: planOrigin?.workout.id
+                        )
+                        _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        if configuration.captureDevice == .appleWatch {
+                            watchTransferMessage = configuration.watchStartMode == .onWatch
+                                ? configuration.watchStartMode.confirmationText : nil
                         }
-                        do {
-                            try await WorkoutLaunchCoordinator
-                                .startRunQuick(
-                                    configuration:
-                                        configuration,
-                                    session: session,
-                                    settings: settings,
-                                    gear: gear,
-                                    phoneWorkout:
-                                        phoneWorkout,
-                                    watchConnection:
-                                        watchConnection,
-                                    spotify:
-                                        spotifyPlayback,
-                                    ghostRace:
-                                        ghostRace,
-                                    workoutMirroring:
-                                        workoutMirroring,
-                                    plannedPlanID: planOrigin?.planID,
-                                    plannedSessionID: planOrigin?.workout.id
-                                )
-                            _ = await social
-                                .confirmCurrentJoinedWorkoutStarted()
-                                if configuration.captureDevice == .appleWatch {
-                                    watchTransferMessage = configuration.watchStartMode == .onWatch
-                                        ? configuration.watchStartMode.confirmationText
-                                        : nil
-                                }
-                        } catch {
-                            await social
-                                .markCurrentJoinedWorkoutLaunchFailed()
-                            watchTransferError =
-                                error.localizedDescription
-                        }
+                        return nil
+                    } catch {
+                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                        return error.localizedDescription
                     }
                 }
             }
@@ -6086,50 +6046,37 @@ struct ATHLTHTrainView: View {
                     let planOrigin = validPendingPlanOrigin(
                         pendingPlannedEnduranceWorkout, kind: .walking
                     )
-                    Task { @MainActor in
-                        guard await social.beginWorkoutWithFriends(
-                            title: "Walk",
-                            kind: .walking,
-                            friends: configuration.friends,
-                            creatorName: session.profile.displayName,
-                            creatorUsername: session.profile.username,
-                            invitePayload:
-                                configuration
-                                    .trainTogetherInvitePayload,
-                            creatorCaptureDevice:
-                                configuration.captureDevice
-                        ) else {
-                            if let message = social.errorMessage {
-                                watchTransferError = message
-                            }
-                            return
-                        }
-                        do {
-                            try await WorkoutLaunchCoordinator
-                                .startWalkQuick(
-                                    configuration:
-                                        configuration,
-                                    settings: settings,
-                                    gear: gear,
-                                    phoneWorkout:
-                                        phoneWorkout,
-                                    watchConnection:
-                                        watchConnection,
-                                    spotify:
-                                        spotifyPlayback,
-                                    workoutMirroring:
-                                        workoutMirroring,
-                                    plannedPlanID: planOrigin?.planID,
-                                    plannedSessionID: planOrigin?.workout.id
-                                )
-                            _ = await social
-                                .confirmCurrentJoinedWorkoutStarted()
-                        } catch {
-                            await social
-                                .markCurrentJoinedWorkoutLaunchFailed()
-                            watchTransferError =
-                                error.localizedDescription
-                        }
+                    guard await social.beginWorkoutWithFriends(
+                        title: "Walk",
+                        kind: .walking,
+                        friends: configuration.friends,
+                        creatorName: session.profile.displayName,
+                        creatorUsername: session.profile.username,
+                        invitePayload: configuration.trainTogetherInvitePayload,
+                        creatorCaptureDevice: configuration.captureDevice
+                    ) else {
+                        return social.errorMessage ?? ATHLTHLocalization.choose(
+                            english: "Workout could not start. Unlock Apple Watch and try again.",
+                            norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
+                        )
+                    }
+                    do {
+                        try await WorkoutLaunchCoordinator.startWalkQuick(
+                            configuration: configuration,
+                            settings: settings,
+                            gear: gear,
+                            phoneWorkout: phoneWorkout,
+                            watchConnection: watchConnection,
+                            spotify: spotifyPlayback,
+                            workoutMirroring: workoutMirroring,
+                            plannedPlanID: planOrigin?.planID,
+                            plannedSessionID: planOrigin?.workout.id
+                        )
+                        _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        return nil
+                    } catch {
+                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                        return error.localizedDescription
                     }
                 }
             }
@@ -6202,76 +6149,47 @@ struct ATHLTHTrainView: View {
                     plannedSession: pendingPlannedEnduranceWorkout?.workout
                 ) { configuration in
                     let planOrigin = matchedPlanOriginForRun(
-                        pendingPlannedEnduranceWorkout,
-                        configuration: configuration
+                        pendingPlannedEnduranceWorkout, configuration: configuration
                     )
-                    Task { @MainActor in
-                        guard await social
-                            .beginWorkoutWithFriends(
-                                title:
-                                    configuration
-                                        .title,
-                                kind: .running,
-                                friends:
-                                    configuration
-                                        .friends,
-                                creatorName:
-                                    session
-                                        .profile
-                                        .displayName,
-                                creatorUsername:
-                                    session
-                                        .profile
-                                        .username,
-                                invitePayload:
-                                    configuration
-                                        .trainTogetherInvitePayload(
-                                            savedRoutes:
-                                                session.savedRoutes
-                                        ),
-                                creatorCaptureDevice:
-                                    configuration.captureDevice
-                            )
-                        else {
-                            if let message = social.errorMessage {
-                                watchTransferError = message
-                            }
-                            return
+                    guard await social.beginWorkoutWithFriends(
+                        title: configuration.title,
+                        kind: .running,
+                        friends: configuration.friends,
+                        creatorName: session.profile.displayName,
+                        creatorUsername: session.profile.username,
+                        invitePayload: configuration.trainTogetherInvitePayload(
+                            savedRoutes: session.savedRoutes
+                        ),
+                        creatorCaptureDevice: configuration.captureDevice
+                    ) else {
+                        return social.errorMessage ?? ATHLTHLocalization.choose(
+                            english: "Workout could not start. Unlock Apple Watch and try again.",
+                            norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
+                        )
+                    }
+                    do {
+                        try await WorkoutLaunchCoordinator.startRunQuick(
+                            configuration: configuration,
+                            session: session,
+                            settings: settings,
+                            gear: gear,
+                            phoneWorkout: phoneWorkout,
+                            watchConnection: watchConnection,
+                            spotify: spotifyPlayback,
+                            ghostRace: ghostRace,
+                            workoutMirroring: workoutMirroring,
+                            plannedPlanID: planOrigin?.planID,
+                            plannedSessionID: planOrigin?.workout.id
+                        )
+                        _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        if configuration.captureDevice == .appleWatch {
+                            watchTransferMessage = configuration.watchStartMode == .onWatch
+                                ? configuration.watchStartMode.confirmationText : nil
                         }
-                        do {
-                            try await WorkoutLaunchCoordinator
-                                .startRunQuick(
-                                    configuration:
-                                        configuration,
-                                    session: session,
-                                    settings: settings,
-                                    gear: gear,
-                                    phoneWorkout:
-                                        phoneWorkout,
-                                    watchConnection:
-                                        watchConnection,
-                                    spotify:
-                                        spotifyPlayback,
-                                    ghostRace:
-                                        ghostRace,
-                                    workoutMirroring:
-                                        workoutMirroring,
-                                    plannedPlanID: planOrigin?.planID,
-                                    plannedSessionID: planOrigin?.workout.id
-                                )
-                            _ = await social
-                                .confirmCurrentJoinedWorkoutStarted()
-                                if configuration.captureDevice == .appleWatch {
-                                    watchTransferMessage = configuration.watchStartMode == .onWatch
-                                        ? configuration.watchStartMode.confirmationText
-                                        : nil
-                                }
-                        } catch {
-                            await social
-                                .markCurrentJoinedWorkoutLaunchFailed()
-                            watchTransferError =
-                                error.localizedDescription
-                        }
+                        return nil
+                    } catch {
+                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                        return error.localizedDescription
                     }
                 }
             }
