@@ -30,18 +30,26 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
         XCTAssertNil(ATHLTHPlanJourney.next(after: .basics, advanced: false))
     }
 
-    func testAdvancedKeepsAllSixPlanningStages() {
+    func testAdvancedUsesMethodChoiceInsteadOfMandatoryHealthIntake() {
         XCTAssertEqual(
             ATHLTHPlanJourney.sequence(advanced: true),
-            [.mode, .goal, .basics, .profile, .week, .review]
+            [.mode, .goal, .basics, .approach, .week, .review]
         )
-        XCTAssertEqual(ATHLTHPlanJourney.position(of: .review, advanced: true), 6)
+        XCTAssertFalse(ATHLTHPlanJourney.sequence(advanced: true).contains(.profile))
+        XCTAssertEqual(ATHLTHPlanJourney.displayedCount(advanced: true), 5)
+        XCTAssertEqual(ATHLTHPlanJourney.position(of: .approach, advanced: true), 4)
+        XCTAssertEqual(ATHLTHPlanJourney.position(of: .week, advanced: true), 5)
+        XCTAssertEqual(ATHLTHPlanJourney.position(of: .review, advanced: true), 5)
+        XCTAssertEqual(ATHLTHPlanJourney.next(after: .basics, advanced: true), .approach)
+        XCTAssertEqual(ATHLTHPlanJourney.next(after: .approach, advanced: true), .week)
     }
 
     func testResumeReturnsToLastAllowedWizardStage() {
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("goal", advanced: true), .goal)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("goal", advanced: false), .goal)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("week", advanced: true), .week)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("profile", advanced: true), .approach)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("approach", advanced: true), .approach)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("review", advanced: true), .review)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("basics", advanced: false), .basics)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("week", advanced: false), .basics)
@@ -137,6 +145,26 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
             in: CGSize(width: 165, height: 300)
         )
         XCTAssertLessThanOrEqual(shortcutSize.width, 166)
+    }
+
+
+    @MainActor
+    func testBuildMethodCardFitsCompactPhones() {
+        for width in [320.0, 375.0, 430.0] {
+            let selector = ATHLTHPlanBuildMethodEntryView(
+                prefersAI: false,
+                planWeeks: 4,
+                trainingDays: 3,
+                focusTitle: "Løping",
+                onSelectManual: {},
+                onSelectAI: {}
+            )
+            let host = UIHostingController(rootView: selector)
+            host.loadViewIfNeeded()
+            let available = width - 36
+            let size = host.sizeThatFits(in: CGSize(width: available, height: 940))
+            XCTAssertLessThanOrEqual(size.width, available + 1)
+        }
     }
 
     func testPlanDesignHasConsistentLayoutPriorities() {
