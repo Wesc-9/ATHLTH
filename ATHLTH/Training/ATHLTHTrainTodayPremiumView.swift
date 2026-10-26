@@ -458,6 +458,11 @@ struct ATHLTHTrainTodayPremiumView: View {
         _ workout: PlannedSession, plan: TrainingPlan
     ) -> some View {
         let finished = completedIDs.contains(workout.id)
+        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        let exerciseCount = Set(blocks.filter { $0.kind == .exercise }
+            .map { $0.exerciseSlug ?? $0.title }).count
+        let pauseCount = blocks.expandedForExecution()
+            .filter { $0.kind == .rest }.count
         return VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .top, spacing: 13) {
@@ -473,25 +478,48 @@ struct ATHLTHTrainTodayPremiumView: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .lineLimit(3)
 
-                        if let duration = workout.durationMinutes {
-                            Label("\(duration) min", systemImage: "clock")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(muted)
-                        }
-
-                        if !workout.exercises.isEmpty {
-                            Label(
-                                tr("\(workout.exercises.count) exercises",
-                                   "\(workout.exercises.count) øvelser"),
-                                systemImage: "dumbbell"
-                            )
+                        ViewThatFits(in: .horizontal) {
+                            HStack(spacing: 9) {
+                                if let duration = workout.durationMinutes {
+                                    Label("\(duration) min", systemImage: "clock")
+                                }
+                                if exerciseCount > 0 {
+                                    Label("\(exerciseCount) " + tr("exercises", "øvelser"),
+                                          systemImage: "dumbbell")
+                                }
+                                if pauseCount > 0 {
+                                    Label("\(pauseCount) " + tr("rests", "pauser"),
+                                          systemImage: "pause.fill")
+                                }
+                                if workout.durationMinutes == nil &&
+                                   exerciseCount == 0 && pauseCount == 0 {
+                                    Label(workout.kind.title,
+                                          systemImage: workout.kind.systemImage)
+                                }
+                            }
+                            .font(.system(size: 10, weight: .medium))
+                            .lineLimit(1)
+                            VStack(alignment: .leading, spacing: 6) {
+                                if let duration = workout.durationMinutes {
+                                    Label("\(duration) min", systemImage: "clock")
+                                }
+                                if exerciseCount > 0 {
+                                    Label("\(exerciseCount) " + tr("exercises", "øvelser"),
+                                          systemImage: "dumbbell")
+                                }
+                                if pauseCount > 0 {
+                                    Label("\(pauseCount) " + tr("rests", "pauser"),
+                                          systemImage: "pause.fill")
+                                }
+                                if workout.durationMinutes == nil &&
+                                   exerciseCount == 0 && pauseCount == 0 {
+                                    Label(workout.kind.title,
+                                          systemImage: workout.kind.systemImage)
+                                }
+                            }
                             .font(.caption.weight(.medium))
-                            .foregroundStyle(muted)
-                        } else {
-                            Label(workout.kind.title, systemImage: workout.kind.systemImage)
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(muted)
                         }
+                        .foregroundStyle(muted)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -1634,7 +1662,7 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private func workoutImage(for kind: WorkoutKind) -> String {
         switch kind {
-        case .strength: return "StrengthQuickHero"
+        case .strength: return "GoalStrength"
         case .running: return "GoalRunning"
         case .walking: return "GoalWalking"
         case .recovery, .mobility: return "GoalRecovery"
