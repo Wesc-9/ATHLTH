@@ -28,6 +28,7 @@ on:
       - release/v1.9.4
       - release/v1.9.5
       - release/v1.9.6
+      - release/v1.9.7
     paths:
       - .github/testflight-trigger
 
