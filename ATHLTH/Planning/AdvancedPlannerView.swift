@@ -1512,91 +1512,86 @@ struct AdvancedPlannerView: View {
         .scrollIndicators(.hidden)
     }
 
+    // MARK: - Premium day timeline (release planner presentation)
     private func selectedDayCard(
         plan: TrainingPlan,
         week: TrainingPlanWeek,
         day: TrainingPlanDay
     ) -> some View {
-        ATHLTHPlanSurface {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(alignment: .center, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(
-                            displayDayTitle(
-                                day,
-                                week: week,
-                                plan: plan
-                            )
-                        )
-                        .font(.title3.weight(.bold))
-
-                        Text(
-                            daySubtitle(
-                                day,
-                                week: week,
-                                plan: plan
-                            )
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+        let ordered = day.sessions.sorted {
+            ($0.scheduledStart ?? .distantFuture) < ($1.scheduledStart ?? .distantFuture)
+        }
+        return ATHLTHPlanSurface {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("DAGENS PLAN")
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(2)
+                            .foregroundStyle(Color(red: 0.52, green: 0.39, blue: 0.22))
+                        Text(displayDayTitle(day, week: week, plan: plan))
+                            .font(.system(size: 25, weight: .semibold, design: .serif))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(daySubtitle(day, week: week, plan: plan))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                     }
-
                     Spacer()
-
                     Button {
                         selectedDayID = day.id
                         showingSessionEditor = true
                     } label: {
-                        Label("Add", systemImage: "plus")
+                        Label("Legg til", systemImage: "plus")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color(red: 0.42, green: 0.32, blue: 0.20))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(Color(red: 0.95, green: 0.92, blue: 0.86),
+                                        in: Capsule())
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .tint(ATHLTHTheme.accent)
+                    .buttonStyle(.plain)
                 }
 
-                if day.sessions.isEmpty {
+                if ordered.isEmpty {
                     Button {
                         selectedDayID = day.id
                         showingSessionEditor = true
                     } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title3)
-                                .foregroundStyle(ATHLTHTheme.accent)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text("Rest day — or add")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(
-                                        ATHLTHTheme.primaryText
-                                    )
-
-                                Text(
-                                    "Strength, run, walk, mobility and recovery can all be planned here."
-                                )
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-
-                            Spacer()
-                        }
-                        .padding(14)
-                        .background(
-                            ATHLTHTheme.accentSoft.opacity(0.55),
-                            in: RoundedRectangle(
-                                cornerRadius: 16,
-                                style: .continuous
-                            )
-                        )
+                        Label("Hviledag · Planlegg en økt", systemImage: "plus.circle")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(18)
+                            .background(Color(red: 0.97, green: 0.96, blue: 0.94),
+                                        in: RoundedRectangle(cornerRadius: 18))
                     }
                     .buttonStyle(.plain)
                 } else {
-                    VStack(spacing: 10) {
-                        ForEach(day.sessions) { workout in
-                            sessionRow(
-                                workout,
-                                dayID: day.id
-                            )
+                    VStack(spacing: 0) {
+                        ForEach(Array(ordered.enumerated()), id: \.element.id) { index, workout in
+                            HStack(alignment: .top, spacing: 10) {
+                                VStack(spacing: 5) {
+                                    Text(workout.scheduledStart?.formatted(date: .omitted, time: .shortened) ?? "ØKT")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        .frame(width: 48, alignment: .leading)
+                                    Circle()
+                                        .strokeBorder(Color(red: 0.60, green: 0.44, blue: 0.25), lineWidth: 2)
+                                        .background(Circle().fill(Color.white))
+                                        .frame(width: 10, height: 10)
+                                    if index < ordered.count - 1 {
+                                        Rectangle()
+                                            .fill(Color(red: 0.76, green: 0.70, blue: 0.60))
+                                            .frame(width: 1, height: 18)
+                                    }
+                                }
+                                VStack(alignment: .leading, spacing: 8) {
+                                    sessionRow(workout, dayID: day.id)
+                                    ATHLTHReleasePlanTimeline(workout: workout)
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .padding(.bottom, 12)
                         }
                     }
                 }
@@ -13277,5 +13272,64 @@ struct PlannedExerciseEditorView: View {
 private extension String {
     var nilIfEmpty: String? {
         isEmpty ? nil : self
+    }
+}
+
+    
+// Read-only timeline; the existing SessionEditorView remains the single editor.
+// Restrained ivory/stone/gold palette avoids category-based pastel cards.
+private struct ATHLTHReleasePlanTimeline: View {
+    let workout: PlannedSession
+    private let bronze = Color(red: 0.49, green: 0.36, blue: 0.19)
+    private let paper = Color(red: 0.975, green: 0.967, blue: 0.949)
+    private let line = Color(red: 0.77, green: 0.72, blue: 0.64)
+
+    var body: some View {
+        let blocks = workout.resolvedWorkoutBlocks.sorted { $0.sequence < $1.sequence }
+        if !blocks.isEmpty {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(blocks.enumerated()), id: \.element.id) { index, block in
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(spacing: 3) {
+                            Image(systemName: block.kind == .rest ? "pause.fill" : block.kind.systemImage)
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(bronze)
+                                .frame(width: 28, height: 28)
+                                .background(Color(red: 0.94, green: 0.92, blue: 0.88), in: Circle())
+                            if index < blocks.count - 1 {
+                                Rectangle().fill(line).frame(width: 1, height: 16)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(block.title)
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(ATHLTHTheme.primaryText)
+                            let description = [
+                                block.kind == .rest
+                                    ? block.durationSeconds.map { "\(Int($0.rounded())) sek pause" }
+                                    : block.targetText,
+                                block.notes
+                            ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+                            if !description.isEmpty {
+                                Text(description)
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(block.kind == .rest
+                        ? Color(red: 0.952, green: 0.931, blue: 0.894)
+                        : Color.white.opacity(0.72), in: RoundedRectangle(cornerRadius: 11))
+                    .padding(.bottom, 5)
+                }
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(paper, in: RoundedRectangle(cornerRadius: 18))
+        }
     }
 }
