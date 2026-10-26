@@ -420,6 +420,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         AnyView(goalContinueBar)
                     } else if step == .basics && mode == .advanced {
                         AnyView(goalContinueBar)
+                    } else if step == .basics && mode == .basic {
+                        AnyView(simpleContinueBar)
                     } else if step == .source {
                         AnyView(sourceContinueBar)
                     } else {
@@ -849,7 +851,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             if mode == .advanced {
                 AnyView(advancedScheduleStep)
             } else {
-                AnyView(wizardScroll(AnyView(simpleBasicsStep)))
+                AnyView(simpleScheduleStep)
             }
         case .profile:
             AnyView(wizardScroll(AnyView(profileStep)))
@@ -1992,169 +1994,89 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }.joined(separator: ATHLTHLocalization.choose(english: " and ", norwegian: " og "))
     }
 
-    private var simpleBasicsStep: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            Text(ATHLTHLocalization.choose(
-                english: "Let's make a plan for you",
-                norwegian: "La oss lage en plan for deg"
-            ))
-            .font(.system(size: 30, weight: .semibold, design: .serif))
-            .foregroundStyle(ATHLTHPlanDesign.ink)
+    // Basic plans share the same photographic language as Advanced, but
+    // intentionally ask fewer questions. Duration belongs to the individual
+    // workout editor, not to this plan-wide setup screen.
+    private var simpleScheduleStep: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 13) {
+                sourceChoiceHeader
 
-            Text(ATHLTHLocalization.choose(
-                english: "Just three choices. You can change your plan later.",
-                norwegian: "Bare tre enkle valg. Du kan endre planen senere."
-            ))
-            .font(.subheadline)
-            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-
-            simpleQuestion(
-                ATHLTHLocalization.choose(english: "What would you like to do?", norwegian: "Hva vil du gjøre?")
-            ) {
-                Text(ATHLTHLocalization.choose(english: "You can choose more than one.", norwegian: "Du kan velge flere."))
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                simpleChoice(ATHLTHLocalization.choose(english: "Go for walks", norwegian: "Gå tur"), symbol: "figure.walk", selected: simpleActivities.contains(.walking)) {
-                    chooseSimpleActivity(.walking)
-                }
-                simpleChoice(ATHLTHLocalization.choose(english: "Go running", norwegian: "Løpe"), symbol: "figure.run", selected: simpleActivities.contains(.running)) {
-                    chooseSimpleActivity(.running)
-                }
-                simpleChoice(ATHLTHLocalization.choose(english: "Build strength", norwegian: "Trene styrke"), symbol: "dumbbell", selected: simpleActivities.contains(.strength)) {
-                    chooseSimpleActivity(.strength)
-                }
-            }
-
-            simpleQuestion(
-                ATHLTHLocalization.choose(english: "How many days each week?", norwegian: "Hvor mange dager i uken?")
-            ) {
-                HStack(spacing: 10) {
-                    ForEach([1, 2, 3], id: \.self) { count in
-                        simpleCompactChoice("\(count)", selected: selectedDays.count == count) {
+                ATHLTHPlanSimpleScheduleEntryView(
+                    startDate: $startDate,
+                    weekCount: $weekCount,
+                    selectedDays: selectedDays,
+                    onSelectFrequency: { count in
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.17)) {
                             setSimpleDays(count)
                         }
-                    }
-                }
-                simpleChoice(ATHLTHLocalization.choose(english: "Choose yourself", norwegian: "Velg selv"), symbol: "calendar", selected: showingSimpleDays || selectedDays.count > 3) {
-                    showingSimpleDays.toggle()
-                }
-                if showingSimpleDays {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 65))], spacing: 10) {
-                        ForEach(1...7, id: \.self) { count in
-                            simpleCompactChoice("\(count)", selected: selectedDays.count == count) {
-                                setSimpleDays(count)
-                            }
+                    },
+                    onToggleDay: { day in
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.17)) {
+                            toggleDay(day)
+                            setSimpleKinds()
                         }
                     }
-                }
-            }
-
-            simpleQuestion(
-                ATHLTHLocalization.choose(english: "How long each time?", norwegian: "Hvor lenge hver gang?")
-            ) {
-                HStack(spacing: 10) {
-                    ForEach([15, 30, 45], id: \.self) { minutes in
-                        simpleCompactChoice("\(minutes) min", selected: simpleMinutes == minutes) {
-                            simpleMinutes = minutes
-                            weeklyTimeBudgetMinutes = minutes * selectedDays.count
-                        }
-                    }
-                }
-                simpleChoice(ATHLTHLocalization.choose(english: "Choose yourself", norwegian: "Velg selv"), symbol: "clock", selected: showingSimpleDuration || ![15, 30, 45].contains(simpleMinutes)) {
-                    showingSimpleDuration.toggle()
-                }
-                if showingSimpleDuration {
-                    HStack(spacing: 16) {
-                        Button {
-                            simpleMinutes = max(5, simpleMinutes - 5)
-                        } label: {
-                            Image(systemName: "minus")
-                                .font(.title2.weight(.semibold))
-                                .frame(width: 60, height: 60)
-                                .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 16))
-                        }
-                        .disabled(simpleMinutes <= 5)
-                        .accessibilityLabel(ATHLTHLocalization.choose(english: "Five minutes less", norwegian: "Fem minutter mindre"))
-                        Text("\(simpleMinutes) min")
-                            .font(.title2.weight(.semibold))
-                            .frame(maxWidth: .infinity)
-                            .accessibilityLabel(ATHLTHLocalization.choose(english: "\(simpleMinutes) minutes each time", norwegian: "\(simpleMinutes) minutter hver gang"))
-                        Button {
-                            simpleMinutes = min(180, simpleMinutes + 5)
-                        } label: {
-                            Image(systemName: "plus")
-                                .font(.title2.weight(.semibold))
-                                .frame(width: 60, height: 60)
-                                .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 16))
-                        }
-                        .disabled(simpleMinutes >= 180)
-                        .accessibilityLabel(ATHLTHLocalization.choose(english: "Five minutes more", norwegian: "Fem minutter mer"))
-                    }
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .buttonStyle(.plain)
-                }
-            }
-
-            DisclosureGroup {
-                VStack(alignment: .leading, spacing: 16) {
-                    DatePicker(ATHLTHLocalization.choose(english: "Start date", norwegian: "Startdato"),
-                               selection: $startDate, displayedComponents: .date)
-                    Stepper(ATHLTHLocalization.choose(
-                        english: "\(weekCount) weeks", norwegian: "\(weekCount) uker"),
-                            value: $weekCount, in: 1...52)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose a period that fits your schedule. Activities, days and session length stay as selected.",
-                        norwegian: "Velg en periode som passer kalenderen din. Aktiviteter, dager og øktlengde beholdes."))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTrainDesign.secondary)
-                }
-                .padding(.top, 12)
-            } label: {
-                Label(ATHLTHLocalization.choose(english: "Start date and plan length", norwegian: "Startdato og planlengde"),
-                      systemImage: "calendar")
-                    .frame(minHeight: 48)
-            }
-            .tint(ATHLTHTrainDesign.bronze)
-
-            VStack(alignment: .leading, spacing: 8) {
-                Label(
-                    ATHLTHLocalization.choose(english: "Your plan", norwegian: "Planen din"),
-                    systemImage: "checkmark.circle.fill"
                 )
-                .font(.headline)
-                Text(simpleActivitySummary.capitalized)
-                    .font(.subheadline.weight(.semibold))
-                Text(ATHLTHLocalization.choose(
-                    english: "\(selectedDays.count) times a week · \(simpleMinutes) minutes each time · \(weekCount) weeks",
-                    norwegian: "\(selectedDays.count) ganger i uken · \(simpleMinutes) minutter hver gang · \(weekCount) uker"
-                ))
-                .font(.subheadline)
-                Text(ATHLTHLocalization.choose(
-                    english: "We'll spread the workouts across the week. You can change them later.",
-                    norwegian: "Vi fordeler øktene utover uken. Du kan endre dem senere."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(16)
-            .athlthPlanCard(radius: 18)
 
-            if let conflict = conflictingPlan {
-                conflictCard(conflict)
-                Text(ATHLTHLocalization.choose(
-                    english: "You already have a plan for these dates. Adjust Start date and plan length above.",
-                    norwegian: "Du har allerede en plan i denne perioden. Endre startdato og planlengde over."
-                ))
-                .font(.subheadline)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                if let conflictingPlan {
+                    conflictCard(conflictingPlan)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Another plan overlaps these dates. Change the start date or number of weeks to continue.",
+                        norwegian: "En annen plan overlapper disse datoene. Endre startdato eller antall uker for å fortsette."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
             }
+            .padding(.horizontal, 18)
+            .padding(.top, 10)
+            .padding(.bottom, 28)
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
         }
-        .onAppear {
-            if title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                updateSimplePlanChoices()
+        .scrollIndicators(.hidden)
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+    }
+
+    private var simpleContinueBar: some View {
+        Button {
+            guard canCreatePlan else { return }
+            createPlan(seedSuggestedWeek: true)
+        } label: {
+            HStack(spacing: 12) {
+                Spacer(minLength: 12)
+                Text(ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
+                    .font(.subheadline.weight(.semibold))
+                Spacer(minLength: 0)
+                Image(systemName: "arrow.right")
+                    .font(.subheadline.weight(.semibold))
             }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, minHeight: 55)
+            .background(
+                LinearGradient(
+                    colors: [
+                        ATHLTHTrainDesign.bronze,
+                        Color(red: 0.70, green: 0.52, blue: 0.30)
+                    ],
+                    startPoint: .leading, endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 22)
+            )
         }
+        .buttonStyle(.plain)
+        .disabled(!canCreatePlan)
+        .opacity(canCreatePlan ? 1 : 0.45)
+        .padding(.horizontal, 18)
+        .padding(.top, 10)
+        .padding(.bottom, 9)
+        .background(ATHLTHTrainDesign.canvas.opacity(0.98))
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Create the plan and open it for editing workouts.",
+            norwegian: "Opprett planen og åpne den for redigering av økter."
+        ))
     }
 
     private func simpleQuestion<Content: View>(
