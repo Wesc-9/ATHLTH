@@ -15,6 +15,11 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var advanced: Bool
     var source: String
     var stage: String
+    // Only built-in category identifiers are stored. No private goal notes.
+    var entryGoalArea: String? = nil
+    var entryGoalChoice: String? = nil
+    var entryPlanFocus: String? = nil
+    var entryPlanGoal: String? = nil
     // Optional so v1 snapshots made before the advanced-fields update still decode.
     // Only structural preferences; health, injuries and private notes are excluded.
     var preferredDayIndexes: [Int]?
@@ -49,6 +54,10 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         advanced: Bool,
         source: String,
         stage: String,
+        entryGoalArea: String? = nil,
+        entryGoalChoice: String? = nil,
+        entryPlanFocus: String? = nil,
+        entryPlanGoal: String? = nil,
         preferredDayIndexes: [Int]? = nil,
         equipmentContext: String? = nil,
         weeklyTimeBudgetMinutes: Int? = nil,
@@ -76,6 +85,21 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.advanced = advanced
         self.source = source
         self.stage = stage
+        self.entryGoalArea = entryGoalArea.flatMap {
+            ATHLTHPlanGoalArea(rawValue: $0)?.rawValue
+        }
+        self.entryGoalChoice = entryGoalChoice.flatMap { choice in
+            guard let area = self.entryGoalArea.flatMap(ATHLTHPlanGoalArea.init(rawValue:)),
+                  ATHLTHPlanGoalOption.options(for: area).contains(where: { $0.id == choice })
+            else { return nil }
+            return choice
+        }
+        self.entryPlanFocus = entryPlanFocus.flatMap {
+            TrainingPlanFocus(rawValue: $0)?.rawValue
+        }
+        self.entryPlanGoal = entryPlanGoal.flatMap {
+            TrainingPlanGoalType(rawValue: $0)?.rawValue
+        }
         self.planningApproach = advanced && ["quick", "guided"].contains(planningApproach ?? "")
             ? planningApproach : nil
         self.guidedDayCursor = advanced ? guidedDayCursor.map { min(max($0, 0), min(max(weekCount, 1), 52) * 7) } : nil
