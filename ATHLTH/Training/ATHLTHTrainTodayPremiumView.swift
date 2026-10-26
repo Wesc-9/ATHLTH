@@ -1523,21 +1523,23 @@ struct ATHLTHTrainTodayPremiumView: View {
     }
 
     private var quickTrainSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text(tr("Start a workout", "Start en økt"))
-                    .font(.system(size: 23, weight: .semibold))
+                    .font(.system(.title2, design: .serif).weight(.semibold))
                     .foregroundStyle(ink)
-                Spacer(minLength: 2)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 3)
                 Button(action: onOpenLibrary) {
-                    Label(tr("See all", "Se alle"), systemImage: "chevron.right")
-                        .labelStyle(.titleAndIcon)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(muted)
-                        .frame(minHeight: 44)
+                    HStack(spacing: 5) {
+                        Text(tr("See all workouts", "Se alle økter"))
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(champagne)
+                    .frame(minHeight: 44)
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(tr("Explore all workouts", "Se alle treningsøkter"))
             }
 
             if hasActiveWorkout {
@@ -1554,7 +1556,9 @@ struct ATHLTHTrainTodayPremiumView: View {
                 ),
                 spacing: 9
             ) {
-                ForEach(sortedQuickActivities) { activity in
+                // The approved six choices remain in predictable positions
+                // rather than rearranging themselves after each workout.
+                ForEach(QuickActivity.allCases) { activity in
                     quickPhotoChoice(activity)
                         .disabled(hasActiveWorkout)
                 }
@@ -1564,27 +1568,53 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private func quickPhotoChoice(_ activity: QuickActivity) -> some View {
         Button { openQuickActivity(activity) } label: {
-            VStack(spacing: 11) {
-                Image(systemName: activity.icon)
-                    .font(.system(size: 26, weight: .medium))
-                    .foregroundStyle(champagne)
-                    .frame(height: 32)
-                    .accessibilityHidden(true)
-                Text(activity.title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ink)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.88)
-                    .multilineTextAlignment(.center)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 6) {
+                    quickChoiceIcon(activity)
+                    Text(activity.title)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .minimumScaleFactor(0.84)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
+
+                VStack(spacing: 5) {
+                    quickChoiceIcon(activity)
+                    Text(activity.title)
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                        .multilineTextAlignment(.center)
+                }
+                .frame(maxWidth: .infinity, minHeight: 70)
             }
-            .frame(maxWidth: .infinity, minHeight: 93)
-            .padding(.horizontal, 5)
-            .athlthTrainPaper()
-            .contentShape(RoundedRectangle(cornerRadius: ATHLTHTrainDesign.radius))
+            .foregroundStyle(ink)
+            .padding(.horizontal, 8)
+            .background(
+                Color.white.opacity(0.94),
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(hairline.opacity(0.38), lineWidth: 0.7)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(activity.title)
         .accessibilityHint(tr("Open workout setup", "Åpner treningsoppsett"))
+    }
+
+    private func quickChoiceIcon(_ activity: QuickActivity) -> some View {
+        Image(systemName: activity.icon)
+            .font(.system(size: 19, weight: .regular))
+            .foregroundStyle(champagne)
+            .frame(width: 38, height: 38)
+            .background(ATHLTHTrainDesign.paleGold.opacity(0.44), in: Circle())
+            .accessibilityHidden(true)
     }
 
     private var ghostRaceSection: some View {
