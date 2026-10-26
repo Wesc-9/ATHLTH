@@ -1295,7 +1295,11 @@ struct ATHLTHTrainTodayPremiumView: View {
                 target: goal.target,
                 latestWeightKilograms: latestHealthWeightKilograms
             )
-            let fraction = weightProgress?.completionFraction ?? goal.progress
+            // Never substitute milestone completion for missing body-mass evidence.
+            // They represent different measurements.
+            let fraction = ATHLTHTrainWeightGoalProgress.visibleFraction(
+                goal: goal, latestWeightKilograms: latestHealthWeightKilograms
+            )
 
             VStack(alignment: .leading, spacing: 10) {
                 NavigationLink {
@@ -1315,7 +1319,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                             ZStack {
                                 Circle()
                                     .stroke(ATHLTHTrainDesign.paleGold, lineWidth: 6)
-                                if weightProgress != nil || total > 0 {
+                                if let fraction {
                                     Circle()
                                         .trim(from: 0, to: fraction)
                                         .stroke(champagne, style: StrokeStyle(
@@ -1380,8 +1384,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tr("Active goal", "Aktivt mål") + ": " + goal.title +
-                    ((weightProgress != nil || total > 0)
-                        ? ", \(Int((fraction * 100).rounded()))%" : ""))
+                    (fraction.map { ", \(Int(($0 * 100).rounded()))%" } ?? ""))
 
                 if let suggested = relevantGoalSuggestion,
                    suggested.id != primaryTrainGoal?.id {
@@ -1719,6 +1722,20 @@ enum ATHLTHTrainWeightGoalProgress {
         var completionFraction: Double {
             min(max(achievedKilograms / targetKilograms, 0), 1)
         }
+    }
+
+    /// A nil result tells Today to present a missing-measurement state, not
+    /// an unrelated milestone percentage. Other goals keep milestone progress.
+    static func visibleFraction(
+        goal: ATHLTHGoal,
+        latestWeightKilograms: Double?
+    ) -> Double? {
+        if goal.target?.metric == .bodyWeightKilograms {
+            return evaluate(
+                target: goal.target, latestWeightKilograms: latestWeightKilograms
+            )?.completionFraction
+        }
+        return goal.milestones.isEmpty ? nil : goal.progress
     }
 
     static func evaluate(
