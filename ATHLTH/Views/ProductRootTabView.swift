@@ -6408,21 +6408,41 @@ struct ATHLTHTrainView: View {
         Group {
             if selectedSection == .today {
                 todayPhotoHeader
+            } else if selectedSection == .progress {
+                // The reference layout has one compact top navigation row.
+                // The editorial progress view owns the single page title.
+                HStack(spacing: 8) {
+                    Text(ATHLTHLocalization.choose(english: "TRAINING", norwegian: "TRENING"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(2.5)
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    Spacer(minLength: 4)
+                    HStack(spacing: 1) {
+                        progressHeaderTab(
+                            ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"),
+                            section: .today
+                        )
+                        progressHeaderTab("Plan", section: .plan)
+                        progressHeaderTab(
+                            ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremdrift"),
+                            section: .progress
+                        )
+                    }
+                    .padding(3)
+                    .background(
+                        ATHLTHTrainDesign.paleGold.opacity(0.27),
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                }
+                .frame(minHeight: 42)
             } else {
                 VStack(alignment: .leading, spacing: 18) {
                     ATHLTHTrainMasthead(
-                        title: selectedSection == .plan
-                            ? ATHLTHLocalization.choose(
-                                english: "Your training plan", norwegian: "Din treningsplan")
-                            : ATHLTHLocalization.choose(
-                                english: "Progress", norwegian: "Fremgang"),
-                        subtitle: selectedSection == .plan
-                            ? ATHLTHLocalization.choose(
-                                english: "A considered plan. Room for every session.",
-                                norwegian: "En gjennomtenkt plan. Plass til hver økt.")
-                            : ATHLTHLocalization.choose(
-                                english: "The work you put in. The progress you can see.",
-                                norwegian: "Arbeidet du legger ned. Fremgangen du kan se."),
+                        title: ATHLTHLocalization.choose(
+                            english: "Your training plan", norwegian: "Din treningsplan"),
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "A considered plan. Room for every session.",
+                            norwegian: "En gjennomtenkt plan. Plass til hver økt."),
                         onLibrary: { showingLibrary = true }
                     )
                     premiumTrainTabs
@@ -6430,6 +6450,34 @@ struct ATHLTHTrainView: View {
                 .padding(.bottom, 8)
             }
         }
+    }
+
+    private func progressHeaderTab(
+        _ title: String,
+        section: ATHLTHTrainSection
+    ) -> some View {
+        let active = selectedSection == section
+        return Button {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                selectedSection = section
+            }
+        } label: {
+            Text(title)
+                .font(.system(size: 11, weight: active ? .semibold : .medium))
+                .foregroundStyle(active ? ATHLTHTrainDesign.ink : ATHLTHTrainDesign.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .frame(width: section == .progress ? 73 : 62, height: 34)
+                .background {
+                    if active {
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(.white)
+                            .shadow(color: .black.opacity(0.07), radius: 4, y: 2)
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 
     /// The reference-inspired, image-led Today cover is only a presentation
