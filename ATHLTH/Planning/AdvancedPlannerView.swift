@@ -12,6 +12,7 @@ struct AdvancedPlannerView: View {
     @State private var selectedWeekID: UUID?
     @State private var selectedDayID: UUID?
     @State private var selectedWorkout: PlannedSession?
+    @State private var workoutPendingPremiumEdit: PlannedSession?
     @State private var selectedStandaloneLobbyWorkout: PlannedSession?
     @State private var showingSessionEditor = false
     @State private var showingStandaloneSessionEditor = false
@@ -234,12 +235,69 @@ struct AdvancedPlannerView: View {
         }
         .sheet(item: $selectedWorkout) { workout in
             if let planID = displayedPlan?.id {
-                PlannedWorkoutDetailView(
-                    planID: planID,
-                    workout: workout,
-                    isHealthCompleted: false
-                )
+                NavigationStack {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 18) {
+                            VStack(alignment: .leading, spacing: 7) {
+                                Text("PLANLAGT ØKT")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .tracking(2)
+                                    .foregroundStyle(Color(red: 0.52, green: 0.39, blue: 0.22))
+                                Text(workout.title)
+                                    .font(.system(size: 30, weight: .semibold, design: .serif))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text(sessionSummary(workout))
+                                    .font(.subheadline)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.top, 18)
+
+                            HStack(spacing: 12) {
+                                Label(workout.kind.title, systemImage: workout.kind.systemImage)
+                                    .font(.caption.weight(.medium))
+                                if let start = workout.scheduledStart {
+                                    Label(start.formatted(date: .omitted, time: .shortened),
+                                          systemImage: "clock")
+                                        .font(.caption.weight(.medium))
+                                }
+                            }
+                            .foregroundStyle(Color(red: 0.49, green: 0.36, blue: 0.19))
+
+                            ATHLTHReleasePlanTimeline(workout: workout)
+
+                            Button {
+                                workoutPendingPremiumEdit = workout
+                                selectedWorkout = nil
+                            } label: {
+                                Label("Rediger økt", systemImage: "square.and.pencil")
+                                    .font(.subheadline.weight(.semibold))
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 15)
+                                    .foregroundStyle(.white)
+                                    .background(Color(red: 0.55, green: 0.40, blue: 0.22),
+                                                in: RoundedRectangle(cornerRadius: 15))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(20)
+                    }
+                    .background(Color(red: 0.985, green: 0.979, blue: 0.965).ignoresSafeArea())
+                    .navigationTitle("Øktoversikt")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Ferdig") { selectedWorkout = nil }
+                        }
+                    }
+                }
                 .environmentObject(session)
+            }
+        }
+        .sheet(item: $workoutPendingPremiumEdit) { workout in
+            if let planID = displayedPlan?.id {
+                SessionEditorView(planID: planID, workout: workout)
+                    .environmentObject(session)
             }
         }
         .confirmationDialog(
