@@ -637,7 +637,9 @@ struct ATHLTHTrainTodayPremiumView: View {
         let hasUnfinishedWorkout = sessions.contains {
             !$0.isExplicitRestDay && !completedIDs.contains($0.id)
         }
-        let visiblePrimaryID = !hasActiveWorkout && plan != nil && hasUnfinishedWorkout
+        // The live recorder replaces the main scheduled card. The same
+        // planned workout must not reappear under "Also today" while live.
+        let visiblePrimaryID = plan != nil && (hasActiveWorkout || hasUnfinishedWorkout)
             ? primaryWorkout?.id : nil
         let remaining = sessions.filter {
             !$0.isExplicitRestDay && $0.id != visiblePrimaryID
