@@ -1300,6 +1300,8 @@ struct ExerciseDetailView: View {
     @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
     @State private var detailTranslationConfig: TranslationSession.Configuration?
     @State private var showOriginalEnglish = false
+    @State private var galleryPage: Int? = 0
+    @State private var instructionsAsList = false
     @State private var languageStatus: LanguageAvailability.Status = .unsupported
 
     let entry: ExerciseLibraryEntry
@@ -1340,8 +1342,8 @@ struct ExerciseDetailView: View {
 
                 VStack(alignment: .leading, spacing: 5) {
                     Text(library.localizedExerciseName(currentEntry))
-                        .font(.system(size: 29, weight: .semibold, design: .rounded))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                         .font(.system(size: 31, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
                         .fixedSize(horizontal: false, vertical: true)
 
                     Text(
@@ -1354,7 +1356,7 @@ struct ExerciseDetailView: View {
                         .joined(separator: " · ")
                     )
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
                 }
 
                 if let summary = displayedSummary, !summary.isEmpty {
@@ -1475,12 +1477,7 @@ struct ExerciseDetailView: View {
             }
             .padding()
         }
-        .background(
-            ATHLTHPremiumCanvas(
-                accent:
-                    ATHLTHTheme.accent
-            )
-        )
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
         .navigationTitle(ATHLTHLocalization.choose(
             english: "Exercise", norwegian: "Øvelse"
         ))
@@ -1605,58 +1602,95 @@ struct ExerciseDetailView: View {
     }
 
     private var artwork: some View {
+        let hasPeakArtwork = currentEntry.imagePeakURL != nil &&
+            currentEntry.imagePeakURL != currentEntry.imageStartURL
         let hasMuscleArtwork = !currentEntry.exercise.primaryMuscles.isEmpty ||
             !currentEntry.exercise.secondaryMuscles.isEmpty
+        let numberOfPages = 1 + (hasPeakArtwork ? 1 : 0) + (hasMuscleArtwork ? 1 : 0)
+        let tileSize: CGFloat = 280
 
-        return VStack(spacing: 7) {
-            // Preserve the first two 160-point exercise images. The atlas is
-            // a third equally sized, swipeable tile rather than shrinking all
-            // three into unreadable thumbnails on smaller iPhones.
+        return VStack(alignment: .leading, spacing: 9) {
             ScrollView(.horizontal) {
-                HStack(spacing: 10) {
-                    ExerciseArtwork(entry: currentEntry, size: 160)
+                HStack(spacing: 11) {
+                    ExerciseArtwork(entry: currentEntry, size: tileSize)
+                        .id(0)
                         .accessibilityLabel(ATHLTHLocalization.choose(
                             english: "Exercise starting position",
                             norwegian: "Øvelsens startposisjon"
                         ))
-
-                    if let peakURL = currentEntry.imagePeakURL,
-                       peakURL != currentEntry.imageStartURL {
-                        peakExerciseArtwork(peakURL)
+                    if hasPeakArtwork, let peakURL = currentEntry.imagePeakURL {
+                        peakExerciseArtwork(peakURL, size: tileSize)
+                            .id(1)
                     }
-
                     if hasMuscleArtwork {
                         ExerciseMuscleGalleryTile(
                             primaryMuscles: currentEntry.exercise.primaryMuscles,
                             secondaryMuscles: currentEntry.exercise.secondaryMuscles,
-                            size: 160
+                            size: tileSize
                         )
+                        .id(hasPeakArtwork ? 2 : 1)
                     }
                 }
-                .padding(10)
+                .scrollTargetLayout()
+                .padding(.horizontal, 13)
+                .padding(.vertical, 13)
             }
             .scrollIndicators(.hidden)
-            .scrollBounceBehavior(.basedOnSize)
+            .scrollTargetBehavior(.viewAligned)
+            .scrollPosition(id: $galleryPage)
+            .frame(height: tileSize + 26)
 
-            if hasMuscleArtwork {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Swipe to see muscles used",
-                        norwegian: "Sveip for å se muskler i bruk"
-                    ),
-                    systemImage: "hand.draw"
-                )
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.horizontal, 12)
-                .padding(.bottom, 7)
+            HStack(spacing: 10) {
+                Text("\(min((galleryPage ?? 0) + 1, numberOfPages)) / \(numberOfPages)")
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                Spacer()
+                if hasMuscleArtwork {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Swipe for muscles used",
+                        norwegian: "Sveip for muskler i bruk"
+                    ), systemImage: "hand.draw")
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .lineLimit(1)
+                }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        galleryPage = max((galleryPage ?? 0) - 1, 0)
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .frame(width: 34, height: 34)
+                        .background(ATHLTHTrainDesign.paper, in: Circle())
+                }
+                .disabled((galleryPage ?? 0) == 0)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Previous image", norwegian: "Forrige bilde"
+                ))
+                Button {
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        galleryPage = min((galleryPage ?? 0) + 1, numberOfPages - 1)
+                    }
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .frame(width: 34, height: 34)
+                        .background(ATHLTHTrainDesign.paper, in: Circle())
+                }
+                .disabled((galleryPage ?? 0) >= numberOfPages - 1)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Next image", norwegian: "Neste bilde"
+                ))
             }
+            .foregroundStyle(ATHLTHTrainDesign.bronze)
+            .padding(.horizontal, 13)
+            .padding(.bottom, 12)
         }
         .athlthTrainPaper()
+        .onChange(of: currentEntry.id) { _, _ in galleryPage = 0 }
     }
 
-    private func peakExerciseArtwork(_ url: URL) -> some View {
+    private func peakExerciseArtwork(_ url: URL, size: CGFloat = 160) -> some View {
         Group {
             if url.isFileURL, let image = UIImage(contentsOfFile: url.path) {
                 Image(uiImage: image)
@@ -1673,9 +1707,9 @@ struct ExerciseDetailView: View {
                 }
             }
         }
-        .frame(width: 160, height: 160)
+        .frame(width: size, height: size)
         .background(ExerciseMuscleGalleryTile.skyBlue)
-        .clipShape(RoundedRectangle(cornerRadius: 20))
+         .clipShape(RoundedRectangle(cornerRadius: 20))
         .accessibilityLabel(ATHLTHLocalization.choose(
             english: "Exercise movement position",
             norwegian: "Øvelsens bevegelsesposisjon"
@@ -2546,7 +2580,7 @@ struct ExerciseMuscleGalleryTile: View {
             Text(ATHLTHLocalization.choose(
                 english: "Muscles used", norwegian: "Muskler i bruk"
             ))
-            .font(.system(size: 10, weight: .semibold))
+            .font(.system(size: size > 200 ? 13 : 10, weight: .semibold))
             .foregroundStyle(ATHLTHPlanDesign.ink)
             .lineLimit(1)
 
@@ -2558,12 +2592,12 @@ struct ExerciseMuscleGalleryTile: View {
                             isFront: front,
                             activationTint: ATHLTHPlanDesign.accent
                         )
-                        .frame(width: 57, height: 110)
+                        .frame(width: size * 0.36, height: size * 0.68)
                         Text(ATHLTHLocalization.choose(
                             english: front ? "Front" : "Back",
                             norwegian: front ? "Forside" : "Bakside"
                         ))
-                        .font(.system(size: 9, weight: .medium))
+                        .font(.system(size: size > 200 ? 11 : 9, weight: .medium))
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                 }
