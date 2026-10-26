@@ -52,6 +52,38 @@ final class StrengthWarmUpExerciseTests: XCTestCase {
         })
     }
 
+    func testWarmUpPhaseAndTimedPrescriptionSurvivePlanSerialization() throws {
+        var planned = exercise()
+        planned.targetKind = .time
+        planned.targetDurationSeconds = 45
+        planned.reps = nil
+        planned.setEntireExerciseWarmUp(true)
+        planned.workoutPhase = .warmup
+
+        let restored = try JSONDecoder().decode(
+            PlannedExercise.self, from: JSONEncoder().encode(planned)
+        )
+        XCTAssertEqual(restored.workoutPhase, .warmup)
+        XCTAssertTrue(restored.isWarmUpExercise)
+        XCTAssertEqual(restored.resolvedTargetKind, .time)
+        XCTAssertEqual(restored.resolvedSetTargets.map(\.durationSeconds),
+                       [45, 45, 45])
+    }
+
+    func testNinetyNinetyHoldIsTimedByDefault() {
+        let snapshot = ExerciseSnapshot(
+            name: "90/90 hold",
+            instructions: [],
+            primaryMuscles: ["Hip flexors"],
+            secondaryMuscles: [],
+            equipment: ["Bodyweight"],
+            imageURL: nil
+        )
+        XCTAssertEqual(snapshot.defaultStrengthTargetKind, .time)
+        XCTAssertTrue(StrengthTimedBodyweightDefaults.isBodyweightHold("90/90 hold"))
+        XCTAssertFalse(StrengthTimedBodyweightDefaults.isBodyweightHold("90/90 hip switches"))
+    }
+
     func testPartialWarmUpRemainsAWorkingExercise() {
         var planned = exercise()
         planned.setTargets = [
