@@ -87,12 +87,6 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         var id: String { label }
     }
 
-    private struct PacePoint: Identifiable {
-        let date: Date
-        let pace: Double
-        var id: Date { date }
-    }
-
     private struct LiftPoint: Identifiable {
         let name: String
         let month: Date
@@ -546,13 +540,16 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         }
     }
 
-    private var pacePoints: [PacePoint] {
+    private var pacePoints: [ATHLTHTrainProgressPaceChartView.Sample] {
         runs.compactMap { workout in
             guard let km = workout.distanceKilometers, km >= 0.5,
                   workout.duration > 0 else { return nil }
             let seconds = workout.duration / km
             guard (120.0...1_200.0).contains(seconds) else { return nil }
-            return PacePoint(date: workout.startDate, pace: seconds / 60)
+            return ATHLTHTrainProgressPaceChartView.Sample(
+                id: workout.id, date: workout.startDate,
+                minutesPerKilometer: seconds / 60
+            )
         }
         .sorted { $0.date < $1.date }
     }
@@ -566,30 +563,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                 if pacePoints.isEmpty {
                     emptyLine(tr("Record a run to see your pace trend.", "Registrer en løpeøkt for å se tempoutviklingen."))
                 } else {
-                    Chart(pacePoints) { point in
-                        LineMark(
-                            x: .value("Dato", point.date),
-                            y: .value("min/km", point.pace)
-                        )
-                        .interpolationMethod(.linear)
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .lineStyle(StrokeStyle(lineWidth: 2.3, lineCap: .round))
-                        PointMark(
-                            x: .value("Dato", point.date),
-                            y: .value("min/km", point.pace)
-                        )
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .symbolSize(20)
-                    }
-                    .chartXAxis {
-                        AxisMarks(values: .automatic(desiredCount: 4)) {
-                            AxisValueLabel(format: .dateTime.day().month(.abbreviated))
-                        }
-                    }
-                    .chartYAxis {
-                        AxisMarks(position: .leading)
-                    }
-                    .frame(height: 181)
+                    ATHLTHTrainProgressPaceChartView(samples: pacePoints)
                 }
             }
 
