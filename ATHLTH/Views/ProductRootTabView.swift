@@ -15110,16 +15110,12 @@ struct ATHLTHProgressView: View {
     private let canvas = Color(red: 0.965, green: 0.972, blue: 0.968)
 
     var body: some View {
-        let useImmersiveProgressHero =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
         return NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: green.opacity(0.60),
+                accent: ATHLTHTheme.premiumGold.opacity(0.18),
                 softTransition: true,
-                immersiveTransition: useImmersiveProgressHero,
-                scrollFadeTransition: true
+                immersiveTransition: false,
+                scrollFadeTransition: false
             ) {
                 Color.clear.frame(height: 1)
             } content: {
@@ -15588,36 +15584,35 @@ struct ATHLTHProgressView: View {
     }
 
     private var personalRecordsCard: some View {
-        let healthRecords = Array(personalRecords.prefix(2))
+        let healthRecords = Array((trainingScope == .strength ? [] : personalRecords).prefix(2))
         let strengthRecords = Array(
-            strengthWorkout.personalRecords
+            (trainingScope == .running ? [] : strengthWorkout.personalRecords)
                 .filter { $0.kind == .heaviestSet }
                 .prefix(2)
         )
         let totalRecordCount =
-            personalRecords.count +
-            strengthWorkout.personalRecords.count +
-            strengthWorkout.repPersonalRecords.count
+            (trainingScope == .strength ? 0 : personalRecords.count) +
+            (trainingScope == .running ? 0 : strengthWorkout.personalRecords.count + strengthWorkout.repPersonalRecords.count)
 
         return NavigationLink {
             ProgressPersonalRecordsView(
-                healthRecords: personalRecords,
+                healthRecords: trainingScope == .strength ? [] : personalRecords,
                 strengthRecords:
-                    strengthWorkout.personalRecords,
+                    trainingScope == .running ? [] : strengthWorkout.personalRecords,
                 repRecords:
-                    strengthWorkout.repPersonalRecords
+                    trainingScope == .running ? [] : strengthWorkout.repPersonalRecords
             )
         } label: {
             VStack(alignment: .leading, spacing: 13) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Personal Records")
+                        Text("Personlige rekorder")
                             .font(.headline)
                             .foregroundStyle(
                                 ATHLTHTheme.primaryText
                             )
 
-                        Text("Your verified best performances.")
+                        Text("Dine beste registrerte prestasjoner.")
                             .font(.caption2)
                             .foregroundStyle(.secondary)
                     }
@@ -15646,14 +15641,14 @@ struct ATHLTHProgressView: View {
                             .font(.title3)
                             .foregroundStyle(.secondary)
 
-                        Text("No records yet")
+                        Text("Ingen rekorder ennå")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(
                                 ATHLTHTheme.primaryText
                             )
 
                         Text(
-                            "ATHLTH will surface verified records from Apple Health and strength workouts you log in ATHLTH."
+                            "Rekorder vises når du har registrert treningsøkter."
                         )
                         .font(.system(size: 9))
                         .foregroundStyle(.secondary)
