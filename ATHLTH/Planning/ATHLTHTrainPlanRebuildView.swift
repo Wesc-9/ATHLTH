@@ -689,6 +689,28 @@ struct ATHLTHTrainPlanRebuildView: View {
                             }
                             if advancedMode {
                                 ATHLTHWorkoutPlanOutlineView(workout: workout, maxVisibleItems: Int.max)
+                                if editable {
+                                    Button {
+                                        workoutPendingFullEdit = workout
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Edit workout structure",
+                                                norwegian: "Rediger øktens oppbygging"
+                                            ),
+                                            systemImage: "square.and.pencil"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                        .frame(maxWidth: .infinity)
+                                        .padding(.vertical, 12)
+                                        .background(
+                                            ATHLTHTheme.champagneSoft,
+                                            in: RoundedRectangle(cornerRadius: 12)
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
                             }
                         }
                     }
