@@ -143,3 +143,5 @@ ATHLTH 1.9.3 build 101 — user-authorized TestFlight upload 2026-10-25. Require
 ATHLTH 1.9.4 build 102 — user-authorized TestFlight upload 2026-10-26, ATHLTH Alive prototype. Require successful same-commit iOS/Watch/Widget build, backend regressions, signing, archive verification and App Store Connect validation before upload.
 
 ATHLTH 1.9.4 build 102 — retry explicitly authorized 2026-10-26 after SwiftUI compile fixes for Strength, Home Map and Route Detail. Upload only after required signing and archive checks succeed.
+
+ATHLTH 1.9.4 build 102 — authorized retry after remaining Home Map/Route Swift compile fixes and GHCR rate-limit backoff on 2026-10-26. Require verified archive, signing and upload.
