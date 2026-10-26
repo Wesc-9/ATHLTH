@@ -127,6 +127,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @State private var equipment: EquipmentContext = .gym
     @State private var weeklyTimeBudgetMinutes = 240
+    @State private var advancedSessionMinutes = 45
     @State private var hasCompetitionDate = false
     @State private var competitionDate =
         Calendar.current.date(
@@ -416,6 +417,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     if step == .mode {
                         AnyView(modeContinueBar)
                     } else if step == .goal {
+                        AnyView(goalContinueBar)
+                    } else if step == .basics && mode == .advanced {
                         AnyView(goalContinueBar)
                     } else if step == .source {
                         AnyView(sourceContinueBar)
@@ -837,15 +840,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case .source:
             AnyView(sourceChoice)
         case .basics:
-            AnyView(wizardScroll(AnyView(
-                Group {
-                    if mode == .basic {
-                        AnyView(simpleBasicsStep)
-                    } else {
-                        AnyView(basicsStep)
-                    }
-                }
-            )))
+            if mode == .advanced {
+                AnyView(advancedScheduleStep)
+            } else {
+                AnyView(wizardScroll(AnyView(simpleBasicsStep)))
+            }
         case .profile:
             AnyView(wizardScroll(AnyView(profileStep)))
         case .week:
@@ -1088,8 +1087,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var modeContinueBar: some View {
         Button {
             if mode == .basic {
-                // Keep existing defaults for duration and schedule.
+                // The simple route is unchanged.
                 updateSimplePlanChoices()
+            } else {
+                // Start the advanced schedule with the approved 4-week, 45-minute preset.
+                // Resumed drafts bypass this button and retain their saved values.
+                if weekCount == 8 { weekCount = 4 }
+                weeklyTimeBudgetMinutes = advancedSessionMinutes * selectedDays.count
             }
             // The preselected running card must already affect the plan even
             // when the user presses Next without tapping a radio row.
@@ -2296,6 +2300,132 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
+    }
+
+
+    // Only advanced planning uses the new reference-led schedule screen.
+    // Basic's original short step intentionally stays unchanged.
+    private var advancedScheduleStep: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 13) {
+                sourceChoiceHeader
+
+                ATHLTHPlanAdvancedScheduleEntryView(
+                    startDate: $startDate,
+                    weekCount: $weekCount,
+                    selectedDays: selectedDays,
+                    minutesPerSession: advancedSessionMinutes,
+                    onSelectFrequency: { count in
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16)) {
+                            selectAdvancedFrequency(count)
+                        }
+                    },
+                    onSelectMinutes: { minutes in
+                        advancedSessionMinutes = minutes
+                        weeklyTimeBudgetMinutes = minutes * selectedDays.count
+                    },
+                    onToggleDay: { day in
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.16)) {
+                            toggleAdvancedTrainingDay(day)
+                        }
+                    }
+                )
+
+                if let conflictingPlan {
+                    conflictCard(conflictingPlan)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Another training plan overlaps this period. Change the start date or length to continue.",
+                        norwegian: "En annen treningsplan overlapper denne perioden. Endre startdato eller varighet for å fortsette."
+                    ))
+                    .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+
+                DisclosureGroup {
+                    VStack(alignment: .leading, spacing: 12) {
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Plan name (optional)", norwegian: "Navn på planen (valgfritt)"
+                            ),
+                            text: $title
+                        )
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: title) { _, value in
+                            if value.count > 40 { title = String(value.prefix(40)) }
+                        }
+
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "Plan description (optional)", norwegian: "Planbeskrivelse (valgfritt)"
+                            ),
+                            text: $planSummary, axis: .vertical
+                        )
+                        .lineLimit(2...4)
+                        .textFieldStyle(.roundedBorder)
+                        .onChange(of: planSummary) { _, value in
+                            if value.count > 240 { planSummary = String(value.prefix(240)) }
+                        }
+
+                        HStack(spacing: 10) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Visibility", norwegian: "Synlighet"
+                            ))
+                            .font(.subheadline)
+                            Spacer(minLength: 0)
+                            Picker(
+                                ATHLTHLocalization.choose(english: "Visibility", norwegian: "Synlighet"),
+                                selection: $visibility
+                            ) {
+                                ForEach(ProfileVisibility.allCases) { item in
+                                    Text(item.title).tag(item)
+                                }
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                        }
+                    }
+                    .padding(.top, 9)
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "More options (optional)", norwegian: "Flere valg (valgfritt)"
+                        ),
+                        systemImage: "slider.horizontal.3"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+                .padding(13)
+                .background(.white.opacity(0.83), in: RoundedRectangle(cornerRadius: 16))
+            }
+            .padding(.horizontal, 18)
+            .padding(.top, 10)
+            .padding(.bottom, 25)
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+    }
+
+    private func selectAdvancedFrequency(_ count: Int) {
+        guard (1...7).contains(count) else { return }
+        if selectedDays.count != count {
+            selectedDays = balancedDays(count: count)
+        }
+        sessionsPerWeek = count
+        weeklyTimeBudgetMinutes = advancedSessionMinutes * count
+    }
+
+    private func toggleAdvancedTrainingDay(_ day: Int) {
+        guard (1...7).contains(day) else { return }
+        if selectedDays.contains(day) {
+            guard selectedDays.count > 1 else { return }
+            selectedDays.remove(day)
+        } else {
+            selectedDays.insert(day)
+        }
+        sessionsPerWeek = selectedDays.count
+        weeklyTimeBudgetMinutes = advancedSessionMinutes * selectedDays.count
     }
 
     private var basicsStep: some View {
@@ -6356,6 +6486,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             if let minutes = draft.weeklyTimeBudgetMinutes {
                 weeklyTimeBudgetMinutes = minutes
+                let perSession = Double(minutes) / Double(max(1, selectedDays.count))
+                advancedSessionMinutes = min(180, max(5, Int((perSession / 5).rounded()) * 5))
             }
             workoutKindOverridesByDay = (draft.workoutKindsByDay ?? [:])
                 .compactMapValues(WorkoutKind.init(rawValue:))
