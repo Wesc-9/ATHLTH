@@ -31,3 +31,4 @@
 - Preserve existing Quick Train recording and launch engines (running, walking and strength) while improving training plans.
 - Preserve working behavior; prefer incremental, reversible changes with fast launch, scrolling and rendering.
 - TestFlight uploads require an explicit user request for the active build.
+- SwiftUI development/reviews: use the project-pinned **SwiftUI Pro 2.0.0** skill in `.agents/skills/swiftui-pro/SKILL.md`, including the relevant `references/` files (not a web dependency). Upstream: `twostraws/SwiftUI-Agent-Skill` commit `1eac100257af9068d5f041c1a1540b1790233716` (MIT; see the skill's `LICENSE`). Apply suggestions only when compatible with ATHLTH's existing deployment targets, UX, architecture and explicit change scope; do not perform unrelated refactors.
