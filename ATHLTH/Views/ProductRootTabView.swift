@@ -6470,7 +6470,9 @@ struct ATHLTHTrainView: View {
 
     private func refreshTrainDayIfChanged() {
         let today = Calendar.current.startOfDay(for: .now)
-        guard today != displayedTrainDay else { return }
+        guard ATHLTHTrainDayChangePolicy.needsRefresh(
+            displayedDay: displayedTrainDay, now: today
+        ) else { return }
         displayedTrainDay = today
         session.refreshActivePlanForToday()
     }
