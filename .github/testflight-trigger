@@ -150,3 +150,5 @@ ATHLTH 1.9.4 build 102 — user-authorized retry on 2026-10-26 after Home Map co
 
 ATHLTH 1.9.5 build 103 — user-approved fresh version and TestFlight retry 2026-10-26 after Explore optional callback compiler correction; require archive, signing, backend and upload verification.
 ATHLTH 1.9.6 build 104 — explicit user-authorized TestFlight upload 2026-10-26; fixed undecodable PlanGoalHero catalog JPEG. Run same-commit iOS XCTest and backend gates, signed iPhone/Apple Watch/Widget archive validation and App Store Connect upload. Keep release/v1.9.6 active; do not implement the postponed Training Week concept yet.
+
+ATHLTH 1.9.6 build 104 — retry explicitly authorized TestFlight upload after correcting legacy training-plan navigation tests; 2026-10-26. Verify green same-commit iOS XCTest and backend regressions, then signed iPhone/Watch/Widget IPA, App Store Connect upload. Do not implement postponed training-week screen.
