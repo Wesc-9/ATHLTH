@@ -242,6 +242,39 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
         XCTAssertEqual(movingAway?.completionFraction, 0)
     }
 
+    func testTodayWeightGoalNeverFallsBackToMilestonePercentage() {
+        let weight = GoalTarget(
+            metric: .bodyWeightKilograms, targetValue: 71,
+            unit: "kg", baselineValue: 78
+        )
+        let milestone = GoalMilestone(
+            title: "Halfway", targetDescription: "First milestone",
+            completedAt: .now
+        )
+        let goal = ATHLTHGoal(
+            title: "Reach 71 kg", category: .body,
+            dataSource: .appleHealth, target: weight,
+            milestones: [milestone, GoalMilestone(
+                title: "Goal", targetDescription: "Final milestone"
+            )]
+        )
+        XCTAssertEqual(goal.progress, 0.5)
+        XCTAssertNil(ATHLTHTrainWeightGoalProgress.visibleFraction(
+            goal: goal, latestWeightKilograms: nil
+        ), "A 50% milestone status cannot be presented as measured body weight")
+        XCTAssertEqual(ATHLTHTrainWeightGoalProgress.visibleFraction(
+            goal: goal, latestWeightKilograms: 73.8
+        ) ?? -1, 0.6, accuracy: 0.0001)
+
+        let nonBodyGoal = ATHLTHGoal(
+            title: "Strength", category: .strength,
+            dataSource: .manual, milestones: goal.milestones
+        )
+        XCTAssertEqual(ATHLTHTrainWeightGoalProgress.visibleFraction(
+            goal: nonBodyGoal, latestWeightKilograms: nil
+        ), 0.5)
+    }
+
     func testWeightGoalDoesNotInventProgressWhenHealthDataOrBaselineIsMissing() {
         let missingBaseline = GoalTarget(
             metric: .bodyWeightKilograms, targetValue: 71,
