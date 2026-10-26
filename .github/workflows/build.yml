@@ -50,6 +50,7 @@ on:
       - release/v1.9.2
       - release/v1.9.3
       - release/v1.9.4
+      - release/v1.9.5
       - fix/v1.4.2-swift6-release
   pull_request:
     branches:
