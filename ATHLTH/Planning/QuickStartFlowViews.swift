@@ -3221,39 +3221,39 @@ private struct ATHLTHQuickWatchLaunchNotice: View {
     let message: String
     let onDismiss: () -> Void
 
+    private var compactMessage: String {
+        let normalized = message.lowercased()
+        if normalized.contains("locked") || normalized.contains("unlock")
+            || normalized.contains("låst") || normalized.contains("lås opp") {
+            return ATHLTHLocalization.choose(
+                english: "Unlock Apple Watch and try again.",
+                norwegian: "Lås opp Apple Watch og prøv igjen."
+            )
+        }
+        return message
+    }
+
     var body: some View {
-        HStack(alignment: .top, spacing: 11) {
-            Image(systemName: "applewatch")
-                .foregroundStyle(ATHLTHTrainDesign.bronze)
-            VStack(alignment: .leading, spacing: 5) {
-                Text(ATHLTHLocalization.choose(
-                    english: "Workout did not start",
-                    norwegian: "Økten ble ikke startet"
-                ))
-                .font(.subheadline.weight(.semibold))
-                Text(message)
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(ATHLTHLocalization.choose(
-                    english: "Your choices are preserved. Unlock Apple Watch and try again.",
-                    norwegian: "Valgene dine er bevart. Lås opp Apple Watch og prøv igjen."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
-            }
+        HStack(spacing: 7) {
+            Image(systemName: "exclamationmark.circle")
+                .accessibilityHidden(true)
+            Text(compactMessage)
+                .lineLimit(1)
+                .minimumScaleFactor(0.83)
+                .accessibilityLabel(message)
             Spacer(minLength: 0)
             Button(action: onDismiss) {
                 Image(systemName: "xmark")
-                    .font(.caption.weight(.semibold))
-                    .frame(width: 28, height: 28)
+                    .font(.system(size: 10, weight: .semibold))
+                    .frame(width: 24, height: 24)
             }
             .accessibilityLabel(ATHLTHLocalization.choose(
                 english: "Dismiss message", norwegian: "Lukk meldingen"
             ))
         }
-        .foregroundStyle(ATHLTHTrainDesign.ink)
-        .padding(14)
-        .athlthTrainPaper()
+        .font(.caption.weight(.medium))
+        .foregroundStyle(ATHLTHTrainDesign.bronze)
+        .frame(height: 27)
     }
 }
 
