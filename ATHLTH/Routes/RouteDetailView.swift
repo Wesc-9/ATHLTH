@@ -145,7 +145,7 @@ struct RouteDetailView: View {
         return index + 1
     }
 
-    var body: some View {
+    private var routePrimaryContent: some View {
         ScrollView {
             LazyVStack(spacing: 16) {
                 mapCard
@@ -223,6 +223,10 @@ struct RouteDetailView: View {
                 }
             }
         }
+    }
+
+    var body: some View {
+        routePrimaryContent
         .task(id: currentRoute.id) {
             await prepareRouteData()
         }
