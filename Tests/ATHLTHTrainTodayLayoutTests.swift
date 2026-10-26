@@ -333,6 +333,49 @@ final class ATHLTHTrainTodayLayoutTests: XCTestCase {
         ))
     }
 
+    func testTodayAgendaDoesNotDuplicateMainWorkoutDuringLiveRecording() {
+        func workout(_ name: String) -> PlannedSession {
+            PlannedSession(
+                id: UUID(), title: name, kind: .strength,
+                scheduledStart: .now, durationMinutes: 45,
+                targetDistanceKilometers: nil,
+                targetPaceSecondsPerKilometer: nil,
+                routeID: nil, exercises: [], notes: nil
+            )
+        }
+        let primary = workout("Upper body")
+        let extra = workout("Intervals")
+        let sessions = [primary, extra]
+
+        let active = ATHLTHTrainTodayAgendaPolicy.remainingSessions(
+            sessions, primaryWorkoutID: primary.id, completedIDs: [],
+            hasPlan: true, hasActiveWorkout: true
+        )
+        XCTAssertEqual(active.map(\.id), [extra.id],
+                       "The live card replaces the primary session, not the other planned work")
+
+        let scheduled = ATHLTHTrainTodayAgendaPolicy.remainingSessions(
+            sessions, primaryWorkoutID: primary.id, completedIDs: [],
+            hasPlan: true, hasActiveWorkout: false
+        )
+        XCTAssertEqual(scheduled.map(\.id), [extra.id])
+
+        let noPlan = ATHLTHTrainTodayAgendaPolicy.remainingSessions(
+            sessions, primaryWorkoutID: primary.id, completedIDs: [],
+            hasPlan: false, hasActiveWorkout: true
+        )
+        XCTAssertEqual(noPlan.count, 2)
+
+        // After all planned sessions finish, the completed-day card is shown.
+        // Their details remain reachable from the secondary agenda.
+        let completed = ATHLTHTrainTodayAgendaPolicy.remainingSessions(
+            sessions, primaryWorkoutID: primary.id,
+            completedIDs: [primary.id, extra.id],
+            hasPlan: true, hasActiveWorkout: false
+        )
+        XCTAssertEqual(completed.count, 2)
+    }
+
     @MainActor
     func testTodaySurfaceFitsCompactPhoneWidths() {
         let plan = TrainingPlan(
