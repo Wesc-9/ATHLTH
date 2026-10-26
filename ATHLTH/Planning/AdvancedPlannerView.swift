@@ -6477,7 +6477,37 @@ struct SessionEditorView: View {
                     if let index = plannedExercises.firstIndex(
                         where: { $0.id == updated.id }
                     ) {
+                        let old = plannedExercises[index]
                         plannedExercises[index] = updated
+                        let oldPhase = old.workoutPhase ??
+                            (old.isWarmUpExercise ? WorkoutPhaseKind.warmup : .main)
+                        let newPhase = updated.workoutPhase ??
+                            (updated.isWarmUpExercise ? WorkoutPhaseKind.warmup : .main)
+                        if oldPhase != newPhase {
+                            // Match the section the user selected, preserving
+                            // data, IDs, sets, durations and existing order
+                            // within each section.
+                            let moved = plannedExercises.remove(at: index)
+                            let destination: Int
+                            switch newPhase {
+                            case .warmup:
+                                destination = plannedExercises.firstIndex {
+                                    ($0.workoutPhase ??
+                                     ($0.isWarmUpExercise ? WorkoutPhaseKind.warmup : .main))
+                                        != .warmup
+                                } ?? plannedExercises.count
+                            case .main, .recovery:
+                                destination = plannedExercises.firstIndex {
+                                    let phase = $0.workoutPhase ??
+                                        ($0.isWarmUpExercise ? WorkoutPhaseKind.warmup : .main)
+                                    return phase != .warmup
+                                } ?? plannedExercises.count
+                            case .cooldown:
+                                destination = plannedExercises.count
+                            }
+                            plannedExercises.insert(moved, at: destination)
+                            normalizeSupersetGroups()
+                        }
                     }
                     exerciseBeingEdited = nil
                 }
@@ -10770,7 +10800,8 @@ struct PlannedExerciseEditorView: View {
                     updated.setType = warmUp ? .warmUp : .work
                     return updated
                 }
-                useIndividualSetTargets = true
+                // Preserve the selected "Same for all" / "Per set" mode.
+                // Warm-up is a phase choice, not a mode-switch gesture.
             }
         )
     }
@@ -13067,6 +13098,7 @@ struct PlannedExerciseEditorView: View {
     }
 
     private func seedIndividualTargetsFromShared() {
+        let preserveWarmUp = entireWarmUpBinding.wrappedValue
         individualSetTargets =
             (0..<max(sets, 1))
                 .map { _ in
@@ -13075,18 +13107,14 @@ struct PlannedExerciseEditorView: View {
 
                     return PlannedExerciseSetTarget(
                         reps: source.reps,
-                        durationSeconds:
-                            source.durationSeconds,
-                        weightKilograms:
-                            source.weightKilograms,
-                        resistanceLevel:
-                            source.resistanceLevel,
-                        restSeconds:
-                            source.restSeconds,
-                        targetRPE:
-                            source.targetRPE,
-                        targetRIR:
-                            source.targetRIR
+                        durationSeconds: source.durationSeconds,
+                        weightKilograms: source.weightKilograms,
+                        resistanceLevel: source.resistanceLevel,
+                        restSeconds: source.restSeconds,
+                        targetRPE: source.targetRPE,
+                        targetRIR: source.targetRIR,
+                        isWarmUp: preserveWarmUp,
+                        setType: preserveWarmUp ? .warmUp : .work
                     )
                 }
     }
@@ -13339,7 +13367,16 @@ struct PlannedExerciseEditorView: View {
             updated.restSeconds =
                 first.restSeconds
         } else {
-            updated.setTargets = nil
+            // Shared prescriptions can also belong to Warm-up. Persist the
+            // phase on every set without forcing the UI into per-set editing.
+            updated.setTargets = entireWarmUpBinding.wrappedValue
+                ? (0..<max(sets, 1)).map { _ in
+                    var target = sharedSetTarget()
+                    target.isWarmUp = true
+                    target.setType = .warmUp
+                    return target
+                }
+                : nil
             updated.reps =
                 targetKind == .reps
                     ? reps
