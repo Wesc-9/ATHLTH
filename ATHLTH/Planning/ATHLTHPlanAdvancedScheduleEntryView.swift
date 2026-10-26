@@ -59,7 +59,8 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
             NavigationStack {
                 List {
                     Section {
-                        ForEach(weekdays, id: \.0) { weekday in
+                        ForEach(0..<weekdays.count, id: \.self) { index in
+                            let weekday = weekdays[index]
                             HStack(spacing: 12) {
                                 Image(systemName: selectedDays.contains(weekday.0)
                                       ? "figure.run" : "moon.stars")
@@ -327,7 +328,8 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
                          tr("Which days will you train?", "Hvilke dager vil du trene?"),
                          tr("Other days become rest days", "Resten settes som hviledager"))
             HStack(spacing: 5) {
-                ForEach(weekdays, id: \.0) { item in
+                ForEach(0..<weekdays.count, id: \.self) { index in
+                    let item = weekdays[index]
                     let chosen = selectedDays.contains(item.0)
                     Button { onToggleDay(item.0) } label: {
                         Text(tr(item.1, item.2))
