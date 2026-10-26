@@ -15192,6 +15192,9 @@ struct ATHLTHProgressView: View {
         let workoutCount = trainingScope == .all
             ? (progressSnapshot?.workoutCount ?? (runs.count + lifts.count))
             : (trainingScope == .running ? runs.count : lifts.count)
+        let activeDayCount = trainingScope == .all
+            ? (progressSnapshot?.activeWorkoutDays.count ?? 0)
+            : Set(runs.map { Calendar.current.startOfDay(for: $0.startDate) }).count
         let duration = trainingScope == .all
             ? (progressSnapshot?.trainingDuration ?? (runDuration + liftDuration))
             : (trainingScope == .running ? runDuration : liftDuration)
@@ -15206,9 +15209,7 @@ struct ATHLTHProgressView: View {
             (trainingScope == .strength ? "Arbeidssett" : "Aktive dager",
              trainingScope == .strength
                  ? "\(lifts.reduce(0) { $0 + $1.totalWorkingSets })"
-                 : "\(trainingScope == .all
-                     ? (progressSnapshot?.activeWorkoutDays.count ?? 0)
-                     : Set(runs.map { Calendar.current.startOfDay(for: $0.startDate) }).count)",
+                 : "\(activeDayCount)",
              "chart.bar")
         ]
         return VStack(alignment: .leading, spacing: 13) {
