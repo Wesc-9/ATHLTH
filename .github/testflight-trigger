@@ -139,3 +139,5 @@ ATHLTH 1.9.0 build 97 — user-authorized TestFlight upload 2026-10-24. Deploy o
 ATHLTH 1.9.1 build 98 — explicitly user-authorized TestFlight upload 2026-10-24. Include latest strength completion/recent activity shared premium artwork, Home header weather and icon refinements, per-second Dynamic Island anchored timer, Watch hybrid strength/treadmill interval improvements. Require the same-commit Build ATHLTH XCTest and backend regression gates, signed iPhone/Watch/Widget archive and App Store Connect validation. Keep release/v1.9.1 active; do not lock or merge main.
 ATHLTH 1.9.2 build 100 TestFlight request 2026-10-25 - validated gated pipeline
 ATHLTH 1.9.3 build 101 — user-authorized TestFlight upload 2026-10-25. Require successful same-commit Build ATHLTH and backend regressions, validated signed iOS/Watch/Widget archive, then upload to App Store Connect. Keep the version active; do not lock.
+
+ATHLTH 1.9.4 build 102 — user-authorized TestFlight upload 2026-10-26, ATHLTH Alive prototype. Require successful same-commit iOS/Watch/Widget build, backend regressions, signing, archive verification and App Store Connect validation before upload.
