@@ -37,7 +37,7 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
         VStack(alignment: .leading, spacing: 13) {
             hero
             frequencyCard
-            durationCard
+            // Session duration is chosen per workout, not as a plan-wide limit.
 
             if dynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 12) {
@@ -394,11 +394,13 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
                 Rectangle().fill(rule.opacity(0.4)).frame(width: 0.6, height: 46)
                 overviewValue("dumbbell", "\(selectedDays.count)", tr("per week", "per uke"))
                 Rectangle().fill(rule.opacity(0.4)).frame(width: 0.6, height: 46)
-                overviewValue("clock", "\(minutesPerSession)", "min")
-                Rectangle().fill(rule.opacity(0.4)).frame(width: 0.6, height: 46)
                 overviewValue("list.bullet", "\(weekCount * selectedDays.count)",
                               tr("total sessions", "totalt"))
             }
+            Text(tr("Set the duration for each workout when you build it.",
+                    "Varigheten bestemmer du når du bygger hver enkelt økt."))
+                .font(.system(size: 10))
+                .foregroundStyle(muted)
         }
     }
 
