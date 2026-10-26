@@ -1623,60 +1623,77 @@ struct ATHLTHTrainTodayPremiumView: View {
     private func activePlanSection(_ plan: TrainingPlan) -> some View {
         let progress = min(max(completionFraction, 0), 1)
         return Button(action: onOpenPlan) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 12) {
-                    Image(systemName: "calendar")
-                        .font(.system(size: 21, weight: .medium))
-                        .foregroundStyle(champagne)
-                        .frame(width: 50, height: 50)
-                        .background(ATHLTHTrainDesign.paleGold.opacity(0.52),
-                                    in: RoundedRectangle(cornerRadius: 16))
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(alignment: .center, spacing: 13) {
+                    Image("GoalMountain")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 86, height: 94)
+                        .clipShape(RoundedRectangle(cornerRadius: 15, style: .continuous))
+                        .accessibilityHidden(true)
 
-                    VStack(alignment: .leading, spacing: 3) {
+                    VStack(alignment: .leading, spacing: 5) {
                         Text(tr("ACTIVE PLAN", "AKTIV PLAN"))
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.6)
-                            .foregroundStyle(muted)
+                            .font(.caption2.weight(.semibold))
+                            .tracking(1.2)
+                            .foregroundStyle(champagne)
+
                         Text(plan.title)
-                            .font(.system(size: 19, weight: .medium, design: .serif))
+                            .font(.system(.title3, design: .serif).weight(.semibold))
                             .foregroundStyle(ink)
+                            .fixedSize(horizontal: false, vertical: true)
                             .lineLimit(2)
+
                         Text(planPosition)
                             .font(.caption)
                             .foregroundStyle(muted)
-                            .lineLimit(1)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(2)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                    Text("\(Int((progress * 100).rounded()))%")
-                        .font(.subheadline.weight(.semibold))
-                        .monospacedDigit()
-                        .foregroundStyle(ink)
-
                     Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(muted)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(champagne)
+                        .accessibilityHidden(true)
                 }
 
-                GeometryReader { geometry in
-                    Capsule()
-                        .fill(hairline.opacity(0.5))
-                        .overlay(alignment: .leading) {
-                            Capsule()
-                                .fill(champagne)
-                                .frame(width: geometry.size.width * progress)
-                        }
+                HStack(spacing: 10) {
+                    GeometryReader { geometry in
+                        Capsule()
+                            .fill(ATHLTHTrainDesign.paleGold.opacity(0.6))
+                            .overlay(alignment: .leading) {
+                                Capsule()
+                                    .fill(champagne)
+                                    .frame(width: geometry.size.width * progress)
+                            }
+                    }
+                    .frame(height: 6)
+                    Text("\(Int((progress * 100).rounded()))%")
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(ink)
                 }
-                .frame(height: 5)
-                .padding(.leading, 62)
+                .padding(.leading, 99)
             }
             .padding(15)
-            .athlthTrainPaper()
-            .contentShape(Rectangle())
+            .background(
+                Color.white.opacity(0.96),
+                in: RoundedRectangle(cornerRadius: 23, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 23, style: .continuous)
+                    .strokeBorder(hairline.opacity(0.45), lineWidth: 0.7)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: ATHLTHTrainDesign.ink.opacity(0.05), radius: 10, y: 4)
+            .contentShape(RoundedRectangle(cornerRadius: 23))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tr("Active plan", "Aktiv plan") +
-                            ": " + plan.title + ", \(Int((progress * 100).rounded()))%")
+                            ": " + plan.title + ", " + planPosition +
+                            ", \(Int((progress * 100).rounded()))%")
+        .accessibilityHint(tr("Open the training plan",
+                              "Åpner treningsplanen"))
     }
 
     private func detailLabel(icon: String, text: String) -> some View {
