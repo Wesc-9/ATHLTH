@@ -9876,6 +9876,11 @@ struct SessionEditorView: View {
 
     private func saveSession() {
         guard canAdd, !isSaving else { return }
+        // Enforce valid consecutive supersets before creating a persisted
+        // session. This also covers edits restored from older drafts.
+        if pendingInvitationWorkout == nil {
+            normalizeSupersetGroups()
+        }
         let workout = pendingInvitationWorkout ?? composeSession()
 
         // Marketplace proposals only prepare a workout; they must not
