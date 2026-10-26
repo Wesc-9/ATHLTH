@@ -43,7 +43,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         var id: Self { self }
         var title: String {
             switch self {
-            case .general: return ATHLTHLocalization.choose(english: "General", norwegian: "Generelt")
+            case .general: return ATHLTHLocalization.choose(english: "All training", norwegian: "All trening")
             case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
             case .strength: return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
             }
@@ -331,9 +331,12 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                         .font(.caption.weight(.semibold))
                         .tracking(1.5)
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    Text(area.title)
-                        .font(.system(.largeTitle, design: .serif))
+                    Text(tr("Progress", "Fremdrift"))
+                        .font(.system(size: 38, weight: .regular, design: .serif))
                         .foregroundStyle(ink)
+                    Text(tr("Your development, in one place", "Din utvikling, samlet på ett sted"))
+                        .font(.caption)
+                        .foregroundStyle(muted)
                 }
                 Spacer(minLength: 8)
                 Menu {
@@ -369,31 +372,30 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         }
     }
     private var areaPicker: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 3) {
             ForEach(Area.allCases) { selection in
                 Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.20)) {
                         area = selection
                     }
                 } label: {
                     Text(selection.title)
-                        .font(.subheadline.weight(area == selection ? .semibold : .medium))
-                        .foregroundStyle(area == selection ? ATHLTHTrainDesign.bronze : muted)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .padding(.vertical, 14)
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                        .overlay(alignment: .bottom) {
-                            Rectangle()
-                                .fill(area == selection ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.rule)
-                                .frame(height: area == selection ? 2 : 0.5)
-                        }
-                        .contentShape(Rectangle())
+                        .font(.system(size: 13, weight: area == selection ? .semibold : .medium))
+                        .foregroundStyle(area == selection ? Color.white : ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(
+                            area == selection ? ATHLTHTheme.accentDeep : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 13)
+                        )
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(area == selection ? .isSelected : [])
             }
         }
+        .padding(4)
+        .background(ATHLTHTheme.champagneSoft, in: RoundedRectangle(cornerRadius: 17))
     }
     private var activeStats: [Stat] {
         switch area {
@@ -422,29 +424,71 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
     }
 
     private var statsCard: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: metricWidth), alignment: .leading)],
-                  alignment: .leading, spacing: 20) {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
             ForEach(activeStats) { item in
-                VStack(alignment: .leading, spacing: 8) {
-                    ATHLTHTrainMetricTile(
-                        title: item.label,
-                        value: isHistoryLoading && area != .strength ? "—" : item.value,
-                        symbol: item.icon)
+                VStack(alignment: .leading, spacing: 11) {
+                    Image(systemName: item.icon)
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(isHistoryLoading && area != .strength ? "—" : item.value)
+                        .font(.system(size: 27, weight: .medium, design: .serif))
+                        .foregroundStyle(ink)
+                        .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.68)
+                    Text(item.label)
+                        .font(.caption)
+                        .foregroundStyle(muted)
                     if !isHistoryLoading, let change = item.change, change.isFinite {
-                        Label(String(format: "%+.0f%%", change),
-                              systemImage: change >= 0 ? "arrow.up.right" : "arrow.down.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(change >= 0 ? positive : muted)
+                        Text(String(format: "%+.0f%%", change))
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
                     }
+                }
+                .frame(maxWidth: .infinity, minHeight: 112, alignment: .leading)
+                .padding(15)
+                .background(Color.white, in: RoundedRectangle(cornerRadius: 19))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 19)
+                        .stroke(ATHLTHTheme.premiumGold.opacity(0.2), lineWidth: 0.8)
                 }
                 .accessibilityElement(children: .combine)
             }
         }
-        .padding(18)
-        .referenceProgressCard()
     }
+    private var generalTrainingTrend: some View {
+        section(
+            title: tr("Training development", "Treningsutvikling"),
+            subtitle: tr("Recorded training hours by period", "Registrerte treningstimer per periode")
+        ) {
+            if let snapshot, !snapshot.buckets.isEmpty {
+                Chart(snapshot.buckets) { bucket in
+                    AreaMark(
+                        x: .value("Dato", bucket.startDate),
+                        y: .value("Timer", bucket.trainingDuration / 3_600)
+                    )
+                    .foregroundStyle(ATHLTHTheme.champagneSoft.opacity(0.7))
+                    LineMark(
+                        x: .value("Dato", bucket.startDate),
+                        y: .value("Timer", bucket.trainingDuration / 3_600)
+                    )
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                }
+                .chartYAxis { AxisMarks(position: .leading) }
+                .frame(height: 185)
+            } else {
+                emptyLine(tr(
+                    "Recorded sessions will appear in your trend.",
+                    "Registrerte økter vises i utviklingsgrafen."
+                ))
+            }
+        }
+    }
+
     private var generalContent: some View {
         VStack(spacing: 12) {
+            generalTrainingTrend
             section(
                 title: tr("Body & health", "Kropp & helse"),
                 subtitle: tr("Latest health data · readiness is an estimate", "Siste helsedata · dagsform er et estimat")
