@@ -22,7 +22,7 @@ struct HomeDailyRecommendationCard: View {
                     Image(systemName: "sparkles")
                         .font(.system(size: 12, weight: .medium))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .accessibilityHidden()
+                        .accessibilityHidden(true)
                 }
 
                 HStack(alignment: .top, spacing: 8) {
@@ -31,7 +31,7 @@ struct HomeDailyRecommendationCard: View {
                         .foregroundStyle(ATHLTHTheme.accentDeep)
                         .frame(width: 32, height: 32)
                         .background(ATHLTHTheme.champagneSoft, in: Circle())
-                        .accessibilityHidden()
+                        .accessibilityHidden(true)
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(advice.title)
@@ -57,7 +57,7 @@ struct HomeDailyRecommendationCard: View {
                     Image(systemName: "chevron.right")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .accessibilityHidden()
+                        .accessibilityHidden(true)
                 }
             }
             .padding(11)
