@@ -79,6 +79,8 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var editingTrainingPlaceWorkout: WorkoutDestination?
     @State private var selectedDayID: UUID?
     @State private var selectedWorkoutID: UUID?
+    @State private var collapsedWorkoutCards: Set<UUID> = []
+    @State private var collapsedWorkoutPhases: Set<String> = []
     @State private var queuedLaunchPlanID: UUID?
     @State private var queuedLaunchWorkout: PlannedSession?
     @State private var deletingWorkout: PlannedSession?
@@ -353,29 +355,30 @@ struct ATHLTHTrainPlanPremiumView: View {
             HStack(alignment: .center, spacing: 10) {
                 Image(systemName: symbol)
                     .font(.system(size: 18, weight: .medium))
-                    .frame(width: 26)
+                    .foregroundStyle(warmGold)
+                    .frame(width: 33, height: 33)
+                    .background(soft, in: Circle())
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(title).font(.subheadline.weight(.semibold))
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold, design: .serif))
+                        .foregroundStyle(graphite)
                     Text(subtitle)
-                        .font(.caption2)
-                        .opacity(0.75)
+                        .font(.system(size: 10))
+                        .foregroundStyle(secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 Spacer(minLength: 0)
-                if selected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 15))
-                }
+                Image(systemName: "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(warmGold)
             }
-            .foregroundStyle(selected ? .white : graphite)
-            .padding(13)
+            .padding(11)
             .frame(maxWidth: .infinity, minHeight: 70)
-            .background(
-                selected ? graphite : Color.white,
-                in: RoundedRectangle(cornerRadius: 16)
-            )
+            .background(.white, in: RoundedRectangle(cornerRadius: 16))
             .overlay {
                 RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(selected ? Color.clear : line, lineWidth: 0.8)
+                    .strokeBorder(selected ? warmGold.opacity(0.72) : line,
+                                  lineWidth: selected ? 1.1 : 0.8)
             }
         }
         .buttonStyle(.plain)
@@ -691,6 +694,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                     referenceSessionCard(
                         workout, day: day, plan: plan,
                         expanded: (selectedWorkoutID ?? workouts[0].id) == workout.id
+                            && !collapsedWorkoutCards.contains(workout.id)
                     )
                 }
             }
@@ -714,7 +718,14 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .frame(width: 42, height: 42)
                     .background(soft, in: Circle())
                 Button {
-                    selectedWorkoutID = workout.id
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                        if expanded {
+                            collapsedWorkoutCards.insert(workout.id)
+                        } else {
+                            collapsedWorkoutCards.remove(workout.id)
+                            selectedWorkoutID = workout.id
+                        }
+                    }
                 } label: {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(workout.title)
@@ -766,6 +777,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .frame(width: 34, height: 44)
                 }
                 .accessibilityLabel(tr("Workout actions", "Økthandlinger"))
+                Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(warmGold)
+                    .accessibilityHidden(true)
             }
             if expanded {
                 referenceWorkoutPhases(workout, day: day, plan: plan)
@@ -815,17 +830,35 @@ struct ATHLTHTrainPlanPremiumView: View {
         let title = phaseIndex == 0 ? tr("Warm-up", "Oppvarming") :
             (phaseIndex == 1 ? tr("Main workout", "Hoveddel")
                              : tr("Cool-down", "Nedtrapping"))
+        let phaseKey = "\(workout.id.uuidString)-\(phaseIndex)"
+        let collapsed = collapsedWorkoutPhases.contains(phaseKey)
         return VStack(alignment: .leading, spacing: 5) {
             HStack(spacing: 7) {
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(warmGold)
-                Text(title)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(graphite)
-                Text("(\(items.count))")
-                    .font(.caption)
-                    .foregroundStyle(secondaryInk)
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                        if collapsed {
+                            collapsedWorkoutPhases.remove(phaseKey)
+                        } else {
+                            collapsedWorkoutPhases.insert(phaseKey)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 7) {
+                        Image(systemName: collapsed ? "chevron.right" : "chevron.down")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(warmGold)
+                        Text(title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(graphite)
+                        Text("(\(items.count))")
+                            .font(.caption)
+                            .foregroundStyle(secondaryInk)
+                    }
+                    .frame(minHeight: 34)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(title)
+                .accessibilityAddTraits(collapsed ? [] : .isSelected)
                 Spacer(minLength: 0)
                 Button {
                     editingWorkout = WorkoutEditDestination(
@@ -841,11 +874,13 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .background(soft, in: Circle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel(tr("Edit workout blocks", "Rediger øktblokker"))
+                .accessibilityLabel(tr("Add block in this phase", "Legg til blokk i denne delen"))
             }
-            ForEach(Array(items.enumerated()), id: \.offset) { pair in
-                referenceBlockRow(pair.element, workout: workout,
-                                  day: day, plan: plan)
+            if !collapsed {
+                ForEach(Array(items.enumerated()), id: \.offset) { pair in
+                    referenceBlockRow(pair.element, workout: workout,
+                                      day: day, plan: plan)
+                }
             }
         }
     }
