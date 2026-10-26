@@ -541,9 +541,10 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                     }
                     let values = sparkValues(item)
                     if values.contains(where: { $0 > 0 }) {
-                        Chart(Array(values.enumerated()), id: \.offset) { index, value in
-                            BarMark(x: .value("Periode", index),
-                                    y: .value("Verdi", value))
+                        Chart {
+                            ForEach(values.indices, id: \.self) { index in
+                                BarMark(x: .value("Periode", index),
+                                        y: .value("Verdi", values[index]))
                                 .foregroundStyle(ATHLTHTrainDesign.gold)
                                 .cornerRadius(1)
                         }
