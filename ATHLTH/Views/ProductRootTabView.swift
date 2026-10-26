@@ -6896,6 +6896,7 @@ struct ATHLTHTrainView: View {
                 ? AnyView(activeTrainWorkoutCard) : nil,
             hasRecordedWorkoutToday: hasRecordedWorkoutToday,
             todaysReadiness: readiness,
+            latestHealthWeightKilograms: health.personalDetails.weightKilograms,
             onChooseSuggestedWorkout: { selectedSuggestedWorkout = $0 },
             onOpenPlan: { selectedSection = .plan },
             onCreatePlan: { beginFreshTrainingPlan() },
