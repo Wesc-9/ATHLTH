@@ -202,8 +202,8 @@ struct ATHLTHPlanGoalEntryView: View {
 
                 VStack(spacing: 0) {
                     let options = ATHLTHPlanGoalOption.options(for: area)
-                    ForEach(Array(options.enumerated()), id: \.element.id) { index, item in
-                        goalRow(item)
+                    ForEach(options.indices, id: \.self) { index in
+                        goalRow(options[index])
                         if index < options.count - 1 {
                             Rectangle()
                                 .fill(rule.opacity(0.4))
