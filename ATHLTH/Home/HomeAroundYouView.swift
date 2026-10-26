@@ -849,6 +849,49 @@ struct AroundYouExploreView: View {
         ExploreRouteSort = .nearest
 
     @MapContentBuilder
+    private var publicWorkoutMapAnnotations: some MapContent {
+                    if filter == .all || filter == .events {
+                        ForEach(nearbyPublicWorkoutPins) { pin in
+                            Annotation(
+                                pin.post.broadArea,
+                                coordinate: pin.coordinate,
+                                anchor: .bottom
+                            ) {
+                                Button {
+                                    selectPublicWorkout(pin.post)
+                                } label: {
+                                    Image(
+                                        systemName: pin.post.workoutKind == "strength"
+                                            ? "dumbbell.fill"
+                                            : "person.2.fill"
+                                    )
+                                    .font(.system(size: 15, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 37, height: 37)
+                                    .background(ATHLTHTheme.vitality, in: Circle())
+                                    .overlay {
+                                        Circle().stroke(.white, lineWidth: 2.5)
+                                    }
+                                    .shadow(color: .black.opacity(0.20), radius: 5, y: 2)
+                                    .scaleEffect(
+                                        selectedPublicWorkout?.id == pin.post.id
+                                            ? 1.13 : 1
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(
+                                    ATHLTHLocalization.choose(
+                                        english: "Public Train Together workout: ",
+                                        norwegian: "Offentlig Tren sammen-økt: "
+                                    ) + pin.post.title
+                                )
+                            }
+                        }
+                    }
+
+    }
+
+    @MapContentBuilder
     private var eventMapAnnotations: some MapContent {
                     if filter == .all || filter == .events {
                         ForEach(nearbyEvents.prefix(30)) { item in
@@ -1040,44 +1083,7 @@ struct AroundYouExploreView: View {
 
                     eventMapAnnotations
 
-                    if filter == .all || filter == .events {
-                        ForEach(nearbyPublicWorkoutPins) { pin in
-                            Annotation(
-                                pin.post.broadArea,
-                                coordinate: pin.coordinate,
-                                anchor: .bottom
-                            ) {
-                                Button {
-                                    selectPublicWorkout(pin.post)
-                                } label: {
-                                    Image(
-                                        systemName: pin.post.workoutKind == "strength"
-                                            ? "dumbbell.fill"
-                                            : "person.2.fill"
-                                    )
-                                    .font(.system(size: 15, weight: .bold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 37, height: 37)
-                                    .background(ATHLTHTheme.vitality, in: Circle())
-                                    .overlay {
-                                        Circle().stroke(.white, lineWidth: 2.5)
-                                    }
-                                    .shadow(color: .black.opacity(0.20), radius: 5, y: 2)
-                                    .scaleEffect(
-                                        selectedPublicWorkout?.id == pin.post.id
-                                            ? 1.13 : 1
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel(
-                                    ATHLTHLocalization.choose(
-                                        english: "Public Train Together workout: ",
-                                        norwegian: "Offentlig Tren sammen-økt: "
-                                    ) + pin.post.title
-                                )
-                            }
-                        }
-                    }
+                    publicWorkoutMapAnnotations
 
                 }
                 .mapStyle(
