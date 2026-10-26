@@ -141,3 +141,5 @@ ATHLTH 1.9.2 build 100 TestFlight request 2026-10-25 - validated gated pipeline
 ATHLTH 1.9.3 build 101 — user-authorized TestFlight upload 2026-10-25. Require successful same-commit Build ATHLTH and backend regressions, validated signed iOS/Watch/Widget archive, then upload to App Store Connect. Keep the version active; do not lock.
 
 ATHLTH 1.9.4 build 102 — user-authorized TestFlight upload 2026-10-26, ATHLTH Alive prototype. Require successful same-commit iOS/Watch/Widget build, backend regressions, signing, archive verification and App Store Connect validation before upload.
+
+ATHLTH 1.9.4 build 102 — retry explicitly authorized 2026-10-26 after SwiftUI compile fixes for Strength, Home Map and Route Detail. Upload only after required signing and archive checks succeed.
