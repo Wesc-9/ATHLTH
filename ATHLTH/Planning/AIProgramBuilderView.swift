@@ -211,6 +211,9 @@ struct AIProgramBuilderView: View {
                         // The upstream wizard already collected duration,
                         // goals, sessions and days. Never ask them twice.
                         seededPlanSummary
+                        if preview == nil {
+                            seededCoachFineTuning
+                        }
                         if let preview {
                             previewSection(preview)
                         } else {
@@ -328,12 +331,12 @@ struct AIProgramBuilderView: View {
                 coachChip("\(sessionsPerWeek) " + ATHLTHLocalization.choose(
                     english: "sessions/week", norwegian: "økter/uke"
                 ))
-                coachChip("\(sessionDurationMinutes) min")
+                // Session lengths can differ; the optional time budget is configured below.
             }
 
             Text(ATHLTHLocalization.choose(
-                english: "Coach uses your selected days, focus, workout types and duration. Nothing is saved before you review and approve the proposal.",
-                norwegian: "Coach bruker dagene, fokuset, økttypene og varigheten du allerede har valgt. Ingenting lagres før du ser over og godkjenner forslaget."
+                english: "Coach respects your goal, dates and available days. Set optional experience, equipment and time preferences below. Nothing is saved until you approve.",
+                norwegian: "Coach tar hensyn til målet, datoene og dagene dine. Du kan legge til erfaring, utstyr og ønsket tidsramme nedenfor. Ingenting lagres før du godkjenner."
             ))
             .font(.subheadline)
             .foregroundStyle(.secondary)
@@ -381,6 +384,120 @@ struct AIProgramBuilderView: View {
         .padding(18)
         .background(.white.opacity(0.88),
                     in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+    }
+
+    /// Optional intake, shown only for AI started from the plan wizard.
+    /// Unlike the old mandatory wizard profile, these answers are requested
+    /// only when the athlete explicitly selects AI. Sensitive limitations
+    /// are never submitted without the separate consent in generateCard.
+    private var seededCoachFineTuning: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: "slider.horizontal.3")
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Fine-tune your AI proposal",
+                        norwegian: "Tilpass AI-forslaget"
+                    ))
+                    .font(.system(size: 16, weight: .medium, design: .serif))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Optional – your goals and training days are already set.",
+                        norwegian: "Valgfritt – mål og treningsdager er allerede valgt."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+            }
+
+            Picker(ATHLTHLocalization.choose(
+                english: "Experience", norwegian: "Treningsnivå"
+            ), selection: $experience) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Not specified", norwegian: "Ikke angitt"
+                )).tag("")
+                Text(ATHLTHLocalization.choose(
+                    english: "Beginner", norwegian: "Nybegynner"
+                )).tag("Beginner")
+                Text(ATHLTHLocalization.choose(
+                    english: "Intermediate", norwegian: "Mosjonist"
+                )).tag("Intermediate")
+                Text(ATHLTHLocalization.choose(
+                    english: "Experienced", norwegian: "Erfaren"
+                )).tag("Experienced")
+            }
+            .tint(ATHLTHTrainDesign.bronze)
+
+            Picker(ATHLTHLocalization.choose(
+                english: "Where do you train?", norwegian: "Hvor trener du?"
+            ), selection: $gymAccess) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Not specified", norwegian: "Ikke angitt"
+                )).tag("")
+                Text(ATHLTHLocalization.choose(
+                    english: "Gym access", norwegian: "Treningssenter"
+                )).tag("Yes")
+                Text(ATHLTHLocalization.choose(
+                    english: "Home or outdoors", norwegian: "Hjemme eller utendørs"
+                )).tag("No")
+            }
+            .tint(ATHLTHTrainDesign.bronze)
+
+            HStack(spacing: 10) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Suggested time per session",
+                    norwegian: "Ønsket tid per økt"
+                ))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+                Spacer(minLength: 0)
+                Menu {
+                    ForEach([20, 30, 40, 45, 60, 75, 90, 120], id: \.self) { minutes in
+                        Button("\(minutes) min") {
+                            sessionDurationMinutes = minutes
+                        }
+                    }
+                } label: {
+                    Text("\(sessionDurationMinutes) min")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+            }
+
+            DisclosureGroup(
+                ATHLTHLocalization.choose(
+                    english: "Equipment and other considerations",
+                    norwegian: "Utstyr og andre hensyn"
+                )
+            ) {
+                VStack(alignment: .leading, spacing: 10) {
+                    TextField(ATHLTHLocalization.choose(
+                        english: "Available equipment, e.g. dumbbells",
+                        norwegian: "Tilgjengelig utstyr, f.eks. manualer"
+                    ), text: $otherEquipment, axis: .vertical)
+                    .lineLimit(1...3)
+                    .textFieldStyle(.roundedBorder)
+
+                    TextField(ATHLTHLocalization.choose(
+                        english: "Movements to avoid (optional)",
+                        norwegian: "Bevegelser du vil unngå (valgfritt)"
+                    ), text: $limitations, axis: .vertical)
+                    .lineLimit(1...3)
+                    .textFieldStyle(.roundedBorder)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Health-related notes are shared only if you separately consent below.",
+                        norwegian: "Helseopplysninger deles bare dersom du samtykker nedenfor."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+                .padding(.top, 9)
+            }
+            .tint(ATHLTHTrainDesign.bronze)
+        }
+        .padding(16)
+        .background(.white.opacity(0.93), in: RoundedRectangle(cornerRadius: 19))
     }
 
     private var coachHero: some View {
