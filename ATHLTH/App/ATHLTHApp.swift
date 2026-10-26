@@ -49,6 +49,7 @@ struct ATHLTHApp: App {
 /// A stateless WindowGroup content closure avoids actor-bound captures from
 /// App.body, the crash site observed in iOS 27 / ATHLTH 1.7.6 build 83.
 private struct ATHLTHSceneRootView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var health = HealthKitManager.shared
     @StateObject private var exerciseLibrary = ExerciseLibraryStore()
     @StateObject private var runningWorkoutLibrary = RunningWorkoutLibraryStore()
@@ -201,6 +202,19 @@ private struct ATHLTHSceneRootView: View {
         }
         .onAppear {
             installBackgroundRefreshHandlersIfNeeded()
+            ATHLTHAliveController.reconcile(
+                isForeground: scenePhase == .active && appSession.signedIn
+            )
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            ATHLTHAliveController.reconcile(
+                isForeground: newPhase == .active && appSession.signedIn
+            )
+        }
+        .onChange(of: appSession.signedIn) { _, signedIn in
+            ATHLTHAliveController.reconcile(
+                isForeground: scenePhase == .active && signedIn
+            )
         }
     }
 
