@@ -237,10 +237,24 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
                 ForEach([30, 45, 60, 75, 90], id: \.self) { minutes in
                     Button { onSelectMinutes(minutes) } label: {
                         VStack(spacing: 1) {
-                            pill("\(minutes)", selected: minutesPerSession == minutes)
+                            Text("\(minutes)")
+                                .font(.system(size: 12, weight: minutesPerSession == minutes ? .semibold : .medium))
                             Text(tr("min", "min"))
                                 .font(.system(size: 9))
-                                .foregroundStyle(muted)
+                        }
+                        .foregroundStyle(minutesPerSession == minutes ? Color.white : ink)
+                        .frame(maxWidth: .infinity, minHeight: 53)
+                        .background(
+                            minutesPerSession == minutes
+                                ? LinearGradient(colors: [bronze, gold],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing)
+                                : LinearGradient(colors: [canvas, .white],
+                                                 startPoint: .topLeading, endPoint: .bottomTrailing),
+                            in: RoundedRectangle(cornerRadius: 11)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 11)
+                                .stroke(rule.opacity(0.45), lineWidth: 0.7)
                         }
                     }
                     .buttonStyle(.plain)
