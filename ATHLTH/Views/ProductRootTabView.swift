@@ -5728,6 +5728,7 @@ struct ATHLTHTrainView: View {
     // True only while the global Train tab is selected.
     private let isActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
@@ -5744,6 +5745,7 @@ struct ATHLTHTrainView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
 
     @State private var selectedSection: ATHLTHTrainSection = .today
+    @State private var displayedTrainDay = Calendar.current.startOfDay(for: .now)
     @State private var todayScrollPosition = ScrollPosition(edge: .top)
     @State private var planScrollPosition = ScrollPosition(edge: .top)
     @State private var floatingTrainTabsVisible = false
@@ -6417,8 +6419,21 @@ struct ATHLTHTrainView: View {
                 floatingTrainTabsVisible = false
                 lastTrainScrollDecisionOffset = 0
             }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active { refreshTrainDayIfChanged() }
+            }
+            // iOS signals midnight, timezone and system-clock changes here.
+            // A visible Train scene must not keep yesterday's workout hero.
+            .onReceive(NotificationCenter.default.publisher(
+                for: UIApplication.significantTimeChangeNotification
+            )) { _ in
+                refreshTrainDayIfChanged()
+            }
             .onChange(of: isActive) { _, active in
-                guard !active else { return }
+                if active {
+                    refreshTrainDayIfChanged()
+                    return
+                }
                 // Reset *only* the viewport on leaving Train. Drafts,
                 // plan edits and any active workout remain untouched.
                 todayScrollPosition.scrollTo(edge: .top)
@@ -6452,6 +6467,13 @@ struct ATHLTHTrainView: View {
         }
     }
 
+
+    private func refreshTrainDayIfChanged() {
+        let today = Calendar.current.startOfDay(for: .now)
+        guard today != displayedTrainDay else { return }
+        displayedTrainDay = today
+        session.refreshActivePlanForToday()
+    }
 
     private func updateTrainCapsuleVisibility(scrollOffset: CGFloat) {
         if scrollOffset < 88 {
@@ -6550,7 +6572,7 @@ struct ATHLTHTrainView: View {
                         .foregroundStyle(ATHLTHTrainDesign.ink)
                         .accessibilityAddTraits(.isHeader)
 
-                    Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                    Text(displayedTrainDay.formatted(.dateTime.weekday(.wide).day().month(.wide)))
                         .font(.subheadline.weight(.medium))
                         .foregroundStyle(ATHLTHTrainDesign.inkLift)
                         .padding(.top, 3)
