@@ -565,7 +565,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             saveResumableDraft()
         }
         .onChange(of: equipment) { _, _ in saveResumableDraft() }
-        .onChange(of: weeklyTimeBudgetMinutes) { _, _ in saveResumableDraft() }
+        .onChange(of: weeklyTimeBudgetMinutes) { _, newValue in
+            if mode == .advanced {
+                let perSession = Double(newValue) / Double(max(1, selectedDays.count))
+                advancedSessionMinutes = min(180, max(5, Int((perSession / 5).rounded()) * 5))
+            }
+            saveResumableDraft()
+        }
         .onChange(of: step) { _, _ in saveResumableDraft() }
         .onChange(of: selectedPlanWeekIndex) { _, _ in saveResumableDraft() }
         .onChange(of: simpleMinutes) { _, _ in saveResumableDraft() }
