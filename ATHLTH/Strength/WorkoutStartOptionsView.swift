@@ -20,7 +20,7 @@ struct WorkoutStartOptionsView: View {
         SocialWorkoutParticipationMode,
         WatchAudioCoachConfiguration,
         StrengthAdvancedConfiguration
-    ) -> Void
+    ) async -> String?
 
     @State private var trackingMode: StrengthTrackingMode
     @State private var selectedFriendIDs: Set<UUID> = []
@@ -50,6 +50,8 @@ struct WorkoutStartOptionsView: View {
     @State private var pendingTreadmillSetup: PlannedExercise?
     @State private var selectedTrainingPlace: ATHLTHTrainingPlace?
     @State private var showingTrainingPlacePicker = false
+    @State private var launchInProgress = false
+    @State private var inlineLaunchError: String?
 
     @State private var showingSpotifyPicker = false
     @State private var didLoadSpotifySelection = false
@@ -74,7 +76,7 @@ struct WorkoutStartOptionsView: View {
             SocialWorkoutParticipationMode,
             WatchAudioCoachConfiguration,
             StrengthAdvancedConfiguration
-        ) -> Void
+    ) async -> String?
     ) {
         self.session = session
         self.trainingDeviceProvider = trainingDeviceProvider
@@ -539,22 +541,79 @@ struct WorkoutStartOptionsView: View {
     }
 
     private var strengthStickyStartBar: some View {
-        ATHLTHQuickStartDeviceLaunchBar(
-            watchAvailable: appleWatchSelectable,
-            onIPhone: { startStrength(using: .iPhone) },
-            onAppleWatch: { startStrength(using: .appleWatch) },
-            preferAppleWatch: watchConnected && !ATHLTHDeviceRole.isIPad,
-            supportingText: ATHLTHDeviceRole.isIPad
-                ? ATHLTHLocalization.choose(
-                    english: "Starts via your signed-in iPhone.",
-                    norwegian: "Startes via din innloggede iPhone."
-                )
-                : nil
-        )
+        VStack(alignment: .leading, spacing: 9) {
+            if let inlineLaunchError {
+                HStack(alignment: .top, spacing: 10) {
+                    Image(systemName: "applewatch")
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Workout did not start",
+                            norwegian: "Økten ble ikke startet"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        Text(inlineLaunchError)
+                            .font(.caption)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your exercises and settings are saved in this card. Unlock Apple Watch and try again.",
+                            norwegian: "Øvelsene og valgene dine er bevart her. Lås opp Apple Watch og prøv igjen."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    }
+                    Spacer(minLength: 0)
+                    Button { inlineLaunchError = nil } label: {
+                        Image(systemName: "xmark")
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 28, height: 28)
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Dismiss message", norwegian: "Lukk meldingen"
+                    ))
+                }
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+                .padding(14)
+                .athlthTrainPaper()
+                .padding(.horizontal, 16)
+            }
+            if launchInProgress {
+                HStack(spacing: 8) {
+                    ProgressView().tint(ATHLTHTrainDesign.bronze)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Starting workout…", norwegian: "Starter treningsøkten…"
+                    ))
+                    .font(.caption)
+                }
+                .padding(.horizontal, 18)
+            }
+            ATHLTHQuickStartDeviceLaunchBar(
+                watchAvailable: appleWatchSelectable,
+                onIPhone: { startStrength(using: .iPhone) },
+                onAppleWatch: { startStrength(using: .appleWatch) },
+                preferAppleWatch: watchConnected && !ATHLTHDeviceRole.isIPad,
+                supportingText: ATHLTHDeviceRole.isIPad
+                    ? ATHLTHLocalization.choose(
+                        english: "Starts via your signed-in iPhone.",
+                        norwegian: "Startes via din innloggede iPhone."
+                    )
+                    : nil
+            )
+            .allowsHitTesting(!launchInProgress)
+            .opacity(launchInProgress ? 0.65 : 1)
+        }
     }
 
     private func startStrength(using device: WorkoutCaptureDevice) {
-        guard device == .iPhone || appleWatchSelectable else { return }
+        guard !launchInProgress else { return }
+        guard device == .iPhone || appleWatchSelectable else {
+            inlineLaunchError = ATHLTHLocalization.choose(
+                english: "Apple Watch is not connected. Use iPhone or check the connection.",
+                norwegian: "Apple Watch er ikke tilkoblet. Velg iPhone eller kontroller forbindelsen."
+            )
+            return
+        }
+        inlineLaunchError = nil
     let selectedFriends = social.resolvedQuickTrainPartners(selectedFriendIDs)
 
     let advancedConfiguration =
@@ -581,10 +640,6 @@ struct WorkoutStartOptionsView: View {
                 effortMetric
         )
 
-    if trackingMode == .advanced {
-        advancedConfiguration
-            .saveAsDefaults()
-    }
 
     var watchAudioCoach =
         strengthAudioCoach.enabled
@@ -594,17 +649,30 @@ struct WorkoutStartOptionsView: View {
         .strengthHapticsEnabled =
         restCues.hapticsEnabled
 
-    onStart(
-        configuredSession,
-        device,
-        trackingMode,
-        selectedFriends,
-        socialMode,
-        watchAudioCoach,
-        advancedConfiguration
-    )
+    // Wait for Watch confirmation. On failure, retain all selected exercises,
+    // weights, settings and this entire sheet instead of navigating home.
+    launchInProgress = true
+    Task { @MainActor in
+        let failure = await onStart(
+            configuredSession,
+            device,
+            trackingMode,
+            selectedFriends,
+            socialMode,
+            watchAudioCoach,
+            advancedConfiguration
+        )
+        launchInProgress = false
+        if let failure {
+            inlineLaunchError = failure
+        } else {
+            if trackingMode == .advanced {
+                advancedConfiguration.saveAsDefaults()
+            }
+            dismiss()
+        }
+    }
 
-        dismiss()
     }
 
     private var spotifySummary: String {
