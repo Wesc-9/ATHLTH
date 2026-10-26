@@ -388,6 +388,38 @@ struct ATHLTHTrainPlanRebuildView: View {
             .frame(maxWidth: .infinity)
             .padding(.vertical, 7)
             .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+
+            HStack(spacing: 4) {
+                ForEach(selected.days.sorted { $0.dayIndex < $1.dayIndex }) { day in
+                    let date = TrainingPlanSchedule.dayDate(in: plan, week: selected, day: day)
+                    let isSelected = expandedDayIDs.contains(day.id)
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            expandedDayIDs = isSelected ? [] : [day.id]
+                        }
+                    } label: {
+                        VStack(spacing: 6) {
+                            Text(date?.formatted(.dateTime.weekday(.abbreviated)).uppercased() ?? "DAG")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text(date?.formatted(.dateTime.day()) ?? "\(day.dayIndex)")
+                                .font(.system(size: 15, weight: .bold, design: .rounded))
+                            Circle()
+                                .fill(day.sessions.isEmpty ? ATHLTHTheme.border : ATHLTHTheme.premiumGold)
+                                .frame(width: 5, height: 5)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .foregroundStyle(isSelected ? Color.white : ATHLTHTheme.primaryText)
+                        .background(
+                            isSelected ? ATHLTHTheme.accentDeep : ATHLTHTheme.champagneSoft.opacity(0.5),
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(date?.formatted(date: .complete, time: .omitted) ?? "Dag \(day.dayIndex)")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                }
+            }
         }
     }
 
@@ -656,7 +688,7 @@ struct ATHLTHTrainPlanRebuildView: View {
                             ))
                             }
                             if advancedMode {
-                                ATHLTHWorkoutPlanOutlineView(workout: workout, maxVisibleItems: 30)
+                                ATHLTHWorkoutPlanOutlineView(workout: workout, maxVisibleItems: Int.max)
                             }
                         }
                     }
@@ -692,10 +724,12 @@ struct ATHLTHTrainPlanRebuildView: View {
                             .contentShape(Rectangle())
                         }
                             .buttonStyle(.plain)
-                            ATHLTHWorkoutPlanOutlineView(
-                                workout: workout,
-                                maxVisibleItems: 7
-                            )
+                            if advancedMode {
+                                ATHLTHWorkoutPlanOutlineView(
+                                    workout: workout,
+                                    maxVisibleItems: Int.max
+                                )
+                            }
                         }
                     }
                     if isRestDay {
