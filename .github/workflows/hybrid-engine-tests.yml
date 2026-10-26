@@ -45,6 +45,8 @@ on:
       - Tests/ATHLTHWorkoutDurationEstimatorTests.swift
       - Tests/ATHLTHWorkoutTimelineOverviewTests.swift
       - Tests/ATHLTHTrainDesignLayoutTests.swift
+      - Tests/ATHLTHTrainTodayLayoutTests.swift
+      - Tests/ATHLTHTrainPlanStudioIntegrationTests.swift
 
 concurrency:
   group: athlth-train-hybrid-tests-${{ github.ref }}
