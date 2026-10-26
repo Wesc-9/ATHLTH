@@ -634,16 +634,13 @@ struct ATHLTHTrainTodayPremiumView: View {
     /// Keep every scheduled session reachable even while the recorder owns
     /// the main card. Opening details never launches a second recording.
     private var remainingTodaySection: some View {
-        let hasUnfinishedWorkout = sessions.contains {
-            !$0.isExplicitRestDay && !completedIDs.contains($0.id)
-        }
-        // The live recorder replaces the main scheduled card. The same
-        // planned workout must not reappear under "Also today" while live.
-        let visiblePrimaryID = plan != nil && (hasActiveWorkout || hasUnfinishedWorkout)
-            ? primaryWorkout?.id : nil
-        let remaining = sessions.filter {
-            !$0.isExplicitRestDay && $0.id != visiblePrimaryID
-        }
+        let remaining = ATHLTHTrainTodayAgendaPolicy.remainingSessions(
+            sessions,
+            primaryWorkoutID: primaryWorkout?.id,
+            completedIDs: completedIDs,
+            hasPlan: plan != nil,
+            hasActiveWorkout: hasActiveWorkout
+        )
         return VStack(alignment: .leading, spacing: 12) {
             if !remaining.isEmpty {
                 Text(tr("ALSO TODAY", "OGSÅ I DAG"))
