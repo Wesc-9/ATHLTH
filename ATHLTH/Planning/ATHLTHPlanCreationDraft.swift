@@ -85,11 +85,10 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.advanced = advanced
         self.source = source
         self.stage = stage
-        self.entryGoalArea = entryGoalArea.flatMap {
-            ATHLTHPlanGoalArea(rawValue: $0)?.rawValue
-        }
+        let parsedArea = entryGoalArea.flatMap(ATHLTHPlanGoalArea.init(rawValue:))
+        self.entryGoalArea = parsedArea?.rawValue
         self.entryGoalChoice = entryGoalChoice.flatMap { choice in
-            guard let area = self.entryGoalArea.flatMap(ATHLTHPlanGoalArea.init(rawValue:)),
+            guard let area = parsedArea,
                   ATHLTHPlanGoalOption.options(for: area).contains(where: { $0.id == choice })
             else { return nil }
             return choice
