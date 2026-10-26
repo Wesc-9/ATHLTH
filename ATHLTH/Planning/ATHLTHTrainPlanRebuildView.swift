@@ -688,7 +688,7 @@ struct ATHLTHTrainPlanRebuildView: View {
                             ))
                             }
                             if advancedMode {
-                                ATHLTHWorkoutPlanOutlineView(workout: workout, maxVisibleItems: Int.max)
+                                ATHLTHWorkoutPlanOutlineView(workout: workout, maxVisibleItems: Int.max, timelineStyle: true)
                                 if editable {
                                     Button {
                                         workoutPendingFullEdit = workout
@@ -749,7 +749,8 @@ struct ATHLTHTrainPlanRebuildView: View {
                             if advancedMode {
                                 ATHLTHWorkoutPlanOutlineView(
                                     workout: workout,
-                                    maxVisibleItems: Int.max
+                                    maxVisibleItems: Int.max,
+                                    timelineStyle: true
                                 )
                             }
                         }
