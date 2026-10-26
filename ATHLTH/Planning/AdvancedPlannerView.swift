@@ -1607,9 +1607,9 @@ struct AdvancedPlannerView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Week at a glance")
-                            .font(.title3.weight(.bold))
-                        Text("Tap a day to edit its schedule.")
+                        Text("Ukeoversikt")
+                            .font(.system(size: 23, weight: .semibold, design: .serif))
+                        Text("Velg en dag for økter, detaljer og redigering.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -1624,7 +1624,7 @@ struct AdvancedPlannerView: View {
                             )
                     )
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.accent)
+                    .foregroundStyle(Color(red: 0.50, green: 0.36, blue: 0.20))
                 }
 
                 VStack(spacing: 0) {
@@ -1661,7 +1661,7 @@ struct AdvancedPlannerView: View {
                                 ) {
                                     Text(
                                         day.sessions.isEmpty
-                                            ? "Rest"
+                                            ? "Hviledag"
                                             : day.sessions
                                                 .map(\.title)
                                                 .joined(
@@ -1718,7 +1718,7 @@ struct AdvancedPlannerView: View {
                         .buttonStyle(.plain)
 
                         if index < week.days.count - 1 {
-                            Divider()
+                            Divider().overlay(Color(red: 0.82, green: 0.78, blue: 0.72).opacity(0.5))
                         }
                     }
                 }
