@@ -15123,72 +15123,35 @@ struct ATHLTHProgressView: View {
             ) {
                 Color.clear.frame(height: 1)
             } content: {
-                LazyVStack(spacing: 14) {
+                LazyVStack(spacing: 15) {
                     progressHeader
                     periodPicker
-                    if trainingScope == .running {
-                        ProgressPerformanceCard(
-                            runningWorkouts: selectedPeriodRunningWorkouts,
-                            strengthWorkouts: [],
-                            healthRecords: personalRecords,
-                            strengthRecords: [],
-                            repRecords: []
-                        )
-                    } else if trainingScope == .strength {
-                        ProgressPerformanceCard(
-                            runningWorkouts: [],
-                            strengthWorkouts: selectedPeriodStrengthWorkouts,
-                            healthRecords: [],
-                            strengthRecords: strengthWorkout.personalRecords,
-                            repRecords: strengthWorkout.repPersonalRecords
-                        )
-                    } else {
-                    if health.hasRequestedAuthorization &&
-                        (health.hasTrainingHealthData || progressHasHealthData) {
-                        weeklyOverview
-
+                    premiumOverview
+                    premiumTrend
+                    if trainingScope == .all {
                         if let snapshot = progressSnapshot {
-                            ProgressTrendCard(
-                                snapshot: snapshot,
-                                metric: $trendMetric
-                            )
+                            ProgressConsistencyCard(snapshot: consistencySnapshot)
+                            ProgressTrendCard(snapshot: snapshot, metric: $trendMetric)
+                        } else {
+                            progressWithoutHealthCard
                         }
-
-                        ProgressConsistencyCard(
-                            snapshot: consistencySnapshot
-                        )
-
-                        ProgressPerformanceCard(
-                            runningWorkouts:
-                                selectedPeriodRunningWorkouts,
-                            strengthWorkouts:
-                                selectedPeriodStrengthWorkouts,
-                            healthRecords: personalRecords,
-                            strengthRecords:
-                                strengthWorkout.personalRecords,
-                            repRecords:
-                                strengthWorkout.repPersonalRecords
-                        )
-
-                        personalRecordsCard
-                        achievementsCard
-                    } else {
-                        progressWithoutHealthCard
-
-                        ProgressPerformanceCard(
-                            runningWorkouts: [],
-                            strengthWorkouts:
-                                selectedPeriodStrengthWorkouts,
-                            healthRecords: personalRecords,
-                            strengthRecords:
-                                strengthWorkout.personalRecords,
-                            repRecords:
-                                strengthWorkout.repPersonalRecords
-                        )
-
-                        personalRecordsCard
-                        achievementsCard
                     }
+                    ProgressPerformanceCard(
+                        runningWorkouts: trainingScope == .strength ? [] : selectedPeriodRunningWorkouts,
+                        strengthWorkouts: trainingScope == .running ? [] : selectedPeriodStrengthWorkouts,
+                        healthRecords: trainingScope == .strength ? [] : personalRecords,
+                        strengthRecords: trainingScope == .running ? [] : strengthWorkout.personalRecords,
+                        repRecords: trainingScope == .running ? [] : strengthWorkout.repPersonalRecords
+                    )
+                    personalRecordsCard
+                    recentActivity
+                    if trainingScope == .all { achievementsCard }
+                    if progressLoading {
+                        ProgressView().controlSize(.small)
+                    } else if let progressError, trainingScope == .all {
+                        Text(progressError)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -15219,6 +15182,193 @@ struct ATHLTHProgressView: View {
                 goals: goalStore
             )
         }
+    }
+
+    private var premiumOverview: some View {
+        let runs = selectedPeriodRunningWorkouts
+        let lifts = selectedPeriodStrengthWorkouts
+        let runDuration = runs.reduce(0.0) { $0 + $1.duration }
+        let liftDuration = lifts.reduce(0.0) {
+            $0 + max(0, ($1.endedAt ?? $1.startedAt).timeIntervalSince($1.startedAt))
+        }
+        let distance = runs.compactMap(\.distanceMeters).reduce(0, +) / 1_000
+        let volume = lifts.reduce(0.0) { $0 + $1.totalVolumeKilograms }
+        let workoutCount = trainingScope == .all
+            ? (progressSnapshot?.workoutCount ?? (runs.count + lifts.count))
+            : (trainingScope == .running ? runs.count : lifts.count)
+        let duration = trainingScope == .all
+            ? (progressSnapshot?.trainingDuration ?? (runDuration + liftDuration))
+            : (trainingScope == .running ? runDuration : liftDuration)
+        let cards: [(String, String, String)] = [
+            ("Økter", "\(workoutCount)", "calendar"),
+            ("Treningstid", duration.shortDuration, "clock"),
+            (trainingScope == .strength ? "Treningsvolum" : "Distanse",
+             trainingScope == .strength ? String(format: "%.0f kg", volume) :
+                String(format: "%.1f km", trainingScope == .all
+                    ? (progressSnapshot?.workoutDistanceMeters ?? (distance * 1_000)) / 1_000
+                    : distance), trainingScope == .strength ? "dumbbell" : "figure.run"),
+            (trainingScope == .strength ? "Arbeidssett" : "Aktive dager",
+             trainingScope == .strength
+                 ? "\(lifts.reduce(0) { $0 + $1.totalWorkingSets })"
+                 : "\(trainingScope == .all
+                     ? (progressSnapshot?.activeWorkoutDays.count ?? 0)
+                     : Set(runs.map { Calendar.current.startOfDay(for: $0.startDate) }).count)",
+             "chart.bar")
+        ]
+        return VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text("Oversikt")
+                    .font(.system(size: 22, weight: .medium, design: .serif))
+                Spacer()
+                Text(period.rawValue)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                ForEach(cards.indices, id: \.self) { index in
+                    let card = cards[index]
+                    VStack(alignment: .leading, spacing: 10) {
+                        Image(systemName: card.2)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text(card.1)
+                            .font(.system(size: 27, weight: .medium, design: .serif))
+                            .monospacedDigit()
+                            .minimumScaleFactor(0.7)
+                            .lineLimit(1)
+                        Text(card.0)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 105, alignment: .leading)
+                    .padding(16)
+                    .background(Color.white, in: RoundedRectangle(cornerRadius: 19))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 19)
+                            .stroke(ATHLTHTheme.premiumGold.opacity(0.18), lineWidth: 0.8)
+                    }
+                }
+            }
+        }
+    }
+
+    private var premiumTrend: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(trainingScope == .running ? "Utvikling i distanse"
+                : trainingScope == .strength ? "Utvikling i treningsvolum"
+                : "Treningsutvikling")
+                .font(.system(size: 22, weight: .medium, design: .serif))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            Text(trainingScope == .running ? "Kilometer per økt"
+                : trainingScope == .strength ? "Kilogram per økt"
+                : "Treningstimer over tid")
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+            if trainingScope == .running {
+                if selectedPeriodRunningWorkouts.isEmpty {
+                    emptyTrend
+                } else {
+                    Chart(selectedPeriodRunningWorkouts) { workout in
+                        BarMark(
+                            x: .value("Dato", workout.startDate),
+                            y: .value("km", (workout.distanceMeters ?? 0) / 1_000)
+                        )
+                        .foregroundStyle(ATHLTHTheme.accentDeep.gradient)
+                        .cornerRadius(3)
+                    }
+                    .frame(height: 178)
+                }
+            } else if trainingScope == .strength {
+                if selectedPeriodStrengthWorkouts.isEmpty {
+                    emptyTrend
+                } else {
+                    Chart(selectedPeriodStrengthWorkouts) { workout in
+                        BarMark(
+                            x: .value("Dato", workout.startedAt),
+                            y: .value("kg", workout.totalVolumeKilograms)
+                        )
+                        .foregroundStyle(ATHLTHTheme.accentDeep.gradient)
+                        .cornerRadius(3)
+                    }
+                    .frame(height: 178)
+                }
+            } else if let snapshot = progressSnapshot, !snapshot.buckets.isEmpty {
+                Chart(snapshot.buckets) { bucket in
+                    AreaMark(
+                        x: .value("Dato", bucket.startDate),
+                        y: .value("Timer", bucket.trainingDuration / 3_600)
+                    )
+                    .foregroundStyle(ATHLTHTheme.champagneSoft)
+                    LineMark(
+                        x: .value("Dato", bucket.startDate),
+                        y: .value("Timer", bucket.trainingDuration / 3_600)
+                    )
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .lineStyle(StrokeStyle(lineWidth: 2.5))
+                }
+                .frame(height: 178)
+            } else {
+                emptyTrend
+            }
+        }
+        .padding(18)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var emptyTrend: some View {
+        Label("Ingen registrerte økter for denne perioden", systemImage: "chart.xyaxis.line")
+            .font(.caption)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .frame(maxWidth: .infinity, minHeight: 170)
+    }
+
+    private var recentActivity: some View {
+        let runEntries = selectedPeriodRunningWorkouts.map {
+            (date: $0.startDate, title: "Løping", detail:
+                String(format: "%.1f km", ($0.distanceMeters ?? 0) / 1_000),
+             symbol: "figure.run")
+        }
+        let strengthEntries = selectedPeriodStrengthWorkouts.map {
+            (date: $0.startedAt, title: "Styrketrening",
+             detail: "\($0.totalWorkingSets) arbeidssett", symbol: "dumbbell")
+        }
+        let entries = (trainingScope == .strength ? [] : runEntries) +
+            (trainingScope == .running ? [] : strengthEntries)
+        let sorted = entries.sorted { $0.date > $1.date }
+        return VStack(alignment: .leading, spacing: 13) {
+            Text("Siste økter")
+                .font(.system(size: 22, weight: .medium, design: .serif))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+            if sorted.isEmpty {
+                Label("Ingen registrerte økter i perioden", systemImage: "calendar")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            } else {
+                ForEach(Array(sorted.prefix(5).enumerated()), id: \.offset) { _, item in
+                    HStack(spacing: 11) {
+                        Image(systemName: item.symbol)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .frame(width: 35, height: 35)
+                            .background(ATHLTHTheme.champagneSoft, in: Circle())
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(item.title).font(.subheadline.weight(.semibold))
+                            Text(item.date.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer()
+                        Text(item.detail)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    if item.date != sorted.prefix(5).last?.date {
+                        Divider().overlay(ATHLTHTheme.divider)
+                    }
+                }
+            }
+        }
+        .padding(18)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var progressWithoutHealthCard: some View {
