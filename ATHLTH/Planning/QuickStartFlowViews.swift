@@ -1209,7 +1209,9 @@ struct RunQuickStartSheet: View {
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     let plannedSession: PlannedSession?
-    let onStart: (RunQuickStartConfiguration) -> Void
+    let onStart: (RunQuickStartConfiguration) async -> String?
+    @State private var launchInProgress = false
+    @State private var launchFailure: String?
 
     @State private var mode: RunQuickStartMode
     @State private var selectedRoute: TrainingRoute?
@@ -1232,7 +1234,7 @@ struct RunQuickStartSheet: View {
         initialWorkout:
             RunningWorkoutTemplate? = nil,
         plannedSession: PlannedSession? = nil,
-        onStart: @escaping (RunQuickStartConfiguration) -> Void
+        onStart: @escaping (RunQuickStartConfiguration) async -> String?
     ) {
         self.trainingDeviceProvider = trainingDeviceProvider
         self.watchConnected = watchConnected
@@ -2179,7 +2181,22 @@ struct RunQuickStartSheet: View {
     }
 
     private var runStickyStartBar: some View {
-        ATHLTHQuickStartDeviceLaunchBar(
+        VStack(alignment: .leading, spacing: 9) {
+            if let launchFailure {
+                ATHLTHQuickWatchLaunchNotice(message: launchFailure) {
+                    self.launchFailure = nil
+                }
+                .padding(.horizontal, 15)
+            }
+            if launchInProgress {
+                ProgressView(ATHLTHLocalization.choose(
+                    english: "Starting workout…",
+                    norwegian: "Starter treningsøkten…"
+                ))
+                .font(.caption)
+                .padding(.horizontal, 18)
+            }
+            ATHLTHQuickStartDeviceLaunchBar(
             watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
             onIPhone: {
                 captureDevice = .iPhone
@@ -2198,6 +2215,9 @@ struct RunQuickStartSheet: View {
                 : nil,
             canStart: canSubmitQuickRun(captureDevice: .iPhone)
         )
+            .allowsHitTesting(!launchInProgress)
+            .opacity(launchInProgress ? 0.65 : 1)
+        }
     }
 
     private func canSubmitQuickRun(
@@ -2224,6 +2244,7 @@ struct RunQuickStartSheet: View {
         captureDevice:
             WorkoutCaptureDevice
     ) {
+        guard !launchInProgress else { return }
         guard canSubmitQuickRun(
             captureDevice:
                 captureDevice
@@ -2240,8 +2261,8 @@ struct RunQuickStartSheet: View {
             routeAlerts.enabled = false
         }
 
-        onStart(
-            RunQuickStartConfiguration(
+        launchFailure = nil
+        let configuration = RunQuickStartConfiguration(
                 mode: mode,
                 route:
                     mode == .route
@@ -2304,8 +2325,16 @@ struct RunQuickStartSheet: View {
                 gearIDs: selectedGearIDs,
                 watchStartMode: watchStartMode
             )
-        )
-        dismiss()
+        launchInProgress = true
+        Task { @MainActor in
+            let failure = await onStart(configuration)
+            launchInProgress = false
+            if let failure {
+                launchFailure = failure
+            } else {
+                dismiss()
+            }
+        }
     }
 
     private var quickRunGuidanceCard:
@@ -2842,7 +2871,9 @@ struct WalkQuickStartSheet: View {
     let trainingDeviceProvider: TrainingDeviceProvider
     let watchConnected: Bool
     var plannedSession: PlannedSession? = nil
-    let onStart: (WalkQuickStartConfiguration) -> Void
+    let onStart: (WalkQuickStartConfiguration) async -> String?
+    @State private var launchInProgress = false
+    @State private var launchFailure: String?
 
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var socialMode:
@@ -3043,7 +3074,22 @@ struct WalkQuickStartSheet: View {
                 .padding()
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                ATHLTHQuickStartDeviceLaunchBar(
+                VStack(alignment: .leading, spacing: 9) {
+                    if let launchFailure {
+                        ATHLTHQuickWatchLaunchNotice(message: launchFailure) {
+                            self.launchFailure = nil
+                        }
+                        .padding(.horizontal, 15)
+                    }
+                    if launchInProgress {
+                        ProgressView(ATHLTHLocalization.choose(
+                            english: "Starting workout…",
+                            norwegian: "Starter treningsøkten…"
+                        ))
+                        .font(.caption)
+                        .padding(.horizontal, 18)
+                    }
+                    ATHLTHQuickStartDeviceLaunchBar(
                     watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
                     onIPhone: { startWalk(using: .iPhone) },
                     onAppleWatch: { startWalk(using: .appleWatch) },
@@ -3055,6 +3101,9 @@ struct WalkQuickStartSheet: View {
                         )
                         : nil
                 )
+                    .allowsHitTesting(!launchInProgress)
+                    .opacity(launchInProgress ? 0.65 : 1)
+                }
             }
             .navigationTitle("Start Walk")
             .navigationBarTitleDisplayMode(.inline)
@@ -3116,12 +3165,13 @@ struct WalkQuickStartSheet: View {
     }
 
     private func startWalk(using device: WorkoutCaptureDevice) {
+        guard !launchInProgress else { return }
         guard device == .iPhone ||
             watchConnected || ATHLTHDeviceRole.isIPad else { return }
         let friends = social.resolvedQuickTrainPartners(selectedFriendIDs)
 
-        onStart(
-            WalkQuickStartConfiguration(
+        launchFailure = nil
+        let configuration = WalkQuickStartConfiguration(
                 captureDevice: device,
                 audioCoach:
                     isAdvancedSetup &&
@@ -3153,8 +3203,57 @@ struct WalkQuickStartSheet: View {
                     socialMode,
                 gearIDs: selectedGearIDs
             )
-        )
-        dismiss()
+        launchInProgress = true
+        Task { @MainActor in
+            let failure = await onStart(configuration)
+            launchInProgress = false
+            if let failure {
+                launchFailure = failure
+            } else {
+                dismiss()
+            }
+        }
+    }
+}
+
+// A recoverable Watch error stays with the quick-start card and draft.
+private struct ATHLTHQuickWatchLaunchNotice: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 11) {
+            Image(systemName: "applewatch")
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Workout did not start",
+                    norwegian: "Økten ble ikke startet"
+                ))
+                .font(.subheadline.weight(.semibold))
+                Text(message)
+                    .font(.caption)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(ATHLTHLocalization.choose(
+                    english: "Your choices are preserved. Unlock Apple Watch and try again.",
+                    norwegian: "Valgene dine er bevart. Lås opp Apple Watch og prøv igjen."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+            Spacer(minLength: 0)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark")
+                    .font(.caption.weight(.semibold))
+                    .frame(width: 28, height: 28)
+            }
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Dismiss message", norwegian: "Lukk meldingen"
+            ))
+        }
+        .foregroundStyle(ATHLTHTrainDesign.ink)
+        .padding(14)
+        .athlthTrainPaper()
     }
 }
 
