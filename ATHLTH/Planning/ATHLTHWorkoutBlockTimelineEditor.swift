@@ -122,7 +122,11 @@ struct ATHLTHWorkoutBlockTimelineEditor: View {
                             Text(block.title)
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ATHLTHTheme.primaryText)
-                            if let target = block.targetText {
+                            if block.kind == .rest {
+                                Text("\(Int(block.durationSeconds ?? 60)) sek pause")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                            } else if let target = block.targetText {
                                 Text(target)
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
@@ -185,6 +189,11 @@ struct ATHLTHWorkoutBlockTimelineEditor: View {
                     ))
                 }
                 .padding(.vertical, 7)
+                .padding(.horizontal, block.kind == .rest ? 9 : 0)
+                .background(
+                    block.kind == .rest ? ATHLTHTheme.champagneSoft : Color.clear,
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
             }
 
             if !blocks.isEmpty {
