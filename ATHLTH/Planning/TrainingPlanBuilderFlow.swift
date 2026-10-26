@@ -1088,9 +1088,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var modeContinueBar: some View {
         Button {
             if mode == .basic {
-                // Establish the simple defaults once at actual continuation.
-                // Merely selecting a card must not mutate a plan or navigate.
+                // Keep existing defaults for duration and schedule.
                 updateSimplePlanChoices()
+            }
+            // The preselected running card must already affect the plan even
+            // when the user presses Next without tapping a radio row.
+            if let selected = ATHLTHPlanGoalOption.options(for: selectedGoalArea)
+                .first(where: { $0.id == selectedGoalChoice }) {
+                selectGoalOption(selected)
+            } else {
+                selectGoalArea(selectedGoalArea)
             }
             goForward()
         } label: {
@@ -6324,6 +6331,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         if let savedGoal = draft.entryPlanGoal.flatMap(TrainingPlanGoalType.init(rawValue:)) {
             goal = savedGoal
+        }
+        if selectedGoalChoice == "distance", selectedGoalArea == .running ||
+            selectedGoalArea == .specific {
+            goalDetail = ATHLTHLocalization.choose(
+                english: "Improve running distance", norwegian: "Løpe lenger"
+            )
         }
         switch draft.source {
         case "library": selectedSource = .library
