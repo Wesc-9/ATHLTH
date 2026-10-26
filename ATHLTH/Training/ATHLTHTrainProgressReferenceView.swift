@@ -328,6 +328,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         .scrollIndicators(.hidden)
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
         .refreshable { await refreshAll() }
+        .task(id: area) { await loadPulseZones() }
         .task(id: PeriodRequest(accountID: session.profile.userID, period: period)) {
             await loadPeriod()
             await loadPulseZones()
@@ -502,19 +503,87 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         }
     }
 
+
+    private struct RunningTrendWeek: Identifiable {
+        let date: Date
+        let distanceKM: Double
+        let paceSeconds: Double?
+        var id: Date { date }
+    }
+
+    private var runningTrendWeeks: [RunningTrendWeek] {
+        let granularity: Calendar.Component = period == .year ? .month : .weekOfYear
+        let grouped = Dictionary(grouping: runs) { workout in
+            Calendar.current.dateInterval(of: granularity, for: workout.startDate)?.start
+                ?? Calendar.current.startOfDay(for: workout.startDate)
+        }
+        return grouped.map { date, workouts in
+            let distance = workouts.compactMap(\.distanceMeters).reduce(0, +)
+            let duration = workouts.reduce(0.0) { $0 + $1.duration }
+            let pace = distance >= 500 ? duration / (distance / 1_000) : 0
+            return RunningTrendWeek(
+                date: date,
+                distanceKM: distance / 1_000,
+                paceSeconds: (120.0...1_200.0).contains(pace) ? pace : nil
+            )
+        }
+        .sorted { $0.date < $1.date }
+    }
+
+    private var visibleRecentSessions: [RecentSession] {
+        switch area {
+        case .general: return recentSessions
+        case .running:
+            let ids = Set(
+                runs.map { "health-" + $0.id.uuidString } +
+                unlinkedPhoneWorkouts.filter { !$0.walking }
+                    .map { "phone-" + $0.id.uuidString }
+            )
+            return recentSessions.filter { ids.contains($0.id) }
+        case .strength:
+            let ids = Set(
+                rangeWorkouts.filter { $0.activity == .strength }
+                    .map { "health-" + $0.id.uuidString } +
+                unlinkedLifts.map { "strength-" + $0.id.uuidString }
+            )
+            return recentSessions.filter { ids.contains($0.id) }
+        }
+    }
+
     private func sparkValues(_ stat: Stat) -> [Double] {
+        if area == .running {
+            return runs.sorted { $0.startDate < $1.startDate }.map { run in
+                switch stat.icon {
+                case "location": return (run.distanceMeters ?? 0) / 1_000
+                case "clock": return run.duration / 3_600
+                case "figure.run": return 1
+                default: return 0
+                }
+            }
+        }
+        if area == .strength {
+            return lifts.sorted { $0.startedAt < $1.startedAt }.map { lift in
+                switch stat.icon {
+                case "dumbbell": return 1
+                case "chart.bar": return lift.totalVolumeKilograms
+                case "square.stack.3d.up": return Double(lift.totalWorkingSets)
+                case "figure.strengthtraining.traditional": return Double(lift.exercises.count)
+                default: return 0
+                }
+            }
+        }
         guard let snapshot else { return [] }
         return snapshot.buckets.map { bucket in
             switch stat.icon {
             case "clock": return bucket.trainingDuration / 3_600
             case "location": return bucket.workoutDistanceMeters / 1_000
-            case "calendar", "figure.run", "dumbbell": return Double(bucket.workoutCount)
+            case "calendar": return Double(bucket.workoutCount)
             default: return 0
             }
         }
     }
 
-    private var editorialMetrics: some View {
+        private var editorialMetrics: some View {
         HStack(alignment: .top, spacing: 6) {
             ForEach(activeStats) { item in
                 VStack(alignment: .leading, spacing: 6) {
@@ -612,11 +681,58 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
 
             if area == .running {
-                if pacePoints.isEmpty {
-                    emptyLine(tr("Record runs to see your pace trend.",
-                                 "Registrer løpeøkter for å se tempoutviklingen."))
+                if runningTrendWeeks.isEmpty {
+                    emptyLine(tr("Record runs to see pace and distance.",
+                                 "Registrer løpeøkter for å se fart og distanse."))
                 } else {
-                    ATHLTHTrainProgressPaceChartView(samples: pacePoints)
+                    let maximumDistance = max(
+                        runningTrendWeeks.map(\.distanceKM).max() ?? 0, 1
+                    )
+                    Chart {
+                        ForEach(runningTrendWeeks) { bucket in
+                            BarMark(
+                                x: .value("Dato", bucket.date),
+                                y: .value("Relativ distanse", bucket.distanceKM / maximumDistance)
+                            )
+                            .foregroundStyle(ATHLTHTrainDesign.paleGold)
+                            .cornerRadius(2)
+                            if let pace = bucket.paceSeconds {
+                                LineMark(
+                                    x: .value("Dato", bucket.date),
+                                    y: .value("Relativ fart", (1_200 - pace) / 1_080)
+                                )
+                                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                .lineStyle(StrokeStyle(lineWidth: 2.2))
+                                .interpolationMethod(.catmullRom)
+                                PointMark(
+                                    x: .value("Dato", bucket.date),
+                                    y: .value("Relativ fart", (1_200 - pace) / 1_080)
+                                )
+                                .foregroundStyle(ATHLTHTrainDesign.gold)
+                                .symbolSize(20)
+                            }
+                        }
+                    }
+                    .chartYAxis(.hidden)
+                    .chartXAxis {
+                        AxisMarks(values: .automatic(desiredCount: 4)) {
+                            AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                                .font(.system(size: 9))
+                        }
+                    }
+                    .frame(height: 170)
+                    HStack(spacing: 12) {
+                        Text(tr("Average pace", "Snittfart") + ": " +
+                             (runningPace.map(paceText) ?? "—"))
+                        Text(tr("Distance", "Distanse") + ": " +
+                             String(format: "%.1f km", runningDistance))
+                    }
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                    Text(tr("Pace and distance use independent relative scales.",
+                            "Fart og distanse vises på hver sin relative skala."))
+                        .font(.system(size: 9)).foregroundStyle(muted)
                 }
             } else if area == .strength {
                 if liftPoints.isEmpty {
@@ -802,13 +918,13 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                     .font(.system(size: 11))
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
             }
-            if recentSessions.isEmpty {
+            if visibleRecentSessions.isEmpty {
                 emptyLine(tr("Completed workouts appear here.",
                              "Fullførte økter vises her."))
             } else {
                 ScrollView(.horizontal) {
                     HStack(spacing: 8) {
-                        ForEach(recentSessions.prefix(8)) { item in
+                        ForEach(visibleRecentSessions.prefix(8)) { item in
                             VStack(alignment: .leading, spacing: 6) {
                                 Image(systemName: item.icon)
                                     .font(.system(size: 17))
@@ -877,10 +993,10 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             } label: {
                 section(title: tr("Recent sessions", "Siste økter"),
                         accessory: tr("Full history", "Hele historikken")) {
-                    if recentSessions.isEmpty {
+                    if visibleRecentSessions.isEmpty {
                         emptyLine(tr("No workouts in this period", "Ingen økter i perioden"))
                     } else {
-                        ForEach(recentSessions.prefix(12)) { item in
+                        ForEach(visibleRecentSessions.prefix(12)) { item in
                             compactRow(icon: item.icon, title: item.title,
                                        subtitle: item.subtitle, value: item.value)
                         }
