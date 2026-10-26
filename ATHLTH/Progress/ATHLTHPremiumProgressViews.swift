@@ -10,7 +10,7 @@ enum ATHLTHProgressScope: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .general: return ATHLTHLocalization.choose(english: "General", norwegian: "Generelt")
+        case .general: return ATHLTHLocalization.choose(english: "All training", norwegian: "All trening")
         case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
         case .strength: return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
         }
@@ -40,97 +40,69 @@ struct ATHLTHPremiumProgressHero: View {
     let secondaryLabel: String
 
     var body: some View {
-        GeometryReader { geometry in
-            ZStack {
-                ATHLTHTheme.accentDeep
+        VStack(alignment: .leading, spacing: 15) {
+            Text(ATHLTHLocalization.choose(english: "TRAINING", norwegian: "TRENING"))
+                .font(.system(size: 11, weight: .medium))
+                .tracking(3)
+                .foregroundStyle(ATHLTHTheme.mutedText)
 
-                Image(scope.imageName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-                    .accessibilityHidden(true)
+            Text(ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremdrift"))
+                .font(.system(size: 42, weight: .regular, design: .serif))
+                .foregroundStyle(ATHLTHTheme.primaryText)
 
-                LinearGradient(
-                    stops: [
-                        .init(color: Color.black.opacity(0.50), location: 0),
-                        .init(color: Color.black.opacity(0.10), location: 0.30),
-                        .init(color: Color.black.opacity(0.20), location: 0.67),
-                        .init(color: Color.black.opacity(0.52), location: 1)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
+            Text(ATHLTHLocalization.choose(
+                english: "Follow your development. Build on what works.",
+                norwegian: "Se utviklingen din. Bygg videre på det som fungerer."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHTheme.mutedText)
 
-                VStack(spacing: 0) {
-                    Text(ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremgang"))
-                        .font(.system(size: 31, weight: .regular, design: .serif))
-                        .tracking(-0.9)
-                        .foregroundStyle(.white)
-                        .shadow(color: .black.opacity(0.24), radius: 8, y: 2)
-                        .padding(.top, 58)
+            HStack(spacing: 12) {
+                Image(systemName: scope == .running ? "figure.run" :
+                    scope == .strength ? "dumbbell" : "chart.xyaxis.line")
+                    .font(.system(size: 25, weight: .light))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 57, height: 57)
+                    .background(ATHLTHTheme.champagneSoft, in: Circle())
 
-                    Spacer(minLength: 8)
-
-                    ZStack {
-                        Circle()
-                            .fill(Color.black.opacity(0.20))
-                            .background {
-                                Circle()
-                                    .fill(.ultraThinMaterial)
-                                    .opacity(0.20)
-                            }
-
-                        Circle()
-                            .stroke(Color.white.opacity(0.25), lineWidth: 7)
-
-                        Circle()
-                            .stroke(
-                                AngularGradient(
-                                    colors: [
-                                        Color.white.opacity(0.78),
-                                        scope.accent.opacity(0.90),
-                                        Color.white.opacity(0.28),
-                                        Color.white.opacity(0.85)
-                                    ],
-                                    center: .center
-                                ),
-                                lineWidth: 3
-                            )
-                            .shadow(color: scope.accent.opacity(0.45), radius: 12)
-
-                        VStack(spacing: 5) {
-                            Text(metricLabel.uppercased())
-                                .font(.system(size: 10, weight: .semibold))
-                                .tracking(1.5)
-                                .lineLimit(1)
-
-                            Text(value)
-                                .font(.system(size: 47, weight: .light, design: .serif))
-                                .monospacedDigit()
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.65)
-
-                            Text(secondaryLabel)
-                                .font(.system(size: 11, weight: .medium))
-                                .lineLimit(2)
-                                .multilineTextAlignment(.center)
-                                .foregroundStyle(.white.opacity(0.87))
-                        }
-                        .padding(.horizontal, 18)
-                        .foregroundStyle(.white)
-                    }
-                    .frame(width: 188, height: 188)
-                    .accessibilityElement(children: .combine)
-
-                    Spacer(minLength: 16)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(scope.title.uppercased())
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.6)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Your training, over time",
+                        norwegian: "Din trening over tid"
+                    ))
+                    .font(.system(size: 20, weight: .medium, design: .serif))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    Text(secondaryLabel)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
                 }
-                .padding(.bottom, 27)
+                Spacer(minLength: 4)
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(metricLabel)
+                        .font(.system(size: 10))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    Text(value)
+                        .font(.system(size: 28, weight: .medium, design: .serif))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .monospacedDigit()
+                }
             }
-            .frame(width: geometry.size.width, height: geometry.size.height)
-            .clipped()
+            .padding(16)
+            .background(Color.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 20))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(ATHLTHTheme.premiumGold.opacity(0.22), lineWidth: 0.8)
+            }
         }
-        .frame(height: 316)
+        .padding(.horizontal, 16)
+        .padding(.top, 58)
+        .padding(.bottom, 18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHTheme.canvasTop)
     }
 }
 
