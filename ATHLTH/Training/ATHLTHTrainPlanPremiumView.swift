@@ -836,6 +836,11 @@ struct ATHLTHTrainPlanPremiumView: View {
         let title = phaseIndex == 0 ? tr("Warm-up", "Oppvarming") :
             (phaseIndex == 1 ? tr("Main workout", "Hoveddel")
                              : tr("Cool-down", "Nedtrapping"))
+        // Rest between sets is visible in the timeline but does not count
+        // as a distinct main exercise in the section heading.
+        let visibleCount = phaseIndex == 1
+            ? items.filter { $0.kind != .rest }.count
+            : items.count
         let phaseKey = "\(workout.id.uuidString)-\(phaseIndex)"
         let collapsed = collapsedWorkoutPhases.contains(phaseKey)
         return VStack(alignment: .leading, spacing: 5) {
@@ -856,7 +861,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                         Text(title)
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(graphite)
-                        Text("(\(items.count))")
+                        Text("(\(visibleCount))")
                             .font(.caption)
                             .foregroundStyle(secondaryInk)
                     }
@@ -908,19 +913,34 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .font(.system(size: 13))
                 .foregroundStyle(warmGold)
                 .frame(width: 30)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(block.title)
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(graphite)
-                    .fixedSize(horizontal: false, vertical: true)
-                if !details.isEmpty {
-                    Text(details)
-                        .font(.system(size: 10))
-                        .foregroundStyle(secondaryInk)
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 7) {
+                    Text(block.title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(graphite)
+                        .lineLimit(1)
+                    Spacer(minLength: 1)
+                    if !details.isEmpty {
+                        Text(details)
+                            .font(.system(size: 10))
+                            .foregroundStyle(secondaryInk)
+                            .lineLimit(1)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(block.title)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(graphite)
                         .fixedSize(horizontal: false, vertical: true)
+                    if !details.isEmpty {
+                        Text(details)
+                            .font(.system(size: 10))
+                            .foregroundStyle(secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
             Menu {
                 Button {
                     editingWorkout = WorkoutEditDestination(
