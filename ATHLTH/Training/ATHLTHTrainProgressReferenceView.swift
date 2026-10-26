@@ -15,6 +15,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
     let header: Header
 
     @State private var area: Area = .general
+    @State private var progressTab: ProgressTab = .overview
     @State private var period: Period = .threeMonths
     @State private var snapshot: HealthProgressSnapshot?
     @State private var allHealthWorkouts: [WorkoutSummary] = []
@@ -78,6 +79,21 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
             case .week: return .day
             case .month, .threeMonths: return .week
             case .year: return .month
+            }
+        }
+    }
+
+
+    private enum ProgressTab: String, CaseIterable, Identifiable {
+        case overview, trends, records, zones, sessions
+        var id: Self { self }
+        var label: String {
+            switch self {
+            case .overview: return ATHLTHLocalization.choose(english: "Overview", norwegian: "Oversikt")
+            case .trends: return ATHLTHLocalization.choose(english: "Trends", norwegian: "Trender")
+            case .records: return ATHLTHLocalization.choose(english: "Records", norwegian: "Rekorder")
+            case .zones: return ATHLTHLocalization.choose(english: "Zones", norwegian: "Soner")
+            case .sessions: return ATHLTHLocalization.choose(english: "Sessions", norwegian: "Økter")
             }
         }
     }
@@ -266,57 +282,52 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         }
     }
 
+
     var body: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: ATHLTHTrainDesign.sectionSpacing) {
+            LazyVStack(alignment: .leading, spacing: 14) {
                 header
-                hero
-                areaPicker
-                    .padding(.bottom, 3)
-
+                editorialHeading
+                editorialBanner
+                editorialNavigation
                 if isHistoryLimited {
-                    Label(tr("Some history could not be loaded. Pull down to try again.",
+                    Label(tr("Some history could not be loaded. Pull to refresh.",
                              "Noe historikk kunne ikke hentes. Dra ned for å prøve igjen."),
                           systemImage: "arrow.clockwise")
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .fixedSize(horizontal: false, vertical: true)
+                        .font(.caption).foregroundStyle(ATHLTHTrainDesign.bronze)
                 }
-
-                statsCard
-
-                switch area {
-                case .general:
-                    generalContent
-                case .running:
-                    runningContent
-                case .strength:
-                    strengthContent
+                switch progressTab {
+                case .overview:
+                    editorialOverview
+                case .trends:
+                    editorialTrend
+                    if area == .running { ATHLTHRunningSpeedProgressCard() }
+                    if area == .strength { strengthContent }
+                case .records:
+                    editorialRecords
+                case .zones:
+                    pulseZoneCard
+                case .sessions:
+                    editorialSessions
                 }
-
                 if isLoading || isHistoryLoading {
-                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 12)
+                    ProgressView().frame(maxWidth: .infinity).padding(.vertical, 10)
                 }
-
-                Text(ATHLTHLocalization.choose(
-                    english: "Overview includes Apple Health and completed local ATHLTH sessions. Running charts and calories use Apple Health. Strength loads are entered by you; planned duration is an estimate.",
-                    norwegian: "Oversikten inkluderer Apple Health og fullførte lokale ATHLTH-økter. Løpegrafer og kalorier bruker Apple Health. Styrkevekter registreres av deg; planlagt varighet er et estimat."
+                Text(tr(
+                    "Apple Health and completed ATHLTH workouts. Unavailable measurements are not estimated.",
+                    "Apple Health og fullførte ATHLTH-økter. Manglende målinger blir ikke anslått."
                 ))
-                .font(.system(size: 11))
-                .foregroundStyle(muted)
-                .padding(.horizontal, 5)
-                .padding(.top, 4)
+                .font(.system(size: 10)).foregroundStyle(muted).padding(.top, 4)
             }
-            .padding(.horizontal, 15)
-            .padding(.top, 18)
-            .padding(.bottom, 34)
-            .frame(maxWidth: 760)
+            .padding(.horizontal, 16)
+            .padding(.top, 12)
+            .padding(.bottom, 40)
+            .frame(maxWidth: ATHLTHTrainDesign.readingWidth)
             .frame(maxWidth: .infinity)
         }
+        .scrollIndicators(.hidden)
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
-        .refreshable {
-            await refreshAll()
-        }
+        .refreshable { await refreshAll() }
         .task(id: PeriodRequest(accountID: session.profile.userID, period: period)) {
             await loadPeriod()
             await loadPulseZones()
@@ -328,7 +339,557 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
         }
     }
 
-    private func loadPulseZones() async {
+    private var editorialHeading: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(tr("Progress", "Fremdrift"))
+                    .font(.system(size: 39, weight: .regular, design: .serif))
+                    .foregroundStyle(ink)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer(minLength: 0)
+                Menu {
+                    Picker(tr("Training type", "Treningstype"), selection: $area) {
+                        ForEach(Area.allCases) { option in
+                            Text(option.title).tag(option)
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 7) {
+                        Text(area.title).lineLimit(1).minimumScaleFactor(0.7)
+                        Image(systemName: "chevron.down").font(.system(size: 10))
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .frame(height: 32)
+                    .background(
+                        LinearGradient(colors: [ATHLTHTrainDesign.gold, ATHLTHTrainDesign.bronze],
+                                       startPoint: .topLeading, endPoint: .bottomTrailing),
+                        in: Capsule()
+                    )
+                }
+            }
+            Text(tr("See your development. Build on what works.",
+                    "Se utviklingen din. Bygg videre på det som fungerer."))
+                .font(.system(size: 13))
+                .foregroundStyle(muted)
+        }
+    }
+
+    private var weekStart: Date {
+        Calendar.current.dateInterval(of: .weekOfYear, for: .now)?.start ?? .now
+    }
+    private var weeklyValue: String {
+        switch area {
+        case .general:
+            return "\(recentSessions.filter { $0.date >= weekStart }.count)"
+        case .running:
+            return String(format: "%.1f km",
+                          runs.filter { $0.startDate >= weekStart }
+                              .compactMap(\.distanceKilometers).reduce(0, +))
+        case .strength:
+            let kg = lifts.filter { $0.startedAt >= weekStart }
+                .reduce(0.0) { $0 + $1.totalVolumeKilograms }
+            return kg >= 1_000 ? String(format: "%.1f t", kg / 1_000)
+                : String(format: "%.0f kg", kg)
+        }
+    }
+
+    private var editorialBanner: some View {
+        ZStack {
+            GeometryReader { geometry in
+                Image("ProgressHero")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+            }
+            LinearGradient(colors: [
+                ATHLTHTrainDesign.paper.opacity(0.97),
+                ATHLTHTrainDesign.paper.opacity(0.82),
+                ATHLTHTrainDesign.paleGold.opacity(0.46)
+            ], startPoint: .leading, endPoint: .trailing)
+            HStack(spacing: 10) {
+                Image(systemName: area == .running ? "figure.run" :
+                      area == .strength ? "dumbbell" : "figure.mixed.cardio")
+                    .font(.system(size: 21, weight: .light))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(width: 42, height: 42)
+                    .background(.white.opacity(0.78), in: Circle())
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(area.title.uppercased())
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(1.6).foregroundStyle(muted)
+                    Text(area == .running ? tr("Stronger runner", "Sterkere løper")
+                         : area == .strength ? tr("Growing stronger", "Sterkere for hver økt")
+                         : tr("Your training", "Treningen din"))
+                        .font(.system(size: 20, weight: .medium, design: .serif))
+                        .foregroundStyle(ink).lineLimit(2)
+                        .minimumScaleFactor(0.74)
+                    Text(tr("One session at a time.", "Utvikling, økt for økt."))
+                        .font(.system(size: 10)).foregroundStyle(muted)
+                }
+                Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("This week", "Denne uken"))
+                        .font(.system(size: 9)).foregroundStyle(muted)
+                    Text(isHistoryLoading && area != .strength ? "—" : weeklyValue)
+                        .font(.system(size: 17, weight: .medium, design: .serif))
+                        .foregroundStyle(ink)
+                        .monospacedDigit().lineLimit(1)
+                        .minimumScaleFactor(0.60)
+                    Text(area == .general ? tr("sessions", "økter")
+                         : area == .running ? tr("distance", "distanse")
+                         : tr("volume", "volum"))
+                        .font(.system(size: 9))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+                .frame(width: 75, alignment: .leading)
+                .padding(10)
+                .background(.white.opacity(0.9),
+                            in: RoundedRectangle(cornerRadius: 11))
+            }
+            .padding(.horizontal, 12)
+        }
+        .frame(height: 109)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(ATHLTHTrainDesign.rule.opacity(0.5), lineWidth: 0.7)
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    private var editorialNavigation: some View {
+        HStack(spacing: 1) {
+            ForEach(ProgressTab.allCases) { item in
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                        progressTab = item
+                    }
+                } label: {
+                    Text(item.label)
+                        .font(.system(size: 10, weight: progressTab == item ? .semibold : .medium))
+                        .foregroundStyle(progressTab == item ? ink : muted)
+                        .lineLimit(1).minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, minHeight: 37)
+                        .background {
+                            if progressTab == item {
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(.white)
+                                    .shadow(color: .black.opacity(0.06), radius: 5, y: 2)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(progressTab == item ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(ATHLTHTrainDesign.paleGold.opacity(0.23),
+                    in: RoundedRectangle(cornerRadius: 13))
+    }
+
+    private var editorialOverview: some View {
+        VStack(spacing: 12) {
+            editorialMetrics
+            editorialTrend
+            HStack(alignment: .top, spacing: 9) {
+                editorialZonesPreview
+                editorialRecordsPreview
+            }
+            editorialRecent
+        }
+    }
+
+    private func sparkValues(_ stat: Stat) -> [Double] {
+        guard let snapshot else { return [] }
+        return snapshot.buckets.map { bucket in
+            switch stat.icon {
+            case "clock": return bucket.trainingDuration / 3_600
+            case "location": return bucket.workoutDistanceMeters / 1_000
+            case "calendar", "figure.run", "dumbbell": return Double(bucket.workoutCount)
+            default: return 0
+            }
+        }
+    }
+
+    private var editorialMetrics: some View {
+        HStack(alignment: .top, spacing: 6) {
+            ForEach(activeStats) { item in
+                VStack(alignment: .leading, spacing: 6) {
+                    Image(systemName: item.icon)
+                        .font(.system(size: 13))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(width: 28, height: 28)
+                        .background(ATHLTHTrainDesign.paleGold.opacity(0.55),
+                                    in: Circle())
+                    Text(item.label)
+                        .font(.system(size: 10))
+                        .foregroundStyle(muted).lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text(isHistoryLoading && area != .strength ? "—" : item.value)
+                        .font(.system(size: 16, weight: .medium, design: .serif))
+                        .foregroundStyle(ink).monospacedDigit()
+                        .lineLimit(1).minimumScaleFactor(0.56)
+                    if !isHistoryLoading, let change = item.change, change.isFinite {
+                        Text(String(format: "%+.0f%%", change))
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundStyle(change >= 0 ? Color.green : Color.orange)
+                    } else {
+                        Text(" ").font(.system(size: 9))
+                    }
+                    let values = sparkValues(item)
+                    if values.contains(where: { $0 > 0 }) {
+                        Chart(Array(values.enumerated()), id: \.offset) { index, value in
+                            BarMark(x: .value("Periode", index),
+                                    y: .value("Verdi", value))
+                                .foregroundStyle(ATHLTHTrainDesign.gold)
+                                .cornerRadius(1)
+                        }
+                        .chartXAxis(.hidden).chartYAxis(.hidden)
+                        .frame(height: 23)
+                    } else {
+                        Rectangle().fill(ATHLTHTrainDesign.paleGold.opacity(0.4))
+                            .frame(height: 1).padding(.vertical, 11)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 8).padding(.vertical, 10)
+                .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 15)
+                        .stroke(ATHLTHTrainDesign.rule.opacity(0.35), lineWidth: 0.7)
+                }
+                .accessibilityElement(children: .combine)
+            }
+        }
+    }
+
+    private var editorialTrend: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Text(tr("Development", "Utvikling"))
+                    .font(.system(size: 22, weight: .medium, design: .serif))
+                    .foregroundStyle(ink)
+                Spacer(minLength: 0)
+                HStack(spacing: 1) {
+                    ForEach([Period.month, .threeMonths, .year]) { option in
+                        Button { period = option } label: {
+                            Text(option == .month ? tr("4 weeks", "4 uker")
+                                 : option == .threeMonths ? tr("12 weeks", "12 uker")
+                                 : tr("1 year", "1 år"))
+                                .font(.system(size: 10, weight: period == option ? .semibold : .regular))
+                                .foregroundStyle(period == option ? ink : muted)
+                                .lineLimit(1).minimumScaleFactor(0.8)
+                                .padding(.horizontal, 7)
+                                .frame(height: 28)
+                                .background {
+                                    if period == option {
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .fill(.white)
+                                            .shadow(color: .black.opacity(0.05), radius: 4)
+                                    }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(2)
+                .background(ATHLTHTrainDesign.canvas,
+                            in: RoundedRectangle(cornerRadius: 9))
+            }
+            HStack(spacing: 14) {
+                Label(area == .running ? tr("Pace", "Snittfart")
+                      : tr("Training time", "Treningstid"), systemImage: "circle.fill")
+                Label(area == .running ? tr("Distance", "Distanse")
+                      : tr("Sessions", "Økter"), systemImage: "square.fill")
+            }
+            .font(.system(size: 9))
+            .foregroundStyle(ATHLTHTrainDesign.bronze)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+
+            if area == .running {
+                if pacePoints.isEmpty {
+                    emptyLine(tr("Record runs to see your pace trend.",
+                                 "Registrer løpeøkter for å se tempoutviklingen."))
+                } else {
+                    ATHLTHTrainProgressPaceChartView(samples: pacePoints)
+                }
+            } else if area == .strength {
+                if liftPoints.isEmpty {
+                    emptyLine(tr("Complete weighted sets to see your progress.",
+                                 "Fullfør vektsett for å se utviklingen."))
+                } else {
+                    Chart(liftPoints) { item in
+                        BarMark(x: .value("Dato", item.month), y: .value("Kg", item.kg))
+                            .foregroundStyle(ATHLTHTrainDesign.gold).cornerRadius(2)
+                    }
+                    .frame(height: 157)
+                }
+            } else if let snapshot, !snapshot.buckets.isEmpty {
+                let maxHours = max(snapshot.buckets.map { $0.trainingDuration / 3_600 }.max() ?? 0, 1)
+                let maxCount = max(snapshot.buckets.map { Double($0.workoutCount) }.max() ?? 0, 1)
+                Chart(snapshot.buckets) { bucket in
+                    BarMark(x: .value("Dato", bucket.startDate),
+                            y: .value("Økter relativt", Double(bucket.workoutCount) / maxCount))
+                        .foregroundStyle(ATHLTHTrainDesign.paleGold).cornerRadius(2)
+                    LineMark(x: .value("Dato", bucket.startDate),
+                             y: .value("Timer relativt", bucket.trainingDuration / 3_600 / maxHours))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .lineStyle(StrokeStyle(lineWidth: 2))
+                        .interpolationMethod(.catmullRom)
+                    PointMark(x: .value("Dato", bucket.startDate),
+                              y: .value("Timer relativt", bucket.trainingDuration / 3_600 / maxHours))
+                        .foregroundStyle(ATHLTHTrainDesign.gold)
+                        .symbolSize(16)
+                }
+                .chartYAxis(.hidden)
+                .chartXAxis {
+                    AxisMarks(values: .automatic(desiredCount: 4)) {
+                        AxisValueLabel(format: .dateTime.month(.abbreviated).day())
+                            .font(.system(size: 9))
+                    }
+                }
+                .frame(height: 153)
+                Text(tr("Hours and sessions · separate relative scales",
+                        "Timer og økter · ulike relative skalaer"))
+                    .font(.system(size: 9)).foregroundStyle(muted)
+            } else {
+                emptyLine(tr("Recorded development appears here.",
+                             "Registrert utvikling vises her."))
+            }
+        }
+        .padding(13)
+        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        .overlay {
+            RoundedRectangle(cornerRadius: 17)
+                .stroke(ATHLTHTrainDesign.rule.opacity(0.4), lineWidth: 0.7)
+        }
+    }
+
+    private func zoneColor(_ index: Int) -> Color {
+        switch index {
+        case 0: return Color(red: 0.38, green: 0.67, blue: 0.55)
+        case 1: return Color(red: 0.58, green: 0.74, blue: 0.48)
+        case 2: return Color(red: 0.86, green: 0.70, blue: 0.35)
+        case 3: return Color(red: 0.93, green: 0.55, blue: 0.34)
+        default: return Color(red: 0.84, green: 0.34, blue: 0.29)
+        }
+    }
+
+    private var editorialZonesPreview: some View {
+        Button { progressTab = .zones } label: {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Text(tr("Heart rate zones", "Pulssoner"))
+                        .font(.system(size: 16, weight: .medium, design: .serif))
+                        .foregroundStyle(ink)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption).foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+                let total = measuredZoneSeconds.reduce(0, +)
+                if total > 0 {
+                    Chart {
+                        ForEach(0..<5, id: \.self) { index in
+                            SectorMark(
+                                angle: .value("Tid", measuredZoneSeconds[index]),
+                                innerRadius: .ratio(0.67),
+                                angularInset: 1
+                            )
+                            .foregroundStyle(zoneColor(index))
+                        }
+                    }
+                    .chartLegend(.hidden)
+                    .frame(height: 106)
+                    .overlay {
+                        if let most = measuredZoneSeconds.enumerated()
+                            .max(by: { $0.element < $1.element }) {
+                            VStack(spacing: 1) {
+                                Text(String(format: "%.0f%%", most.element / total * 100))
+                                    .font(.system(size: 17, weight: .medium, design: .serif))
+                                Text(tr("zone", "sone") + " \(most.offset + 1)")
+                                    .font(.system(size: 9))
+                            }
+                            .foregroundStyle(ink)
+                        }
+                    }
+                } else {
+                    Image(systemName: "heart.text.square")
+                        .font(.system(size: 30, weight: .ultraLight))
+                        .foregroundStyle(ATHLTHTrainDesign.gold)
+                        .frame(maxWidth: .infinity, minHeight: 106)
+                }
+                Text(total > 0 ? tr("View zone distribution", "Se sonefordelingen")
+                     : tr("No measured zones yet", "Ingen målte soner ennå"))
+                    .font(.system(size: 10)).foregroundStyle(muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(10)
+            .background(.white, in: RoundedRectangle(cornerRadius: 15))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(ATHLTHTrainDesign.rule.opacity(0.4), lineWidth: 0.7)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var editorialRecordsPreview: some View {
+        Button { progressTab = .records } label: {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Text(tr("Best sessions", "Beste økter"))
+                        .font(.system(size: 16, weight: .medium, design: .serif))
+                        .foregroundStyle(ink)
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption).foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+                if area != .strength && !runningRecords.isEmpty {
+                    ForEach(runningRecords.prefix(3)) { item in
+                        HStack(spacing: 5) {
+                            Image(systemName: "medal.fill")
+                                .foregroundStyle(ATHLTHTrainDesign.gold)
+                            Text(item.kind.title)
+                                .lineLimit(1)
+                            Spacer(minLength: 0)
+                            Text(item.formattedValue)
+                                .lineLimit(1).minimumScaleFactor(0.72)
+                        }
+                        .font(.system(size: 9))
+                        .foregroundStyle(ink)
+                        .frame(minHeight: 26)
+                    }
+                } else if area != .running, let item = strength.personalRecords.first {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.title).lineLimit(2)
+                        Text(item.value).fontWeight(.semibold)
+                    }
+                    .font(.system(size: 10))
+                    .foregroundStyle(ink)
+                    .frame(maxWidth: .infinity, minHeight: 98, alignment: .topLeading)
+                } else {
+                    Text(tr("Your records will appear here.",
+                            "Rekordene dine vises her."))
+                        .font(.system(size: 10)).foregroundStyle(muted)
+                        .frame(maxWidth: .infinity, minHeight: 98)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: 164, alignment: .topLeading)
+            .padding(10)
+            .background(.white, in: RoundedRectangle(cornerRadius: 15))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(ATHLTHTrainDesign.rule.opacity(0.4), lineWidth: 0.7)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var editorialRecent: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text(tr("Recent sessions", "Siste økter"))
+                    .font(.system(size: 19, weight: .medium, design: .serif))
+                    .foregroundStyle(ink)
+                Spacer()
+                Button(tr("See all", "Se alle")) { progressTab = .sessions }
+                    .font(.system(size: 11))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+            }
+            if recentSessions.isEmpty {
+                emptyLine(tr("Completed workouts appear here.",
+                             "Fullførte økter vises her."))
+            } else {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(recentSessions.prefix(8)) { item in
+                            VStack(alignment: .leading, spacing: 6) {
+                                Image(systemName: item.icon)
+                                    .font(.system(size: 17))
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                    .frame(width: 30, height: 30)
+                                    .background(ATHLTHTrainDesign.paleGold.opacity(0.5),
+                                                in: RoundedRectangle(cornerRadius: 8))
+                                Text(item.title).font(.system(size: 11, weight: .medium))
+                                    .lineLimit(1)
+                                Text(item.value).font(.system(size: 11, design: .serif))
+                                    .lineLimit(1)
+                                Text(item.subtitle).font(.system(size: 9))
+                                    .foregroundStyle(muted).lineLimit(1)
+                            }
+                            .foregroundStyle(ink)
+                            .frame(width: 112, alignment: .leading)
+                            .padding(9)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .padding(12)
+        .background(.white.opacity(0.73),
+                    in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private var editorialRecords: some View {
+        VStack(spacing: 12) {
+            NavigationLink {
+                ProgressPersonalRecordsView(
+                    healthRecords: area == .strength ? [] : healthRecords,
+                    strengthRecords: area == .running ? [] : strength.personalRecords,
+                    repRecords: area == .running ? [] : strength.repPersonalRecords
+                )
+            } label: {
+                section(title: tr("Personal records", "Personlige rekorder"),
+                        accessory: tr("See all", "Se alle")) {
+                    if area != .strength {
+                        ForEach(runningRecords.prefix(4)) { item in
+                            recordLine(item.kind.title, value: item.formattedValue)
+                        }
+                    }
+                    if area != .running {
+                        ForEach(strength.personalRecords.prefix(4)) { item in
+                            recordLine(item.title, value: item.value)
+                        }
+                    }
+                    if runningRecords.isEmpty && strength.personalRecords.isEmpty {
+                        emptyLine(tr("No personal records yet.",
+                                     "Ingen personlige rekorder ennå."))
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+            ATHLTHTrainAchievementsView(startDate: period.start)
+        }
+    }
+
+    private var editorialSessions: some View {
+        VStack(spacing: 12) {
+            NavigationLink {
+                WorkoutHistoryView(startDate: period.start, endDate: .now)
+            } label: {
+                section(title: tr("Recent sessions", "Siste økter"),
+                        accessory: tr("Full history", "Hele historikken")) {
+                    if recentSessions.isEmpty {
+                        emptyLine(tr("No workouts in this period", "Ingen økter i perioden"))
+                    } else {
+                        ForEach(recentSessions.prefix(12)) { item in
+                            compactRow(icon: item.icon, title: item.title,
+                                       subtitle: item.subtitle, value: item.value)
+                        }
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+        private func loadPulseZones() async {
         let requestID = UUID()
         zoneRequestID = requestID
         measuredZoneSeconds = [Double](repeating: 0, count: 5)
