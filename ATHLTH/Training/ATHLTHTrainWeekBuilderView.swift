@@ -27,9 +27,12 @@ struct ATHLTHTrainWeekBuilderView: View {
     private let paper = ATHLTHTrainDesign.canvas
     private let line = ATHLTHTrainDesign.rule
 
-    init(planID: UUID, initialWeekIndex: Int = 0) {
+    init(
+        planID: UUID, initialWeekIndex: Int = 0, initialDayID: UUID? = nil
+    ) {
         self.planID = planID
         _weekIndex = State(initialValue: max(initialWeekIndex, 0))
+        _selectedDayID = State(initialValue: initialDayID)
     }
 
     private struct EditorRequest: Identifiable {
