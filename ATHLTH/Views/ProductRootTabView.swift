@@ -925,34 +925,38 @@ struct ATHLTHHomeView: View {
                     defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
                 ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
-                    Task { @MainActor in
-                        do {
-                            let didStart =
-                                try await WorkoutLaunchCoordinator.startStrength(
-                                workout: configuredWorkout,
-                                captureDevice: captureDevice,
-                                trackingMode: trackingMode,
-                                selectedFriends: selectedFriends,
-                                participationMode: socialMode,
-                                audioCoach: audioCoach,
-                                advancedConfiguration:
-                                    advancedConfiguration,
-                                session: session,
-                                settings: settings,
-                                social: social,
-                                strengthWorkout: strengthWorkout,
-                                watchConnection: watchConnection,
-                                spotify: spotifyPlayback
-                            )
-                            if didStart {
-                                showingHomeStrengthWorkout = true
-                            } else if let error = social.errorMessage {
-                                homeWatchTransferError = error
-                            }
-                        } catch {
-                            homeWatchTransferError =
-                                error.localizedDescription
+                    // Return the launch failure to the sheet that owns the
+                    // unsaved exercise/set configuration. Do not show a global
+                    // Home alert or dismiss the setup on a locked Watch.
+                    do {
+                        let didStart = try await WorkoutLaunchCoordinator.startStrength(
+                            workout: configuredWorkout,
+                            captureDevice: captureDevice,
+                            trackingMode: trackingMode,
+                            selectedFriends: selectedFriends,
+                            participationMode: socialMode,
+                            audioCoach: audioCoach,
+                            advancedConfiguration: advancedConfiguration,
+                            session: session,
+                            settings: settings,
+                            social: social,
+                            strengthWorkout: strengthWorkout,
+                            watchConnection: watchConnection,
+                            spotify: spotifyPlayback
+                        )
+                        if didStart {
+                            showingHomeStrengthWorkout = true
+                            return nil
                         }
+                        // The iPad sends an envelope to the paired iPhone;
+                        // a successful enqueue deliberately returns false.
+                        if ATHLTHDeviceRole.isIPad { return nil }
+                        return social.errorMessage ?? ATHLTHLocalization.choose(
+                            english: "The workout could not start. Check Apple Watch and try again.",
+                            norwegian: "Økten kunne ikke startes. Kontroller Apple Watch og prøv igjen."
+                        )
+                    } catch {
+                        return error.localizedDescription
                     }
                 }
             }
@@ -1047,52 +1051,41 @@ struct ATHLTHHomeView: View {
                             settings
                                 .defaultStrengthTracking
                     ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
-
-                        Task { @MainActor in
-                            do {
-                                let didStart =
-                                    try await WorkoutLaunchCoordinator
-                                        .startStrength(
-                                            workout:
-                                                configuredWorkout,
-                                            captureDevice:
-                                                captureDevice,
-                                            trackingMode:
-                                                trackingMode,
-                                            selectedFriends: selectedFriends,
-                                participationMode: socialMode,
-                                audioCoach:
-                                                audioCoach,
-                                            advancedConfiguration:
-                                                advancedConfiguration,
-                                            session:
-                                                session,
-                                            settings:
-                                                settings,
-                                            social:
-                                                social,
-                                            strengthWorkout:
-                                                strengthWorkout,
-                                            watchConnection:
-                                                watchConnection,
-                                            spotify:
-                                                spotifyPlayback
-                                        )
-
-                                if didStart {
-                                    pendingHomeQuickStartKind =
-                                        nil
-                                    showingHomeStrengthWorkout =
-                                        true
-                                } else if let error = social.errorMessage {
-                                    homeWatchTransferError = error
-                                }
-                            } catch {
-                                homeWatchTransferError =
-                                    error.localizedDescription
-                            }
+                    // Return the launch failure to the sheet that owns the
+                    // unsaved exercise/set configuration. Do not show a global
+                    // Home alert or dismiss the setup on a locked Watch.
+                    do {
+                        let didStart = try await WorkoutLaunchCoordinator.startStrength(
+                            workout: configuredWorkout,
+                            captureDevice: captureDevice,
+                            trackingMode: trackingMode,
+                            selectedFriends: selectedFriends,
+                            participationMode: socialMode,
+                            audioCoach: audioCoach,
+                            advancedConfiguration: advancedConfiguration,
+                            session: session,
+                            settings: settings,
+                            social: social,
+                            strengthWorkout: strengthWorkout,
+                            watchConnection: watchConnection,
+                            spotify: spotifyPlayback
+                        )
+                        if didStart {
+                            pendingHomeQuickStartKind = nil
+                                                        showingHomeStrengthWorkout = true
+                            return nil
                         }
+                        // The iPad sends an envelope to the paired iPhone;
+                        // a successful enqueue deliberately returns false.
+                        if ATHLTHDeviceRole.isIPad { return nil }
+                        return social.errorMessage ?? ATHLTHLocalization.choose(
+                            english: "The workout could not start. Check Apple Watch and try again.",
+                            norwegian: "Økten kunne ikke startes. Kontroller Apple Watch og prøv igjen."
+                        )
+                    } catch {
+                        return error.localizedDescription
                     }
+                }
                 } else {
                     QuickWorkoutStartSheet(
                         kind: kind,
@@ -5970,34 +5963,38 @@ struct ATHLTHTrainView: View {
                     defaultCapture: .automatic,
                     defaultTracking: settings.defaultStrengthTracking
                 ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
-                    Task { @MainActor in
-                        do {
-                            let didStart =
-                                try await WorkoutLaunchCoordinator.startStrength(
-                                workout: configuredWorkout,
-                                captureDevice: captureDevice,
-                                trackingMode: trackingMode,
-                                selectedFriends: selectedFriends,
-                                participationMode: socialMode,
-                                audioCoach: audioCoach,
-                                advancedConfiguration:
-                                    advancedConfiguration,
-                                session: session,
-                                settings: settings,
-                                social: social,
-                                strengthWorkout: strengthWorkout,
-                                watchConnection: watchConnection,
-                                spotify: spotifyPlayback
-                            )
-                            if didStart {
-                                showingStrengthWorkout = true
-                            } else if let error = social.errorMessage {
-                                watchTransferError = error
-                            }
-                        } catch {
-                            watchTransferError =
-                                error.localizedDescription
+                    // Return the launch failure to the sheet that owns the
+                    // unsaved exercise/set configuration. Do not show a global
+                    // Home alert or dismiss the setup on a locked Watch.
+                    do {
+                        let didStart = try await WorkoutLaunchCoordinator.startStrength(
+                            workout: configuredWorkout,
+                            captureDevice: captureDevice,
+                            trackingMode: trackingMode,
+                            selectedFriends: selectedFriends,
+                            participationMode: socialMode,
+                            audioCoach: audioCoach,
+                            advancedConfiguration: advancedConfiguration,
+                            session: session,
+                            settings: settings,
+                            social: social,
+                            strengthWorkout: strengthWorkout,
+                            watchConnection: watchConnection,
+                            spotify: spotifyPlayback
+                        )
+                        if didStart {
+                            showingStrengthWorkout = true
+                            return nil
                         }
+                        // The iPad sends an envelope to the paired iPhone;
+                        // a successful enqueue deliberately returns false.
+                        if ATHLTHDeviceRole.isIPad { return nil }
+                        return social.errorMessage ?? ATHLTHLocalization.choose(
+                            english: "The workout could not start. Check Apple Watch and try again.",
+                            norwegian: "Økten kunne ikke startes. Kontroller Apple Watch og prøv igjen."
+                        )
+                    } catch {
+                        return error.localizedDescription
                     }
                 }
             }
@@ -6155,50 +6152,39 @@ struct ATHLTHTrainView: View {
                         settings
                             .defaultStrengthTracking
                 ) { configuredWorkout, captureDevice, trackingMode, selectedFriends, socialMode, audioCoach, advancedConfiguration in
-
-                    Task { @MainActor in
-                        do {
-                            let didStart =
-                                try await WorkoutLaunchCoordinator
-                                    .startStrength(
-                                        workout:
-                                            configuredWorkout,
-                                        captureDevice:
-                                            captureDevice,
-                                        trackingMode:
-                                            trackingMode,
-                                        selectedFriends: selectedFriends,
-                                participationMode: socialMode,
-                                audioCoach:
-                                            audioCoach,
-                                        advancedConfiguration:
-                                            advancedConfiguration,
-                                        session:
-                                            session,
-                                        settings:
-                                            settings,
-                                        social:
-                                            social,
-                                        strengthWorkout:
-                                            strengthWorkout,
-                                        watchConnection:
-                                            watchConnection,
-                                        spotify:
-                                            spotifyPlayback
-                                    )
-
-                            if didStart {
-                                showingStrengthQuickStart =
-                                    false
-                                showingStrengthWorkout =
-                                    true
-                            } else if let error = social.errorMessage {
-                                watchTransferError = error
-                            }
-                        } catch {
-                            watchTransferError =
-                                error.localizedDescription
+                    // Return the launch failure to the sheet that owns the
+                    // unsaved exercise/set configuration. Do not show a global
+                    // Home alert or dismiss the setup on a locked Watch.
+                    do {
+                        let didStart = try await WorkoutLaunchCoordinator.startStrength(
+                            workout: configuredWorkout,
+                            captureDevice: captureDevice,
+                            trackingMode: trackingMode,
+                            selectedFriends: selectedFriends,
+                            participationMode: socialMode,
+                            audioCoach: audioCoach,
+                            advancedConfiguration: advancedConfiguration,
+                            session: session,
+                            settings: settings,
+                            social: social,
+                            strengthWorkout: strengthWorkout,
+                            watchConnection: watchConnection,
+                            spotify: spotifyPlayback
+                        )
+                        if didStart {
+                            showingStrengthQuickStart = false
+                                                        showingStrengthWorkout = true
+                            return nil
                         }
+                        // The iPad sends an envelope to the paired iPhone;
+                        // a successful enqueue deliberately returns false.
+                        if ATHLTHDeviceRole.isIPad { return nil }
+                        return social.errorMessage ?? ATHLTHLocalization.choose(
+                            english: "The workout could not start. Check Apple Watch and try again.",
+                            norwegian: "Økten kunne ikke startes. Kontroller Apple Watch og prøv igjen."
+                        )
+                    } catch {
+                        return error.localizedDescription
                     }
                 }
             }
