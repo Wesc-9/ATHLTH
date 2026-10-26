@@ -5,6 +5,11 @@ struct ATHLTHInsightsView: View {
     var onSelectTab: (Int) -> Void = { _ in }
 
     @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var selectedSection: ATHLTHInsightsSection = .overview
+    @State private var trainingDays: [ATHLTHInsightsTrainingDay] = []
+    @State private var muscleSummary: ATHLTHInsightsMuscleSummary = .empty
 
     @State private var trendSnapshot: HealthProgressSnapshot?
     @State private var isLoadingTrend = false
@@ -22,14 +27,14 @@ struct ATHLTHInsightsView: View {
 
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTheme.accentDeep.opacity(0.62),
+                accent: ATHLTHTrainDesign.gold.opacity(0.28),
                 pullDownFadeBridge: true,
                 lightweightScrolling: true
             ) {
                 ATHLTHTabHero(
                     imageName: "ProgressHero",
                     title: ATHLTHLocalization.choose(english: "Insights", norwegian: "Innsikt"),
-                    subtitle: ATHLTHLocalization.choose(english: "Understand what is happening, what changed and what it means for your training.", norwegian: "Forstå dagsformen, endringene og hva de betyr for treningen din."),
+                    subtitle: ATHLTHLocalization.choose(english: "Understand your body. Train smarter.", norwegian: "Forstå kroppen din. Tren smartere."),
                     height: 236,
                     alignment: .leading,
                     focalOffsetX: immersive ? 4 : 16,
@@ -39,20 +44,27 @@ struct ATHLTHInsightsView: View {
                     immersiveCopy: immersive
                 )
             } content: {
-                LazyVStack(spacing: 16) {
-                    pulseCard
-                    nowCard
-                    whatChangedCard
-                    trendCard
-                    whyItMattersCard
-                    whatIfCard
-                    replayCard
-                    detailDestinationsCard
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    ATHLTHInsightsNavigation(selection: $selectedSection)
+                        .padding(.bottom, 3)
+
+                    // Each section has its own hierarchy, but all original
+                    // signals, recommendations, simulator and destinations remain.
+                    switch selectedSection {
+                    case .overview:
+                        AnyView(overviewSection)
+                    case .health:
+                        AnyView(healthSection)
+                    case .training:
+                        AnyView(trainingSection)
+                    case .development:
+                        AnyView(developmentSection)
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 14)
                 .padding(.bottom, 32)
-                .frame(maxWidth: 900)
+                .frame(maxWidth: ATHLTHTrainDesign.readingWidth)
                 .frame(maxWidth: .infinity)
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -73,12 +85,233 @@ struct ATHLTHInsightsView: View {
                 if sessionBaselines != updated {
                     sessionBaselines = updated
                 }
+                trainingDays = ATHLTHInsightsTrainingDay.make(from: workouts)
+            }
+            .onReceive(strength.$workoutHistory) { history in
+                muscleSummary = ATHLTHInsightsMuscleSummary.make(from: history)
             }
         }
     }
 
+    // Existing assets are authoritative. ATHLTHTabHero above continues to
+    // use ProgressHero; no downloaded or mockup artwork is bundled here.
+    private var overviewSection: some View {
+        Group {
+            readinessOverviewCard
+            whyItMattersCard
+            whatChangedCard
+            detailDestinationsCard
+        }
+    }
+
+    private var healthSection: some View {
+        Group {
+            nowCard
+            healthExplanationCard
+            pulseCard
+            NavigationLink {
+                ATHLTHRecoveryView(onSelectTab: onSelectTab)
+            } label: {
+                insightDestinationRow(
+                    title: tr("More about recovery", "Mer om restitusjon"),
+                    subtitle: tr("Sleep, soreness and recovery history", "Søvn, stølhet og restitusjonshistorikk"),
+                    icon: "leaf"
+                )
+                .padding(18)
+                .athlthTrainPaper()
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    private var trainingSection: some View {
+        Group {
+            ATHLTHInsightsTrainingWeekCard(days: trainingDays)
+            ATHLTHInsightsMuscleCard(summary: muscleSummary)
+            trendCard
+            replayCard
+        }
+    }
+
+    private var developmentSection: some View {
+        Group {
+            whatChangedCard
+            trendCard
+            whatIfCard
+            replayCard
+            detailDestinationsCard
+        }
+    }
+
+    private var readinessOverviewCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(spacing: 9) {
+                Image(systemName: pulseIcon)
+                    .foregroundStyle(ATHLTHTrainDesign.gold)
+                Text(tr("Today's readiness", "Dagens form"))
+                    .font(.system(size: 20, weight: .medium, design: .serif))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                Spacer(minLength: 2)
+                Text(Date.now.formatted(date: .abbreviated, time: .omitted))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+
+            HStack(alignment: .center, spacing: 17) {
+                ZStack {
+                    Circle()
+                        .stroke(ATHLTHTrainDesign.paleGold, lineWidth: 12)
+                    Circle()
+                        .trim(from: 0, to: CGFloat(health.recovery.score ?? 0) / 100)
+                        .stroke(
+                            AngularGradient(
+                                colors: [ATHLTHTrainDesign.paleGold, ATHLTHTrainDesign.gold,
+                                         ATHLTHTrainDesign.bronze],
+                                center: .center
+                            ),
+                            style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                        )
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: 2) {
+                        Text(health.recovery.score.map(String.init) ?? "—")
+                            .font(.system(size: 37, weight: .regular, design: .serif))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHTrainDesign.ink)
+                        Text(health.recovery.score == nil ? tr("No data", "Ingen data") : pulseTitle.capitalized)
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                    }
+                }
+                .frame(width: 135, height: 135)
+                .accessibilityLabel(tr("Readiness score", "Dagsformscore") +
+                    ": " + (health.recovery.score.map(String.init) ?? tr("Unavailable", "Ikke tilgjengelig")))
+
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(pulseTitle.capitalized)
+                        .font(.system(size: 27, weight: .regular, design: .serif))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                    Text(pulseDetail)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    NavigationLink {
+                        ATHLTHRecoveryView(onSelectTab: onSelectTab)
+                    } label: {
+                        Label(tr("See details", "Se detaljer"),
+                              systemImage: "arrow.up.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    }
+                }
+            }
+
+            HStack(spacing: 7) {
+                readinessMetric(tr("Sleep", "Søvn"), sleepValue, "moon.stars.fill")
+                readinessMetric("HRV", hrvValue, "waveform.path.ecg")
+                readinessMetric(tr("Resting HR", "Hvilepuls"), restingHRValue, "heart.fill")
+            }
+        }
+        .padding(18)
+        .athlthTrainPaper(emphasized: true)
+    }
+
+    private func readinessMetric(_ title: String, _ value: String, _ icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Image(systemName: icon)
+                .foregroundStyle(ATHLTHTrainDesign.gold)
+                .font(.caption)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.67)
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+        .background(ATHLTHTrainDesign.canvas.opacity(0.88),
+                    in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private var healthExplanationCard: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Label(tr("How your body is responding", "Slik reagerer kroppen"),
+                  systemImage: "waveform.path.ecg")
+                .font(.system(size: 20, weight: .medium, design: .serif))
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+
+            healthSignalRow(
+                title: tr("Sleep", "Søvn"),
+                value: sleepValue,
+                explanation: sleepDetail,
+                symbol: "moon.stars.fill"
+            )
+            Divider().overlay(ATHLTHTrainDesign.rule.opacity(0.4))
+            healthSignalRow(
+                title: tr("Resting heart rate", "Hvilepuls"),
+                value: restingHRValue,
+                explanation: restingHRDetail,
+                symbol: "heart"
+            )
+            Divider().overlay(ATHLTHTrainDesign.rule.opacity(0.4))
+            healthSignalRow(
+                title: "HRV",
+                value: hrvValue,
+                explanation: hrvDetail,
+                symbol: "waveform.path.ecg"
+            )
+        }
+        .padding(18)
+        .athlthTrainPaper()
+    }
+
+    private func healthSignalRow(title: String, value: String, explanation: String, symbol: String) -> some View {
+        HStack(spacing: 13) {
+            Image(systemName: symbol)
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 34, height: 34)
+                .background(ATHLTHTrainDesign.paleGold.opacity(0.35),
+                            in: RoundedRectangle(cornerRadius: 10))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                Text(explanation)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 5)
+            Text(value)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+    }
+
+    private func insightsPaper<Content: View>(
+        @ViewBuilder _ content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12, content: content)
+            .padding(18)
+            .athlthTrainPaper()
+    }
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
     private var pulseCard: some View {
-        ATHLTHUnifiedCard {
+        insightsPaper {
             HStack(alignment: .top, spacing: 14) {
                 ZStack {
                     Circle()
@@ -126,7 +359,7 @@ struct ATHLTHInsightsView: View {
     }
 
     private var nowCard: some View {
-        ATHLTHUnifiedCard {
+        insightsPaper {
             ATHLTHSectionHeader(title: ATHLTHLocalization.choose(english: "Now", norwegian: "Akkurat nå"))
 
             Text(ATHLTHLocalization.choose(english: "Your current signals, without making you interpret a dashboard first.", norwegian: "Dagens viktigste signaler, enkelt forklart."))
@@ -178,7 +411,7 @@ struct ATHLTHInsightsView: View {
     }
 
     private var whatChangedCard: some View {
-        ATHLTHUnifiedCard {
+        insightsPaper {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(ATHLTHLocalization.choose(english: "What changed?", norwegian: "Hva har endret seg?"))
@@ -267,7 +500,7 @@ struct ATHLTHInsightsView: View {
     }
 
     private var trendCard: some View {
-        ATHLTHUnifiedCard {
+        insightsPaper {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(ATHLTHLocalization.choose(english: "Trend", norwegian: "Utvikling"))
@@ -352,7 +585,7 @@ struct ATHLTHInsightsView: View {
     }
 
     private var whyItMattersCard: some View {
-        ATHLTHUnifiedCard {
+        insightsPaper {
             HStack(alignment: .top, spacing: 13) {
                 Image(systemName: "lightbulb.max.fill")
                     .font(.system(size: 19, weight: .semibold))
@@ -404,7 +637,7 @@ struct ATHLTHInsightsView: View {
     }
 
     private var whatIfCard: some View {
-        ATHLTHUnifiedCard {
+        insightsPaper {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(ATHLTHLocalization.choose(english: "What if?", norwegian: "Hva om?"))
@@ -497,7 +730,7 @@ struct ATHLTHInsightsView: View {
         NavigationLink {
             GhostReplaySimulatorView()
         } label: {
-            ATHLTHUnifiedCard {
+            insightsPaper {
                 HStack(alignment: .top, spacing: 13) {
                     Image(systemName: "figure.run.circle.fill")
                         .font(.system(size: 24, weight: .semibold))
@@ -536,7 +769,7 @@ struct ATHLTHInsightsView: View {
     }
 
     private var detailDestinationsCard: some View {
-        ATHLTHUnifiedCard {
+        insightsPaper {
             ATHLTHSectionHeader(title: ATHLTHLocalization.choose(english: "Go deeper", norwegian: "Se flere detaljer"))
 
             VStack(spacing: 0) {
