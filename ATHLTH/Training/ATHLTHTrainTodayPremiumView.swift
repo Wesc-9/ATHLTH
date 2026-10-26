@@ -1494,33 +1494,58 @@ struct ATHLTHTrainTodayPremiumView: View {
             focusIcon = "sparkles"
         }
 
-        return VStack(alignment: .leading, spacing: 13) {
-            Text(tr("Today's focus", "Dagens fokus"))
-                .font(.headline.weight(.semibold))
-                .foregroundStyle(ink)
-            HStack(alignment: .top, spacing: 10) {
-                Image(systemName: focusIcon)
-                    .font(.system(size: 20, weight: .medium))
-                    .foregroundStyle(champagne)
-                    .frame(width: 40, height: 40)
-                    .background(ATHLTHTrainDesign.paleGold.opacity(0.35),
-                                in: Circle())
+        return ZStack(alignment: .topLeading) {
+            GeometryReader { geometry in
+                Image("GoalMountain")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                    .overlay {
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.95),
+                                Color.white.opacity(0.74),
+                                Color.white.opacity(0.68)
+                            ],
+                            startPoint: .topLeading, endPoint: .bottomTrailing
+                        )
+                    }
                     .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(focusTitle)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(focusBody)
-                        .font(.caption2)
-                        .foregroundStyle(muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
             }
+            .allowsHitTesting(false)
+
+            VStack(alignment: .leading, spacing: 11) {
+                HStack(spacing: 8) {
+                    Image(systemName: focusIcon)
+                        .font(.system(size: 22, weight: .regular))
+                        .foregroundStyle(champagne)
+                        .accessibilityHidden(true)
+                    Text(tr("Today's focus", "Dagens fokus"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(champagne)
+                }
+
+                Text(focusTitle)
+                    .font(.system(.title3, design: .serif).weight(.semibold))
+                    .foregroundStyle(ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Text(focusBody)
+                    .font(.caption)
+                    .foregroundStyle(ink.opacity(0.73))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, minHeight: 174, alignment: .topLeading)
+            .padding(15)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(14)
-        .athlthTrainPaper()
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(hairline.opacity(0.43), lineWidth: 0.7)
+                .allowsHitTesting(false)
+        }
     }
 
     private var quickTrainSection: some View {
