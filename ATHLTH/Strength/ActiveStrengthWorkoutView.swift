@@ -128,6 +128,19 @@ struct ActiveStrengthWorkoutView: View {
                     )
                 }
             }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if showingSpotifyControls && spotify.isConnected &&
+                   strength.activeWorkout != nil {
+                    HStack(spacing: 0) {
+                        inlineSpotifyBar
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.leading, 80)
+                    .padding(.top, 3)
+                    .padding(.bottom, 5)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english: "Strength",
@@ -180,7 +193,9 @@ struct ActiveStrengthWorkoutView: View {
 
                     if spotify.isConnected {
                         Button {
-                            showingSpotifyControls = true
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                showingSpotifyControls.toggle()
+                            }
                         } label: {
                             ATHLTHSpotifyGlyph()
                                 .frame(width: 30, height: 30)
@@ -268,63 +283,6 @@ struct ActiveStrengthWorkoutView: View {
             .sheet(isPresented: $showingExerciseQueue) {
                 StrengthActiveExerciseQueueView()
                     .environmentObject(strength)
-            }
-            .sheet(isPresented: $showingSpotifyControls) {
-                VStack(spacing: 18) {
-                    HStack(spacing: 11) {
-                        ATHLTHSpotifyGlyph().frame(width: 38, height: 38)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("Spotify").font(.headline)
-                            Text(ATHLTHLocalization.choose(
-                                english: "Workout playback",
-                                norwegian: "Musikk under treningen"
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        Spacer()
-                    }
-                    HStack(spacing: 12) {
-                        Button {
-                            Task {
-                                await spotify.handleIPhoneAudioDockCommand(
-                                    spotify.isPlaying ? .pause : .resume
-                                )
-                            }
-                        } label: {
-                            Label(
-                                spotify.isPlaying
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Pause", norwegian: "Pause"
-                                    )
-                                    : ATHLTHLocalization.choose(
-                                        english: "Play", norwegian: "Spill"
-                                    ),
-                                systemImage: spotify.isPlaying
-                                    ? "pause.fill" : "play.fill"
-                            )
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHPlanDesign.ink)
-                        Button {
-                            Task {
-                                await spotify.handleIPhoneAudioDockCommand(.next)
-                            }
-                        } label: {
-                            Label(ATHLTHLocalization.choose(
-                                english: "Next track",
-                                norwegian: "Neste låt"
-                            ), systemImage: "forward.end.fill")
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                        }
-                        .buttonStyle(.bordered)
-                    }
-                }
-                .padding(22)
-                .presentationDetents([.height(205)])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(ATHLTHPlanDesign.surface)
             }
             .sheet(isPresented: $showingExerciseLibrary) {
                 NavigationStack {
@@ -1847,6 +1805,64 @@ struct ActiveStrengthWorkoutView: View {
     /// Confirming is a save action, not a destructive delete.
     /// The active workout remains untouched until the primary action is tapped.
     @ViewBuilder
+    /// A single thin line tucked under the Spotify toolbar button.
+    /// Reuses the playback commands without opening a modal sheet.
+    private var inlineSpotifyBar: some View {
+        HStack(spacing: 7) {
+            ATHLTHSpotifyGlyph()
+                .frame(width: 17, height: 17)
+                .accessibilityHidden(true)
+            Text("Spotify")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+            Spacer(minLength: 0)
+            Button {
+                Task {
+                    await spotify.handleIPhoneAudioDockCommand(
+                        spotify.isPlaying ? .pause : .resume
+                    )
+                }
+            } label: {
+                Image(systemName: spotify.isPlaying ? "pause.fill" : "play.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 31, height: 38)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(spotify.isPlaying
+                ? ATHLTHLocalization.choose(
+                    english: "Pause Spotify", norwegian: "Pause Spotify"
+                  )
+                : ATHLTHLocalization.choose(
+                    english: "Play Spotify", norwegian: "Spill Spotify"
+                  ))
+            Button {
+                Task {
+                    await spotify.handleIPhoneAudioDockCommand(.next)
+                }
+            } label: {
+                Image(systemName: "forward.end.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(width: 31, height: 38)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Next Spotify track", norwegian: "Neste Spotify-låt"
+            ))
+        }
+        .foregroundStyle(ATHLTHTrainDesign.ink)
+        .padding(.leading, 9)
+        .padding(.trailing, 5)
+        .frame(width: 207, height: 40)
+        .background(ATHLTHTrainDesign.paper, in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.5), lineWidth: 0.7)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: ATHLTHTrainDesign.ink.opacity(0.05),
+                radius: 6, x: 0, y: 2)
+    }
+
     private var strengthFinishConfirmationSheet: some View {
         if let workout = strength.activeWorkout {
             let plannedSetCount = workout.exercises.reduce(0) {
