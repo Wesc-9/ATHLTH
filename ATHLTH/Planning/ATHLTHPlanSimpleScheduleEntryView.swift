@@ -58,7 +58,7 @@ struct ATHLTHPlanSimpleScheduleEntryView: View {
             GeometryReader { bounds in
                 HStack(spacing: 0) {
                     Spacer(minLength: 0)
-                    Image("PlanScheduleHero")
+                    Image("PlanGoalHero")
                         .resizable()
                         .scaledToFill()
                         .frame(width: bounds.size.width * 0.66, height: bounds.size.height)
