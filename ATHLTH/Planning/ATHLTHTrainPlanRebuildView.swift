@@ -31,6 +31,8 @@ struct ATHLTHTrainPlanRebuildView: View {
                 .sorted().joined(separator: ",")
         }
     }
+    @SceneStorage("athlth.train.plan.advancedMode")
+    private var advancedMode = false
     @State private var selectedWorkout: PlannedSession?
     @State private var workoutPendingQuickEdit: PlannedSession?
     @State private var workoutPendingFullEdit: PlannedSession?
@@ -74,6 +76,7 @@ struct ATHLTHTrainPlanRebuildView: View {
         VStack(alignment: .leading, spacing: 18) {
             if let plan {
                 planHeader(plan)
+                planModePicker
                 if let week = selectedWeek {
                     weekSelector(plan, selected: week)
                     VStack(alignment: .leading, spacing: 10) {
@@ -90,12 +93,11 @@ struct ATHLTHTrainPlanRebuildView: View {
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
-                        Text(ATHLTHLocalization.choose(
-                            english: "Open a free day to plan a workout or mark it as a rest day.",
-                            norwegian: "Åpne en ledig dag for å planlegge en økt eller velge hviledag."
-                        ))
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        if !advancedMode {
+                            Text("Velg en dag for å se økter, redigere eller planlegge hvile.")
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
                         ForEach(week.days.sorted { $0.dayIndex < $1.dayIndex }) { day in
                             dayRow(day, week: week, plan: plan)
                         }
@@ -301,6 +303,28 @@ struct ATHLTHTrainPlanRebuildView: View {
         .buttonStyle(.plain)
     }
 
+    private var planModePicker: some View {
+        HStack(spacing: 0) {
+            ForEach([false, true], id: \.self) { mode in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { advancedMode = mode }
+                } label: {
+                    Text(mode ? "Avansert" : "Enkel")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(advancedMode == mode ? Color.white : ATHLTHTheme.primaryText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(advancedMode == mode ? ATHLTHTheme.accentDeep : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(advancedMode == mode ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(ATHLTHTheme.champagneSoft, in: RoundedRectangle(cornerRadius: 17))
+    }
+
     private func weekSelector(
         _ plan: TrainingPlan,
         selected: TrainingPlanWeek
@@ -340,39 +364,40 @@ struct ATHLTHTrainPlanRebuildView: View {
                 ))
             }
 
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 9) {
-                    ForEach(plan.weeks.sorted { $0.weekNumber < $1.weekNumber }) { week in
-                        Button {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                chosenWeekID = week.id
-                                expandedDayIDs = []
-                            }
-                        } label: {
-                            VStack(spacing: 3) {
-                                Text("\(week.weekNumber)")
-                                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Week", norwegian: "Uke"
-                                ))
-                                .font(.system(size: 10, weight: .medium))
-                            }
-                            .foregroundStyle(week.id == selected.id
-                                ? Color.white : ATHLTHTheme.primaryText)
-                            .frame(width: 65, height: 57)
-                            .background(
-                                week.id == selected.id
-                                    ? ATHLTHTheme.accentDeep
-                                    : Color.white,
-                                in: RoundedRectangle(cornerRadius: 15)
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(week.id == selected.id ? .isSelected : [])
-                    }
+            HStack(spacing: 12) {
+                Button { changeWeek(by: -1, in: plan, selected: selected) } label: {
+                    Image(systemName: "chevron.left").frame(width: 42, height: 42)
                 }
-                .padding(.vertical, 2)
+                .disabled(selected.id == plan.weeks.min(by: { $0.weekNumber < $1.weekNumber })?.id)
+                Spacer()
+                VStack(spacing: 2) {
+                    Text("Uke \(selected.weekNumber)")
+                        .font(.system(size: 20, weight: .semibold, design: .serif))
+                    Text("\(selected.weekNumber) av \(plan.weeks.count)")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer()
+                Button { changeWeek(by: 1, in: plan, selected: selected) } label: {
+                    Image(systemName: "chevron.right").frame(width: 42, height: 42)
+                }
+                .disabled(selected.id == plan.weeks.max(by: { $0.weekNumber < $1.weekNumber })?.id)
             }
+            .buttonStyle(.plain)
+            .foregroundStyle(ATHLTHTheme.accentDeep)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 7)
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 16))
+        }
+    }
+
+    private func changeWeek(by step: Int, in plan: TrainingPlan, selected: TrainingPlanWeek) {
+        let weeks = plan.weeks.sorted { $0.weekNumber < $1.weekNumber }
+        guard let index = weeks.firstIndex(where: { $0.id == selected.id }),
+              weeks.indices.contains(index + step) else { return }
+        withAnimation(.easeInOut(duration: 0.2)) {
+            chosenWeekID = weeks[index + step].id
+            expandedDayIDs = []
         }
     }
 
@@ -630,10 +655,9 @@ struct ATHLTHTrainPlanRebuildView: View {
                                 norwegian: "Økthandlinger"
                             ))
                             }
-                            ATHLTHWorkoutPlanOutlineView(
-                                workout: workout,
-                                maxVisibleItems: 7
-                            )
+                            if advancedMode {
+                                ATHLTHWorkoutPlanOutlineView(workout: workout, maxVisibleItems: 30)
+                            }
                         }
                     }
                     ForEach(standaloneWorkouts) { workout in
