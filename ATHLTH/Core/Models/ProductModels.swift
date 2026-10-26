@@ -464,7 +464,10 @@ extension ExerciseSnapshot {
             "wall sit",
             "dead hang",
             "hollow hold",
-            "isometric hold"
+            "isometric hold",
+            "90/90 hold",
+            "90 90 hold",
+            "90/90 stretch hold"
         ]
 
         return timeBasedKeywords.contains {
