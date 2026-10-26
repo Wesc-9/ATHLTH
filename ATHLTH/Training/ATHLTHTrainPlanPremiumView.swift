@@ -2014,21 +2014,28 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(graphite)
             }
-            HStack(alignment: .top, spacing: 7) {
-                Image(systemName: block.kind == .rest ? "pause.circle" :
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: block.kind == .rest ? "pause.fill" :
                       block.kind == .exercise ? "dumbbell" :
                       block.kind == .run ? "figure.run" : "circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(block.kind == .rest
-                        ? secondaryInk : ATHLTHTheme.accentDeep)
-                    .frame(width: 16)
-                VStack(alignment: .leading, spacing: 2) {
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(warmGold)
+                    .frame(width: 29, height: 29)
+                    .background(Color(red: 0.945, green: 0.927, blue: 0.889), in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
                     Text(block.title)
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(graphite)
                         .fixedSize(horizontal: false, vertical: true)
-                    if let target = block.targetText {
-                        Text(target)
+                    let detail = [
+                        block.kind == .rest
+                            ? block.durationSeconds.map { "\(Int($0.rounded())) sek pause" }
+                            : block.targetText,
+                        block.notes
+                    ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+                    if !detail.isEmpty {
+                        Text(detail)
                             .font(.system(size: 11))
                             .foregroundStyle(secondaryInk)
                             .fixedSize(horizontal: false, vertical: true)
@@ -2037,9 +2044,21 @@ struct ATHLTHTrainPlanPremiumView: View {
                 Spacer(minLength: 0)
             }
         }
-        .padding(9)
+        .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(soft, in: RoundedRectangle(cornerRadius: 11))
+        .background(
+            block.kind == .rest
+                ? Color(red: 0.957, green: 0.938, blue: 0.905)
+                : Color(red: 0.978, green: 0.971, blue: 0.954),
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 1.5)
+                .fill(warmGold.opacity(block.kind == .rest ? 0.70 : 0.34))
+                .frame(width: 2)
+                .padding(.vertical, 9)
+                .accessibilityHidden(true)
+        }
     }
 
     private func premiumWorkoutFacts(_ workout: PlannedSession) -> some View {
@@ -3337,16 +3356,18 @@ struct ATHLTHTrainPlanPremiumView: View {
         ) ?? first
     }
 
+    // A single restrained palette across activity types; icons and names,
+    // rather than blue/green/purple surfaces, identify the workout.
     private func kindTint(_ kind: WorkoutKind) -> Color {
         switch kind {
         case .strength:
-            return Color(red: 0.63, green: 0.45, blue: 0.34)
+            return Color(red: 0.46, green: 0.34, blue: 0.22)
         case .running:
-            return Color(red: 0.39, green: 0.49, blue: 0.62)
+            return Color(red: 0.57, green: 0.42, blue: 0.25)
         case .walking:
-            return Color(red: 0.43, green: 0.53, blue: 0.43)
+            return Color(red: 0.51, green: 0.45, blue: 0.37)
         case .recovery, .mobility:
-            return Color(red: 0.52, green: 0.46, blue: 0.63)
+            return Color(red: 0.57, green: 0.53, blue: 0.47)
         case .custom:
             return warmGold
         }
