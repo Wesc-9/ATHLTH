@@ -1368,18 +1368,6 @@ struct ExerciseDetailView: View {
                     }
                 }
 
-                if !currentEntry.exercise.primaryMuscles.isEmpty ||
-                    !currentEntry.exercise.secondaryMuscles.isEmpty {
-                    // The anatomy diagram is now the gallery's third image;
-                    // keep the muscle names as lightweight, accessible details.
-                    ExerciseMuscleOverview(
-                        primaryMuscles: currentEntry.exercise.primaryMuscles,
-                        secondaryMuscles: currentEntry.exercise.secondaryMuscles,
-                        showsAnatomy: false
-                    )
-                    .padding(.horizontal, 4)
-                }
-
                 if ATHLTHLocalization.isNorwegian,
                    currentEntry.source == .repDB {
                     HStack(spacing: 8) {
@@ -1585,7 +1573,7 @@ struct ExerciseDetailView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(ATHLTHTheme.accent)
+                    .tint(ATHLTHTrainDesign.bronze)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                     .padding(.bottom, 8)
@@ -1665,25 +1653,7 @@ struct ExerciseDetailView: View {
                 .padding(.bottom, 7)
             }
         }
-        .background(
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.card,
-                    ATHLTHTheme.cardWarm.opacity(0.52)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 24, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(Color.white.opacity(0.72), lineWidth: 0.8)
-        }
-        .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(0.06),
-            radius: 12, x: 0, y: 6
-        )
+        .athlthTrainPaper()
     }
 
     private func peakExerciseArtwork(_ url: URL) -> some View {
@@ -1716,50 +1686,23 @@ struct ExerciseDetailView: View {
         _ title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 10) {
+                Capsule()
+                    .fill(ATHLTHTrainDesign.gold)
+                    .frame(width: 3, height: 19)
+                    .accessibilityHidden(true)
+                Text(title)
+                    .font(.system(size: 21, weight: .medium, design: .serif))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+            }
             content()
         }
-        .padding(16)
-        .frame(
-            maxWidth: .infinity,
-            alignment: .leading
-        )
-        .background(
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.card,
-                    ATHLTHTheme.cardWarm
-                        .opacity(0.62)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-        )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 22,
-                style: .continuous
-            )
-            .stroke(
-                Color.white.opacity(0.72),
-                lineWidth: 0.8
-            )
-        }
-        .shadow(
-            color:
-                ATHLTHTheme.accentDeep
-                    .opacity(0.065),
-            radius: 12,
-            x: 0,
-            y: 6
-        )
+        .padding(19)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .athlthTrainPaper()
     }
+
 }
 
 // AI only drafts editable exercise metadata. It never publishes the exercise or
@@ -2556,11 +2499,12 @@ struct ExerciseArtwork: View {
             }
         }
         .frame(width: size, height: size)
+        .background(ExerciseMuscleGalleryTile.skyBlue)
         .clipShape(RoundedRectangle(cornerRadius: min(size * 0.18, 20)))
     }
 
     private var fallback: some View {
-        ATHLTHTheme.accent.opacity(0.08)
+        ExerciseMuscleGalleryTile.skyBlue
             .overlay {
                 Image(
                     systemName: entry.source == .custom
@@ -2586,7 +2530,10 @@ struct ExerciseMuscleGalleryTile: View {
 
     // Matches the pale blue exercise-illustration photography without
     // tinting the anatomy atlas or changing primary/secondary highlights.
-    static let skyBlue = Color(red: 0.84, green: 0.945, blue: 0.985)
+    // Shared reference blue for start, peak and anatomy tiles (#DFF0FA).
+    // Original catalog illustrations may have a baked-in slightly different
+    // blue; keeping all three host surfaces equal prevents extra color drift.
+    static let skyBlue = Color(red: 223.0 / 255, green: 240.0 / 255, blue: 250.0 / 255)
 
     private var profile: StrengthMuscleProfile {
         ExerciseMuscleProfileFactory.profile(
