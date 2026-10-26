@@ -6940,6 +6940,9 @@ struct ATHLTHTrainView: View {
             onQuickCustom: { activity in startCustomQuick(as: activity) },
             onGhostRace: { showingGhostHub = true }
         )
+        // Reset date-specific check-in and proposed workout state exactly
+        // once when the calendar day changes; never reset the live recorder.
+        .id(displayedTrainDay)
     }
 
     @ViewBuilder
