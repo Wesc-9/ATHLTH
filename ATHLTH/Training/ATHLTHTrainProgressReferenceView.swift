@@ -547,6 +547,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                                         y: .value("Verdi", values[index]))
                                 .foregroundStyle(ATHLTHTrainDesign.gold)
                                 .cornerRadius(1)
+                            }
                         }
                         .chartXAxis(.hidden).chartYAxis(.hidden)
                         .frame(height: 23)
