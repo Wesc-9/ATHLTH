@@ -152,3 +152,5 @@ ATHLTH 1.9.5 build 103 — user-approved fresh version and TestFlight retry 2026
 ATHLTH 1.9.6 build 104 — explicit user-authorized TestFlight upload 2026-10-26; fixed undecodable PlanGoalHero catalog JPEG. Run same-commit iOS XCTest and backend gates, signed iPhone/Apple Watch/Widget archive validation and App Store Connect upload. Keep release/v1.9.6 active; do not implement the postponed Training Week concept yet.
 
 ATHLTH 1.9.6 build 104 — retry explicitly authorized TestFlight upload after correcting legacy training-plan navigation tests; 2026-10-26. Verify green same-commit iOS XCTest and backend regressions, then signed iPhone/Watch/Widget IPA, App Store Connect upload. Do not implement postponed training-week screen.
+
+ATHLTH 1.9.7 build 105 — user-authorized TestFlight upload 2026-10-27 (Europe/Oslo). Include approved Insights redesign with existing ProgressHero, premium muscle atlas and four Train-style tabs; require same-commit iOS XCTest and backend regression success, verified iPhone+Apple Watch+Widget signing and archive, and App Store Connect upload. Leave release/v1.9.7 active and unlocked; no additional design changes.
