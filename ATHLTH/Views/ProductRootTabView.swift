@@ -15145,8 +15145,6 @@ struct ATHLTHProgressView: View {
                     } else {
                     if health.hasRequestedAuthorization &&
                         (health.hasTrainingHealthData || progressHasHealthData) {
-                        periodPicker
-
                         weeklyOverview
 
                         if let snapshot = progressSnapshot {
