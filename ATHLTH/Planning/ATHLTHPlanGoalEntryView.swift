@@ -225,45 +225,65 @@ struct ATHLTHPlanGoalEntryView: View {
 
     private var hero: some View {
         ZStack(alignment: .leading) {
+            // The approved scenic runner portrait is shipped as an optimized
+            // local asset. Limit it to the trailing half so the editorial
+            // heading stays readable at normal and large text sizes.
             GeometryReader { bounds in
-                Image("GoalAdventure")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: bounds.size.width, height: bounds.size.height)
-                    .clipped()
+                HStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    Image("PlanGoalHero")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(
+                            width: bounds.size.width * 0.53,
+                            height: bounds.size.height
+                        )
+                        .clipped()
+                        .accessibilityHidden(true)
+                }
             }
+
             LinearGradient(
                 stops: [
                     .init(color: ATHLTHTrainDesign.canvas, location: 0),
-                    .init(color: ATHLTHTrainDesign.canvas.opacity(0.96), location: 0.40),
-                    .init(color: ATHLTHTrainDesign.canvas.opacity(0.30), location: 1)
+                    .init(color: ATHLTHTrainDesign.canvas.opacity(0.99), location: 0.37),
+                    .init(color: ATHLTHTrainDesign.canvas.opacity(0.78), location: 0.58),
+                    .init(color: ATHLTHTrainDesign.canvas.opacity(0.10), location: 0.91)
                 ],
                 startPoint: .leading, endPoint: .trailing
             )
+
             VStack(alignment: .leading, spacing: 9) {
-                Text(ATHLTHLocalization.choose(english: "BUILD YOUR PLAN",
-                                                norwegian: "BYGG DIN PLAN"))
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2.5)
-                    .foregroundStyle(secondary)
-                Text(ATHLTHLocalization.choose(english: "What is your goal?",
-                                                norwegian: "Hva er målet ditt?"))
-                    .font(.system(size: 35, weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.75)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(ATHLTHLocalization.choose(
+                    english: "BUILD YOUR PLAN",
+                    norwegian: "BYGG DIN PLAN"
+                ))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(2.5)
+                .foregroundStyle(secondary)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "What is your goal?",
+                    norwegian: "Hva er målet ditt?"
+                ))
+                .font(.system(size: 35, weight: .regular, design: .serif))
+                .foregroundStyle(ink)
+                .lineLimit(2)
+                .minimumScaleFactor(0.72)
+                .fixedSize(horizontal: false, vertical: true)
+
                 Text(ATHLTHLocalization.choose(
                     english: "Choose the main focus for your plan.",
                     norwegian: "Velg hovedfokus for planen din."
                 ))
                 .font(.system(size: 13))
                 .foregroundStyle(secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 3)
         }
-        .frame(height: 157)
+        .frame(height: dynamicTypeSize.isAccessibilitySize ? 196 : 157)
         .clipped()
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isHeader)
