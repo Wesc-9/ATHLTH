@@ -19,6 +19,38 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertEqual(restored.simpleActivityKinds, ["walking"])
     }
 
+    func testSelectedGoalSurvivesCheckpointWithoutSavingPersonalNotes() throws {
+        let draft = ATHLTHPlanCreationDraft(
+            title: "My running plan",
+            weekCount: 6,
+            startDate: Date(),
+            advanced: false,
+            source: "scratch",
+            stage: "goal",
+            entryGoalArea: "running",
+            entryGoalChoice: "speed",
+            entryPlanFocus: TrainingPlanFocus.running.rawValue,
+            entryPlanGoal: TrainingPlanGoalType.runFaster.rawValue
+        )
+        let data = try JSONEncoder().encode(draft)
+        let restored = try JSONDecoder().decode(ATHLTHPlanCreationDraft.self, from: data)
+        XCTAssertEqual(restored.entryGoalArea, "running")
+        XCTAssertEqual(restored.entryGoalChoice, "speed")
+        XCTAssertEqual(restored.entryPlanFocus, "running")
+        XCTAssertEqual(restored.entryPlanGoal, "runFaster")
+        XCTAssertFalse(String(decoding: data, as: UTF8.self).contains("goalDetail"))
+
+        let invalid = ATHLTHPlanCreationDraft(
+            title: "Invalid goal", weekCount: 4, startDate: Date(),
+            advanced: true, source: "scratch", stage: "goal",
+            entryGoalArea: "running", entryGoalChoice: "invented_choice",
+            entryPlanFocus: "unknown_focus", entryPlanGoal: "unknown_goal"
+        )
+        XCTAssertNil(invalid.entryGoalChoice)
+        XCTAssertNil(invalid.entryPlanFocus)
+        XCTAssertNil(invalid.entryPlanGoal)
+    }
+
     private func defaults() -> (UserDefaults, String) {
         let suite = "ATHLTHPlanCreationDraftTests.\(UUID().uuidString)"
         return (UserDefaults(suiteName: suite)!, suite)
