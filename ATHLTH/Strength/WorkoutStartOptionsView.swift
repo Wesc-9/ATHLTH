@@ -543,39 +543,27 @@ struct WorkoutStartOptionsView: View {
     private var strengthStickyStartBar: some View {
         VStack(alignment: .leading, spacing: 9) {
             if let inlineLaunchError {
-                HStack(alignment: .top, spacing: 10) {
-                    Image(systemName: "applewatch")
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Workout did not start",
-                            norwegian: "Økten ble ikke startet"
-                        ))
-                        .font(.subheadline.weight(.semibold))
-                        Text(inlineLaunchError)
-                            .font(.caption)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Your exercises and settings are saved in this card. Unlock Apple Watch and try again.",
-                            norwegian: "Øvelsene og valgene dine er bevart her. Lås opp Apple Watch og prøv igjen."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    }
+                HStack(spacing: 7) {
+                    Image(systemName: "exclamationmark.circle")
+                        .accessibilityHidden(true)
+                    Text(compactWatchStartMessage(inlineLaunchError))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.83)
+                        .accessibilityLabel(inlineLaunchError)
                     Spacer(minLength: 0)
-                    Button { inlineLaunchError = nil } label: {
+                    Button { self.inlineLaunchError = nil } label: {
                         Image(systemName: "xmark")
-                            .font(.caption.weight(.semibold))
-                            .frame(width: 28, height: 28)
+                            .font(.system(size: 10, weight: .semibold))
+                            .frame(width: 24, height: 24)
                     }
                     .accessibilityLabel(ATHLTHLocalization.choose(
                         english: "Dismiss message", norwegian: "Lukk meldingen"
                     ))
                 }
-                .foregroundStyle(ATHLTHTrainDesign.ink)
-                .padding(14)
-                .athlthTrainPaper()
-                .padding(.horizontal, 16)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .padding(.horizontal, 18)
+                .frame(height: 27)
             }
             if launchInProgress {
                 HStack(spacing: 8) {
@@ -602,6 +590,18 @@ struct WorkoutStartOptionsView: View {
             .allowsHitTesting(!launchInProgress)
             .opacity(launchInProgress ? 0.65 : 1)
         }
+    }
+
+    private func compactWatchStartMessage(_ message: String) -> String {
+        let normalized = message.lowercased()
+        if normalized.contains("locked") || normalized.contains("unlock")
+            || normalized.contains("låst") || normalized.contains("lås opp") {
+            return ATHLTHLocalization.choose(
+                english: "Unlock Apple Watch and try again.",
+                norwegian: "Lås opp Apple Watch og prøv igjen."
+            )
+        }
+        return message
     }
 
     private func startStrength(using device: WorkoutCaptureDevice) {
