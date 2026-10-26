@@ -88,8 +88,6 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var movingPlanID: UUID?
     @State private var movingPlanVersion: Int?
     @State private var moveTargetDate = Date()
-    @State private var moveWeekDate = Date()
-    @State private var moveError: String?
     @State private var editingPlan: TrainingPlan?
     @State private var trainingPlanPendingDeletion: TrainingPlan?
 
@@ -125,192 +123,13 @@ struct ATHLTHTrainPlanPremiumView: View {
         AnyView(editingSheets)
     }
 
-    private func beginMovingWorkout(_ workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan) {
-        moveError = nil
+    private func beginMovingWorkout(
+        _ workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan
+    ) {
         moveTargetDate = planDayDate(day.dayIndex, plan: plan)
-        moveWeekDate = moveTargetDate
         movingPlanID = plan.id
         movingPlanVersion = plan.version
         movingWorkout = workout
-    }
-
-    private func simpleMoveDays(earliest: Date, last: Date) -> some View {
-        let calendar = Calendar.current
-        let weekStart = calendar.dateInterval(of: .weekOfYear, for: moveWeekDate)?.start ?? moveWeekDate
-        let dates = (0..<7).compactMap { calendar.date(byAdding: .day, value: $0, to: weekStart) }
-        return VStack(alignment: .leading, spacing: 10) {
-            Text(tr("Choose a new day", "Velg en ny dag"))
-                .font(.headline)
-            HStack {
-                Button {
-                    moveWeekDate = calendar.date(byAdding: .day, value: -7, to: weekStart) ?? weekStart
-                } label: {
-                    Image(systemName: "chevron.left").frame(width: 48, height: 48)
-                }
-                .disabled((dates.last ?? weekStart) <= earliest || weekStart <= earliest)
-                .accessibilityLabel(tr("Previous week", "Forrige uke"))
-                Spacer()
-                Text(weekStart.formatted(.dateTime.day().month(.abbreviated)))
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Button {
-                    moveWeekDate = calendar.date(byAdding: .day, value: 7, to: weekStart) ?? weekStart
-                } label: {
-                    Image(systemName: "chevron.right").frame(width: 48, height: 48)
-                }
-                .disabled((dates.last ?? weekStart) >= last)
-                .accessibilityLabel(tr("Next week", "Neste uke"))
-            }
-            ForEach(dates, id: \.self) { date in
-                let selected = calendar.isDate(date, inSameDayAs: moveTargetDate)
-                Button {
-                    moveTargetDate = date
-                    moveError = nil
-                } label: {
-                    HStack {
-                        Text(date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))
-                            .font(.body.weight(.semibold))
-                            .multilineTextAlignment(.leading)
-                        Spacer()
-                        if selected { Image(systemName: "checkmark.circle.fill") }
-                    }
-                    .foregroundStyle(selected ? Color.white : graphite)
-                    .padding(.horizontal, 14)
-                    .frame(minHeight: 52)
-                    .background(selected ? graphite : soft, in: RoundedRectangle(cornerRadius: 14))
-                }
-                .disabled(date < earliest || date > last)
-                .opacity(date < earliest || date > last ? 0.35 : 1)
-                .accessibilityAddTraits(selected ? .isSelected : [])
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
-    // Small view fragments prevent SwiftUI's result-builder type checker
-    // from having to solve the entire planner and all of its sheets at once.
-    // Isolate the move-workout form from the long Plan workspace modifier
-    // chain so SwiftUI can type-check it independently on Swift 6.
-    @ViewBuilder
-    private func movingWorkoutEditor(_ workout: PlannedSession) -> some View {
-            if let selectedMovePlanID = movingPlanID,
-               let plan = session.trainingPlan(withID: selectedMovePlanID) {
-                NavigationStack {
-                    Form {
-                        Section {
-                            if let startDate = plan.startDate,
-                               !plan.weeks.isEmpty {
-                                let calendar = Calendar.current
-                                let first = calendar.startOfDay(for: startDate)
-                                let last = calendar.date(
-                                    byAdding: .day,
-                                    value: plan.weeks.count * 7 - 1,
-                                    to: first
-                                ) ?? first
-                                let earliest = max(
-                                    calendar.startOfDay(for: Date()), first
-                                )
-                                if earliest <= last {
-                                    if advanced {
-                                        DatePicker(
-                                            tr("New workout date", "Ny treningsdato"),
-                                            selection: $moveTargetDate,
-                                            in: earliest...last,
-                                            displayedComponents: .date
-                                        )
-                                    } else {
-                                        simpleMoveDays(earliest: earliest, last: last)
-                                    }
-                                } else {
-                                    Text(tr(
-                                        "This plan has no upcoming dates.",
-                                        "Denne planen har ingen kommende datoer."
-                                    ))
-                                    .foregroundStyle(.secondary)
-                                }
-                            } else {
-                                Text(tr(
-                                    "The plan has no valid date range.",
-                                    "Planen mangler en gyldig datoperiode."
-                                ))
-                                .foregroundStyle(.secondary)
-                            }
-                        } footer: {
-                            Text(tr(
-                                "Choose a date within the plan. Completed and skipped workouts cannot be moved.",
-                                "Velg en dato innenfor planen. Gjennomførte og hoppede økter kan ikke flyttes."
-                            ))
-                        }
-                        if let moveError {
-                            Text(moveError)
-                                .foregroundStyle(.red)
-                        }
-                    }
-                    .navigationTitle(tr("Move workout", "Flytt økt"))
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(tr("Cancel", "Avbryt")) {
-                                movingWorkout = nil
-                                movingPlanID = nil
-                                movingPlanVersion = nil
-                            }
-                        }
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button(tr("Save", "Lagre")) {
-                                if session.movePlanStudioWorkout(
-                                    planID: plan.id,
-                                    workoutID: workout.id,
-                                    targetDate: moveTargetDate,
-                                    expectedVersion: movingPlanVersion ?? -1,
-                                    healthWorkouts: health.workouts,
-                                    strengthHistory: strength.workoutHistory
-                                ) {
-                                    if let start = plan.startDate {
-                                        let days = Calendar.current.dateComponents(
-                                            [.day], from: Calendar.current.startOfDay(for: start),
-                                            to: Calendar.current.startOfDay(for: moveTargetDate)
-                                        ).day ?? 0
-                                        selectedWeekIndex = max(0, days / 7)
-                    selectedDayID = nil
-                                    }
-                                    movingWorkout = nil
-                                    movingPlanID = nil
-                                    movingPlanVersion = nil
-                                    moveError = nil
-                                } else {
-                                    moveError = tr(
-                                        "Could not move this workout. Check the date or refresh the plan.",
-                                        "Kunne ikke flytte økten. Kontroller datoen eller oppdater planen."
-                                    )
-                                }
-                            }
-                            .fontWeight(.semibold)
-                            .disabled({
-                                guard let start = plan.startDate,
-                                      !plan.weeks.isEmpty else { return true }
-                                let calendar = Calendar.current
-                                let first = calendar.startOfDay(for: start)
-                                let last = calendar.date(
-                                    byAdding: .day,
-                                    value: plan.weeks.count * 7 - 1,
-                                    to: first
-                                ) ?? first
-                                let target = calendar.startOfDay(for: moveTargetDate)
-                                let source = plan.weeks.flatMap(\.days).first {
-                                    $0.sessions.contains { $0.id == workout.id }
-                                }
-                                let unchanged = source.map {
-                                    calendar.isDate(planDayDate($0.dayIndex, plan: plan), inSameDayAs: target)
-                                } ?? true
-                                return unchanged || target < max(first, calendar.startOfDay(for: Date()))
-                                    || target > last
-                            }())
-                        }
-                    }
-                }
-                .presentationDetents([.large])
-            }
     }
 
     // A single Plan Studio entry, backed by the existing plan records and editors.
@@ -949,8 +768,38 @@ struct ATHLTHTrainPlanPremiumView: View {
         } message: {
             Text(deleteError ?? "")
         }
-        .sheet(item: $movingWorkout) { workout in
-            movingWorkoutEditor(workout)
+        .sheet(item: $movingWorkout, onDismiss: {
+            movingPlanID = nil
+            movingPlanVersion = nil
+        }) { workout in
+            if let movingPlanID,
+               let plan = session.trainingPlan(withID: movingPlanID) {
+                ATHLTHTrainMoveWorkoutSheet(
+                    plan: plan,
+                    workout: workout,
+                    expectedVersion: movingPlanVersion ?? -1,
+                    initialDate: moveTargetDate,
+                    advanced: advanced,
+                    onSaved: { targetDate in
+                        if let start = plan.startDate {
+                            let days = Calendar.current.dateComponents(
+                                [.day],
+                                from: Calendar.current.startOfDay(for: start),
+                                to: Calendar.current.startOfDay(for: targetDate)
+                            ).day ?? 0
+                            selectedWeekIndex = max(0, days / 7)
+                            selectedDayID = nil
+                        }
+                        movingWorkout = nil
+                    },
+                    onCancel: { movingWorkout = nil }
+                )
+            } else {
+                ContentUnavailableView(
+                    tr("Plan unavailable", "Planen er utilgjengelig"),
+                    systemImage: "calendar.badge.exclamationmark"
+                )
+            }
         }
         .sheet(isPresented: $showingAIHelp) {
             CoachPlanAdaptationView()
