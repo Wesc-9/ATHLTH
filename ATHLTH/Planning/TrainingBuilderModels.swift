@@ -645,7 +645,10 @@ enum StrengthTimedBodyweightDefaults {
             normalized.contains("l sit hold") ||
             normalized.contains("l sit") ||
             normalized.contains("plank") ||
-            normalized.contains("hollow hold")
+            normalized.contains("hollow hold") ||
+            normalized.contains("90/90 hold") ||
+            normalized.contains("90/90 stretch hold") ||
+            normalized.contains("90 90 hold")
     }
 }
 
