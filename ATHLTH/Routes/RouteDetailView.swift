@@ -355,6 +355,7 @@ struct RouteDetailView: View {
                 initialRoute: route
             ) { configuration in
                 launchRunFromDetails(configuration)
+                return nil
             }
         }
         .sheet(isPresented: $showingFullLeaderboard) {
