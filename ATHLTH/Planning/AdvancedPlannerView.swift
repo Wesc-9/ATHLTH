@@ -7449,6 +7449,7 @@ struct SessionEditorView: View {
                             plannedExercises.removeAll {
                                 $0.id == planned.id
                             }
+                            normalizeSupersetGroups()
                         } label: {
                             Label(
                                 ATHLTHLocalization.choose(
@@ -7558,6 +7559,7 @@ struct SessionEditorView: View {
                         fromOffsets: offsets,
                         toOffset: destination
                     )
+                    normalizeSupersetGroups()
                 }
             }
 
@@ -9134,6 +9136,30 @@ struct SessionEditorView: View {
                     plannedExercises.count
                 )
         )
+    }
+
+    // Keep superset identifiers local to consecutive runs after reordering
+    // or deletion. A lone member is an ordinary exercise, not a superset.
+    private func normalizeSupersetGroups() {
+        var seen = Set<UUID>()
+        var cursor = 0
+        while cursor < plannedExercises.count {
+            guard let group = plannedExercises[cursor].supersetGroupID else {
+                cursor += 1
+                continue
+            }
+            let start = cursor
+            while cursor < plannedExercises.count,
+                  plannedExercises[cursor].supersetGroupID == group {
+                cursor += 1
+            }
+            let count = cursor - start
+            let resolved: UUID? = count < 2 ? nil : (seen.contains(group) ? UUID() : group)
+            if count >= 2 { seen.insert(group) }
+            for index in start..<cursor {
+                plannedExercises[index].supersetGroupID = resolved
+            }
+        }
     }
 
     private func toggleSuperset(at index: Int) {
