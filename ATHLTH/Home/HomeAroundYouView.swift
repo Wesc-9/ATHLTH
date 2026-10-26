@@ -1326,6 +1326,7 @@ struct AroundYouExploreView: View {
                 initialRoute: route
             ) { configuration in
                 launchRunFromExplore(configuration)
+                return nil
             }
         }
         .alert(
