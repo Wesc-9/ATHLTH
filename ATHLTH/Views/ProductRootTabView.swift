@@ -736,6 +736,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
+    @Environment(\.dynamicTypeSize) private var homeDynamicTypeSize
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var community: CommunityEventStore
@@ -882,7 +883,7 @@ struct ATHLTHHomeView: View {
                         }
                     )
 
-                    homeGoalAndCalendarRow
+                    homeDailyRecommendationAndCalendarRow
 
                     HomeActiveFriendsStrip()
 
@@ -1816,477 +1817,81 @@ struct ATHLTHHomeView: View {
         homeWorkoutsThisWeek.count
     }
 
-    private let homeGoalCalendarContentMinHeight: CGFloat = 82
-    private let homeGoalThumbnailHeight: CGFloat = 58
+    // The calendar keeps its place; a useful daily insight replaces the
+    // former Home goal shortcut without deleting any saved goals.
+    private let homeCalendarContentMinHeight: CGFloat = 82
 
-    @ViewBuilder
-    private var homeGoalAndCalendarRow:
-        some View {
-        HStack(
-            alignment: .top,
-            spacing: 10
-        ) {
-            Group {
-                if let goal =
-                        homeActiveGoal {
-                    homeCompactGoalCard(
-                        goal
-                    )
-                } else {
-                    homeCompactCreateGoalCard
-                }
+    private var homeDailyRecommendation: HomeDailyRecommendationPolicy.Advice {
+        let readiness: HomeDailyRecommendationPolicy.Readiness
+        // An unavailable score is not evidence of good or poor recovery.
+        if health.recovery.score == nil {
+            readiness = .unavailable
+        } else {
+            switch health.recovery.state {
+            case .ready: readiness = .ready
+            case .balanced: readiness = .balanced
+            case .takeItEasy: readiness = .takeItEasy
+            case .recover: readiness = .recover
+            case .buildingBaseline: readiness = .unavailable
             }
-            .frame(
-                maxWidth: .infinity
-            )
-
-            homeTodayCalendarCard
-                .frame(
-                    maxWidth:
-                        .infinity
-                )
         }
-    }
 
-    private func homeCompactGoalCard(
-        _ goal: ATHLTHGoal
-    ) -> some View {
-        let progress = min(max(goal.progress, 0), 1)
-        let percentage =
-            Int((progress * 100).rounded())
-        let progressCaption =
-            goal.milestones.isEmpty
-                ? ATHLTHLocalization.choose(
-                    english: "Progress",
-                    norwegian: "Fremdrift"
-                )
-                : ATHLTHLocalization.format(
-                    english: "%d of %d steps",
-                    norwegian: "%d av %d delmål",
-                    goal.completedMilestones,
-                    goal.milestones.count
-                )
+        let hasWorkoutToday = !HomeTodayCalendarSchedule.workouts(
+            plan: session.activePlan,
+            standalone: session.standalonePlannedSessions
+        ).isEmpty
 
-        return VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-            HStack {
-                Text("Aktuelt mål")
-                    .font(
-                        .subheadline
-                            .weight(.bold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-
-                Spacer(minLength: 4)
-
-                NavigationLink {
-                    GoalsHubView()
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("Se alle")
-                            .font(
-                                .system(
-                                    size: 10,
-                                    weight: .semibold
-                                )
-                            )
-
-                        Image(
-                            systemName: "chevron.right"
-                        )
-                        .font(
-                            .system(
-                                size: 8,
-                                weight: .bold
-                            )
-                        )
-                    }
-                    .foregroundStyle(
-                        ATHLTHTheme.accentDeep
-                    )
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Se alle mål")
-            }
-
-            NavigationLink {
-                GoalDetailView(goalID: goal.id)
-            } label: {
-                HStack(
-                    alignment: .center,
-                    spacing: 9
-                ) {
-                    GoalCoverView(
-                        goal: goal,
-                        showsDecorativeSymbol: false
-                    )
-                    .frame(
-                        width: 76,
-                        height:
-                            homeGoalThumbnailHeight
-                    )
-                    .clipShape(
-                        RoundedRectangle(
-                            cornerRadius: 15,
-                            style: .continuous
-                        )
-                    )
-                    .overlay(alignment: .topLeading) {
-                        Image(
-                            systemName:
-                                goal.category.systemImage
-                        )
-                        .font(
-                            .system(
-                                size: 10,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .frame(
-                            width: 23,
-                            height: 23
-                        )
-                        .background(
-                            Color.white.opacity(0.88),
-                            in: Circle()
-                        )
-                        .padding(7)
-                    }
-                    .overlay {
-                        RoundedRectangle(
-                            cornerRadius: 15,
-                            style: .continuous
-                        )
-                        .stroke(
-                            Color.white.opacity(0.38),
-                            lineWidth: 0.7
-                        )
-                        .allowsHitTesting(false)
-                    }
-
-                    VStack(
-                        alignment: .leading,
-                        spacing: 4
-                    ) {
-                        Text(
-                            homeCompactGoalCategoryTitle(
-                                for: goal.category
-                            )
-                        )
-                        .font(
-                            .system(
-                                size: 8.5,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.accentDeep
-                        )
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-
-                        Text(goal.title)
-                            .font(
-                                .system(
-                                    size: 12.5,
-                                    weight: .bold,
-                                    design: .rounded
-                                )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme.primaryText
-                            )
-                            .lineLimit(2)
-                            .minimumScaleFactor(0.85)
-                            .multilineTextAlignment(
-                                .leading
-                            )
-                            .layoutPriority(1)
-
-                        Spacer(minLength: 2)
-
-                        GeometryReader { geometry in
-                            ZStack(
-                                alignment: .leading
-                            ) {
-                                Capsule()
-                                    .fill(
-                                        ATHLTHTheme
-                                            .accentDeep
-                                            .opacity(0.09)
-                                    )
-
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                ATHLTHTheme
-                                                    .accentDeep,
-                                                ATHLTHTheme
-                                                    .vitality
-                                            ],
-                                            startPoint:
-                                                .leading,
-                                            endPoint:
-                                                .trailing
-                                        )
-                                    )
-                                    .frame(
-                                        width:
-                                            geometry.size.width *
-                                            CGFloat(progress)
-                                    )
-                            }
-                        }
-                        .frame(height: 5)
-                        .accessibilityHidden(true)
-
-                        HStack(spacing: 3) {
-                            Text(progressCaption)
-                                .font(
-                                    .system(
-                                        size: 8.5,
-                                        weight: .medium
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
-                                .lineLimit(1)
-                                .minimumScaleFactor(
-                                    0.75
-                                )
-
-                            Spacer(minLength: 1)
-
-                            Text("\(percentage)%")
-                                .font(
-                                    .system(
-                                        size: 9.5,
-                                        weight: .bold,
-                                        design: .rounded
-                                    )
-                                    .monospacedDigit()
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.accentDeep
-                                )
-                        }
-                    }
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight:
-                            homeGoalCalendarContentMinHeight,
-                        maxHeight:
-                            homeGoalCalendarContentMinHeight,
-                        alignment: .leading
-                    )
-                }
-                .frame(
-                    minHeight:
-                        homeGoalCalendarContentMinHeight
-                )
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                "Åpne mål: \(goal.title), \(percentage)%"
-            )
-        }
-        .padding(11)
-        .background(
-            Color.white.opacity(0.92),
-            in: RoundedRectangle(
-                cornerRadius: 19,
-                style: .continuous
-            )
+        return HomeDailyRecommendationPolicy.recommendation(
+            readiness: readiness,
+            hasWorkoutToday: hasWorkoutToday,
+            trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio
         )
-        .overlay {
-            RoundedRectangle(
-                cornerRadius: 19,
-                style: .continuous
-            )
-            .stroke(
-                Color.black.opacity(0.04),
-                lineWidth: 0.7
-            )
+    }
+
+    private func openHomeDailyRecommendation(
+        _ advice: HomeDailyRecommendationPolicy.Advice
+    ) {
+        switch advice.destination {
+        case .insights:
+            onSelectTab(2)
+        case .training:
+            onOpenTrain(.today)
         }
     }
 
-    private func homeCompactGoalCategoryTitle(
-        for category: GoalCategory
-    ) -> String {
-        switch category {
-        case .event:
-            return ATHLTHLocalization.choose(
-                english: "Event",
-                norwegian: "Arrangement"
-            )
-        case .endurance:
-            return ATHLTHLocalization.choose(
-                english: "Running",
-                norwegian: "Løping"
-            )
-        case .strength:
-            return ATHLTHLocalization.choose(
-                english: "Strength",
-                norwegian: "Styrke"
-            )
-        case .body:
-            return ATHLTHLocalization.choose(
-                english: "Wellness",
-                norwegian: "Helse"
-            )
-        case .consistency:
-            return ATHLTHLocalization.choose(
-                english: "Consistency",
-                norwegian: "Vaner"
-            )
-        case .recovery:
-            return ATHLTHLocalization.choose(
-                english: "Recovery",
-                norwegian: "Restitusjon"
-            )
-        case .custom:
-            return ATHLTHLocalization.choose(
-                english: "Personal",
-                norwegian: "Personlig"
-            )
-        }
-    }
+    private var homeDailyRecommendationAndCalendarRow: some View {
+        let advice = homeDailyRecommendation
 
-    private var homeCompactCreateGoalCard:
-        some View {
-        NavigationLink {
-            GoalCreationView()
-        } label: {
-            VStack(
-                alignment: .leading,
-                spacing: 8
-            ) {
-                HStack {
-                    Text("Aktuelt mål")
-                        .font(
-                            .subheadline
-                                .weight(
-                                    .bold
-                                )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
-
-                    Spacer()
-
-                    Image(
-                        systemName: "plus"
-                    )
-                    .font(
-                        .caption.bold()
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
-                    )
+        return Group {
+            if homeDynamicTypeSize.isAccessibilitySize {
+                VStack(spacing: 10) {
+                    HomeDailyRecommendationCard(advice: advice) {
+                        openHomeDailyRecommendation(advice)
+                    }
+                    homeTodayCalendarCard
                 }
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .top, spacing: 10) {
+                        HomeDailyRecommendationCard(advice: advice) {
+                            openHomeDailyRecommendation(advice)
+                        }
+                        .frame(maxWidth: .infinity)
 
-                HStack(spacing: 9) {
-                    Image(
-                        systemName:
-                            "target"
-                    )
-                    .font(
-                        .system(
-                            size: 17,
-                            weight:
-                                .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        .green
-                    )
-                    .frame(
-                        width: 34,
-                        height: 34
-                    )
-                    .background(
-                        Color.green
-                            .opacity(0.10),
-                        in: Circle()
-                    )
+                        homeTodayCalendarCard
+                            .frame(maxWidth: .infinity)
+                    }
+                    .frame(minWidth: 330)
 
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Text("Sett et mål")
-                            .font(
-                                .caption
-                                    .weight(
-                                        .bold
-                                    )
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .primaryText
-                            )
-
-                        Text(
-                            "Følg fremgangen direkte fra Home."
-                        )
-                        .font(
-                            .system(
-                                size: 9.5
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                        .lineLimit(2)
+                    VStack(spacing: 10) {
+                        HomeDailyRecommendationCard(advice: advice) {
+                            openHomeDailyRecommendation(advice)
+                        }
+                        homeTodayCalendarCard
                     }
                 }
-                .frame(
-                    minHeight:
-                        homeGoalCalendarContentMinHeight
-                )
-            }
-            .padding(11)
-            .background(
-                Color.white.opacity(
-                    0.90
-                ),
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 19,
-                        style:
-                            .continuous
-                    )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 19,
-                    style:
-                        .continuous
-                )
-                .stroke(
-                    Color.black.opacity(
-                        0.04
-                    ),
-                    lineWidth: 0.7
-                )
             }
         }
-        .buttonStyle(.plain)
     }
 
     private var homeTodayCalendarCard:
@@ -2487,7 +2092,7 @@ struct ATHLTHHomeView: View {
                 }
                 .frame(
                     minHeight:
-                        homeGoalCalendarContentMinHeight,
+                        homeCalendarContentMinHeight,
                     alignment: .top
                 )
             } else {
@@ -2523,7 +2128,7 @@ struct ATHLTHHomeView: View {
                 }
                 .frame(
                     minHeight:
-                        homeGoalCalendarContentMinHeight,
+                        homeCalendarContentMinHeight,
                     alignment: .center
                 )
             }
