@@ -24,6 +24,8 @@ struct ATHLTHTrainTodayPremiumView: View {
     let hasRecordedWorkoutToday: Bool
     /// Already filtered for a reliable, recent HealthKit baseline by the parent.
     let todaysReadiness: RecoveryReadinessSummary?
+    /// Most recently registered body mass from Apple Health, when accessible.
+    let latestHealthWeightKilograms: Double?
     let onChooseSuggestedWorkout: (WorkoutTemplateCatalogEntry) -> Void
     let onOpenPlan: () -> Void
     let onCreatePlan: () -> Void
@@ -1289,8 +1291,11 @@ struct ATHLTHTrainTodayPremiumView: View {
         if let goal = visibleTrainGoal {
             let total = goal.milestones.count
             let done = goal.completedMilestones
-            let fraction = total > 0
-                ? min(max(Double(done) / Double(total), 0), 1) : 0
+            let weightProgress = ATHLTHTrainWeightGoalProgress.evaluate(
+                target: goal.target,
+                latestWeightKilograms: latestHealthWeightKilograms
+            )
+            let fraction = weightProgress?.completionFraction ?? goal.progress
 
             VStack(alignment: .leading, spacing: 10) {
                 NavigationLink {
@@ -1310,7 +1315,7 @@ struct ATHLTHTrainTodayPremiumView: View {
                             ZStack {
                                 Circle()
                                     .stroke(ATHLTHTrainDesign.paleGold, lineWidth: 6)
-                                if total > 0 {
+                                if weightProgress != nil || total > 0 {
                                     Circle()
                                         .trim(from: 0, to: fraction)
                                         .stroke(champagne, style: StrokeStyle(
@@ -1334,7 +1339,31 @@ struct ATHLTHTrainTodayPremiumView: View {
                                     .foregroundStyle(ink)
                                     .fixedSize(horizontal: false, vertical: true)
                                     .lineLimit(3)
-                                if total > 0 {
+                                if let weightProgress {
+                                    Text(
+                                        tr(
+                                            "\(weightProgress.achievedKilograms.formatted(.number.precision(.fractionLength(1)))) of \(weightProgress.targetKilograms.formatted(.number.precision(.fractionLength(1)))) kg",
+                                            "\(weightProgress.achievedKilograms.formatted(.number.precision(.fractionLength(1)))) av \(weightProgress.targetKilograms.formatted(.number.precision(.fractionLength(1)))) kg"
+                                        )
+                                    )
+                                    .font(.caption2.weight(.medium))
+                                    .foregroundStyle(champagne)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                    Text(tr("Apple Health · Last recorded weight: ",
+                                            "Apple Health · Siste registrerte vekt: ") +
+                                         weightProgress.latest.formatted(
+                                            .number.precision(.fractionLength(1))) + " kg")
+                                        .font(.caption2)
+                                        .foregroundStyle(muted)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                } else if goal.target?.metric == .bodyWeightKilograms {
+                                    Text(tr("No comparable Apple Health weight yet",
+                                            "Mangler sammenlignbare vektdata i Apple Health"))
+                                        .font(.caption2)
+                                        .foregroundStyle(muted)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                } else if total > 0 {
                                     Text(tr("\(done) of \(total) milestones",
                                             "\(done) av \(total) delmål"))
                                         .font(.caption2)
@@ -1351,7 +1380,8 @@ struct ATHLTHTrainTodayPremiumView: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(tr("Active goal", "Aktivt mål") + ": " + goal.title +
-                    (total > 0 ? ", \(Int((fraction * 100).rounded()))%" : ""))
+                    ((weightProgress != nil || total > 0)
+                        ? ", \(Int((fraction * 100).rounded()))%" : ""))
 
                 if let suggested = relevantGoalSuggestion,
                    suggested.id != primaryTrainGoal?.id {
@@ -1672,6 +1702,39 @@ struct ATHLTHTrainTodayPremiumView: View {
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+}
+
+/// Numerical progress against a body-weight target using Apple Health data.
+/// Never substitutes completed milestones or a sample goal for actual kilograms.
+enum ATHLTHTrainWeightGoalProgress {
+    struct Result {
+        let initial: Double
+        let latest: Double
+        let target: Double
+
+        private var direction: Double { target < initial ? -1 : 1 }
+        var achievedKilograms: Double { (latest - initial) * direction }
+        var targetKilograms: Double { abs(target - initial) }
+        var completionFraction: Double {
+            min(max(achievedKilograms / targetKilograms, 0), 1)
+        }
+    }
+
+    static func evaluate(
+        target: GoalTarget?,
+        latestWeightKilograms: Double?
+    ) -> Result? {
+        guard let target, target.metric == .bodyWeightKilograms,
+              let start = target.baselineValue,
+              let latest = latestWeightKilograms,
+              start.isFinite, start > 0,
+              latest.isFinite, latest > 0,
+              target.targetValue.isFinite, target.targetValue > 0,
+              abs(target.targetValue - start) >= 0.2
+        else { return nil }
+
+        return Result(initial: start, latest: latest, target: target.targetValue)
     }
 }
 
