@@ -136,6 +136,8 @@ struct ATHLTHTrainPlanPremiumView: View {
     // Simple and advanced change the amount of visible detail, not the data.
     private var planContent: some View {
         VStack(alignment: .leading, spacing: 17) {
+            referencePageIntro
+
             // The selected plan is the entire purpose of this tab. Keep it
             // above creation, mode and management controls.
             if browsingMyPlans {
@@ -203,29 +205,45 @@ struct ATHLTHTrainPlanPremiumView: View {
 
 
     private var studioPlanTools: some View {
-        DisclosureGroup(isExpanded: $showingPlanTools) {
-            VStack(alignment: .leading, spacing: 14) {
-                Text(tr(
-                    "Choose simple weekly editing or day-by-day detail. Your plan, workouts and drafts are unchanged.",
-                    "Velg enkel ukevisning eller detaljert dag-for-dag-redigering. Planer, økter og utkast påvirkes ikke."
-                ))
-                .font(.caption)
-                .foregroundStyle(secondaryInk)
-                .fixedSize(horizontal: false, vertical: true)
-                studioEntryPoints
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 9) {
+                studioModeChoice(
+                    title: tr("Simple", "Enkel"),
+                    subtitle: tr("Weekly planning", "Ukesvis planlegging"),
+                    symbol: "doc.text",
+                    selected: !advanced
+                ) { advanced = false }
+                studioModeChoice(
+                    title: tr("Advanced", "Avansert"),
+                    subtitle: tr("Detailed day by day", "Detaljstyr dag for dag"),
+                    symbol: "slider.horizontal.3",
+                    selected: advanced
+                ) { advanced = true }
             }
-            .padding(.top, 13)
-        } label: {
-            Label(
-                tr("Manage and build plans", "Administrer og bygg planer"),
-                systemImage: "slider.horizontal.3"
-            )
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(graphite)
-            .frame(minHeight: 42, alignment: .leading)
+            Button {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                    showingPlanTools.toggle()
+                }
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "slider.horizontal.3")
+                    Text(tr("Manage and build plans", "Administrer og bygg planer"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 0)
+                    Image(systemName: showingPlanTools ? "chevron.up" : "chevron.right")
+                }
+                .foregroundStyle(graphite)
+                .frame(minHeight: 56)
+                .padding(.horizontal, 15)
+                .athlthTrainPaper()
+            }
+            .buttonStyle(.plain)
+            if showingPlanTools {
+                studioEntryPoints
+                    .padding(13)
+                    .athlthTrainPaper()
+            }
         }
-        .padding(16)
-        .athlthTrainPaper()
     }
 
     private var studioWelcome: some View {
@@ -403,126 +421,541 @@ struct ATHLTHTrainPlanPremiumView: View {
         .athlthTrainPaper(emphasized: true)
     }
 
+    // Reference-inspired Plan: a compact current plan, seven-day selector and
+    // expanded selected day. All values come from persisted plan records.
     private func studioPlanWorkspace(_ plan: TrainingPlan) -> some View {
-        VStack(alignment: .leading, spacing: ATHLTHTrainDesign.sectionSpacing) {
-            studioPlanCover(plan)
+        VStack(alignment: .leading, spacing: 11) {
+            if let active = session.activePlan, active.id != plan.id {
+                referencePlanSummary(active, isActive: true)
+            }
+            referencePlanSummary(plan, isActive: session.activePlan?.id == plan.id)
 
-            HStack(alignment: .center) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("YOUR SCHEDULE", "DIN UKEPLAN"))
-                        .font(.system(size: 10, weight: .bold))
-                        .tracking(1.5)
-                        .foregroundStyle(warmGold)
-                    Text(tr("Open a day to see everything", "Åpne en dag for alle detaljer"))
-                        .font(.subheadline)
-                        .foregroundStyle(secondaryInk)
+            if !plan.weeks.isEmpty {
+                let index = min(max(selectedWeekIndex ?? currentWeekIndex(plan), 0),
+                                plan.weeks.count - 1)
+                let week = plan.weeks[index]
+                VStack(alignment: .leading, spacing: 12) {
+                    referenceWeekNavigator(plan, weekIndex: index)
+                    premiumWeekDayStrip(week, plan: plan)
+                    if let day = premiumSelectedDay(in: week, plan: plan) {
+                        referenceDayWorkspace(day, plan: plan)
+                    }
+                    if showingEntirePlan {
+                        premiumAllWeeks(plan)
+                    }
                 }
-                Spacer(minLength: 6)
+                .padding(10)
+                .background(.white.opacity(0.93),
+                            in: RoundedRectangle(cornerRadius: 22))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22)
+                        .strokeBorder(line.opacity(0.75), lineWidth: 0.8)
+                }
+            } else {
                 Button {
                     showingEditor = true
                 } label: {
-                    Image(systemName: "square.and.pencil")
-                        .font(.system(size: 17, weight: .semibold))
+                    Label(tr("Build your first week", "Bygg din første uke"),
+                          systemImage: "calendar.badge.plus")
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
+            }
+        }
+    }
+
+    private var referencePageIntro: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Plan")
+                        .font(.system(size: 39, weight: .regular, design: .serif))
                         .foregroundStyle(graphite)
-                        .frame(width: 44, height: 44)
-                        .background(.white, in: Circle())
+                        .accessibilityAddTraits(.isHeader)
+                    Text(tr("Build week by week, with structure and flow.",
+                            "Bygg uke for uke, med struktur og flyt."))
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .accessibilityLabel(tr("Edit training week", "Rediger treningsuke"))
+                Spacer(minLength: 0)
             }
-
-            if !plan.weeks.isEmpty {
-                let index = min(max(selectedWeekIndex ?? currentWeekIndex(plan), 0), plan.weeks.count - 1)
-                HStack(spacing: 14) {
-                    Button {
-                        selectPremiumPlanWeek(max(index - 1, 0))
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .frame(width: 48, height: 48)
-                    }
-                    .disabled(index == 0)
-                    .accessibilityLabel(tr("Previous week", "Forrige uke"))
-                    Spacer(minLength: 0)
-                    VStack(spacing: 3) {
-                        Text(tr("Week", "Uke") + " \(index + 1)")
-                            .font(ATHLTHTrainDesign.sectionTitle)
-                        Text("\(index + 1) / \(plan.weeks.count)")
-                            .font(.caption.monospacedDigit())
-                            .foregroundStyle(secondaryInk)
-                    }
-                    Spacer(minLength: 0)
-                    Button {
-                        selectPremiumPlanWeek(min(index + 1, plan.weeks.count - 1))
-                    } label: {
-                        Image(systemName: "chevron.right")
-                            .frame(width: 48, height: 48)
-                    }
-                    .disabled(index == plan.weeks.count - 1)
-                    .accessibilityLabel(tr("Next week", "Neste uke"))
+            HStack(spacing: 3) {
+                referenceModePill(tr("Simple", "Enkel"), selected: !advanced) {
+                    advanced = false
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(graphite)
-                .padding(.horizontal, 4)
-
-                let week = plan.weeks[index]
-                premiumWeekDayStrip(week, plan: plan)
-                VStack(spacing: 16) {
-                    ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
-                        // A stable root per day keeps SwiftUI row identity even
-                        // while its editable details expand and collapse.
-                        VStack(spacing: 0) {
-                            studioDayRow(day, plan: plan)
-                            if selectedDayID == day.id {
-                                premiumSelectedDayPanel(day, plan: plan)
-                                    .padding(.bottom, 7)
-                            }
-                        }
-                    }
+                referenceModePill(tr("Advanced", "Avansert"), selected: advanced) {
+                    advanced = true
                 }
             }
+            .frame(maxWidth: 220)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .padding(.bottom, 2)
+    }
 
-            Button {
-                showingEditor = true
-            } label: {
-                HStack(spacing: 11) {
-                    Image(systemName: "square.stack.3d.up")
-                        .font(.title3)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(tr("Open the week and day builder", "Åpne uke- og dagbyggeren"))
-                            .font(.subheadline.weight(.semibold))
-                        Text(tr(
-                            "Warm-up, intervals, recovery, sets and session-specific targets",
-                            "Oppvarming, intervaller, pauser, sett og øktspesifikke mål"
-                        ))
+    private func referenceModePill(
+        _ title: String, selected: Bool, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: selected ? .semibold : .medium))
+                .foregroundStyle(selected ? .white : graphite)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .frame(maxWidth: .infinity, minHeight: 38)
+                .background(
+                    selected ? warmGold : ATHLTHTrainDesign.paleGold.opacity(0.35),
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func referencePlanSummary(
+        _ plan: TrainingPlan, isActive: Bool
+    ) -> some View {
+        let progress = session.trainingPlanProgress(
+            plan, healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        let fraction = min(max(progress.completionFraction, 0), 1)
+        let week = currentWeekIndex(plan)
+        let weeklyCount = plan.weeks.indices.contains(week)
+            ? plan.weeks[week].days.flatMap(\.sessions)
+                .filter { !$0.isExplicitRestDay }.count : 0
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 11) {
+                Image(systemName: "dumbbell")
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(warmGold)
+                    .frame(width: 53, height: 53)
+                    .background(soft, in: Circle())
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(isActive ? tr("Active plan", "Aktiv plan")
+                                  : tr("Saved plan", "Lagret plan"))
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(warmGold)
+                    Text(plan.title)
+                        .font(.system(size: 20, weight: .semibold, design: .serif))
+                        .foregroundStyle(graphite)
+                        .lineLimit(2)
+                    Text(tr("Week \(week + 1) of \(plan.weeks.count) · \(weeklyCount) workouts this week",
+                            "Uke \(week + 1) av \(plan.weeks.count) · \(weeklyCount) økter denne uken"))
                         .font(.caption)
                         .foregroundStyle(secondaryInk)
+                }
+                Spacer(minLength: 4)
+                Button {
+                    if isActive && self.plan?.id != plan.id {
+                        focusedPlanID = plan.id
+                        browsingMyPlans = false
+                        selectedWeekIndex = nil
+                        selectedDayID = nil
+                    } else {
+                        showingEntirePlan.toggle()
                     }
-                    Spacer(minLength: 0)
-                    Image(systemName: "arrow.up.right")
+                } label: {
+                    VStack(spacing: 3) {
+                        Image(systemName: "chevron.right")
+                        Text(isActive && self.plan?.id != plan.id
+                             ? tr("Open", "Åpne") : tr("Full plan", "Hele planen"))
+                            .font(.system(size: 10))
+                    }
+                    .foregroundStyle(warmGold)
+                    .frame(minWidth: 49, minHeight: 44)
                 }
-                .foregroundStyle(graphite)
-                .padding(17)
-                .athlthTrainPaper()
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("See entire plan", "Se hele planen"))
             }
-            .buttonStyle(.plain)
+            HStack(spacing: 12) {
+                ProgressView(value: fraction)
+                    .tint(warmGold)
+                Text("\(Int((fraction * 100).rounded())) %")
+                    .font(.caption2.monospacedDigit())
+                    .foregroundStyle(secondaryInk)
+                    .fixedSize()
+            }
+        }
+        .padding(15)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(line.opacity(0.58), lineWidth: 0.7)
+        }
+    }
 
-            HStack(spacing: 13) {
-                Button {
-                    showingWorkoutLibrary = true
-                } label: {
-                    Label(tr("My workouts", "Mine økter"), systemImage: "bookmark")
+    private func referenceWeekNavigator(
+        _ plan: TrainingPlan, weekIndex: Int
+    ) -> some View {
+        let from = planDayDate(1, plan: plan)
+        let through = planDayDate(7, plan: plan)
+        return HStack(spacing: 9) {
+            Button {
+                selectPremiumPlanWeek(max(0, weekIndex - 1))
+            } label: {
+                Image(systemName: "chevron.left")
+                    .frame(width: 44, height: 44)
+                    .background(soft, in: Circle())
+            }
+            .disabled(weekIndex == 0)
+            .accessibilityLabel(tr("Previous week", "Forrige uke"))
+            Spacer(minLength: 0)
+            VStack(spacing: 2) {
+                Text(tr("Week", "Uke") + " \(weekIndex + 1)")
+                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .foregroundStyle(graphite)
+                Text(from.formatted(.dateTime.day().month(.abbreviated)) + " – " +
+                     through.formatted(.dateTime.day().month(.abbreviated)))
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+            }
+            Spacer(minLength: 0)
+            Button {
+                selectPremiumPlanWeek(min(weekIndex + 1, plan.weeks.count - 1))
+            } label: {
+                Image(systemName: "chevron.right")
+                    .frame(width: 44, height: 44)
+                    .background(soft, in: Circle())
+            }
+            .disabled(weekIndex >= plan.weeks.count - 1)
+            .accessibilityLabel(tr("Next week", "Neste uke"))
+        }
+        .foregroundStyle(warmGold)
+        .buttonStyle(.plain)
+    }
+
+    private func referenceDayWorkspace(
+        _ day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        let workouts = day.sessions.filter { !$0.isExplicitRestDay }
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(planDayDate(day.dayIndex, plan: plan)
+                        .formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                        .font(.system(size: 19, weight: .semibold, design: .serif))
+                        .foregroundStyle(graphite)
+                    Text("\(workouts.count) " + tr("workouts", "økter"))
+                        .font(.caption)
+                        .foregroundStyle(secondaryInk)
                 }
+                Spacer(minLength: 0)
                 Button {
-                    showingEntirePlan.toggle()
+                    showingEditor = true
                 } label: {
-                    Label(tr("All weeks", "Alle uker"), systemImage: "calendar")
+                    Label(tr("Edit day", "Rediger dag"), systemImage: "pencil")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(warmGold)
+                        .padding(.horizontal, 11)
+                        .frame(minHeight: 36)
+                        .background(soft, in: Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+            if workouts.isEmpty {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label(
+                        day.sessions.contains(where: \.isExplicitRestDay)
+                            ? tr("Rest and recovery", "Hvile og restitusjon")
+                            : tr("No workouts planned", "Ingen økter planlagt"),
+                        systemImage: "leaf"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(secondaryInk)
+                    Button {
+                        editingWorkout = WorkoutEditDestination(
+                            planID: plan.id, dayID: day.id,
+                            version: plan.version, workout: nil
+                        )
+                    } label: {
+                        Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
+                }
+                .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(soft, in: RoundedRectangle(cornerRadius: 14))
+            } else {
+                ForEach(workouts) { workout in
+                    referenceSessionCard(
+                        workout, day: day, plan: plan,
+                        expanded: (selectedWorkoutID ?? workouts[0].id) == workout.id
+                    )
                 }
             }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(graphite)
+        }
+        .padding(9)
+        .background(
+            ATHLTHTrainDesign.paleGold.opacity(0.16),
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+    }
+
+    private func referenceSessionCard(
+        _ workout: PlannedSession, day: TrainingPlanDay,
+        plan: TrainingPlan, expanded: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 10) {
+                Image(systemName: workout.kind.systemImage)
+                    .font(.system(size: 18))
+                    .foregroundStyle(warmGold)
+                    .frame(width: 42, height: 42)
+                    .background(soft, in: Circle())
+                Button {
+                    selectedWorkoutID = workout.id
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(workout.title)
+                            .font(.system(size: 17, weight: .semibold, design: .serif))
+                            .foregroundStyle(graphite)
+                            .multilineTextAlignment(.leading)
+                        if let duration = ATHLTHPlannedWorkoutPresentation.duration(for: workout) {
+                            Text(duration)
+                                .font(.caption)
+                                .foregroundStyle(secondaryInk)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                Menu {
+                    Button {
+                        editingWorkout = WorkoutEditDestination(
+                            planID: plan.id, dayID: day.id,
+                            version: plan.version, workout: workout
+                        )
+                    } label: {
+                        Label(tr("Edit workout", "Rediger økt"),
+                              systemImage: "square.and.pencil")
+                    }
+                    Button {
+                        beginMovingWorkout(workout, day: day, plan: plan)
+                    } label: {
+                        Label(tr("Move workout", "Flytt økt"),
+                              systemImage: "arrow.left.arrow.right")
+                    }
+                    Button {
+                        preparePlanDayCopy(day, plan: plan)
+                        copyingSourceWorkoutID = workout.id
+                    } label: {
+                        Label(tr("Copy workout", "Kopier økt"),
+                              systemImage: "doc.on.doc")
+                    }
+                    Button {
+                        session.saveSharedWorkout(workout)
+                        copyFeedback = tr("Saved to My workouts", "Lagret i Mine økter")
+                    } label: {
+                        Label(tr("Save workout", "Lagre økt"), systemImage: "bookmark")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(graphite)
+                        .frame(width: 34, height: 44)
+                }
+                .accessibilityLabel(tr("Workout actions", "Økthandlinger"))
+            }
+            if expanded {
+                referenceWorkoutPhases(workout, day: day, plan: plan)
+                referenceBlockPicker(workout, day: day, plan: plan)
+            }
+        }
+        .padding(12)
+        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(line.opacity(0.6), lineWidth: 0.7)
+        }
+    }
+
+    private func referenceWorkoutPhases(
+        _ workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        return VStack(alignment: .leading, spacing: 11) {
+            if blocks.isEmpty {
+                Text(tr("No blocks yet. Add the first in the workout builder.",
+                        "Ingen blokker ennå. Legg til den første i øktbyggeren."))
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+            } else {
+                ForEach(0..<3, id: \.self) { phaseIndex in
+                    referenceWorkoutPhase(
+                        phaseIndex: phaseIndex, blocks: blocks,
+                        workout: workout, day: day, plan: plan
+                    )
+                }
+            }
+        }
+    }
+
+    private func referenceWorkoutPhase(
+        phaseIndex: Int, blocks: [WorkoutTemplateBlock],
+        workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        let phase: WorkoutPhaseKind = phaseIndex == 0 ? .warmup :
+            (phaseIndex == 1 ? .main : .cooldown)
+        let items = blocks.filter { block in
+            phaseIndex == 1
+                ? (block.resolvedPhase == .main || block.resolvedPhase == .recovery)
+                : block.resolvedPhase == phase
+        }
+        let title = phaseIndex == 0 ? tr("Warm-up", "Oppvarming") :
+            (phaseIndex == 1 ? tr("Main workout", "Hoveddel")
+                             : tr("Cool-down", "Nedtrapping"))
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack(spacing: 7) {
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(warmGold)
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(graphite)
+                Text("(\(items.count))")
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+                Spacer(minLength: 0)
+                Button {
+                    editingWorkout = WorkoutEditDestination(
+                        planID: plan.id, dayID: day.id,
+                        version: plan.version, workout: workout
+                    )
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(warmGold)
+                        .frame(width: 32, height: 32)
+                        .background(soft, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Edit workout blocks", "Rediger øktblokker"))
+            }
+            ForEach(Array(items.enumerated()), id: \.offset) { pair in
+                referenceBlockRow(pair.element, workout: workout,
+                                  day: day, plan: plan)
+            }
+        }
+    }
+
+    private func referenceBlockRow(
+        _ block: WorkoutTemplateBlock, workout: PlannedSession,
+        day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        let details = [
+            block.kind == .rest
+                ? block.durationSeconds.map { "\(Int($0.rounded())) sek" }
+                : block.targetText,
+            block.notes
+        ].compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · ")
+        return HStack(alignment: .center, spacing: 9) {
+            Image(systemName: block.kind == .rest ? "pause.circle.fill" :
+                (block.kind == .exercise ? "dumbbell" :
+                 (block.kind == .run ? "figure.run" : "figure.walk")))
+                .font(.system(size: 13))
+                .foregroundStyle(warmGold)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(block.title)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(graphite)
+                    .fixedSize(horizontal: false, vertical: true)
+                if !details.isEmpty {
+                    Text(details)
+                        .font(.system(size: 10))
+                        .foregroundStyle(secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            Spacer(minLength: 0)
+            Menu {
+                Button {
+                    editingWorkout = WorkoutEditDestination(
+                        planID: plan.id, dayID: day.id,
+                        version: plan.version, workout: workout
+                    )
+                } label: {
+                    Label(tr("Edit in builder", "Rediger i øktbyggeren"),
+                          systemImage: "pencil")
+                }
+                Button {
+                    session.saveSharedWorkout(workout)
+                    copyFeedback = tr("Saved to My workouts", "Lagret i Mine økter")
+                } label: {
+                    Label(tr("Save workout", "Lagre økt"), systemImage: "bookmark")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+                    .frame(width: 32, height: 35)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(
+            block.kind == .rest ? soft : ATHLTHTrainDesign.canvas,
+            in: RoundedRectangle(cornerRadius: 10)
+        )
+    }
+
+    private func referenceBlockPicker(
+        _ workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        let choices: [(String, String)] = [
+            (tr("Running", "Løping"), "figure.run"),
+            (tr("Walk", "Gå"), "figure.walk"),
+            (tr("Cycling", "Sykling"), "bicycle"),
+            ("Yoga", "figure.yoga"),
+            (tr("Meditation", "Meditasjon"), "leaf"),
+            (tr("Exercise", "Øvelse"), "dumbbell"),
+            (tr("Workout", "Treningsøkt"), "list.bullet"),
+            (tr("Interval", "Intervall"), "waveform.path"),
+            (tr("Superset", "Supersett"), "link"),
+            (tr("Rest", "Pause"), "pause.fill"),
+            (tr("Stretch", "Uttøying"), "figure.flexibility")
+        ]
+        return VStack(alignment: .leading, spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 78), spacing: 5)],
+                      spacing: 6) {
+                ForEach(Array(choices.enumerated()), id: \.offset) { entry in
+                    Button {
+                        editingWorkout = WorkoutEditDestination(
+                            planID: plan.id, dayID: day.id,
+                            version: plan.version, workout: workout
+                        )
+                    } label: {
+                        Label(entry.element.0, systemImage: entry.element.1)
+                            .font(.system(size: 10, weight: .medium))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .foregroundStyle(graphite)
+                            .frame(maxWidth: .infinity, minHeight: 32)
+                            .background(.white, in: Capsule())
+                            .overlay {
+                                Capsule().strokeBorder(line.opacity(0.65), lineWidth: 0.7)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Button {
+                editingWorkout = WorkoutEditDestination(
+                    planID: plan.id, dayID: day.id,
+                    version: plan.version, workout: workout
+                )
+            } label: {
+                Label(tr("Add block", "Legg til blokk"), systemImage: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 38)
+                    .background(warmGold, in: RoundedRectangle(cornerRadius: 12))
+            }
             .buttonStyle(.plain)
-            if showingEntirePlan {
-                premiumAllWeeks(plan)
-            }
         }
     }
 
@@ -538,11 +971,11 @@ struct ATHLTHTrainPlanPremiumView: View {
         HStack(spacing: 4) {
             ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
                 let date = planDayDate(day.dayIndex, plan: plan)
-                let selected = selectedDayID == day.id
+                let selected = premiumSelectedDay(in: week, plan: plan)?.id == day.id
                 let count = day.sessions.filter { !$0.isExplicitRestDay }.count
                 Button {
                     withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                        selectedDayID = selected ? nil : day.id
+                        selectedDayID = day.id
                         selectedWorkoutID = nil
                         selectedDetailSection = .structure
                     }
