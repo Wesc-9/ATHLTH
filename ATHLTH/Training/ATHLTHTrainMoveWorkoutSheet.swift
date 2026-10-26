@@ -38,37 +38,21 @@ struct ATHLTHTrainMoveWorkoutSheet: View {
     }
 
     private var bounds: ClosedRange<Date>? {
-        guard let startDate = plan.startDate, !plan.weeks.isEmpty else { return nil }
-        let calendar = Calendar.current
-        let first = calendar.startOfDay(for: startDate)
-        let last = calendar.date(
-            byAdding: .day, value: plan.weeks.count * 7 - 1, to: first
-        ) ?? first
-        let earliest = max(first, calendar.startOfDay(for: .now))
-        guard earliest <= last else { return nil }
-        return earliest...last
+        ATHLTHTrainWorkoutMovePolicy.allowedDates(
+            startDate: plan.startDate, weekCount: plan.weeks.count
+        )
     }
 
     private var originalDate: Date? {
-        guard let start = plan.startDate else { return nil }
-        let calendar = Calendar.current
-        for (weekIndex, week) in plan.weeks.enumerated() {
-            for day in week.days where day.sessions.contains(where: { $0.id == workout.id }) {
-                return calendar.date(
-                    byAdding: .day,
-                    value: weekIndex * 7 + min(max(day.dayIndex - 1, 0), 6),
-                    to: calendar.startOfDay(for: start)
-                )
-            }
-        }
-        return nil
+        ATHLTHTrainWorkoutMovePolicy.originalDate(
+            for: workout.id, in: plan
+        )
     }
 
     private var canSave: Bool {
-        guard let bounds, let originalDate else { return false }
-        let target = Calendar.current.startOfDay(for: targetDate)
-        return bounds.contains(target) &&
-            !Calendar.current.isDate(target, inSameDayAs: originalDate)
+        ATHLTHTrainWorkoutMovePolicy.canMove(
+            to: targetDate, from: originalDate, within: bounds
+        )
     }
 
     var body: some View {
