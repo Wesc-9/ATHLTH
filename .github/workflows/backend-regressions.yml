@@ -13,7 +13,7 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -49,18 +49,18 @@ jobs:
           # GHCR can briefly throttle public container pulls on shared
           # runners. Retry only this disposable test-service startup;
           # all actual database/privacy assertions below remain required.
-          for attempt in 1 2 3; do
+          for attempt in 1 2 3 4; do
             if supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor; then
               echo "Supabase test database started."
               exit 0
             fi
-            if [ "$attempt" -eq 3 ]; then
+            if [ "$attempt" -eq 4 ]; then
               echo "::error::Disposable Supabase startup failed after three attempts."
               exit 1
             fi
-            echo "::warning::Transient container registry/start failure; retrying database startup ($attempt/3)."
+            echo "::warning::Transient container registry/start failure; retrying database startup ($attempt/4)."
             supabase stop --no-backup || true
-            sleep $((attempt * 25))
+            sleep $((attempt * 60))
           done
       - name: Replay migrations and verify privacy rules
         run: |
