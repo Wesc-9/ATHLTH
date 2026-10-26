@@ -1313,27 +1313,38 @@ struct ATHLTHTrainTodayPremiumView: View {
                 target: goal.target,
                 latestWeightKilograms: latestHealthWeightKilograms
             )
-            // Never substitute milestone completion for missing body-mass evidence.
-            // They represent different measurements.
+            // Incomplete Apple Health data must never become a fake percentage.
             let fraction = ATHLTHTrainWeightGoalProgress.visibleFraction(
                 goal: goal, latestWeightKilograms: latestHealthWeightKilograms
             )
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 5) {
                 NavigationLink {
                     GoalDetailView(goalID: goal.id)
                 } label: {
-                    VStack(alignment: .leading, spacing: 14) {
-                        HStack {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack(alignment: .center, spacing: 8) {
+                            Image(systemName: "target")
+                                .font(.system(size: 22, weight: .regular))
+                                .foregroundStyle(champagne)
+                                .accessibilityHidden(true)
                             Text(tr("Active goal", "Aktivt mål"))
-                                .font(.headline.weight(.semibold))
-                                .foregroundStyle(ink)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(champagne)
                             Spacer(minLength: 2)
                             Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundStyle(muted)
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(champagne)
+                                .accessibilityHidden(true)
                         }
-                        HStack(spacing: 10) {
+
+                        HStack(alignment: .top, spacing: 8) {
+                            Text(goal.title)
+                                .font(.system(.title3, design: .serif).weight(.semibold))
+                                .foregroundStyle(ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
                             ZStack {
                                 Circle()
                                     .stroke(ATHLTHTrainDesign.paleGold, lineWidth: 6)
@@ -1343,61 +1354,40 @@ struct ATHLTHTrainTodayPremiumView: View {
                                         .stroke(champagne, style: StrokeStyle(
                                             lineWidth: 6, lineCap: .round))
                                         .rotationEffect(.degrees(-90))
-                                    Text("\(Int((fraction * 100).rounded()))%")
-                                        .font(.caption.weight(.bold))
-                                        .monospacedDigit()
-                                        .foregroundStyle(ink)
                                 } else {
                                     Image(systemName: goal.category.systemImage)
+                                        .font(.caption)
                                         .foregroundStyle(champagne)
                                 }
                             }
-                            .frame(width: 62, height: 62)
+                            .frame(width: 43, height: 43)
                             .accessibilityHidden(true)
+                        }
 
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text(goal.title)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ink)
-                                    .fixedSize(horizontal: false, vertical: true)
-                                    .lineLimit(3)
-                                if let weightProgress {
-                                    Text(
-                                        tr(
-                                            "\(weightProgress.achievedKilograms.formatted(.number.precision(.fractionLength(1)))) of \(weightProgress.targetKilograms.formatted(.number.precision(.fractionLength(1)))) kg",
-                                            "\(weightProgress.achievedKilograms.formatted(.number.precision(.fractionLength(1)))) av \(weightProgress.targetKilograms.formatted(.number.precision(.fractionLength(1)))) kg"
-                                        )
-                                    )
-                                    .font(.caption2.weight(.medium))
-                                    .foregroundStyle(champagne)
-                                    .fixedSize(horizontal: false, vertical: true)
-
-                                    Text(tr("Apple Health · Last recorded weight: ",
-                                            "Apple Health · Siste registrerte vekt: ") +
-                                         weightProgress.latest.formatted(
-                                            .number.precision(.fractionLength(1))) + " kg")
-                                        .font(.caption2)
-                                        .foregroundStyle(muted)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                } else if goal.target?.metric == .bodyWeightKilograms {
-                                    Text(tr("No comparable Apple Health weight yet",
-                                            "Mangler sammenlignbare vektdata i Apple Health"))
-                                        .font(.caption2)
-                                        .foregroundStyle(muted)
-                                        .fixedSize(horizontal: false, vertical: true)
-                                } else if total > 0 {
-                                    Text(tr("\(done) of \(total) milestones",
-                                            "\(done) av \(total) delmål"))
-                                        .font(.caption2)
-                                        .foregroundStyle(muted)
-                                } else if let deadline = goal.deadline {
-                                    Text(deadline.formatted(date: .abbreviated, time: .omitted))
-                                        .font(.caption2)
-                                        .foregroundStyle(muted)
-                                }
-                            }
+                        if let weightProgress {
+                            Text(tr(
+                                "\(weightProgress.achievedKilograms.formatted(.number.precision(.fractionLength(1)))) of \(weightProgress.targetKilograms.formatted(.number.precision(.fractionLength(1)))) kg",
+                                "\(weightProgress.achievedKilograms.formatted(.number.precision(.fractionLength(1)))) av \(weightProgress.targetKilograms.formatted(.number.precision(.fractionLength(1)))) kg"
+                            ))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(muted)
+                        } else if goal.target?.metric == .bodyWeightKilograms {
+                            Text(tr("No comparable Apple Health weight yet",
+                                    "Mangler sammenlignbare vektdata i Apple Health"))
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                        } else if total > 0 {
+                            Text(tr("\(done) of \(total) milestones",
+                                    "\(done) av \(total) delmål"))
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                        } else if let deadline = goal.deadline {
+                            Text(deadline.formatted(date: .abbreviated, time: .omitted))
+                                .font(.caption)
+                                .foregroundStyle(muted)
                         }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -1426,26 +1416,37 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .accessibilityHint(goalRecommendationReason)
                 }
             }
-            .padding(14)
-            .athlthTrainPaper()
+            .padding(15)
+            .frame(maxWidth: .infinity, minHeight: 174, alignment: .topLeading)
+            .background(
+                Color.white.opacity(0.95),
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .strokeBorder(hairline.opacity(0.43), lineWidth: 0.7)
+                    .allowsHitTesting(false)
+            }
         } else {
             NavigationLink {
                 GoalsHubView()
             } label: {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(tr("Active goal", "Aktivt mål"))
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(ink)
-                    Image(systemName: "target")
-                        .font(.title2)
+                VStack(alignment: .leading, spacing: 11) {
+                    Label(tr("Active goal", "Aktivt mål"), systemImage: "target")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(champagne)
                     Text(tr("Choose a goal", "Velg et mål"))
-                        .font(.subheadline)
-                        .foregroundStyle(muted)
+                        .font(.system(.title3, design: .serif))
+                        .foregroundStyle(ink)
+                    Image(systemName: "arrow.up.right")
+                        .foregroundStyle(champagne)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
-                .athlthTrainPaper()
+                .frame(maxWidth: .infinity, minHeight: 174, alignment: .topLeading)
+                .padding(15)
+                .background(
+                    Color.white.opacity(0.95),
+                    in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+                )
             }
             .buttonStyle(.plain)
         }
