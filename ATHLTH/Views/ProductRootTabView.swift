@@ -6531,7 +6531,7 @@ struct ATHLTHTrainView: View {
                         Spacer(minLength: 0)
                         premiumTrainTabs
                     }
-                    Spacer(minLength: 0)
+                    Spacer().frame(height: 18)
                     Text(ATHLTHLocalization.choose(
                         english: "TRAINING", norwegian: "TRENING"
                     ))
@@ -6554,6 +6554,7 @@ struct ATHLTHTrainView: View {
                         .fill(ATHLTHTrainDesign.gold)
                         .frame(width: 37, height: 2)
                         .padding(.top, 17)
+                    Spacer(minLength: 0)
                 }
                 .padding(18)
             }
@@ -6886,7 +6887,7 @@ struct ATHLTHTrainView: View {
             healthCompletedIDs: healthIDs,
             completionFraction: progress,
             planPosition: active.map {
-                trainTodayPlanPositionText($0)
+                trainTodayPlanOverviewText($0)
             } ?? "",
             hasActiveWorkout: hasOngoingTrainWorkout,
             activeWorkoutKind: activeTrainWorkoutKind,
@@ -8508,6 +8509,23 @@ struct ATHLTHTrainView: View {
                 isHealthCompleted:
                     isHealthCompleted
             )
+    }
+
+    /// A factual plan summary for the compact Today card.
+    /// Week completion is based on actual completed sessions, never
+    /// on invented showcase figures from the design reference.
+    private func trainTodayPlanOverviewText(_ plan: TrainingPlan) -> String {
+        guard !plan.weeks.isEmpty else {
+            return ATHLTHLocalization.choose(
+                english: "No scheduled weeks", norwegian: "Ingen planlagte uker"
+            )
+        }
+        let weekIndex = min(trainCurrentWeekIndex(in: plan), plan.weeks.count - 1)
+        let stats = trainWeekCompletionStats(in: plan, weekIndex: weekIndex)
+        return ATHLTHLocalization.choose(
+            english: "Week \(weekIndex + 1) of \(plan.weeks.count) · \(stats.completed) of \(stats.total) workouts this week",
+            norwegian: "Uke \(weekIndex + 1) av \(plan.weeks.count) · \(stats.completed) av \(stats.total) økter denne uken"
+        )
     }
 
     private func trainTodayPlanPositionText(
