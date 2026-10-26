@@ -1755,69 +1755,10 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
     private func premiumAllWeeks(_ plan: TrainingPlan) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(tr("Entire training plan", "Hele treningsplanen"))
-                .font(.system(size: 20, weight: .regular, design: .serif))
-            ForEach(Array(plan.weeks.enumerated()), id: \.element.id) { entry in
-                let index = entry.offset
-                let week = entry.element
-                DisclosureGroup {
-                    VStack(spacing: 4) {
-                        ForEach(week.days.sorted(by: {
-                            $0.dayIndex < $1.dayIndex
-                        })) { day in
-                            Button {
-                                selectPremiumPlanWeek(index)
-                                selectedDayID = day.id
-                                showingEntirePlan = false
-                            } label: {
-                                HStack(spacing: 11) {
-                                    Text(copyPlanDate(day.dayIndex, week: index, plan: plan)
-                                        .formatted(.dateTime.weekday(.abbreviated).day()))
-                                        .font(.caption.weight(.semibold))
-                                        .foregroundStyle(secondaryInk)
-                                        .frame(width: 50, alignment: .leading)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        if day.sessions.isEmpty {
-                                            Text(tr("Rest day", "Hviledag"))
-                                                .font(.subheadline)
-                                        } else {
-                                            ForEach(day.sessions) { workout in
-                                                Text(workout.title)
-                                                    .font(.subheadline.weight(.medium))
-                                                    .lineLimit(1)
-                                            }
-                                        }
-                                    }
-                                    Spacer()
-                                    Image(systemName: "chevron.right")
-                                        .font(.caption)
-                                        .foregroundStyle(secondaryInk)
-                                }
-                                .padding(.vertical, 8)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .foregroundStyle(graphite)
-                        }
-                    }
-                    .padding(.top, 7)
-                } label: {
-                    let workoutCount = week.days.flatMap(\.sessions)
-                        .filter { !$0.isExplicitRestDay }.count
-                    HStack {
-                        Text(tr("Week \(index + 1)", "Uke \(index + 1)"))
-                            .font(.subheadline.weight(.semibold))
-                        Spacer()
-                        Text("\(workoutCount) " + tr("workouts", "økter"))
-                            .font(.caption)
-                            .foregroundStyle(secondaryInk)
-                            .padding(.trailing, 7)
-                    }
-                }
-                .padding(12)
-                .background(.white, in: RoundedRectangle(cornerRadius: 13))
-            }
+        ATHLTHTrainPlanAllWeeksView(plan: plan) { weekIndex, dayID in
+            selectPremiumPlanWeek(weekIndex)
+            selectedDayID = dayID
+            showingEntirePlan = false
         }
     }
 
@@ -1885,10 +1826,12 @@ struct ATHLTHTrainPlanPremiumView: View {
     ) -> some View {
         LazyVStack(alignment: .leading, spacing: 12) {
             ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
-                premiumPlanDayTile(day, plan: plan,
-                    selected: premiumSelectedDay(in: week, plan: plan)?.id == day.id)
-                if premiumSelectedDay(in: week, plan: plan)?.id == day.id {
-                    premiumSelectedDayPanel(day, plan: plan)
+                VStack(spacing: 0) {
+                    premiumPlanDayTile(day, plan: plan,
+                        selected: premiumSelectedDay(in: week, plan: plan)?.id == day.id)
+                    if premiumSelectedDay(in: week, plan: plan)?.id == day.id {
+                        premiumSelectedDayPanel(day, plan: plan)
+                    }
                 }
             }
         }
