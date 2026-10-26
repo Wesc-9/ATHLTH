@@ -8715,12 +8715,12 @@ struct ATHLTHProgressView: View {
             } label: {
                 Label("Train", systemImage: "chevron.left")
                     .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(ATHLTHTheme.primaryText)
                     .padding(.horizontal, 13)
                     .frame(height: 33)
-                    .background(Color.black.opacity(0.29), in: Capsule())
+                    .background(Color.white.opacity(0.94), in: Capsule())
                     .overlay {
-                        Capsule().stroke(Color.white.opacity(0.30), lineWidth: 0.7)
+                        Capsule().stroke(ATHLTHTheme.premiumGold.opacity(0.30), lineWidth: 0.7)
                     }
             }
             .buttonStyle(.plain)
@@ -8754,12 +8754,12 @@ struct ATHLTHProgressView: View {
                         .font(.system(size: 8, weight: .semibold))
                 }
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(.white)
+                .foregroundStyle(ATHLTHTheme.primaryText)
                 .padding(.horizontal, 11)
                 .frame(height: 33)
-                .background(Color.black.opacity(0.29), in: Capsule())
+                .background(Color.white.opacity(0.94), in: Capsule())
                 .overlay {
-                    Capsule().stroke(Color.white.opacity(0.30), lineWidth: 0.7)
+                    Capsule().stroke(ATHLTHTheme.premiumGold.opacity(0.30), lineWidth: 0.7)
                 }
             }
             .padding(.top, 59)
