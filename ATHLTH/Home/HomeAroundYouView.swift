@@ -848,6 +848,47 @@ struct AroundYouExploreView: View {
     @State private var routeSort:
         ExploreRouteSort = .nearest
 
+    @MapContentBuilder
+    private var eventMapAnnotations: some MapContent {
+                    if filter == .all || filter == .events {
+                        ForEach(nearbyEvents.prefix(30)) { item in
+                            if let coordinate =
+                                eventCoordinate(item) {
+                                Annotation(
+                                    item.event.title,
+                                    coordinate: coordinate,
+                                    anchor: .bottom
+                                ) {
+                                    Button {
+                                        selectEvent(item)
+                                    } label: {
+                                        Image(systemName: item.event.activityType.systemImage)
+                                            .font(.system(size: 16, weight: .bold))
+                                            .foregroundStyle(.white)
+                                            .frame(width: 36, height: 36)
+                                            .background(Color.purple, in: Circle())
+                                            .overlay {
+                                                Circle()
+                                                    .stroke(.white, lineWidth: 2.5)
+                                            }
+                                            .shadow(color: .black.opacity(0.22), radius: 6, y: 3)
+                                            .scaleEffect(selectedEvent?.id == item.id ? 1.15 : 1)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(
+                                        ATHLTHLocalization.choose(
+                                            english: "View event: ",
+                                            norwegian: "Vis arrangement: "
+                                        ) + item.event.title
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+
+    }
+
     var body: some View {
         ZStack {
             MapReader { proxy in
@@ -997,41 +1038,7 @@ struct AroundYouExploreView: View {
                         }
                     }
 
-                    if filter == .all || filter == .events {
-                        ForEach(nearbyEvents.prefix(30)) { item in
-                            if let coordinate =
-                                eventCoordinate(item) {
-                                Annotation(
-                                    item.event.title,
-                                    coordinate: coordinate,
-                                    anchor: .bottom
-                                ) {
-                                    Button {
-                                        selectEvent(item)
-                                    } label: {
-                                        Image(systemName: item.event.activityType.systemImage)
-                                            .font(.system(size: 16, weight: .bold))
-                                            .foregroundStyle(.white)
-                                            .frame(width: 36, height: 36)
-                                            .background(Color.purple, in: Circle())
-                                            .overlay {
-                                                Circle()
-                                                    .stroke(.white, lineWidth: 2.5)
-                                            }
-                                            .shadow(color: .black.opacity(0.22), radius: 6, y: 3)
-                                            .scaleEffect(selectedEvent?.id == item.id ? 1.15 : 1)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel(
-                                        ATHLTHLocalization.choose(
-                                            english: "View event: ",
-                                            norwegian: "Vis arrangement: "
-                                        ) + item.event.title
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    eventMapAnnotations
 
                     if filter == .all || filter == .events {
                         ForEach(nearbyPublicWorkoutPins) { pin in
