@@ -125,6 +125,17 @@ enum ATHLTHSurfaceCoordinator {
             await ATHLTHLiveActivityController.shared.sync(
                 with: accountSurfacesEnabled ? snapshot : nil
             )
+            guard generation == accountGeneration else { return }
+            let workoutIsActive = accountSurfacesEnabled &&
+                snapshot.map {
+                    $0.state == .preparing ||
+                    $0.state == .running ||
+                    $0.state == .paused ||
+                    $0.state == .ending
+                } == true
+            ATHLTHAliveController.workoutDidChange(
+                isActive: workoutIsActive
+            )
         }
     }
 
