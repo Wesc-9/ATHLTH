@@ -7048,7 +7048,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
 
         if mode == .basic {
-            updateSimplePlanChoices()
+            // The activity mix is derived from the goal step. Rebuild day
+            // suggestions without replacing the selected goal focus, e.g.
+            // Endurance or General Fitness, with an inferred category.
+            setSimpleKinds()
         }
 
         let profile = currentPlanBuilderProfile
