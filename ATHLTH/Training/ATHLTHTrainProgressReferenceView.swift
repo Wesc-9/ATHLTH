@@ -652,7 +652,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                     if recentSessions.isEmpty {
                         emptyLine(tr("Completed workouts will appear here.", "Fullførte økter vises her."))
                     } else {
-                        ForEach(recentSessions.prefix(3)) { item in
+                        ForEach(recentSessions.prefix(5)) { item in
                             compactRow(
                                 icon: item.icon,
                                 title: item.title,
