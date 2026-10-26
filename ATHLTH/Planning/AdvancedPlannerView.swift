@@ -10935,23 +10935,7 @@ struct PlannedExerciseEditorView: View {
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTrainDesign.secondary)
                             } else {
-                                Stepper(value: $durationSeconds, in: 15...7_200, step: 5) {
-                                    HStack(spacing: 8) {
-                                        Image(systemName: "clock")
-                                            .foregroundStyle(ATHLTHTrainDesign.bronze)
-                                        Text(ATHLTHLocalization.choose(
-                                            english: "Time per set",
-                                            norwegian: "Tid per sett"
-                                        ))
-                                        .font(.subheadline.weight(.medium))
-                                        Spacer()
-                                        Text(formattedDuration(durationSeconds))
-                                            .font(.subheadline.weight(.semibold))
-                                            .monospacedDigit()
-                                            .foregroundStyle(ATHLTHTrainDesign.ink)
-                                    }
-                                }
-                                .tint(ATHLTHTrainDesign.bronze)
+                                exerciseDurationFields(value: $durationSeconds)
                             }
                         }
 
@@ -12044,6 +12028,21 @@ struct PlannedExerciseEditorView: View {
                 }
             }
 
+            if targetKind == .time {
+                exerciseDurationFields(
+                    value: Binding(
+                        get: {
+                            binding.wrappedValue.durationSeconds ?? durationSeconds
+                        },
+                        set: { newValue in
+                            var target = binding.wrappedValue
+                            target.durationSeconds = newValue
+                            binding.wrappedValue = target
+                        }
+                    )
+                )
+            }
+
             LazyVGrid(
                 columns: [
                     GridItem(
@@ -12086,36 +12085,6 @@ struct PlannedExerciseEditorView: View {
                         range: 1...100,
                         step: 1,
                         suffix: ""
-                    )
-                } else {
-                    setMetricStepper(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english: "Time",
-                                norwegian: "Tid"
-                            ),
-                        value:
-                            Binding(
-                                get: {
-                                    binding
-                                        .wrappedValue
-                                        .durationSeconds ??
-                                    durationSeconds
-                                },
-                                set: { value in
-                                    var target =
-                                        binding
-                                            .wrappedValue
-                                    target.durationSeconds =
-                                        value
-                                    binding
-                                        .wrappedValue =
-                                        target
-                                }
-                            ),
-                        range: 15...7_200,
-                        step: 15,
-                        suffix: "s"
                     )
                 }
 
@@ -13498,6 +13467,77 @@ struct PlannedExerciseEditorView: View {
 
         onSave(updated)
         dismiss()
+    }
+
+    /// Execution target, not recovery time. Keep seconds in the existing
+    /// PlannedExercise / PlannedExerciseSetTarget models so Watch and iPhone
+    /// receive the same timed-set prescription.
+    private func exerciseDurationFields(value: Binding<Int>) -> some View {
+        HStack(spacing: 12) {
+            Label(ATHLTHLocalization.choose(
+                english: "Execution time",
+                norwegian: "Utførelsestid"
+            ), systemImage: "timer")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+            Spacer(minLength: 8)
+            TextField(
+                "0",
+                value: Binding<Int>(
+                    get: { min(max(value.wrappedValue / 60, 0), 120) },
+                    set: { minutes in
+                        let bounded = min(max(minutes, 0), 120)
+                        value.wrappedValue = min(
+                            max(bounded * 60 + value.wrappedValue % 60, 15),
+                            7_200
+                        )
+                    }
+                ),
+                format: .number
+            )
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.trailing)
+            .frame(width: 32)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Minutes", norwegian: "Minutter"
+            ))
+            Text("min")
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            TextField(
+                "00",
+                value: Binding<Int>(
+                    get: { value.wrappedValue % 60 },
+                    set: { seconds in
+                        let bounded = min(max(seconds, 0), 59)
+                        value.wrappedValue = min(
+                            max(value.wrappedValue / 60 * 60 + bounded, 15),
+                            7_200
+                        )
+                    }
+                ),
+                format: .number
+            )
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.trailing)
+            .frame(width: 32)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Seconds", norwegian: "Sekunder"
+            ))
+            Text("sek")
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .background(
+            ATHLTHTrainDesign.paleGold.opacity(0.38),
+            in: RoundedRectangle(cornerRadius: 13)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 13)
+                .stroke(ATHLTHTrainDesign.rule.opacity(0.55), lineWidth: 0.7)
+        }
     }
 
     private func formattedDuration(
