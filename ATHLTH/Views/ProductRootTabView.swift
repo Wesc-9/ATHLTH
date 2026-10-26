@@ -5824,7 +5824,11 @@ struct ATHLTHTrainView: View {
                                     }
                                 )
                             } else {
+                                // Let the first white card rest on the scenic cover,
+                                // without altering scroll position or recorder state.
                                 premiumTodayScreen
+                                    .padding(.top, -30)
+                                    .zIndex(1)
                             }
                         }
                         .padding(.horizontal, 17)
