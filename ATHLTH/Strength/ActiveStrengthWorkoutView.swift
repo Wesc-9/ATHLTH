@@ -1863,6 +1863,7 @@ struct ActiveStrengthWorkoutView: View {
                 radius: 6, x: 0, y: 2)
     }
 
+    @ViewBuilder
     private var strengthFinishConfirmationSheet: some View {
         if let workout = strength.activeWorkout {
             let plannedSetCount = workout.exercises.reduce(0) {
