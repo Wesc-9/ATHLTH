@@ -457,23 +457,31 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
                 let uniform = rows.allSatisfy {
                     $0.reps == rows[0].reps && $0.weight == rows[0].weight
                 }
+                // Snapshot actor-bound view/state values before entering the
+                // synchronous local builder (Swift 6 concurrency safety).
+                let localizedName = library.localizedExerciseName(entry)
+                let sourceIdentifier = entry.sourceIdentifier
+                let exerciseID = entry.id
+                let configuredPhase = phase
+                let savedNotes: String? = notes.isEmpty ? nil : notes
+                let shareableSnapshot = entry.source == .custom &&
+                    entry.exercise.isVisibleOutsideOwnerLibrary
+                    ? ATHLTHExerciseReferenceResolver.shareableSnapshot(entry.exercise)
+                    : nil
                 let payload: [WorkoutTemplateBlock] = {
                     func block(_ row: (reps: Int, weight: Double?), index: Int) -> WorkoutTemplateBlock {
                         var value = WorkoutTemplateBlock(
                             sequence: index, kind: .exercise,
-                            title: library.localizedExerciseName(entry),
-                            exerciseSlug: entry.sourceIdentifier,
+                            title: localizedName,
+                            exerciseSlug: sourceIdentifier,
                             distanceMeters: nil, repetitions: row.reps,
                             durationSeconds: nil,
                             targetWeightKilograms: row.weight,
-                            loadNote: nil, notes: notes.isEmpty ? nil : notes,
-                            phase: phase
+                            loadNote: nil, notes: savedNotes,
+                            phase: configuredPhase
                         )
-                        value.exerciseID = entry.id
-                        if entry.source == .custom && entry.exercise.isVisibleOutsideOwnerLibrary {
-                            value.exerciseSnapshot =
-                                ATHLTHExerciseReferenceResolver.shareableSnapshot(entry.exercise)
-                        }
+                        value.exerciseID = exerciseID
+                        value.exerciseSnapshot = shareableSnapshot
                         return value
                     }
                     if uniform {
