@@ -1536,15 +1536,17 @@ enum HomeHealthMetricKind:
     }
 
     var tint: Color {
+        // Desaturated accent colors sit naturally on Home's warm ivory paper
+        // while preserving a distinguishable visual identity per metric.
         switch self {
         case .sleep:
-            return .indigo
+            return Color(red: 0.55, green: 0.50, blue: 0.65)
         case .respiratoryRate:
-            return .blue
+            return Color(red: 0.38, green: 0.57, blue: 0.69)
         case .hrv:
-            return .red
+            return Color(red: 0.73, green: 0.44, blue: 0.44)
         case .load:
-            return .green
+            return Color(red: 0.38, green: 0.57, blue: 0.45)
         }
     }
 
