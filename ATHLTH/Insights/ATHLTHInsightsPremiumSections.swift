@@ -165,17 +165,23 @@ enum ATHLTHInsightsMuscleRanking {
                 return $0.score > $1.score
             }
         guard let peak = ordered.first?.score, peak > 0 else { return [] }
-        // Require a meaningful comparison across at least three regions and
-        // three recorded sessions before signaling a concentration in red.
-        // A relative percentile alone never establishes fatigue/injury risk.
+        // Highlight a truly disproportionate concentration, not simply a
+        // near-peak muscle: if every region is equally used, none is red.
+        // At least three logged regions and sessions are needed to compare.
+        // Relative use alone is NEVER evidence of injury or overtraining.
         let hasComparison = ordered.count >= 3 && summary.sessionCount >= 3
+        let middle = ordered.count / 2
+        let median = ordered.count.isMultiple(of: 2)
+            ? (ordered[middle - 1].score + ordered[middle].score) / 2
+            : ordered[middle].score
         return ordered.map { item in
             let share = min(max(item.score / peak, 0), 1)
             return ATHLTHInsightsMuscleFocus(
                 region: item.region,
                 percentage: Int((share * 100).rounded()),
                 score: item.score,
-                needsLoadBalanceAttention: hasComparison && share >= 0.85
+                needsLoadBalanceAttention: hasComparison
+                    && share >= 0.85 && item.score >= median * 1.20
             )
         }
     }
