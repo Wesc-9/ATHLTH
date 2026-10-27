@@ -2060,6 +2060,14 @@ struct ATHLTHTrainPlanPremiumView: View {
                 ScrollView {
                     ATHLTHTrainLibraryPremiumView(
                         onOpenPlan: { showingWorkoutLibrary = false },
+                        onOpenSelectedPlan: { planID in
+                            focusedPlanID = planID
+                            browsingMyPlans = false
+                            selectedWeekIndex = nil
+                            selectedDayID = nil
+                            selectedWorkoutID = nil
+                            showingWorkoutLibrary = false
+                        },
                         startWithWorkouts: true
                     )
                     .padding(16)
