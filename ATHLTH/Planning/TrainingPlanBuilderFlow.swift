@@ -6768,6 +6768,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     /// silently written to disk and can be reentered when needed.
     private func restorePlanDraft(_ draft: ATHLTHPlanCreationDraft) {
         mode = draft.advanced ? .advanced : .basic
+        entryChoice = draft.advanced ? .advanced : .simple
         title = draft.usedDefaultTitle == true ? "" : draft.title
         weekCount = draft.weekCount
         startDate = max(Calendar.current.startOfDay(for: Date()), draft.startDate)
