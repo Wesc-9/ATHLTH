@@ -47,8 +47,10 @@ final class ATHLTHMeasuredKilometerSplitsTests: XCTestCase {
     }
 
     func testNoSyntheticSplitsWithoutWatchOrGPSHistory() {
+        // Disambiguate the measured-minute overload from the GPS overload.
+        let emptyRecordedMinutes: [ATHLTHRecordedRunningMinute] = []
         XCTAssertTrue(ATHLTHRunningResultInsights.kilometerSplits(
-            from: [], reportedDistanceMeters: 2100
+            from: emptyRecordedMinutes, reportedDistanceMeters: 2100
         ).isEmpty)
     }
 }
