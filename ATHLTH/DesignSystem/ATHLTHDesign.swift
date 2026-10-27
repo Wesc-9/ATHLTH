@@ -3,6 +3,19 @@ import ImageIO
 import SwiftUI
 import UIKit
 
+/// Shared safe-area inset for full-bleed Train and Insights covers.
+/// The cover starts behind the status bar, but its controls remain below it.
+@MainActor
+enum ATHLTHCoverSafeArea {
+    static var statusBarTop: CGFloat {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first(where: { $0.isKeyWindow })?
+            .safeAreaInsets.top ?? 0
+    }
+}
+
 enum ATHLTHTheme {
     static let cornerRadius: CGFloat = 24
     static let smallCornerRadius: CGFloat = 16
