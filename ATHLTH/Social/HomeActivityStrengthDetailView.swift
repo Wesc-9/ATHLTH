@@ -308,7 +308,8 @@ struct HomeActivityStrengthDetailView: View {
                     showsCompletionLabel: false,
                     showsMetrics: false,
                     detailMetadata: workoutHeroMetadata,
-                    cornerRadius: 0
+                    cornerRadius: 0,
+                    trainDetailStyle: true
                 )
                 .frame(width: viewport.size.width, height: workoutHeroHeight)
             }
@@ -400,37 +401,43 @@ struct HomeActivityStrengthDetailView: View {
             0,
             min(1, muscleSummary.profile.intensity(for: activation.region))
         )
+        let tint = ATHLTHStrengthFocusTint.color(for: intensity)
+        let percentage = Int((intensity * 100).rounded())
+
         return VStack(alignment: .leading, spacing: 7) {
-            Text(activation.region.activityDisplayTitle)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
+            HStack(alignment: .firstTextBaseline) {
+                Text(activation.region.activityDisplayTitle)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                Spacer(minLength: 8)
+
+                Text("\(percentage) %")
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+            }
 
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(ATHLTHTheme.border.opacity(0.75))
+                        .fill(ATHLTHTrainDesign.rule.opacity(0.38))
                     Capsule()
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    ATHLTHTheme.premiumGold,
-                                    Color(red: 0.34, green: 0.63, blue: 0.48)
-                                ],
-                                startPoint: .leading,
-                                endPoint: .trailing
-                            )
-                        )
+                        // Solid region tint: 100% stays entirely red;
+                        // medium-focus muscles are orange, lower-focus green.
+                        .fill(tint)
                         .frame(width: geometry.size.width * intensity)
                 }
             }
             .frame(height: 6)
+            .accessibilityElement(children: .ignore)
             .accessibilityLabel(
                 ATHLTHLocalization.choose(
                     english: "Relative muscle focus",
                     norwegian: "Relativt muskelfokus"
-                )
+                ) + ", \(percentage) %"
             )
         }
     }
