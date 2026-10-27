@@ -220,7 +220,9 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                 "Expand or collapse workout steps", "Utvid eller lukk øktens detaljer"
             ))
             if expanded {
-                VStack(alignment: .leading, spacing: 11) {
+                // Virtualize large mixed strength / interval timelines while
+                // preserving the complete ordered list for the user.
+                LazyVStack(alignment: .leading, spacing: 11) {
                     if sourceBlocks.isEmpty {
                         Text(tr("No detailed steps yet.", "Ingen detaljerte øktblokker ennå."))
                             .font(.caption)
