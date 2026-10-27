@@ -91,8 +91,11 @@ final class ATHLTHRunningResultInsightsTests: XCTestCase {
     }
 
     func testMissingRouteDoesNotFabricateInsights() {
+        // Both CLLocation and ATHLTHRecordedRunningMinute overloads exist.
+        // Explicitly use a missing GPS route for this regression test.
+        let emptyGPSRoute: [CLLocation] = []
         XCTAssertTrue(ATHLTHRunningResultInsights.kilometerSplits(
-            from: [], reportedDistanceMeters: 5_000
+            from: emptyGPSRoute, reportedDistanceMeters: 5_000
         ).isEmpty)
         XCTAssertNil(ATHLTHRunningResultInsights.bestKilometer([]))
         XCTAssertTrue(ATHLTHRunningResultInsights.elevationProfile(from: []).isEmpty)
