@@ -93,6 +93,9 @@ struct AIProgramRequest: Encodable {
     let preferredDays: [Int]
     let sessionDurationMinutes: Int
     let userNotes: String
+    // Defaults preserve existing non-injury plan-generation call sites.
+    var injurySafetyNotes: String? = nil
+    var excludedMovements: [String]? = nil
     let goals: [AIProgramGoalInput]
     let existingDays: [AIProgramExistingDay]
 }
