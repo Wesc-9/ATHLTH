@@ -351,8 +351,24 @@ struct ATHLTHInsightsView: View {
 
             HStack(spacing: 7) {
                 readinessMetric(tr("Sleep", "Søvn"), sleepValue, "moon.stars.fill")
-                readinessMetric("HRV", hrvValue, "waveform.path.ecg")
                 readinessMetric(tr("Resting HR", "Hvilepuls"), restingHRValue, "heart.fill")
+                readinessMetric("HRV", hrvValue, "waveform.path.ecg")
+            }
+            HStack(spacing: 7) {
+                readinessMetric(
+                    tr("Breathing", "Respirasjon"),
+                    recoverySnapshot.days.reversed()
+                        .compactMap(\.respiratoryRate).first.map {
+                            String(format: "%.1f/min", $0)
+                        } ?? "—",
+                    "lungs"
+                )
+                readinessMetric(
+                    tr("Training load", "Belastning"),
+                    recoverySnapshot.days.isEmpty ? "—"
+                        : "\(Int(recoverySnapshot.trainingLoad.acuteMinutes.rounded())) min",
+                    "chart.bar.fill"
+                )
             }
         }
         .padding(18)
