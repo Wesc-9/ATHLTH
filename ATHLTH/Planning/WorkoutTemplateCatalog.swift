@@ -3606,8 +3606,15 @@ struct WorkoutTemplateBuilderView: View {
                     tr("Heart rate zone", "Pulssone"),
                     selection: Binding<Int>(
                         get: { blocks[index].targetHeartRateZone ?? 0 },
-                        set: { blocks[index].targetHeartRateZone =
-                            (1...5).contains($0) ? $0 : nil }
+                        set: { selected in
+                            blocks[index].targetHeartRateZone =
+                                (1...5).contains(selected) ? selected : nil
+                            // A manual choice replaces the imported intensity
+                            // label; never keep contradictory HR ranges.
+                            blocks[index].sourceIntensityZoneLabel = nil
+                            blocks[index].targetHeartRatePercentMin = nil
+                            blocks[index].targetHeartRatePercentMax = nil
+                        }
                     )
                 ) {
                     Text(tr("No target", "Ingen")).tag(0)
