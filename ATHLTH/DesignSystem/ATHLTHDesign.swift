@@ -1147,6 +1147,8 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
     /// Skip full-height shadow and offscreen clip/mask compositing on
     /// scrolling-heavy dashboards such as Insights.
     let lightweightScrolling: Bool
+    /// Home opts into Train's warm white/cream editorial surface.
+    let warmHomePalette: Bool
     let sheetOverlapOverride: CGFloat?
     let transitionFadeHeightOverride: CGFloat?
     private let hero: Hero
@@ -1196,6 +1198,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         scrollFadeTransition: Bool = false,
         pullDownFadeBridge: Bool = false,
         lightweightScrolling: Bool = false,
+        warmHomePalette: Bool = false,
         sheetOverlapOverride: CGFloat? = nil,
         transitionFadeHeightOverride: CGFloat? = nil,
         @ViewBuilder hero: () -> Hero,
@@ -1207,6 +1210,7 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
         self.scrollFadeTransition = scrollFadeTransition
         self.pullDownFadeBridge = pullDownFadeBridge
         self.lightweightScrolling = lightweightScrolling
+        self.warmHomePalette = warmHomePalette
         self.sheetOverlapOverride =
             sheetOverlapOverride
         self.transitionFadeHeightOverride =
@@ -1217,7 +1221,11 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
 
     var body: some View {
         ZStack {
-            ATHLTHPremiumCanvas(accent: accent)
+            if warmHomePalette {
+                ATHLTHTrainDesign.canvas.ignoresSafeArea()
+            } else {
+                ATHLTHPremiumCanvas(accent: accent)
+            }
 
             VStack(spacing: -sheetOverlap) {
                 hero
@@ -1290,13 +1298,16 @@ struct ATHLTHPinnedHeroLayout<Hero: View, Content: View>: View {
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    ATHLTHTheme.canvasTop.opacity(
-                                        immersiveTransition ? 0.965 : 0.99
-                                    ),
-                                    ATHLTHTheme.surfaceStone.opacity(
-                                        immersiveTransition ? 0.965 : 0.98
-                                    ),
-                                    ATHLTHTheme.canvasBottom.opacity(0.96)
+                                    warmHomePalette ? ATHLTHTrainDesign.paper :
+                                        ATHLTHTheme.canvasTop.opacity(
+                                            immersiveTransition ? 0.965 : 0.99
+                                        ),
+                                    warmHomePalette ? ATHLTHTrainDesign.canvas :
+                                        ATHLTHTheme.surfaceStone.opacity(
+                                            immersiveTransition ? 0.965 : 0.98
+                                        ),
+                                    warmHomePalette ? ATHLTHTrainDesign.canvas :
+                                        ATHLTHTheme.canvasBottom.opacity(0.96)
                                 ],
                                 startPoint: .top,
                                 endPoint: .bottom
