@@ -316,11 +316,11 @@ private struct ATHLTHMedalReededEdge: Shape {
             let inner = radius * 0.893
             let outer = radius * 0.978
             path.move(to: CGPoint(
-                x: center.x + cos(a) * inner,
-                y: center.y + sin(a) * inner))
+                x: center.x + CGFloat(cos(a)) * inner,
+                y: center.y + CGFloat(sin(a)) * inner))
             path.addLine(to: CGPoint(
-                x: center.x + cos(a) * outer,
-                y: center.y + sin(a) * outer))
+                x: center.x + CGFloat(cos(a)) * outer,
+                y: center.y + CGFloat(sin(a)) * outer))
         }
         return path
     }
@@ -359,96 +359,182 @@ private struct ATHLTHGoldCupHandles: Shape {
     }
 }
 
-/// A sculpted trophy silhouette: actual bowl, open handles, stem and
-/// pedestal, not SF Symbols' flat "trophy.fill" pictogram.
+/// Raised handles, hollow rim, spun-metal bowl, fitted stem and engraved
+/// basalt pedestal give each prestige cup the proportions of an actual award.
+/// Gold remains reserved for earned prestige achievements, not regular medals.
 struct ATHLTHGoldPrestigeCupArtwork: View {
     let size: CGFloat
     let isUnlocked: Bool
 
-    private let gold: [Color] = [
-        Color(red: 1.00, green: 0.95, blue: 0.66),
-        Color(red: 0.99, green: 0.78, blue: 0.26),
-        Color(red: 0.66, green: 0.40, blue: 0.08),
-        Color(red: 0.96, green: 0.73, blue: 0.20),
-        Color(red: 0.99, green: 0.88, blue: 0.42)
-    ]
+    private let brass = Color(red: 0.54, green: 0.31, blue: 0.065)
+    private let warmGold = Color(red: 0.86, green: 0.65, blue: 0.28)
+    private let polishedGold = Color(red: 1.00, green: 0.91, blue: 0.64)
+    private let nearBlack = Color(red: 0.12, green: 0.12, blue: 0.14)
 
-    private var finish: LinearGradient {
-        LinearGradient(colors: gold, startPoint: .topLeading, endPoint: .bottomTrailing)
+    private var spunGold: LinearGradient {
+        LinearGradient(
+            stops: [
+                .init(color: brass, location: 0),
+                .init(color: polishedGold, location: 0.18),
+                .init(color: warmGold, location: 0.35),
+                .init(color: Color(red: 0.58, green: 0.36, blue: 0.09), location: 0.61),
+                .init(color: polishedGold, location: 0.79),
+                .init(color: brass, location: 1)
+            ],
+            startPoint: .leading, endPoint: .trailing)
     }
 
     var body: some View {
         ZStack {
             Ellipse()
-                .fill(Color.black.opacity(0.19))
-                .frame(width: size * 0.70, height: size * 0.075)
-                .blur(radius: size * 0.040)
-                .offset(y: size * 0.49)
+                .fill(nearBlack.opacity(0.20))
+                .frame(width: size * 0.78, height: size * 0.060)
+                .blur(radius: size * 0.05)
+                .offset(y: size * 0.54)
 
+            // Cast brass handles, highlighted on their outer edge.
             ATHLTHGoldCupHandles()
-                .stroke(finish, style: StrokeStyle(lineWidth: size * 0.077,
-                                                    lineCap: .round, lineJoin: .round))
-                .frame(width: size * 0.93, height: size * 0.52)
-                .offset(y: -size * 0.19)
-                .shadow(color: Color(red: 0.39, green: 0.21, blue: 0.04).opacity(0.48),
-                        radius: size * 0.018, x: size * 0.01, y: size * 0.02)
+                .stroke(
+                    LinearGradient(
+                        colors: [brass, polishedGold, warmGold, brass],
+                        startPoint: .topLeading, endPoint: .bottomTrailing),
+                    style: StrokeStyle(lineWidth: size * 0.082,
+                                       lineCap: .round, lineJoin: .round))
+                .frame(width: size * 0.91, height: size * 0.52)
+                .offset(y: -size * 0.20)
+                .shadow(color: brass.opacity(0.58),
+                        radius: size * 0.020, x: size * 0.018, y: size * 0.018)
+            ATHLTHGoldCupHandles()
+                .stroke(Color.white.opacity(0.40),
+                        style: StrokeStyle(lineWidth: size * 0.018,
+                                           lineCap: .round))
+                .frame(width: size * 0.91, height: size * 0.52)
+                .offset(x: -size * 0.011, y: -size * 0.216)
 
+            // Interior lip makes the bowl look hollow rather than like a filled
+            // SF Symbol. The reeded seam catches a separate specular light.
             ATHLTHGoldCupBowl()
-                .fill(finish)
-                .frame(width: size * 0.70, height: size * 0.55)
+                .fill(spunGold)
+                .frame(width: size * 0.72, height: size * 0.55)
                 .overlay {
                     ATHLTHGoldCupBowl()
-                        .stroke(Color.white.opacity(0.45), lineWidth: size * 0.010)
-                        .frame(width: size * 0.70, height: size * 0.55)
+                        .fill(LinearGradient(
+                            colors: [.white.opacity(0.20), .clear,
+                                     brass.opacity(0.28)],
+                            startPoint: .topLeading, endPoint: .bottomTrailing))
+                        .frame(width: size * 0.72, height: size * 0.55)
+                }
+                .overlay {
+                    ATHLTHGoldCupBowl()
+                        .strokeBorderIfAvailable(color: polishedGold,
+                                                 width: max(0.65, size * 0.008))
+                        .frame(width: size * 0.72, height: size * 0.55)
                 }
                 .offset(y: -size * 0.20)
-                .shadow(color: Color(red: 0.33, green: 0.18, blue: 0.03).opacity(0.43),
-                        radius: size * 0.025, x: 0, y: size * 0.016)
+                .shadow(color: brass.opacity(0.52),
+                        radius: size * 0.025, x: 0, y: size * 0.020)
+
+            // Narrow glancing reflection, clipped to the curved bowl surface.
+            Capsule()
+                .fill(LinearGradient(
+                    colors: [.white.opacity(0.60), .white.opacity(0.04)],
+                    startPoint: .leading, endPoint: .trailing))
+                .frame(width: size * 0.070, height: size * 0.34)
+                .rotationEffect(.degrees(13))
+                .offset(x: -size * 0.155, y: -size * 0.206)
+                .mask {
+                    ATHLTHGoldCupBowl()
+                        .frame(width: size * 0.72, height: size * 0.55)
+                        .offset(y: -size * 0.20)
+                }
 
             Ellipse()
                 .fill(LinearGradient(
-                    colors: [Color(red: 0.42, green: 0.25, blue: 0.07),
-                             Color(red: 0.76, green: 0.51, blue: 0.12),
-                             Color(red: 1.00, green: 0.91, blue: 0.51)],
+                    colors: [nearBlack.opacity(0.80), brass,
+                             warmGold, polishedGold, brass],
                     startPoint: .top, endPoint: .bottom))
-                .frame(width: size * 0.67, height: size * 0.095)
+                .frame(width: size * 0.68, height: size * 0.088)
                 .overlay {
                     Ellipse()
-                        .stroke(Color.white.opacity(0.60), lineWidth: size * 0.012)
+                        .strokeBorder(polishedGold.opacity(0.79),
+                                      lineWidth: max(0.7, size * 0.011))
                 }
-                .offset(y: -size * 0.443)
+                .offset(y: -size * 0.447)
 
-            RoundedRectangle(cornerRadius: size * 0.018)
-                .fill(finish)
-                .frame(width: size * 0.095, height: size * 0.26)
-                .offset(y: size * 0.257)
-
-            Ellipse()
-                .fill(finish)
-                .frame(width: size * 0.27, height: size * 0.09)
-                .offset(y: size * 0.35)
-
-            RoundedRectangle(cornerRadius: size * 0.022)
-                .fill(finish)
-                .frame(width: size * 0.48, height: size * 0.09)
-                .offset(y: size * 0.415)
+            // Raised centre boss and turned brass neck.
+            Circle()
+                .fill(RadialGradient(
+                    colors: [polishedGold, warmGold, brass],
+                    center: .topLeading, startRadius: 0,
+                    endRadius: size * 0.20))
+                .frame(width: size * 0.12, height: size * 0.12)
+                .offset(y: size * 0.09)
 
             RoundedRectangle(cornerRadius: size * 0.025)
-                .fill(finish)
-                .frame(width: size * 0.59, height: size * 0.080)
+                .fill(spunGold)
+                .frame(width: size * 0.10, height: size * 0.25)
                 .overlay {
                     RoundedRectangle(cornerRadius: size * 0.025)
-                        .stroke(Color.white.opacity(0.48), lineWidth: max(0.5, size * 0.008))
+                        .stroke(brass.opacity(0.65), lineWidth: 0.7)
+                        .frame(width: size * 0.10, height: size * 0.25)
                 }
-                .offset(y: size * 0.475)
+                .offset(y: size * 0.225)
+
+            Ellipse()
+                .fill(spunGold)
+                .frame(width: size * 0.32, height: size * 0.090)
+                .offset(y: size * 0.36)
+
+            RoundedRectangle(cornerRadius: size * 0.018)
+                .fill(spunGold)
+                .frame(width: size * 0.49, height: size * 0.074)
+                .offset(y: size * 0.400)
+
+            // Weighty, non-golden base supports the cup physically.
+            RoundedRectangle(cornerRadius: size * 0.033)
+                .fill(LinearGradient(
+                    colors: [
+                        Color(red: 0.30, green: 0.29, blue: 0.28),
+                        Color(red: 0.12, green: 0.13, blue: 0.14),
+                        Color(red: 0.23, green: 0.22, blue: 0.22)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: size * 0.60, height: size * 0.145)
+                .overlay {
+                    RoundedRectangle(cornerRadius: size * 0.033)
+                        .strokeBorder(Color.white.opacity(0.22),
+                                      lineWidth: max(0.6, size * 0.007))
+                        .frame(width: size * 0.60, height: size * 0.145)
+                }
+                .offset(y: size * 0.470)
+
+            RoundedRectangle(cornerRadius: size * 0.009)
+                .fill(LinearGradient(
+                    colors: [brass, warmGold, polishedGold, brass],
+                    startPoint: .leading, endPoint: .trailing))
+                .frame(width: size * 0.39, height: size * 0.075)
+                .overlay {
+                    if size >= 78 {
+                        Text("ATHLTH")
+                            .font(.system(size: size * 0.057,
+                                          weight: .heavy, design: .rounded))
+                            .tracking(size * 0.006)
+                            .foregroundStyle(nearBlack.opacity(0.92))
+                    }
+                }
+                .offset(y: size * 0.471)
         }
         .frame(width: size, height: size * 1.10)
-        .shadow(color: Color(red: 0.45, green: 0.25, blue: 0.06).opacity(0.22),
-                radius: size * 0.063, y: size * 0.022)
-        .saturation(isUnlocked ? 1 : 0)
-        .opacity(isUnlocked ? 1 : 0.38)
+        .saturation(isUnlocked ? 0.92 : 0)
+        .opacity(isUnlocked ? 1 : 0.35)
         .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Prestige gold trophy", norwegian: "Prestisjepokal i gull"
-        ))
+            english: "Prestige gold trophy", norwegian: "Prestisjepokal i gull"))
+    }
+}
+
+/// Some custom Shapes are not InsettableShapes; stroke without shifting
+/// the original bowl geometry.
+private extension Shape {
+    func strokeBorderIfAvailable(color: Color, width: CGFloat) -> some View {
+        stroke(color.opacity(0.47), lineWidth: width)
     }
 }
