@@ -226,7 +226,8 @@ struct ProductRootTabView: View {
             // The former Recovery view remains available from within Insights
             // for detailed readiness and the daily check-in.
             ATHLTHInsightsView(
-                onSelectTab: { tab in selectedTab = tab }
+                onSelectTab: { tab in selectedTab = tab },
+                isActive: selectedTab == 2
             )
                 .tabItem {
                     Label(
