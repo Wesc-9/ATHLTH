@@ -78,21 +78,36 @@ if "ATHLTHInsightsView(" not in two or "ATHLTHTrainView(" in two:
 if "AnyView(ProductRootTabView())" not in preview:
     fail("Authenticated production root no longer uses ProductRootTabView")
 
-# Reference layout must actually be present and use real data.
+# Audit the active editorial layout, rather than requiring all of the
+# previous redundant charts. Each tab must have a distinct purpose.
 for token in (
     "ATHLTHInsightsNavigation(",
+    "ATHLTHInsightsCoverHero(",
     "readinessOverviewCard",
-    "dailyRecommendationCard",
+    "signalPerspectiveCard",
     "ATHLTHInsightsDailyCheckInCard(",
     "ATHLTHInsightsReferenceSignalCard(",
-    "ATHLTHInsightsReferenceLoadCard(",
-    "ATHLTHInsightsReferenceTimeCard(",
+    "ATHLTHInsightsMuscleCard(summary: muscleSummary)",
+    "trainingRhythmCard",
     "ATHLTHInsightsReferenceDistributionCard(",
+    "whatChangedCard",
+    "whatIfCard",
     "recoveryTrendSnapshot(days: 7)",
     "ATHLTHRecoveryView(onSelectTab: onSelectTab)",
 ):
     if token not in insights:
-        fail(f"Required new Insights element or detail path is missing: {token}")
+        fail(f"Required Insights element or data route is missing: {token}")
+# Guard against duplicate cards across tabs: a repeated trend can be seen
+# in details, but the four top-level summaries must not copy one another.
+development = between(insights,
+    "private var developmentSection: some View {", "@MainActor")
+if "ATHLTHInsightsReferenceSignalCard(" in development:
+    fail("Development cannot duplicate health signal charts")
+training = between(insights,
+    "private var trainingSection: some View {",
+    "private var developmentSection: some View {")
+if training.find("ATHLTHInsightsMuscleCard(") > training.find("trainingRhythmCard"):
+    fail("Muscle balance must be the first training insight")
 for case in ("case overview, health, training, development",):
     if case not in sections:
         fail("Reference's four sections were removed or changed")
@@ -105,4 +120,4 @@ for token in (
 
 print("PASS: production and preview tab 2 both use the reference Insights view.")
 print("PASS: legacy Recovery remains a detail page only.")
-print("PASS: reference cards consume recorded Health and check-in data.")
+print("PASS: nonrepetitive editorial cards consume recorded Health, workout and check-in data.")
