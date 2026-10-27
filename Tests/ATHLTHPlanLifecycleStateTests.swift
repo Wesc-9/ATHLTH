@@ -66,6 +66,60 @@ final class ATHLTHPlanLifecycleStateTests: XCTestCase {
         XCTAssertEqual(store.activePlan?.id, replacement.id)
     }
 
+    func testUpcomingPlanIsVisibleAndDisabledPlansAreNotPreviewed() throws {
+        let suite = "PlanLifecycle.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        var future = plan("First 5K")
+        future.startDate = Calendar.current.date(byAdding: .day, value: 5, to: Date())
+        let store = AppSessionStore(defaults: defaults)
+        XCTAssertTrue(store.addTrainingPlan(future))
+        XCTAssertNil(store.activePlan)
+        XCTAssertEqual(store.nextTrainingPlan?.id, future.id)
+
+        XCTAssertTrue(store.deactivateTrainingPlan(future.id))
+        XCTAssertNil(store.nextTrainingPlan)
+        XCTAssertNotNil(store.trainingPlan(withID: future.id))
+        XCTAssertTrue(store.resumeTrainingPlan(future.id))
+        XCTAssertEqual(store.nextTrainingPlan?.id, future.id)
+
+        XCTAssertTrue(store.pauseTrainingPlan(future.id))
+        XCTAssertNil(store.nextTrainingPlan)
+    }
+
+    func testNewPlanMayStartTodayAfterExplicitDeactivationOfOverlappingPlan() throws {
+        let suite = "PlanLifecycle.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        var future = plan("First 5K")
+        future.startDate = Calendar.current.date(byAdding: .day, value: 5, to: Date())
+        var today = plan("New program")
+        today.weeks.append(TrainingPlanWeek(
+            id: UUID(), weekNumber: 2, title: "Week 2",
+            days: (1...7).map {
+                TrainingPlanDay(id: UUID(), dayIndex: $0, title: "", sessions: [])
+            }
+        ))
+
+        let store = AppSessionStore(defaults: defaults)
+        XCTAssertTrue(store.addTrainingPlan(future))
+        XCTAssertEqual(store.trainingPlanConflict(
+            startDate: Calendar.current.startOfDay(for: Date()),
+            weekCount: 2
+        )?.id, future.id)
+        XCTAssertFalse(store.addTrainingPlan(today))
+
+        // The old plan is retained, not deleted or silently rescheduled.
+        XCTAssertTrue(store.deactivateTrainingPlan(future.id))
+        XCTAssertTrue(store.addTrainingPlan(today))
+        XCTAssertEqual(store.activePlan?.id, today.id)
+        XCTAssertNil(store.nextTrainingPlan)
+        XCTAssertTrue(store.isTrainingPlanDeactivated(future.id))
+        XCTAssertNotNil(store.trainingPlan(withID: future.id))
+    }
+
     func testOldAccountTrainingContentDecodesWithoutLifecycleFields() throws {
         let old = """
         {"activePlan":null,"scheduledPlans":[],"planTemplates":[],
