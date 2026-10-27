@@ -36,6 +36,8 @@ jobs:
           node supabase/functions/_shared/recovery-privacy.test.ts
           node supabase/functions/_shared/strength-session-prompt.test.ts
           node supabase/functions/_shared/strength-session-handler.test.ts
+      - name: Test Coach's injury exclusion guard
+        run: deno test supabase/functions/_shared/ai-training-injury-guard.test.ts
       - name: Test Groq Audio Coach request policy
         run: |
           deno test supabase/functions/audio-coach-groq-turn/policy.test.ts
