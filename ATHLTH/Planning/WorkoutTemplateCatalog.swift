@@ -134,6 +134,11 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var phase: WorkoutPhaseKind? = nil
     var targetPaceSecondsPerKilometer: Double? = nil
     var targetHeartRateZone: Int? = nil
+    /// Original intensity target from Zoned (which uses six heart-rate zones).
+    /// These preserve mixed ranges and Z6 even if ATHLTH displays five zones.
+    var sourceIntensityZoneLabel: String? = nil
+    var targetHeartRatePercentMin: Double? = nil
+    var targetHeartRatePercentMax: Double? = nil
     /// Athlete-selected perceived intensity (RPE 1...10). Never a measured
     /// physiological reading; optional so historic templates still decode.
     var targetEffortRPE: Int? = nil
@@ -178,6 +183,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.phase == rhs.phase &&
         lhs.targetPaceSecondsPerKilometer == rhs.targetPaceSecondsPerKilometer &&
         lhs.targetHeartRateZone == rhs.targetHeartRateZone &&
+        lhs.sourceIntensityZoneLabel == rhs.sourceIntensityZoneLabel &&
+        lhs.targetHeartRatePercentMin == rhs.targetHeartRatePercentMin &&
+        lhs.targetHeartRatePercentMax == rhs.targetHeartRatePercentMax &&
         lhs.targetEffortRPE == rhs.targetEffortRPE &&
         lhs.treadmillInclinePercent == rhs.treadmillInclinePercent &&
         lhs.setCount == rhs.setCount &&
@@ -207,6 +215,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(phase)
         hasher.combine(targetPaceSecondsPerKilometer)
         hasher.combine(targetHeartRateZone)
+        hasher.combine(sourceIntensityZoneLabel)
+        hasher.combine(targetHeartRatePercentMin)
+        hasher.combine(targetHeartRatePercentMax)
         hasher.combine(targetEffortRPE)
         hasher.combine(treadmillInclinePercent)
         hasher.combine(setCount)
@@ -244,6 +255,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case phase
         case targetPaceSecondsPerKilometer = "target_pace_seconds_per_km"
         case targetHeartRateZone = "target_hr_zone"
+        case sourceIntensityZoneLabel = "source_intensity_zone"
+        case targetHeartRatePercentMin = "target_hr_percent_min"
+        case targetHeartRatePercentMax = "target_hr_percent_max"
         case targetEffortRPE = "target_effort_rpe"
         case treadmillInclinePercent = "treadmill_incline_percent"
         case setCount = "set_count"
@@ -314,7 +328,11 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
             parts.append(String(format: "%d:%02d/km", seconds / 60, seconds % 60))
         }
 
-        if let targetHeartRateZone, (1...5).contains(targetHeartRateZone) {
+        if let sourceIntensityZoneLabel,
+           let lo = targetHeartRatePercentMin,
+           let hi = targetHeartRatePercentMax {
+            parts.append("Puls \(sourceIntensityZoneLabel) · \(Int(lo))–\(Int(hi)) % HRmaks")
+        } else if let targetHeartRateZone, (1...5).contains(targetHeartRateZone) {
             parts.append("Puls sone \(targetHeartRateZone)")
         }
         if let targetEffortRPE, (1...10).contains(targetEffortRPE) {
@@ -374,6 +392,9 @@ extension Array where Element == WorkoutTemplateBlock {
             item.activityTag = source.activityTag
             item.treadmillInclinePercent = source.treadmillInclinePercent
             item.targetEffortRPE = source.targetEffortRPE
+            item.sourceIntensityZoneLabel = source.sourceIntensityZoneLabel
+            item.targetHeartRatePercentMin = source.targetHeartRatePercentMin
+            item.targetHeartRatePercentMax = source.targetHeartRatePercentMax
             output.append(item)
         }
 
@@ -520,7 +541,7 @@ struct WorkoutTemplateCatalogEntry: Identifiable, Codable, Hashable {
 extension WorkoutTemplateCatalogEntry {
     /// A single offline baseline used everywhere, even without connectivity.
     static var bundledCatalog: [WorkoutTemplateCatalogEntry] {
-        fallbackCatalog + ATHLTHCuratedStrengthWorkouts.entries
+        fallbackCatalog + ATHLTHCuratedStrengthWorkouts.entries + ATHLTHZonedPlanLibrary.workoutCatalogEntries
     }
 }
 
