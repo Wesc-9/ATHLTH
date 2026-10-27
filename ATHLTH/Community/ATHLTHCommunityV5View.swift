@@ -136,12 +136,15 @@ struct ATHLTHCommunityV5View: View {
                 let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard clean.count >= 2 else {
                     groups.clearSearch()
+                    social.clearSearch()
                     return
                 }
                 do { try await Task.sleep(for: .milliseconds(280)) }
                 catch { return }
                 guard !Task.isCancelled else { return }
-                await groups.search(clean)
+                async let clubMatches: Void = groups.search(clean)
+                async let peopleMatches: Void = social.search(clean)
+                _ = await (clubMatches, peopleMatches)
             }
         }
     }
@@ -247,26 +250,74 @@ struct ATHLTHCommunityV5View: View {
     }
 
     private var searchField: some View {
-        HStack(spacing: 9) {
-            Image(systemName: "magnifyingglass")
-                .foregroundStyle(ATHLTHCommunityEditorial.gold)
-            TextField(ATHLTHLocalization.choose(
-                english: "Search public Clubs",
-                norwegian: "Søk etter offentlige klubber"), text: $query)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-            if !query.isEmpty {
-                Button {
-                    query = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(ATHLTHCommunityEditorial.secondary)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: "magnifyingglass")
+                    .foregroundStyle(ATHLTHCommunityEditorial.gold)
+                TextField(ATHLTHLocalization.choose(
+                    english: "Search people or Clubs",
+                    norwegian: "Søk etter personer eller klubber"), text: $query)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                if !query.isEmpty {
+                    Button {
+                        query = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(ATHLTHCommunityEditorial.secondary)
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Clear", norwegian: "Tøm"))
                 }
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Clear", norwegian: "Tøm"))
+            }
+            .font(.subheadline)
+
+            if query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
+                if !social.discoverResults.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "People", norwegian: "Personer"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHCommunityEditorial.secondary)
+                    ForEach(Array(social.discoverResults.prefix(5))) { person in
+                        NavigationLink {
+                            FriendProfileView(userID: person.userID)
+                        } label: {
+                            HStack(spacing: 10) {
+                                SocialAvatar(profile: person, size: 35)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(person.resolvedName)
+                                        .font(.subheadline.weight(.medium))
+                                    if let handle = person.username, !handle.isEmpty {
+                                        Text("@\(handle)")
+                                            .font(.caption)
+                                            .foregroundStyle(ATHLTHCommunityEditorial.secondary)
+                                    }
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHCommunityEditorial.gold)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ATHLTHCommunityEditorial.ink)
+                    }
+                }
+                if tab != .clubs, !publicClubs.isEmpty {
+                    Button {
+                        tab = .clubs
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "View matching Clubs",
+                            norwegian: "Vis klubber som passer søket"),
+                            systemImage: "person.3")
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHCommunityEditorial.gold)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
         }
-        .font(.subheadline)
         .padding(13)
         .communityEditorialCard()
     }
@@ -369,6 +420,19 @@ struct ATHLTHCommunityV5View: View {
                     }
                 }
             }
+
+            Button {
+                showCreate = true
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Create a Club or group event",
+                    norwegian: "Opprett klubb eller fellesaktivitet"),
+                    systemImage: "plus.circle")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHCommunityEditorial.gold)
+                    .frame(maxWidth: .infinity, minHeight: 40)
+            }
+            .buttonStyle(.plain)
         }
     }
 
