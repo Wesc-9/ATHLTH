@@ -28,13 +28,13 @@ final class ATHLTHInsightsReferenceTests: XCTestCase {
         XCTAssertNil(ATHLTHInsightReferenceMetric.respiratory.value(missing))
     }
 
-    func testTrainingMinutesDoNotMasqueradeAsAClinicalLoadScore() {
+    func testTrainingMinutesDoNotMasqueradeAsAClinicalLoadScore() throws {
         let load = RecoveryTrainingLoadSummary(
             acuteMinutes: 300, chronicWeeklyAverageMinutes: 250,
             strengthMinutes: 100, runningMinutes: 160,
             walkingMinutes: 40, otherMinutes: 0
         )
-        XCTAssertEqual(load.ratio, 1.2, accuracy: 0.0001)
+        XCTAssertEqual(try XCTUnwrap(load.ratio), 1.2, accuracy: 0.0001)
         XCTAssertEqual(load.runningMinutes + load.strengthMinutes +
                        load.walkingMinutes + load.otherMinutes, load.acuteMinutes)
     }
