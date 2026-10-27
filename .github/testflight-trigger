@@ -161,3 +161,5 @@ ATHLTH 1.9.8 build 106 — TestFlight retry after Swift 6 release archive fixes 
 ATHLTH 1.9.8 build 106 — TestFlight retry after plan journey XCTest API fix — 2026-10-27
 ATHLTH 1.9.9 build 107 — explicit TestFlight request 2026-10-27 (Europe/Oslo), source f50e1fbeb912134b76c8b1c004f96ff7db74ecfc; require same-commit iOS XCTest and backend checks, signed iPhone/Watch/Widget archive and verified App Store Connect upload. Keep release/v1.9.9 active and unlocked.
 ATHLTH 1.9.9 build 107 — user-authorized TestFlight retry 2026-10-27 after resolving AI plan builder interpolation Swift compile errors; source 22b03755023bcab8354c0c897ded463ea786c208. Require passing same-commit iOS and backend checks, signed archive and verified App Store Connect upload; keep release active and unlocked.
+
+ATHLTH 2.0.0 build 108 — TestFlight explicitly requested 2026-10-27. Upload Community V5 new three-tab shell and current release/v2.0.0. Validate iPhone, Watch and Widget versions/signing before App Store Connect upload. Keep release active; no main merge.
