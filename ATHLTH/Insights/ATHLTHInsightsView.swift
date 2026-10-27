@@ -2,6 +2,9 @@ import SwiftUI
 import UIKit
 
 struct ATHLTHInsightsView: View {
+    // TabView may create all its tabs eagerly. Defer Health trend work until
+    // Insights is selected, then refresh if the user returns to this tab.
+    var isActive: Bool = true
     var onSelectTab: (Int) -> Void = { _ in }
 
     @EnvironmentObject private var health: HealthKitManager
@@ -74,7 +77,18 @@ struct ATHLTHInsightsView: View {
                 }
                 await loadTrend()
             }
-            .task {
+            .task(id: isActive) {
+                guard isActive else { return }
+                // Seed from already loaded stores even if their published
+                // values have not changed since the tab was constructed.
+                trainingDays = ATHLTHInsightsTrainingDay.make(from: health.workouts)
+                muscleSummary = ATHLTHInsightsMuscleSummary.make(
+                    from: strength.workoutHistory
+                )
+                sessionBaselines = InsightsSessionBaselines.calculate(
+                    workouts: health.workouts,
+                    at: Date()
+                )
                 await loadTrend()
             }
             .onReceive(health.$workouts) { workouts in
