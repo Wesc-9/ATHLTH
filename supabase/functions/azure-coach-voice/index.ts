@@ -10,6 +10,45 @@ const voiceIDs: Record<string, string> = {
   iselin: "nb-NO-IselinNeural",
   pernille: "nb-NO-PernilleNeural",
 };
+
+// Query the voices supported by the configured Azure resource instead of
+// hardcoding the three original voices in the iOS client. No secret or URL
+// is ever supplied by the client. Only Norwegian neural ShortNames are used.
+type AzureVoice = { ShortName?: string; Locale?: string; Gender?: string };
+type CoachVoice = { id: string; name: string; detail: string; shortName: string };
+let cachedDirectory: { region: string; expires: number; voices: CoachVoice[] } | null = null;
+async function voiceDirectory(key: string, region: string): Promise<CoachVoice[]> {
+  if (cachedDirectory && cachedDirectory.region === region &&
+      cachedDirectory.expires > Date.now()) return cachedDirectory.voices;
+  const response = await fetch(
+    "https://" + region + ".tts.speech.microsoft.com/cognitiveservices/voices/list",
+    { headers: { "Ocp-Apim-Subscription-Key": key },
+      signal: AbortSignal.timeout(5000) },
+  );
+  if (!response.ok) throw new Error("Azure voices unavailable");
+  const records: unknown = await response.json();
+  if (!Array.isArray(records) || records.length > 1500)
+    throw new Error("Invalid Azure voice catalog");
+  const voices = (records as AzureVoice[])
+    .filter((voice) => voice.Locale === "nb-NO" &&
+      typeof voice.ShortName === "string" &&
+      /^nb-NO-[A-Za-z0-9]+Neural$/.test(voice.ShortName))
+    .map((voice) => {
+      const shortName = voice.ShortName!;
+      const legacy = Object.entries(voiceIDs).find(([, value]) => value === shortName);
+      const name = shortName.slice("nb-NO-".length, -"Neural".length);
+      return {
+        id: legacy?.[0] ?? shortName,
+        name,
+        detail: voice.Gender === "Male" ? "Norsk · mannlig" :
+          voice.Gender === "Female" ? "Norsk · kvinnelig" : "Norsk",
+        shortName,
+      };
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, "nb"));
+  cachedDirectory = { region, expires: Date.now() + 60 * 60_000, voices };
+  return voices;
+}
 const json = (data: Record<string, unknown>, status = 200) =>
   Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 const escapeXML = (s: string): string => s.replace(/[&<>"']/g, (match) =>
@@ -39,10 +78,12 @@ Deno.serve(async (req: Request) => {
   if (!body || typeof body !== "object" || Array.isArray(body))
     return json({ error: "Invalid request" }, 400);
   const requestBody = body as Record<string, unknown>;
+  const isCatalog = requestBody.action === "catalog";
   const requestedVoice = requestBody.voice;
-  if (typeof requestedVoice !== "string" ||
-      !Object.prototype.hasOwnProperty.call(voiceIDs, requestedVoice))
-    return json({ error: "Unsupported voice" }, 400);
+  if (!isCatalog && (typeof requestedVoice !== "string" ||
+      !(/^[a-z]{3,20}$/.test(requestedVoice) ||
+        /^nb-NO-[A-Za-z0-9]+Neural$/.test(requestedVoice))))
+    return json({ error: "Unsupported voice", code: "UNSUPPORTED_VOICE" }, 400);
   // No arbitrary URL or SSML can be provided by the client.
   const liveText = requestBody.text;
   if (liveText !== undefined &&
@@ -68,6 +109,36 @@ Deno.serve(async (req: Request) => {
       (entitlement.current_period_ends_at == null || validUntil(entitlement.current_period_ends_at))) ||
      (entitlement.status === "trialing" && validUntil(entitlement.trial_ends_at)));
   if (!eligible) return json({ error: "ATHLTH+ required", code: "PREMIUM_REQUIRED" }, 403);
+  // Catalog discovery does not synthesize speech or consume TTS quota.
+  // Both catalog and synthesis stay behind verified ATHLTH+ access.
+  if (isCatalog) {
+    try {
+      const voices = await voiceDirectory(key, region);
+      return json({ voices: voices.map(({ id, name, detail }) => ({
+        id, name, detail,
+      })) });
+    } catch {
+      return json({ error: "Could not load Azure voice catalog",
+                    code: "VOICE_CATALOG_UNAVAILABLE" }, 503);
+    }
+  }
+
+  // The client may select a newer Norwegian voice discovered from Azure.
+  // Resolve only against Azure's server-fetched list, never raw client SSML.
+  let azureShortName = typeof requestedVoice === "string"
+    ? voiceIDs[requestedVoice] : undefined;
+  if (!azureShortName) {
+    try {
+      const voices = await voiceDirectory(key, region);
+      azureShortName = voices.find((voice) => voice.id === requestedVoice)?.shortName;
+    } catch {
+      return json({ error: "Voice directory is unavailable",
+                    code: "VOICE_CATALOG_UNAVAILABLE" }, 503);
+    }
+  }
+  if (!azureShortName)
+    return json({ error: "Unsupported voice", code: "UNSUPPORTED_VOICE" }, 400);
+
 
   // Both routes require the server-verified ATHLTH+ entitlement above.
   // Live training uses its own fair-use cap. Previews keep the existing
@@ -98,7 +169,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const ssml = '<speak version="1.0" xml:lang="nb-NO"><voice name="' +
-    voiceIDs[requestedVoice] + '">' + escapeXML(speech) + '</voice></speak>';
+    azureShortName + '">' + escapeXML(speech) + '</voice></speak>';
   let azure: Response;
   try {
     azure = await fetch("https://" + region + ".tts.speech.microsoft.com/cognitiveservices/v1", {
