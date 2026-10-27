@@ -219,7 +219,7 @@ struct AIProgramBuilderView: View {
                 in: draft,
                 excludedMovements: standaloneIntake.excludedExerciseNames,
                 avoidLowerBody: standaloneIntake.injuryRestriction == .avoidLowerBody
-            ).map { "excludedExercise:($0)" }
+            ).map { "excludedExercise:\($0)" }
         }
         return issues
     }
@@ -2363,8 +2363,8 @@ struct AIProgramBuilderView: View {
                     .map { String($0.dropFirst("excludedExercise:".count)) }
                 if !excluded.isEmpty {
                     errorMessage = ATHLTHLocalization.choose(
-                        english: "AI suggested an exercise you said you cannot do: (excluded.joined(separator: ", ")). Nothing was saved. Review your restrictions before trying again.",
-                        norwegian: "AI foreslo en øvelse du har oppgitt at du ikke kan utføre: (excluded.joined(separator: ", ")). Ingenting ble lagret. Kontroller begrensningene før du prøver igjen."
+                        english: "AI suggested an exercise you said you cannot do: \(excluded.joined(separator: ", ")). Nothing was saved. Review your restrictions before trying again.",
+                        norwegian: "AI foreslo en øvelse du har oppgitt at du ikke kan utføre: \(excluded.joined(separator: ", ")). Ingenting ble lagret. Kontroller begrensningene før du prøver igjen."
                     )
                 } else {
                     errorMessage = ATHLTHLocalization.choose(
