@@ -1189,7 +1189,12 @@ struct MirroredWorkoutLiveView: View {
         // Never substitute whole-workout average for "current pace".
         let paceLabel = ATHLTHLocalization.choose(
             english: "CURRENT PACE", norwegian: "TEMPO NÅ")
-        let paceValue = (currentPace ?? rollingPaceSeconds).map(paceText) ?? "—"
+        // Apple Watch's treadmill "current" pace can be a cumulative
+        // average. Prefer measured last-30-second distance deltas indoors.
+        let livePace = snapshot.treadmillInclinePercent != nil
+            ? rollingPaceSeconds
+            : (currentPace ?? rollingPaceSeconds)
+        let paceValue = livePace.map(paceText) ?? "—"
         let distance = snapshot.distanceMeters.isFinite
             ? max(snapshot.distanceMeters, 0) : 0
 
