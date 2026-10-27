@@ -210,7 +210,7 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         Text(focus)
                             .font(.system(size: tight ? 10 : (small ? 12 : 17),
                                           weight: .medium))
-                            .foregroundStyle(trainDetailStyle ? ATHLTHTrainDesign.paleGold : secondaryInk)
+                            .foregroundStyle(trainDetailStyle ? ATHLTHTrainDesign.gold : secondaryInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.77)
                     }
