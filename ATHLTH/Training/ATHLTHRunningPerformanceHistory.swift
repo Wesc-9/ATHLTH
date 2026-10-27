@@ -76,13 +76,18 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
     }
 
     init?(watch: WatchWorkoutResult) {
-        guard watch.structuredWorkoutFullyCompleted == true,
-              let recorded = watch.recordedRunningSteps,
-              Self.validFullRecording(recorded, expectedCount: recorded.count)
-        else { return nil }
+        let recorded = watch.recordedRunningSteps ?? []
+        let fullyStructured = watch.structuredWorkoutFullyCompleted == true &&
+            Self.validFullRecording(recorded, expectedCount: recorded.count)
+        let hasMeasuredMinutes = (watch.recordedRunningMinutes ?? []).contains {
+            $0.activeSeconds > 0 && $0.recordedDistanceMeters > 0
+        }
+        guard (watch.kind == .running || watch.kind == .walking),
+              fullyStructured || hasMeasuredMinutes else { return nil }
         id = watch.id
         workoutID = watch.structuredWorkoutSourceID
-        title = watch.structuredWorkoutTitle ?? "Intervaller"
+        title = watch.structuredWorkoutTitle ??
+            (watch.kind == .walking ? "Gåtur" : "Løpeøkt")
         completedAt = watch.endedAt
         source = "Apple Watch"
         steps = recorded
