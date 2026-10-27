@@ -1,226 +1,293 @@
 import SwiftUI
 
-/// The fourth visible step for advanced planning. Both paths ultimately
-/// produce the same TrainingPlan; switching paths never discards setup data.
+/// Choice is available only to Advanced plan builders.
+/// Manual options use the existing week and guided-day editors; AI uses
+/// ATHLTH's existing AIProgramBuilderView. No parallel plan is created here.
+enum ATHLTHPlanBuildMethod: String, CaseIterable, Identifiable {
+    case dayByDay
+    case weekByWeek
+    case ai
+
+    var id: String { rawValue }
+}
+
 struct ATHLTHPlanBuildMethodEntryView: View {
-    let prefersAI: Bool
-    let planWeeks: Int
-    let trainingDays: Int
-    let focusTitle: String
-    let onSelectManual: () -> Void
-    let onSelectAI: () -> Void
+    let selected: ATHLTHPlanBuildMethod
+    let onSelect: (ATHLTHPlanBuildMethod) -> Void
+    let onOpenLibrary: () -> Void
+    let onOpenMyPlans: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
     private let secondary = ATHLTHTrainDesign.secondary
-    private let gold = ATHLTHTrainDesign.gold
     private let canvas = ATHLTHTrainDesign.canvas
     private let rule = ATHLTHTrainDesign.rule
 
-    private func localized(_ en: String, _ no: String) -> String {
+    private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 11) {
             introduction
-
-            VStack(spacing: 13) {
-                buildCard(
-                    title: localized("Build it yourself", "Bygg selv"),
-                    subtitle: localized(
-                        "Choose each workout, exercise and interval. All details stay in your hands.",
-                        "Velg økter, øvelser og intervaller selv. Du bestemmer alle detaljene."
-                    ),
-                    image: "PlanEntryAdvanced",
-                    icon: "calendar.badge.plus",
-                    features: [
-                        localized("Week overview", "Ukeoversikt"),
-                        localized("Edit every workout", "Rediger alle økter")
-                    ],
-                    selected: !prefersAI,
-                    action: onSelectManual
+            methodCard(
+                .dayByDay,
+                name: tr("Day by day", "Dag for dag"),
+                description: tr(
+                    "Plan each training day separately. Once a week is complete, copy it to the remaining weeks.",
+                    "Gå gjennom hver treningsdag enkeltvis. Når en uke er ferdig, kan du kopiere den videre i planen."
+                ),
+                photo: "PlanScheduleHero",
+                symbol: "calendar.badge.checkmark",
+                qualities: [
+                    ("target", tr("Detailed", "Detaljert")),
+                    ("square.on.square", tr("Copy week", "Kopier uke")),
+                    ("dumbbell", tr("Each day", "Daglige valg"))
+                ]
+            )
+            methodCard(
+                .weekByWeek,
+                name: tr("Week by week", "Uke for uke"),
+                description: tr(
+                    "Build complete weeks together, then adjust workouts, workload and progression from week to week.",
+                    "Bygg hele uker samlet og juster økter, belastning og progresjon fra uke til uke."
+                ),
+                photo: "PlanEntryAdvanced",
+                symbol: "chart.bar.fill",
+                qualities: [
+                    ("calendar", tr("Week structure", "Ukestruktur")),
+                    ("slider.horizontal.3", tr("Manual", "Manuell")),
+                    ("chart.line.uptrend.xyaxis", tr("Progression", "Progresjon"))
+                ]
+            )
+            methodCard(
+                .ai,
+                name: tr("Use AI", "Bruk AI"),
+                description: tr(
+                    "Let ATHLTH Coach suggest a plan from your actual goals, chosen days and time frame. Review it before saving.",
+                    "La ATHLTH Coach foreslå en plan basert på målene, dagene og rammene dine. Godkjenn før lagring."
+                ),
+                photo: "GoalAdventure",
+                symbol: "sparkles",
+                qualities: [
+                    ("brain.head.profile", tr("Smart suggestions", "Smart forslag")),
+                    ("bolt", tr("Fast", "Raskt")),
+                    ("slider.horizontal.3", tr("Editable", "Justerbart"))
+                ]
+            )
+            HStack(spacing: 9) {
+                shortcut(
+                    tr("Plan library", "Planbibliotek"),
+                    subtitle: tr("Ready-made plans", "Utforsk ferdige planer"),
+                    symbol: "book.closed",
+                    action: onOpenLibrary
                 )
-                buildCard(
-                    title: "ATHLTH AI",
-                    subtitle: localized(
-                        "Get a tailored proposal based on your goal and availability. Review it before saving.",
-                        "Få et personlig forslag ut fra målet ditt og når du kan trene. Du godkjenner før lagring."
-                    ),
-                    image: "GoalRunning",
-                    icon: "sparkles",
-                    features: [
-                        localized("Suggested workouts", "Foreslåtte økter"),
-                        localized("Fully editable", "Kan redigeres")
-                    ],
-                    selected: prefersAI,
-                    action: onSelectAI
+                shortcut(
+                    tr("My plans", "Mine planer"),
+                    subtitle: tr("Manage saved plans", "Se og rediger planer"),
+                    symbol: "doc.text",
+                    action: onOpenMyPlans
                 )
             }
+            .padding(.top, 3)
+        }
+        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+    }
 
-            VStack(alignment: .leading, spacing: 9) {
-                HStack(spacing: 8) {
-                    Image(systemName: "checkmark.seal")
-                        .foregroundStyle(bronze)
-                    Text(localized("Your setup is saved", "Vi tar med valgene dine"))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(ink)
-                }
-                Text(
-                    "\(focusTitle) · \(planWeeks) " +
-                    localized("weeks", "uker") +
-                    " · \(trainingDays) " +
-                    localized("sessions a week", "økter per uke")
-                )
-                .font(.system(size: 11))
-                .foregroundStyle(secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-                Text(localized(
-                    "You can switch to AI later without losing your manually planned sessions.",
-                    "Du kan be AI om forslag senere uten å miste øktene du allerede har planlagt."
+    private var introduction: some View {
+        ZStack(alignment: .leading) {
+            GeometryReader { bounds in
+                Image("PlanGoalHero")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: bounds.size.width, height: bounds.size.height)
+                    .clipped()
+                    .accessibilityHidden(true)
+            }
+            LinearGradient(
+                stops: [
+                    .init(color: canvas, location: 0),
+                    .init(color: canvas.opacity(0.98), location: 0.30),
+                    .init(color: canvas.opacity(0.83), location: 0.51),
+                    .init(color: canvas.opacity(0.04), location: 1)
+                ],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            VStack(alignment: .leading, spacing: 7) {
+                Text(tr("BUILD YOUR PLAN", "BYGG DIN PLAN"))
+                    .font(.system(size: 9, weight: .semibold))
+                    .tracking(2.5)
+                    .foregroundStyle(secondary)
+                Text(tr("How will you\nbuild your plan?",
+                        "Hvordan vil du\nbygge opp planen?"))
+                    .font(.system(
+                        size: typeSize.isAccessibilitySize ? 29 : 35,
+                        weight: .regular, design: .serif
+                    ))
+                    .foregroundStyle(ink)
+                    .lineSpacing(-2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityAddTraits(.isHeader)
+                Text(tr(
+                    "Choose whether to plan one day at a time, build weeks or use AI.",
+                    "Velg om du vil gå dag for dag, bygge ukene samlet eller få hjelp av AI."
                 ))
-                .font(.system(size: 11))
+                .font(.system(size: 12))
                 .foregroundStyle(secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(15)
-            .background(.white.opacity(0.86), in: RoundedRectangle(cornerRadius: 17))
-            .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .stroke(rule.opacity(0.45), lineWidth: 0.7)
-            }
+            .padding(.leading, 4)
+            .padding(.trailing, typeSize.isAccessibilitySize ? 36 : 103)
         }
+        .frame(height: typeSize.isAccessibilitySize ? 215 : 178)
+        .clipped()
     }
 
-    private var introduction: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(localized("BUILD YOUR PLAN", "BYGG DIN PLAN"))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2.4)
-                .foregroundStyle(bronze)
-            Text(localized("How would you like\nto build your plan?",
-                           "Hvordan vil du\nbygge planen?"))
-                .font(.system(size: typeSize.isAccessibilitySize ? 29 : 35,
-                              weight: .regular, design: .serif))
-                .foregroundStyle(ink)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-            Text(localized(
-                "Choose the approach that suits you. The result is always your own editable training plan.",
-                "Velg det som passer deg. Uansett får du en treningsplan du kan endre fritt."
-            ))
-            .font(.system(size: 12.5))
-            .foregroundStyle(secondary)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.vertical, 7)
-    }
-
-    private func buildCard(
-        title: String,
-        subtitle: String,
-        image: String,
-        icon: String,
-        features: [String],
-        selected: Bool,
-        action: @escaping () -> Void
+    private func methodCard(
+        _ method: ATHLTHPlanBuildMethod,
+        name: String,
+        description: String,
+        photo: String,
+        symbol: String,
+        qualities: [(String, String)]
     ) -> some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 0) {
+        let chosen = selected == method
+        return Button { onSelect(method) } label: {
+            VStack(spacing: 0) {
                 ZStack(alignment: .leading) {
-                    GeometryReader { geometry in
-                        HStack(spacing: 0) {
-                            Spacer(minLength: 0)
-                            Image(image)
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: geometry.size.width * 0.64,
-                                       height: geometry.size.height)
-                                .clipped()
-                                .accessibilityHidden(true)
-                        }
+                    GeometryReader { bounds in
+                        Image(photo)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: bounds.size.width, height: bounds.size.height)
+                            .clipped()
+                            .accessibilityHidden(true)
                     }
                     LinearGradient(
                         stops: [
-                            .init(color: .white, location: 0),
-                            .init(color: .white.opacity(0.98), location: 0.32),
-                            .init(color: .white.opacity(0.79), location: 0.59),
+                            .init(color: .white.opacity(0.99), location: 0),
+                            .init(color: .white.opacity(0.96), location: 0.30),
+                            .init(color: .white.opacity(0.70), location: 0.59),
                             .init(color: .white.opacity(0.05), location: 1)
                         ],
-                        startPoint: .leading, endPoint: .trailing
+                        startPoint: .leading,
+                        endPoint: .trailing
                     )
-                    HStack(alignment: .top, spacing: 9) {
-                        VStack(alignment: .leading, spacing: 9) {
-                            Image(systemName: icon)
-                                .font(.system(size: 18, weight: .medium))
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack(alignment: .top, spacing: 10) {
+                            Image(systemName: symbol)
+                                .font(.system(size: 19, weight: .medium))
                                 .foregroundStyle(bronze)
-                                .frame(width: 37, height: 37)
-                                .background(ATHLTHTrainDesign.paleGold.opacity(0.6),
+                                .frame(width: 38, height: 38)
+                                .background(ATHLTHTrainDesign.paleGold.opacity(0.60),
                                             in: Circle())
-                            Text(title)
-                                .font(.system(size: 25, weight: .medium, design: .serif))
+                            Text(name)
+                                .font(.system(size: 24, weight: .semibold, design: .serif))
                                 .foregroundStyle(ink)
-                            Text(subtitle)
-                                .font(.system(size: 11))
-                                .foregroundStyle(secondary)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .lineLimit(4)
+                                .minimumScaleFactor(0.78)
+                                .lineLimit(1)
+                                .padding(.top, 3)
+                            Spacer(minLength: 32)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.trailing, 90)
-                        Spacer(minLength: 0)
+                        Text(description)
+                            .font(.system(size: 11))
+                            .foregroundStyle(secondary)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(typeSize.isAccessibilitySize ? 7 : 3)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .padding(.leading, 48)
+                            .padding(.trailing, 78)
                     }
-                    .padding(15)
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Image(systemName: selected ? "checkmark" : "circle")
-                                .font(.system(size: selected ? 13 : 27,
-                                              weight: .semibold))
-                                .foregroundStyle(selected ? Color.white : ink.opacity(0.37))
-                                .frame(width: 32, height: 32)
-                                .background {
-                                    if selected { Circle().fill(gold) }
-                                }
-                        }
-                        Spacer(minLength: 0)
-                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(13)
-                    .accessibilityHidden(true)
+
+                    Image(systemName: chosen ? "checkmark" : "circle")
+                        .font(.system(size: chosen ? 13 : 27, weight: .semibold))
+                        .foregroundStyle(chosen ? .white : ink.opacity(0.30))
+                        .frame(width: 31, height: 31)
+                        .background {
+                            if chosen { Circle().fill(bronze.gradient) }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: .topTrailing)
+                        .padding(11)
+                        .accessibilityHidden(true)
                 }
-                .frame(height: typeSize.isAccessibilitySize ? 199 : 155)
+                .frame(height: typeSize.isAccessibilitySize ? 177 : 124)
                 .clipped()
-                Rectangle().fill(rule.opacity(0.45)).frame(height: 0.7)
-                HStack(spacing: 12) {
-                    ForEach(features, id: \.self) { feature in
-                        Label(feature, systemImage: "checkmark")
-                            .font(.system(size: 10))
+
+                HStack(spacing: 6) {
+                    ForEach(qualities.indices, id: \.self) { i in
+                        Label(qualities[i].1, systemImage: qualities[i].0)
+                            .font(.system(size: 9.5))
                             .foregroundStyle(secondary)
                             .lineLimit(1)
-                            .minimumScaleFactor(0.72)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .minimumScaleFactor(0.67)
+                            .frame(maxWidth: .infinity, minHeight: 32)
                     }
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 11)
+                .padding(.horizontal, 6)
+                .background(.white.opacity(0.86))
             }
             .background(.white, in: RoundedRectangle(cornerRadius: 18))
             .clipShape(RoundedRectangle(cornerRadius: 18))
             .overlay {
                 RoundedRectangle(cornerRadius: 18)
-                    .strokeBorder(selected ? gold : rule.opacity(0.5),
-                                  lineWidth: selected ? 1.5 : 0.7)
+                    .strokeBorder(chosen ? bronze : rule.opacity(0.43),
+                                  lineWidth: chosen ? 1.5 : 0.7)
+                    .allowsHitTesting(false)
             }
-            .shadow(color: ink.opacity(selected ? 0.09 : 0.04),
-                    radius: selected ? 13 : 8, y: 4)
+            .shadow(color: ink.opacity(chosen ? 0.07 : 0.035), radius: 10, y: 4)
+            .contentShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title + ". " + subtitle)
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .accessibilityLabel(name + ". " + description)
+        .accessibilityAddTraits(chosen ? .isSelected : [])
+    }
+
+    private func shortcut(
+        _ title: String,
+        subtitle: String,
+        symbol: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: symbol)
+                    .font(.system(size: 19))
+                    .foregroundStyle(bronze)
+                    .frame(width: 40, height: 40)
+                    .background(ATHLTHTrainDesign.paleGold.opacity(0.52),
+                                in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(ink)
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(.system(size: 9.5))
+                        .foregroundStyle(secondary)
+                        .lineLimit(2)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(bronze)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: 61, alignment: .leading)
+            .background(.white.opacity(0.89),
+                        in: RoundedRectangle(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(rule.opacity(0.32), lineWidth: 0.7)
+            }
+        }
+        .buttonStyle(.plain)
     }
 }
