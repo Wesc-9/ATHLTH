@@ -287,14 +287,14 @@ enum ATHLTHZonedPlanLibrary {
         default: distance = source.targetDistanceKm
         }
         let notes = [
-            "Zoned race day · \(sourcePlan.nameEn)",
-            "Week \(week.weekNumber) · \(week.phase)",
-            source.notesEn ?? "Event effort and warm-up should be personalized.",
-            "Pace and heart rate zones must be selected for the athlete; no default max-effort target is assumed.",
+            ATHLTHLocalization.choose(english: "Zoned race day", norwegian: "Zoned konkurransedag") + " · \(ATHLTHZonedLocalization.planTitle(sourcePlan.id, english: sourcePlan.nameEn))",
+            ATHLTHLocalization.choose(english: "Week \(week.weekNumber)", norwegian: "Uke \(week.weekNumber)") + " · \(ATHLTHZonedLocalization.phase(week.phase))",
+            ATHLTHZonedLocalization.text(source.notesEn ?? "Personalize competition preparation."),
+            ATHLTHLocalization.choose(english: "Choose safe, individual pace and heart-rate goals.", norwegian: "Velg trygge, individuelt tilpassede farts- og pulsmål."),
             "Source: Zoned (MIT), github.com/alarboulletmarin/zoned"
         ].joined(separator: "\n")
         var event = PlannedSession(
-            id: UUID(), title: "Race day",
+            id: UUID(), title: ATHLTHLocalization.choose(english: "Race day", norwegian: "Konkurransedag"),
             kind: .running, scheduledStart: nil,
             durationMinutes: source.targetDurationMin ?? source.estimatedDurationMin,
             targetDistanceKilometers: distance,
@@ -303,12 +303,12 @@ enum ATHLTHZonedPlanLibrary {
         )
         event.workoutCategory = "running"
         event.workoutBlocks = [WorkoutTemplateBlock(
-            sequence: 1, kind: .run, title: "Race",
+            sequence: 1, kind: .run, title: ATHLTHLocalization.choose(english: "Race", norwegian: "Konkurranse"),
             exerciseSlug: nil,
             distanceMeters: distance.map { $0 * 1_000 },
             repetitions: nil, durationSeconds: nil,
             targetWeightKilograms: nil, loadNote: nil,
-            notes: "Choose a safe, individual effort target.",
+            notes: ATHLTHLocalization.choose(english: "Choose an individual effort target.", norwegian: "Velg et individuelt intensitetsmål."),
             phase: .main, cardioActivity: .running
         )]
         return event
@@ -352,17 +352,21 @@ enum ATHLTHZonedPlanLibrary {
             let recovery = step.role == "recovery"
             let blockPhase: WorkoutPhaseKind = recovery ? .recovery : phase
             let isCycling = sport == "cycling"
+            let description = (step.descriptionEn ?? "").lowercased()
+            let isActiveRecovery = ["jog", "run", "spin", "ride", "pedal", "walk", "cycle"]
+                .contains { description.contains($0) }
+            let passiveRest = blockPhase == .recovery && !isActiveRecovery
             let notes: [String] = [
-                step.vmaPercent.map { "Target VMA: \($0)%" },
-                step.intensityType.map { "Pace intensity: \($0)" },
-                step.elevationGainM.map { "Elevation gain: \($0) m" },
-                step.gradientPercent.map { "Gradient: \($0)%" },
-                step.terrainType.map { "Terrain: \($0)" }
+                step.vmaPercent.map { ATHLTHLocalization.choose(english: "VMA target: \($0) %", norwegian: "VMA-mål: \($0) %") },
+                step.intensityType.map { ATHLTHLocalization.choose(english: "Pace intensity: \($0)", norwegian: "Fartsintensitet: \($0)") },
+                step.elevationGainM.map { ATHLTHLocalization.choose(english: "Elevation gain: \($0) m", norwegian: "Høydemeter: \($0) m") },
+                step.gradientPercent.map { ATHLTHLocalization.choose(english: "Gradient: \($0) %", norwegian: "Stigning: \($0) %") },
+                step.terrainType.map { ATHLTHLocalization.choose(english: "Terrain: \($0)", norwegian: "Terreng: \(ATHLTHZonedLocalization.text($0))") }
             ].compactMap { $0 }
             let zone = step.zone.flatMap(zonePrescription)
             var block = WorkoutTemplateBlock(
                 sequence: result.count + 1,
-                kind: isCycling ? (recovery ? .rest : .note) : .run,
+                kind: passiveRest ? .rest : (isCycling ? .note : .run),
                 title: ATHLTHZonedLocalization.text(step.descriptionEn ?? (recovery ? "Recovery" : "Effort")),
                 exerciseSlug: nil,
                 distanceMeters: step.distanceM ?? step.distanceKm.map { $0 * 1_000 },
