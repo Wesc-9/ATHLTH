@@ -446,10 +446,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 .frame(maxWidth: .infinity)
                 .background(
                     ATHLTHTrainDesign.canvas,
-                    in: UnevenRoundedRectangle(topLeadingRadius: 22,
-                                               topTrailingRadius: 22,
-                                               bottomLeadingRadius: 22,
-                                               bottomTrailingRadius: 22)
+                    in: RoundedRectangle(cornerRadius: 22)
                 )
                 .padding(.horizontal, 7)
                 .padding(.top, -17)
@@ -782,32 +779,38 @@ struct ATHLTHTrainPlanPremiumView: View {
     ) -> some View {
         let workouts = day.sessions.filter { !$0.isExplicitRestDay }
         return VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .center, spacing: 10) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(planDayDate(day.dayIndex, plan: plan)
-                        .formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                        .font(.system(size: 19, weight: .semibold, design: .serif))
-                        .foregroundStyle(graphite)
-                    Text("\(workouts.count) " + tr("workouts", "økter") +
-                         (workouts.first.map { " · " + tr("Focus: ", "Fokus: ") + $0.kind.title } ?? ""))
-                        .font(.caption)
-                        .foregroundStyle(secondaryInk)
-                }
-                Spacer(minLength: 0)
+            HStack(spacing: 8) {
                 Button {
-                    showingEditor = true
+                    selectedDayID = day.id
+                    showingDayDetails = true
                 } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(planDayDate(day.dayIndex, plan: plan)
+                            .formatted(.dateTime.weekday(.wide).day().month(.wide)))
+                            .font(.system(size: 19, weight: .semibold, design: .serif))
+                            .foregroundStyle(graphite)
+                            .multilineTextAlignment(.leading)
+                        Text("\(workouts.count) " + tr("workouts", "økter") +
+                             (workouts.first.map { " · " + $0.kind.title } ?? ""))
+                            .font(.caption)
+                            .foregroundStyle(secondaryInk)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                Spacer(minLength: 0)
+                Button { showingEditor = true } label: {
                     Label(tr("Edit day", "Rediger dag"), systemImage: "pencil")
-                        .font(.caption.weight(.medium))
+                        .font(.system(size: 11, weight: .medium))
                         .foregroundStyle(warmGold)
-                        .padding(.horizontal, 11)
-                        .frame(minHeight: 36)
+                        .padding(.horizontal, 9)
+                        .frame(minHeight: 35)
                         .background(soft, in: Capsule())
                 }
                 .buttonStyle(.plain)
             }
             if workouts.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
+                VStack(spacing: 11) {
                     Label(
                         day.sessions.contains(where: \.isExplicitRestDay)
                             ? tr("Rest and recovery", "Hvile og restitusjon")
@@ -823,120 +826,168 @@ struct ATHLTHTrainPlanPremiumView: View {
                         )
                     } label: {
                         Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
-                            .font(.subheadline.weight(.semibold))
                     }
                     .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
                 }
-                .padding(15)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(soft, in: RoundedRectangle(cornerRadius: 14))
+                .frame(maxWidth: .infinity, minHeight: 90)
             } else {
                 ForEach(workouts) { workout in
-                    referenceSessionCard(
-                        workout, day: day, plan: plan,
-                        expanded: (selectedWorkoutID ?? workouts[0].id) == workout.id
-                            && !collapsedWorkoutCards.contains(workout.id)
-                    )
+                    referenceSessionCard(workout, day: day, plan: plan)
                 }
-            }
-        }
-        .padding(9)
-        .background(
-            ATHLTHTrainDesign.paleGold.opacity(0.16),
-            in: RoundedRectangle(cornerRadius: 18)
-        )
-    }
-
-    private func referenceSessionCard(
-        _ workout: PlannedSession, day: TrainingPlanDay,
-        plan: TrainingPlan, expanded: Bool
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 10) {
-                Image(systemName: workout.kind.systemImage)
-                    .font(.system(size: 18))
-                    .foregroundStyle(warmGold)
-                    .frame(width: 42, height: 42)
-                    .background(soft, in: Circle())
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                        if expanded {
-                            collapsedWorkoutCards.insert(workout.id)
-                        } else {
-                            collapsedWorkoutCards.remove(workout.id)
-                            selectedWorkoutID = workout.id
-                        }
+                HStack(spacing: 9) {
+                    Button {
+                        selectedDayID = day.id
+                        showingDayDetails = true
+                    } label: {
+                        Label(tr("See day details", "Se dagsvisning"),
+                              systemImage: "list.bullet")
+                            .font(.caption.weight(.medium))
+                            .frame(maxWidth: .infinity, minHeight: 43)
                     }
-                } label: {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(workout.title)
-                            .font(.system(size: 17, weight: .semibold, design: .serif))
-                            .foregroundStyle(graphite)
-                            .multilineTextAlignment(.leading)
-                        if let duration = ATHLTHPlannedWorkoutPresentation.duration(for: workout) {
-                            Text(duration)
-                                .font(.caption)
-                                .foregroundStyle(secondaryInk)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .buttonStyle(.plain)
-                Menu {
+                    .buttonStyle(.bordered)
                     Button {
                         editingWorkout = WorkoutEditDestination(
                             planID: plan.id, dayID: day.id,
-                            version: plan.version, workout: workout
+                            version: plan.version, workout: nil
                         )
                     } label: {
-                        Label(tr("Edit workout", "Rediger økt"),
-                              systemImage: "square.and.pencil")
+                        Label(tr("Add workout", "Legg til økt"),
+                              systemImage: "plus")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity, minHeight: 43)
+                            .background(warmGold.gradient,
+                                        in: RoundedRectangle(cornerRadius: 12))
                     }
-                    Button {
-                        beginMovingWorkout(workout, day: day, plan: plan)
-                    } label: {
-                        Label(tr("Move workout", "Flytt økt"),
-                              systemImage: "arrow.left.arrow.right")
-                    }
-                    Button {
-                        preparePlanDayCopy(day, plan: plan)
-                        copyingSourceWorkoutID = workout.id
-                    } label: {
-                        Label(tr("Copy workout", "Kopier økt"),
-                              systemImage: "doc.on.doc")
-                    }
-                    Button {
-                        session.saveSharedWorkout(workout)
-                        copyFeedback = tr("Saved to My workouts", "Lagret i Mine økter")
-                    } label: {
-                        Label(tr("Save workout", "Lagre økt"), systemImage: "bookmark")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(graphite)
-                        .frame(width: 34, height: 44)
+                    .buttonStyle(.plain)
                 }
-                .accessibilityLabel(tr("Workout actions", "Økthandlinger"))
-                Image(systemName: expanded ? "chevron.up" : "chevron.down")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(warmGold)
-                    .accessibilityHidden(true)
-            }
-            if expanded {
-                referenceWorkoutPhases(workout, day: day, plan: plan)
-                referenceBlockPicker(workout, day: day, plan: plan)
             }
         }
         .padding(12)
-        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+        .background(.white.opacity(0.96),
+                    in: RoundedRectangle(cornerRadius: 20))
         .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(line.opacity(0.6), lineWidth: 0.7)
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(line.opacity(0.58), lineWidth: 0.7)
         }
     }
 
-    private func referenceWorkoutPhases(
+    private func referenceSessionCard(
+        _ workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        let done = isPremiumPlanWorkoutCompleted(workout, plan: plan)
+        let skipped = session.isPlanSessionSkipped(
+            planID: plan.id, sessionID: workout.id
+        )
+        return Button {
+            selectedDayID = day.id
+            selectedWorkoutID = workout.id
+            showingDayDetails = true
+        } label: {
+            HStack(spacing: 10) {
+                Image(workout.kind == .running ? "GoalRunning" :
+                      (workout.kind == .strength ? "StrengthQuickHero" : "GoalWalking"))
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 59, height: 59)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 11))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(workout.title)
+                        .font(.system(size: 15, weight: .semibold, design: .serif))
+                        .foregroundStyle(graphite)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    HStack(spacing: 5) {
+                        if let duration = ATHLTHPlannedWorkoutPresentation.duration(for: workout) {
+                            Text(duration)
+                        }
+                        Text("·")
+                        Text(workout.kind.title)
+                    }
+                    .font(.system(size: 11))
+                    .foregroundStyle(secondaryInk)
+                    Text(done ? tr("Completed", "Fullført") :
+                         (skipped ? tr("Skipped", "Hoppet over") :
+                          tr("Tap to view workout", "Trykk for øktdetaljer")))
+                        .font(.system(size: 10))
+                        .foregroundStyle(done ? Color.green : secondaryInk)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: done ? "checkmark.circle.fill" :
+                      (skipped ? "minus.circle" : "chevron.right"))
+                    .font(.system(size: 16))
+                    .foregroundStyle(done ? .green : warmGold)
+            }
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: 76)
+            .background(ATHLTHTrainDesign.canvas.opacity(0.68),
+                        in: RoundedRectangle(cornerRadius: 15))
+            .contentShape(RoundedRectangle(cornerRadius: 15))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func referenceWeekPulse(
+        _ plan: TrainingPlan, week: TrainingPlanWeek
+    ) -> some View {
+        let planned = week.days.flatMap(\.sessions)
+            .filter { !$0.isExplicitRestDay }
+        let completed = planned.filter {
+            isPremiumPlanWorkoutCompleted($0, plan: plan)
+        }.count
+        return VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text(tr("This week", "Denne uken"))
+                    .font(.system(size: 17, weight: .semibold, design: .serif))
+                    .foregroundStyle(graphite)
+                Spacer()
+                Button(tr("Full overview", "Hele oversikten")) {
+                    planDetailTab = 1
+                    showingPlanDetails = true
+                }
+                .font(.caption)
+                .foregroundStyle(warmGold)
+            }
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("\(completed)/\(planned.count)")
+                        .font(.system(size: 21, weight: .semibold, design: .serif))
+                    Text(tr("Workouts completed", "Økter fullført"))
+                        .font(.system(size: 10))
+                        .foregroundStyle(secondaryInk)
+                }
+                Spacer()
+                HStack(alignment: .bottom, spacing: 7) {
+                    ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                        let plannedCount = day.sessions.filter {
+                            !$0.isExplicitRestDay
+                        }.count
+                        let doneCount = day.sessions.filter {
+                            !$0.isExplicitRestDay &&
+                            isPremiumPlanWorkoutCompleted($0, plan: plan)
+                        }.count
+                        VStack(spacing: 5) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(doneCount > 0 ? warmGold :
+                                      (plannedCount > 0 ? warmGold.opacity(0.34) : line))
+                                .frame(width: 12,
+                                       height: CGFloat(plannedCount > 0 ? 17 + plannedCount * 8 : 11))
+                            Text(weekday(day.dayIndex, plan: plan).prefix(1))
+                                .font(.system(size: 9))
+                                .foregroundStyle(secondaryInk)
+                        }
+                        .frame(width: 17, height: 57, alignment: .bottom)
+                    }
+                }
+            }
+        }
+        .padding(14)
+        .background(.white, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+        private func referenceWorkoutPhases(
         _ workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan
     ) -> some View {
         let blocks = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
