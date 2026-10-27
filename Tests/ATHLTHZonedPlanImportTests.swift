@@ -33,26 +33,30 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
     }
 
     @MainActor
-    func testZonedSixZoneRangesStayExactAndDoNotMasqueradeAsSingleFiveZoneTarget() {
+    func testZonedSixSourceZonesNormalizeToFiveATHLTHZones() {
         let easy = ATHLTHZonedPlanLibrary.zonePrescription("Z1-Z2")
         XCTAssertEqual(easy?.minimum, 50)
         XCTAssertEqual(easy?.maximum, 70)
         XCTAssertNil(easy?.athlthZone)
 
         let sprint = ATHLTHZonedPlanLibrary.zonePrescription("Z6")
-        XCTAssertEqual(sprint?.minimum, 95)
+        XCTAssertEqual(sprint?.minimum, 90)
         XCTAssertEqual(sprint?.maximum, 100)
         XCTAssertEqual(sprint?.athlthZone, 5)
+        XCTAssertEqual(sprint?.label, "Z5")
 
         let plus = ATHLTHZonedPlanLibrary.zonePrescription("Z5+")
         XCTAssertEqual(plus?.minimum, 90)
         XCTAssertEqual(plus?.maximum, 100)
         XCTAssertEqual(plus?.athlthZone, 5)
+        XCTAssertEqual(plus?.label, "Z5")
 
         let wide = ATHLTHZonedPlanLibrary.zonePrescription("Z1-Z6")
         XCTAssertEqual(wide?.maximum, 100)
+        XCTAssertEqual(wide?.label, "Z1-Z5")
         XCTAssertNil(wide?.athlthZone)
         XCTAssertNil(ATHLTHZonedPlanLibrary.zonePrescription("easy"))
+        XCTAssertNil(ATHLTHZonedPlanLibrary.zonePrescription("Z7"))
     }
 
     @MainActor
@@ -92,4 +96,92 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         XCTAssertTrue(cyclingBlocks.contains { $0.activityTag == "cycling" })
         XCTAssertTrue(cyclingBlocks.contains { $0.sourceIntensityZoneLabel != nil })
     }
+
+    @MainActor
+    func testRestCanBecomeActiveJogAndBackWithoutLosingIntervalGroupOrTime() {
+        let id = UUID()
+        var rest = WorkoutTemplateBlock(
+            sequence: 3, kind: .rest, title: "Rest",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 120,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        rest.groupID = id
+        rest.groupKind = .intervals
+        rest.groupRounds = 4
+
+        let active = ATHLTHActiveRecovery.convert(rest, active: true)
+        XCTAssertTrue(active.isActiveRecovery)
+        XCTAssertEqual(active.kind, .run)
+        XCTAssertEqual(active.cardioActivity, .running)
+        XCTAssertEqual(active.targetHeartRateZone, 1)
+        XCTAssertEqual(active.durationSeconds, 120)
+        XCTAssertEqual(active.groupID, id)
+        XCTAssertEqual(active.groupRounds, 4)
+        XCTAssertEqual(ATHLTHLiveWorkoutEngineRouter.engine(for: active), .endurance)
+
+        let restored = ATHLTHActiveRecovery.convert(active, active: false)
+        XCTAssertEqual(restored.kind, .rest)
+        XCTAssertEqual(restored.durationSeconds, 120)
+        XCTAssertEqual(restored.groupID, id)
+        XCTAssertNil(restored.targetHeartRateZone)
+    }
+
+    @MainActor
+    func testExpandedIntervalDoesNotAppendActiveRecoveryAfterLastRound() {
+        let id = UUID()
+        var effort = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Interval",
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 240,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: .main
+        )
+        effort.groupID = id
+        effort.groupKind = .intervals
+        effort.groupRounds = 4
+        var recovery = ATHLTHActiveRecovery.convert(
+            WorkoutTemplateBlock(
+                sequence: 2, kind: .rest, title: "Rest",
+                exerciseSlug: nil, distanceMeters: nil,
+                repetitions: nil, durationSeconds: 120,
+                targetWeightKilograms: nil, loadNote: nil,
+                notes: nil, phase: .main
+            ), active: true
+        )
+        recovery.groupID = id
+        recovery.groupKind = .intervals
+        recovery.groupRounds = 4
+        let timeline = [effort, recovery].expandedForExecution()
+        XCTAssertEqual(timeline.count, 7)
+        XCTAssertEqual(timeline.filter { $0.isActiveRecovery }.count, 3)
+        XCTAssertEqual(timeline.last?.kind, .run)
+        XCTAssertFalse(timeline.last?.isActiveRecovery ?? true)
+    }
+
+    @MainActor
+    func testFiveZoneRangeSurvivesPhaseReordering() throws {
+        let src = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first { $0.id == "VMA-001" })
+        let zone = try XCTUnwrap(ATHLTHZonedPlanLibrary.blocks(for: src)
+            .first { $0.sourceIntensityZoneLabel == "Z1-Z2" })
+        let copy = ATHLTHWorkoutPhasePlacement.renumbered(zone, sequence: 17)
+        XCTAssertEqual(copy.sourceIntensityZoneLabel, "Z1-Z2")
+        XCTAssertEqual(copy.targetHeartRatePercentMin, 50)
+        XCTAssertEqual(copy.targetHeartRatePercentMax, 70)
+    }
+
+    @MainActor
+    func testNorwegianWorkoutLabels() {
+        let previous = UserDefaults.standard.string(forKey: "settings.language")
+        defer {
+            if let previous { UserDefaults.standard.set(previous, forKey: "settings.language") }
+            else { UserDefaults.standard.removeObject(forKey: "settings.language") }
+        }
+        UserDefaults.standard.set("nb", forKey: "settings.language")
+        XCTAssertEqual(ATHLTHZonedLocalization.planTitle("5k-debutant", english: "5K Beginner"),
+                       "Din første 5 km")
+        XCTAssertEqual(ATHLTHZonedLocalization.text("Progressive jog"), "Progressiv jogg")
+    }
+
 }
