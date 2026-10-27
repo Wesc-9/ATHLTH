@@ -1,5 +1,6 @@
 import SwiftUI
 import Supabase
+import UIKit
 
 enum StrengthAIWorkoutGoal:
     String,
