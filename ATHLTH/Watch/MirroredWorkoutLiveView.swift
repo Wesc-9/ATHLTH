@@ -8,6 +8,7 @@ struct MirroredWorkoutLiveView: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var showingTreadmillInclineEditor = false
@@ -15,6 +16,13 @@ struct MirroredWorkoutLiveView: View {
     @State private var coachOutputName: String?
     @State private var showingAIConversation = false
     @State private var showingAddRunningWorkout = false
+    @State private var showingSpotifyControls = false
+    @State private var showingTargetPaceEditor = false
+    @State private var targetPaceDraftSeconds = 330.0
+    @State private var enteredTargetPaceSeconds: Double?
+    @State private var paceSamples: [(elapsed: Double, distance: Double)] = []
+    @State private var rollingPaceSeconds: TimeInterval?
+    @State private var paceWorkoutStart: Date?
 
     var body: some View {
         NavigationStack {
@@ -300,7 +308,8 @@ struct MirroredWorkoutLiveView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
 
-                        controls(snapshot)
+                        // Workout actions live in the fixed safe-area dock
+                        // below the scrollable health and Coach content.
                     } else {
                         ContentUnavailableView(
                             "Waiting for Apple Watch",
@@ -324,6 +333,28 @@ struct MirroredWorkoutLiveView: View {
             .navigationBarTitleDisplayMode(
                 .inline
             )
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if let snapshot = mirroring.snapshot {
+                    controls(snapshot)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
+                        .padding(.bottom, 6)
+                        .frame(maxWidth: .infinity)
+                        .background(.regularMaterial)
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if showingSpotifyControls && spotify.isConnected {
+                    HStack {
+                        Spacer(minLength: 0)
+                        mirroredSpotifyBar
+                            .padding(.trailing, 13)
+                    }
+                    .padding(.vertical, 4)
+                    .background(.regularMaterial)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
+            }
             .toolbar {
                 if mirroring
                     .hasActiveMirroredWorkout {
@@ -355,6 +386,23 @@ struct MirroredWorkoutLiveView: View {
                                     "Legg ned økten"
                             )
                         )
+                    }
+                }
+
+                if spotify.isConnected && mirroring.hasActiveMirroredWorkout {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.22)) {
+                                showingSpotifyControls.toggle()
+                            }
+                        } label: {
+                            ATHLTHSpotifyGlyph()
+                                .frame(width: 24, height: 24)
+                        }
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Show or hide Spotify controls",
+                            norwegian: "Vis eller skjul Spotify-kontroller"
+                        ))
                     }
                 }
 
@@ -480,6 +528,51 @@ struct MirroredWorkoutLiveView: View {
                 treadmillInclineDraft =
                     value
             }
+        }
+        .sheet(isPresented: $showingTargetPaceEditor) {
+            NavigationStack {
+                Form {
+                    Section {
+                        Stepper(
+                            String(format: "%.1f km/t · %d:%02d/km",
+                                3_600 / targetPaceDraftSeconds,
+                                Int(targetPaceDraftSeconds) / 60,
+                                Int(targetPaceDraftSeconds) % 60),
+                            value: $targetPaceDraftSeconds,
+                            in: 120...1200, step: 5
+                        )
+                        Slider(value: $targetPaceDraftSeconds,
+                               in: 120...1200, step: 5)
+                    } footer: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "A manually chosen target. Actual pace comes from Apple Watch and is not overwritten.",
+                            norwegian: "Et manuelt mål. Faktisk tempo måles av Apple Watch og endres ikke."
+                        ))
+                    }
+                }
+                .navigationTitle(ATHLTHLocalization.choose(
+                    english: "Target pace", norwegian: "Måltempo"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avbryt"
+                        )) { showingTargetPaceEditor = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Save", norwegian: "Lagre"
+                        )) {
+                            enteredTargetPaceSeconds = targetPaceDraftSeconds
+                            showingTargetPaceEditor = false
+                        }
+                    }
+                }
+            }
+        }
+        .onChange(of: mirroring.snapshot?.capturedAt) { _, _ in
+            guard let snap = mirroring.snapshot else { return }
+            updateRollingPace(with: snap)
         }
         .interactiveDismissDisabled(mirroring.hasActiveMirroredWorkout)
         .task(
@@ -1089,18 +1182,21 @@ struct MirroredWorkoutLiveView: View {
         let currentPace = freshPace
             ? snapshot.currentPaceSecondsPerKilometer : nil
         let averagePace = averageRunningPaceText(snapshot)
-        let paceLabel = currentPace != nil
-            ? ATHLTHLocalization.choose(
-                english: "PACE", norwegian: "TEMPO"
-              )
-            : ATHLTHLocalization.choose(
-                english: "AVERAGE PACE", norwegian: "SNITTEMPO"
-              )
-        let paceValue = currentPace.map(paceText) ?? averagePace
+        // Never substitute whole-workout average for "current pace".
+        let paceLabel = ATHLTHLocalization.choose(
+            english: "CURRENT PACE", norwegian: "TEMPO NÅ")
+        let paceValue = (currentPace ?? rollingPaceSeconds).map(paceText) ?? "—"
         let distance = snapshot.distanceMeters.isFinite
             ? max(snapshot.distanceMeters, 0) : 0
 
         return VStack(spacing: 12) {
+            if snapshot.runningStepTitle != nil,
+               snapshot.runningStepCount != nil {
+                ATHLTHMirroredRunIntervalHero(snapshot: snapshot)
+                    .id(snapshot.runningStepIndex)
+                    .animation(.easeInOut(duration: 0.28),
+                               value: snapshot.runningStepIndex)
+            } else {
             ATHLTHUnifiedCard {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack {
@@ -1254,6 +1350,8 @@ struct MirroredWorkoutLiveView: View {
                 .padding(.vertical, 4)
             }
 
+            }
+
             if snapshot.routeTitle != nil || snapshot.routeCueEnglish != nil {
                 ATHLTHUnifiedCard {
                     HStack(spacing: 12) {
@@ -1365,6 +1463,30 @@ struct MirroredWorkoutLiveView: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 92,
                            alignment: .leading)
+                }
+            }
+
+            HStack(spacing: 10) {
+                runningMetric(
+                    title: ATHLTHLocalization.choose(
+                        english: "WORKOUT AVERAGE", norwegian: "SNITTEMPO ØKTEN"),
+                    value: averagePace,
+                    unit: "/km"
+                )
+                if snapshot.treadmillInclinePercent != nil &&
+                   snapshot.runningStepTitle == nil {
+                    Button {
+                        targetPaceDraftSeconds = enteredTargetPaceSeconds ?? 330
+                        showingTargetPaceEditor = true
+                    } label: {
+                        runningMetric(
+                            title: ATHLTHLocalization.choose(
+                                english: "TARGET PACE", norwegian: "MÅLTEMPO"),
+                            value: enteredTargetPaceSeconds.map(paceText) ?? "Legg inn",
+                            unit: "/km"
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -1787,6 +1909,72 @@ struct MirroredWorkoutLiveView: View {
         // Indoor runs have no GPS speed. Prefer the measured average pace
         // when Watch distance and elapsed time are available.
         return averageRunningPaceText(snapshot)
+    }
+
+    /// 15–30-second rolling pace derived from measured Watch distance deltas.
+    /// Paused samples and stale/implausible jumps never change the live value.
+    private func updateRollingPace(with snapshot: WatchWorkoutLiveSnapshot) {
+        guard snapshot.kind == .running || snapshot.kind == .walking else { return }
+        if paceWorkoutStart != snapshot.startedAt {
+            paceWorkoutStart = snapshot.startedAt
+            paceSamples = []
+            rollingPaceSeconds = nil
+            enteredTargetPaceSeconds = nil
+        }
+        guard snapshot.state == .running,
+              snapshot.elapsedTime.isFinite,
+              snapshot.distanceMeters.isFinite, snapshot.distanceMeters >= 0
+        else { return }
+        let sample = (elapsed: snapshot.elapsedTime, distance: snapshot.distanceMeters)
+        if let prev = paceSamples.last {
+            guard sample.elapsed > prev.elapsed && sample.distance >= prev.distance else { return }
+        }
+        paceSamples.append(sample)
+        paceSamples = paceSamples.filter { sample.elapsed - $0.elapsed <= 30 }
+        guard let first = paceSamples.first,
+              sample.elapsed - first.elapsed >= 8,
+              sample.distance - first.distance >= 12
+        else { return }
+        let meters = sample.distance - first.distance
+        let seconds = sample.elapsed - first.elapsed
+        let pace = seconds * 1000 / meters
+        if pace.isFinite, (120...1800).contains(pace) {
+            rollingPaceSeconds = pace
+        }
+    }
+
+    private var mirroredSpotifyBar: some View {
+        HStack(spacing: 7) {
+            ATHLTHSpotifyGlyph()
+                .frame(width: 17, height: 17)
+            Text("Spotify")
+                .font(.system(size: 12, weight: .semibold))
+            Spacer(minLength: 0)
+            Button {
+                Task {
+                    await spotify.handleIPhoneAudioDockCommand(
+                        spotify.isPlaying ? .pause : .resume)
+                }
+            } label: {
+                Image(systemName: spotify.isPlaying ? "pause.fill" : "play.fill")
+                    .frame(width: 32, height: 34)
+            }
+            .buttonStyle(.plain)
+            Button {
+                Task { await spotify.handleIPhoneAudioDockCommand(.next) }
+            } label: {
+                Image(systemName: "forward.end.fill")
+                    .frame(width: 32, height: 34)
+            }
+            .buttonStyle(.plain)
+        }
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(ATHLTHTrainDesign.ink)
+        .padding(.horizontal, 10)
+        .frame(width: 210, height: 40)
+        .background(ATHLTHTrainDesign.paper, in: Capsule())
+        .overlay(Capsule().strokeBorder(
+            ATHLTHTrainDesign.rule.opacity(0.5), lineWidth: 0.7))
     }
 
     private func averageRunningPaceText(
