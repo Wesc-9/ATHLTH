@@ -2358,9 +2358,16 @@ struct AIProgramBuilderView: View {
 
         return plan.weeks.flatMap { week in
             week.days.map { day in
-                AIProgramExistingDay(
+                // The API and AI use calendar weekdays (Mon=1), while
+                // stored plans use relative offsets from plan.startDate.
+                let weekday = plan.startDate.map {
+                    ATHLTHTrainingPlanSchedule.calendarWeekdayIndex(
+                        forRelativeDayIndex: day.dayIndex, planStart: $0
+                    )
+                } ?? day.dayIndex
+                return AIProgramExistingDay(
                     weekNumber: week.weekNumber,
-                    dayIndex: day.dayIndex,
+                    dayIndex: weekday,
                     dayTitle: day.title,
                     existingSessions: day.sessions.map(\.title)
                 )
