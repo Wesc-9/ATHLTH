@@ -23,6 +23,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     // Optional so v1 snapshots made before the advanced-fields update still decode.
     // Only structural preferences; health, injuries and private notes are excluded.
     var preferredDayIndexes: [Int]?
+    var varyWeekdays: Bool? = nil
     var equipmentContext: String?
     var weeklyTimeBudgetMinutes: Int?
     // Only structural week choices and built-in subtype labels are stored.
@@ -59,6 +60,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         entryPlanFocus: String? = nil,
         entryPlanGoal: String? = nil,
         preferredDayIndexes: [Int]? = nil,
+        varyWeekdays: Bool = false,
         equipmentContext: String? = nil,
         weeklyTimeBudgetMinutes: Int? = nil,
         workoutKindsByDay: [Int: String]? = nil,
@@ -121,6 +123,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         } else {
             self.preferredDayIndexes = nil
         }
+        self.varyWeekdays = advanced ? varyWeekdays : false
         self.equipmentContext = equipmentContext
         self.weeklyTimeBudgetMinutes = weeklyTimeBudgetMinutes.map {
             min(max($0, 60), 1200)
