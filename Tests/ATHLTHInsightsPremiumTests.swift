@@ -133,6 +133,21 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
     }
 
     @MainActor
+    func testEvenlyTrainedMusclesDoNotAllBecomeRed() {
+        let profile = StrengthMuscleProfile(activations: [
+            .init(region: .quads, score: 10),
+            .init(region: .hamstrings, score: 9.8),
+            .init(region: .glutes, score: 9.6),
+            .init(region: .calves, score: 9.4),
+            .init(region: .upperBack, score: 9.2)
+        ])
+        let ranking = ATHLTHInsightsMuscleRanking.all(
+            ATHLTHInsightsMuscleSummary(profile: profile, sessionCount: 18))
+        XCTAssertEqual(ranking.first?.percentage, 100)
+        XCTAssertFalse(ranking.contains(where: \.needsLoadBalanceAttention))
+    }
+
+    @MainActor
     func testUnknownMusclesRemainUncoloredAndUnranked() {
         let profile = StrengthMuscleProfile(activations: [
             .init(region: .chest, score: 4),
