@@ -352,6 +352,15 @@ struct AIProgramDraftStep: Codable, Hashable {
         if blockKind == .run {
             block.cardioActivity = workoutKind == .walking ? .walking : .running
             block.isIndoor = block.treadmillInclinePercent != nil
+        } else if blockKind == .exercise {
+            // The unified editor/executor needs exercise identity for AI
+            // strength blocks just as it does for manually added exercises.
+            // Preserve the generated name without inventing a library ID.
+            block.exerciseSnapshot = ExerciseSnapshot(
+                name: String(title.prefix(120)),
+                instructions: [], primaryMuscles: [],
+                equipment: [], imageURL: nil
+            )
         }
         return block
     }
