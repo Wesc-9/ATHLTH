@@ -599,14 +599,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             repeatWeekCount = min(repeatWeekCount, max(1, value - 1))
         }
         .onChange(of: selectedDays) { _, _ in
-            structuredWorkoutsByDay = structuredWorkoutsByDay
-                .filter { selectedDays.contains($0.key) }
-            workoutKindOverridesByDay = workoutKindOverridesByDay
-                .filter { selectedDays.contains($0.key) }
-            workoutTitleOverridesByDay = workoutTitleOverridesByDay
-                .filter { selectedDays.contains($0.key) }
-            workoutMinutesByDay = workoutMinutesByDay
-                .filter { selectedDays.contains($0.key) }
+            // Simple and Advanced share the chosen weekdays. Do not erase
+            // Advanced workout details just because a day was toggled in Simple.
+            // Advanced edits remain in their original positions when returning.
+            if mode == .advanced {
+                structuredWorkoutsByDay = structuredWorkoutsByDay
+                    .filter { selectedDays.contains($0.key) }
+                workoutKindOverridesByDay = workoutKindOverridesByDay
+                    .filter { selectedDays.contains($0.key) }
+                workoutTitleOverridesByDay = workoutTitleOverridesByDay
+                    .filter { selectedDays.contains($0.key) }
+                workoutMinutesByDay = workoutMinutesByDay
+                    .filter { selectedDays.contains($0.key) }
+            }
+            sessionsPerWeek = selectedDays.count
             saveResumableDraft()
         }
         .onChange(of: equipment) { _, _ in saveResumableDraft() }
@@ -2289,15 +2295,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func switchSetupMode(to advanced: Bool) {
         let nextMode: TrainingPlanBuilderMode = advanced ? .advanced : .basic
         guard mode != nextMode else { return }
+        // This is a navigation choice, NOT "new plan": all entered fields,
+        // schedule, chosen days and mode-specific editing work survive.
         mode = nextMode
-        if !advanced {
-            startDate = Calendar.current.startOfDay(for: .now)
-            weekCount = 4
-            setSimpleKinds()
-        } else if weekCount == 4 {
-            weekCount = 8
-        }
-        // Preserve explicitly selected goals, plan title and training days.
         sessionsPerWeek = selectedDays.count
     }
 
@@ -2433,19 +2433,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func updateSimplePlanChoices() {
-        if simpleActivities.count > 1 {
-            focus = .hybrid
-            // Keep the user's title untouched when changing preferred activities.
-        } else if simpleActivities.contains(.running) {
-            focus = .running
-            // Activity changes should not overwrite a custom plan title.
-        } else if simpleActivities.contains(.strength) {
-            focus = .strength
-            // Plan name stays independent of chosen activity.
-        } else {
-            focus = .generalFitness
-            // No forced plan title: the default appears as placeholder.
-        }
+        // Activity choices determine Simple's workout suggestions. They must
+        // not replace Advanced's already selected training focus or goal.
         setSimpleKinds()
     }
 
@@ -2456,14 +2445,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func setSimpleKinds() {
-        let kinds = orderedSimpleActivities
-        guard !kinds.isEmpty else { return }
-        workoutKindOverridesByDay = Dictionary(
-            uniqueKeysWithValues: selectedDays.sorted().enumerated().map {
-                ($0.element, kinds[$0.offset % kinds.count])
-            }
-        )
-        weeklyTimeBudgetMinutes = simpleMinutes * selectedDays.count
+        // Resolved Simple suggestions are computed separately, so switching
+        // modes never overwrites Advanced's per-day exercise selection or
+        // its training-time budget.
+        sessionsPerWeek = selectedDays.count
     }
 
     // Basics already appears in the step progress header. Use one quiet
@@ -5925,7 +5910,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func resolvedWorkoutTitle(for day: Int) -> String {
-        if let chosen = workoutTitleOverridesByDay[day],
+        if mode == .advanced,
+           let chosen = workoutTitleOverridesByDay[day],
            !chosen.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return chosen
         }
@@ -5936,8 +5922,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func resolvedWorkoutMinutes(for day: Int) -> Int {
-        if let chosen = workoutMinutesByDay[day] { return chosen }
         if mode == .basic { return simpleMinutes }
+        if let chosen = workoutMinutesByDay[day] { return chosen }
         return max(20, min(180, weeklyTimeBudgetMinutes / max(selectedDays.count, 1)))
     }
 
@@ -5971,19 +5957,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func resolvedWorkoutKind(
         for dayIndex: Int
     ) -> WorkoutKind {
-        if let override =
-            workoutKindOverridesByDay[
-                dayIndex
-            ] {
+        if mode == .basic {
+            let activities = orderedSimpleActivities
+            if !activities.isEmpty {
+                return activities[trainingSlot(for: dayIndex) % activities.count]
+            }
+        }
+        if let override = workoutKindOverridesByDay[dayIndex] {
             return override
         }
-
-        return suggestedKind(
-            slot:
-                trainingSlot(
-                    for: dayIndex
-                )
-        )
+        return suggestedKind(slot: trainingSlot(for: dayIndex))
     }
 
     private var reviewStep: some View {
@@ -6821,7 +6804,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             selectedDays = Set(days)
             sessionsPerWeek = days.count
         }
-        if draft.advanced {
+        // Restore both Simple and Advanced structural preferences regardless
+        // of which mode was shown when this draft was last saved.
+        do {
             if let equipmentValue = draft.equipmentContext,
                let restored = EquipmentContext(rawValue: equipmentValue) {
                 equipment = restored
@@ -6843,12 +6828,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             guidedDayCursor = min(max(0, draft.guidedDayCursor ?? 0), weekCount * 7)
             firstGuidedWeekDecisionMade = draft.firstGuidedWeekDecisionMade ?? false
             selectedPlanWeekIndex = min(max(0, draft.selectedPlanWeekIndex ?? 0), weekCount - 1)
-        } else {
-            simpleMinutes = draft.simpleMinutes ?? simpleMinutes
-            if let kinds = draft.simpleActivityKinds {
-                let restored = Set(kinds.compactMap(WorkoutKind.init(rawValue:)))
-                if !restored.isEmpty { simpleActivities = restored }
-            }
+        }
+        simpleMinutes = draft.simpleMinutes ?? simpleMinutes
+        if let kinds = draft.simpleActivityKinds {
+            let restored = Set(kinds.compactMap(WorkoutKind.init(rawValue:)))
+            if !restored.isEmpty { simpleActivities = restored }
         }
         varyWeekdays = draft.varyWeekdays ?? false
         selectedGoalIDs = Set(draft.linkedGoalIDs ?? []).intersection(
