@@ -68,6 +68,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var weekCount = 4
     @State private var startDate =
         ATHLTHTrainingPlanBuilderFlow.defaultStartDate()
+    // A conflict can be resolved only by an explicit choice from the athlete.
+    // Never deactivate a saved program merely by changing dates in a draft.
+    @State private var approvedPlanReplacementID: UUID?
 
     @State private var focus: TrainingPlanFocus = .running
     @State private var selectedGoalArea: ATHLTHPlanGoalArea = .running
@@ -537,16 +540,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 return
             }
 
-            let suggested =
-                session
-                    .suggestedTrainingPlanStartDate
-            let defaultDate =
-                Self.defaultStartDate()
-
-            startDate = mode == .basic
-                ? Calendar.current.startOfDay(for: .now)
-                : max(Calendar.current.startOfDay(for: .now),
-                      Calendar.current.startOfDay(for: suggested))
+            // Today must remain available even if a scheduled program
+            // starts soon. The athlete resolves any overlap explicitly.
+            startDate = Calendar.current.startOfDay(for: .now)
         }
         .onDisappear {
             // A normal dismissal exits the editing session, while locking
@@ -6674,7 +6670,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case .approach:
             return true
         case .basics:
-            return conflictingPlan == nil
+            return conflictIsResolved
         case .profile:
             return
                 injuryFree ||
@@ -6701,7 +6697,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var canCreatePlan: Bool {
         !selectedDays.isEmpty &&
-        conflictingPlan == nil &&
+        conflictIsResolved &&
         (
             mode == .basic || injuryFree ||
             !injuriesOrLimitations
@@ -6733,6 +6729,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             startDate: startDate,
             endDate: resolvedEndDate
         )
+    }
+
+    private var conflictIsResolved: Bool {
+        guard let conflictingPlan else { return true }
+        return approvedPlanReplacementID == conflictingPlan.id
     }
 
     private var focusSummary: String {
@@ -7153,69 +7154,54 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func conflictCard(
         _ conflict: TrainingPlan
     ) -> some View {
-        HStack(
-            alignment: .top,
-            spacing: 11
-        ) {
-            Image(
-                systemName:
-                    "calendar.badge.exclamationmark"
-            )
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(
-                ATHLTHTheme.premiumGold
-            )
-            .frame(width: 38, height: 38)
-            .background(
-                ATHLTHTheme.premiumGoldSoft,
-                in: RoundedRectangle(
-                    cornerRadius: 11,
-                    style: .continuous
-                )
-            )
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(alignment: .top, spacing: 11) {
+                Image(systemName: "calendar.badge.exclamationmark")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                    .frame(width: 38, height: 38)
+                    .background(ATHLTHTheme.premiumGoldSoft,
+                                in: RoundedRectangle(cornerRadius: 11))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Overlaps with \(conflict.title)",
+                        norwegian: "Overlapper med \(conflict.title)"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
 
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Overlaps with \(conflict.title)",
-                        norwegian:
-                            "Overlapper med \(conflict.title)"
-                    )
-                )
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Move the start date or change the duration before creating the plan.",
-                        norwegian:
-                            "Flytt startdatoen eller endre varigheten før planen opprettes."
-                    )
-                )
-                .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose new dates or deactivate the other plan when this one is created.",
+                        norwegian: "Velg andre datoer, eller deaktiver den andre planen når den nye opprettes."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Spacer(minLength: 0)
             }
-
-            Spacer()
+            Toggle(isOn: Binding(
+                get: { approvedPlanReplacementID == conflict.id },
+                set: { approvedPlanReplacementID = $0 ? conflict.id : nil }
+            )) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Deactivate \(conflict.title) when saving",
+                        norwegian: "Deaktiver \(conflict.title) ved lagring"
+                    ))
+                    .font(.subheadline.weight(.medium))
+                    Text(ATHLTHLocalization.choose(
+                        english: "The original plan is kept under My plans, including its workouts.",
+                        norwegian: "Den opprinnelige planen beholdes under Mine planer, med øktene sine."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+            .tint(ATHLTHTheme.premiumGold)
         }
         .padding(14)
-        .background(
-            ATHLTHTheme.premiumGoldSoft
-                .opacity(0.54),
-            in: RoundedRectangle(
-                cornerRadius: 18,
-                style: .continuous
-            )
-        )
+        .background(ATHLTHTheme.premiumGoldSoft.opacity(0.54),
+                    in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var aiBuilderSeed:
@@ -7461,6 +7447,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
         let profile = currentPlanBuilderProfile
 
+        // Persisted plans are changed only at the moment the new plan is
+        // saved, never while choosing dates or editing an unfinished draft.
+        let replacedPlan = conflictingPlan
+        if let replacedPlan {
+            guard approvedPlanReplacementID == replacedPlan.id,
+                  session.deactivateTrainingPlan(replacedPlan.id) else {
+                creationError = ATHLTHLocalization.choose(
+                    english: "Could not deactivate the overlapping plan.",
+                    norwegian: "Kunne ikke deaktivere den overlappende planen."
+                )
+                return
+            }
+        }
+
         let created =
             session
                 .createConfiguredTrainingPlan(
@@ -7478,6 +7478,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
 
         guard let created else {
+            if let replacedPlan {
+                // Creation failed: leave the old plan as it was.
+                _ = session.resumeTrainingPlan(replacedPlan.id)
+            }
             if let conflict =
                 conflictingPlan {
                 creationError =
@@ -7506,6 +7510,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
         }
 
+        // Do not retain permission to replace a plan after this creation.
+        approvedPlanReplacementID = nil
         // Open the real day-by-day planner directly after saving so the
         // user can immediately add exercises, edit days and review the week.
         createdPlanID = created.id
