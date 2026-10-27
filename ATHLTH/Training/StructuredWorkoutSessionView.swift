@@ -324,8 +324,12 @@ struct StructuredWorkoutSessionView: View {
             }
             liveTargets(for: block)
             HStack {
-                Label(block.resolvedPhase.title.uppercased(),
-                      systemImage: block.resolvedPhase.symbol)
+                Label(block.isActiveRecovery
+                          ? ATHLTHLocalization.choose(
+                              english: "ACTIVE RECOVERY", norwegian: "AKTIV PAUSE")
+                          : block.resolvedPhase.title.uppercased(),
+                      systemImage: block.isActiveRecovery ? "figure.run"
+                          : block.resolvedPhase.symbol)
                     .font(.caption2.weight(.bold))
                     .tracking(1.8)
                     .foregroundStyle(
@@ -441,7 +445,14 @@ struct StructuredWorkoutSessionView: View {
                         systemImage: "speedometer"
                     )
                 }
-                if let zone = block.targetHeartRateZone {
+                if let normalized = block.sourceIntensityZoneLabel {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Zone \(normalized)", norwegian: "Sone \(normalized)"
+                        ),
+                        systemImage: "heart"
+                    )
+                } else if let zone = block.targetHeartRateZone {
                     Label(
                         ATHLTHLocalization.choose(
                             english: "Zone \(zone)", norwegian: "Sone \(zone)"
@@ -465,7 +476,14 @@ struct StructuredWorkoutSessionView: View {
                     Label("\(Int(seconds / 60)) min",
                           systemImage: "clock")
                 }
-                if let zone = block.targetHeartRateZone, (1...5).contains(zone) {
+                if let normalized = block.sourceIntensityZoneLabel {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Zone \(normalized)", norwegian: "Sone \(normalized)"
+                        ),
+                        systemImage: "heart"
+                    )
+                } else if let zone = block.targetHeartRateZone, (1...5).contains(zone) {
                     Label(
                         ATHLTHLocalization.choose(
                             english: "Zone \(zone)",
