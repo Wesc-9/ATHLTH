@@ -36,9 +36,13 @@ checks = {
     "The Plan header is part of the same Train navigation":
         "premiumTrainBrandHeader" in root
         and "progressHeaderTab(\"Plan\", section: .plan)" in root,
-    "The full week editor can copy the selected week":
-        'tr("Edit / copy week", "Rediger / kopier uke")' in plan
-        and "ATHLTHTrainWeekBuilderView(" in plan,
+    "Week copy is wired to the real safe copy service":
+        'tr("Copy week", "Kopier uke")' in plan
+        and "ATHLTHTrainPlanWeekCopyPolicy.copy(" in plan
+        and "ATHLTHTrainPlanWeekCopyPolicy.preview(" in plan,
+    "Full week editor opens the selected persisted week":
+        "ATHLTHTrainWeekBuilderView(" in plan
+        and "initialWeekIndex: selectedWeekIndex" in plan,
 }
 
 for label, passed in checks.items():
