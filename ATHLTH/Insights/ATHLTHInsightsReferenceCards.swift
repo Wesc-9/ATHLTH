@@ -69,7 +69,7 @@ struct ATHLTHInsightsReferenceSignalCard: View {
         VStack(alignment: .leading, spacing: 13) {
             HStack(spacing: 9) {
                 Image(systemName: metric.icon)
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .foregroundStyle(ATHLTHInsightsStyle.accent)
                     .font(.system(size: 19))
                 Text(metric.title)
                     .font(.system(size: 20, weight: .semibold, design: .serif))
@@ -107,10 +107,10 @@ struct ATHLTHInsightsReferenceSignalCard: View {
                         Image(systemName: "arrow.right")
                     }
                     .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .foregroundStyle(ATHLTHInsightsStyle.accent)
                     .padding(.horizontal, 11)
                     .frame(height: 35)
-                    .background(ATHLTHTrainDesign.paleGold.opacity(0.43),
+                    .background(ATHLTHInsightsStyle.track,
                                 in: Capsule())
                 }
                 .buttonStyle(.plain)
@@ -123,20 +123,20 @@ struct ATHLTHInsightsReferenceSignalCard: View {
                                 x: .value("Day", day.date, unit: .day),
                                 y: .value("Hours", value)
                             )
-                            .foregroundStyle(ATHLTHTrainDesign.bronze.opacity(0.78))
+                            .foregroundStyle(ATHLTHInsightsStyle.accent.opacity(0.78))
                             .cornerRadius(5)
                         } else {
                             LineMark(
                                 x: .value("Day", day.date, unit: .day),
                                 y: .value("Value", value)
                             )
-                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            .foregroundStyle(ATHLTHInsightsStyle.accent)
                             .interpolationMethod(.catmullRom)
                             PointMark(
                                 x: .value("Day", day.date, unit: .day),
                                 y: .value("Value", value)
                             )
-                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            .foregroundStyle(ATHLTHInsightsStyle.accent)
                         }
                     }
                 }
@@ -162,7 +162,7 @@ struct ATHLTHInsightsReferenceSignalCard: View {
             }
         }
         .padding(17)
-        .athlthTrainPaper()
+        .athlthInsightsSurface()
     }
 }
 
@@ -194,7 +194,7 @@ struct ATHLTHInsightsReferenceLoadCard: View {
                    ratio.isFinite {
                     Text(String(format: "%+.0f %%", (ratio - 1) * 100))
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
                     Text(ATHLTHLocalization.choose(
                         english: "vs. 4-week average",
                         norwegian: "mot 4-ukers snitt"))
@@ -208,7 +208,7 @@ struct ATHLTHInsightsReferenceLoadCard: View {
                         x: .value("Day", day.date, unit: .day),
                         y: .value("Minutes", max(0, day.trainingMinutes))
                     )
-                    .foregroundStyle(ATHLTHTrainDesign.bronze.opacity(0.75))
+                    .foregroundStyle(ATHLTHInsightsStyle.accent.opacity(0.75))
                     .cornerRadius(5)
                 }
                 .chartXAxis {
@@ -225,7 +225,7 @@ struct ATHLTHInsightsReferenceLoadCard: View {
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
         }
         .padding(17)
-        .athlthTrainPaper()
+        .athlthInsightsSurface()
     }
 
     private func heading(_ label: String, icon: String) -> some View {
@@ -236,9 +236,9 @@ struct ATHLTHInsightsReferenceLoadCard: View {
             Spacer()
             Button(action: onMore) {
                 Image(systemName: "arrow.right")
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .foregroundStyle(ATHLTHInsightsStyle.accent)
                     .frame(width: 36, height: 32)
-                    .background(ATHLTHTrainDesign.paleGold.opacity(0.42),
+                    .background(ATHLTHInsightsStyle.track,
                                 in: Capsule())
             }
             .buttonStyle(.plain)
@@ -288,7 +288,7 @@ struct ATHLTHInsightsReferenceTimeCard: View {
                         x: .value("Day", day.date, unit: .day),
                         y: .value("Minutes", max(0, day.minutes))
                     )
-                    .foregroundStyle(ATHLTHTrainDesign.bronze.opacity(0.72))
+                    .foregroundStyle(ATHLTHInsightsStyle.accent.opacity(0.72))
                     .cornerRadius(5)
                 }
                 .chartXAxis {
@@ -301,7 +301,7 @@ struct ATHLTHInsightsReferenceTimeCard: View {
         }
         .foregroundStyle(ATHLTHTrainDesign.ink)
         .padding(17)
-        .athlthTrainPaper()
+        .athlthInsightsSurface()
     }
 }
 
@@ -319,11 +319,11 @@ struct ATHLTHInsightsReferenceDistributionCard: View {
     private var segments: [Slice] {
         [
             Slice(title: ATHLTHLocalization.choose(english: "Running", norwegian: "Løping"),
-                  minutes: load.runningMinutes, color: ATHLTHTrainDesign.bronze),
+                  minutes: load.runningMinutes, color: ATHLTHInsightsStyle.accent),
             Slice(title: ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke"),
-                  minutes: load.strengthMinutes, color: ATHLTHTrainDesign.gold),
+                  minutes: load.strengthMinutes, color: ATHLTHInsightsStyle.accent),
             Slice(title: ATHLTHLocalization.choose(english: "Walking", norwegian: "Gå"),
-                  minutes: load.walkingMinutes, color: ATHLTHTrainDesign.paleGold),
+                  minutes: load.walkingMinutes, color: ATHLTHInsightsStyle.track),
             Slice(title: ATHLTHLocalization.choose(english: "Other", norwegian: "Annet"),
                   minutes: load.otherMinutes, color: ATHLTHTrainDesign.secondary.opacity(0.50))
         ].filter { $0.minutes > 0 }
@@ -390,7 +390,7 @@ struct ATHLTHInsightsReferenceDistributionCard: View {
             }
         }
         .padding(17)
-        .athlthTrainPaper()
+        .athlthInsightsSurface()
     }
 }
 
@@ -411,7 +411,7 @@ struct ATHLTHInsightsDailyCheckInCard: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 8) {
                 Image(systemName: "face.smiling")
-                    .foregroundStyle(ATHLTHTrainDesign.gold)
+                    .foregroundStyle(ATHLTHInsightsStyle.accent)
                 Text(ATHLTHLocalization.choose(
                     english: "How you've been feeling", norwegian: "Hvordan du har hatt det"))
                     .font(.system(size: 19, weight: .semibold, design: .serif))
@@ -422,7 +422,7 @@ struct ATHLTHInsightsDailyCheckInCard: View {
                         ? ATHLTHLocalization.choose(english: "Update", norwegian: "Oppdater")
                         : ATHLTHLocalization.choose(english: "Check in", norwegian: "Registrer"))
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
                 }
             }
             if let today = store.todayEnergy {
@@ -439,12 +439,12 @@ struct ATHLTHInsightsDailyCheckInCard: View {
                             y: .value("Energy", energy)
                         )
                         .interpolationMethod(.catmullRom)
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
                         PointMark(
                             x: .value("Day", entry.date, unit: .day),
                             y: .value("Energy", energy)
                         )
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
                     }
                 }
                 .chartYScale(domain: 1...5)
@@ -463,6 +463,6 @@ struct ATHLTHInsightsDailyCheckInCard: View {
             }
         }
         .padding(17)
-        .athlthTrainPaper()
+        .athlthInsightsSurface()
     }
 }
