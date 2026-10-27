@@ -6744,14 +6744,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
         }
         varyWeekdays = draft.varyWeekdays ?? false
+        selectedGoalIDs = Set(draft.linkedGoalIDs ?? []).intersection(
+            Set(goalStore.activeGoals.filter { $0.status == .active }.map(\.id))
+        )
         step = ATHLTHPlanJourney.restoredStep(draft.stage, advanced: draft.advanced)
     }
 
     private func saveResumableDraft() {
         guard didApplySuggestedStartDate,
               !completedPlanCreation,
-              !isHydratingPlanDraft,
-              step != .mode else {
+              !isHydratingPlanDraft else {
             return
         }
         let draft = ATHLTHPlanCreationDraft(
@@ -6768,6 +6770,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             entryPlanGoal: goal.rawValue,
             preferredDayIndexes: selectedDays.sorted(),
             varyWeekdays: mode == .advanced ? varyWeekdays : false,
+            linkedGoalIDs: Array(selectedGoalIDs),
             equipmentContext: mode == .advanced ? equipment.rawValue : nil,
             weeklyTimeBudgetMinutes: mode == .advanced
                 ? weeklyTimeBudgetMinutes : nil,
@@ -7325,8 +7328,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 // Basic no longer asks for a duration. Let each activity
                 // receive an editable suggestion from the workout builder
                 // instead of forcing an unseen 30-minute time budget.
-                weeklyTimeBudgetMinutes:
-                    mode == .basic ? nil : weeklyTimeBudgetMinutes,
+                weeklyTimeBudgetMinutes: nil,
                 simpleWorkoutKinds: mode == .basic ? orderedSimpleActivities : nil,
                 preferredWorkoutKindsByDay:
                     mode == .advanced ? Dictionary(
@@ -7342,13 +7344,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 ($0, resolvedWorkoutTitle(for: $0))
                             }
                     ) : nil,
-                preferredWorkoutMinutesByDay:
-                    mode == .advanced ? Dictionary(
-                        uniqueKeysWithValues:
-                            selectedDays.sorted().map {
-                                ($0, resolvedWorkoutMinutes(for: $0))
-                            }
-                    ) : nil
+                preferredWorkoutMinutesByDay: mode == .advanced && !workoutMinutesByDay.isEmpty
+                    ? workoutMinutesByDay : nil
             )
 
     }
