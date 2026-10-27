@@ -1,4 +1,5 @@
 import { enforceAIRequestBudget } from "../_shared/ai-request-budget.ts";
+import { conflictsWithInjuryRestrictions } from "../_shared/ai-training-injury-guard.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 type GoalInput = {
@@ -654,14 +655,27 @@ Hard rules:
     return json({ error: "AI returned an invalid program." }, 502);
   }
 
-  return json(
-    normalizeProgram(
-      program,
-      weekCount,
-      preferredDays,
-      sessionsPerWeek,
-      existingDays,
-      mode,
-    ),
+  const normalized = normalizeProgram(
+    program,
+    weekCount,
+    preferredDays,
+    sessionsPerWeek,
+    existingDays,
+    mode,
   );
+
+  if (conflictsWithInjuryRestrictions(
+    normalized,
+    constraints.excludedMovements,
+    constraints.injurySafetyNotes,
+  )) {
+    // Do not return a contraindicated AI plan for the athlete to accept.
+    // Do not log or echo the health notes or specific restricted movements.
+    return json({
+      error: "AI suggested an excluded exercise. No plan was saved; please try again.",
+      code: "AI_COACH_INJURY_CONFLICT",
+    }, 422);
+  }
+
+  return json(normalized);
 });
