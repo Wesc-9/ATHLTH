@@ -21,6 +21,55 @@ final class ATHLTHAzureVoicePreviewPlayer:
         let voice: String
         let audioBase64: String
     }
+    private struct ServiceError: Decodable {
+        let code: String?
+    }
+
+    static func diagnostic(_ error: Error) -> String {
+        let code: String?
+        let status: Int
+        if let failure = error as? FunctionsError,
+           case let .httpError(httpStatus, data) = failure {
+            code = try? JSONDecoder().decode(ServiceError.self, from: data).code
+            status = httpStatus
+        } else {
+            code = nil
+            status = 0
+        }
+
+        switch code {
+        case "PREMIUM_REQUIRED":
+            return ATHLTHLocalization.choose(
+                english: "Azure voices require an active ATHLTH+ subscription.",
+                norwegian: "Azure-stemmer krever et aktivt ATHLTH+-abonnement.")
+        case "NOT_AVAILABLE":
+            return ATHLTHLocalization.choose(
+                english: "Azure voice service is disabled on the server.",
+                norwegian: "Azure-stemmer er deaktivert på serveren.")
+        case "FREE_BUDGET_EXHAUSTED", "AI_RATE_LIMIT":
+            return ATHLTHLocalization.choose(
+                english: "The voice usage limit is reached. Try again later.",
+                norwegian: "Talekvoten er brukt opp. Prøv igjen senere.")
+        case "UNSUPPORTED_VOICE":
+            return ATHLTHLocalization.choose(
+                english: "The selected Azure voice is not available in this resource.",
+                norwegian: "Den valgte Azure-stemmen finnes ikke i denne ressursen.")
+        case "VOICE_CATALOG_UNAVAILABLE", "AZURE_UNAVAILABLE":
+            return ATHLTHLocalization.choose(
+                english: "Cannot reach the Azure voice service. Check region and voice configuration.",
+                norwegian: "Får ikke kontakt med Azure-stemmene. Kontroller region og stemmeoppsett.")
+        default:
+            if status == 401 || status == 403 {
+                return ATHLTHLocalization.choose(
+                    english: "Sign in again and verify ATHLTH+ access for Azure voices.",
+                    norwegian: "Logg inn på nytt og kontroller ATHLTH+-tilgangen.")
+            }
+            return ATHLTHLocalization.choose(
+                english: "The Azure preview is unavailable right now. Local speech still works.",
+                norwegian: "Azure-forhåndslytting er utilgjengelig nå. Lokal tale fungerer fortsatt.")
+        }
+    }
+
 
     func preview(_ voice: String, duckMusic: Bool) {
         guard loadingVoice == nil else { return }
@@ -63,10 +112,7 @@ final class ATHLTHAzureVoicePreviewPlayer:
                 }
                 loadingVoice = nil
                 releaseAudioSessionIfOwned()
-                message = ATHLTHLocalization.choose(
-                    english: "Azure voice preview is unavailable. Your iPhone's offline voice still works during workouts.",
-                    norwegian: "Azure-stemmen kan ikke forhåndslyttes nå. iPhone-stemmen fungerer fortsatt under treningsøkter."
-                )
+                message = Self.diagnostic(error)
             }
         }
     }
@@ -104,15 +150,43 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @AppStorage("settings.audioCoach.azureThirdPartyConsent")
     private var allowsAzureWorkoutText = false
+    @State private var discoveredVoices: [Voice]?
+    @State private var catalogMessage: String?
 
-    private struct Voice: Identifiable {
+    private struct CatalogRequest: Encodable {
+        let action: String
+    }
+    private struct CatalogReply: Decodable {
+        let voices: [Voice]
+    }
+
+    @MainActor
+    private func loadAzureVoices() async {
+        do {
+            let response: CatalogReply = try await
+                SupabaseEnvironment.client.functions.invoke(
+                    "azure-coach-voice",
+                    options: FunctionInvokeOptions(
+                        body: CatalogRequest(action: "catalog")
+                    )
+                )
+            guard !response.voices.isEmpty else { return }
+            discoveredVoices = response.voices
+            catalogMessage = nil
+        } catch {
+            catalogMessage = ATHLTHAzureVoicePreviewPlayer.diagnostic(error)
+        }
+    }
+
+
+    private struct Voice: Identifiable, Decodable {
         let id: String
         let name: String
         let detail: String
     }
 
     private var voices: [Voice] {
-        [
+        discoveredVoices ?? [
             Voice(id: "finn", name: "Finn", detail: ATHLTHLocalization.choose(
                 english: "Norwegian · male",
                 norwegian: "Norsk · mannlig"
@@ -241,6 +315,13 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            if let catalogMessage, preview.message == nil {
+                Label(catalogMessage, systemImage: "info.circle")
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             Text(ATHLTHLocalization.choose(
                 english: "Azure voices require ATHLTH+. Apple Watch uses its own local voice whenever iPhone audio is unavailable. The existing system-voice menu is always available.",
                 norwegian: "Azure-stemmer krever ATHLTH+. Apple Watch bruker lokal stemme når iPhone-lyden ikke er tilgjengelig. De vanlige systemstemmene er fortsatt tilgjengelige."
@@ -250,6 +331,7 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         .padding(14)
+        .task { await loadAzureVoices() }
         .onDisappear { preview.stop() }
     }
 }
