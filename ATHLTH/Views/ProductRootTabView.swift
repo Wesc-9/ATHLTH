@@ -222,9 +222,11 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
 
-            ATHLTHRecoveryView(
-                isActive:
-                    selectedTab == 2
+            // Open the premium four-section Insights experience as the
+            // actual tab root. The legacy recovery page remains available
+            // from Insights as a drill-down, not as the default landing.
+            ATHLTHInsightsView(
+                isActive: selectedTab == 2
             ) { tab in
                 selectedTab = tab
             }
