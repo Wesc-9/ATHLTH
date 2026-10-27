@@ -374,24 +374,80 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
         XCTAssertNil(restored.blocks.first?.loadNote)
     }
 
-    func testBasicNeverPersistsAdvancedWorkoutBuilder() {
+    func testSwitchingToSimpleRetainsSanitizedAdvancedWorkoutsForSwitchingBack() throws {
+        // A mode change is not a fresh draft. Structured advanced training
+        // must survive even when the last visible page is the Simple wizard.
         let exercise = WorkoutTemplateBlock(
             sequence: 1, kind: .exercise, title: "Squat",
             exerciseSlug: "repdb-squat", distanceMeters: nil,
             repetitions: 10, durationSeconds: nil,
-            targetWeightKilograms: nil, loadNote: nil, notes: nil
+            targetWeightKilograms: nil,
+            loadNote: "Private note", notes: "Private workout note"
         )
         let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
-            title: "Hidden details", kind: .strength,
-            durationMinutes: 30, routeID: nil, blocks: [exercise]
+            title: "Legs", kind: .strength,
+            durationMinutes: 30, routeID: UUID(), blocks: [exercise]
         )
         let draft = ATHLTHPlanCreationDraft(
-            title: "Basic walking", weekCount: 8,
+            title: "Hybrid training", weekCount: 8,
             startDate: Date(), advanced: false,
-            source: "scratch", stage: "basics",
-            structuredWorkoutsByDay: [1: blueprint]
+            source: "scratch", stage: "mode",
+            preferredDayIndexes: [1, 3, 5],
+            varyWeekdays: true,
+            equipmentContext: "both",
+            weeklyTimeBudgetMinutes: 360,
+            workoutKindsByDay: [1: "strength", 3: "running"],
+            workoutPresetsByDay: [3: "Bakkeintervaller"],
+            workoutMinutesByDay: [3: 45],
+            structuredWorkoutsByDay: [1: blueprint],
+            planningApproach: "quick",
+            selectedPlanWeekIndex: 2,
+            simpleMinutes: 25,
+            simpleActivityKinds: ["walking", "running"]
         )
-        XCTAssertNil(draft.structuredWorkoutsByDay)
+        let bytes = try JSONEncoder().encode(draft)
+        let resumed = try JSONDecoder().decode(
+            ATHLTHPlanCreationDraft.self, from: bytes
+        )
+        XCTAssertFalse(resumed.advanced)
+        XCTAssertEqual(resumed.preferredDayIndexes, [1, 3, 5])
+        XCTAssertEqual(resumed.weekCount, 8)
+        XCTAssertEqual(resumed.varyWeekdays, true)
+        XCTAssertEqual(resumed.equipmentContext, "both")
+        XCTAssertEqual(resumed.weeklyTimeBudgetMinutes, 360)
+        XCTAssertEqual(resumed.workoutKindsByDay?[3], "running")
+        XCTAssertEqual(resumed.workoutPresetsByDay?[3], "Bakkeintervaller")
+        XCTAssertEqual(resumed.workoutMinutesByDay?[3], 45)
+        XCTAssertEqual(resumed.planningApproach, "quick")
+        XCTAssertEqual(resumed.selectedPlanWeekIndex, 2)
+        XCTAssertEqual(resumed.simpleMinutes, 25)
+        XCTAssertEqual(resumed.simpleActivityKinds, ["walking", "running"])
+        let detail = try XCTUnwrap(resumed.structuredWorkoutsByDay?[1])
+        XCTAssertEqual(detail.title, "Legs")
+        XCTAssertNil(detail.routeID)
+        XCTAssertNil(detail.blocks.first?.notes)
+        XCTAssertNil(detail.blocks.first?.loadNote)
+        let stored = String(decoding: bytes, as: UTF8.self)
+        XCTAssertFalse(stored.contains("Private workout note"))
+        XCTAssertFalse(stored.contains("Private note"))
+    }
+
+    func testFreshDefaultInputsAreIndependentOfPreviousDraft() {
+        let previous = ATHLTHPlanCreationDraft(
+            title: "Previous", weekCount: 12, startDate: Date(),
+            advanced: true, source: "scratch", stage: "week",
+            preferredDayIndexes: [2, 4, 6],
+            workoutKindsByDay: [2: "running"]
+        )
+        let fresh = ATHLTHPlanCreationDraft(
+            title: "New plan", weekCount: 4, startDate: Date(),
+            advanced: false, source: "scratch", stage: "mode",
+            preferredDayIndexes: [1, 3, 5]
+        )
+        XCTAssertEqual(previous.preferredDayIndexes, [2, 4, 6])
+        XCTAssertEqual(fresh.preferredDayIndexes, [1, 3, 5])
+        XCTAssertNil(fresh.workoutKindsByDay)
+        XCTAssertEqual(fresh.weekCount, 4)
     }
 
     func testNewPlanDraftDoesNotOverwriteExistingDraft() throws {
