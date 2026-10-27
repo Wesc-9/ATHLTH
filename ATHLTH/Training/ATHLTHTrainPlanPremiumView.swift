@@ -82,6 +82,10 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var openingWorkout: WorkoutDestination?
     @State private var editingTrainingPlaceWorkout: WorkoutDestination?
     @State private var selectedDayID: UUID?
+    private enum PlanDayTab {
+        case workouts, details
+    }
+    @State private var selectedDayTab: PlanDayTab = .workouts
     @State private var selectedWorkoutID: UUID?
     @State private var collapsedWorkoutCards: Set<UUID> = []
     @State private var collapsedWorkoutPhases: Set<String> = []
@@ -192,6 +196,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             selectedWeekIndex = nil
             selectedDayID = nil
             selectedWorkoutID = nil
+            selectedDayTab = .workouts
             selectedDetailSection = .structure
             if let plan {
                 advanced = plan.builderProfile?.mode == .advanced
@@ -605,6 +610,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                 selectedDayID = selected ? nil : day.id
                 selectedWorkoutID = nil
+                selectedDayTab = .workouts
                 selectedDetailSection = .structure
             }
         } label: {
@@ -1030,6 +1036,21 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 .buttonStyle(.plain)
             }
+            HStack(spacing: 4) {
+                referenceModePill(
+                    tr("Scheduled workouts", "Planlagte økter"),
+                    selected: selectedDayTab == .workouts
+                ) {
+                    selectedDayTab = .workouts
+                }
+                referenceModePill(
+                    tr("Day details", "Dagdetaljer"),
+                    selected: selectedDayTab == .details
+                ) {
+                    selectedDayTab = .details
+                }
+            }
+            if selectedDayTab == .workouts {
             if workouts.isEmpty {
                 VStack(alignment: .leading, spacing: 10) {
                     Label(
@@ -1062,6 +1083,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                             && !collapsedWorkoutCards.contains(workout.id)
                     )
                 }
+            }
+            } else {
+                // Reuse the real advanced detail panel: duration, intervals,
+                // structure, location and the existing workout editor.
+                premiumSelectedDayPanel(day, plan: plan)
             }
             HStack(spacing: 10) {
                 Button {
@@ -2506,6 +2532,7 @@ struct ATHLTHTrainPlanPremiumView: View {
             selectedWeekIndex = index
             selectedDayID = nil
             selectedWorkoutID = nil
+            selectedDayTab = .workouts
             selectedDetailSection = .structure
         }
     }
