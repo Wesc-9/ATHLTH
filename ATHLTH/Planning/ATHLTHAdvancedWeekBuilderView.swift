@@ -409,28 +409,25 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 }
                 .buttonStyle(.plain)
             }
-            phase(.warmup, workout: workout, day: day, index: index)
-            phase(.main, workout: workout, day: day, index: index)
-            phase(.cooldown, workout: workout, day: day, index: index)
-            if workout.blocks.contains(where: { $0.resolvedPhase == .recovery }) {
-                phase(.recovery, workout: workout, day: day, index: index)
+            ForEach(ATHLTHWorkoutTimelinePresentation.sections(for: workout.blocks)) { section in
+                phase(section, day: day, index: index)
             }
         }
         .padding(13)
         .background(.white, in: RoundedRectangle(cornerRadius: 17))
     }
 
-    private func phase(_ phase: WorkoutPhaseKind,
-                       workout: ATHLTHPlanStructuredWorkoutBlueprint,
+    private func phase(_ section: ATHLTHWorkoutTimelinePresentation.Section,
                        day: Int, index: Int) -> some View {
-        let blocks = workout.blocks.filter { $0.resolvedPhase == phase }
+        let phase = section.phase
+        let blocks = section.blocks
         return VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Image(systemName: phase.symbol)
                     .foregroundStyle(gold)
                 Text(phase.title)
                     .font(.subheadline.weight(.semibold))
-                Text("(\(blocks.count))")
+                Text("(\(section.activityCount))")
                     .font(.caption).foregroundStyle(secondary)
                 Spacer()
                 Button { onAddExercise(day, index, phase) } label: {

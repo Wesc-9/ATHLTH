@@ -97,4 +97,58 @@ final class ATHLTHWorkoutPhasePlacementTests: XCTestCase {
         ), 0)
     }
 
+
+    func testFourByFourPausesStayBetweenIntervals() {
+        func pause() -> WorkoutTemplateBlock {
+            var item = block("Pause", phase: .recovery)
+            item.kind = .rest
+            item.durationSeconds = 120
+            return item
+        }
+        let timeline = [
+            block("Oppvarming", phase: .warmup),
+            block("Intervall 1", phase: .main), pause(),
+            block("Intervall 2", phase: .main), pause(),
+            block("Intervall 3", phase: .main), pause(),
+            block("Intervall 4", phase: .main),
+            block("Nedjogging", phase: .cooldown)
+        ]
+        let sections = ATHLTHWorkoutTimelinePresentation.sections(for: timeline)
+        XCTAssertEqual(sections.map(\.phase), [.warmup, .main, .cooldown])
+        XCTAssertEqual(sections.map(\.activityCount), [1, 4, 1])
+        XCTAssertEqual(sections[1].blocks.map(\.title), [
+            "Intervall 1", "Pause", "Intervall 2", "Pause",
+            "Intervall 3", "Pause", "Intervall 4"
+        ])
+        XCTAssertEqual(sections[2].blocks.map(\.title), ["Nedjogging"])
+        XCTAssertEqual(sections.flatMap(\.blocks), timeline)
+    }
+
+    func testWarmupPauseAndNonRestRecoveryDoNotMove() {
+        var pause = block("Pause etter oppvarming", phase: .recovery)
+        pause.kind = .rest
+        let timeline = [
+            block("Oppvarming", phase: .warmup), pause,
+            block("Intervall", phase: .main),
+            block("Restitusjonsøvelse", phase: .recovery),
+            block("Nedtrapping", phase: .cooldown)
+        ]
+        let sections = ATHLTHWorkoutTimelinePresentation.sections(for: timeline)
+        XCTAssertEqual(sections.map(\.phase),
+                       [.warmup, .main, .recovery, .cooldown])
+        XCTAssertEqual(sections[0].blocks.map(\.title),
+                       ["Oppvarming", "Pause etter oppvarming"])
+        XCTAssertEqual(sections.flatMap(\.blocks), timeline)
+    }
+
+    func testSimpleSessionKeepsItsThreePhases() {
+        let timeline = [
+            block("Oppvarming", phase: .warmup),
+            block("Intervall", phase: .main),
+            block("Nedtrapping", phase: .cooldown)
+        ]
+        let sections = ATHLTHWorkoutTimelinePresentation.sections(for: timeline)
+        XCTAssertEqual(sections.map(\.phase), [.warmup, .main, .cooldown])
+        XCTAssertEqual(sections.map(\.activityCount), [1, 1, 1])
+    }
 }

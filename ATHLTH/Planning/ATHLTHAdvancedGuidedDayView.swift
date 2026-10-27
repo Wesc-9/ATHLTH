@@ -206,11 +206,8 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 }
             }
             .buttonStyle(.plain)
-            phaseSection(.warmup, workout: workout, workoutIndex: index)
-            phaseSection(.main, workout: workout, workoutIndex: index)
-            phaseSection(.cooldown, workout: workout, workoutIndex: index)
-            if workout.blocks.contains(where: { $0.resolvedPhase == .recovery }) {
-                phaseSection(.recovery, workout: workout, workoutIndex: index)
+            ForEach(ATHLTHWorkoutTimelinePresentation.sections(for: workout.blocks)) { section in
+                phaseSection(section, workoutIndex: index)
             }
             if index == 0 {
                 Button(action: onAddWorkout) {
@@ -233,11 +230,11 @@ struct ATHLTHAdvancedGuidedDayView: View {
     }
 
     private func phaseSection(
-        _ phase: WorkoutPhaseKind,
-        workout: ATHLTHPlanStructuredWorkoutBlueprint,
+        _ section: ATHLTHWorkoutTimelinePresentation.Section,
         workoutIndex: Int
     ) -> some View {
-        let blocks = workout.blocks.filter { $0.resolvedPhase == phase }
+        let phase = section.phase
+        let blocks = section.blocks
         return VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Image(systemName: phase.symbol).foregroundStyle(gold)
@@ -245,7 +242,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 Text(phase.title)
                     .font(.system(size: 12, weight: .semibold))
                     .foregroundStyle(ink)
-                Text("(\(blocks.count))")
+                Text("(\(section.activityCount))")
                     .font(.caption2).foregroundStyle(secondary)
                 Spacer()
                 Button { onAddExercise(phase, workoutIndex) } label: {

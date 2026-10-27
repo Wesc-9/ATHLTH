@@ -111,3 +111,41 @@ enum ATHLTHWorkoutPhasePlacement {
     }
 
 }
+
+
+// MARK: - Chronological presentation of workout phases
+
+/// UI-only grouping. The persisted block array already defines playback
+/// order, including recovery between intervals; never reorder it by phase.
+enum ATHLTHWorkoutTimelinePresentation {
+    struct Section: Identifiable {
+        let id: Int
+        let phase: WorkoutPhaseKind
+        var blocks: [WorkoutTemplateBlock]
+
+        // An interval section with four efforts and three pauses reads (4),
+        // while its pause rows remain visible between the efforts.
+        var activityCount: Int {
+            let work = blocks.filter { $0.kind != .rest }.count
+            return work > 0 ? work : blocks.count
+        }
+    }
+
+    static func sections(for blocks: [WorkoutTemplateBlock]) -> [Section] {
+        var sections: [Section] = []
+        for block in blocks {
+            let phase = block.kind == .rest
+                ? (sections.last?.phase ?? block.resolvedPhase)
+                : block.resolvedPhase
+
+            if let last = sections.indices.last, sections[last].phase == phase {
+                sections[last].blocks.append(block)
+            } else {
+                sections.append(Section(
+                    id: sections.count, phase: phase, blocks: [block]
+                ))
+            }
+        }
+        return sections
+    }
+}
