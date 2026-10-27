@@ -15,6 +15,16 @@ final class ATHLTHAzureCoachVoiceTests: XCTestCase {
         }
     }
 
+    func testDiscoveredNorwegianAzureVoiceIdentifiers() {
+        XCTAssertEqual(
+            ATHLTHAzureCoachVoice.key("azure:nb-NO-NewVoiceNeural"),
+            "nb-NO-NewVoiceNeural"
+        )
+        XCTAssertNil(ATHLTHAzureCoachVoice.key("azure:en-US-JennyNeural"))
+        XCTAssertNil(ATHLTHAzureCoachVoice.key("azure:nb-NO-Bad<Voice>Neural"))
+        XCTAssertNil(ATHLTHAzureCoachVoice.key("azure:nb-NO-OtherNeural?x=1"))
+    }
+
     func testUnavailableOrTamperedVoiceFallsBackToApple() {
         XCTAssertNil(ATHLTHAzureCoachVoice.key(nil))
         XCTAssertNil(ATHLTHAzureCoachVoice.key(""))
