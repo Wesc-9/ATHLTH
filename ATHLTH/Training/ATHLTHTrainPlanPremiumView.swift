@@ -953,12 +953,21 @@ struct ATHLTHTrainPlanPremiumView: View {
                 planID: plan.id, sessionID: workout.id
             ),
             onEditBlock: { sourceIndex, executionStepIndex in
-                editingWorkout = WorkoutEditDestination(
-                    planID: plan.id, dayID: day.id,
-                    version: plan.version, workout: workout,
-                    focusedBlockIndex: sourceIndex,
-                    focusedExecutionStepIndex: executionStepIndex
-                )
+                let date = planDayDate(day.dayIndex, plan: plan)
+                if Calendar.current.startOfDay(for: date) <
+                    Calendar.current.startOfDay(for: Date()) {
+                    // Past history is immutable. Offer a future-dated copy
+                    // rather than opening an editor that cannot save.
+                    preparePlanDayCopy(day, plan: plan)
+                    copyingSourceWorkoutID = workout.id
+                } else {
+                    editingWorkout = WorkoutEditDestination(
+                        planID: plan.id, dayID: day.id,
+                        version: plan.version, workout: workout,
+                        focusedBlockIndex: sourceIndex,
+                        focusedExecutionStepIndex: executionStepIndex
+                    )
+                }
             }
         )
     }
