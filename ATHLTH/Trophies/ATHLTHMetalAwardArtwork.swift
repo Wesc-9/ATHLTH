@@ -306,7 +306,7 @@ struct ATHLTHMetalMedalArtwork: View {
 }
 
 /// One Canvas path instead of dozens of per-medal SwiftUI views.
-private struct ATHLTHMedalReededEdge: Shape {
+struct ATHLTHMedalReededEdge: Shape {
     func path(in rect: CGRect) -> Path {
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let radius = min(rect.width, rect.height) / 2
@@ -426,8 +426,8 @@ struct ATHLTHGoldPrestigeCupArtwork: View {
                 }
                 .overlay {
                     ATHLTHGoldCupBowl()
-                        .strokeBorderIfAvailable(color: polishedGold,
-                                                 width: max(0.65, size * 0.008))
+                        .stroke(polishedGold.opacity(0.50),
+                                lineWidth: max(0.65, size * 0.008))
                         .frame(width: size * 0.72, height: size * 0.55)
                 }
                 .offset(y: -size * 0.20)
@@ -531,10 +531,3 @@ struct ATHLTHGoldPrestigeCupArtwork: View {
     }
 }
 
-/// Some custom Shapes are not InsettableShapes; stroke without shifting
-/// the original bowl geometry.
-private extension Shape {
-    func strokeBorderIfAvailable(color: Color, width: CGFloat) -> some View {
-        stroke(color.opacity(0.47), lineWidth: width)
-    }
-}
