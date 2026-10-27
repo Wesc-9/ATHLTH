@@ -612,6 +612,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     let initialQuickAdd: String?
     let initialPhase: WorkoutPhaseKind?
     let initialFocusedBlockIndex: Int?
+    let initialFocusedExecutionStepIndex: Int?
 
     @State private var draft: PlannedSession
     @State private var showExerciseSearch = false
@@ -681,7 +682,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         existingWorkout: PlannedSession? = nil,
         initialQuickAdd: String? = nil,
         initialPhase: WorkoutPhaseKind? = nil,
-        initialFocusedBlockIndex: Int? = nil
+        initialFocusedBlockIndex: Int? = nil,
+        initialFocusedExecutionStepIndex: Int? = nil
     ) {
         self.planID = planID
         self.dayID = dayID
@@ -690,6 +692,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         self.initialQuickAdd = initialQuickAdd
         self.initialPhase = initialPhase
         self.initialFocusedBlockIndex = initialFocusedBlockIndex
+        self.initialFocusedExecutionStepIndex = initialFocusedExecutionStepIndex
         _draft = State(initialValue: existingWorkout ?? PlannedSession(
             id: UUID(), title: "", kind: .strength,
             scheduledStart: nil, durationMinutes: 50,
@@ -845,6 +848,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     initialQuickAdd: initialQuickAdd,
                     initialPhase: initialPhase,
                     initialFocusedBlockIndex: initialFocusedBlockIndex,
+                    initialFocusedExecutionStepIndex: initialFocusedExecutionStepIndex,
                     initialDurationOverrideMinutes: durationWasEditedManually
                         ? draft.durationMinutes : nil,
                     draftContext: "plan-\(planID.uuidString)-day-\(dayID.uuidString)-workout-\(existingWorkout?.id.uuidString ?? "new")",
