@@ -2007,7 +2007,11 @@ struct ATHLTHHomeView: View {
                                 selectedHomeStandaloneWorkout = workout
                             }
                         } label: {
-                            homeCalendarPlanRow(workout)
+                            homeCompactCalendarRow(
+                                time: workout.scheduledStart,
+                                title: workout.title,
+                                icon: workout.kind.systemImage
+                            )
                         }
                         .buttonStyle(.plain)
                     }
@@ -2026,31 +2030,12 @@ struct ATHLTHHomeView: View {
                                     event.id
                             )
                         } label: {
-                            homeCalendarEventRow(
-                                time:
-                                    event.event
-                                        .startsAt,
-                                title:
-                                    event.event
-                                        .title,
-                                systemImage:
-                                    event.event
-                                        .activityType
-                                        .systemImage,
-                                detail:
-                                    event.event
-                                        .meetingName
-                                        .trimmingCharacters(
-                                            in:
-                                                .whitespacesAndNewlines
-                                        )
-                                        .isEmpty
-                                        ? event.event
-                                            .activityType
-                                            .title
-                                        : event.event
-                                            .meetingName
+                            homeCompactCalendarRow(
+                                time: event.event.startsAt,
+                                title: event.event.title,
+                                icon: event.event.activityType.systemImage
                             )
+
                         }
                         .buttonStyle(.plain)
                     }
@@ -2074,26 +2059,10 @@ struct ATHLTHHomeView: View {
                                     event: event
                                 )
                             } label: {
-                                homeCalendarEventRow(
-                                    time:
-                                        event.startsAt,
-                                    title:
-                                        event.title,
-                                    systemImage:
-                                        homeGroupEventSystemImage(
-                                            event.activityType
-                                        ),
-                                    detail:
-                                        event.meetingName
-                                            .trimmingCharacters(
-                                                in:
-                                                    .whitespacesAndNewlines
-                                            )
-                                            .isEmpty
-                                            ? homeGroupEventActivityTitle(
-                                                event.activityType
-                                            )
-                                            : event.meetingName
+                                homeCompactCalendarRow(
+                                    time: event.startsAt,
+                                    title: event.title,
+                                    icon: homeGroupEventSystemImage(event.activityType)
                                 )
                             }
                             .buttonStyle(.plain)
@@ -2156,6 +2125,39 @@ struct ATHLTHHomeView: View {
         }
     }
 
+
+    private func homeCompactCalendarRow(
+        time: Date?,
+        title: String,
+        icon: String
+    ) -> some View {
+        HStack(alignment: .center, spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                .frame(width: 25, height: 32)
+                .background(ATHLTHTrainDesign.paleGold.opacity(0.30),
+                            in: RoundedRectangle(cornerRadius: 9))
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                Text(time?.formatted(date: .omitted, time: .shortened) ??
+                     ATHLTHLocalization.choose(
+                        english: "Time not set", norwegian: "Tid ikke satt"))
+                    .font(.system(size: 9))
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(6)
+        .frame(maxWidth: .infinity, minHeight: 55, alignment: .leading)
+        .background(ATHLTHTrainDesign.canvas.opacity(0.55),
+                    in: RoundedRectangle(cornerRadius: 12))
+    }
 
     // The compact Home card displays two slots, but "See all" must expose
     // every saved workout, including sessions created from Weekly Progress.
