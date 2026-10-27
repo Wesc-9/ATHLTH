@@ -177,6 +177,19 @@ struct ATHLTHTrainPlanPremiumView: View {
         .onAppear {
             refreshUnfinishedPlanDraft()
             session.refreshActivePlanForToday()
+            if let checkpoint = unfinishedPlanDrafts.first(where: {
+                unfinishedDraftStore.wasEditing(
+                    userID: session.profile.userID,
+                    draftID: $0.draftID
+                ) &&
+                Date().timeIntervalSince($0.draft.savedAt) < 24 * 60 * 60
+            }) {
+                Task { @MainActor in
+                    await Task.yield()
+                    guard !showingCreation else { return }
+                    openDraft(checkpoint)
+                }
+            }
             if let plan {
                 advanced = plan.builderProfile?.mode == .advanced
             }
@@ -1229,6 +1242,8 @@ struct ATHLTHTrainPlanPremiumView: View {
         _ day: TrainingPlanDay, plan: TrainingPlan
     ) -> some View {
         let workouts = day.sessions.filter { !$0.isExplicitRestDay }
+        let primaryWorkout = workouts.first(where: { $0.id == selectedWorkoutID }) ??
+            workouts.first
         return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 15) {
@@ -1236,7 +1251,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                             "Uke \((selectedWeekIndex ?? currentWeekIndex(plan)) + 1) av \(plan.weeks.count) · \(plan.title)"))
                         .font(.caption)
                         .foregroundStyle(secondaryInk)
-                    if let workout = workouts.first {
+                    if let workout = primaryWorkout {
                         ZStack(alignment: .bottomLeading) {
                             Image(premiumPlanHeroArt(plan))
                                 .resizable()
