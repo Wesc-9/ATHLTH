@@ -26,6 +26,17 @@ struct ATHLTHSurfaceRuntimeObserver: View {
             .accessibilityHidden(true)
             .task {
                 publishSurface()
+                // Start/recover the active workout Live Activity even when
+                // the initial mirrored snapshot arrived before this observer
+                // was mounted. The existing onChange still owns updates.
+                ATHLTHSurfaceCoordinator.syncLiveActivity(
+                    with: enrichedWorkoutSnapshot(
+                        ATHLTHLiveWorkoutSnapshotSelection.resolve(
+                            mirroredWatch: workoutMirroring.snapshot,
+                            phoneWorkout: phoneWorkout.currentLiveSnapshot()
+                        )
+                    )
+                )
             }
             .onChange(of: health.recovery) { _, _ in
                 publishSurface()
