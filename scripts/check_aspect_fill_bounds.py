@@ -29,8 +29,13 @@ REQUIRED = {
         r"\.frame\(width:\s*viewport\.size\.width,\s*height:\s*(?:196|workoutHeroHeight)\)",
         r"\.containerRelativeFrame\(\.horizontal\)",
     ),
-    "ATHLTH/Community/CommunityV4.swift": (
-        r"Image\(assetName\).*?\.scaledToFill\(\)\s*\.athlthBoundedFill\(\)",
+    # Community V5 replaces and deletes the former V4 screen. The large
+    # photographic hero must be constrained by its GeometryReader viewport;
+    # club images use the existing bounded-fill helper.
+    "ATHLTH/Community/ATHLTHCommunityV5View.swift": (
+        r"private var clubHero: some View.*?GeometryReader\s*\{\s*size\s+in.*?\.scaledToFill\(\)\s*\.frame\(width:\s*size\.size\.width,\s*height:\s*size\.size\.height\)",
+        r"private func joinedClubCard.*?\.athlthBoundedFill\(\)",
+        r"private func recommendedClubRow.*?\.athlthBoundedFill\(\)",
     ),
     "ATHLTH/Social/SocialViews.swift": (
         r"Image\(\"CommunityHero\"\)\s*\.resizable\(\)\s*\.scaledToFill\(\)\s*\.athlthBoundedFill\(\)",
@@ -55,6 +60,9 @@ def main() -> int:
     errors: list[str] = []
     for relative, patterns in REQUIRED.items():
         path = ROOT / relative
+        if not path.exists():
+            errors.append(f"Required artwork source is missing: {relative}")
+            continue
         source = path.read_text(encoding="utf-8")
         for pattern in patterns:
             if not re.search(pattern, source, re.DOTALL):
