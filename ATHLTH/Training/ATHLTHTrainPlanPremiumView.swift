@@ -151,6 +151,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     private var planContent: some View {
         VStack(alignment: .leading, spacing: 15) {
             referencePageIntro
+            workspaceNavigation
 
             // The true active-plan state is the source of truth. Never show an
             // archived or saved plan as active simply because it exists.
@@ -494,14 +495,20 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
             if !session.trainingPlans.isEmpty {
                 Button {
-                    showingMyPlans = true
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                        browsingMyPlans = true
+                    }
                 } label: {
-                    Label(tr("Manage saved plans", "Administrer lagrede planer"),
+                    Label(tr("Use an existing plan", "Bruk en eksisterende plan"),
                           systemImage: "square.stack")
-                        .font(.subheadline.weight(.medium))
-                        .frame(maxWidth: .infinity, minHeight: 46)
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 48)
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(ATHLTHTrainSecondaryButtonStyle())
+                .accessibilityHint(tr(
+                    "Shows your active, upcoming and previous training plans.",
+                    "Viser aktive, kommende og tidligere treningsplaner."
+                ))
             }
         }
     }
