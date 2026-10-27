@@ -319,13 +319,17 @@ struct ATHLTHInsightsReferenceDistributionCard: View {
     private var segments: [Slice] {
         [
             Slice(title: ATHLTHLocalization.choose(english: "Running", norwegian: "Løping"),
-                  minutes: load.runningMinutes, color: ATHLTHInsightsStyle.accent),
+                  minutes: load.runningMinutes,
+                  color: ATHLTHInsightsStyle.accent),
             Slice(title: ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke"),
-                  minutes: load.strengthMinutes, color: ATHLTHInsightsStyle.accent),
+                  minutes: load.strengthMinutes,
+                  color: Color(red: 0.46, green: 0.42, blue: 0.37)),
             Slice(title: ATHLTHLocalization.choose(english: "Walking", norwegian: "Gå"),
-                  minutes: load.walkingMinutes, color: ATHLTHInsightsStyle.track),
+                  minutes: load.walkingMinutes,
+                  color: Color(red: 0.80, green: 0.80, blue: 0.73)),
             Slice(title: ATHLTHLocalization.choose(english: "Other", norwegian: "Annet"),
-                  minutes: load.otherMinutes, color: ATHLTHTrainDesign.secondary.opacity(0.50))
+                  minutes: load.otherMinutes,
+                  color: Color(red: 0.66, green: 0.72, blue: 0.73))
         ].filter { $0.minutes > 0 }
     }
 
