@@ -47,54 +47,56 @@ enum ATHLTHInsightsSection: String, CaseIterable, Identifiable {
     }
 }
 
+/// The same translucent segmented selector used by Train Today,
+/// compressed slightly to fit four Insights destinations on iPhone.
 struct ATHLTHInsightsNavigation: View {
     @Binding var selection: ATHLTHInsightsSection
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 1) {
             ForEach(ATHLTHInsightsSection.allCases) { section in
                 let active = selection == section
                 Button {
-                    if reduceMotion {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
                         selection = section
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            selection = section
-                        }
                     }
                 } label: {
                     Text(section.title)
-                        .font(.system(size: 11, weight: active ? .semibold : .medium))
-                        .foregroundStyle(active ? Color.white : ATHLTHTrainDesign.ink)
+                        .font(.system(size: 11,
+                                      weight: active ? .semibold : .medium))
                         .lineLimit(1)
-                        .minimumScaleFactor(0.70)
-                        .frame(maxWidth: .infinity, minHeight: 42)
-                        .padding(.horizontal, 2)
+                        .minimumScaleFactor(0.78)
+                        .foregroundStyle(active ? ATHLTHInsightsStyle.ink :
+                                         ATHLTHInsightsStyle.ink.opacity(0.76))
+                        .padding(.horizontal, 7)
+                        .frame(minHeight: 43)
                         .background {
                             if active {
-                                Capsule().fill(
-                                    LinearGradient(
-                                        colors: [ATHLTHInsightsStyle.accent,
-                                                 Color(red: 0.82, green: 0.71, blue: 0.51)],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
+                                RoundedRectangle(cornerRadius: 12,
+                                                style: .continuous)
+                                    .fill(Color.white.opacity(0.96))
+                                    .shadow(color: .black.opacity(0.07), radius: 3, y: 2)
                             }
                         }
-                        .contentShape(Capsule())
+                        .contentShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(section.title)
                 .accessibilityAddTraits(active ? .isSelected : [])
             }
         }
-        .padding(5)
-        .background(ATHLTHTrainDesign.paper, in: Capsule())
-        .overlay { Capsule().strokeBorder(ATHLTHTrainDesign.rule.opacity(0.5), lineWidth: 0.7) }
-        .shadow(color: ATHLTHTrainDesign.bronze.opacity(0.06), radius: 9, y: 3)
+        .padding(4)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(.white.opacity(0.78), lineWidth: 0.7)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
         .accessibilityElement(children: .contain)
-        .accessibilityLabel(ATHLTHLocalization.choose(english: "Insights sections", norwegian: "Innsiktfaner"))
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Insights sections", norwegian: "Innsiktfaner"))
     }
 }
 
