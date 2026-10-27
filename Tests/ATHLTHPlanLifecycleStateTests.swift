@@ -51,6 +51,21 @@ final class ATHLTHPlanLifecycleStateTests: XCTestCase {
         XCTAssertEqual(store.activePlan?.id, startPlan.id)
     }
 
+    func testPausedProgramCanBeReplacedButNotResumedOverAnActiveProgram() throws {
+        let suite = "PlanLifecycle.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let first = plan("First")
+        let replacement = plan("Replacement")
+        let store = AppSessionStore(activePlan: first, defaults: defaults)
+        XCTAssertTrue(store.pauseTrainingPlan(first.id))
+        XCTAssertTrue(store.addTrainingPlan(replacement))
+        XCTAssertEqual(store.activePlan?.id, replacement.id)
+        XCTAssertFalse(store.resumeTrainingPlan(first.id))
+        XCTAssertTrue(store.isTrainingPlanPaused(first.id))
+        XCTAssertEqual(store.activePlan?.id, replacement.id)
+    }
+
     func testOldAccountTrainingContentDecodesWithoutLifecycleFields() throws {
         let old = """
         {"activePlan":null,"scheduledPlans":[],"planTemplates":[],
