@@ -157,3 +157,4 @@ ATHLTH 1.9.7 build 105 — user-authorized TestFlight upload 2026-10-27 (Europe/
 
 ATHLTH 1.9.7 build 105 — explicitly user-authorized TestFlight retry 2026-10-27 after fixing SwiftUI type-check complexity in HomeDailyRecommendationCard and missing Train Today navigation case. Require successful iOS XCTest/backend regressions on this exact commit, signed iPhone/Watch/Widget archive and App Store Connect upload. Preserve active release/v1.9.7; do not implement postponed Training Week redesign.
 ATHLTH 1.9.8 build 106 — TestFlight requested 2026-10-27 — Plan and Coach redesign
+ATHLTH 1.9.8 build 106 — TestFlight retry after Swift 6 release archive fixes — 2026-10-27
