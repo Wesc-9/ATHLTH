@@ -65,6 +65,11 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingCoach = false
     @State private var showingRecoveryAdvice = false
     @State private var showingAIHelp = false
+    @State private var showingAICreation = false
+    @State private var pendingDayWorkoutEdit: WorkoutEditDestination?
+    @State private var pendingPlanDetailsFromLibrary = false
+    @State private var pendingPlanMetadataEdit: TrainingPlan?
+    @State private var pendingNewPlanFromLibrary = false
     private struct WorkoutEditDestination: Identifiable {
         let planID: UUID
         let dayID: UUID
@@ -438,7 +443,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                         referenceEmptyAction(tr("AI coach", "AI-coach"),
                                              caption: tr("Personal guidance", "Personlig hjelp"),
                                              symbol: "sparkles") {
-                            showingAIHelp = true
+                            showingAICreation = true
                         }
                     }
                     .padding(.top, 9)
@@ -466,13 +471,13 @@ struct ATHLTHTrainPlanPremiumView: View {
             HStack(spacing: 9) {
                 referenceTemplateCard("GoalStrength",
                                       title: tr("Strength", "Styrke"),
-                                      detail: tr("4 weeks · Beginner", "4 uker · Nybegynner"))
+                                      detail: tr("Strength templates", "Styrkemaler"))
                 referenceTemplateCard("GoalRunning",
-                                      title: tr("Run 10 km", "Løp 10 km"),
-                                      detail: tr("8 weeks · All levels", "8 uker · Alle nivåer"))
+                                      title: tr("Running", "Løping"),
+                                      detail: tr("Running templates", "Løpemaler"))
                 referenceTemplateCard("StrengthQuickHero",
-                                      title: tr("Home strength", "Helkropp"),
-                                      detail: tr("6 weeks · Home", "6 uker · Hjemme"))
+                                      title: tr("Whole body", "Helkropp"),
+                                      detail: tr("Explore templates", "Utforsk maler"))
             }
             if !session.trainingPlans.isEmpty {
                 Button {
@@ -1302,11 +1307,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 Spacer()
                                 Menu {
                                     Button {
-                                        showingDayDetails = false
-                                        editingWorkout = WorkoutEditDestination(
+                                        pendingDayWorkoutEdit = WorkoutEditDestination(
                                             planID: plan.id, dayID: day.id,
                                             version: plan.version, workout: workout
                                         )
+                                        showingDayDetails = false
                                     } label: {
                                         Label(tr("Edit workout", "Rediger økt"),
                                               systemImage: "pencil")
@@ -1326,12 +1331,12 @@ struct ATHLTHTrainPlanPremiumView: View {
                             }
                             referenceWorkoutPhases(workout, day: day, plan: plan)
                             Button {
-                                showingDayDetails = false
-                                editingWorkout = WorkoutEditDestination(
+                                pendingDayWorkoutEdit = WorkoutEditDestination(
                                     planID: plan.id, dayID: day.id,
                                     version: plan.version, workout: workout,
                                     quickAdd: "picker", quickPhase: .main
                                 )
+                                showingDayDetails = false
                             } label: {
                                 Label(tr("Add block", "Legg til blokk"), systemImage: "plus")
                                     .font(.subheadline.weight(.semibold))
@@ -1688,15 +1693,15 @@ struct ATHLTHTrainPlanPremiumView: View {
                                     tr("See entire plan", "Se hele planen"),
                                     symbol: "calendar") {
                                         focusedPlanID = active.id
-                                        showingMyPlans = false
                                         planDetailTab = 1
-                                        showingPlanDetails = true
+                                        pendingPlanDetailsFromLibrary = true
+                                        showingMyPlans = false
                                     }
                                 referenceManagementAction(
                                     tr("Edit plan", "Rediger plan"),
                                     symbol: "pencil") {
+                                        pendingPlanMetadataEdit = active
                                         showingMyPlans = false
-                                        editingPlan = active
                                     }
                                 referenceManagementAction(
                                     tr("Pause, deactivate or change plan",
@@ -1801,8 +1806,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
+                        pendingNewPlanFromLibrary = true
                         showingMyPlans = false
-                        beginNewPlanCreation()
                     } label: {
                         Image(systemName: "plus")
                             .foregroundStyle(warmGold)
@@ -1964,8 +1969,35 @@ struct ATHLTHTrainPlanPremiumView: View {
                 pendingCreatedPlanID = planID
             }
         }
-        .sheet(isPresented: $showingMyPlans) {
+        .sheet(isPresented: $showingMyPlans, onDismiss: {
+            if pendingPlanDetailsFromLibrary {
+                pendingPlanDetailsFromLibrary = false
+                showingPlanDetails = true
+            } else if let item = pendingPlanMetadataEdit {
+                pendingPlanMetadataEdit = nil
+                editingPlan = item
+            } else if pendingNewPlanFromLibrary {
+                pendingNewPlanFromLibrary = false
+                beginNewPlanCreation()
+            }
+        }) {
             referenceMyPlansSheet
+        }
+        .sheet(isPresented: $showingAICreation, onDismiss: {
+            if let planID = pendingCreatedPlanID {
+                focusedPlanID = planID
+                browsingMyPlans = false
+                selectedWeekIndex = 0
+                selectedDayID = nil
+                pendingCreatedPlanID = nil
+            }
+        }) {
+            AIProgramBuilderView(
+                mode: .generate,
+                onProgramCreatedPlanID: { planID in
+                    pendingCreatedPlanID = planID
+                }
+            )
         }
         .sheet(isPresented: $showingPlanDetails) {
             if let plan {
@@ -1973,6 +2005,10 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
         }
         .sheet(isPresented: $showingDayDetails, onDismiss: {
+            if let destination = pendingDayWorkoutEdit {
+                pendingDayWorkoutEdit = nil
+                editingWorkout = destination
+            }
             if let planID = queuedLaunchPlanID,
                let workout = queuedLaunchWorkout {
                 queuedLaunchPlanID = nil
