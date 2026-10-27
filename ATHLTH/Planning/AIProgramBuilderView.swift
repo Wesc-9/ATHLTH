@@ -124,10 +124,20 @@ struct AIProgramBuilderView: View {
     @State private var shareLimitationsWithAI = false
     @State private var currentSessionsPerWeek = 0
     @State private var useProfileInterests = true
+    @State private var standaloneIntake = ATHLTHAIProgramIntake()
 
     private let equipmentOptions = [
-        "Dumbbells", "Kettlebells", "Resistance bands", "Barbell & plates",
-        "Bench", "Squat rack", "Pull-up bar", "Treadmill", "Exercise bike"
+        "Bodyweight / no equipment", "Dumbbells", "Kettlebells",
+        "Resistance bands", "Barbell & plates", "Bench", "Squat rack",
+        "Pull-up bar", "Treadmill", "Exercise bike"
+    ]
+    private let muscleGroupOptions = [
+        "Full body", "Legs", "Glutes", "Chest", "Back",
+        "Shoulders", "Arms", "Core"
+    ]
+    private let injuryAreaOptions = [
+        "Knees", "Feet / ankles", "Hips", "Back", "Shoulders",
+        "Elbows", "Wrists / hands", "Neck", "Other"
     ]
 
     @State private var preview: AIProgramDraft?
@@ -206,10 +216,13 @@ struct AIProgramBuilderView: View {
     }
 
     private var canGenerate: Bool {
-        (seed != nil || questionsAnswered) &&
-        !availableDays.isEmpty &&
-        sessionsPerWeek >= 1 &&
-        !isGenerating
+        if isStandaloneCoachJourney {
+            return standaloneIntake.isComplete && !isGenerating
+        }
+        return (seed != nil || questionsAnswered) &&
+            !availableDays.isEmpty &&
+            sessionsPerWeek >= 1 &&
+            !isGenerating
     }
 
     var body: some View {
@@ -378,31 +391,91 @@ struct AIProgramBuilderView: View {
         VStack(alignment: .leading, spacing: 15) {
             HStack {
                 Text(ATHLTHLocalization.choose(
-                    english: "TELL US ABOUT YOU", norwegian: "FORTELL OM DEG"))
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2).foregroundStyle(ATHLTHTrainDesign.secondary)
-                Spacer()
-                Text("2 / 5")
-                    .font(.caption.monospacedDigit())
+                    english: "PLAN FOUNDATION", norwegian: "GRUNNLAG FOR PLANEN"))
+                    .font(.caption.bold())
+                    .tracking(1.8)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
+                Spacer()
+                Text(ATHLTHLocalization.choose(
+                    english: "Nothing is preselected",
+                    norwegian: "Ingenting er forhåndsvalgt"
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
             }
+
             Text(ATHLTHLocalization.choose(
-                english: "Your goals. Your plan.", norwegian: "Din hverdag. Dine mål."))
-                .font(.system(size: 32, weight: .regular, design: .serif))
+                english: "Tell Coach what you actually need.",
+                norwegian: "Fortell Coach hva du faktisk trenger."))
+                .font(.largeTitle)
+                .fontDesign(.serif)
+
             Text(ATHLTHLocalization.choose(
-                english: "Tell Coach what matters. You can change these choices later.",
-                norwegian: "Fortell Coach hva som er viktig for deg. Du kan endre alt senere."))
-                .font(.system(size: 12))
+                english: "Coach waits until the required choices are yours. A linked main goal is optional.",
+                norwegian: "Coach venter til de nødvendige valgene er dine. Et koblet hovedmål er valgfritt."))
+                .font(.subheadline)
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
 
-            coachIntakeCard("target", ATHLTHLocalization.choose(
-                english: "What should the plan focus on?", norwegian: "Hva er hovedmålet ditt?")) {
-                if goalStore.activeGoals.isEmpty {
+            coachIntakeCard("figure.mixed.cardio", ATHLTHLocalization.choose(
+                english: "What do you want to train?", norwegian: "Hva ønsker du å trene?")) {
+                coachChoiceGrid {
+                    ForEach(TrainingFocus.profileSelectionCases) { focus in
+                        coachToggleOption(
+                            focus.title,
+                            selected: standaloneIntake.trainingTypes.contains(focus)
+                        ) {
+                            toggleStandaloneTrainingType(focus)
+                        }
+                    }
+                }
+
+                Divider()
+
+                Text(ATHLTHLocalization.choose(
+                    english: "What do you want to achieve?",
+                    norwegian: "Hva ønsker du å oppnå?"))
+                    .font(.subheadline.bold())
+
+                coachChoiceGrid {
+                    ForEach(ATHLTHAIProgramIntake.Outcome.allCases) { outcome in
+                        coachToggleOption(
+                            outcome.title,
+                            selected: standaloneIntake.outcomes.contains(outcome)
+                        ) {
+                            toggle(outcome, in: &standaloneIntake.outcomes)
+                        }
+                    }
+                }
+
+                if standaloneIntake.trainingTypes.contains(.strength) {
+                    Divider()
                     Text(ATHLTHLocalization.choose(
-                        english: "You have no active goals yet. Coach can use your training focus.",
-                        norwegian: "Du har ingen aktive mål. Coach kan bruke treningsfokuset ditt."))
-                        .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
-                } else {
+                        english: "Muscle focus",
+                        norwegian: "Muskelgrupper"))
+                        .font(.subheadline.bold())
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose at least one, including full body if you do not want a narrower focus.",
+                        norwegian: "Velg minst én. Velg hele kroppen dersom du ikke ønsker et smalere fokus."))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    coachChoiceGrid {
+                        ForEach(muscleGroupOptions, id: \.self) { muscle in
+                            coachToggleOption(
+                                localizedMuscleGroup(muscle),
+                                selected: standaloneIntake.muscleGroups.contains(muscle)
+                            ) {
+                                toggle(muscle, in: &standaloneIntake.muscleGroups)
+                            }
+                        }
+                    }
+                }
+
+                if !goalStore.activeGoals.isEmpty {
+                    Divider()
+                    Text(ATHLTHLocalization.choose(
+                        english: "Main goal (optional)",
+                        norwegian: "Hovedmål (valgfritt)"))
+                        .font(.subheadline.bold())
                     ForEach(goalStore.activeGoals) { goal in
                         Button {
                             if selectedGoalIDs.contains(goal.id) {
@@ -411,212 +484,508 @@ struct AIProgramBuilderView: View {
                                 selectedGoalIDs.insert(goal.id)
                             }
                         } label: {
-                            HStack {
-                                Image(systemName: goal.category.systemImage)
+                            HStack(spacing: 10) {
+                                Image(systemName: selectedGoalIDs.contains(goal.id)
+                                      ? "checkmark.circle.fill" : "circle")
                                     .foregroundStyle(ATHLTHTrainDesign.bronze)
-                                    .frame(width: 26)
                                 Text(goal.title)
-                                    .font(.system(size: 12, weight: .medium))
+                                    .font(.subheadline)
                                     .multilineTextAlignment(.leading)
                                 Spacer(minLength: 0)
-                                Image(systemName: selectedGoalIDs.contains(goal.id)
-                                    ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
                             }
-                            .padding(10)
-                            .background(ATHLTHTrainDesign.canvas,
-                                        in: RoundedRectangle(cornerRadius: 11))
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
                 }
 
-                Button {
-                    coachGoalIDsBeforeCreation = Set(goalStore.goals.map(\.id))
-                    showingCoachGoalCreator = true
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Create a new goal", norwegian: "Opprett nytt mål"),
-                          systemImage: "plus.circle")
-                        .font(.system(size: 12, weight: .medium))
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                }
-
-                Picker(ATHLTHLocalization.choose(
-                    english: "Training focus", norwegian: "Treningsfokus"),
-                       selection: $trainingFocus) {
-                    ForEach(TrainingFocus.allCases) { focus in
-                        Text(focus.title).tag(focus)
-                    }
-                }
-                .tint(ATHLTHTrainDesign.bronze)
-
                 TextField(ATHLTHLocalization.choose(
-                    english: "Tell Coach what you want to improve...",
-                    norwegian: "Fortell Coach hva du ønsker å oppnå..."),
+                    english: "Other wishes for the plan (optional)",
+                    norwegian: "Andre ønsker for planen (valgfritt)"),
                           text: $coachFocusNotes, axis: .vertical)
-                    .lineLimit(2...4)
+                    .lineLimit(2...5)
                     .textFieldStyle(.roundedBorder)
             }
 
-            coachIntakeCard("figure.run", ATHLTHLocalization.choose(
-                english: "Your experience", norwegian: "Hvor mye erfaring har du?")) {
-                HStack(spacing: 6) {
-                    intakeOption("Beginner", english: "Beginner", norwegian: "Nybegynner",
-                                 selection: $experience)
-                    intakeOption("Intermediate", english: "Intermediate", norwegian: "Mosjonist",
-                                 selection: $experience)
-                    intakeOption("Experienced", english: "Experienced", norwegian: "Erfaren",
-                                 selection: $experience)
+            coachIntakeCard("chart.bar.fill", ATHLTHLocalization.choose(
+                english: "Experience", norwegian: "Erfaringsnivå")) {
+                coachChoiceGrid {
+                    ForEach(ATHLTHAIProgramIntake.Experience.allCases) { level in
+                        coachToggleOption(
+                            level.title,
+                            selected: standaloneIntake.experience == level
+                        ) {
+                            standaloneIntake.experience = level
+                        }
+                    }
                 }
                 Stepper(ATHLTHLocalization.choose(
                     english: "Currently \(currentSessionsPerWeek) sessions per week",
                     norwegian: "Trener nå \(currentSessionsPerWeek) økter per uke"),
                         value: $currentSessionsPerWeek, in: 0...14)
-                    .font(.system(size: 12))
             }
 
             coachIntakeCard("calendar", ATHLTHLocalization.choose(
-                english: "Schedule and duration", norwegian: "Treningsdager og varighet")) {
+                english: "Start, duration and training days",
+                norwegian: "Start, varighet og treningsdager")) {
                 DatePicker(ATHLTHLocalization.choose(
                     english: "Start date", norwegian: "Startdato"),
                            selection: $startDate,
                            in: Calendar.current.startOfDay(for: .now)...,
                            displayedComponents: .date)
-                    .font(.system(size: 12))
                     .tint(ATHLTHTrainDesign.bronze)
-                HStack {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Plan duration", norwegian: "Planens varighet"))
-                        .font(.system(size: 12))
-                    Spacer()
-                    Menu {
-                        ForEach(1...52, id: \.self) { count in
-                            Button("\(count) " + ATHLTHLocalization.choose(
-                                english: "weeks", norwegian: "uker")) {
-                                weekCount = count
-                                timelineMode = .weeks
-                            }
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Plan duration", norwegian: "Planens varighet"))
+                    .font(.subheadline.bold())
+                coachChoiceGrid {
+                    ForEach([4, 6, 8, 12, 16, 24], id: \.self) { weeks in
+                        coachToggleOption(
+                            ATHLTHLocalization.format(
+                                english: "%d weeks", norwegian: "%d uker", weeks),
+                            selected: standaloneIntake.durationWeeks == weeks
+                        ) {
+                            standaloneIntake.durationWeeks = weeks
                         }
-                    } label: {
-                        Text("\(resolvedWeeks) " + ATHLTHLocalization.choose(
-                            english: "weeks", norwegian: "uker"))
-                            .foregroundStyle(ATHLTHTrainDesign.bronze)
                     }
                 }
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Days you can train", norwegian: "Dager du kan trene"))
+                    .font(.subheadline.bold())
                 HStack(spacing: 5) {
                     ForEach(1...7, id: \.self) { day in
                         Button {
-                            if availableDays.contains(day) {
-                                if availableDays.count > 1 { availableDays.remove(day) }
-                            } else {
-                                availableDays.insert(day)
-                            }
-                            sessionsPerWeek = min(sessionsPerWeek, availableDays.count)
+                            toggleStandaloneDay(day)
                         } label: {
                             Text(["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"][day - 1])
-                                .font(.system(size: 10, weight: .medium))
-                                .lineLimit(1).minimumScaleFactor(0.73)
-                                .foregroundStyle(availableDays.contains(day) ? .white :
-                                                 ATHLTHTrainDesign.ink)
-                                .frame(maxWidth: .infinity, minHeight: 37)
-                                .background(availableDays.contains(day)
-                                    ? ATHLTHTrainDesign.bronze :
-                                    ATHLTHTrainDesign.canvas, in: Capsule())
+                                .font(.caption.bold())
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.72)
+                                .foregroundStyle(
+                                    standaloneIntake.availableDays.contains(day)
+                                        ? .white : ATHLTHTrainDesign.ink
+                                )
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                                .background(
+                                    standaloneIntake.availableDays.contains(day)
+                                        ? ATHLTHTrainDesign.bronze
+                                        : ATHLTHTrainDesign.canvas,
+                                    in: Capsule()
+                                )
                         }
                         .buttonStyle(.plain)
-                        .accessibilityAddTraits(availableDays.contains(day) ? .isSelected : [])
+                        .accessibilityAddTraits(
+                            standaloneIntake.availableDays.contains(day)
+                                ? .isSelected : []
+                        )
                     }
                 }
-                Toggle(isOn: $aiChoosesFrequency) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Let Coach choose the workout frequency",
-                        norwegian: "La Coach foreslå antall økter"))
-                    .font(.system(size: 12))
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Sessions per week", norwegian: "Antall økter per uke"))
+                    .font(.subheadline.bold())
+                coachChoiceGrid {
+                    ForEach(1...7, id: \.self) { count in
+                        coachToggleOption(
+                            "\(count)",
+                            selected: standaloneIntake.sessionsPerWeek == count,
+                            enabled: standaloneIntake.availableDays.count >= count
+                        ) {
+                            standaloneIntake.sessionsPerWeek = count
+                        }
+                    }
                 }
-                .tint(ATHLTHTrainDesign.bronze)
-                if !aiChoosesFrequency {
-                    Stepper(ATHLTHLocalization.choose(
-                        english: "\(sessionsPerWeek) sessions per week",
-                        norwegian: "\(sessionsPerWeek) økter per uke"),
-                            value: $sessionsPerWeek,
-                            in: 1...max(1, availableDays.count))
-                        .font(.system(size: 12))
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Approximate time per session",
+                    norwegian: "Omtrentlig tid per økt"))
+                    .font(.subheadline.bold())
+                coachChoiceGrid {
+                    ForEach([20, 30, 45, 60, 75, 90], id: \.self) { minutes in
+                        coachToggleOption(
+                            "\(minutes) min",
+                            selected: standaloneIntake.sessionDurationMinutes == minutes
+                        ) {
+                            standaloneIntake.sessionDurationMinutes = minutes
+                        }
+                    }
                 }
             }
 
-            coachIntakeCard("dumbbell", ATHLTHLocalization.choose(
-                english: "Equipment and preferences", norwegian: "Utstyr og ønsker")) {
-                HStack(spacing: 6) {
-                    intakeOption("Yes", english: "Gym", norwegian: "Treningssenter",
-                                 selection: $gymAccess)
-                    intakeOption("No", english: "Home / outside", norwegian: "Hjemme / ute",
-                                 selection: $gymAccess)
-                }
-                TextField(ATHLTHLocalization.choose(
-                    english: "Other available equipment (optional)",
-                    norwegian: "Annet utstyr du har tilgang til (valgfritt)"),
-                          text: $otherEquipment)
-                    .textFieldStyle(.roundedBorder)
-                HStack {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Approximate time budget",
-                        norwegian: "Omtrentlig tidsramme"))
-                        .font(.system(size: 12))
-                    Spacer()
-                    Menu {
-                        ForEach([20,30,40,45,60,75,90,120], id: \.self) { minutes in
-                            Button("\(minutes) min") { sessionDurationMinutes = minutes }
+            coachIntakeCard("location.fill", ATHLTHLocalization.choose(
+                english: "Where can you train?", norwegian: "Hvor kan du trene?")) {
+                coachChoiceGrid {
+                    ForEach(ATHLTHAIProgramIntake.Location.allCases) { location in
+                        coachToggleOption(
+                            location.title,
+                            selected: standaloneIntake.locations.contains(location)
+                        ) {
+                            toggleStandaloneLocation(location)
                         }
-                    } label: {
-                        Text("\(sessionDurationMinutes) min")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundStyle(ATHLTHTrainDesign.bronze)
                     }
                 }
+
+                if standaloneIntake.locations.contains(.gym) &&
+                    standaloneIntake.locations.contains(.outdoors) {
+                    Divider()
+                    Text(ATHLTHLocalization.choose(
+                        english: "Balance gym and outdoor training",
+                        norwegian: "Fordel treningen mellom ute og gym"))
+                        .font(.subheadline.bold())
+
+                    if standaloneIntake.outdoorSharePercent == nil {
+                        Button {
+                            standaloneIntake.outdoorSharePercent = 50
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Set distribution",
+                                norwegian: "Angi fordeling"),
+                                  systemImage: "slider.horizontal.3")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                    } else {
+                        let outdoorPercent = standaloneIntake.outdoorSharePercent ?? 50
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Gym \(100 - outdoorPercent)%",
+                                norwegian: "Gym \(100 - outdoorPercent)%"))
+                            Spacer()
+                            Text(ATHLTHLocalization.choose(
+                                english: "Outdoors \(outdoorPercent)%",
+                                norwegian: "Ute \(outdoorPercent)%"))
+                        }
+                        .font(.caption.bold())
+                        Slider(
+                            value: Binding(
+                                get: {
+                                    Double(standaloneIntake.outdoorSharePercent ?? 50)
+                                },
+                                set: {
+                                    standaloneIntake.outdoorSharePercent = Int($0.rounded())
+                                }
+                            ),
+                            in: 0...100,
+                            step: 5
+                        )
+                        .tint(ATHLTHTrainDesign.bronze)
+                        .accessibilityValue("\(outdoorPercent) " +
+                            ATHLTHLocalization.choose(
+                                english: "percent outdoors",
+                                norwegian: "prosent utendørs"))
+                    }
+                }
+
+                Divider()
                 Text(ATHLTHLocalization.choose(
-                    english: "A guideline only: each workout may have a different duration.",
-                    norwegian: "Kun en veiledende ramme – hver enkelt økt kan ha ulik varighet."))
-                    .font(.system(size: 10))
+                    english: "Equipment you can use",
+                    norwegian: "Utstyr du har tilgang til"))
+                    .font(.subheadline.bold())
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose bodyweight if you do not have equipment.",
+                    norwegian: "Velg kroppsvekt dersom du ikke har utstyr."))
+                    .font(.caption)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
+                coachChoiceGrid {
+                    ForEach(equipmentOptions, id: \.self) { equipment in
+                        coachToggleOption(
+                            localizedEquipment(equipment),
+                            selected: standaloneIntake.equipment.contains(equipment)
+                        ) {
+                            toggle(equipment, in: &standaloneIntake.equipment)
+                        }
+                    }
+                }
                 TextField(ATHLTHLocalization.choose(
-                    english: "Movements to avoid (optional)",
-                    norwegian: "Bevegelser du vil unngå (valgfritt)"),
-                          text: $limitations, axis: .vertical)
+                    english: "Other equipment (optional)",
+                    norwegian: "Annet utstyr (valgfritt)"),
+                          text: $standaloneIntake.otherEquipment, axis: .vertical)
                     .lineLimit(1...3)
                     .textFieldStyle(.roundedBorder)
-                if !limitations.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    Toggle(isOn: $shareLimitationsWithAI) {
+            }
+
+            coachIntakeCard("cross.case.fill", ATHLTHLocalization.choose(
+                english: "Injuries and limitations",
+                norwegian: "Skader og begrensninger")) {
+                ForEach(ATHLTHAIProgramIntake.InjuryStatus.allCases) { status in
+                    coachToggleOption(
+                        status.title,
+                        selected: standaloneIntake.injuryStatus == status
+                    ) {
+                        chooseInjuryStatus(status)
+                    }
+                }
+
+                if standaloneIntake.injuryStatus == .considerations {
+                    Divider()
+                    Text(ATHLTHLocalization.choose(
+                        english: "Affected areas", norwegian: "Berørte områder"))
+                        .font(.subheadline.bold())
+                    coachChoiceGrid {
+                        ForEach(injuryAreaOptions, id: \.self) { area in
+                            coachToggleOption(
+                                localizedInjuryArea(area),
+                                selected: standaloneIntake.injuryAreas.contains(area)
+                            ) {
+                                toggle(area, in: &standaloneIntake.injuryAreas)
+                            }
+                        }
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "How severe is it?", norwegian: "Hvor alvorlig er det?"))
+                        .font(.subheadline.bold())
+                    coachChoiceGrid {
+                        ForEach(ATHLTHAIProgramIntake.InjurySeverity.allCases) { severity in
+                            coachToggleOption(
+                                severity.title,
+                                selected: standaloneIntake.injurySeverity == severity
+                            ) {
+                                standaloneIntake.injurySeverity = severity
+                            }
+                        }
+                    }
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Required restriction", norwegian: "Påkrevd hensyn"))
+                        .font(.subheadline.bold())
+                    ForEach(ATHLTHAIProgramIntake.InjuryRestriction.allCases) { restriction in
+                        coachToggleOption(
+                            restriction.title,
+                            selected: standaloneIntake.injuryRestriction == restriction
+                        ) {
+                            standaloneIntake.injuryRestriction = restriction
+                        }
+                    }
+
+                    TextField(ATHLTHLocalization.choose(
+                        english: "Describe pain, diagnosis or movements to avoid",
+                        norwegian: "Beskriv smerte, diagnose eller bevegelser som må unngås"),
+                              text: $standaloneIntake.injuryNotes, axis: .vertical)
+                        .lineLimit(2...5)
+                        .textFieldStyle(.roundedBorder)
+
+                    Toggle(isOn: $standaloneIntake.healthSharingAuthorized) {
                         Text(ATHLTHLocalization.choose(
-                            english: "I consent to share these health-related notes with Coach",
+                            english: "I consent to share these health-related details with Coach",
                             norwegian: "Jeg samtykker til å dele disse helseopplysningene med Coach"))
-                            .font(.system(size: 11))
+                            .font(.subheadline)
                     }
                     .tint(ATHLTHTrainDesign.bronze)
+
                     Text(ATHLTHLocalization.choose(
-                        english: "If disabled, the notes are not sent to the AI service.",
-                        norwegian: "Hvis dette er av, sendes ikke notatene til AI-tjenesten."))
-                        .font(.system(size: 10))
+                        english: "Coach can adapt training, but does not diagnose or replace qualified medical advice.",
+                        norwegian: "Coach kan tilpasse trening, men stiller ikke diagnose og erstatter ikke kvalifisert helsehjelp."))
+                        .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
                 }
             }
 
+            if !standaloneIntake.validationIssues.isEmpty {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Complete the required choices before Coach builds the plan.",
+                        norwegian: "Fullfør de nødvendige valgene før Coach lager planen."),
+                    systemImage: "info.circle"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+
             Button {
+                applyStandaloneIntakeToRequest()
                 Task { await generatePreview() }
             } label: {
                 Label(ATHLTHLocalization.choose(
                     english: "Build my plan with Coach",
                     norwegian: "Lag planen min med Coach"),
                       systemImage: "sparkles")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.headline)
                     .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .frame(maxWidth: .infinity, minHeight: 54)
                     .background(ATHLTHTrainDesign.bronze.gradient,
                                 in: RoundedRectangle(cornerRadius: 17))
             }
             .buttonStyle(.plain)
             .disabled(!canGenerate)
             .opacity(canGenerate ? 1 : 0.5)
+        }
+    }
+
+    @ViewBuilder
+    private func coachChoiceGrid<Content: View>(
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        LazyVGrid(
+            columns: [GridItem(.adaptive(minimum: 112), spacing: 8)],
+            alignment: .leading,
+            spacing: 8
+        ) {
+            content()
+        }
+    }
+
+    private func coachToggleOption(
+        _ title: String,
+        selected: Bool,
+        enabled: Bool = true,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                Text(title)
+                    .multilineTextAlignment(.leading)
+                Spacer(minLength: 0)
+            }
+            .font(.subheadline)
+            .foregroundStyle(selected ? .white : ATHLTHTrainDesign.ink)
+            .padding(.horizontal, 10)
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .background(
+                selected ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.canvas,
+                in: RoundedRectangle(cornerRadius: 12)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .opacity(enabled ? 1 : 0.35)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func toggleStandaloneTrainingType(_ focus: TrainingFocus) {
+        if standaloneIntake.trainingTypes.contains(focus) {
+            standaloneIntake.trainingTypes.remove(focus)
+        } else {
+            if focus == .generalFitness {
+                standaloneIntake.trainingTypes.removeAll()
+            } else {
+                standaloneIntake.trainingTypes.remove(.generalFitness)
+            }
+            standaloneIntake.trainingTypes.insert(focus)
+        }
+        if !standaloneIntake.trainingTypes.contains(.strength) {
+            standaloneIntake.muscleGroups.removeAll()
+        }
+    }
+
+    private func toggleStandaloneDay(_ day: Int) {
+        if standaloneIntake.availableDays.contains(day) {
+            standaloneIntake.availableDays.remove(day)
+        } else {
+            standaloneIntake.availableDays.insert(day)
+        }
+        if let count = standaloneIntake.sessionsPerWeek,
+           count > standaloneIntake.availableDays.count {
+            standaloneIntake.sessionsPerWeek = nil
+        }
+    }
+
+    private func toggleStandaloneLocation(
+        _ location: ATHLTHAIProgramIntake.Location
+    ) {
+        toggle(location, in: &standaloneIntake.locations)
+        if !(standaloneIntake.locations.contains(.gym) &&
+             standaloneIntake.locations.contains(.outdoors)) {
+            standaloneIntake.outdoorSharePercent = nil
+        }
+    }
+
+    private func chooseInjuryStatus(
+        _ status: ATHLTHAIProgramIntake.InjuryStatus
+    ) {
+        standaloneIntake.injuryStatus = status
+        if status == .none {
+            standaloneIntake.injuryAreas.removeAll()
+            standaloneIntake.injurySeverity = nil
+            standaloneIntake.injuryRestriction = nil
+            standaloneIntake.injuryNotes = ""
+            standaloneIntake.healthSharingAuthorized = false
+        }
+    }
+
+    private func toggle<Value: Hashable>(
+        _ value: Value,
+        in selection: inout Set<Value>
+    ) {
+        if selection.contains(value) {
+            selection.remove(value)
+        } else {
+            selection.insert(value)
+        }
+    }
+
+    private func applyStandaloneIntakeToRequest() {
+        guard standaloneIntake.isComplete,
+              let focus = standaloneIntake.resolvedTrainingFocus,
+              let durationWeeks = standaloneIntake.durationWeeks,
+              let requestedSessions = standaloneIntake.sessionsPerWeek,
+              let requestedMinutes = standaloneIntake.sessionDurationMinutes
+        else { return }
+
+        trainingFocus = focus
+        weekCount = durationWeeks
+        timelineMode = .weeks
+        sessionsPerWeek = requestedSessions
+        aiChoosesFrequency = false
+        availableDays = standaloneIntake.availableDays
+        sessionDurationMinutes = requestedMinutes
+        experience = standaloneIntake.experience?.rawValue ?? ""
+        gymAccess = standaloneIntake.locations.map(\.title).sorted().joined(separator: ", ")
+        homeEquipment = standaloneIntake.equipment
+        otherEquipment = standaloneIntake.otherEquipment
+        limitations = standaloneIntake.injuryNotes
+        shareLimitationsWithAI =
+            standaloneIntake.injuryStatus == .considerations &&
+            standaloneIntake.healthSharingAuthorized
+    }
+
+    private func localizedMuscleGroup(_ value: String) -> String {
+        switch value {
+        case "Full body": return ATHLTHLocalization.choose(english: value, norwegian: "Hele kroppen")
+        case "Legs": return ATHLTHLocalization.choose(english: value, norwegian: "Bein")
+        case "Glutes": return ATHLTHLocalization.choose(english: value, norwegian: "Sete")
+        case "Chest": return ATHLTHLocalization.choose(english: value, norwegian: "Bryst")
+        case "Back": return ATHLTHLocalization.choose(english: value, norwegian: "Rygg")
+        case "Shoulders": return ATHLTHLocalization.choose(english: value, norwegian: "Skuldre")
+        case "Arms": return ATHLTHLocalization.choose(english: value, norwegian: "Armer")
+        case "Core": return ATHLTHLocalization.choose(english: value, norwegian: "Kjerne")
+        default: return value
+        }
+    }
+
+    private func localizedEquipment(_ value: String) -> String {
+        switch value {
+        case "Bodyweight / no equipment":
+            return ATHLTHLocalization.choose(english: value, norwegian: "Kroppsvekt / uten utstyr")
+        case "Dumbbells": return ATHLTHLocalization.choose(english: value, norwegian: "Manualer")
+        case "Kettlebells": return ATHLTHLocalization.choose(english: value, norwegian: "Kettlebells")
+        case "Resistance bands": return ATHLTHLocalization.choose(english: value, norwegian: "Strikker")
+        case "Barbell & plates": return ATHLTHLocalization.choose(english: value, norwegian: "Vektstang og skiver")
+        case "Bench": return ATHLTHLocalization.choose(english: value, norwegian: "Benk")
+        case "Squat rack": return ATHLTHLocalization.choose(english: value, norwegian: "Knebøystativ")
+        case "Pull-up bar": return ATHLTHLocalization.choose(english: value, norwegian: "Pull-up-stang")
+        case "Treadmill": return ATHLTHLocalization.choose(english: value, norwegian: "Tredemølle")
+        case "Exercise bike": return ATHLTHLocalization.choose(english: value, norwegian: "Spinningsykkel")
+        default: return value
+        }
+    }
+
+    private func localizedInjuryArea(_ value: String) -> String {
+        switch value {
+        case "Knees": return ATHLTHLocalization.choose(english: value, norwegian: "Knær")
+        case "Feet / ankles": return ATHLTHLocalization.choose(english: value, norwegian: "Føtter / ankler")
+        case "Hips": return ATHLTHLocalization.choose(english: value, norwegian: "Hofter")
+        case "Back": return ATHLTHLocalization.choose(english: value, norwegian: "Rygg")
+        case "Shoulders": return ATHLTHLocalization.choose(english: value, norwegian: "Skuldre")
+        case "Elbows": return ATHLTHLocalization.choose(english: value, norwegian: "Albuer")
+        case "Wrists / hands": return ATHLTHLocalization.choose(english: value, norwegian: "Håndledd / hender")
+        case "Neck": return ATHLTHLocalization.choose(english: value, norwegian: "Nakke")
+        case "Other": return ATHLTHLocalization.choose(english: value, norwegian: "Annet")
+        default: return value
         }
     }
 
@@ -1147,6 +1516,17 @@ struct AIProgramBuilderView: View {
     }
 
     private var coachContext: String {
+        if isStandaloneCoachJourney {
+            let additionalRequest = coachFocusNotes.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            return standaloneIntake.coachContext +
+                "\nAthlete's optional plan request: " +
+                (additionalRequest.isEmpty
+                    ? "None"
+                    : String(additionalRequest.prefix(700)))
+        }
+
         let interests = useProfileInterests
             ? (session.onboardingProfile?.interests.map(\.title).sorted().joined(separator: ", ") ?? "")
             : "Not shared"
@@ -2022,8 +2402,15 @@ struct AIProgramBuilderView: View {
     private func loadDefaultsIfNeeded() {
         guard !didLoadDefaults else { return }
         didLoadDefaults = true
-        trainingFocus = session.onboardingProfile?.trainingFocus ?? .generalFitness
-        if let saved = AccountLocalStorage.read(CoachIntakePreferences.self, name: "coach", userID: session.profile.userID) {
+        if !isStandaloneCoachJourney {
+            trainingFocus = session.onboardingProfile?.trainingFocus ?? .generalFitness
+        }
+        if !isStandaloneCoachJourney,
+           let saved = AccountLocalStorage.read(
+                CoachIntakePreferences.self,
+                name: "coach",
+                userID: session.profile.userID
+           ) {
             experience = saved.experience
             trainingFocus = saved.trainingFocus
             gymAccess = saved.gymAccess
@@ -2135,14 +2522,5 @@ struct AIProgramBuilderView: View {
             showingQuestions = false
         }
 
-        if selectedGoalIDs.isEmpty,
-           let primary = goalStore.primaryGoal {
-            selectedGoalIDs = [primary.id]
-        }
-
-        if selectedGoalIDs.isEmpty,
-           let first = goalStore.activeGoals.first {
-            selectedGoalIDs = [first.id]
-        }
     }
 }
