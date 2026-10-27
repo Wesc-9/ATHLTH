@@ -93,4 +93,30 @@ final class ATHLTHTrainDesignLayoutTests: XCTestCase {
             }
         }
     }
+    @MainActor
+    func testSharedTrainHeaderKeepsSameDimensionsAcrossAllThreeSelections() {
+        // The exact same navigation/eyebrow component is used in all
+        // three scrollable sections, including the Today cover.
+        for width in [320.0, 390.0, 768.0] {
+            for typeSize in [DynamicTypeSize.large, .accessibility3] {
+                var heights: [CGFloat] = []
+                for section in [ATHLTHTrainSection.today, .plan, .progress] {
+                    let row = ATHLTHTrainHeaderRow(selection: .constant(section))
+                        .environment(\.dynamicTypeSize, typeSize)
+                    let host = UIHostingController(rootView: row)
+                    host.loadViewIfNeeded()
+                    let measured = host.sizeThatFits(
+                        in: CGSize(width: width - 40, height: 240))
+                    XCTAssertGreaterThan(measured.height, 0)
+                    XCTAssertLessThanOrEqual(measured.width, width - 39)
+                    heights.append(measured.height)
+                }
+                XCTAssertLessThanOrEqual(
+                    (heights.max() ?? 0) - (heights.min() ?? 0), 1.5,
+                    "Switching Train tabs must not resize the shared masthead")
+            }
+        }
+    }
+
+
 }

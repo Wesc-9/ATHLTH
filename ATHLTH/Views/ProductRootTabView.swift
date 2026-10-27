@@ -5323,8 +5323,7 @@ struct ATHLTHTrainView: View {
     @State private var displayedTrainDay = Calendar.current.startOfDay(for: .now)
     @State private var todayScrollPosition = ScrollPosition(edge: .top)
     @State private var planScrollPosition = ScrollPosition(edge: .top)
-    @State private var floatingTrainTabsVisible = false
-    @State private var lastTrainScrollDecisionOffset: CGFloat = 0
+    @State private var progressScrollPosition = ScrollPosition(edge: .top)
     @State private var highlightedTrainPlanID: UUID?
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
@@ -5369,88 +5368,29 @@ struct ATHLTHTrainView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            ZStack(alignment: .top) {
                 if selectedSection == .progress {
-                    // Let the shared masthead scroll at large text sizes so
-                    // it cannot consume the entire analysis viewport.
                     ATHLTHTrainProgressReferenceView(
-                        onReturnToToday: {
-                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                                selectedSection = .today
-                            }
-                        },
-                        onOpenPlan: {
-                            selectedSection = .plan
-                        },
-                        header: premiumTrainBrandHeader
+                        onReturnToToday: { selectedSection = .today },
+                        onOpenPlan: { selectedSection = .plan },
+                        header: premiumTrainBrandHeader(for: .progress),
+                        scrollPosition: $progressScrollPosition
                     )
+                    .transition(.opacity)
+                } else if selectedSection == .plan {
+                    trainRootScroll(for: .plan)
+                        .transition(.opacity)
                 } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
-                            premiumTrainBrandHeader
-
-                            if selectedSection == .plan {
-                                ATHLTHTrainPlanPremiumView(
-                                    highlightedPlanID: highlightedTrainPlanID,
-                                    onStartWorkout: { planID, workout in
-                                        openTodayPrimaryWorkout(
-                                            workout,
-                                            planID: planID,
-                                            isHealthCompleted: false
-                                        )
-                                    }
-                                )
-                            } else {
-                                // Let the first white card rest on the scenic cover,
-                                // without altering scroll position or recorder state.
-                                premiumTodayScreen
-                                    .padding(.top, -40)
-                                    .zIndex(1)
-                            }
-                        }
-                        .padding(.horizontal, 17)
-                        .padding(.top, 18)
-                        .padding(.bottom, 36)
-                        .containerRelativeFrame(.horizontal) { @Sendable availableWidth, _ in
-                            min(availableWidth, 760)
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-                    .scrollIndicators(.hidden)
-                    // Today artwork belongs behind the status bar, while
-                    // Plan preserves its standard safe-area positioning.
-                    .ignoresSafeArea(
-                        .container,
-                        edges: selectedSection == .today ? .top : []
-                    )
-                    .scrollPosition(
-                        selectedSection == .plan
-                            ? $planScrollPosition : $todayScrollPosition
-                    )
-                    // Use the native iOS 18 scroll offset; do not install
-                    // competing UIKit delegates on workout/planning screens.
-                    .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                        max(0, geometry.contentOffset.y + geometry.contentInsets.top)
-                    } action: { _, offset in
-                        updateTrainCapsuleVisibility(scrollOffset: offset)
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        if floatingTrainTabsVisible {
-                            premiumTrainTabs
-                                .frame(maxWidth: ATHLTHTrainDesign.readingWidth,
-                                       alignment: .trailing)
-                                .frame(maxWidth: .infinity, alignment: .trailing)
-                                .padding(.top, 8)
-                                .padding(.horizontal, 17)
-                                .transition(.move(edge: .top).combined(with: .opacity))
-                        }
-                    }
-                    .background(
-                        ATHLTHTrainDesign.canvas.ignoresSafeArea()
-                    )
-                    .toolbar(.hidden, for: .navigationBar)
+                    trainRootScroll(for: .today)
+                        .transition(.opacity)
                 }
             }
+            // A short crossfade replaces the jerky animated height changes
+            // between a full-bleed Today hero and compact Plan/Progress pages.
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.22),
+                       value: selectedSection)
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .toolbar(.hidden, for: .navigationBar)
             // Keep root Train navigation metadata small regardless of which
             // Today/Plan/Progress section is selected.
             .athlthStablePresentationBoundary()
@@ -5931,10 +5871,6 @@ struct ATHLTHTrainView: View {
             ) { _, _ in
                 handleNavigationRequest()
             }
-            .onChange(of: selectedSection) { _, _ in
-                floatingTrainTabsVisible = false
-                lastTrainScrollDecisionOffset = 0
-            }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .active { refreshTrainDayIfChanged() }
             }
@@ -5954,8 +5890,7 @@ struct ATHLTHTrainView: View {
                 // plan edits and any active workout remain untouched.
                 todayScrollPosition.scrollTo(edge: .top)
                 planScrollPosition.scrollTo(edge: .top)
-                floatingTrainTabsVisible = false
-                lastTrainScrollDecisionOffset = 0
+                progressScrollPosition.scrollTo(edge: .top)
             }
             .alert("ATHLTH", isPresented: Binding(
                 get: {
@@ -5984,6 +5919,47 @@ struct ATHLTHTrainView: View {
     }
 
 
+    @ViewBuilder
+    private func trainRootScroll(for section: ATHLTHTrainSection) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                premiumTrainBrandHeader(for: section)
+
+                if section == .plan {
+                    ATHLTHTrainPlanPremiumView(
+                        highlightedPlanID: highlightedTrainPlanID,
+                        onStartWorkout: { planID, workout in
+                            openTodayPrimaryWorkout(
+                                workout,
+                                planID: planID,
+                                isHealthCompleted: false
+                            )
+                        }
+                    )
+                } else {
+                    premiumTodayScreen
+                        .padding(.top, -40)
+                        .zIndex(1)
+                }
+            }
+            .padding(.horizontal, 17)
+            // Today owns the full-bleed status-bar image; the compact
+            // Plan and Progress mastheads start at the same screen y.
+            .padding(.top, section == .today ? 18 : 24)
+            .padding(.bottom, 36)
+            .containerRelativeFrame(.horizontal) { @Sendable availableWidth, _ in
+                min(availableWidth, ATHLTHTrainDesign.readingWidth)
+            }
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .ignoresSafeArea(.container, edges: section == .today ? .top : [])
+        // Preserve *independent* scroll positions on switching. No pinned
+        // or floating duplicate tabs are drawn over scrolled content.
+        .scrollPosition(section == .plan ? $planScrollPosition : $todayScrollPosition)
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+    }
+
     private func refreshTrainDayIfChanged() {
         let today = Calendar.current.startOfDay(for: .now)
         guard ATHLTHTrainDayChangePolicy.needsRefresh(
@@ -5993,137 +5969,30 @@ struct ATHLTHTrainView: View {
         session.refreshActivePlanForToday()
     }
 
-    private func updateTrainCapsuleVisibility(scrollOffset: CGFloat) {
-        if scrollOffset < 88 {
-            lastTrainScrollDecisionOffset = scrollOffset
-            if floatingTrainTabsVisible {
-                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
-                    floatingTrainTabsVisible = false
-                }
-            }
-            return
-        }
-
-        // Ignore tiny oscillations from scroll deceleration or layout changes.
-        let movement = scrollOffset - lastTrainScrollDecisionOffset
-        guard abs(movement) >= 23 else { return }
-        lastTrainScrollDecisionOffset = scrollOffset
-        let shouldAppear = movement < 0
-        guard floatingTrainTabsVisible != shouldAppear else { return }
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.16)) {
-            floatingTrainTabsVisible = shouldAppear
-        }
-    }
-
-    // Shared identity and named navigation across all three Train sections.
-    private var premiumTrainBrandHeader: some View {
-        Group {
-            if selectedSection == .today {
-                todayPhotoHeader
-            } else if selectedSection == .progress {
-                // The reference layout has one compact top navigation row.
-                // The editorial progress view owns the single page title.
-                HStack(spacing: 8) {
-                    Text(ATHLTHLocalization.choose(english: "TRAINING", norwegian: "TRENING"))
-                        .font(.system(size: 10, weight: .semibold))
-                        .tracking(2.5)
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    Spacer(minLength: 4)
-                    HStack(spacing: 1) {
-                        progressHeaderTab(
-                            ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"),
-                            section: .today
-                        )
-                        progressHeaderTab("Plan", section: .plan)
-                        progressHeaderTab(
-                            ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremdrift"),
-                            section: .progress
-                        )
-                    }
-                    .padding(3)
-                    .background(
-                        ATHLTHTrainDesign.paleGold.opacity(0.27),
-                        in: RoundedRectangle(cornerRadius: 13)
-                    )
-                }
-                .frame(minHeight: 42)
-            } else {
-                // Plan follows the compact top navigation from Fremdrift.
-                // Its title and mode selector live inside the Plan workspace.
-                HStack(spacing: 8) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "TRAINING", norwegian: "TRENING"
-                    ))
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(2.5)
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    Spacer(minLength: 4)
-                    HStack(spacing: 1) {
-                        progressHeaderTab(
-                            ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"),
-                            section: .today
-                        )
-                        progressHeaderTab("Plan", section: .plan)
-                        progressHeaderTab(
-                            ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremdrift"),
-                            section: .progress
-                        )
-                    }
-                    .padding(3)
-                    .background(
-                        ATHLTHTrainDesign.paleGold.opacity(0.27),
-                        in: RoundedRectangle(cornerRadius: 13)
-                    )
-                }
-                .frame(minHeight: 42)
-            }
-        }
-    }
-
-    private func progressHeaderTab(
-        _ title: String,
-        section: ATHLTHTrainSection
+    // Every Train section has exactly one shared navigation row, embedded
+    // in its scrollable content rather than pinned to the viewport.
+    @ViewBuilder
+    private func premiumTrainBrandHeader(
+        for section: ATHLTHTrainSection
     ) -> some View {
-        let active = selectedSection == section
-        return Button {
-            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                selectedSection = section
-            }
-        } label: {
-            Text(title)
-                .font(.system(size: 11, weight: active ? .semibold : .medium))
-                .foregroundStyle(active ? ATHLTHTrainDesign.ink : ATHLTHTrainDesign.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-                .frame(width: section == .progress ? 73 : 62, height: 34)
-                .background {
-                    if active {
-                        RoundedRectangle(cornerRadius: 10)
-                            .fill(.white)
-                            .shadow(color: .black.opacity(0.07), radius: 4, y: 2)
-                    }
-                }
+        if section == .today {
+            todayPhotoHeader
+        } else {
+            ATHLTHTrainHeaderRow(selection: $selectedSection)
+                // Today cover starts at x = 20; Plan and Progress must
+                // align both the selector and eyebrow to that same inset.
+                .padding(.horizontal, section == .plan ? 3 : 4)
         }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(active ? .isSelected : [])
     }
 
-    /// The reference-inspired, image-led Today cover is only a presentation
-    /// layer: the date, navigation and scheduled workouts remain live data.
     private var todayPhotoHeader: some View {
-        ATHLTHTrainTodayCoverView(day: displayedTrainDay, selection: $selectedSection)
-            // Only the Today cover reaches the phone edges. Plan and the
-            // workout cards retain the usual readable horizontal inset.
-            .padding(.horizontal, -17)
-            .padding(.top, -18)
+        ATHLTHTrainTodayCoverView(
+            day: displayedTrainDay, selection: $selectedSection
+        )
+        .padding(.horizontal, -17)
+        .padding(.top, -18)
     }
 
-    private var premiumTrainTabs: some View {
-        ATHLTHTrainNavigation(
-            selection: $selectedSection,
-            compact: selectedSection == .today
-        )
-    }
     private var activeTrainWorkoutKind: WorkoutKind? {
         if let workout = phoneWorkout.active {
             return workout.walking ? .walking : .running

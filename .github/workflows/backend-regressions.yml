@@ -18,6 +18,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Guard Insights tab routing and reference design
         run: python3 scripts/audit_insights_entrypoints.py
+      - name: Guard Train tab consistency and non-sticky navigation
+        run: python3 scripts/audit_train_header_alignment.py
       - uses: actions/setup-node@v4
         with:
           node-version: '24'

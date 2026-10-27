@@ -13,6 +13,7 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
     let onReturnToToday: () -> Void
     let onOpenPlan: () -> Void
     let header: Header
+    @Binding var scrollPosition: ScrollPosition
 
     @State private var area: Area = .general
     @State private var progressTab: ProgressTab = .overview
@@ -320,12 +321,13 @@ struct ATHLTHTrainProgressReferenceView<Header: View>: View {
                 .font(.system(size: 10)).foregroundStyle(muted).padding(.top, 4)
             }
             .padding(.horizontal, 16)
-            .padding(.top, 12)
+            .padding(.top, 24)
             .padding(.bottom, 40)
             .frame(maxWidth: ATHLTHTrainDesign.readingWidth)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+        .scrollPosition($scrollPosition)
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
         .refreshable { await refreshAll() }
         .task(id: area) { await loadPulseZones() }

@@ -7,12 +7,10 @@ struct ATHLTHTrainTodayCoverView: View {
     let day: Date
     @Binding var selection: ATHLTHTrainSection
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ScaledMetric(relativeTo: .largeTitle) private var headingSize: CGFloat = 49
 
     private let ink = ATHLTHTrainDesign.ink
-    private let bronze = ATHLTHTrainDesign.bronze
 
     var body: some View {
         GeometryReader { geometry in
@@ -44,17 +42,7 @@ struct ATHLTHTrainTodayCoverView: View {
                 )
 
                 VStack(alignment: .leading, spacing: 0) {
-                    ViewThatFits(in: .horizontal) {
-                        HStack(alignment: .center, spacing: 8) {
-                            eyebrow
-                            Spacer(minLength: 2)
-                            topNavigation
-                        }
-                        VStack(alignment: .leading, spacing: 8) {
-                            eyebrow
-                            topNavigation
-                        }
-                    }
+                    ATHLTHTrainHeaderRow(selection: $selection)
 
                     Text(ATHLTHLocalization.choose(english: "Today", norwegian: "I dag"))
                         .font(.system(size: min(headingSize, 71),
@@ -97,63 +85,4 @@ struct ATHLTHTrainTodayCoverView: View {
         .accessibilityValue(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
     }
 
-    private var eyebrow: some View {
-        Text(ATHLTHLocalization.choose(english: "TRAINING", norwegian: "TRENING"))
-            .font(.caption2.weight(.semibold))
-            .tracking(2.4)
-            .foregroundStyle(ink.opacity(0.7))
-            .lineLimit(1)
-    }
-
-    private var topNavigation: some View {
-        HStack(spacing: 1) {
-            navButton(.today, label: ATHLTHLocalization.choose(
-                english: "Today", norwegian: "I dag"
-            ))
-            navButton(.plan, label: "Plan")
-            navButton(.progress, label: ATHLTHLocalization.choose(
-                english: "Progress", norwegian: "Fremdrift"
-            ))
-        }
-        .padding(4)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
-        .overlay {
-            RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(.white.opacity(0.7), lineWidth: 0.7)
-                .allowsHitTesting(false)
-        }
-        .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
-        .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Train sections", norwegian: "Treningsfaner"
-        ))
-    }
-
-    private func navButton(_ section: ATHLTHTrainSection, label: String) -> some View {
-        let selected = selection == section
-        return Button {
-            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                selection = section
-            }
-        } label: {
-            Text(label)
-                .font(.system(.caption, design: .default,
-                              weight: selected ? .semibold : .medium))
-                .lineLimit(1)
-                .minimumScaleFactor(0.85)
-                .foregroundStyle(selected ? ink : ink.opacity(0.77))
-                .padding(.horizontal, 11)
-                .frame(minHeight: 44)
-                .background {
-                    if selected {
-                        RoundedRectangle(cornerRadius: 12, style: .continuous)
-                            .fill(Color.white.opacity(0.95))
-                            .shadow(color: .black.opacity(0.06), radius: 3, y: 2)
-                    }
-                }
-                .contentShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
 }

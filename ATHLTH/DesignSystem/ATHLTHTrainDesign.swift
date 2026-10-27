@@ -81,6 +81,93 @@ struct ATHLTHTrainSectionHeading: View {
     }
 }
 
+/// One identical, non-sticky Train selector for Today, Plan and Progress.
+/// The parent embeds this in each section's own scrollable masthead.
+struct ATHLTHTrainHeaderRow: View {
+    @Binding var selection: ATHLTHTrainSection
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var activeCapsule
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .center, spacing: 8) {
+                eyebrow
+                Spacer(minLength: 2)
+                capsule
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                eyebrow
+                capsule
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Training sections", norwegian: "Treningsfaner"))
+    }
+
+    private var eyebrow: some View {
+        Text(ATHLTHLocalization.choose(english: "TRAINING", norwegian: "TRENING"))
+            .font(.caption2.weight(.semibold))
+            .tracking(2.4)
+            .foregroundStyle(ATHLTHTrainDesign.bronze)
+            .lineLimit(1)
+    }
+
+    private var capsule: some View {
+        HStack(spacing: 1) {
+            tab(.today, title: ATHLTHLocalization.choose(
+                english: "Today", norwegian: "I dag"))
+            tab(.plan, title: "Plan")
+            tab(.progress, title: ATHLTHLocalization.choose(
+                english: "Progress", norwegian: "Fremdrift"))
+        }
+        .padding(4)
+        .background(
+            ATHLTHTrainDesign.paper.opacity(0.97),
+            in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.42), lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: ATHLTHTrainDesign.ink.opacity(0.08), radius: 9, y: 3)
+    }
+
+    private func tab(_ section: ATHLTHTrainSection, title: String) -> some View {
+        let active = selection == section
+        return Button {
+            guard selection != section else { return }
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.22)) {
+                selection = section
+            }
+        } label: {
+            Text(title)
+                .font(.system(.caption, design: .default,
+                              weight: active ? .semibold : .medium))
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
+                .foregroundStyle(active ? ATHLTHTrainDesign.ink
+                                        : ATHLTHTrainDesign.secondary)
+                .frame(width: section == .progress ? 82 : 62, height: 44)
+                .background {
+                    if active {
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(.white)
+                            .shadow(color: .black.opacity(0.075), radius: 4, y: 2)
+                            .matchedGeometryEffect(id: "train-header-active",
+                                                   in: activeCapsule)
+                    }
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(active ? .isSelected : [])
+        .accessibilityIdentifier("train-header-\(section)")
+    }
+}
+
 struct ATHLTHTrainNavigation: View {
     @Binding var selection: ATHLTHTrainSection
     var compact = false
