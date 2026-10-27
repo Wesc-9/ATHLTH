@@ -15,6 +15,8 @@ struct ATHLTHStrengthCompletedHeroCard: View {
     var showsMetrics = true
     var detailMetadata: String? = nil
     var cornerRadius: CGFloat? = nil
+    // Only the compact Home activity strip uses the clearer photo treatment.
+    var recentActivityStrip = false
 
     private let ink = Color(red: 0.14, green: 0.15, blue: 0.16)
     private let secondaryInk = Color(red: 0.35, green: 0.38, blue: 0.42)
@@ -69,23 +71,27 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                     .scaledToFill()
                     .frame(width: cardWidth, height: cardHeight)
                     .clipped()
-                    .saturation(0.75)
-                    .contrast(0.88)
+                    .saturation(recentActivityStrip ? 0.95 : 0.75)
+                    .contrast(recentActivityStrip ? 0.98 : 0.88)
 
-                // Matte light grade keeps the medal and muscles legible
-                // without making the strength room a distracting hero.
+                // Home keeps the photograph clear, while the full workout
+                // result retains its original light, readable presentation.
                 LinearGradient(
                     stops: [
-                        .init(color: Color.white.opacity(0.64), location: 0),
-                        .init(color: Color.white.opacity(0.36), location: 0.42),
+                        .init(color: Color.white.opacity(recentActivityStrip ? 0.20 : 0.64), location: 0),
+                        .init(color: Color.white.opacity(recentActivityStrip ? 0.14 : 0.36), location: 0.42),
                         .init(color: Color(red: 0.98, green: 0.97, blue: 0.95)
-                            .opacity(0.79), location: 1)
+                            .opacity(recentActivityStrip ? 0.46 : 0.79), location: 1)
                     ],
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 )
                 LinearGradient(
-                    colors: [.clear, .white.opacity(0.10), .white.opacity(0.91)],
+                    colors: [
+                        .clear,
+                        .white.opacity(0.10),
+                        .white.opacity(recentActivityStrip ? 0.55 : 0.91)
+                    ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
