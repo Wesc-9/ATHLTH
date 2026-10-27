@@ -133,14 +133,14 @@ enum ATHLTHZonedPlanLibrary {
             case "advanced", "elite": level = ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert")
             default: level = ATHLTHLocalization.choose(english: "Intermediate", norwegian: "Middels")
             }
-            let title = source.nameEn
+            let title = ATHLTHZonedLocalization.planTitle(source.id, english: source.nameEn)
             let goal = source.raceDistance.map { "Run \($0)" } ??
                 ATHLTHLocalization.choose(english: "Build running fitness", norwegian: "Bygg løpeform")
             return TrainingPlanCatalogEntry(
                 id: UUID(uuidString: String(format: "B3000000-0000-0000-0000-%012d", index + 1))!,
                 slug: "zoned-\(source.id)",
                 title: title,
-                summary: source.descriptionEn,
+                summary: ATHLTHZonedLocalization.planSummary(source.id, english: source.descriptionEn),
                 category: "running",
                 goal: goal,
                 level: level,
@@ -163,8 +163,8 @@ enum ATHLTHZonedPlanLibrary {
             return WorkoutTemplateCatalogEntry(
                 id: UUID(uuidString: String(format: "B4000000-0000-0000-0000-%012d", index + 1))!,
                 slug: "zoned-\(workout.id.lowercased())",
-                title: workout.nameEn,
-                summary: workout.descriptionEn,
+                title: ATHLTHZonedLocalization.text(workout.nameEn),
+                summary: ATHLTHZonedLocalization.workoutSummary(workout.category, english: workout.descriptionEn),
                 category: activity,
                 difficulty: workout.difficulty,
                 estimatedDurationMinutes: workout.typicalDuration.map { ($0.min + $0.max) / 2 },
@@ -219,43 +219,46 @@ enum ATHLTHZonedPlanLibrary {
         let optionalStrength = week.sessions.filter { $0.isSuggestion == true }
             .map(\.workoutId).joined(separator: ", ")
         var detail: [String] = [
-            workout.descriptionEn,
-            "Zoned · \(sourcePlan.nameEn) · week \(week.weekNumber) (\(week.phase))",
-            "Zoned session: \(source.workoutId)",
+            ATHLTHZonedLocalization.workoutSummary(workout.category, english: workout.descriptionEn),
+            ATHLTHLocalization.choose(
+                english: "Zoned · \(sourcePlan.nameEn) · week \(week.weekNumber) (\(week.phase))",
+                norwegian: "Zoned · \(ATHLTHZonedLocalization.planTitle(sourcePlan.id, english: sourcePlan.nameEn)) · uke \(week.weekNumber) (\(ATHLTHZonedLocalization.phase(week.phase)))"
+            ),
+            ATHLTHLocalization.choose(english: "Zoned session: \(source.workoutId)", norwegian: "Zoned-økt: \(source.workoutId)"),
         ]
-        if week.isRecoveryWeek { detail.append("Recovery week") }
-        if source.isKeySession { detail.append("Key session") }
-        if let km = week.targetKm { detail.append("Weekly running target: \(km) km") }
-        if let km = week.targetLongRunKm { detail.append("Weekly long-run target: \(km) km") }
-        if let load = week.weeklyLoadScore { detail.append("Zoned weekly load score: \(load)") }
-        if let load = source.loadScore { detail.append("Zoned session load score: \(load)") }
-        if let km = source.targetDistanceKm { detail.append("Planned distance: \(km) km") }
+        if week.isRecoveryWeek { detail.append(ATHLTHLocalization.choose(english: "Recovery week", norwegian: "Restitusjonsuke")) }
+        if source.isKeySession { detail.append(ATHLTHLocalization.choose(english: "Key session", norwegian: "Nøkkeløkt")) }
+        if let km = week.targetKm { detail.append(ATHLTHLocalization.choose(english: "Weekly running target: \(km) km", norwegian: "Ukemål løping: \(km) km")) }
+        if let km = week.targetLongRunKm { detail.append(ATHLTHLocalization.choose(english: "Weekly long-run target: \(km) km", norwegian: "Ukemål langtur: \(km) km")) }
+        if let load = week.weeklyLoadScore { detail.append(ATHLTHLocalization.choose(english: "Zoned weekly load score: \(load)", norwegian: "Zoned-belastning for uken: \(load)")) }
+        if let load = source.loadScore { detail.append(ATHLTHLocalization.choose(english: "Zoned session load score: \(load)", norwegian: "Zoned-belastning for økten: \(load)")) }
+        if let km = source.targetDistanceKm { detail.append(ATHLTHLocalization.choose(english: "Planned distance: \(km) km", norwegian: "Planlagt distanse: \(km) km")) }
         if let notes = source.notesEn, !notes.isEmpty {
-            detail.append("Source pace example (not personalized): \(notes)")
+            detail.append(ATHLTHLocalization.choose(english: "Source pace example (not personalized): \(notes)", norwegian: "Fartseksempel fra kilden (ikke personlig): \(ATHLTHZonedLocalization.text(notes))"))
         }
         if let examples = source.paceNotes, !examples.isEmpty {
-            detail.append("Zoned example pace zones: " + examples.map {
+            detail.append(ATHLTHLocalization.choose(english: "Zoned example pace zones: ", norwegian: "Zoned-eksempler på fartssoner: ") + examples.map {
                 "\($0.zone): \($0.paceMinKm.map(String.init(describing:)) ?? "?")–\($0.paceMaxKm.map(String.init(describing:)) ?? "?") min/km"
             }.joined(separator: "; "))
         }
         if !optionalStrength.isEmpty {
-            detail.append("Optional strength recommendations, not automatically scheduled: \(optionalStrength)")
+            detail.append(ATHLTHLocalization.choose(english: "Optional strength recommendations, not automatically scheduled: \(optionalStrength)", norwegian: "Valgfrie styrkeøkter, ikke lagt til automatisk: \(optionalStrength)"))
         }
         if let tips = workout.coachingTipsEn, !tips.isEmpty {
-            detail.append("Coach tips: " + tips.prefix(3).joined(separator: " · "))
+            detail.append(ATHLTHLocalization.isNorwegian ? "Tips: Følg planlagt intensitet og tilpass treningen til dagsformen." : "Coach tips: " + tips.prefix(3).joined(separator: " · "))
         }
         if let mistakes = workout.commonMistakesEn, !mistakes.isEmpty {
-            detail.append("Avoid: " + mistakes.prefix(2).joined(separator: " · "))
+            detail.append(ATHLTHLocalization.isNorwegian ? "Unngå: Å øke intensiteten utover det økten foreskriver." : "Avoid: " + mistakes.prefix(2).joined(separator: " · "))
         }
-        if workout.environment?.requiresHills == true { detail.append("Requires hills") }
-        if workout.environment?.requiresTrack == true { detail.append("Requires track") }
+        if workout.environment?.requiresHills == true { detail.append(ATHLTHLocalization.choose(english: "Requires hills", norwegian: "Krever bakker")) }
+        if workout.environment?.requiresTrack == true { detail.append(ATHLTHLocalization.choose(english: "Requires track", norwegian: "Krever løpebane")) }
         detail.append("Source: Zoned (MIT), github.com/alarboulletmarin/zoned")
         if sourcePlan.id == "retour-blessure" {
-            detail.append("General fitness content only; not medical rehabilitation advice.")
+            detail.append(ATHLTHLocalization.choose(english: "General fitness content only; not medical rehabilitation advice.", norwegian: "Generell trening, ikke medisinsk rehabilitering."))
         }
         var session = PlannedSession(
             id: UUID(),
-            title: workout.nameEn,
+            title: ATHLTHZonedLocalization.text(workout.nameEn),
             kind: kind,
             scheduledStart: nil,
             durationMinutes: max(5, plannedMinutes),
@@ -360,7 +363,7 @@ enum ATHLTHZonedPlanLibrary {
             var block = WorkoutTemplateBlock(
                 sequence: result.count + 1,
                 kind: isCycling ? (recovery ? .rest : .note) : .run,
-                title: step.descriptionEn ?? (recovery ? "Recovery" : "Effort"),
+                title: ATHLTHZonedLocalization.text(step.descriptionEn ?? (recovery ? "Recovery" : "Effort")),
                 exerciseSlug: nil,
                 distanceMeters: step.distanceM ?? step.distanceKm.map { $0 * 1_000 },
                 repetitions: nil,
