@@ -504,7 +504,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 48)
                 }
-                .buttonStyle(ATHLTHTrainSecondaryButtonStyle())
+                .buttonStyle(.bordered)
                 .accessibilityHint(tr(
                     "Shows your active, upcoming and previous training plans.",
                     "Viser aktive, kommende og tidligere treningsplaner."
