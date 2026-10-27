@@ -79,6 +79,7 @@ const schema = {
                       "targetPaceSecondsPerKilometer",
                       "notes",
                       "exercises",
+                      "blocks",
                     ],
                     properties: {
                       title: { type: "string" },
@@ -104,6 +105,33 @@ const schema = {
                       },
                       notes: {
                         type: ["string", "null"],
+                      },
+                      blocks: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          additionalProperties: false,
+                          required: [
+                            "title", "kind", "phase", "durationSeconds",
+                            "distanceMeters", "repetitions",
+                            "targetPaceSecondsPerKilometer",
+                            "treadmillInclinePercent", "targetHeartRateZone",
+                            "targetEffortRPE", "notes",
+                          ],
+                          properties: {
+                            title: { type: "string" },
+                            kind: { type: "string", enum: ["run", "exercise", "rest", "note"] },
+                            phase: { type: "string", enum: ["warmup", "main", "recovery", "cooldown"] },
+                            durationSeconds: { type: ["number", "null"] },
+                            distanceMeters: { type: ["number", "null"] },
+                            repetitions: { type: ["integer", "null"] },
+                            targetPaceSecondsPerKilometer: { type: ["number", "null"] },
+                            treadmillInclinePercent: { type: ["number", "null"] },
+                            targetHeartRateZone: { type: ["integer", "null"] },
+                            targetEffortRPE: { type: ["integer", "null"] },
+                            notes: { type: ["string", "null"] },
+                          },
+                        },
                       },
                       exercises: {
                         type: "array",
@@ -300,6 +328,47 @@ function normalizeProgram(
           typeof session?.notes === "string"
             ? session.notes.slice(0, 1200)
             : null,
+        blocks: Array.isArray(session?.blocks)
+          ? session.blocks.slice(0, 80).filter((block: any) =>
+              block && ["run", "exercise", "rest", "note"].includes(block.kind) &&
+              ["warmup", "main", "recovery", "cooldown"].includes(block.phase) &&
+              typeof block.title === "string" && block.title.trim()
+            ).map((block: any) => ({
+              title: String(block.title).slice(0, 120),
+              kind: block.kind,
+              phase: block.phase,
+              durationSeconds: Number.isFinite(block.durationSeconds) &&
+                  block.durationSeconds > 0
+                ? Math.min(block.durationSeconds, 14_400) : null,
+              distanceMeters: Number.isFinite(block.distanceMeters) &&
+                  block.distanceMeters > 0
+                ? Math.min(block.distanceMeters, 100_000) : null,
+              repetitions: Number.isInteger(block.repetitions) &&
+                  block.repetitions >= 1 && block.repetitions <= 100
+                ? block.repetitions : null,
+              targetPaceSecondsPerKilometer:
+                Number.isFinite(block.targetPaceSecondsPerKilometer) &&
+                block.targetPaceSecondsPerKilometer >= 120 &&
+                block.targetPaceSecondsPerKilometer <= 1200
+                  ? block.targetPaceSecondsPerKilometer : null,
+              treadmillInclinePercent:
+                Number.isFinite(block.treadmillInclinePercent) &&
+                block.treadmillInclinePercent >= 0 &&
+                block.treadmillInclinePercent <= 20
+                  ? block.treadmillInclinePercent : null,
+              targetHeartRateZone:
+                Number.isInteger(block.targetHeartRateZone) &&
+                block.targetHeartRateZone >= 1 &&
+                block.targetHeartRateZone <= 5
+                  ? block.targetHeartRateZone : null,
+              targetEffortRPE:
+                Number.isInteger(block.targetEffortRPE) &&
+                block.targetEffortRPE >= 1 && block.targetEffortRPE <= 10
+                  ? block.targetEffortRPE : null,
+              notes: typeof block.notes === "string"
+                ? block.notes.slice(0, 500) : null,
+            }))
+          : [],
         exercises: Array.isArray(session?.exercises)
           ? session.exercises.slice(0, 12).map((exercise: any) => ({
               name: String(exercise?.name ?? "Exercise").slice(0, 120),
@@ -501,6 +570,10 @@ Hard rules:
 - If a goal or note suggests a medical limitation, keep recommendations general and low-risk rather than treating the condition.
 - Strength work should use exercise names, sets, reps, sensible RPE, and rest, but never invent target weights.
 - Running/walking sessions can include duration and/or distance. Only include a target pace when the provided goal genuinely supports one.
+- Every session has a blocks array (which may be empty if no precise structure is justified). Blocks describe one chronological timeline: warmup, main effort, recovery between efforts, cooldown. If prescribing intervals, include EACH effort and EACH between-effort rest; never append an extra rest after the last repeat.
+- For an explicitly prescribed 4x4 interval session, provide warmup, four distinct 240-second main run blocks, three 120-second recovery blocks between them, and a cooldown. Use targetPaceSecondsPerKilometer, treadmillInclinePercent, targetHeartRateZone and targetEffortRPE only when justified by user input; otherwise use null.
+- For strength, include explicit exercise blocks with proper repetitions and recovery steps when helpful. Never invent a measured heart rate, completed workout, equipment access or target weight.
+- Keep arrays of blocks reasonably short (prefer fewer than 30), and do not generate workout details that were not requested or cannot be supported.
 - Use the user's goal deadlines and milestones as context, but do not exceed the explicit timeline.
 - The output is a draft the user will review before applying.
 `.trim();
