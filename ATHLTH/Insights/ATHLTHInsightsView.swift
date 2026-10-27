@@ -13,6 +13,9 @@ struct ATHLTHInsightsView: View {
     @State private var selectedSection: ATHLTHInsightsSection = .overview
     @State private var trainingDays: [ATHLTHInsightsTrainingDay] = []
     @State private var muscleSummary: ATHLTHInsightsMuscleSummary = .empty
+    @StateObject private var dailyCheckInStore = RecoverySorenessStore()
+    @State private var dailyCheckInEntries: [RecoverySorenessEntry] = []
+    @State private var showingDailyCheckIn = false
 
     @State private var trendSnapshot: HealthProgressSnapshot?
     @State private var isLoadingTrend = false
@@ -51,8 +54,8 @@ struct ATHLTHInsightsView: View {
                     ATHLTHInsightsNavigation(selection: $selectedSection)
                         .padding(.bottom, 3)
 
-                    // Each section has its own hierarchy, but all original
-                    // signals, recommendations, simulator and destinations remain.
+                    // Only the premium Insights screens are presented.
+                    // Older Recovery screens no longer appear as destinations.
                     switch selectedSection {
                     case .overview:
                         AnyView(overviewSection)
@@ -75,6 +78,7 @@ struct ATHLTHInsightsView: View {
                 if !health.shouldDeferAutomaticHealthWork {
                     await health.refreshAll()
                 }
+                refreshCheckInEntries()
                 await loadTrend()
             }
             .task(id: isActive) {
@@ -89,6 +93,7 @@ struct ATHLTHInsightsView: View {
                     workouts: health.workouts,
                     at: Date()
                 )
+                refreshCheckInEntries()
                 await loadTrend()
             }
             .onReceive(health.$workouts) { workouts in
@@ -104,7 +109,28 @@ struct ATHLTHInsightsView: View {
             .onReceive(strength.$workoutHistory) { history in
                 muscleSummary = ATHLTHInsightsMuscleSummary.make(from: history)
             }
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: Notification.Name("athlth.dailyCheckInDidUpdate")
+                )
+            ) { _ in
+                // The reminder and other screens may write using another
+                // RecoverySorenessStore instance; read the persisted history.
+                refreshCheckInEntries()
+            }
+            .onReceive(dailyCheckInStore.$entries) { entries in
+                dailyCheckInEntries = entries
+            }
+            .sheet(isPresented: $showingDailyCheckIn, onDismiss: {
+                refreshCheckInEntries()
+            }) {
+                RecoverySorenessLogView(store: dailyCheckInStore)
+            }
         }
+    }
+
+    private func refreshCheckInEntries() {
+        dailyCheckInEntries = RecoverySorenessStore().entries
     }
 
     // Existing assets are authoritative. ATHLTHTabHero above continues to
@@ -112,9 +138,13 @@ struct ATHLTHInsightsView: View {
     private var overviewSection: some View {
         Group {
             readinessOverviewCard
+            ATHLTHDailyWellbeingSummaryCard(
+                entries: dailyCheckInEntries,
+                onEdit: { showingDailyCheckIn = true },
+                onViewTrend: { selectedSection = .development }
+            )
             whyItMattersCard
             whatChangedCard
-            detailDestinationsCard
         }
     }
 
@@ -123,18 +153,6 @@ struct ATHLTHInsightsView: View {
             nowCard
             healthExplanationCard
             pulseCard
-            NavigationLink {
-                ATHLTHRecoveryView(onSelectTab: onSelectTab)
-            } label: {
-                insightDestinationRow(
-                    title: tr("More about recovery", "Mer om restitusjon"),
-                    subtitle: tr("Sleep, soreness and recovery history", "Søvn, stølhet og restitusjonshistorikk"),
-                    icon: "leaf"
-                )
-                .padding(18)
-                .athlthTrainPaper()
-            }
-            .buttonStyle(.plain)
         }
     }
 
@@ -149,11 +167,14 @@ struct ATHLTHInsightsView: View {
 
     private var developmentSection: some View {
         Group {
+            ATHLTHDailyWellbeingTrendCard(
+                entries: dailyCheckInEntries,
+                onEdit: { showingDailyCheckIn = true }
+            )
             whatChangedCard
             trendCard
             whatIfCard
             replayCard
-            detailDestinationsCard
         }
     }
 
@@ -210,14 +231,15 @@ struct ATHLTHInsightsView: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    NavigationLink {
-                        ATHLTHRecoveryView(onSelectTab: onSelectTab)
+                    Button {
+                        selectedSection = .health
                     } label: {
-                        Label(tr("See details", "Se detaljer"),
+                        Label(tr("See health signals", "Se helsesignaler"),
                               systemImage: "arrow.up.right")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHTrainDesign.bronze)
                     }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -780,38 +802,6 @@ struct ATHLTHInsightsView: View {
             }
         }
         .buttonStyle(.plain)
-    }
-
-    private var detailDestinationsCard: some View {
-        insightsPaper {
-            ATHLTHSectionHeader(title: ATHLTHLocalization.choose(english: "Go deeper", norwegian: "Se flere detaljer"))
-
-            VStack(spacing: 0) {
-                NavigationLink {
-                    ATHLTHRecoveryView(onSelectTab: onSelectTab)
-                } label: {
-                    insightDestinationRow(
-                        title: ATHLTHLocalization.choose(english: "Recovery details", norwegian: "Restitusjon"),
-                        subtitle: ATHLTHLocalization.choose(english: "Readiness, sleep, soreness and recovery tools", norwegian: "Dagsform, søvn, stølhet og restitusjon"),
-                        icon: "leaf.fill"
-                    )
-                }
-
-                Divider()
-                    .padding(.leading, 46)
-
-                NavigationLink {
-                    ATHLTHProgressView()
-                } label: {
-                    insightDestinationRow(
-                        title: ATHLTHLocalization.choose(english: "Progress details", norwegian: "Fremgang"),
-                        subtitle: ATHLTHLocalization.choose(english: "Charts, records, consistency and achievements", norwegian: "Grafer, rekorder, kontinuitet og prestasjoner"),
-                        icon: "chart.bar.fill"
-                    )
-                }
-            }
-            .padding(.top, 6)
-        }
     }
 
     private func insightMetric(
