@@ -83,6 +83,54 @@ enum ATHLTHRunningResultInsights {
         return completed
     }
 
+    /// Indoor Apple Watch/phone recordings have no GPS track. Reconstruct
+    /// only fully measured kilometre splits from the actual recorded minute
+    /// distance/time samples, never from prescribed belt speed or plan pace.
+    static func kilometerSplits(
+        from minutes: [ATHLTHRecordedRunningMinute],
+        reportedDistanceMeters: Double?
+    ) -> [KilometerSplit] {
+        guard !minutes.isEmpty, minutes.count <= 2_500 else { return [] }
+        var distance = 0.0
+        var splitElapsed = 0.0
+        var wholeDistance = 0.0
+        var results: [KilometerSplit] = []
+        for sample in minutes {
+            let meters = sample.recordedDistanceMeters
+            let seconds = sample.activeSeconds
+            guard meters.isFinite, meters >= 0, meters <= 800,
+                  seconds.isFinite, seconds > 0, seconds <= 120,
+                  meters / seconds <= 9.8 else { return [] }
+            wholeDistance += meters
+            var available = meters
+            var secondsLeft = seconds
+            while available > 0 {
+                let use = min(1_000 - distance, available)
+                let usedSeconds = secondsLeft * (use / available)
+                distance += use
+                splitElapsed += usedSeconds
+                available -= use
+                secondsLeft -= usedSeconds
+                if distance >= 999.999 {
+                    guard (50...2_400).contains(splitElapsed) else { return [] }
+                    results.append(KilometerSplit(
+                        kilometer: results.count + 1,
+                        durationSeconds: splitElapsed
+                    ))
+                    distance = 0
+                    splitElapsed = 0
+                }
+            }
+            if meters == 0 { splitElapsed += seconds }
+        }
+        if let official = reportedDistanceMeters, official.isFinite, official > 0 {
+            guard abs(wholeDistance - official) / official <= 0.20 else {
+                return []
+            }
+        }
+        return results
+    }
+
     static func bestKilometer(_ splits: [KilometerSplit]) -> KilometerSplit? {
         splits.min { $0.durationSeconds < $1.durationSeconds }
     }
