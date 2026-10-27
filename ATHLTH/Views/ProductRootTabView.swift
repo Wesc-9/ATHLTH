@@ -222,12 +222,12 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Train", systemImage: "dumbbell.fill") }
                 .tag(1)
 
-            ATHLTHRecoveryView(
-                isActive:
-                    selectedTab == 2
-            ) { tab in
-                selectedTab = tab
-            }
+            // Insights must use the reference-designed four-section screen.
+            // The former Recovery view remains available from within Insights
+            // for detailed readiness and the daily check-in.
+            ATHLTHInsightsView(
+                onSelectTab: { tab in selectedTab = tab }
+            )
                 .tabItem {
                     Label(
                         "Insights",
