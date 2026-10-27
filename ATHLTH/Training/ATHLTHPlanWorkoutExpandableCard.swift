@@ -9,6 +9,7 @@ enum ATHLTHPlanWorkoutCardPresentation {
         let sourceIndex: Int
         let groupTitle: String?
         let groupSteps: [WorkoutTemplateBlock]?
+        let groupStepIndex: Int?
     }
 
     struct Section: Identifiable {
@@ -35,10 +36,11 @@ enum ATHLTHPlanWorkoutCardPresentation {
                 let rounds = Swift.min(Swift.max(first.groupRounds ?? 1, 1), 20)
                 let name = groupKind.title + " · \(rounds) " +
                     ATHLTHLocalization.choose(english: "rounds", norwegian: "runder")
-                for item in expanded where entries.count < 1_000 {
+                for (stepIndex, item) in expanded.enumerated() where entries.count < 1_000 {
                     entries.append(Entry(
                         id: entries.count, block: item, sourceIndex: sourceIndex,
-                        groupTitle: name, groupSteps: expanded
+                        groupTitle: name, groupSteps: expanded,
+                        groupStepIndex: stepIndex
                     ))
                 }
             } else {
@@ -47,7 +49,7 @@ enum ATHLTHPlanWorkoutCardPresentation {
                 for item in [first].expandedForExecution() where entries.count < 1_000 {
                     entries.append(Entry(
                         id: entries.count, block: item, sourceIndex: sourceIndex,
-                        groupTitle: nil, groupSteps: nil
+                        groupTitle: nil, groupSteps: nil, groupStepIndex: nil
                     ))
                 }
             }
@@ -129,19 +131,23 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
     let workout: PlannedSession
     let completed: Bool
     let skipped: Bool
-    let onEditBlock: (Int?) -> Void
+    let onEditBlock: (Int?, Int?) -> Void
 
     @State private var expanded = false
     @State private var selectedDetail: Selection?
     @State private var editAfterDismiss = false
     @State private var editSourceIndex: Int?
+    @State private var editGroupStepIndex: Int?
+    @State private var viewingEntireInterval = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private struct Selection: Identifiable {
         let id = UUID()
         let title: String
         let blocks: [WorkoutTemplateBlock]
+        let groupSteps: [WorkoutTemplateBlock]?
         let sourceIndex: Int?
+        let groupStepIndex: Int?
     }
 
     private let ink = ATHLTHTrainDesign.ink
@@ -238,10 +244,13 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                                 .foregroundStyle(ink)
                                 ForEach(section.entries) { entry in
                                     Button {
+                                        viewingEntireInterval = false
                                         selectedDetail = Selection(
-                                            title: entry.groupTitle ?? entry.block.title,
-                                            blocks: entry.groupSteps ?? [entry.block],
-                                            sourceIndex: entry.sourceIndex
+                                            title: entry.block.title,
+                                            blocks: [entry.block],
+                                            groupSteps: entry.groupSteps,
+                                            sourceIndex: entry.sourceIndex,
+                                            groupStepIndex: entry.groupStepIndex
                                         )
                                     } label: {
                                         HStack(spacing: 9) {
@@ -292,14 +301,14 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                         Button {
                             selectedDetail = Selection(
                                 title: workout.title, blocks: timeline.map(\.block),
-                                sourceIndex: nil
+                                groupSteps: nil, sourceIndex: nil, groupStepIndex: nil
                             )
                         } label: {
                             Label(tr("Entire workout", "Hele økten"), systemImage: "list.bullet")
                                 .frame(maxWidth: .infinity, minHeight: 42)
                         }
                         .buttonStyle(.bordered)
-                        Button { onEditBlock(nil) } label: {
+                        Button { onEditBlock(nil, nil) } label: {
                             Label(tr("Edit workout", "Rediger økt"),
                                   systemImage: "slider.horizontal.3")
                                 .frame(maxWidth: .infinity, minHeight: 42)
@@ -317,8 +326,9 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
         .sheet(item: $selectedDetail, onDismiss: {
             if editAfterDismiss {
                 editAfterDismiss = false
-                onEditBlock(editSourceIndex)
+                onEditBlock(editSourceIndex, editGroupStepIndex)
                 editSourceIndex = nil
+                editGroupStepIndex = nil
             }
         }) { selection in
             detailSheet(selection)
@@ -334,7 +344,29 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                         .font(.system(size: 25, weight: .semibold, design: .serif))
                         .foregroundStyle(ink)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    ForEach(Array(selection.blocks.enumerated()), id: \.offset) { _, block in
+                    if let allSteps = selection.groupSteps {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                viewingEntireInterval.toggle()
+                            }
+                        } label: {
+                            Label(
+                                viewingEntireInterval
+                                    ? tr("Show selected effort", "Vis valgt drag")
+                                    : tr("Show entire interval series", "Vis hele intervallserien"),
+                                systemImage: viewingEntireInterval
+                                    ? "chevron.up" : "list.number"
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                        }
+                        .buttonStyle(.bordered)
+                        Text("\(allSteps.count) " + tr("steps in the series", "deler i serien"))
+                            .font(.caption)
+                            .foregroundStyle(secondary)
+                    }
+                    ForEach(Array((viewingEntireInterval
+                        ? (selection.groupSteps ?? selection.blocks)
+                        : selection.blocks).enumerated()), id: \.offset) { _, block in
                         VStack(alignment: .leading, spacing: 7) {
                             Text(block.title).font(.headline).foregroundStyle(ink)
                             Text(block.resolvedPhase.title)
@@ -360,6 +392,7 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                     }
                     Button {
                         editSourceIndex = selection.sourceIndex
+                        editGroupStepIndex = selection.groupStepIndex
                         editAfterDismiss = true
                         selectedDetail = nil
                     } label: {
