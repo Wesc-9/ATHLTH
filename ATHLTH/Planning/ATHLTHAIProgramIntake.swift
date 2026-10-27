@@ -192,11 +192,12 @@ struct ATHLTHAIProgramIntake: Equatable {
             issues.append("locationBalance")
         }
         if injuryStatus == nil { issues.append("injuryStatus") }
-        if injuryStatus == .considerations {
+        if injuryStatus == .considerations && healthSharingAuthorized {
+            // Ask for details only when the athlete opted to send them.
+            // Without consent, generate only generic, conservative guidance.
             if injuryAreas.isEmpty { issues.append("injuryAreas") }
             if injurySeverity == nil { issues.append("injurySeverity") }
             if injuryRestriction == nil { issues.append("injuryRestriction") }
-            // Never force sensitive disclosure to create a generic plan.
         }
         return issues
     }
