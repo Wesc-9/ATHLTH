@@ -36,3 +36,7 @@
 - Preserve working behavior; prefer incremental, reversible changes with fast launch, scrolling and rendering.
 - TestFlight uploads require an explicit user request for the active build.
 - SwiftUI development/reviews: use the project-pinned **SwiftUI Pro 2.0.0** skill in `.agents/skills/swiftui-pro/SKILL.md`, including the relevant `references/` files (not a web dependency). Upstream: `twostraws/SwiftUI-Agent-Skill` commit `1eac100257af9068d5f041c1a1540b1790233716` (MIT; see the skill's `LICENSE`). Apply suggestions only when compatible with ATHLTH's existing deployment targets, UX, architecture and explicit change scope; do not perform unrelated refactors.
+- HealthKit, WorkoutKit, health-data permissions, background delivery, live workouts, planned workouts and iPhone/Watch workout coordination: use `.agents/skills/axiom-health/SKILL.md` and load only the relevant bundled references.
+- watchOS app structure, Watch Connectivity, Always On, Smart Stack, complications, Digital Crown, background behavior and Watch diagnostics: use `.agents/skills/axiom-watchos/SKILL.md` together with `axiom-health` for workout-session lifecycle.
+- App Intents, Siri, Shortcuts, Spotlight, widgets, Control Center and Apple Intelligence exposure: use `.agents/skills/app-intents/SKILL.md` and load only the references needed for the task.
+- Project-pinned skills are guidance, not authorization to broaden scope, add dependencies, deploy, or upload to TestFlight. Preserve ATHLTH deployment targets and verify version-specific API availability.
