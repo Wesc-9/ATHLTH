@@ -20,7 +20,7 @@ struct ATHLTHAdvancedPlanAddContentView: View {
 
     let initialKind: Kind
     let phase: WorkoutPhaseKind
-    let onExercise: (WorkoutTemplateBlock) -> Void
+    let onExercise: ([WorkoutTemplateBlock]) -> Void
     let onWorkout: (PlannedSession) -> Void
 
     @State private var kind: Kind = .exercise
@@ -150,8 +150,8 @@ struct ATHLTHAdvancedPlanAddContentView: View {
             }
             .navigationDestination(item: $selectedExerciseID) { exerciseID in
                 if let item = exercises.allExercises.first(where: { $0.id == exerciseID }) {
-                    ATHLTHAdvancedExerciseConfigurationView(entry: item, phase: phase) { block in
-                        onExercise(block)
+                    ATHLTHAdvancedExerciseConfigurationView(entry: item, phase: phase) { blocks in
+                        onExercise(blocks)
                         dismiss()
                     }
                 }
@@ -321,10 +321,13 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
     @Environment(\.dismiss) private var dismiss
     let entry: ExerciseLibraryEntry
     let phase: WorkoutPhaseKind
-    let onAdd: (WorkoutTemplateBlock) -> Void
-    @State private var repetitions = 10
-    @State private var sets = 4
-    @State private var weight: Double = 0
+    let onAdd: ([WorkoutTemplateBlock]) -> Void
+    private struct EditableSet: Identifiable {
+        let id = UUID()
+        var weight: Double = 0
+        var repetitions: Int = 10
+    }
+    @State private var exerciseSets: [EditableSet] = Array(repeating: EditableSet(), count: 4).map { _ in EditableSet() }
     @State private var restSeconds = 120
     @State private var notes = ""
     private let gold = ATHLTHTrainDesign.bronze
@@ -356,22 +359,54 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
                 Divider()
                 Text(tr("Sets and reps", "Sett og reps"))
                     .font(.headline)
-                Stepper(value: $sets, in: 1...20) {
-                    Label("\(sets) " + tr("sets", "sett"), systemImage: "list.number")
+                ForEach(exerciseSets.indices, id: \.self) { index in
+                    HStack(spacing: 10) {
+                        Text("\(index + 1)")
+                            .font(.caption.weight(.semibold))
+                            .frame(width: 25, height: 31)
+                            .background(ATHLTHTrainDesign.paleGold, in: Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(tr("Weight (kg)", "Vekt (kg)"))
+                                .font(.system(size: 9)).foregroundStyle(secondary)
+                            TextField("0", value: $exerciseSets[index].weight, format: .number)
+                                .keyboardType(.decimalPad)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(tr("Reps", "Reps"))
+                                .font(.system(size: 9)).foregroundStyle(secondary)
+                            TextField("10", value: $exerciseSets[index].repetitions,
+                                      format: .number)
+                                .keyboardType(.numberPad)
+                                .textFieldStyle(.roundedBorder)
+                        }
+                        Button {
+                            guard exerciseSets.count > 1 else { return }
+                            exerciseSets.remove(at: index)
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption).foregroundStyle(secondary)
+                                .frame(width: 28, height: 42)
+                        }
+                        .accessibilityLabel(tr("Remove set", "Fjern sett"))
+                    }
+                    .frame(minHeight: 48)
                 }
-                Stepper(value: $repetitions, in: 1...100) {
-                    Label("\(repetitions) " + tr("reps per set", "reps per sett"),
-                          systemImage: "repeat")
+                Button {
+                    guard exerciseSets.count < 20 else { return }
+                    if let last = exerciseSets.last {
+                        exerciseSets.append(EditableSet(weight: last.weight,
+                                                        repetitions: last.repetitions))
+                    }
+                } label: {
+                    Label(tr("Add set", "Legg til sett"), systemImage: "plus")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(gold)
+                        .frame(maxWidth: .infinity, minHeight: 35)
+                        .background(ATHLTHTrainDesign.paleGold.opacity(0.45),
+                                    in: RoundedRectangle(cornerRadius: 10))
                 }
-                HStack {
-                    Text(tr("Target weight (kg)", "Målvekt (kg)"))
-                    Spacer()
-                    TextField("0", value: $weight, format: .number)
-                        .keyboardType(.decimalPad)
-                        .multilineTextAlignment(.trailing)
-                        .frame(width: 78)
-                        .textFieldStyle(.roundedBorder)
-                }
+                .buttonStyle(.plain)
                 Divider()
                 Stepper(value: $restSeconds, in: 0...600, step: 15) {
                     Label(tr("Rest", "Hviletid") + ": \(restSeconds) sek",
@@ -401,25 +436,58 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
         }
         .safeAreaInset(edge: .bottom) {
             Button {
-                var block = WorkoutTemplateBlock(
-                    sequence: 0, kind: .exercise,
-                    title: library.localizedExerciseName(entry),
-                    exerciseSlug: entry.sourceIdentifier,
-                    distanceMeters: nil, repetitions: repetitions,
-                    durationSeconds: nil,
-                    targetWeightKilograms: weight > 0 ? weight : nil,
-                    loadNote: nil,
-                    notes: notes.isEmpty ? nil : notes,
-                    phase: phase
-                )
-                block.exerciseID = entry.id
-                block.setCount = sets
-                block.restBetweenSetsSeconds = Double(restSeconds)
-                if entry.source == .custom && entry.exercise.isVisibleOutsideOwnerLibrary {
-                    block.exerciseSnapshot =
-                        ATHLTHExerciseReferenceResolver.shareableSnapshot(entry.exercise)
+                guard !exerciseSets.isEmpty else { return }
+                let rows = exerciseSets.map {
+                    (reps: max(1, min($0.repetitions, 100)),
+                     weight: $0.weight.isFinite && $0.weight > 0 ? $0.weight : nil)
                 }
-                onAdd(block)
+                let uniform = rows.allSatisfy {
+                    $0.reps == rows[0].reps && $0.weight == rows[0].weight
+                }
+                let payload: [WorkoutTemplateBlock] = {
+                    func block(_ row: (reps: Int, weight: Double?), index: Int) -> WorkoutTemplateBlock {
+                        var value = WorkoutTemplateBlock(
+                            sequence: index, kind: .exercise,
+                            title: library.localizedExerciseName(entry),
+                            exerciseSlug: entry.sourceIdentifier,
+                            distanceMeters: nil, repetitions: row.reps,
+                            durationSeconds: nil,
+                            targetWeightKilograms: row.weight,
+                            loadNote: nil, notes: notes.isEmpty ? nil : notes,
+                            phase: phase
+                        )
+                        value.exerciseID = entry.id
+                        if entry.source == .custom && entry.exercise.isVisibleOutsideOwnerLibrary {
+                            value.exerciseSnapshot =
+                                ATHLTHExerciseReferenceResolver.shareableSnapshot(entry.exercise)
+                        }
+                        return value
+                    }
+                    if uniform {
+                        var one = block(rows[0], index: 1)
+                        one.setCount = rows.count
+                        one.restBetweenSetsSeconds = Double(restSeconds)
+                        return [one]
+                    }
+                    var all: [WorkoutTemplateBlock] = []
+                    for index in rows.indices {
+                        var set = block(rows[index], index: all.count + 1)
+                        set.setCount = 1
+                        all.append(set)
+                        if index < rows.count - 1 && restSeconds > 0 {
+                            all.append(WorkoutTemplateBlock(
+                                sequence: all.count + 1, kind: .rest,
+                                title: tr("Between sets", "Mellom sett"),
+                                exerciseSlug: nil, distanceMeters: nil,
+                                repetitions: nil, durationSeconds: Double(restSeconds),
+                                targetWeightKilograms: nil, loadNote: nil,
+                                notes: nil, phase: .recovery
+                            ))
+                        }
+                    }
+                    return all
+                }()
+                onAdd(payload)
             } label: {
                 Label(tr("Add exercise", "Legg til øvelse"),
                       systemImage: "plus")
