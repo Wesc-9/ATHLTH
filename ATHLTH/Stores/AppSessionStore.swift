@@ -44,6 +44,9 @@ struct TrainingPlanProgressSnapshot {
 
 struct AccountTrainingContent: Codable {
     var activePlan: TrainingPlan?
+    // Optional for backwards-compatible decoding of existing local backups.
+    var pausedTrainingPlanIDs: Set<UUID>? = nil
+    var deactivatedTrainingPlanIDs: Set<UUID>? = nil
     var scheduledPlans: [TrainingPlan]
     var planTemplates: [TrainingPlan]
     var savedWorkoutTemplates: [PlannedSession]
@@ -68,6 +71,8 @@ final class AppSessionStore: ObservableObject {
         }
     }
     @Published private(set) var scheduledPlans: [TrainingPlan]
+    @Published private(set) var pausedTrainingPlanIDs: Set<UUID>
+    @Published private(set) var deactivatedTrainingPlanIDs: Set<UUID>
     @Published private(set) var planTemplates: [TrainingPlan]
     @Published private(set) var savedWorkoutTemplates: [PlannedSession]
     @Published private(set) var standalonePlannedSessions: [PlannedSession]
@@ -111,6 +116,8 @@ final class AppSessionStore: ObservableObject {
         self.profile = resolvedProfile
         self.activePlan = activePlan
         self.scheduledPlans = []
+        self.pausedTrainingPlanIDs = []
+        self.deactivatedTrainingPlanIDs = []
         self.planTemplates = []
         self.savedWorkoutTemplates = []
         self.standalonePlannedSessions = []
@@ -600,6 +607,8 @@ final class AppSessionStore: ObservableObject {
         loadingAccountContent = true
         activePlan = nil
         scheduledPlans = []
+        pausedTrainingPlanIDs = []
+        deactivatedTrainingPlanIDs = []
         savedRoutes = []
         planTemplates = []
         savedWorkoutTemplates = []
@@ -1641,11 +1650,64 @@ final class AppSessionStore: ObservableObject {
         return true
     }
 
+    /// Explicit lifecycle decisions are independent of plan dates. A paused
+    /// or deactivated plan must never reappear when the app refreshes Today.
+    func isTrainingPlanPaused(_ id: UUID) -> Bool {
+        pausedTrainingPlanIDs.contains(id)
+    }
+
+    func isTrainingPlanDeactivated(_ id: UUID) -> Bool {
+        deactivatedTrainingPlanIDs.contains(id)
+    }
+
+    @discardableResult
+    func pauseTrainingPlan(_ id: UUID) -> Bool {
+        guard trainingPlan(withID: id) != nil else { return false }
+        deactivatedTrainingPlanIDs.remove(id)
+        pausedTrainingPlanIDs.insert(id)
+        if let active = activePlan, active.id == id {
+            activePlan = nil
+            scheduledPlans.removeAll { $0.id == id }
+            scheduledPlans.append(active)
+        }
+        refreshActivePlanForToday()
+        return true
+    }
+
+    @discardableResult
+    func deactivateTrainingPlan(_ id: UUID) -> Bool {
+        guard trainingPlan(withID: id) != nil else { return false }
+        pausedTrainingPlanIDs.remove(id)
+        deactivatedTrainingPlanIDs.insert(id)
+        if let active = activePlan, active.id == id {
+            activePlan = nil
+            scheduledPlans.removeAll { $0.id == id }
+            scheduledPlans.append(active)
+        }
+        refreshActivePlanForToday()
+        return true
+    }
+
+    /// Resume/activate an explicitly paused plan. Only one active plan is
+    /// allowed and existing overlapping schedules must still be resolved.
+    @discardableResult
+    func resumeTrainingPlan(_ id: UUID) -> Bool {
+        guard let plan = trainingPlan(withID: id),
+              activePlan == nil || activePlan?.id == id else { return false }
+        let wasPaused = pausedTrainingPlanIDs.remove(id) != nil
+        let wasDeactivated = deactivatedTrainingPlanIDs.remove(id) != nil
+        guard wasPaused || wasDeactivated else { return true }
+        refreshActivePlanForToday()
+        return true
+    }
+
     func refreshActivePlanForToday(
         referenceDate: Date = Date()
     ) {
         var plans = trainingPlans.map(normalizedTrainingPlan)
         let activeCandidates = plans.filter {
+            !pausedTrainingPlanIDs.contains($0.id) &&
+            !deactivatedTrainingPlanIDs.contains($0.id) &&
             trainingPlanStatusWithoutCurrentPlan(
                 $0,
                 referenceDate: referenceDate
@@ -1681,6 +1743,8 @@ final class AppSessionStore: ObservableObject {
     func deleteTrainingPlan(
         _ planID: UUID
     ) {
+        pausedTrainingPlanIDs.remove(planID)
+        deactivatedTrainingPlanIDs.remove(planID)
         if let plan = trainingPlan(withID: planID) {
             for workout in plan.weeks.flatMap(\.days).flatMap(\.sessions) {
                 PlannedWorkoutReminderScheduler.cancel(workout.id)
@@ -4571,6 +4635,8 @@ final class AppSessionStore: ObservableObject {
 
         let content = AccountTrainingContent(
             activePlan: activePlan,
+            pausedTrainingPlanIDs: pausedTrainingPlanIDs,
+            deactivatedTrainingPlanIDs: deactivatedTrainingPlanIDs,
             scheduledPlans: scheduledPlans,
             planTemplates: planTemplates,
             savedWorkoutTemplates: savedWorkoutTemplates,
@@ -4659,6 +4725,8 @@ final class AppSessionStore: ObservableObject {
         let ownsUnlabelledLegacy = defaults.string(forKey: "legacy.trainingOwner") == userID.uuidString
         let legacyPlan = mayMigrate ? Self.loadActivePlan(from: defaults) : nil
         activePlan = stored?.activePlan ?? (legacyPlan?.ownerID == userID ? legacyPlan : nil)
+        pausedTrainingPlanIDs = stored?.pausedTrainingPlanIDs ?? []
+        deactivatedTrainingPlanIDs = stored?.deactivatedTrainingPlanIDs ?? []
         scheduledPlans = stored?.scheduledPlans ?? (mayMigrate ? Self.loadScheduledPlans(from: defaults).filter { $0.ownerID == userID } : [])
         planTemplates = stored?.planTemplates ?? (mayMigrate ? Self.loadPlanTemplates(from: defaults).filter { $0.ownerID == userID } : [])
         savedRoutes = stored?.savedRoutes ?? (mayMigrate ? Self.loadSavedRoutes(from: defaults).filter { $0.ownerID == userID } : [])
