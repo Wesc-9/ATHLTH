@@ -118,8 +118,9 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.editorKind = advanced && ["day", "studio", "library"].contains(editorKind ?? "")
             ? editorKind : nil
         self.simpleMinutes = simpleMinutes.map { min(max($0, 5), 180) }
-        self.simpleActivityKinds = simpleActivityKinds?
-            .filter { ["running", "walking", "strength"].contains($0) }
+        self.simpleActivityKinds = simpleActivityKinds?.filter {
+            ["running", "walking", "strength"].contains($0)
+        }
         if let preferredDayIndexes {
             let valid = Set(preferredDayIndexes.filter { (1...7).contains($0) })
             self.preferredDayIndexes = valid.isEmpty ? nil : valid.sorted()
