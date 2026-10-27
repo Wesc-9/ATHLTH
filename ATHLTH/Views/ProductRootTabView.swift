@@ -10601,10 +10601,18 @@ struct ATHLTHTrainView: View {
     }
 
     private var libraryContent: some View {
-        TrainingLibraryHomeView { workout in
-            pendingPlannedEnduranceWorkout = nil
-            pendingRunningTemplate = workout
-        }
+        TrainingLibraryHomeView(
+            onStartRunning: { workout in
+                pendingPlannedEnduranceWorkout = nil
+                pendingRunningTemplate = workout
+            },
+            onOpenPlan: { planID in
+                highlightedTrainPlanID = planID
+                selectedTrainPlanWeekIndex = nil
+                selectedSection = .plan
+                showingLibrary = false
+            }
+        )
     }
 
     private func quickStartTile(
