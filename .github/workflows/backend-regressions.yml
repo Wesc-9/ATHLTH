@@ -16,6 +16,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Guard Insights tab routing and reference design
+        run: python3 scripts/audit_insights_entrypoints.py
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
