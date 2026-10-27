@@ -691,7 +691,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }) {
             AIProgramBuilderView(
                 mode: .generate,
-                seed: aiBuilderSeed,
+                // Coach selected on the start screen must collect its own
+                // intake. Seeded AI for legacy drafts keeps its wizard values.
+                seed: entryChoice == .coach ? nil : aiBuilderSeed,
                 onProgramCreatedPlanID: { id in
                     createdPlanID = id
                     completedPlanCreation = true
