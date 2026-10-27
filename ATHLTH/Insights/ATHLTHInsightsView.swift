@@ -25,27 +25,17 @@ struct ATHLTHInsightsView: View {
     @State private var sessionBaselines = InsightsSessionBaselines.empty
 
     var body: some View {
-        let immersive =
-            UIDevice.current.userInterfaceIdiom == .pad ||
-            UIScreen.main.bounds.width >= 390
-
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTrainDesign.gold.opacity(0.28),
+                accent: ATHLTHInsightsStyle.canvas,
+                immersiveTransition: true,
                 pullDownFadeBridge: true,
-                lightweightScrolling: true
+                lightweightScrolling: true,
+                sheetOverlapOverride: 32
             ) {
-                ATHLTHTabHero(
+                ATHLTHInsightsCoverHero(
                     imageName: insightsHeroImage,
-                    title: ATHLTHLocalization.choose(english: "Insights", norwegian: "Innsikt"),
-                    subtitle: insightsHeroSubtitle,
-                    height: 236,
-                    alignment: .leading,
-                    focalOffsetX: immersive ? 4 : 16,
-                    focalOffsetY: immersive ? 6 : 16,
-                    titleFontSize: immersive ? 31 : 30,
-                    copyWidthFraction: immersive ? 0.72 : 0.84,
-                    immersiveCopy: immersive
+                    subtitle: insightsHeroSubtitle
                 )
             } content: {
                 LazyVStack(alignment: .leading, spacing: 16) {
@@ -111,7 +101,7 @@ struct ATHLTHInsightsView: View {
         case .overview: return "ProgressHero"
         case .health: return "RecoveryHero"
         case .training: return "GoalMountain"
-        case .development: return "ProgressHero"
+        case .development: return "GoalProgress"
         }
     }
 
@@ -129,73 +119,56 @@ struct ATHLTHInsightsView: View {
     private var overviewSection: some View {
         Group {
             readinessOverviewCard
-            dailyRecommendationCard
-            ATHLTHInsightsDailyCheckInCard(store: checkInStore) {
-                showingCheckIn = true
-            }
-            detailDestinationsCard
+            signalPerspectiveCard
         }
     }
-
     private var healthSection: some View {
         Group {
+            healthSignalIntroCard
             ATHLTHInsightsReferenceSignalCard(
                 metric: .sleep, snapshot: recoverySnapshot
             ) { selectedSection = .development }
             ATHLTHInsightsReferenceSignalCard(
-                metric: .restingHeartRate, snapshot: recoverySnapshot
-            ) { selectedSection = .development }
-            ATHLTHInsightsReferenceSignalCard(
                 metric: .hrv, snapshot: recoverySnapshot
             ) { selectedSection = .development }
-            ATHLTHInsightsReferenceSignalCard(
-                metric: .respiratory, snapshot: recoverySnapshot
-            ) { selectedSection = .development }
-            NavigationLink {
-                ATHLTHRecoveryView(onSelectTab: onSelectTab)
+            DisclosureGroup {
+                VStack(spacing: 14) {
+                    ATHLTHInsightsReferenceSignalCard(
+                        metric: .restingHeartRate, snapshot: recoverySnapshot
+                    ) { selectedSection = .development }
+                    ATHLTHInsightsReferenceSignalCard(
+                        metric: .respiratory, snapshot: recoverySnapshot
+                    ) { selectedSection = .development }
+                }
+                .padding(.top, 10)
             } label: {
-                insightDestinationRow(
-                    title: tr("Recovery details", "Restitusjon"),
-                    subtitle: tr("Sleep, soreness and your personal baseline",
-                                 "Søvn, stølhet og personlige grunnlinjer"),
-                    icon: "leaf"
-                )
-                .padding(18)
-                .athlthTrainPaper()
+                Label(tr("More body signals", "Flere kroppssignaler"),
+                      systemImage: "waveform.path.ecg")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
             }
-            .buttonStyle(.plain)
+            .tint(ATHLTHInsightsStyle.accent)
+            .padding(17)
+            .athlthInsightsSurface()
         }
     }
-
     private var trainingSection: some View {
         Group {
-            ATHLTHInsightsReferenceLoadCard(snapshot: recoverySnapshot) {
-                selectedSection = .development
-            }
-            ATHLTHInsightsReferenceTimeCard(days: trainingDays)
+            ATHLTHInsightsMuscleCard(summary: muscleSummary)
+            trainingRhythmCard
             ATHLTHInsightsReferenceDistributionCard(
                 load: recoverySnapshot.trainingLoad,
                 sessionCount: trainingDays.reduce(0) { $0 + $1.sessions }
             )
-            ATHLTHInsightsMuscleCard(summary: muscleSummary)
         }
     }
-
     private var developmentSection: some View {
         Group {
+            whatChangedCard
             ATHLTHInsightsDailyCheckInCard(store: checkInStore) {
                 showingCheckIn = true
             }
-            whatChangedCard
-            trendCard
-            ATHLTHInsightsReferenceSignalCard(
-                metric: .sleep, snapshot: recoverySnapshot
-            ) { selectedSection = .health }
-            ATHLTHInsightsReferenceSignalCard(
-                metric: .hrv, snapshot: recoverySnapshot
-            ) { selectedSection = .health }
             whatIfCard
-            detailDestinationsCard
         }
     }
 
@@ -255,7 +228,7 @@ struct ATHLTHInsightsView: View {
             .buttonStyle(.plain)
         }
         .padding(17)
-        .athlthTrainPaper()
+        .athlthInsightsSurface()
     }
 
     private var dailyRecommendationTitle: String {
@@ -354,25 +327,9 @@ struct ATHLTHInsightsView: View {
                 readinessMetric(tr("Resting HR", "Hvilepuls"), restingHRValue, "heart.fill")
                 readinessMetric("HRV", hrvValue, "waveform.path.ecg")
             }
-            HStack(spacing: 7) {
-                readinessMetric(
-                    tr("Breathing", "Respirasjon"),
-                    recoverySnapshot.days.reversed()
-                        .compactMap(\.respiratoryRate).first.map {
-                            String(format: "%.1f/min", $0)
-                        } ?? "—",
-                    "lungs"
-                )
-                readinessMetric(
-                    tr("Training load", "Belastning"),
-                    recoverySnapshot.days.isEmpty ? "—"
-                        : "\(Int(recoverySnapshot.trainingLoad.acuteMinutes.rounded())) min",
-                    "chart.bar.fill"
-                )
-            }
         }
         .padding(18)
-        .athlthTrainPaper(emphasized: true)
+        .athlthInsightsSurface()
     }
 
     private func readinessMetric(_ title: String, _ value: String, _ icon: String) -> some View {
@@ -403,7 +360,7 @@ struct ATHLTHInsightsView: View {
     ) -> some View {
         VStack(alignment: .leading, spacing: 12, content: content)
             .padding(18)
-            .athlthTrainPaper()
+            .athlthInsightsSurface()
     }
 
     private func tr(_ english: String, _ norwegian: String) -> String {
@@ -888,7 +845,7 @@ struct ATHLTHInsightsView: View {
             to: &items,
             percent: snapshot.trainingDurationChangePercent,
             threshold: 8,
-            noun: "Training time",
+            noun: tr("Training time", "Treningstid"),
             icon: "clock.arrow.circlepath",
             tint: ATHLTHTheme.accent
         )
@@ -906,7 +863,7 @@ struct ATHLTHInsightsView: View {
             to: &items,
             percent: snapshot.workoutChangePercent,
             threshold: 10,
-            noun: "Workout frequency",
+            noun: tr("Workout frequency", "Øktfrekvens"),
             icon: "calendar.badge.clock",
             tint: ATHLTHTheme.vitality
         )
@@ -915,7 +872,7 @@ struct ATHLTHInsightsView: View {
             to: &items,
             percent: snapshot.sleepChangePercent,
             threshold: 5,
-            noun: "Average sleep",
+            noun: tr("Average sleep", "Gjennomsnittlig søvn"),
             icon: "moon.stars.fill",
             tint: .purple
         )
@@ -949,13 +906,13 @@ struct ATHLTHInsightsView: View {
         }
 
         let direction = percent >= 0 ? "up" : "down"
-        let title = "\(noun) is \(direction) \(Int(abs(percent).rounded()))%"
+        let title = "\(noun): \(percent >= 0 ? tr("økt", "økt") : tr("reduced", "redusert")) \(Int(abs(percent).rounded())) %"
 
         items.append(
             InsightsChangeItem(
                 id: "\(noun)-\(direction)",
                 title: title,
-                detail: "Compared with the previous 28-day period.",
+                detail: tr("Compared with the previous 28 days.", "Sammenlignet med foregående 28 dager."),
                 icon: icon,
                 tint: tint,
                 percent: percent
