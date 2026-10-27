@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import XCTest
 @testable import ATHLTH
 
@@ -40,6 +41,40 @@ final class TrophyMedalSystemTests: XCTestCase {
             TrophyCatalog.runningDistance.id))
         XCTAssertFalse(PrestigeTrophyCatalog.isPrestigeTrophy(
             TrophyCatalog.strengthSessions.id))
+    }
+
+    @MainActor
+    func testPhysicalAwardArtworkFitsSmallAndLargePresentationSizes() {
+        for size: CGFloat in [54, 78, 86, 112, 190, 278] {
+            for metal in ATHLTHMedalMetal.allCases {
+                let controller = UIHostingController(
+                    rootView: ATHLTHMintedBrandSeal(size: size, metal: metal))
+                controller.loadViewIfNeeded()
+                let fitted = controller.sizeThatFits(
+                    in: CGSize(width: size + 20, height: size + 20))
+                XCTAssertGreaterThan(fitted.width, 0)
+                XCTAssertLessThanOrEqual(fitted.width, size + 20)
+            }
+            let cup = UIHostingController(
+                rootView: ATHLTHGoldPrestigeCupArtwork(
+                    size: size, isUnlocked: true))
+            cup.loadViewIfNeeded()
+            let fitted = cup.sizeThatFits(
+                in: CGSize(width: size + 20, height: size * 1.2 + 20))
+            XCTAssertGreaterThan(fitted.height, 0)
+            XCTAssertLessThanOrEqual(fitted.height, size * 1.2 + 20)
+        }
+    }
+
+    func testReededMedalDieIsFiniteForCompactAwards() {
+        for size: CGFloat in [54, 78, 190] {
+            let path = ATHLTHMedalReededEdge().path(
+                in: CGRect(x: 0, y: 0, width: size, height: size))
+            XCTAssertFalse(path.isEmpty)
+            XCTAssertTrue(path.boundingRect.width.isFinite)
+            XCTAssertTrue(path.boundingRect.height.isFinite)
+            XCTAssertGreaterThan(path.boundingRect.width, size * 0.8)
+        }
     }
 
     func testMedalColoursAreOpaqueMetallicColours() {
