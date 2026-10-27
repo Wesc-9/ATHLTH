@@ -26,41 +26,43 @@ struct ATHLTHInsightsView: View {
 
     var body: some View {
         NavigationStack {
-            ATHLTHPinnedHeroLayout(
-                accent: ATHLTHInsightsStyle.canvas,
-                immersiveTransition: true,
-                pullDownFadeBridge: true,
-                lightweightScrolling: true,
-                sheetOverlapOverride: 32
-            ) {
-                ATHLTHInsightsCoverHero(
-                    imageName: insightsHeroImage,
-                    subtitle: insightsHeroSubtitle
-                )
-            } content: {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    ATHLTHInsightsNavigation(selection: $selectedSection)
-                        .padding(.bottom, 3)
+            // Match Train's single vertically scrolling editorial cover.
+            // This ScrollView expands behind the status bar; the cover alone
+            // compensates for the real device top inset so controls stay safe.
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    ATHLTHInsightsCoverHero(
+                        imageName: insightsHeroImage,
+                        subtitle: insightsHeroSubtitle,
+                        selection: $selectedSection
+                    )
+                    .padding(.horizontal, -17)
 
-                    // Each section has its own hierarchy, but all original
-                    // signals, recommendations, simulator and destinations remain.
-                    switch selectedSection {
-                    case .overview:
-                        AnyView(overviewSection)
-                    case .health:
-                        AnyView(healthSection)
-                    case .training:
-                        AnyView(trainingSection)
-                    case .development:
-                        AnyView(developmentSection)
+                    LazyVStack(alignment: .leading, spacing: 16) {
+                        switch selectedSection {
+                        case .overview:
+                            overviewSection
+                        case .health:
+                            healthSection
+                        case .training:
+                            trainingSection
+                        case .development:
+                            developmentSection
+                        }
                     }
+                    // Same image/card overlap as Train Today, adjusted for
+                    // the shorter Insights cover and four-option capsule.
+                    .padding(.top, -26)
+                    .padding(.bottom, 40)
+                    .zIndex(1)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 14)
-                .padding(.bottom, 32)
+                .padding(.horizontal, 17)
                 .frame(maxWidth: ATHLTHTrainDesign.readingWidth)
                 .frame(maxWidth: .infinity)
             }
+            .scrollIndicators(.hidden)
+            .ignoresSafeArea(.container, edges: .top)
+            .background(ATHLTHInsightsStyle.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingCheckIn) {
                 RecoverySorenessLogView(store: checkInStore)
@@ -1234,12 +1236,21 @@ private struct InsightsChangeItem: Identifiable {
     let percent: Double
 }
 
+/// Compact companion to ATHLTHTrainTodayCoverView: same borderless
+/// status-bar artwork, warm editorial type and overlaid section control.
 private struct ATHLTHInsightsCoverHero: View {
     let imageName: String
     let subtitle: String
+    @Binding var selection: ATHLTHInsightsSection
+
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .largeTitle) private var headingSize: CGFloat = 43
 
     var body: some View {
         GeometryReader { geometry in
+            let safeTop = max(geometry.safeAreaInsets.top,
+                              ATHLTHCoverSafeArea.statusBarTop)
+
             ZStack(alignment: .topLeading) {
                 Image(imageName)
                     .resizable()
@@ -1247,50 +1258,87 @@ private struct ATHLTHInsightsCoverHero: View {
                     .frame(width: geometry.size.width,
                            height: geometry.size.height)
                     .clipped()
+                    .accessibilityHidden(true)
 
+                // Train's bright readable cover treatment instead of the
+                // opaque dark overlay previously obscuring the Insights art.
                 LinearGradient(
                     stops: [
-                        .init(color: .black.opacity(0.38), location: 0),
-                        .init(color: .black.opacity(0.23), location: 0.35),
-                        .init(color: .black.opacity(0.04), location: 0.64),
-                        .init(color: ATHLTHInsightsStyle.canvas.opacity(0.94), location: 1)
+                        .init(color: Color(red: 0.99, green: 0.985, blue: 0.965)
+                            .opacity(0.91), location: 0),
+                        .init(color: Color(red: 0.99, green: 0.985, blue: 0.965)
+                            .opacity(0.73), location: 0.39),
+                        .init(color: .clear, location: 0.88)
                     ],
-                    startPoint: .top,
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+                .allowsHitTesting(false)
+
+                LinearGradient(
+                    colors: [.clear, ATHLTHInsightsStyle.canvas.opacity(0.28)],
+                    startPoint: .center,
                     endPoint: .bottom
                 )
                 .allowsHitTesting(false)
 
                 VStack(alignment: .leading, spacing: 0) {
-                    Text("ATHLTH")
-                        .font(.system(size: 17, weight: .black))
-                        .tracking(4.8)
-                    Text("MOVE BETTER · LIVE LONGER")
-                        .font(.system(size: 8, weight: .semibold))
-                        .tracking(1.6)
-                        .padding(.top, 3)
-
-                    Spacer(minLength: 15)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 7) {
+                            eyebrow
+                            Spacer(minLength: 3)
+                            ATHLTHInsightsNavigation(selection: $selection)
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            eyebrow
+                            ATHLTHInsightsNavigation(selection: $selection)
+                        }
+                    }
 
                     Text(ATHLTHLocalization.choose(
-                        english: "Insights", norwegian: "Innsikt"))
-                        .font(.system(size: 40, weight: .semibold, design: .serif))
-                        .lineLimit(1)
+                        english: "Insights", norwegian: "Innsikt"
+                    ))
+                    .font(.system(size: min(headingSize, 59),
+                                  weight: .regular, design: .serif))
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.78)
+                    .padding(.top, 22)
+                    .accessibilityAddTraits(.isHeader)
+
                     Text(subtitle)
-                        .font(.system(size: 15, weight: .medium))
-                        .padding(.top, 3)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.85)
-                    Spacer().frame(height: 74)
+                        .font(.system(.title3, design: .serif))
+                        .foregroundStyle(ATHLTHInsightsStyle.ink.opacity(0.74))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .padding(.top, 7)
+
+                    Spacer(minLength: 0)
                 }
-                .foregroundStyle(.white)
-                .shadow(color: .black.opacity(0.40), radius: 8, y: 2)
-                .padding(.horizontal, 24)
-                .padding(.top, 77)
+                .padding(.horizontal, 20)
+                .padding(.top, 24 + safeTop)
+                .padding(.bottom, 28)
                 .frame(maxWidth: .infinity, maxHeight: .infinity,
                        alignment: .topLeading)
             }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+            .clipShape(UnevenRoundedRectangle(
+                cornerRadii: .init(topLeading: 0, bottomLeading: 25,
+                                   bottomTrailing: 25, topTrailing: 0),
+                style: .continuous
+            ))
         }
-        .frame(height: 336)
-        .ignoresSafeArea(edges: .top)
+        // Deliberately shorter than Train Today (378 pt), but includes the
+        // same measured status-bar bleed on phones with a Dynamic Island.
+        .frame(height: (dynamicTypeSize.isAccessibilitySize ? 360 : 292)
+                      + ATHLTHCoverSafeArea.statusBarTop)
+        .accessibilityElement(children: .contain)
+    }
+
+    private var eyebrow: some View {
+        Text(ATHLTHLocalization.choose(english: "INSIGHTS", norwegian: "INNSIKT"))
+            .font(.caption2.weight(.semibold))
+            .tracking(2.4)
+            .foregroundStyle(ATHLTHInsightsStyle.ink.opacity(0.74))
+            .lineLimit(1)
     }
 }
