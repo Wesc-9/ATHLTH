@@ -88,6 +88,64 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
         XCTAssertEqual(ranked.most.first?.percentage, 100)
     }
 
+    @MainActor
+    func testAllLoggedMusclesAreRankedAndHighestIs100Percent() {
+        let profile = StrengthMuscleProfile(activations: [
+            .init(region: .quads, score: 8),
+            .init(region: .hamstrings, score: 7.5),
+            .init(region: .glutes, score: 6.8),
+            .init(region: .outerHip, score: 3),
+            .init(region: .upperBack, score: 1),
+            .init(region: .calves, score: 0.5)
+        ])
+        let summary = ATHLTHInsightsMuscleSummary(profile: profile, sessionCount: 18)
+        let all = ATHLTHInsightsMuscleRanking.all(summary)
+        XCTAssertEqual(all.count, 6)
+        XCTAssertEqual(all.map(\.region), [
+            .quads, .hamstrings, .glutes, .outerHip, .upperBack, .calves
+        ])
+        XCTAssertEqual(all.map(\.percentage), [100, 94, 85, 38, 13, 6])
+        XCTAssertEqual(all.filter(\.needsLoadBalanceAttention).map(\.region),
+                       [.quads, .hamstrings, .glutes])
+        let extremes = ATHLTHInsightsMuscleRanking.extremes(summary)
+        XCTAssertEqual(extremes.most.map(\.region), [.quads, .hamstrings])
+        XCTAssertEqual(extremes.least.map(\.region), [.calves, .upperBack])
+    }
+
+    @MainActor
+    func testRedAttentionNeedsEnoughComparativeEvidence() {
+        let profile = StrengthMuscleProfile(activations: [
+            .init(region: .chest, score: 10),
+            .init(region: .biceps, score: 9),
+            .init(region: .triceps, score: 8)
+        ])
+        let oneSession = ATHLTHInsightsMuscleSummary(
+            profile: profile, sessionCount: 1)
+        XCTAssertFalse(ATHLTHInsightsMuscleRanking.all(oneSession)
+            .contains(where: \.needsLoadBalanceAttention))
+        let twoRegions = ATHLTHInsightsMuscleSummary(
+            profile: StrengthMuscleProfile(activations: [
+                .init(region: .chest, score: 10),
+                .init(region: .biceps, score: 9)
+            ]), sessionCount: 10)
+        XCTAssertFalse(ATHLTHInsightsMuscleRanking.all(twoRegions)
+            .contains(where: \.needsLoadBalanceAttention))
+    }
+
+    @MainActor
+    func testUnknownMusclesRemainUncoloredAndUnranked() {
+        let profile = StrengthMuscleProfile(activations: [
+            .init(region: .chest, score: 4),
+            .init(region: .lats, score: 0),
+            .init(region: .quads, score: .nan)
+        ])
+        let all = ATHLTHInsightsMuscleRanking.all(
+            ATHLTHInsightsMuscleSummary(profile: profile, sessionCount: 9))
+        XCTAssertEqual(all.map(\.region), [.chest])
+        XCTAssertEqual(all.first?.percentage, 100)
+        XCTAssertFalse(all.first?.needsLoadBalanceAttention ?? true)
+    }
+
     func testCompactFourTabNavigationFitsPhones() {
         for width in [320.0, 375.0, 430.0] {
             let view = ATHLTHInsightsNavigation(selection: .constant(.overview))
