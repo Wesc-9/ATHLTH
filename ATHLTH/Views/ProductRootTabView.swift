@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 import UserNotifications
 
 enum ATHLTHTrainNavigationRequest: Identifiable {
+    case today
     case plan
     case workout(planID: UUID, workoutID: UUID)
     case quick(WorkoutKind)
@@ -16,6 +17,8 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
 
     var id: String {
         switch self {
+        case .today:
+            return "today"
         case .plan:
             return "plan"
         case let .workout(planID, workoutID):
@@ -11616,6 +11619,9 @@ struct ATHLTHTrainView: View {
         }
 
         switch request {
+        case .today:
+            selectedSection = .today
+
         case .plan:
             selectedSection = .plan
 
