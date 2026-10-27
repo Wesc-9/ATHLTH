@@ -172,6 +172,129 @@ struct ATHLTHInsightsView: View {
         }
     }
 
+    private var healthSignalIntroCard: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Label(tr("See the pattern, not just a number", "Se mønsteret, ikke bare tallet"),
+                  systemImage: "waveform.path.ecg")
+                .font(.system(size: 18, weight: .semibold, design: .serif))
+                .foregroundStyle(ATHLTHInsightsStyle.ink)
+            Text(tr(
+                "Sleep and HRV show your recent seven-day trends. Expand the other measurements only when you want to explore further.",
+                "Søvn og HRV viser utviklingen de siste sju dagene. Utvid øvrige målinger når du vil gå dypere."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHInsightsStyle.muted)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(17)
+        .athlthInsightsSurface()
+    }
+
+    private var signalPerspectiveCard: some View {
+        let recent = recoverySnapshot.days.suffix(7)
+        let hrv = recent.compactMap(\.hrvMilliseconds)
+        let sleep = recent.compactMap { $0.sleepDuration.map { $0 / 3600 } }
+        let number: String
+        let description: String
+        if hrv.count >= 3, let latest = hrv.last {
+            let previous = hrv.dropLast().reduce(0, +) / Double(hrv.count - 1)
+            number = String(format: "%+.0f %%", previous > 0 ?
+                            (latest - previous) / previous * 100 : 0)
+            description = tr(
+                "Latest measured HRV compared with earlier days. Day-to-day variation is not a diagnosis.",
+                "Siste målte HRV sammenlignet med tidligere dager. Daglige variasjoner er ikke en diagnose."
+            )
+        } else if sleep.count >= 3, let latest = sleep.last {
+            let previous = sleep.dropLast().reduce(0, +) / Double(sleep.count - 1)
+            number = String(format: "%+.0f min", (latest - previous) * 60)
+            description = tr(
+                "Last recorded sleep compared with preceding measured nights.",
+                "Siste registrerte søvn sammenlignet med tidligere målte netter."
+            )
+        } else {
+            number = "—"
+            description = tr(
+                "Your own comparison appears after several measured days in Apple Health.",
+                "Din personlige sammenligning vises etter flere dager med målinger i Apple Health."
+            )
+        }
+        return VStack(alignment: .leading, spacing: 10) {
+            Label(tr("Your latest signal", "Ditt siste signal"),
+                  systemImage: "waveform.path.ecg")
+                .font(.system(size: 19, weight: .semibold, design: .serif))
+                .foregroundStyle(ATHLTHInsightsStyle.ink)
+            Text(number)
+                .font(.system(size: 34, weight: .semibold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHInsightsStyle.accent)
+            Text(description)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHInsightsStyle.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(17)
+        .athlthInsightsSurface()
+    }
+
+    private var trainingRhythmCard: some View {
+        let activeDays = trainingDays.filter { $0.sessions > 0 }
+        let totalMinutes = trainingDays.reduce(0.0) { $0 + $1.minutes }
+        let averageMinutes = activeDays.isEmpty ? 0 :
+            Int((totalMinutes / Double(activeDays.count)).rounded())
+        return VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Label(tr("Training rhythm", "Treningsrytme"),
+                      systemImage: "calendar")
+                    .font(.system(size: 19, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
+                Spacer(minLength: 4)
+                Text(tr("7 days", "7 dager"))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text("\(activeDays.count)/\(trainingDays.count)")
+                    .font(.system(size: 31, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
+                Text(tr("days with activity", "dager med aktivitet"))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+            }
+            HStack(spacing: 6) {
+                ForEach(trainingDays) { day in
+                    VStack(spacing: 6) {
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(day.sessions > 0 ?
+                                  ATHLTHInsightsStyle.accent :
+                                  ATHLTHInsightsStyle.track)
+                            .frame(height: 33)
+                            .overlay {
+                                if day.sessions > 1 {
+                                    Text("\(day.sessions)")
+                                        .font(.caption2.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                }
+                            }
+                        Text(day.date.formatted(.dateTime.weekday(.narrow)))
+                            .font(.system(size: 10))
+                            .foregroundStyle(ATHLTHInsightsStyle.muted)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+            }
+            Text(activeDays.isEmpty
+                ? tr("Your rhythm appears when workouts are recorded.",
+                     "Treningsrytmen vises etter registrerte økter.")
+                : tr("Average \(averageMinutes) minutes on active days. Rest days are also visible.",
+                     "Gjennomsnittlig \(averageMinutes) minutter på aktive dager. Hviledager er også synlige."))
+                .font(.caption)
+                .foregroundStyle(ATHLTHInsightsStyle.muted)
+        }
+        .padding(17)
+        .athlthInsightsSurface()
+    }
+
     @MainActor
     private func loadRecoverySignals() async {
         guard health.healthDataAvailable,
@@ -1104,4 +1227,65 @@ private struct InsightsChangeItem: Identifiable {
     let icon: String
     let tint: Color
     let percent: Double
+}
+
+private struct ATHLTHInsightsCoverHero: View {
+    let imageName: String
+    let subtitle: String
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .topLeading) {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width,
+                           height: geometry.size.height)
+                    .clipped()
+
+                LinearGradient(
+                    stops: [
+                        .init(color: .black.opacity(0.38), location: 0),
+                        .init(color: .black.opacity(0.23), location: 0.35),
+                        .init(color: .black.opacity(0.04), location: 0.64),
+                        .init(color: ATHLTHInsightsStyle.canvas.opacity(0.94), location: 1)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .allowsHitTesting(false)
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Text("ATHLTH")
+                        .font(.system(size: 17, weight: .black))
+                        .tracking(4.8)
+                    Text("MOVE BETTER · LIVE LONGER")
+                        .font(.system(size: 8, weight: .semibold))
+                        .tracking(1.6)
+                        .padding(.top, 3)
+
+                    Spacer(minLength: 15)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Insights", norwegian: "Innsikt"))
+                        .font(.system(size: 40, weight: .semibold, design: .serif))
+                        .lineLimit(1)
+                    Text(subtitle)
+                        .font(.system(size: 15, weight: .medium))
+                        .padding(.top, 3)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                    Spacer().frame(height: 74)
+                }
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.40), radius: 8, y: 2)
+                .padding(.horizontal, 24)
+                .padding(.top, 77)
+                .frame(maxWidth: .infinity, maxHeight: .infinity,
+                       alignment: .topLeading)
+            }
+        }
+        .frame(height: 336)
+        .ignoresSafeArea(edges: .top)
+    }
 }
