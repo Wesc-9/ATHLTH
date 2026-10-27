@@ -312,9 +312,9 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
                 .lineLimit(1)
         }
-        .frame(width: 96, alignment: .leading)
-        .padding(.horizontal, 10)
-        .frame(height: 56)
+        .frame(width: 74, alignment: .leading)
+        .padding(.horizontal, 8)
+        .frame(height: 55)
         .background {
             RoundedRectangle(cornerRadius: 15, style: .continuous)
                 .fill(ATHLTHTrainDesign.paper.opacity(0.95))
