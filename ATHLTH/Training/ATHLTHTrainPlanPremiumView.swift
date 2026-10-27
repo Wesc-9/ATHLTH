@@ -213,44 +213,85 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
 
+    // Plan management is secondary to the active schedule: no second
+    // Simple/Advanced choice or competing dashboard below the weekly plan.
     private var studioPlanTools: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 9) {
-                studioModeChoice(
-                    title: tr("Simple", "Enkel"),
-                    subtitle: tr("Weekly planning", "Ukesvis planlegging"),
-                    symbol: "doc.text",
-                    selected: !advanced
-                ) { advanced = false }
-                studioModeChoice(
-                    title: tr("Advanced", "Avansert"),
-                    subtitle: tr("Detailed day by day", "Detaljstyr dag for dag"),
-                    symbol: "slider.horizontal.3",
-                    selected: advanced
-                ) { advanced = true }
+            HStack(spacing: 10) {
+                Button {
+                    if let draft = unfinishedPlanDrafts.first {
+                        openDraft(draft)
+                    } else {
+                        beginNewPlanCreation()
+                    }
+                } label: {
+                    Label(
+                        unfinishedPlanDrafts.isEmpty
+                            ? tr("New training plan", "Ny treningsplan")
+                            : tr("Continue draft", "Fortsett utkast"),
+                        systemImage: unfinishedPlanDrafts.isEmpty ? "plus" : "arrow.uturn.forward"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .foregroundStyle(.white)
+                    .background(warmGold, in: RoundedRectangle(cornerRadius: 15))
+                }
+                Button {
+                    browsingMyPlans.toggle()
+                } label: {
+                    Label(
+                        browsingMyPlans ? tr("Active plan", "Aktiv plan") :
+                            tr("My plans", "Mine planer"),
+                        systemImage: "square.stack"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 48)
+                    .foregroundStyle(graphite)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15)
+                            .strokeBorder(line.opacity(0.7), lineWidth: 0.8)
+                    }
+                }
             }
+            .buttonStyle(.plain)
+
             Button {
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
                     showingPlanTools.toggle()
                 }
             } label: {
-                HStack(spacing: 11) {
-                    Image(systemName: "slider.horizontal.3")
-                    Text(tr("Manage and build plans", "Administrer og bygg planer"))
-                        .font(.subheadline.weight(.semibold))
-                    Spacer(minLength: 0)
-                    Image(systemName: showingPlanTools ? "chevron.up" : "chevron.right")
+                HStack(spacing: 8) {
+                    Image(systemName: "ellipsis.circle")
+                    Text(tr("More plan tools", "Flere planverktøy"))
+                    Spacer()
+                    Image(systemName: showingPlanTools ? "chevron.up" : "chevron.down")
                 }
-                .foregroundStyle(graphite)
-                .frame(minHeight: 56)
-                .padding(.horizontal, 15)
-                .athlthTrainPaper()
+                .font(.caption.weight(.medium))
+                .foregroundStyle(secondaryInk)
+                .frame(minHeight: 42)
             }
             .buttonStyle(.plain)
             if showingPlanTools {
-                studioEntryPoints
-                    .padding(13)
-                    .athlthTrainPaper()
+                VStack(spacing: 10) {
+                    Button {
+                        showingTemplates = true
+                    } label: {
+                        Label(tr("Browse plan templates", "Utforsk planmaler"),
+                              systemImage: "books.vertical")
+                    }
+                    Button {
+                        showingWorkoutLibrary = true
+                    } label: {
+                        Label(tr("Saved workouts", "Lagrede økter"),
+                              systemImage: "bookmark")
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(graphite)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(15)
+                .athlthTrainPaper()
             }
         }
     }
@@ -433,36 +474,16 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     // Reference-inspired Plan: a compact current plan, seven-day selector and
     // expanded selected day. All values come from persisted plan records.
+    // Entirely rebuilt visible Plan chapter. Its data and mutations continue
+    // to use the existing TrainingPlan, day IDs and unified workout builder.
     private func studioPlanWorkspace(_ plan: TrainingPlan) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 13) {
             if let active = session.activePlan, active.id != plan.id {
                 referencePlanSummary(active, isActive: true)
             }
             referencePlanSummary(plan, isActive: session.activePlan?.id == plan.id)
 
-            if !plan.weeks.isEmpty {
-                let index = min(max(selectedWeekIndex ?? currentWeekIndex(plan), 0),
-                                plan.weeks.count - 1)
-                let week = plan.weeks[index]
-                VStack(alignment: .leading, spacing: 12) {
-                    if showingEntirePlan {
-                        premiumAllWeeks(plan)
-                        Divider().overlay(line)
-                    }
-                    referenceWeekNavigator(plan, weekIndex: index)
-                    premiumWeekDayStrip(week, plan: plan)
-                    if let day = premiumSelectedDay(in: week, plan: plan) {
-                        referenceDayWorkspace(day, plan: plan)
-                    }
-                }
-                .padding(10)
-                .background(.white.opacity(0.93),
-                            in: RoundedRectangle(cornerRadius: 22))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 22)
-                        .strokeBorder(line.opacity(0.75), lineWidth: 0.8)
-                }
-            } else {
+            if plan.weeks.isEmpty {
                 Button {
                     showingEditor = true
                 } label: {
@@ -471,37 +492,240 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .frame(maxWidth: .infinity, minHeight: 52)
                 }
                 .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
+            } else {
+                let weekIndex = min(
+                    max(selectedWeekIndex ?? currentWeekIndex(plan), 0),
+                    plan.weeks.count - 1
+                )
+                let week = plan.weeks[weekIndex]
+                VStack(alignment: .leading, spacing: 12) {
+                    referenceWeekNavigator(plan, weekIndex: weekIndex)
+
+                    // Only ONE week is visible at a time. Every day, including
+                    // rest and empty days, gets a real accessible row.
+                    LazyVStack(alignment: .leading, spacing: 8) {
+                        ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                            planReferenceDayRow(day, plan: plan)
+                            if selectedDayID == day.id {
+                                referenceDayWorkspace(day, plan: plan)
+                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        Button {
+                            selectedWeekIndex = weekIndex
+                            showingEditor = true
+                        } label: {
+                            Label(tr("Edit / copy week", "Rediger / kopier uke"),
+                                  systemImage: "square.on.square")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(warmGold)
+                        .background(soft, in: RoundedRectangle(cornerRadius: 14))
+
+                        Button {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                                showingEntirePlan.toggle()
+                            }
+                        } label: {
+                            Label(
+                                showingEntirePlan
+                                    ? tr("Hide weeks", "Skjul uker")
+                                    : tr("All weeks", "Alle uker"),
+                                systemImage: "calendar"
+                            )
+                            .font(.subheadline.weight(.medium))
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(graphite)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                    }
+                    if showingEntirePlan {
+                        premiumAllWeeks(plan)
+                            .padding(.top, 4)
+                    }
+                }
+                .padding(11)
+                .background(.white.opacity(0.87),
+                            in: RoundedRectangle(cornerRadius: 22))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 22)
+                        .strokeBorder(line.opacity(0.62), lineWidth: 0.8)
+                }
             }
         }
     }
 
-    private var referencePageIntro: some View {
-        HStack(alignment: .top, spacing: 9) {
-            VStack(alignment: .leading, spacing: 5) {
-                Text("Plan")
-                    .font(.system(size: 39, weight: .regular, design: .serif))
-                    .foregroundStyle(graphite)
-                    .accessibilityAddTraits(.isHeader)
-                Text(tr("Build week by week, with structure and flow.",
-                        "Bygg uke for uke, med struktur og flyt."))
-                    .font(.system(size: 13))
-                    .foregroundStyle(secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true)
+    /// Premium image-led full-width days, independent of the compact week
+    /// strip that previously hid the planned workout names and details.
+    private func planReferenceDayRow(
+        _ day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        let date = planDayDate(day.dayIndex, plan: plan)
+        let workouts = day.sessions.filter { !$0.isExplicitRestDay }
+        let first = workouts.first
+        let selected = selectedDayID == day.id
+        let image: String = {
+            switch first?.kind {
+            case .running: return "GoalRunning"
+            case .walking: return "GoalWalking"
+            case .strength: return "StrengthQuickHero"
+            case .mobility, .recovery: return "RecoveryHero"
+            case .custom: return "PlanScheduleHero"
+            case .none: return "PlanScheduleHero"
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        }()
+        return Button {
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                selectedDayID = selected ? nil : day.id
+                selectedWorkoutID = nil
+                selectedDetailSection = .structure
+            }
+        } label: {
+            HStack(spacing: 11) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(date.formatted(.dateTime.weekday(.abbreviated)))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(graphite)
+                    Text(date.formatted(.dateTime.day().month(.abbreviated)))
+                        .font(.caption2)
+                        .foregroundStyle(secondaryInk)
+                }
+                .frame(width: 51, alignment: .leading)
 
-            HStack(spacing: 3) {
-                referenceModePill(tr("Simple", "Enkel"), selected: !advanced) {
-                    advanced = false
+                Image(image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 84, height: 76)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 5) {
+                        Image(systemName: first?.kind.systemImage ?? "moon.stars")
+                            .foregroundStyle(warmGold)
+                        Text(first?.title ?? (day.sessions.contains(where: \.isExplicitRestDay)
+                            ? tr("Rest day", "Hviledag")
+                            : tr("Open day", "Ledig dag")))
+                            .font(.system(size: 15, weight: .semibold, design: .serif))
+                            .foregroundStyle(graphite)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
+                    }
+                    if let first {
+                        Text(first.kind.title)
+                            .font(.caption)
+                            .foregroundStyle(secondaryInk)
+                            .lineLimit(1)
+                        HStack(spacing: 5) {
+                            if let duration = ATHLTHPlannedWorkoutPresentation.duration(for: first) {
+                                Text(duration)
+                            }
+                            if workouts.count > 1 {
+                                Text("· \(workouts.count) " + tr("workouts", "økter"))
+                            }
+                            if isPremiumPlanWorkoutCompleted(first, plan: plan) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(warmGold)
+                            }
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(secondaryInk)
+                        .lineLimit(1)
+                    } else {
+                        Text(day.sessions.contains(where: \.isExplicitRestDay)
+                             ? tr("Recovery", "Restitusjon")
+                             : tr("Add a session", "Legg til økt"))
+                            .font(.caption)
+                            .foregroundStyle(secondaryInk)
+                    }
                 }
-                referenceModePill(tr("Advanced", "Avansert"), selected: advanced) {
-                    advanced = true
-                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: selected ? "chevron.up" :
+                      (first == nil ? "plus.circle" : "chevron.right"))
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(warmGold)
+                    .frame(width: 23)
             }
-            .frame(width: 185)
-            .padding(.top, 6)
+            .padding(9)
+            .frame(maxWidth: .infinity, minHeight: 92, alignment: .leading)
+            .background(selected ? soft : .white, in: RoundedRectangle(cornerRadius: 16))
+            .overlay {
+                RoundedRectangle(cornerRadius: 16)
+                    .strokeBorder(selected ? warmGold.opacity(0.6) : line.opacity(0.55),
+                                  lineWidth: selected ? 1.1 : 0.7)
+            }
+            .contentShape(Rectangle())
         }
-        .padding(.bottom, 2)
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            date.formatted(date: .complete, time: .omitted) +
+            ": " + (first?.title ?? tr("Rest or open day", "Hvile eller ledig dag"))
+        )
+        .accessibilityHint(tr("Open day details and editing", "Åpne dagdetaljer og redigering"))
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var referencePageIntro: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tr("YOUR TRAINING", "DIN TRENING"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(2.1)
+                        .foregroundStyle(warmGold)
+                    Text("Plan")
+                        .font(.system(size: 35, weight: .regular, design: .serif))
+                        .foregroundStyle(graphite)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                Spacer(minLength: 4)
+                HStack(spacing: 3) {
+                    referenceModePill(tr("Simple", "Enkel"), selected: !advanced) {
+                        advanced = false
+                    }
+                    referenceModePill(tr("Advanced", "Avansert"), selected: advanced) {
+                        advanced = true
+                    }
+                }
+                .frame(width: 180)
+                .padding(.top, 7)
+            }
+
+            // A compact photographic identity, not a second giant hero.
+            ZStack(alignment: .bottomLeading) {
+                GeometryReader { proxy in
+                    Image("PlanScheduleHero")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: proxy.size.width, height: proxy.size.height)
+                        .clipped()
+                        .accessibilityHidden(true)
+                }
+                LinearGradient(
+                    colors: [.black.opacity(0.02), .black.opacity(0.09), .black.opacity(0.46)],
+                    startPoint: .top, endPoint: .bottom
+                )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("YOUR WEEK. YOUR PACE.", "DIN UKE. DITT TEMPO."))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(1.4)
+                    Text(tr("Plan every session with purpose.",
+                            "Hver økt har sin plass."))
+                        .font(.system(size: 17, weight: .medium, design: .serif))
+                }
+                .foregroundStyle(.white)
+                .padding(16)
+            }
+            .frame(height: 125)
+            .clipShape(RoundedRectangle(cornerRadius: 19))
+        }
     }
 
     private func referenceModePill(
@@ -607,39 +831,52 @@ struct ATHLTHTrainPlanPremiumView: View {
     ) -> some View {
         let from = planDayDate(1, plan: plan)
         let through = planDayDate(7, plan: plan)
+        let workouts = plan.weeks[weekIndex].days.flatMap(\.sessions)
+            .filter { !$0.isExplicitRestDay }.count
+
         return HStack(spacing: 9) {
-            Button {
-                selectPremiumPlanWeek(max(0, weekIndex - 1))
-            } label: {
-                Image(systemName: "chevron.left")
-                    .frame(width: 44, height: 44)
-                    .background(soft, in: Circle())
-            }
-            .disabled(weekIndex == 0)
-            .accessibilityLabel(tr("Previous week", "Forrige uke"))
-            Spacer(minLength: 0)
-            VStack(spacing: 2) {
-                Text(tr("Week", "Uke") + " \(weekIndex + 1)")
-                    .font(.system(size: 20, weight: .semibold, design: .serif))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(tr("TRAINING WEEK", "TRENINGSUKE"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.6)
+                    .foregroundStyle(warmGold)
+                Text(tr("Week \(weekIndex + 1) of \(plan.weeks.count)",
+                        "Uke \(weekIndex + 1) av \(plan.weeks.count)"))
+                    .font(.system(size: 23, weight: .medium, design: .serif))
                     .foregroundStyle(graphite)
                 Text(from.formatted(.dateTime.day().month(.abbreviated)) + " – " +
-                     through.formatted(.dateTime.day().month(.abbreviated)))
-                    .font(.caption)
+                     through.formatted(.dateTime.day().month(.abbreviated)) +
+                     " · \(workouts) " + tr("workouts", "økter"))
+                    .font(.caption2)
                     .foregroundStyle(secondaryInk)
             }
-            Spacer(minLength: 0)
-            Button {
-                selectPremiumPlanWeek(min(weekIndex + 1, plan.weeks.count - 1))
-            } label: {
-                Image(systemName: "chevron.right")
-                    .frame(width: 44, height: 44)
-                    .background(soft, in: Circle())
+            Spacer(minLength: 4)
+            HStack(spacing: 5) {
+                Button {
+                    selectPremiumPlanWeek(max(0, weekIndex - 1))
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .frame(width: 40, height: 43)
+                        .background(soft, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(weekIndex == 0)
+                .accessibilityLabel(tr("Previous week", "Forrige uke"))
+
+                Button {
+                    selectPremiumPlanWeek(min(weekIndex + 1, plan.weeks.count - 1))
+                } label: {
+                    Image(systemName: "chevron.right")
+                        .frame(width: 40, height: 43)
+                        .background(soft, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .disabled(weekIndex == plan.weeks.count - 1)
+                .accessibilityLabel(tr("Next week", "Neste uke"))
             }
-            .disabled(weekIndex >= plan.weeks.count - 1)
-            .accessibilityLabel(tr("Next week", "Neste uke"))
+            .buttonStyle(.plain)
+            .foregroundStyle(warmGold)
         }
-        .foregroundStyle(warmGold)
-        .buttonStyle(.plain)
+        .padding(.horizontal, 3)
+        .padding(.top, 3)
     }
 
     private func referenceDayWorkspace(
