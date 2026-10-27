@@ -241,7 +241,7 @@ struct ProductRootTabView: View {
                 .tabItem { Label("Explore", systemImage: "map.fill") }
                 .tag(3)
 
-            ATHLTHCommunityV4View()
+            ATHLTHCommunityV5View()
                 .tabItem { Label("Community", systemImage: "person.3.fill") }
                 .tag(4)
         }
