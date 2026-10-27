@@ -1341,7 +1341,7 @@ struct TrainingPlanCatalogEntry: Identifiable, Codable, Hashable {
     /// Local plans never disappear when the published server collection is
     /// unavailable or smaller; exact-slug server items are kept once.
     static var bundledCatalog: [TrainingPlanCatalogEntry] {
-        fallbackCatalog + ATHLTHCuratedTrainingPlans.entries
+        fallbackCatalog + ATHLTHZonedPlanLibrary.catalogEntries + ATHLTHCuratedTrainingPlans.entries
     }
 
     var usesCompetitionTaper: Bool {
