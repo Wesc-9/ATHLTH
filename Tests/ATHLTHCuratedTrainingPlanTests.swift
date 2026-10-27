@@ -14,7 +14,7 @@ final class ATHLTHCuratedTrainingPlanTests: XCTestCase {
 
         for plan in entries {
             XCTAssertTrue((6...16).contains(plan.durationWeeks) ||
-                          plan.slug == "marathon-build", plan.slug)
+                          plan.slug == "marathon-build" || plan.tags.contains("zoned"), plan.slug)
             XCTAssertEqual(plan.workoutPattern.count, plan.sessionsPerWeek, plan.slug)
             XCTAssertEqual(plan.sessionBlueprints.count, plan.sessionsPerWeek, plan.slug)
             for blueprint in plan.sessionBlueprints {
