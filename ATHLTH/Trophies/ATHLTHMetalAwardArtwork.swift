@@ -117,69 +117,145 @@ struct ATHLTHMedalHexagon: Shape {
     }
 }
 
-/// One visual component for every non-prestige achievement.
+/// A struck metal medallion, not a flat pictogram. The concentric edge,
+/// reeded rim, specular highlights and recessed die create physical depth.
+/// All category medals share the same mint finish; rarity changes the alloy.
 struct ATHLTHMetalMedalArtwork: View {
     let trophy: TrophyProgressItem
     let size: CGFloat
     var showActivityIcon: Bool = true
-    // Unlock animations must display the metal of the newly earned stage,
-    // even when the trophy series already has a higher unlocked level.
     var rarityOverride: TrophyRarity? = nil
 
     private var metal: ATHLTHMedalMetal {
         ATHLTHMedalMetal(rarity: rarityOverride ?? trophy.displayRarity)
     }
     private var unlocked: Bool { trophy.isUnlocked }
+    private var shadow: Color { metal.shadow }
 
     var body: some View {
         ZStack {
-            ATHLTHMedalHexagon()
-                .fill(LinearGradient(
-                    colors: metal.highlights,
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ))
-                .shadow(color: metal.shadow.opacity(unlocked ? 0.34 : 0.10),
-                        radius: size * 0.075, x: 0, y: size * 0.05)
+            // Real medals have a thick, shadow-casting edge, not a flat hexagon.
+            Circle()
+                .fill(shadow.opacity(0.23))
+                .frame(width: size * 0.91, height: size * 0.91)
+                .blur(radius: size * 0.074)
+                .offset(x: size * 0.035, y: size * 0.067)
 
-            ATHLTHMedalHexagon()
+            Circle()
                 .fill(LinearGradient(
-                    colors: [Color.white.opacity(0.66), .clear, metal.shadow.opacity(0.55)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ))
+                    colors: [shadow, metal.highlights[2],
+                             metal.highlights[0], metal.highlights[4]],
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
                 .padding(size * 0.018)
+                .offset(y: size * 0.033)
 
-            ATHLTHMedalHexagon()
+            Circle()
+                .fill(AngularGradient(
+                    colors: [
+                        metal.highlights[2], metal.highlights[0],
+                        metal.highlights[3], metal.highlights[4],
+                        metal.highlights[1], metal.highlights[0],
+                        metal.highlights[2]
+                    ],
+                    center: .center, startAngle: .degrees(-100),
+                    endAngle: .degrees(260)))
+                .padding(size * 0.025)
+                .overlay {
+                    Circle()
+                        .strokeBorder(
+                            LinearGradient(
+                                colors: [Color.white.opacity(0.94),
+                                         shadow.opacity(0.50),
+                                         metal.highlights[0].opacity(0.85)],
+                                startPoint: .topLeading, endPoint: .bottomTrailing),
+                            lineWidth: max(0.7, size * 0.018)
+                        )
+                        .padding(size * 0.033)
+                }
+
+            // Tiny radial grooves make the rim read as a minted object.
+            ATHLTHMedalReededEdge()
+                .stroke(Color.white.opacity(0.46),
+                        lineWidth: max(0.45, size * 0.005))
+                .padding(size * 0.043)
+                .shadow(color: shadow.opacity(0.25),
+                        radius: size * 0.003, y: size * 0.003)
+
+            Circle()
                 .fill(LinearGradient(
-                    colors: metal.face,
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ))
-                .padding(size * 0.075)
-                .shadow(color: metal.shadow.opacity(0.48), radius: size * 0.013,
-                        x: 0, y: size * 0.022)
+                    colors: [metal.face[0], metal.face[1], metal.face[2]],
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
+                .padding(size * 0.105)
+                .overlay {
+                    Circle()
+                        .strokeBorder(shadow.opacity(0.60),
+                                      lineWidth: max(0.5, size * 0.008))
+                        .padding(size * 0.102)
+                    Circle()
+                        .strokeBorder(Color.white.opacity(0.49),
+                                      lineWidth: max(0.5, size * 0.007))
+                        .padding(size * 0.126)
+                }
+                .shadow(color: shadow.opacity(0.46),
+                        radius: size * 0.017, x: 0, y: size * 0.012)
 
-            ATHLTHMedalHexagon()
-                .stroke(
-                    LinearGradient(
-                        colors: [Color.white.opacity(0.76), metal.shadow.opacity(0.36), Color.white.opacity(0.28)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    ),
-                    lineWidth: max(0.8, size * 0.011)
-                )
-                .padding(size * 0.084)
+            // Brushed-metal reflections, clipped to the recessed field.
+            Circle()
+                .fill(LinearGradient(
+                    stops: [
+                        .init(color: Color.white.opacity(0.22), location: 0),
+                        .init(color: Color.white.opacity(0.02), location: 0.34),
+                        .init(color: shadow.opacity(0.18), location: 0.63),
+                        .init(color: Color.white.opacity(0.12), location: 1)
+                    ],
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
+                .padding(size * 0.13)
 
-            embossedCategorySymbol
-                .frame(width: size * 0.48, height: size * 0.42)
-                .shadow(color: metal.shadow.opacity(0.65),
-                        radius: size * 0.012, x: size * 0.012, y: size * 0.025)
+            if size >= 73 {
+                // Stamped maker's mark and tier—engraving is deliberately
+                // restrained so the silhouette stays readable on small cards.
+                Text("ATHLTH")
+                    .font(.system(size: size * 0.074, weight: .heavy, design: .rounded))
+                    .tracking(size * 0.008)
+                    .foregroundStyle(metal.highlights[0].opacity(0.76))
+                    .shadow(color: shadow.opacity(0.65),
+                            radius: 0.3, x: 0, y: 0.8)
+                    .offset(y: -size * 0.245)
+
+                Text(metal.title.uppercased())
+                    .font(.system(size: size * 0.065, weight: .bold, design: .rounded))
+                    .tracking(size * 0.006)
+                    .foregroundStyle(metal.highlights[0].opacity(0.72))
+                    .shadow(color: shadow.opacity(0.58),
+                            radius: 0.4, x: 0, y: 0.7)
+                    .offset(y: size * 0.255)
+            }
+
+            if showActivityIcon {
+                embossedCategorySymbol
+                    .frame(width: size * 0.37, height: size * 0.36)
+            } else {
+                ATHLTHMarkShape()
+                    .fill(LinearGradient(
+                        colors: [metal.highlights[0], metal.highlights[3],
+                                 metal.highlights[2]],
+                        startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .frame(width: size * 0.32, height: size * 0.22)
+                    .shadow(color: shadow.opacity(0.62),
+                            radius: size * 0.010, y: size * 0.012)
+            }
 
             if !unlocked {
-                ATHLTHMedalHexagon()
-                    .fill(Color(.systemBackground).opacity(0.60))
+                Circle()
+                    .fill(Color.black.opacity(0.34))
+                    .padding(size * 0.03)
+                Circle()
+                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 1)
+                    .padding(size * 0.065)
                 Image(systemName: "lock.fill")
-                    .font(.system(size: size * 0.19, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(size * 0.11)
-                    .background(.thinMaterial, in: Circle())
+                    .font(.system(size: size * 0.16, weight: .medium))
+                    .foregroundStyle(.white.opacity(0.90))
+                    .shadow(color: .black.opacity(0.55), radius: 3, y: 2)
             }
         }
         .frame(width: size, height: size)
@@ -191,36 +267,62 @@ struct ATHLTHMetalMedalArtwork: View {
         if trophy.category == .signature {
             ATHLTHMarkShape()
                 .fill(LinearGradient(
-                    colors: [metal.highlights[0], metal.highlights[1], metal.highlights[3]],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ))
+                    colors: [metal.highlights[0], metal.highlights[3],
+                             metal.highlights[2]],
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
                 .overlay {
                     ATHLTHMarkShape()
-                        .stroke(Color.white.opacity(0.45), lineWidth: max(0.5, size * 0.007))
+                        .stroke(Color.white.opacity(0.60),
+                                lineWidth: max(0.5, size * 0.006))
                 }
-                .frame(width: size * 0.50, height: size * 0.31)
+                .shadow(color: shadow.opacity(0.72),
+                        radius: size * 0.014,
+                        x: size * 0.010, y: size * 0.020)
         } else {
             Image(systemName: trophy.category.medalSystemImage)
                 .resizable()
                 .scaledToFit()
                 .symbolRenderingMode(.monochrome)
                 .foregroundStyle(LinearGradient(
-                    colors: [metal.highlights[0], metal.highlights[1], metal.highlights[3]],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ))
+                    colors: [metal.highlights[0], metal.highlights[3],
+                             metal.highlights[2]],
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
                 .overlay {
                     Image(systemName: trophy.category.medalSystemImage)
                         .resizable()
                         .scaledToFit()
-                        .foregroundStyle(Color.white.opacity(0.24))
-                        .offset(x: -size * 0.007, y: -size * 0.009)
+                        .foregroundStyle(Color.white.opacity(0.32))
+                        .offset(x: -size * 0.009, y: -size * 0.011)
                         .mask {
                             Image(systemName: trophy.category.medalSystemImage)
-                                .resizable()
-                                .scaledToFit()
+                                .resizable().scaledToFit()
                         }
                 }
+                .shadow(color: shadow.opacity(0.82),
+                        radius: size * 0.012,
+                        x: size * 0.010, y: size * 0.022)
         }
+    }
+}
+
+/// One Canvas path instead of dozens of per-medal SwiftUI views.
+private struct ATHLTHMedalReededEdge: Shape {
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        var path = Path()
+        for tick in 0..<80 {
+            let a = Double(tick) * .pi * 2 / 80
+            let inner = radius * 0.893
+            let outer = radius * 0.978
+            path.move(to: CGPoint(
+                x: center.x + cos(a) * inner,
+                y: center.y + sin(a) * inner))
+            path.addLine(to: CGPoint(
+                x: center.x + cos(a) * outer,
+                y: center.y + sin(a) * outer))
+        }
+        return path
     }
 }
 
