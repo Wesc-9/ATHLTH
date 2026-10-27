@@ -196,7 +196,7 @@ struct ATHLTHAIProgramIntake: Equatable {
             if injuryAreas.isEmpty { issues.append("injuryAreas") }
             if injurySeverity == nil { issues.append("injurySeverity") }
             if injuryRestriction == nil { issues.append("injuryRestriction") }
-            if !healthSharingAuthorized { issues.append("healthSharingAuthorized") }
+            // Never force sensitive disclosure to create a generic plan.
         }
         return issues
     }
@@ -227,6 +227,15 @@ struct ATHLTHAIProgramIntake: Equatable {
             Required restriction: \(injuryRestriction?.title ?? "Not specified").
             Athlete notes: \(String(injuryNotes.prefix(500))).
             This restriction is mandatory. Never prescribe movement that loads an area the athlete said must not be loaded. If lower-body training is excluded, do not prescribe running, jumping, squats, lunges or other lower-body loading. For severe or very painful symptoms, keep the plan conservative and tell the athlete to seek qualified medical guidance before resuming affected movements.
+            """
+        } else if injuryStatus == .considerations {
+            injuryText = """
+            The athlete has not authorized sharing the details of their limitations.
+            No affected areas, symptoms or notes are shared. Recommend a generic
+            conservative low-impact starting point, avoid high-intensity and
+            heavy loading, and ask them to consult a qualified professional
+            before attempting potentially aggravating exercise. Never infer
+            undisclosed injuries or present the plan as individually safe.
             """
         } else {
             injuryText = "The athlete explicitly reported no injuries or training limitations."
