@@ -163,3 +163,5 @@ ATHLTH 1.9.9 build 107 — explicit TestFlight request 2026-10-27 (Europe/Oslo),
 ATHLTH 1.9.9 build 107 — user-authorized TestFlight retry 2026-10-27 after resolving AI plan builder interpolation Swift compile errors; source 22b03755023bcab8354c0c897ded463ea786c208. Require passing same-commit iOS and backend checks, signed archive and verified App Store Connect upload; keep release active and unlocked.
 
 ATHLTH 2.0.0 build 108 — TestFlight explicitly requested 2026-10-27. Upload Community V5 new three-tab shell and current release/v2.0.0. Validate iPhone, Watch and Widget versions/signing before App Store Connect upload. Keep release active; no main merge.
+
+ATHLTH 2.0.0 build 108 — explicit user-authorized TestFlight retry 2026-10-27 after replacing stale Community V4 routing in App and Notifications. Archive/sign/upload current release/v2.0.0; verify iOS Watch Widgets.
