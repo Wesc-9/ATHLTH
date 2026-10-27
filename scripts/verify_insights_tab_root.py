@@ -26,7 +26,13 @@ if "ATHLTHInsightsNavigation(selection: $selectedSection)" not in insights:
     raise SystemExit("The premium Insights view must render its section selector")
 if "case overview, health, training, development" not in sections:
     raise SystemExit("The four approved Insights sections must remain available")
-if "ATHLTHRecoveryView(onSelectTab: onSelectTab)" not in insights:
-    raise SystemExit("Keep legacy recovery tools available as a details destination")
+if "ATHLTHRecoveryView(" in insights:
+    raise SystemExit("Old Recovery screens must no longer be reachable from premium Insights")
+if "ATHLTHDailyWellbeingSummaryCard(" not in insights:
+    raise SystemExit("Insights Overview must show the athlete's actual daily answers")
+if "ATHLTHDailyWellbeingTrendCard(" not in insights:
+    raise SystemExit("Insights Trends must show self-reported 7/30-day history")
+if "RecoverySorenessLogView(store: dailyCheckInStore)" not in insights:
+    raise SystemExit("The daily check-in form must remain available inside Insights")
 
-print("Insights tab root, four sections, and legacy recovery details are wired.")
+print("Insights tab root, four sections, self-report history and check-in sheet are wired.")
