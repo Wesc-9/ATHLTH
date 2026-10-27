@@ -62,21 +62,6 @@ struct ATHLTHPlanBuildMethodEntryView: View {
                     ("chart.line.uptrend.xyaxis", tr("Progression", "Progresjon"))
                 ]
             )
-            methodCard(
-                .ai,
-                name: tr("Use AI", "Bruk AI"),
-                description: tr(
-                    "Let ATHLTH Coach suggest a plan from your actual goals, chosen days and time frame. Review it before saving.",
-                    "La ATHLTH Coach foreslå en plan basert på målene, dagene og rammene dine. Godkjenn før lagring."
-                ),
-                photo: "GoalAdventure",
-                symbol: "sparkles",
-                qualities: [
-                    ("brain.head.profile", tr("Smart suggestions", "Smart forslag")),
-                    ("bolt", tr("Fast", "Raskt")),
-                    ("slider.horizontal.3", tr("Editable", "Justerbart"))
-                ]
-            )
             HStack(spacing: 9) {
                 shortcut(
                     tr("Plan library", "Planbibliotek"),
@@ -132,8 +117,8 @@ struct ATHLTHPlanBuildMethodEntryView: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                 Text(tr(
-                    "Choose whether to plan one day at a time, build weeks or use AI.",
-                    "Velg om du vil gå dag for dag, bygge ukene samlet eller få hjelp av AI."
+                    "Choose whether to plan one day at a time or build entire weeks.",
+                    "Velg om du vil planlegge dag for dag eller bygge ukene samlet."
                 ))
                 .font(.system(size: 12))
                 .foregroundStyle(secondary)
