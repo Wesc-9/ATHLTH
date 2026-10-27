@@ -388,7 +388,7 @@ private struct ATHLTHCompatibilityPreviewRootView: View {
             ATHLTHExploreView()
 
         case 4:
-            ATHLTHCommunityV4View()
+            ATHLTHCommunityV5View()
 
         default:
             ATHLTHHomeView(
