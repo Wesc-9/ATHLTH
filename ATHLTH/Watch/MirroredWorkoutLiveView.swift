@@ -1482,7 +1482,7 @@ struct MirroredWorkoutLiveView: View {
                     value: averagePace,
                     unit: "/km"
                 )
-                if snapshot.treadmillInclinePercent != nil &&
+                if snapshot.kind == .running &&
                    snapshot.runningStepTitle == nil {
                     Button {
                         targetPaceDraftSeconds =

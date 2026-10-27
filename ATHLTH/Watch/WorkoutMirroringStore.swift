@@ -440,7 +440,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     @discardableResult
     func sendTreadmillTargetPaceSecondsPerKilometer(_ seconds: Double) -> Bool {
         guard let mirroredSession, let startedAt = snapshot?.startedAt,
-              snapshot?.treadmillInclinePercent != nil,
+              snapshot?.kind == .running,
               seconds.isFinite, (120...1200).contains(seconds),
               let data = try? JSONEncoder().encode(WatchWorkoutMirrorCommand(
                   command: .setTreadmillTargetPace,

@@ -669,7 +669,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func setTreadmillTargetPaceSecondsPerKilometer(_ seconds: Double) {
-        guard treadmillInclinePercent != nil,
+        guard kind == .running,
               seconds.isFinite, (120...1200).contains(seconds) else { return }
         publish {
             self.treadmillTargetPaceSecondsPerKilometer =
