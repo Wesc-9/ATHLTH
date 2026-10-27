@@ -443,7 +443,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .safeAreaInset(edge: .bottom) {
                 if !showingCreatedPlan {
                     if step == .mode {
-                        AnyView(modeContinueBar)
+                        AnyView(modeSetupContinueBar)
                     } else if step == .goal {
                         AnyView(goalContinueBar)
                     } else if step == .basics && mode == .advanced {
@@ -555,6 +555,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: goal) { _, _ in saveResumableDraft() }
         .onChange(of: selectedGoalArea) { _, _ in saveResumableDraft() }
         .onChange(of: selectedGoalChoice) { _, _ in saveResumableDraft() }
+        .onChange(of: selectedGoalIDs) { _, selected in
+            if let linked = goalStore.activeGoals.first(where: {
+                selected.contains($0.id) && $0.status == .active
+            }) {
+                applyExistingGoalFocus(linked)
+            }
+        }
         .onChange(of: varyWeekdays) { _, _ in saveResumableDraft() }
         .onChange(of: selectedSource) { _, _ in saveResumableDraft() }
         .onChange(of: workoutKindOverridesByDay) { _, _ in saveResumableDraft() }
@@ -880,7 +887,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var content: some View {
         switch step {
         case .mode:
-            AnyView(modeChoice)
+            if mode == .advanced {
+                AnyView(advancedScheduleStep)
+            } else {
+                AnyView(simpleScheduleStep)
+            }
         case .goal:
             AnyView(goalChoice)
         case .source:
@@ -1217,6 +1228,89 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         ) {
             sourceRoute.append(.mine)
         }
+    }
+
+    // New plans start in the actual two-mode setup. No legacy "choose mode"
+    // or redundant goal screen sits in front of the approved design.
+    private var modeSetupContinueBar: some View {
+        Button {
+            guard canCreatePlan else { return }
+            if mode == .basic {
+                startDate = Calendar.current.startOfDay(for: .now)
+                setSimpleKinds()
+                createPlan(seedSuggestedWeek: true)
+            } else {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                    step = .approach
+                }
+            }
+        } label: {
+            HStack {
+                Spacer()
+                Text(mode == .basic
+                    ? ATHLTHLocalization.choose(english: "Create simple plan", norwegian: "Lag enkel plan")
+                    : ATHLTHLocalization.choose(english: "Continue to plan builder", norwegian: "Fortsett til planbygger"))
+                    .font(.system(size: 14, weight: .semibold))
+                Spacer()
+                Image(systemName: "arrow.right")
+            }
+            .foregroundStyle(.white)
+            .padding(.horizontal, 19)
+            .frame(maxWidth: .infinity, minHeight: 54)
+            .background(
+                LinearGradient(
+                    colors: [ATHLTHTrainDesign.bronze, Color(red: 0.70, green: 0.52, blue: 0.30)],
+                    startPoint: .leading, endPoint: .trailing
+                ),
+                in: RoundedRectangle(cornerRadius: 20)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!canCreatePlan)
+        .opacity(canCreatePlan ? 1 : 0.45)
+        .padding(.horizontal, 18)
+        .padding(.top, 8)
+        .padding(.bottom, 9)
+        .background(ATHLTHTrainDesign.canvas.opacity(0.99))
+    }
+
+    private func applyExistingGoalFocus(_ linked: ATHLTHGoal) {
+        switch linked.category {
+        case .strength:
+            focus = .strength
+            goal = .getStronger
+            selectedGoalArea = .strength
+            selectedGoalChoice = "power"
+            if mode == .basic { simpleActivities = [.strength] }
+        case .event:
+            focus = .running
+            goal = .raceReady
+            selectedGoalArea = .specific
+            selectedGoalChoice = "event"
+            if mode == .basic { simpleActivities = [.running] }
+            if let deadline = linked.deadline {
+                hasCompetitionDate = true
+                competitionDate = deadline
+            }
+        case .endurance:
+            focus = .running
+            goal = .improveFitness
+            selectedGoalArea = .running
+            selectedGoalChoice = "fitness"
+            if mode == .basic { simpleActivities = [.running] }
+        case .recovery:
+            focus = .generalFitness
+            goal = .improveFitness
+            selectedGoalArea = .general
+            selectedGoalChoice = "wellness"
+            if mode == .basic { simpleActivities = [.walking] }
+        case .consistency, .body, .custom:
+            focus = .generalFitness
+            goal = .improveFitness
+            selectedGoalArea = .general
+            selectedGoalChoice = "fitness"
+        }
+        if mode == .basic { setSimpleKinds() }
     }
 
     private var modeContinueBar: some View {
@@ -6716,6 +6810,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func goBack() {
+        if step == .approach {
+            withAnimation(.easeInOut(duration: 0.18)) { step = .mode }
+            return
+        }
         guard let previous = ATHLTHPlanJourney.previous(
             before: step, advanced: mode == .advanced
         ) else {
