@@ -82,7 +82,10 @@ if "AnyView(ProductRootTabView())" not in preview:
 # Regression: the root ScrollView began below the Dynamic Island while the
 # cover still rounded its upper corners, leaving a pale horizontal strip.
 train_cover = Path("ATHLTH/Training/ATHLTHTrainTodayCoverView.swift").read_text()
-if "edges: selectedSection == .today ? .top : []" not in root:
+if "edges: section == .today ? .top : []" not in root or (
+    ".ignoresSafeArea(.container, edges: section == .today ? .top : [])"
+    not in root
+):
     fail("Train Today ScrollView must ignore the top safe area")
 if "ATHLTHCoverSafeArea.statusBarTop" not in train_cover:
     fail("Train cover must reserve safe space for the Dynamic Island controls")
