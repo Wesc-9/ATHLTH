@@ -28,6 +28,7 @@ on:
       - release/v1.9.0
       - release/v1.9.1
       - release/v1.9.2
+      - release/v1.9.9
     paths:
       - ATHLTH/**/*.swift
       - ATHLTHWidgets/**/*.swift
@@ -56,6 +57,9 @@ jobs:
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify Insights main-tab and preview routing
+        run: python3 scripts/audit_insights_entrypoints.py
 
       - name: Select Xcode 27
         run: |
@@ -116,6 +120,13 @@ jobs:
           test -s "$DEVICE_MATRIX"
 
           cat "$DEVICE_MATRIX"
+
+          # The app was built in an earlier workflow step. Explicitly
+          # resolve it in this shell; step-local variables are not inherited.
+          APP=$(find "$RUNNER_TEMP/DerivedData/Build/Products/Release-iphonesimulator" \
+            -maxdepth 1 -name 'ATHLTH.app' -print -quit)
+          test -n "$APP"
+          test -d "$APP"
 
           cleanup_device() {
             local udid="$1"
