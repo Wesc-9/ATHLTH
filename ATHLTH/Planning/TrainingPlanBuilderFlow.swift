@@ -3744,43 +3744,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
 
     // Quick week planning and day-by-day planning share one persisted date model.
-    private var chooseWeekPlanningApproach: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            stepIntro(
-                eyebrow: ATHLTHLocalization.choose(english: "03 · YOUR APPROACH", norwegian: "03 · DIN PLANLEGGING"),
-                title: ATHLTHLocalization.choose(english: "How do you want to plan?", norwegian: "Hvordan vil du planlegge?"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Both choices produce the same editable training plan.",
-                    norwegian: "Begge valgene gir deg samme treningsplan, med mulighet for å endre alt senere."
-                ),
-                icon: "calendar.badge.plus"
-            )
-            ATHLTHPlanWeekApproachCard(
-                icon: "calendar",
-                title: ATHLTHLocalization.choose(english: "Quick week", norwegian: "Rask ukeplan"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Pick your days and start with a week overview. Add detail when you want.",
-                    norwegian: "Velg treningsdager og start med ukeoversikten. Legg til detaljer når du vil."
-                )
-            ) {
-                weekPlanningApproach = .quick
-            }
-            ATHLTHPlanWeekApproachCard(
-                icon: "list.number",
-                title: ATHLTHLocalization.choose(english: "Day by day", norwegian: "Bygg dag for dag"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Plan each date in order. After week one, copy it or continue.",
-                    norwegian: "Planlegg én dag om gangen. Etter første uke kan du kopiere den eller fortsette."
-                )
-            ) {
-                weekPlanningApproach = .guided
-                guidedDayCursor = 0
-                firstGuidedWeekDecisionMade = false
-                repeatWeekCount = max(1, weekCount - 1)
-            }
-        }
-    }
-
     private var guidedCurrentWeek: Int { min(guidedDayCursor / 7, max(0, weekCount - 1)) }
 
     private var guidedCurrentDate: Date {
