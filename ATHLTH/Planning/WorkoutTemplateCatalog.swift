@@ -1804,6 +1804,7 @@ struct WorkoutTemplateBuilderView: View {
     private let draftContext: String
     private let initialQuickAdd: String?
     private let initialFocusedBlockIndex: Int?
+    private let initialFocusedExecutionStepIndex: Int?
     private let plannedDate: Date?
     private let planCopyDays: [ATHLTHPlanCopyDay]
     private let onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)?
@@ -1819,6 +1820,7 @@ struct WorkoutTemplateBuilderView: View {
         initialQuickAdd: String? = nil,
         initialPhase: WorkoutPhaseKind? = nil,
         initialFocusedBlockIndex: Int? = nil,
+        initialFocusedExecutionStepIndex: Int? = nil,
         initialDurationOverrideMinutes: Int? = nil,
         draftContext: String = "shared-template",
         plannedDate: Date? = nil,
@@ -1843,6 +1845,7 @@ struct WorkoutTemplateBuilderView: View {
         self.draftContext = draftContext
         self.initialQuickAdd = initialQuickAdd
         self.initialFocusedBlockIndex = initialFocusedBlockIndex
+        self.initialFocusedExecutionStepIndex = initialFocusedExecutionStepIndex
         self.plannedDate = plannedDate
         self.planCopyDays = planCopyDays
         self.onCopyToPlan = onCopyToPlan
@@ -2248,10 +2251,26 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 if let focused = initialFocusedBlockIndex,
                    blocks.indices.contains(focused) {
-                    expandedBlockIndex = focused
-                    selectedPhase = blocks[focused].resolvedPhase
-                    if let groupID = blocks[focused].groupID {
-                        collapsedGroupIDs.remove(groupID)
+                    // The Plan card uses the executable interval index, not
+                    // just the compact group's first recipe item. Split only
+                    // when a specific round was selected. This allows editing
+                    // duration, pace, incline and recovery independently.
+                    if let requestedStep = initialFocusedExecutionStepIndex,
+                       let groupID = blocks[focused].groupID,
+                       blocks[focused].groupKind == .intervals,
+                       let individualized = ATHLTHIntervalGroupEditing.individualSteps(
+                           in: blocks, groupID: groupID
+                       ) {
+                        blocks = individualized
+                        let index = min(focused + requestedStep, blocks.count - 1)
+                        expandedBlockIndex = index
+                        selectedPhase = blocks[index].resolvedPhase
+                    } else {
+                        expandedBlockIndex = focused
+                        selectedPhase = blocks[focused].resolvedPhase
+                        if let groupID = blocks[focused].groupID {
+                            collapsedGroupIDs.remove(groupID)
+                        }
                     }
                 }
                 draftActive = true
