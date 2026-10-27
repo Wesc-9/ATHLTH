@@ -207,7 +207,8 @@ extension AIProgramDraft {
                     targetPaceSecondsPerKilometer: sameKind
                         ? proposed?.targetPaceSecondsPerKilometer : nil,
                     notes: sameKind ? proposed?.notes : nil,
-                    exercises: sameKind ? (proposed?.exercises ?? []) : []
+                    exercises: sameKind ? (proposed?.exercises ?? []) : [],
+                    blocks: sameKind ? proposed?.blocks : nil
                 )
                 return AIProgramDraftDay(
                     dayIndex: day.dayIndex, title: day.title,
