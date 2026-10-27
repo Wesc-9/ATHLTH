@@ -401,13 +401,18 @@ struct ATHLTHTrainPlanPremiumView: View {
     private var studioEmptyState: some View {
         VStack(alignment: .leading, spacing: 15) {
             VStack(spacing: 0) {
-                Image("PlanGoalHero")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 224)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
-                    .accessibilityHidden(true)
+                // A scaled-to-fill image must receive a *concrete* width.
+                // Otherwise its aspect-ratio ideal width expands the entire
+                // Plan tab (including the heading and cards) beyond the phone.
+                GeometryReader { bounds in
+                    Image("PlanGoalHero")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: bounds.size.width, height: 224)
+                        .clipped()
+                        .accessibilityHidden(true)
+                }
+                .frame(height: 224)
 
                 VStack(spacing: 12) {
                     Image(systemName: "dumbbell")
@@ -443,7 +448,13 @@ struct ATHLTHTrainPlanPremiumView: View {
                     }
                     .buttonStyle(.plain)
                     .padding(.top, 4)
-                    HStack(spacing: 9) {
+                    LazyVGrid(
+                        columns: Array(
+                            repeating: GridItem(.flexible(minimum: 0), spacing: 9),
+                            count: 3
+                        ),
+                        spacing: 9
+                    ) {
                         referenceEmptyAction(tr("Use template", "Bruk mal"),
                                              caption: tr("Ready plans", "Ferdige planer"),
                                              symbol: "doc.text") {
@@ -482,7 +493,13 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .font(.caption)
                     .foregroundStyle(warmGold)
             }
-            HStack(spacing: 9) {
+            LazyVGrid(
+                columns: Array(
+                    repeating: GridItem(.flexible(minimum: 0), spacing: 9),
+                    count: 3
+                ),
+                spacing: 9
+            ) {
                 referenceTemplateCard("GoalStrength",
                                       title: tr("Strength", "Styrke"),
                                       detail: tr("Strength templates", "Styrkemaler"))
@@ -548,13 +565,15 @@ struct ATHLTHTrainPlanPremiumView: View {
     ) -> some View {
         Button { showingTemplates = true } label: {
             VStack(alignment: .leading, spacing: 6) {
-                Image(asset)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(height: 91)
-                    .frame(maxWidth: .infinity)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 11))
+                GeometryReader { bounds in
+                    Image(asset)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: bounds.size.width, height: 91)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 11))
+                }
+                .frame(height: 91)
                 Text(title)
                     .font(.system(size: 12, weight: .semibold, design: .serif))
                     .foregroundStyle(graphite)
