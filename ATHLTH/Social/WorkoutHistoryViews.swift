@@ -1016,6 +1016,7 @@ struct PostWorkoutReviewView: View {
     @State private var completionWaitingSeconds: TimeInterval?
     @State private var completionRoute: [CLLocation] = []
     @State private var isAdvancedReview = false
+    @State private var showingKilometerDetails = false
     @State private var showingTrainingPartners = false
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var selectedPhotoPreviews: [Data] = []
@@ -1028,6 +1029,9 @@ struct PostWorkoutReviewView: View {
                     summaryCard
                     if workout.activity != .strength {
                         resultStrip
+                        if workout.activity == .running || workout.activity == .walking {
+                            kilometerSplitsDisclosure
+                        }
                     }
                     if let recorded = completedPhoneStepResults, !recorded.isEmpty {
                         recordedIntervalsReviewCard(recorded)
@@ -1266,6 +1270,129 @@ struct PostWorkoutReviewView: View {
                 }
             }
         }
+    }
+
+    /// Prefer genuine GPS kilometer markers outdoors. On a treadmill use
+    /// recorded Watch/iPhone minute distance, never the planned target speed.
+    private var reviewedKilometerSplits: [ATHLTHRunningResultInsights.KilometerSplit] {
+        let routeSplits = ATHLTHRunningResultInsights.kilometerSplits(
+            from: completionRoute, reportedDistanceMeters: workout.distanceMeters)
+        if !routeSplits.isEmpty { return routeSplits }
+
+        let history = ATHLTHRunningPerformanceHistory.load(
+            userID: session.profile.userID)
+        let recorded = ATHLTHRunningPerformanceHistory.match(
+            workoutID: workout.id,
+            endDate: workout.endDate,
+            duration: workout.duration,
+            candidates: history
+        )
+        let phoneMinutes: [ATHLTHRecordedRunningMinute]? = {
+            guard let phone = phoneWorkout.lastCompletedWorkout,
+                  phone.id == workout.id || phone.healthID == workout.id
+            else { return nil }
+            return phone.recordedRunningMinutes
+        }()
+        return ATHLTHRunningResultInsights.kilometerSplits(
+            from: recorded?.minutes ?? phoneMinutes ?? [],
+            reportedDistanceMeters: workout.distanceMeters
+        )
+    }
+
+    private var kilometerSplitsDisclosure: some View {
+        let splits = reviewedKilometerSplits
+        return VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.24)) {
+                    showingKilometerDetails.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "figure.run")
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Kilometer by kilometer",
+                            norwegian: "Kilometer for kilometer"
+                        ))
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        Text("\(splits.count) " + ATHLTHLocalization.choose(
+                            english: "verified km splits", norwegian: "registrerte kilometersplitt"))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    Spacer()
+                    Image(systemName: showingKilometerDetails
+                          ? "chevron.up" : "chevron.down")
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                .padding(16)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if showingKilometerDetails {
+                Divider().padding(.horizontal, 14)
+                if splits.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "No verified kilometer timestamps were recorded. We won't invent splits from the workout average.",
+                        norwegian: "Det finnes ikke nok registrerte kilometermålinger. Vi beregner ikke fiktive splittider fra øktens snitt."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .padding(16)
+                } else {
+                    HStack {
+                        Text("KM").frame(maxWidth: .infinity, alignment: .leading)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Pace", norwegian: "Tempo"))
+                            .frame(maxWidth: .infinity)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Speed", norwegian: "Fart"))
+                            .frame(maxWidth: .infinity)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Time", norwegian: "Tid"))
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .padding(.horizontal, 15)
+                    .padding(.top, 12)
+                    ForEach(splits) { split in
+                        let seconds = Int(split.durationSeconds.rounded())
+                        HStack(spacing: 5) {
+                            Text("\(split.kilometer)")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(String(format: "%d:%02d/km",
+                                        seconds / 60, seconds % 60))
+                                .frame(maxWidth: .infinity)
+                            Text(String(format: "%.1f km/t",
+                                        3_600 / split.durationSeconds))
+                                .frame(maxWidth: .infinity)
+                            Text(String(format: "%d:%02d",
+                                        seconds / 60, seconds % 60))
+                                .frame(maxWidth: .infinity, alignment: .trailing)
+                        }
+                        .font(.system(size: 11, weight: .semibold, design: .rounded))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .monospacedDigit()
+                        .padding(.horizontal, 15)
+                        .padding(.vertical, 10)
+                        if split.id != splits.last?.id {
+                            Divider().padding(.horizontal, 15)
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Measured completed kilometres only; no planned targets.",
+                        norwegian: "Kun fullførte, målte kilometere. Ingen planlagte mål."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .padding([.horizontal, .bottom], 15)
+                }
+            }
+        }
+        .athlthPlanCard(radius: 22)
     }
 
     private var completedPhoneStepResults: [ATHLTHRecordedRunningStep]? {
