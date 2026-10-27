@@ -23,6 +23,10 @@ checks = {
     "Opening a day shows details in the actual schedule":
         "if selectedDayID == day.id {" in plan
         and "referenceDayWorkspace(day, plan: plan)" in plan,
+    "The day has both scheduled workouts and real day-details modes":
+        'tr("Scheduled workouts", "Planlagte økter")' in plan
+        and 'tr("Day details", "Dagdetaljer")' in plan
+        and "premiumSelectedDayPanel(day, plan: plan)" in plan,
     "Workout phase data comes from unified recorded structure":
         "ATHLTHUnifiedWorkout.editorBlocks(from: workout)" in plan
         and "referenceWorkoutPhase(" in plan,
