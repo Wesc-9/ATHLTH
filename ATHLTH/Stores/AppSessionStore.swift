@@ -1289,7 +1289,11 @@ final class AppSessionStore: ObservableObject {
 
         return trainingPlans
             .filter {
-                guard let startDate = $0.startDate else {
+                // A paused/deactivated plan remains saved, but cannot be
+                // presented as the next enabled program on Plan overview.
+                guard !pausedTrainingPlanIDs.contains($0.id),
+                      !deactivatedTrainingPlanIDs.contains($0.id),
+                      let startDate = $0.startDate else {
                     return false
                 }
 
