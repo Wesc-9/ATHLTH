@@ -5,7 +5,7 @@ import Foundation
 /// display is an interpretation, never a replacement for the source target.
 /// Running pace examples from Zoned are NOT individualized pace prescriptions.
 enum ATHLTHZonedPlanLibrary {
-    struct Plan: Decodable {
+    struct Plan: Decodable, Sendable {
         let id: String
         let nameEn: String
         let descriptionEn: String
@@ -17,7 +17,7 @@ enum ATHLTHZonedPlanLibrary {
         let weeks: [Week]
     }
 
-    struct Week: Decodable {
+    struct Week: Decodable, Sendable {
         let weekNumber: Int
         let phase: String
         let isRecoveryWeek: Bool
@@ -28,14 +28,14 @@ enum ATHLTHZonedPlanLibrary {
         let sessions: [Session]
     }
 
-    struct PaceNote: Decodable {
+    struct PaceNote: Decodable, Sendable {
         let zone: String
         let paceMinKm: Double?
         let paceMaxKm: Double?
         let descriptionEn: String?
     }
 
-    struct Session: Decodable {
+    struct Session: Decodable, Sendable {
         let dayOfWeek: Int
         let workoutId: String
         let sessionType: String
@@ -50,7 +50,7 @@ enum ATHLTHZonedPlanLibrary {
         let paceNotes: [PaceNote]?
     }
 
-    struct Step: Decodable {
+    struct Step: Decodable, Sendable {
         let kind: String
         let descriptionEn: String?
         let durationSec: Double?
@@ -68,19 +68,19 @@ enum ATHLTHZonedPlanLibrary {
         let between: [Step]?
     }
 
-    struct Duration: Decodable {
+    struct Duration: Decodable, Sendable {
         let min: Int
         let max: Int
     }
 
-    struct Environment: Decodable {
+    struct Environment: Decodable, Sendable {
         let requiresHills: Bool?
         let requiresTrack: Bool?
         let prefersFlat: Bool?
         let prefersSoft: Bool?
     }
 
-    struct Workout: Decodable {
+    struct Workout: Decodable, Sendable {
         let id: String
         let discipline: String?
         let nameEn: String
@@ -380,7 +380,7 @@ enum ATHLTHZonedPlanLibrary {
         }
     }
 
-    struct ZonePrescription: Equatable {
+    struct ZonePrescription: Equatable, Sendable {
         let minimum: Double
         let maximum: Double
         let athlthZone: Int?
