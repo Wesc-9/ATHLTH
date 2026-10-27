@@ -774,8 +774,9 @@ struct ATHLTHHomeView: View {
     var body: some View {
         NavigationStack {
             ATHLTHPinnedHeroLayout(
-                accent: ATHLTHTheme.premiumGold.opacity(0.44),
-                pullDownFadeBridge: true
+                accent: ATHLTHTrainDesign.gold.opacity(0.16),
+                pullDownFadeBridge: true,
+                warmHomePalette: true
             ) {
                 ZStack(alignment: .topTrailing) {
                     ATHLTHHomeDashboardHero(
@@ -1845,10 +1846,24 @@ struct ATHLTHHomeView: View {
             standalone: session.standalonePlannedSessions
         ).isEmpty
 
+        let first = HomeTodayCalendarSchedule.workouts(
+            plan: session.activePlan,
+            standalone: session.standalonePlannedSessions
+        ).first
+        let plannedActivity: HomeDailyRecommendationPolicy.PlannedActivity? =
+            first.map { workout in
+                switch workout.kind {
+                case .running: return .running
+                case .strength: return .strength
+                default: return .other
+                }
+            }
+
         return HomeDailyRecommendationPolicy.recommendation(
             readiness: readiness,
             hasWorkoutToday: hasWorkoutToday,
-            trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio
+            trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio,
+            plannedActivity: plannedActivity
         )
     }
 
@@ -1875,25 +1890,20 @@ struct ATHLTHHomeView: View {
                     homeTodayCalendarCard
                 }
             } else {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .top, spacing: 10) {
-                        HomeDailyRecommendationCard(advice: advice) {
-                            openHomeDailyRecommendation(advice)
-                        }
+                // Do not let an intrinsic ideal width collapse this into two
+                // full-width cards. Each tile receives exactly half of Home.
+                HStack(alignment: .top, spacing: 10) {
+                    HomeDailyRecommendationCard(advice: advice) {
+                        openHomeDailyRecommendation(advice)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .layoutPriority(1)
+
+                    homeTodayCalendarCard
                         .frame(maxWidth: .infinity)
-
-                        homeTodayCalendarCard
-                            .frame(maxWidth: .infinity)
-                    }
-                    .frame(minWidth: 330)
-
-                    VStack(spacing: 10) {
-                        HomeDailyRecommendationCard(advice: advice) {
-                            openHomeDailyRecommendation(advice)
-                        }
-                        homeTodayCalendarCard
-                    }
+                        .layoutPriority(1)
                 }
+                .frame(maxWidth: .infinity, alignment: .top)
             }
         }
     }
@@ -1936,17 +1946,13 @@ struct ATHLTHHomeView: View {
                 showingHomeTodayCalendarAll = true
             } label: {
                 HStack {
-                    Text("Kalender i dag")
-                        .font(
-                            .subheadline
-                                .weight(
-                                    .bold
-                                )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
+                    Text(ATHLTHLocalization.choose(
+                        english: "Today", norwegian: "Kalender i dag"
+                    ))
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.80)
 
                     Spacer()
 
@@ -2138,27 +2144,15 @@ struct ATHLTHHomeView: View {
             }
         }
         .padding(11)
+        .frame(maxWidth: .infinity, minHeight: 196, alignment: .topLeading)
         .background(
-            Color.white.opacity(0.90),
-            in:
-                RoundedRectangle(
-                    cornerRadius: 19,
-                    style:
-                        .continuous
-                )
+            ATHLTHTrainDesign.paper,
+            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 19,
-                style:
-                    .continuous
-            )
-            .stroke(
-                Color.black.opacity(
-                    0.04
-                ),
-                lineWidth: 0.7
-            )
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.34),
+                              lineWidth: 0.8)
         }
     }
 
