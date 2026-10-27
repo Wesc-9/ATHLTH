@@ -293,7 +293,7 @@ struct ATHLTHPlanExistingChoice: View {
     private let bronze = ATHLTHTrainDesign.bronze
 
     private var photo: String {
-        symbol == "bookmark" ? "GoalMountain" : "GoalAdventure"
+        (symbol == "bookmark" || symbol == "doc.text") ? "GoalMountain" : "GoalAdventure"
     }
 
     var body: some View {
