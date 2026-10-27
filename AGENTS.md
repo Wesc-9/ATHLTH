@@ -1,6 +1,8 @@
 # ATHLTH development baseline
 
-- Active development version: **1.9.6** on `release/v1.9.6` (2026-10-26; build 104). All new changes belong on this branch; do not upload to TestFlight unless explicitly requested.
+- Active development version: **1.9.8** on `release/v1.9.8` (2026-10-27; build 106). All new changes belong on this branch; do not upload to TestFlight unless explicitly requested.
+- Version **1.9.7** is locked for new development at commit `57d7c49d912f2b8d0764489eeae5be91dde90f44` (build 105). Preservation branch: `backup/v1.9.7-locked-before-v1.9.8-20261027`. Do not use `release/v1.9.7` as the active baseline; it contains post-lock divergent work.
+- Version **1.9.6** is locked for new development. Preservation branch: `backup/v1.9.6-locked-before-v1.9.7-20261026`. Keep `release/v1.9.6` unchanged.
 - Version **1.9.5** is locked. Frozen commit: `40e1255a28c86dccba5388770a559932b5fef9b9` (build 103). Preservation branch: `backup/v1.9.5-locked-before-v1.9.6-20261026`. Same-commit build, backend regressions and TestFlight upload workflow succeeded on 2026-10-26 (run 40361490944). Apple's processing and tester availability are not independently verified. Keep `release/v1.9.5` unchanged.
 
 - Version **1.9.3** is locked for further development. Frozen source commit: `843c144c6f7ee8ed1b9e3e998c15f63d721e3640` (build 101). Preservation branch: `backup/v1.9.3-locked-before-v1.9.4-20261025`. Same-commit iOS build, backend regressions and TestFlight upload succeeded on 2026-10-25 (workflow run 40238299290). The GitHub upload success does not confirm Apple's subsequent processing or tester availability. Keep `release/v1.9.3` unchanged.
