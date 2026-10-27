@@ -222,15 +222,22 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         // Only genuine recorded values are displayed in the image.
                         HStack(spacing: 7) {
                             if duration.isFinite, duration > 0 {
-                                detailMetric("clock", compactDurationLabel)
+                                detailMetric(
+                                    "clock",
+                                    compactDurationLabel,
+                                    ATHLTHLocalization.choose(
+                                        english: "Duration",
+                                        norwegian: "Varighet"
+                                    )
+                                )
                             }
                             if let exerciseCount, exerciseCount > 0 {
                                 detailMetric(
                                     "dumbbell.fill",
-                                    ATHLTHLocalization.format(
-                                        english: "%d exercises",
-                                        norwegian: "%d øvelser",
-                                        exerciseCount
+                                    String(exerciseCount),
+                                    ATHLTHLocalization.choose(
+                                        english: "Exercises",
+                                        norwegian: "Øvelser"
                                     )
                                 )
                             }
@@ -277,18 +284,58 @@ struct ATHLTHStrengthCompletedHeroCard: View {
         )
     }
 
-    private func detailMetric(_ icon: String, _ text: String) -> some View {
-        Label(text, systemImage: icon)
-            .font(.system(size: 11, weight: .semibold))
-            .foregroundStyle(Color.white)
-            .lineLimit(1)
-            .minimumScaleFactor(0.8)
-            .padding(.horizontal, 10)
-            .frame(height: 29)
-            .background(Color.black.opacity(0.34), in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.7)
+    // Same warm-paper/metallic-edge language as the other Train cards.
+    // Kept compact so both metrics fit inside the photo without covering
+    // the anatomical figures or changing the workout-complete design.
+    private func detailMetric(
+        _ icon: String,
+        _ value: String,
+        _ label: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .accessibilityHidden(true)
+
+                Text(value)
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
+
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                .lineLimit(1)
+        }
+        .frame(width: 96, alignment: .leading)
+        .padding(.horizontal, 10)
+        .frame(height: 56)
+        .background {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .fill(ATHLTHTrainDesign.paper.opacity(0.95))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            .white.opacity(0.95),
+                            ATHLTHTrainDesign.gold.opacity(0.52),
+                            ATHLTHTrainDesign.rule.opacity(0.50)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 0.9
+                )
+        }
+        .shadow(color: ATHLTHTrainDesign.bronze.opacity(0.12), radius: 8, y: 3)
+        .accessibilityElement(children: .combine)
     }
 
     private var metricDivider: some View {
