@@ -107,6 +107,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let week: Int
         let phase: WorkoutPhaseKind
         let kind: ATHLTHAdvancedPlanAddContentView.Kind
+        var workoutIndex: Int = 0
     }
     @State private var guidedDayCursor = 0
     @State private var firstGuidedWeekDecisionMade = false
@@ -731,7 +732,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 phase: destination.phase,
                 onExercise: { blocks in
                     insertGuidedLibraryExercise(
-                        blocks, day: destination.day, week: destination.week)
+                        blocks, day: destination.day, week: destination.week,
+                        workoutIndex: destination.workoutIndex)
                 },
                 onWorkout: { workout in
                     insertGuidedLibraryWorkout(
@@ -4165,10 +4167,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 guidedDayCursor = min(weekCount * 7 - 1,
                     guidedCurrentWeek * 7 + offset)
             },
-            onAddExercise: { phase in
+            onAddExercise: { phase, workoutIndex in
                 advancedAddDestination = AdvancedAddDestination(
                     day: guidedCurrentWeekday, week: guidedCurrentWeek,
-                    phase: phase, kind: .exercise)
+                    phase: phase, kind: .exercise, workoutIndex: workoutIndex)
             },
             onAddWorkout: {
                 advancedAddDestination = AdvancedAddDestination(
@@ -4187,12 +4189,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func insertGuidedLibraryExercise(
-        _ blocks: [WorkoutTemplateBlock], day: Int, week: Int
+        _ blocks: [WorkoutTemplateBlock], day: Int, week: Int,
+        workoutIndex: Int
     ) {
         guard !blocks.isEmpty else { return }
         let key = weekDayKey(day, weekIndex: week)
         var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
-        var workout = edit.detailedWorkout ??
+        let extras = edit.additionalDetailedWorkouts ?? []
+        let editingExtra = workoutIndex > 0 && extras.indices.contains(workoutIndex - 1)
+        var workout = (editingExtra ? extras[workoutIndex - 1] : edit.detailedWorkout) ??
             ATHLTHPlanStructuredWorkoutBlueprint(
                 title: ATHLTHLocalization.choose(
                     english: "Strength workout", norwegian: "Styrkeøkt"),
@@ -4219,10 +4224,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         if let estimate = ATHLTHWorkoutDurationEstimator.minutes(for: workout.blocks) {
             workout.durationMinutes = estimate
         }
-        edit.detailedWorkout = workout
-        edit.title = workout.title
-        edit.kind = workout.kind
-        edit.durationMinutes = workout.durationMinutes
+        if editingExtra {
+            var copies = extras
+            copies[workoutIndex - 1] = workout
+            edit.additionalDetailedWorkouts = copies
+        } else {
+            edit.detailedWorkout = workout
+            edit.title = workout.title
+            edit.kind = workout.kind
+            edit.durationMinutes = workout.durationMinutes
+        }
         edit.isRestDay = false
         edit.removeTemplateDetail = false
         weekDayEdits[key] = edit
