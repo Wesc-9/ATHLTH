@@ -162,6 +162,9 @@ struct ATHLTHPlanGoalOption: Identifiable {
     }
 }
 
+/// The live Plan creation goal screen. All selections are driven by the
+/// wizard's existing bindings and persist as TrainingPlanFocus/GoalType.
+/// This is presentation only: it introduces no alternate creation path.
 struct ATHLTHPlanGoalEntryView: View {
     let area: ATHLTHPlanGoalArea
     let selectedChoice: String
@@ -170,87 +173,45 @@ struct ATHLTHPlanGoalEntryView: View {
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
+    private let canvas = ATHLTHTrainDesign.canvas
     private let ink = ATHLTHTrainDesign.ink
-    private let secondary = ATHLTHTrainDesign.secondary
-    private let bronze = ATHLTHTrainDesign.bronze
+    private let muted = ATHLTHTrainDesign.secondary
     private let gold = ATHLTHTrainDesign.gold
-    private let rule = ATHLTHTrainDesign.rule
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let divider = ATHLTHTrainDesign.rule
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 21) {
-            hero
-            if dynamicTypeSize.isAccessibilitySize {
-                VStack(spacing: 10) {
-                    ForEach(ATHLTHPlanGoalArea.allCases) { item in areaCard(item) }
-                }
-            } else {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10),
-                                    GridItem(.flexible(), spacing: 10)],
-                          spacing: 10) {
-                    ForEach(ATHLTHPlanGoalArea.allCases) { item in areaCard(item) }
-                }
-            }
-
-            VStack(alignment: .leading, spacing: 11) {
-                Text(ATHLTHLocalization.choose(
-                    english: "WHAT'S YOUR MAIN GOAL?",
-                    norwegian: "HVA ER DITT HOVEDMÅL?"
-                ))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2.1)
-                .foregroundStyle(secondary)
-
-                VStack(spacing: 0) {
-                    let options = ATHLTHPlanGoalOption.options(for: area)
-                    ForEach(options.indices, id: \.self) { index in
-                        goalRow(options[index])
-                        if index < options.count - 1 {
-                            Rectangle()
-                                .fill(rule.opacity(0.4))
-                                .frame(height: 0.6)
-                                .padding(.horizontal, 15)
-                        }
-                    }
-                }
-                .background(.white.opacity(0.93),
-                            in: RoundedRectangle(cornerRadius: 17))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 17)
-                        .stroke(rule.opacity(0.36), lineWidth: 0.6)
-                }
-            }
+        VStack(alignment: .leading, spacing: 20) {
+            referenceHero
+            categoryGrid
+            mainGoalList
         }
         .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
     }
 
-    private var hero: some View {
+    // Full-width scenic cover, with the editorial copy remaining entirely
+    // legible on top of the left-to-right warm-paper fade.
+    private var referenceHero: some View {
         ZStack(alignment: .leading) {
-            // The approved scenic runner portrait is shipped as an optimized
-            // local asset. Limit it to the trailing half so the editorial
-            // heading stays readable at normal and large text sizes.
-            GeometryReader { bounds in
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    Image("PlanGoalHero")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(
-                            width: bounds.size.width * 0.53,
-                            height: bounds.size.height
-                        )
-                        .clipped()
-                        .accessibilityHidden(true)
-                }
+            GeometryReader { geometry in
+                Image("PlanGoalHero")
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                    .accessibilityHidden(true)
             }
 
             LinearGradient(
                 stops: [
-                    .init(color: ATHLTHTrainDesign.canvas, location: 0),
-                    .init(color: ATHLTHTrainDesign.canvas.opacity(0.99), location: 0.37),
-                    .init(color: ATHLTHTrainDesign.canvas.opacity(0.78), location: 0.58),
-                    .init(color: ATHLTHTrainDesign.canvas.opacity(0.10), location: 0.91)
+                    .init(color: canvas, location: 0),
+                    .init(color: canvas.opacity(0.99), location: 0.29),
+                    .init(color: canvas.opacity(0.90), location: 0.48),
+                    .init(color: canvas.opacity(0.31), location: 0.78),
+                    .init(color: canvas.opacity(0.04), location: 1)
                 ],
-                startPoint: .leading, endPoint: .trailing
+                startPoint: .leading,
+                endPoint: .trailing
             )
 
             VStack(alignment: .leading, spacing: 9) {
@@ -259,149 +220,248 @@ struct ATHLTHPlanGoalEntryView: View {
                     norwegian: "BYGG DIN PLAN"
                 ))
                 .font(.system(size: 10, weight: .semibold))
-                .tracking(2.5)
-                .foregroundStyle(secondary)
+                .tracking(2.6)
+                .foregroundStyle(muted)
 
                 Text(ATHLTHLocalization.choose(
                     english: "What is your goal?",
                     norwegian: "Hva er målet ditt?"
                 ))
-                .font(.system(size: 35, weight: .regular, design: .serif))
+                .font(.system(
+                    size: dynamicTypeSize.isAccessibilitySize ? 32 : 36,
+                    weight: .regular, design: .serif
+                ))
                 .foregroundStyle(ink)
                 .lineLimit(2)
-                .minimumScaleFactor(0.72)
+                .minimumScaleFactor(0.78)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
 
                 Text(ATHLTHLocalization.choose(
                     english: "Choose the main focus for your plan.",
                     norwegian: "Velg hovedfokus for planen din."
                 ))
                 .font(.system(size: 13))
-                .foregroundStyle(secondary)
+                .foregroundStyle(muted)
                 .fixedSize(horizontal: false, vertical: true)
             }
+            .padding(.horizontal, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 3)
         }
-        .frame(height: dynamicTypeSize.isAccessibilitySize ? 196 : 157)
+        .frame(height: dynamicTypeSize.isAccessibilitySize ? 205 : 145)
         .clipped()
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+        .padding(.horizontal, -18)
+        .accessibilityElement(children: .contain)
     }
 
-    private func areaCard(_ item: ATHLTHPlanGoalArea) -> some View {
-        let chosen = area == item
+    @ViewBuilder
+    private var categoryGrid: some View {
+        if dynamicTypeSize.isAccessibilitySize {
+            VStack(spacing: 10) {
+                ForEach(ATHLTHPlanGoalArea.allCases) { item in
+                    categoryCard(item)
+                }
+            }
+        } else {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ],
+                spacing: 10
+            ) {
+                ForEach(ATHLTHPlanGoalArea.allCases) { item in
+                    categoryCard(item)
+                }
+            }
+        }
+    }
+
+    private func categoryCard(_ item: ATHLTHPlanGoalArea) -> some View {
+        let isSelected = area == item
         return Button {
             onChooseArea(item)
         } label: {
-            ZStack(alignment: .leading) {
+            ZStack(alignment: .topLeading) {
                 GeometryReader { bounds in
                     Image(item.imageName)
                         .resizable()
                         .scaledToFill()
                         .frame(width: bounds.size.width, height: bounds.size.height)
                         .clipped()
+                        .accessibilityHidden(true)
                 }
+
                 LinearGradient(
                     stops: [
-                        .init(color: .white.opacity(0.98), location: 0),
-                        .init(color: .white.opacity(0.89), location: 0.45),
-                        .init(color: .white.opacity(0.03), location: 1)
+                        .init(color: .white.opacity(0.99), location: 0),
+                        .init(color: .white.opacity(0.95), location: 0.27),
+                        .init(color: .white.opacity(0.68), location: 0.58),
+                        .init(color: .white.opacity(0.04), location: 1)
                     ],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
-                VStack(alignment: .leading, spacing: 7) {
-                    Image(systemName: item.icon)
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundStyle(chosen ? .white : bronze)
-                        .frame(width: 37, height: 37)
-                        .background(chosen ? gold : ATHLTHTrainDesign.paleGold.opacity(0.73),
-                                    in: Circle())
-                        .padding(.bottom, 2)
 
-                    Spacer(minLength: 0)
+                VStack(alignment: .leading, spacing: 5) {
+                    Image(systemName: item.icon)
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(isSelected ? .white : bronze)
+                        .frame(width: 39, height: 39)
+                        .background(
+                            isSelected ? gold : ATHLTHTrainDesign.paleGold.opacity(0.72),
+                            in: Circle()
+                        )
+                        .accessibilityHidden(true)
+
+                    Spacer(minLength: 4)
 
                     Text(item.title)
-                        .font(.system(size: 21, weight: .medium, design: .serif))
+                        .font(.system(size: 21, weight: .semibold, design: .serif))
                         .foregroundStyle(ink)
                         .lineLimit(1)
-                        .minimumScaleFactor(0.82)
+                        .minimumScaleFactor(0.78)
+
                     Text(item.subtitle)
-                        .font(.system(size: 10.5))
-                        .foregroundStyle(secondary)
-                        .lineLimit(3)
+                        .font(.system(size: 11))
+                        .foregroundStyle(muted)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 3)
+                        .frame(maxWidth: .infinity, minHeight: 30, alignment: .topLeading)
                         .fixedSize(horizontal: false, vertical: true)
-                        .frame(minHeight: 38, alignment: .top)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .padding(12)
-                if chosen {
-                    VStack {
-                        HStack {
-                            Spacer()
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundStyle(.white)
-                                .frame(width: 27, height: 27)
-                                .background(gold, in: Circle())
-                        }
-                        Spacer()
-                    }
-                    .padding(10)
-                    .accessibilityHidden(true)
+
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 28, height: 28)
+                        .background(gold, in: Circle())
+                        .frame(maxWidth: .infinity, maxHeight: .infinity,
+                               alignment: .topTrailing)
+                        .padding(10)
+                        .accessibilityHidden(true)
                 }
             }
-            .frame(height: dynamicTypeSize.isAccessibilitySize ? 190 : 162)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .frame(height: dynamicTypeSize.isAccessibilitySize ? 160 : 128)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(chosen ? gold : rule.opacity(0.4),
-                                  lineWidth: chosen ? 1.4 : 0.65)
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(
+                        isSelected ? bronze.opacity(0.88) : divider.opacity(0.35),
+                        lineWidth: isSelected ? 1.3 : 0.65
+                    )
+                    .allowsHitTesting(false)
             }
-            .shadow(color: ink.opacity(0.04), radius: 8, y: 3)
+            .shadow(color: bronze.opacity(0.07), radius: 12, y: 4)
+            .contentShape(RoundedRectangle(cornerRadius: 18))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(item.title + ". " + item.subtitle)
-        .accessibilityAddTraits(chosen ? [.isSelected] : [])
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Select this training focus.",
+            norwegian: "Velg dette treningsfokuset."
+        ))
     }
 
-    private func goalRow(_ item: ATHLTHPlanGoalOption) -> some View {
-        let chosen = selectedChoice == item.id
+    private var mainGoalList: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text(ATHLTHLocalization.choose(
+                english: "WHAT'S YOUR MAIN GOAL?",
+                norwegian: "HVA ER DITT HOVEDMÅL?"
+            ))
+            .font(.system(size: 10, weight: .semibold))
+            .tracking(2.2)
+            .foregroundStyle(muted)
+            .accessibilityAddTraits(.isHeader)
+
+            VStack(spacing: 0) {
+                let options = ATHLTHPlanGoalOption.options(for: area)
+                ForEach(options.indices, id: \.self) { index in
+                    mainGoalRow(options[index])
+                    if index < options.count - 1 {
+                        Rectangle()
+                            .fill(divider.opacity(0.32))
+                            .frame(height: 0.6)
+                            .padding(.horizontal, 12)
+                    }
+                }
+            }
+            .background(
+                .white.opacity(0.93),
+                in: RoundedRectangle(cornerRadius: 19, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
+                    .strokeBorder(divider.opacity(0.32), lineWidth: 0.65)
+                    .allowsHitTesting(false)
+            }
+            .shadow(color: bronze.opacity(0.045), radius: 13, y: 5)
+        }
+    }
+
+    private func mainGoalRow(_ option: ATHLTHPlanGoalOption) -> some View {
+        let isSelected = option.id == selectedChoice
         return Button {
-            onChooseGoal(item)
+            onChooseGoal(option)
         } label: {
             HStack(spacing: 11) {
-                Image(systemName: item.icon)
-                    .font(.system(size: 20, weight: .medium))
+                Image(systemName: option.icon)
+                    .font(.system(size: 20, weight: .regular))
                     .foregroundStyle(bronze)
                     .frame(width: 43, height: 43)
-                    .background(ATHLTHTrainDesign.paleGold.opacity(0.34),
-                                in: Circle())
+                    .background(
+                        ATHLTHTrainDesign.paleGold.opacity(0.34),
+                        in: Circle()
+                    )
                     .accessibilityHidden(true)
+
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(item.title)
+                    Text(option.title)
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(ink)
-                    Text(item.subtitle)
+                        .multilineTextAlignment(.leading)
+                    Text(option.subtitle)
                         .font(.system(size: 10.5))
-                        .foregroundStyle(secondary)
+                        .foregroundStyle(muted)
+                        .multilineTextAlignment(.leading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
+
                 Spacer(minLength: 0)
-                Image(systemName: chosen ? "largecircle.fill.circle" : "circle")
-                    .font(.system(size: 24, weight: .regular))
-                    .foregroundStyle(chosen ? bronze : secondary.opacity(0.30))
-                    .accessibilityHidden(true)
+
+                ZStack {
+                    Circle()
+                        .strokeBorder(
+                            isSelected ? bronze : divider.opacity(0.70),
+                            lineWidth: isSelected ? 1.6 : 1.25
+                        )
+                        .frame(width: 21, height: 21)
+                    if isSelected {
+                        Circle()
+                            .fill(bronze)
+                            .frame(width: 13, height: 13)
+                    }
+                }
+                .frame(width: 29, height: 40)
+                .accessibilityHidden(true)
             }
-            .frame(minHeight: 62)
+            .frame(maxWidth: .infinity, minHeight: 57)
             .padding(.horizontal, 13)
+            .padding(.vertical, 3)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(item.title + ". " + item.subtitle)
-        .accessibilityAddTraits(chosen ? [.isSelected] : [])
+        .accessibilityLabel(option.title + ". " + option.subtitle)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Select as your main goal.",
+            norwegian: "Velg som hovedmål."
+        ))
     }
 }
