@@ -69,19 +69,6 @@ struct ATHLTHPlanSetupFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
-            // Deliberately small switch, outside all data cards.
-            HStack {
-                Spacer(minLength: 0)
-                HStack(spacing: 2) {
-                    modeTab(false, title: tr("Simple", "Enkel"))
-                    modeTab(true, title: tr("Advanced", "Avansert"))
-                }
-                .padding(3)
-                .frame(width: 188)
-                .background(.white.opacity(0.75), in: Capsule())
-            }
-            .padding(.bottom, 1)
-
             hero
             nameCard
             if !advanced {
@@ -104,28 +91,46 @@ struct ATHLTHPlanSetupFields: View {
         .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
     }
 
+    /// A pair of real buttons, each styled like the wizard's "Tilbake"
+    /// capsule. Their actions are driven by the owning plan builder.
     private func modeTab(_ isAdvanced: Bool, title: String) -> some View {
-        Button { onModeChange(isAdvanced) } label: {
+        let selected = advanced == isAdvanced
+        return Button {
+            onModeChange(isAdvanced)
+        } label: {
             Text(title)
-                .font(.system(size: 11, weight: advanced == isAdvanced ? .semibold : .medium))
-                .foregroundStyle(advanced == isAdvanced ? .white : ink)
-                .frame(maxWidth: .infinity, minHeight: 30)
-                .background(advanced == isAdvanced ? bronze : .clear,
-                            in: Capsule())
+                .font(.system(size: 12, weight: selected ? .semibold : .medium))
+                .foregroundStyle(selected ? ink : muted)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 40)
+                .background(Color.white.opacity(0.85), in: Capsule())
+                .overlay {
+                    Capsule()
+                        .strokeBorder(
+                            selected ? bronze.opacity(0.65) : Color.black.opacity(0.08),
+                            lineWidth: selected ? 1.2 : 0.8
+                        )
+                        .allowsHitTesting(false)
+                }
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityAddTraits(advanced == isAdvanced ? .isSelected : [])
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var hero: some View {
         ZStack(alignment: .leading) {
             GeometryReader { geometry in
                 Image(advanced ? "PlanEntryAdvanced" : "PlanEntrySimple")
-                    .resizable().scaledToFill()
+                    .resizable()
+                    .scaledToFill()
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
                     .accessibilityHidden(true)
             }
+            .allowsHitTesting(false)
+
             LinearGradient(
                 stops: [
                     .init(color: canvas, location: 0),
@@ -135,33 +140,48 @@ struct ATHLTHPlanSetupFields: View {
                 ],
                 startPoint: .leading, endPoint: .trailing
             )
-            VStack(alignment: .leading, spacing: 5) {
-                Text(tr("BUILD YOUR PLAN", "BYGG DIN PLAN"))
-                    .font(.system(size: 9, weight: .semibold))
-                    .tracking(2.2)
-                    .foregroundStyle(muted)
-                Text(advanced ? tr("Build your plan\nin detail", "Bygg planen\nmer detaljert")
-                              : tr("Build your plan\nsimply", "Bygg planen\nenkelt"))
-                    .font(.system(size: typeSize.isAccessibilitySize ? 30 : 34,
-                                  weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                    .lineSpacing(-2)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityAddTraits(.isHeader)
-                Text(advanced
-                     ? tr("Adapt the plan to your goals and everyday life.",
-                          "Tilpass planen etter dine mål, hverdag og preferanser.")
-                     : tr("A few choices, and we'll help build your plan.",
-                          "Noen få valg, så lager vi en treningsplan som passer deg."))
-                    .font(.system(size: 11.5))
-                    .foregroundStyle(muted)
-                    .fixedSize(horizontal: false, vertical: true)
+            .allowsHitTesting(false)
+
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .center, spacing: 7) {
+                    Text(tr("BUILD YOUR PLAN", "BYGG DIN PLAN"))
+                        .font(.system(size: 9, weight: .semibold))
+                        .tracking(2.2)
+                        .foregroundStyle(muted)
+                    Spacer(minLength: 2)
+                    modeTab(false, title: tr("Simple", "Enkel"))
+                    modeTab(true, title: tr("Advanced", "Avansert"))
+                }
+                .padding(.top, 8)
+
+                Spacer(minLength: 10)
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(advanced
+                         ? tr("Build your plan\nin detail", "Bygg planen\nmer detaljert")
+                         : tr("Build your plan\nsimply", "Bygg planen\nenkelt"))
+                        .font(.system(size: typeSize.isAccessibilitySize ? 30 : 34,
+                                      weight: .regular, design: .serif))
+                        .foregroundStyle(ink)
+                        .lineSpacing(-2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(advanced
+                         ? tr("Adapt the plan to your goals and everyday life.",
+                              "Tilpass planen etter dine mål, hverdag og preferanser.")
+                         : tr("A few choices, and we'll help build your plan.",
+                              "Noen få valg, så lager vi en treningsplan som passer deg."))
+                        .font(.system(size: 11.5))
+                        .foregroundStyle(muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 4)
+                .padding(.trailing, typeSize.isAccessibilitySize ? 50 : 115)
+                .padding(.bottom, 13)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 4)
-            .padding(.trailing, typeSize.isAccessibilitySize ? 50 : 115)
         }
-        .frame(height: typeSize.isAccessibilitySize ? 196 : 151)
+        .frame(height: typeSize.isAccessibilitySize ? 235 : 194)
         .clipped()
     }
 
