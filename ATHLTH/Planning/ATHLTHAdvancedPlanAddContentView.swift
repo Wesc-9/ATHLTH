@@ -355,6 +355,19 @@ struct ATHLTHAdvancedExerciseConfigurationView: View {
                             .font(.caption).foregroundStyle(secondary)
                     }
                     Spacer()
+                    Button {
+                        dismiss()
+                    } label: {
+                        Label(tr("Change exercise", "Bytt øvelse"),
+                              systemImage: "arrow.left.arrow.right")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(gold)
+                            .padding(.horizontal, 9)
+                            .frame(minHeight: 32)
+                            .background(ATHLTHTrainDesign.paleGold.opacity(0.55),
+                                        in: Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
                 Divider()
                 Text(tr("Sets and reps", "Sett og reps"))
