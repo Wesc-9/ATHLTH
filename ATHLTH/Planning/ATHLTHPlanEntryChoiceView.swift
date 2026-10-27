@@ -12,6 +12,7 @@ struct ATHLTHPlanEntryChoiceView: View {
 
     @Binding var choice: Choice
     let onOpenLibrary: () -> Void
+    let onCancel: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -115,8 +116,19 @@ struct ATHLTHPlanEntryChoiceView: View {
     private var progressHeader: some View {
         VStack(spacing: 12) {
             HStack(spacing: 7) {
-                // The Close action is attached to the wizard, not duplicated
-                // here. A neutral title slot preserves the reference layout.
+                Button(action: onCancel) {
+                    Text(tr("Cancel", "Avbryt"))
+                        .font(.system(size: 13))
+                        .foregroundStyle(ink)
+                        .padding(.horizontal, 12)
+                        .frame(height: 34)
+                        .background(.white.opacity(0.93), in: Capsule())
+                        .overlay {
+                            Capsule().strokeBorder(outline.opacity(0.35), lineWidth: 0.7)
+                        }
+                }
+                .buttonStyle(.plain)
+
                 Text("ATHLTH / PLAN")
                     .font(.system(size: 11, weight: .semibold))
                     .tracking(2.7)
