@@ -2293,7 +2293,7 @@ struct ATHLTHNotificationCenterView: View {
             } else if eventKind.contains("invite") ||
                 eventKind.hasPrefix("group_") ||
                 eventKind.contains("event") {
-                ATHLTHCommunityV4View()
+                ATHLTHCommunityV5View()
             } else {
                 SocialHubView(
                     initialTab: .feed
