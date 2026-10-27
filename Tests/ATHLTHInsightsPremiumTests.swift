@@ -61,6 +61,33 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
     }
 
     @MainActor
+    func testOnlyMeasuredMusclesAppearInHighLowRanking() {
+        let profile = StrengthMuscleProfile(activations: [
+            .init(region: .quads, score: 6),
+            .init(region: .hamstrings, score: 3),
+            .init(region: .glutes, score: 1),
+            .init(region: .calves, score: 0.5)
+        ])
+        let summary = ATHLTHInsightsMuscleSummary(profile: profile, sessionCount: 4)
+        let ranked = ATHLTHInsightsMuscleRanking.extremes(summary)
+        XCTAssertEqual(ranked.most.map(\.region), [.quads, .hamstrings])
+        XCTAssertEqual(ranked.least.map(\.region), [.calves, .glutes])
+        XCTAssertEqual(ranked.most.count, 2)
+        XCTAssertEqual(ranked.least.count, 2)
+        XCTAssertFalse((ranked.most + ranked.least).contains { $0.percentage < 0 })
+    }
+
+    func testUnmeasuredMusclesAreNotInventedAsZeroPercent() {
+        let profile = StrengthMuscleProfile(activations: [
+            .init(region: .quads, score: 4)
+        ])
+        let summary = ATHLTHInsightsMuscleSummary(profile: profile, sessionCount: 1)
+        let ranked = ATHLTHInsightsMuscleRanking.extremes(summary)
+        XCTAssertEqual(ranked.most.map(\.region), [.quads])
+        XCTAssertTrue(ranked.least.isEmpty)
+        XCTAssertEqual(ranked.most.first?.percentage, 100)
+    }
+
     func testCompactFourTabNavigationFitsPhones() {
         for width in [320.0, 375.0, 430.0] {
             let view = ATHLTHInsightsNavigation(selection: .constant(.overview))
