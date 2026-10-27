@@ -99,6 +99,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var guidedTrainingPlaceExpanded = false
     @State private var weekDayEdits: [Int: ATHLTHPlanWeekDayEdit] = [:]
     @State private var weekPlanningApproach: ATHLTHPlanWeekPlanningApproach?
+    @State private var advancedAddDestination: AdvancedAddDestination?
+
+    private struct AdvancedAddDestination: Identifiable {
+        let id = UUID()
+        let day: Int
+        let week: Int
+        let phase: WorkoutPhaseKind
+        let kind: ATHLTHAdvancedPlanAddContentView.Kind
+    }
     @State private var guidedDayCursor = 0
     @State private var firstGuidedWeekDecisionMade = false
     @State private var repeatWeekCount = 1
@@ -715,6 +724,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
                 editingTrainingPlaceDay = nil
             }
+        }
+        .sheet(item: $advancedAddDestination) { destination in
+            ATHLTHAdvancedPlanAddContentView(
+                initialKind: destination.kind,
+                phase: destination.phase,
+                onExercise: { block in
+                    insertGuidedLibraryExercise(
+                        block, day: destination.day, week: destination.week)
+                },
+                onWorkout: { workout in
+                    insertGuidedLibraryWorkout(
+                        workout, day: destination.day, week: destination.week)
+                }
+            )
         }
         .sheet(item: $selectingLibraryDay) { selection in
             ATHLTHPlanWorkoutLibraryPicker { workout in
@@ -4120,50 +4143,142 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     /// Guided mode and quick week mode render exactly the same expandable
     /// workout card and phase-detail engine. Only navigation and creation
     /// actions differ: guided mode advances one explicitly planned day at a time.
+    // Single authoritative advanced day screen, replacing the legacy
+    // week-preview card while preserving the existing dated edit store.
     private var guidedCurrentDayCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text(ATHLTHLocalization.choose(english: "WEEK", norwegian: "UKE") +
-                    " \(guidedCurrentWeek + 1) / \(weekCount)")
-                    .font(.caption.weight(.semibold))
-                Spacer()
-                Text(ATHLTHLocalization.choose(english: "DAY", norwegian: "DAG") +
-                    " \((guidedDayCursor % 7) + 1) / 7")
-                    .font(.caption.weight(.semibold))
-            }
-            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-
-            HStack(spacing: 4) {
-                ForEach(0..<7, id: \.self) { index in
-                    Capsule()
-                        .fill(index <= guidedDayCursor % 7
-                              ? ATHLTHPlanDesign.ink : ATHLTHPlanDesign.outline)
-                        .frame(height: 5)
-                }
-            }
-
-            guidedWeekNavigator
-
-            if let previousGuidedEdits {
-                Button {
-                    weekDayEdits = previousGuidedEdits
-                    self.previousGuidedEdits = nil
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Undo last transfer", norwegian: "Angre siste flytting"),
-                        systemImage: "arrow.uturn.backward")
-                }
-                .buttonStyle(.bordered)
-            }
-
-            weeklyPreviewDayCard(guidedCurrentWeekday, guided: true)
-            guidedTrainingPlaceDisclosure(for: guidedCurrentWeekday)
-        }
-        .onAppear {
-            selectedPlanWeekIndex = guidedCurrentWeek
-            expandedWeekPreviewDays.insert(
+        ATHLTHAdvancedGuidedDayView(
+            date: guidedCurrentDate,
+            weekNumber: guidedCurrentWeek + 1,
+            totalWeeks: weekCount,
+            dayIndex: guidedDayCursor % 7,
+            startDate: startDate,
+            workouts: previewWorkouts(for: guidedCurrentWeekday),
+            isRestDay: weekDayEdits[
                 weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
-            )
+            ]?.isRestDay == true,
+            onSelectDay: { offset in
+                guidedDayCursor = min(weekCount * 7 - 1,
+                    guidedCurrentWeek * 7 + offset)
+            },
+            onAddExercise: { phase in
+                advancedAddDestination = AdvancedAddDestination(
+                    day: guidedCurrentWeekday, week: guidedCurrentWeek,
+                    phase: phase, kind: .exercise)
+            },
+            onAddWorkout: {
+                advancedAddDestination = AdvancedAddDestination(
+                    day: guidedCurrentWeekday, week: guidedCurrentWeek,
+                    phase: .main, kind: .workout)
+            },
+            onQuick: { quick in
+                addAdvancedQuickContent(quick)
+            },
+            onEditWorkout: { index in
+                selectedPlanWeekIndex = guidedCurrentWeek
+                editPreviewWorkout(guidedCurrentWeekday, index: index)
+            },
+            onRestDay: { setRestDay(guidedCurrentWeekday) }
+        )
+    }
+
+    private func insertGuidedLibraryExercise(
+        _ block: WorkoutTemplateBlock, day: Int, week: Int
+    ) {
+        let key = weekDayKey(day, weekIndex: week)
+        var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
+        var workout = edit.detailedWorkout ??
+            ATHLTHPlanStructuredWorkoutBlueprint(
+                title: ATHLTHLocalization.choose(
+                    english: "Strength workout", norwegian: "Styrkeøkt"),
+                kind: .strength, durationMinutes: 30, routeID: nil, blocks: [])
+        var next = block
+        next = WorkoutTemplateBlock(
+            sequence: (workout.blocks.map(\.sequence).max() ?? 0) + 1,
+            kind: block.kind, title: block.title,
+            exerciseSlug: block.exerciseSlug,
+            distanceMeters: block.distanceMeters,
+            repetitions: block.repetitions,
+            durationSeconds: block.durationSeconds,
+            targetWeightKilograms: block.targetWeightKilograms,
+            loadNote: block.loadNote, notes: block.notes,
+            phase: block.phase
+        )
+        next.setCount = block.setCount
+        next.restBetweenSetsSeconds = block.restBetweenSetsSeconds
+        next.exerciseID = block.exerciseID
+        next.exerciseSnapshot = block.exerciseSnapshot
+        workout.blocks.append(next)
+        workout.kind = workoutKind(for: workout.blocks)
+        if let estimate = ATHLTHWorkoutDurationEstimator.minutes(for: workout.blocks) {
+            workout.durationMinutes = estimate
+        }
+        edit.detailedWorkout = workout
+        edit.title = workout.title
+        edit.kind = workout.kind
+        edit.durationMinutes = workout.durationMinutes
+        edit.isRestDay = false
+        edit.removeTemplateDetail = false
+        weekDayEdits[key] = edit
+        selectedDays.insert(day)
+        sessionsPerWeek = selectedDays.count
+    }
+
+    private func insertGuidedLibraryWorkout(
+        _ workout: PlannedSession, day: Int, week: Int
+    ) {
+        selectedPlanWeekIndex = week
+        let existing = weekDayEdits[weekDayKey(day, weekIndex: week)]
+        let addAsExtra = existing?.isRestDay != true &&
+            existing?.detailedWorkout?.isValid == true
+        assignLibraryWorkout(workout, to: day, asExtra: addAsExtra)
+        if weekDayEdits[weekDayKey(day, weekIndex: week)]?.isRestDay == false {
+            selectedDays.insert(day)
+            sessionsPerWeek = selectedDays.count
+        } else if weekDayEdits[weekDayKey(day, weekIndex: week)]?.detailedWorkout?.isValid == true {
+            selectedDays.insert(day)
+            sessionsPerWeek = selectedDays.count
+        }
+    }
+
+    private func addAdvancedQuickContent(_ choice: String) {
+        selectedPlanWeekIndex = guidedCurrentWeek
+        let day = guidedCurrentWeekday
+        switch choice {
+        case "running": chooseQuickWorkout(.run, on: day)
+        case "walking": chooseQuickWorkout(.walk, on: day)
+        case "yoga": chooseQuickWorkout(.yoga, on: day)
+        case "meditation": chooseQuickWorkout(.meditation, on: day)
+        case "cycling", "interval", "superset":
+            // Opens the real advanced workout composer with all available
+            // cycling, interval and superset timeline tools.
+            quickStudioOption = nil
+            addingExtraWorkout = false
+            editingWorkoutIndex = 0
+            composingAdvancedDay = WeekDayEditorSelection(id: day)
+        case "rest":
+            let key = weekDayKey(day, weekIndex: guidedCurrentWeek)
+            if var edit = weekDayEdits[key],
+               var workout = edit.detailedWorkout, workout.isValid {
+                let rest = WorkoutTemplateBlock(
+                    sequence: (workout.blocks.map(\.sequence).max() ?? 0) + 1,
+                    kind: .rest,
+                    title: ATHLTHLocalization.choose(
+                        english: "Rest", norwegian: "Pause"),
+                    exerciseSlug: nil, distanceMeters: nil,
+                    repetitions: nil, durationSeconds: 90,
+                    targetWeightKilograms: nil, loadNote: nil,
+                    notes: nil, phase: .main
+                )
+                workout.blocks.append(rest)
+                edit.detailedWorkout = workout
+                weekDayEdits[key] = edit
+            } else {
+                setRestDay(day)
+            }
+        default:
+            advancedAddDestination = AdvancedAddDestination(
+                day: day, week: guidedCurrentWeek,
+                phase: .main, kind: .exercise)
         }
     }
 
