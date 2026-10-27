@@ -906,14 +906,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case .profile:
             AnyView(wizardScroll(AnyView(profileStep))) // legacy only
         case .approach:
-            AnyView(buildApproachChoice)
+            if mode == .advanced {
+                AnyView(buildApproachChoice)
+            } else {
+                AnyView(wizardScroll(AnyView(weekStep)))
+            }
         case .week:
             AnyView(wizardScroll(AnyView(
                 Group {
                     if mode == .advanced {
                         switch weekPlanningApproach {
                         case .none:
-                            AnyView(chooseWeekPlanningApproach)
+                            AnyView(weekStep)
                         case .some(.quick):
                             AnyView(weekStep)
                         case .some(.guided):
@@ -1540,32 +1544,47 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .background(ATHLTHTrainDesign.canvas.opacity(0.98))
     }
 
-    // New step four: the mode is just a route. Manually authored work and
-    // AI-generated sessions continue to use the existing TrainingPlan.
+    // Advanced-only fourth step. Three real destinations share the same plan
+    // data. Simple plans are created from their setup and open the week view.
+    private var selectedBuildMethod: ATHLTHPlanBuildMethod {
+        if prefersAIPlanBuild { return .ai }
+        return weekPlanningApproach == .quick ? .weekByWeek : .dayByDay
+    }
+
+    private func selectBuildMethod(_ method: ATHLTHPlanBuildMethod) {
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+            switch method {
+            case .dayByDay:
+                prefersAIPlanBuild = false
+                if weekPlanningApproach != .guided {
+                    weekPlanningApproach = .guided
+                    guidedDayCursor = 0
+                    firstGuidedWeekDecisionMade = false
+                    repeatWeekCount = max(1, weekCount - 1)
+                }
+            case .weekByWeek:
+                prefersAIPlanBuild = false
+                weekPlanningApproach = .quick
+            case .ai:
+                prefersAIPlanBuild = true
+            }
+        }
+    }
+
     private var buildApproachChoice: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 15) {
+            LazyVStack(alignment: .leading, spacing: 11) {
                 sourceChoiceHeader
                 ATHLTHPlanBuildMethodEntryView(
-                    prefersAI: prefersAIPlanBuild,
-                    planWeeks: weekCount,
-                    trainingDays: selectedDays.count,
-                    focusTitle: selectedGoalArea.title,
-                    onSelectManual: {
-                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                            prefersAIPlanBuild = false
-                        }
-                    },
-                    onSelectAI: {
-                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                            prefersAIPlanBuild = true
-                        }
-                    }
+                    selected: selectedBuildMethod,
+                    onSelect: selectBuildMethod,
+                    onOpenLibrary: { sourceRoute.append(.library) },
+                    onOpenMyPlans: { sourceRoute.append(.mine) }
                 )
             }
             .padding(.horizontal, 18)
             .padding(.top, 10)
-            .padding(.bottom, 28)
+            .padding(.bottom, 24)
             .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
             .frame(maxWidth: .infinity)
         }
@@ -1575,23 +1594,31 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var buildApproachContinueBar: some View {
         Button {
-            guard canContinue else { return }
-            if prefersAIPlanBuild {
-                // Actual existing Coach service: preview, edit, then confirm
-                // before the plan is saved. Dismissing returns here.
+            guard mode == .advanced, canContinue else { return }
+            switch selectedBuildMethod {
+            case .ai:
                 showingAIBuilder = true
-            } else {
+            case .dayByDay:
+                selectBuildMethod(.dayByDay)
+                goForward()
+            case .weekByWeek:
+                selectBuildMethod(.weekByWeek)
                 goForward()
             }
         } label: {
             HStack(spacing: 10) {
                 Spacer(minLength: 12)
-                Image(systemName: prefersAIPlanBuild ? "sparkles" : "calendar.badge.plus")
-                Text(ATHLTHLocalization.choose(
-                    english: prefersAIPlanBuild ? "Continue with ATHLTH AI" : "Build my week",
-                    norwegian: prefersAIPlanBuild ? "Fortsett med ATHLTH AI" : "Bygg treningsuken"
-                ))
-                .font(.subheadline.weight(.semibold))
+                if selectedBuildMethod == .ai {
+                    Image(systemName: "sparkles")
+                }
+                Text(selectedBuildMethod == .ai
+                     ? ATHLTHLocalization.choose(
+                        english: "Continue with ATHLTH Coach",
+                        norwegian: "Fortsett med ATHLTH Coach")
+                     : ATHLTHLocalization.choose(
+                        english: "Choose and continue",
+                        norwegian: "Velg og fortsett"))
+                    .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 12)
                 Image(systemName: "arrow.right")
             }
@@ -1600,14 +1627,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .frame(maxWidth: .infinity, minHeight: 55)
             .background(
                 LinearGradient(
-                    colors: [ATHLTHTrainDesign.bronze, Color(red: 0.69, green: 0.51, blue: 0.31)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
+                    colors: [ATHLTHTrainDesign.bronze,
+                             Color(red: 0.69, green: 0.51, blue: 0.31)],
+                    startPoint: .leading, endPoint: .trailing
                 ),
-                in: RoundedRectangle(cornerRadius: 18)
+                in: RoundedRectangle(cornerRadius: 19)
             )
         }
         .buttonStyle(.plain)
-        .disabled(!canContinue)
+        .disabled(mode != .advanced || !canContinue)
         .padding(.horizontal, 18)
         .padding(.vertical, 10)
         .background(ATHLTHTrainDesign.canvas.opacity(0.98))
