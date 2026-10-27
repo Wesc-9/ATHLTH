@@ -135,7 +135,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var targetPaceSecondsPerKilometer: Double? = nil
     var targetHeartRateZone: Int? = nil
     /// Original intensity target from Zoned (which uses six heart-rate zones).
-    /// These preserve mixed ranges and Z6 even if ATHLTH displays five zones.
+    /// This displays normalized ATHLTH Z1-Z5 ranges; original source is in JSON.
     var sourceIntensityZoneLabel: String? = nil
     var targetHeartRatePercentMin: Double? = nil
     var targetHeartRatePercentMax: Double? = nil
@@ -328,12 +328,19 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
             parts.append(String(format: "%d:%02d/km", seconds / 60, seconds % 60))
         }
 
-        if let sourceIntensityZoneLabel,
+        if let zoneLabel = sourceIntensityZoneLabel,
            let lo = targetHeartRatePercentMin,
            let hi = targetHeartRatePercentMax {
-            parts.append("Puls \(sourceIntensityZoneLabel) · \(Int(lo))–\(Int(hi)) % HRmaks")
+            let label = ATHLTHLocalization.choose(
+                english: "HR zone", norwegian: "Pulssone"
+            )
+            parts.append("\(label) \(zoneLabel) · \(Int(lo))–\(Int(hi)) % " +
+                ATHLTHLocalization.choose(english: "max HR", norwegian: "makspuls"))
         } else if let targetHeartRateZone, (1...5).contains(targetHeartRateZone) {
-            parts.append("Puls sone \(targetHeartRateZone)")
+            parts.append(ATHLTHLocalization.choose(
+                english: "HR zone \(targetHeartRateZone)",
+                norwegian: "Pulssone \(targetHeartRateZone)"
+            ))
         }
         if let targetEffortRPE, (1...10).contains(targetEffortRPE) {
             parts.append("RPE \(targetEffortRPE)/10")
