@@ -1,6 +1,35 @@
 import SwiftUI
 import Charts
 
+enum ATHLTHInsightsStyle {
+    static let ink = Color(red: 0.11, green: 0.13, blue: 0.16)
+    static let muted = Color(red: 0.41, green: 0.43, blue: 0.46)
+    static let accent = Color(red: 0.68, green: 0.53, blue: 0.34)
+    static let subtleAccent = Color(red: 0.77, green: 0.77, blue: 0.72)
+    static let track = Color(red: 0.92, green: 0.92, blue: 0.90)
+    static let canvas = Color(red: 0.985, green: 0.984, blue: 0.977)
+}
+
+private struct ATHLTHInsightsSurfaceModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background(Color.white, in: RoundedRectangle(cornerRadius: 24,
+                                                        style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .strokeBorder(ATHLTHInsightsStyle.track, lineWidth: 0.8)
+            }
+            .shadow(color: ATHLTHInsightsStyle.ink.opacity(0.035),
+                    radius: 15, y: 5)
+    }
+}
+
+extension View {
+    func athlthInsightsSurface() -> some View {
+        modifier(ATHLTHInsightsSurfaceModifier())
+    }
+}
+
 /// Insights uses the same editorial navigation and colors as Train.
 /// The sections filter presentation only; none change health or workout data.
 enum ATHLTHInsightsSection: String, CaseIterable, Identifiable {
@@ -46,7 +75,8 @@ struct ATHLTHInsightsNavigation: View {
                             if active {
                                 Capsule().fill(
                                     LinearGradient(
-                                        colors: [ATHLTHTrainDesign.bronze, ATHLTHTrainDesign.gold],
+                                        colors: [ATHLTHInsightsStyle.accent,
+                                                 Color(red: 0.82, green: 0.71, blue: 0.51)],
                                         startPoint: .topLeading,
                                         endPoint: .bottomTrailing
                                     )
@@ -112,91 +142,175 @@ struct ATHLTHInsightsMuscleSummary {
     }
 }
 
+/// Recorded training share, not a clinical fatigue or recovery percentage.
+/// Only regions with positive evidence are ranked: missing data stays unknown.
+struct ATHLTHInsightsMuscleFocus: Identifiable {
+    let region: StrengthMuscleRegion
+    let percentage: Int
+    let score: Double
+    var id: StrengthMuscleRegion { region }
+}
+
+enum ATHLTHInsightsMuscleRanking {
+    static func extremes(_ summary: ATHLTHInsightsMuscleSummary)
+        -> (most: [ATHLTHInsightsMuscleFocus], least: [ATHLTHInsightsMuscleFocus]) {
+        let valid = summary.profile.activations.filter {
+            $0.score.isFinite && $0.score > 0
+        }
+        let total = valid.reduce(0.0) { $0 + $1.score }
+        guard total > 0 else { return ([], []) }
+        let ordered = valid.sorted {
+            if $0.score == $1.score { return $0.region.rawValue < $1.region.rawValue }
+            return $0.score > $1.score
+        }
+        let count = min(2, ordered.count)
+        let high = Array(ordered.prefix(count))
+        let highIDs = Set(high.map(\.region))
+        let low = Array(ordered.reversed().filter {
+            !highIDs.contains($0.region)
+        }.prefix(2))
+        func focus(_ item: StrengthMuscleActivation) -> ATHLTHInsightsMuscleFocus {
+            ATHLTHInsightsMuscleFocus(
+                region: item.region,
+                percentage: Int((100 * item.score / total).rounded()),
+                score: item.score
+            )
+        }
+        return (high.map(focus), low.map(focus))
+    }
+}
+
 struct ATHLTHInsightsMuscleCard: View {
     let summary: ATHLTHInsightsMuscleSummary
 
-    private var topMuscles: String {
-        var seen: Set<String> = []
-        let names = summary.profile.topActivations.compactMap { activation -> String? in
-            let name = activation.region.activityDisplayTitle
-            guard seen.insert(name).inserted else { return nil }
-            return name
-        }
-        return names.prefix(4).joined(separator: " · ")
+    private var focus: (most: [ATHLTHInsightsMuscleFocus],
+                        least: [ATHLTHInsightsMuscleFocus]) {
+        ATHLTHInsightsMuscleRanking.extremes(summary)
+    }
+
+    private var highlightedProfile: StrengthMuscleProfile {
+        let chosen = Set((focus.most + focus.least).map(\.region))
+        return StrengthMuscleProfile(
+            activations: summary.profile.activations.filter {
+                chosen.contains($0.region)
+            },
+            primaryRegions: summary.profile.primaryRegions.intersection(chosen),
+            secondaryRegions: summary.profile.secondaryRegions.intersection(chosen)
+        )
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            HStack(alignment: .firstTextBaseline) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Label(ATHLTHLocalization.choose(
-                    english: "Muscles trained", norwegian: "Muskler i bruk"
+                    english: "Your muscle balance", norwegian: "Din muskelbalanse"
                 ), systemImage: "figure.strengthtraining.traditional")
-                    .font(.system(size: 20, weight: .medium, design: .serif))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-                Spacer(minLength: 4)
-                Text(ATHLTHLocalization.choose(english: "Last 28 days", norwegian: "Siste 28 dager"))
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHTrainDesign.secondary)
-            }
-
-            HStack(spacing: 10) {
-                Image(systemName: "dumbbell")
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                Text("\(summary.sessionCount) " + ATHLTHLocalization.choose(
-                    english: "completed strength workouts", norwegian: "fullførte styrkeøkter"
-                ))
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
-                .font(.caption)
-            }
-
-            StrengthMuscleMapView(
-                profile: summary.profile,
-                compact: false,
-                style: .activation,
-                presentation: .insight,
-                activationTint: ATHLTHTrainDesign.gold
-            )
-            .frame(maxWidth: 470)
-            .frame(height: 268)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 7)
-            .background(
-                LinearGradient(
-                    colors: [ATHLTHTrainDesign.paleGold.opacity(0.30), Color.white.opacity(0.4)],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                ),
-                in: RoundedRectangle(cornerRadius: 18)
-            )
-
-            if topMuscles.isEmpty {
+                    .font(.system(size: 19, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
+                Spacer(minLength: 3)
                 Text(ATHLTHLocalization.choose(
-                    english: "Complete a strength session with recorded exercises to see your actual muscle distribution here.",
-                    norwegian: "Fullfør en styrkeøkt med registrerte øvelser for å se hvilke muskler du faktisk har trent."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
-            } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Main muscle groups", norwegian: "Mest trente muskelgrupper"
-                    ))
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    Text(topMuscles)
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(ATHLTHTrainDesign.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Text(ATHLTHLocalization.choose(
-                    english: "Highlights reflect completed ATHLTH strength exercises with muscle data — not a measurement of muscle growth.",
-                    norwegian: "Markeringene bygger på utførte styrkeøvelser med muskeldata, ikke målinger av muskelvekst."
+                    english: "28 days", norwegian: "28 dager"
                 ))
                 .font(.caption2)
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                .foregroundStyle(ATHLTHInsightsStyle.muted)
+            }
+
+            if focus.most.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(systemName: "figure.strengthtraining.traditional")
+                        .font(.title)
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Muscle balance appears after completed strength training with recorded muscle metadata.",
+                        norwegian: "Muskelbalansen vises etter fullført styrketrening med registrerte muskelgrupper."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+                }
+                .padding(.vertical, 22)
+            } else {
+                HStack(alignment: .center, spacing: 10) {
+                    StrengthMuscleMapView(
+                        profile: highlightedProfile,
+                        compact: true,
+                        style: .activation,
+                        presentation: .insight,
+                        activationTint: ATHLTHInsightsStyle.accent
+                    )
+                    .frame(width: 144, height: 228)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Highlighted most and least trained muscle groups",
+                        norwegian: "Fremhever mest og minst trente muskelgrupper"
+                    ))
+                    VStack(alignment: .leading, spacing: 14) {
+                        rankingSection(
+                            title: ATHLTHLocalization.choose(
+                                english: "MOST TRAINED", norwegian: "MEST TRENT"
+                            ),
+                            rows: focus.most,
+                            accent: ATHLTHInsightsStyle.accent
+                        )
+                        if !focus.least.isEmpty {
+                            rankingSection(
+                                title: ATHLTHLocalization.choose(
+                                    english: "LEAST TRAINED", norwegian: "MINST TRENT"
+                                ),
+                                rows: focus.least,
+                                accent: ATHLTHInsightsStyle.subtleAccent
+                            )
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Share of recorded muscle activation across \(summary.sessionCount) strength sessions. Not muscle growth, fatigue or a medical measurement.",
+                    norwegian: "Andel registrert muskelaktivering fra \(summary.sessionCount) styrkeøkter. Ikke muskelvekst, utmattelse eller en medisinsk måling."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHInsightsStyle.muted)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(18)
-        .athlthTrainPaper()
+        .padding(17)
+        .athlthInsightsSurface()
+    }
+
+    private func rankingSection(
+        title: String,
+        rows: [ATHLTHInsightsMuscleFocus],
+        accent: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Text(title)
+                .font(.system(size: 10, weight: .bold))
+                .tracking(0.9)
+                .foregroundStyle(ATHLTHInsightsStyle.muted)
+            ForEach(rows) { muscle in
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 4) {
+                        Text(muscle.region.activityDisplayTitle)
+                            .font(.system(size: 12, weight: .semibold))
+                            .lineLimit(2)
+                            .minimumScaleFactor(0.77)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Text("\(muscle.percentage)%")
+                            .font(.system(size: 13, weight: .bold,
+                                          design: .rounded))
+                            .monospacedDigit()
+                    }
+                    GeometryReader { geometry in
+                        Capsule().fill(ATHLTHInsightsStyle.track)
+                            .overlay(alignment: .leading) {
+                                Capsule().fill(accent)
+                                    .frame(width: max(2, geometry.size.width *
+                                        CGFloat(muscle.percentage) / 100))
+                            }
+                    }
+                    .frame(height: 5)
+                }
+                .foregroundStyle(ATHLTHInsightsStyle.ink)
+            }
+        }
     }
 }
 
