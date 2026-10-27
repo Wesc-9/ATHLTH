@@ -1,8 +1,8 @@
 import Foundation
 
 /// Bundled, attributed import of Zoned's MIT-licensed training content.
-/// We keep the original six-zone percentage prescription. ATHLTH's five-zone
-/// display is an interpretation, never a replacement for the source target.
+/// All active sessions use the app's standard five HRmax zones.
+/// The original six-zone content stays in the attributed source JSON snapshot.
 /// Running pace examples from Zoned are NOT individualized pace prescriptions.
 enum ATHLTHZonedPlanLibrary {
     struct Plan: Decodable, Sendable {
@@ -373,7 +373,7 @@ enum ATHLTHZonedPlanLibrary {
                 cardioActivity: isCycling ? nil : .running
             )
             block.activityTag = isCycling ? "cycling" : nil
-            block.sourceIntensityZoneLabel = step.zone
+            block.sourceIntensityZoneLabel = zone?.label
             block.targetHeartRatePercentMin = zone?.minimum
             block.targetHeartRatePercentMax = zone?.maximum
             result.append(block)
@@ -384,24 +384,27 @@ enum ATHLTHZonedPlanLibrary {
         let minimum: Double
         let maximum: Double
         let athlthZone: Int?
+        let label: String
     }
 
-    /// Zoned Z1..Z6: 50-60,60-70,70-80,80-90,90-95,95-100 % HRmax.
-    /// ATHLTH's Z5 spans 90-100 %. A source range crossing zone boundaries
-    /// remains a range; we never turn Z1-Z3 into a false single-zone target.
-    static func zonePrescription(_ label: String) -> ZonePrescription? {
-        let values = label.uppercased()
+    /// One coherent five-zone ATHLTH scheme for every imported session:
+    /// Z1 50-60, Z2 60-70, Z3 70-80, Z4 80-90, Z5 90-100% HRmax.
+    /// Zoned's source Z5 (90-95) and Z6 (95-100) both map to Z5.
+    /// A range like Z4-Z6 becomes Z4-Z5 rather than a fabricated Z6.
+    static func zonePrescription(_ source: String) -> ZonePrescription? {
+        let values = source.uppercased()
             .split(whereSeparator: { !$0.isNumber })
             .compactMap { Int($0) }
-            .filter { (1...6).contains($0) }
-        guard let lo = values.min(), var hi = values.max() else { return nil }
-        if label.contains("+") { hi = 6 }
-        let bounds: [Double] = [50, 60, 70, 80, 90, 95, 100]
-        let zone: Int? = lo == hi ? min(lo, 5) : (lo >= 5 ? 5 : nil)
+        guard !values.isEmpty, values.allSatisfy({ (1...6).contains($0) }),
+              let low = values.min(), let high = values.max() else { return nil }
+        let first = min(low, 5)
+        let last = source.contains("+") ? 5 : min(high, 5)
+        let bounds: [Double] = [50, 60, 70, 80, 90, 100]
         return ZonePrescription(
-            minimum: bounds[lo - 1],
-            maximum: bounds[hi],
-            athlthZone: zone
+            minimum: bounds[first - 1],
+            maximum: bounds[last],
+            athlthZone: first == last ? first : nil,
+            label: first == last ? "Z\(first)" : "Z\(first)-Z\(last)"
         )
     }
 
