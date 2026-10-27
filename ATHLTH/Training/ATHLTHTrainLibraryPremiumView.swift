@@ -8,6 +8,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
     let onOpenPlan: () -> Void
+    var onOpenSelectedPlan: ((UUID) -> Void)? = nil
     var startWithWorkouts: Bool = false
     var onPlanCreated: ((UUID) -> Void)? = nil
 
@@ -200,7 +201,11 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 sectionTitle(tr("MY PROGRAMS", "MINE TRENINGSPROGRAM"))
                 ForEach(session.trainingPlans.filter { matches($0.title, $0.summary) }) { plan in
                     Button {
-                        onOpenPlan()
+                        if let onOpenSelectedPlan {
+                            onOpenSelectedPlan(plan.id)
+                        } else {
+                            onOpenPlan()
+                        }
                     } label: {
                         planRow(
                             title: plan.title,
@@ -417,9 +422,14 @@ struct ATHLTHTrainLibraryPremiumView: View {
                             plan.id,
                             startDate: session.suggestedTrainingPlanStartDate
                         )
-                        if created != nil {
+                        if let created {
                             selectedTemplate = nil
-                            onOpenPlan()
+                            onPlanCreated?(created.id)
+                            if let onOpenSelectedPlan {
+                                onOpenSelectedPlan(created.id)
+                            } else {
+                                onOpenPlan()
+                            }
                         } else {
                             alertMessage = tr(
                                 "The selected dates conflict with another plan. Change your schedule before starting.",
