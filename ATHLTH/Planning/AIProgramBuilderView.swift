@@ -138,6 +138,17 @@ struct AIProgramBuilderView: View {
     @State private var didLoadDefaults = false
     @State private var completingPlanID: UUID?
     @State private var completingPlanVersion: Int?
+    private enum CoachJourneyStage {
+        case welcome, intake, generating, preview, ready
+    }
+    @State private var coachJourneyStage: CoachJourneyStage = .welcome
+    @State private var coachPreviewWeek = 1
+    @State private var coachSavedPlan: TrainingPlan?
+    @State private var showingCoachGoalCreator = false
+    @State private var coachGoalIDsBeforeCreation: Set<UUID> = []
+    private var isStandaloneCoachJourney: Bool {
+        mode == .generate && seed == nil
+    }
 
     private let service = AIProgramService()
     private let dayNames = ["M", "T", "W", "T", "F", "S", "S"]
@@ -205,9 +216,13 @@ struct AIProgramBuilderView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 18) {
-                    coachHero
+                    if isStandaloneCoachJourney {
+                        standaloneCoachContent
+                    } else {
+                        coachHero
+                    }
 
-                    if seed != nil && mode == .generate {
+                    if !isStandaloneCoachJourney && seed != nil && mode == .generate {
                         // The upstream wizard already collected duration,
                         // goals, sessions and days. Never ask them twice.
                         seededPlanSummary
@@ -219,9 +234,9 @@ struct AIProgramBuilderView: View {
                         } else {
                             generateCard
                         }
-                    } else if showingQuestions {
+                    } else if !isStandaloneCoachJourney && showingQuestions {
                         coachQuestions
-                    } else {
+                    } else if !isStandaloneCoachJourney {
                         coachSummary
                         goalsSection
                         timelineSection
@@ -248,7 +263,9 @@ struct AIProgramBuilderView: View {
                 )
             )
             .disabled(isGenerating)
-            .onChange(of: coachContext) { _, _ in preview = nil }
+            .onChange(of: coachContext) { _, _ in
+                if coachJourneyStage != .ready { preview = nil }
+            }
             .onChange(of: intakePreferences) { _, value in
                 guard didLoadDefaults, session.signedIn else { return }
                 AccountLocalStorage.write(
@@ -257,9 +274,7 @@ struct AIProgramBuilderView: View {
                     userID: session.profile.userID
                 )
             }
-            .navigationTitle(
-                seed == nil && showingQuestions ? "Meet your coach" : "ATHLTH Coach"
-            )
+            .navigationTitle("ATHLTH Coach")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -285,6 +300,16 @@ struct AIProgramBuilderView: View {
                 Text(errorMessage ?? "")
             }
         }
+        .sheet(isPresented: $showingCoachGoalCreator, onDismiss: {
+            if let created = goalStore.activeGoals.first(where: {
+                !coachGoalIDsBeforeCreation.contains($0.id) && $0.status == .active
+            }) {
+                selectedGoalIDs.insert(created.id)
+            }
+            coachGoalIDsBeforeCreation.removeAll()
+        }) {
+            GoalCreationView()
+        }
         .sheet(item: $editingDraftWorkout) { selection in
             if let draft = preview,
                let workout = ATHLTHPlanDraftEditing.workout(in: draft, selection: selection) {
@@ -302,6 +327,333 @@ struct AIProgramBuilderView: View {
                 }
             }
         }
+    }
+
+    // The standalone Coach journey uses real AIProgramService drafts.
+    // The legacy completion flow and seeded Wizard Coach stay untouched.
+    @ViewBuilder
+    private var standaloneCoachContent: some View {
+        switch coachJourneyStage {
+        case .welcome:
+            ATHLTHCoachPlanWelcomeScreen {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    coachJourneyStage = .intake
+                }
+            }
+        case .intake:
+            coachPlanIntake
+        case .generating:
+            ATHLTHCoachPlanGeneratingScreen()
+        case .preview:
+            if let preview {
+                ATHLTHCoachPlanDraftScreen(
+                    draft: preview,
+                    startDate: startDate,
+                    selectedWeek: $coachPreviewWeek,
+                    onEditWorkout: { week, day, index in
+                        editingDraftWorkout = ATHLTHPlanDraftWorkoutSelection(
+                            weekNumber: week, dayIndex: day, sessionIndex: index
+                        )
+                    },
+                    onRegenerate: {
+                        Task { await generatePreview() }
+                    },
+                    onApprove: {
+                        applyPreview(preview)
+                    }
+                )
+            } else {
+                coachPlanIntake
+            }
+        case .ready:
+            if let coachSavedPlan {
+                ATHLTHCoachPlanReadyScreen(plan: coachSavedPlan) {
+                    dismiss()
+                }
+            }
+        }
+    }
+
+    private var coachPlanIntake: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "TELL US ABOUT YOU", norwegian: "FORTELL OM DEG"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2).foregroundStyle(ATHLTHTrainDesign.secondary)
+                Spacer()
+                Text("2 / 5")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Your goals. Your plan.", norwegian: "Din hverdag. Dine mål."))
+                .font(.system(size: 32, weight: .regular, design: .serif))
+            Text(ATHLTHLocalization.choose(
+                english: "Tell Coach what matters. You can change these choices later.",
+                norwegian: "Fortell Coach hva som er viktig for deg. Du kan endre alt senere."))
+                .font(.system(size: 12))
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+
+            coachIntakeCard("target", ATHLTHLocalization.choose(
+                english: "What should the plan focus on?", norwegian: "Hva er hovedmålet ditt?")) {
+                if goalStore.activeGoals.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "You have no active goals yet. Coach can use your training focus.",
+                        norwegian: "Du har ingen aktive mål. Coach kan bruke treningsfokuset ditt."))
+                        .font(.caption).foregroundStyle(ATHLTHTrainDesign.secondary)
+                } else {
+                    ForEach(goalStore.activeGoals) { goal in
+                        Button {
+                            if selectedGoalIDs.contains(goal.id) {
+                                selectedGoalIDs.remove(goal.id)
+                            } else {
+                                selectedGoalIDs.insert(goal.id)
+                            }
+                        } label: {
+                            HStack {
+                                Image(systemName: goal.category.systemImage)
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                    .frame(width: 26)
+                                Text(goal.title)
+                                    .font(.system(size: 12, weight: .medium))
+                                    .multilineTextAlignment(.leading)
+                                Spacer(minLength: 0)
+                                Image(systemName: selectedGoalIDs.contains(goal.id)
+                                    ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            }
+                            .padding(10)
+                            .background(ATHLTHTrainDesign.canvas,
+                                        in: RoundedRectangle(cornerRadius: 11))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                Button {
+                    coachGoalIDsBeforeCreation = Set(goalStore.goals.map(\.id))
+                    showingCoachGoalCreator = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Create a new goal", norwegian: "Opprett nytt mål"),
+                          systemImage: "plus.circle")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+
+                Picker(ATHLTHLocalization.choose(
+                    english: "Training focus", norwegian: "Treningsfokus"),
+                       selection: $trainingFocus) {
+                    ForEach(TrainingFocus.allCases) { focus in
+                        Text(focus.title).tag(focus)
+                    }
+                }
+                .tint(ATHLTHTrainDesign.bronze)
+
+                TextField(ATHLTHLocalization.choose(
+                    english: "Tell Coach what you want to improve...",
+                    norwegian: "Fortell Coach hva du ønsker å oppnå..."),
+                          text: $coachFocusNotes, axis: .vertical)
+                    .lineLimit(2...4)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            coachIntakeCard("figure.run", ATHLTHLocalization.choose(
+                english: "Your experience", norwegian: "Hvor mye erfaring har du?")) {
+                HStack(spacing: 6) {
+                    intakeOption("Beginner", english: "Beginner", norwegian: "Nybegynner",
+                                 selection: $experience)
+                    intakeOption("Intermediate", english: "Intermediate", norwegian: "Mosjonist",
+                                 selection: $experience)
+                    intakeOption("Experienced", english: "Experienced", norwegian: "Erfaren",
+                                 selection: $experience)
+                }
+                Stepper(ATHLTHLocalization.choose(
+                    english: "Currently \(currentSessionsPerWeek) sessions per week",
+                    norwegian: "Trener nå \(currentSessionsPerWeek) økter per uke"),
+                        value: $currentSessionsPerWeek, in: 0...14)
+                    .font(.system(size: 12))
+            }
+
+            coachIntakeCard("calendar", ATHLTHLocalization.choose(
+                english: "Schedule and duration", norwegian: "Treningsdager og varighet")) {
+                DatePicker(ATHLTHLocalization.choose(
+                    english: "Start date", norwegian: "Startdato"),
+                           selection: $startDate,
+                           in: Calendar.current.startOfDay(for: .now)...,
+                           displayedComponents: .date)
+                    .font(.system(size: 12))
+                    .tint(ATHLTHTrainDesign.bronze)
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Plan duration", norwegian: "Planens varighet"))
+                        .font(.system(size: 12))
+                    Spacer()
+                    Menu {
+                        ForEach(1...52, id: \.self) { count in
+                            Button("\(count) " + ATHLTHLocalization.choose(
+                                english: "weeks", norwegian: "uker")) {
+                                weekCount = count
+                                timelineMode = .weeks
+                            }
+                        }
+                    } label: {
+                        Text("\(resolvedWeeks) " + ATHLTHLocalization.choose(
+                            english: "weeks", norwegian: "uker"))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    }
+                }
+                HStack(spacing: 5) {
+                    ForEach(1...7, id: \.self) { day in
+                        Button {
+                            if availableDays.contains(day) {
+                                if availableDays.count > 1 { availableDays.remove(day) }
+                            } else {
+                                availableDays.insert(day)
+                            }
+                            sessionsPerWeek = min(sessionsPerWeek, availableDays.count)
+                        } label: {
+                            Text(["Man", "Tir", "Ons", "Tor", "Fre", "Lør", "Søn"][day - 1])
+                                .font(.system(size: 10, weight: .medium))
+                                .lineLimit(1).minimumScaleFactor(0.73)
+                                .foregroundStyle(availableDays.contains(day) ? .white :
+                                                 ATHLTHTrainDesign.ink)
+                                .frame(maxWidth: .infinity, minHeight: 37)
+                                .background(availableDays.contains(day)
+                                    ? ATHLTHTrainDesign.bronze :
+                                    ATHLTHTrainDesign.canvas, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(availableDays.contains(day) ? .isSelected : [])
+                    }
+                }
+                Toggle(isOn: $aiChoosesFrequency) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Let Coach choose the workout frequency",
+                        norwegian: "La Coach foreslå antall økter"))
+                    .font(.system(size: 12))
+                }
+                .tint(ATHLTHTrainDesign.bronze)
+                if !aiChoosesFrequency {
+                    Stepper(ATHLTHLocalization.choose(
+                        english: "\(sessionsPerWeek) sessions per week",
+                        norwegian: "\(sessionsPerWeek) økter per uke"),
+                            value: $sessionsPerWeek,
+                            in: 1...max(1, availableDays.count))
+                        .font(.system(size: 12))
+                }
+            }
+
+            coachIntakeCard("dumbbell", ATHLTHLocalization.choose(
+                english: "Equipment and preferences", norwegian: "Utstyr og ønsker")) {
+                HStack(spacing: 6) {
+                    intakeOption("Yes", english: "Gym", norwegian: "Treningssenter",
+                                 selection: $gymAccess)
+                    intakeOption("No", english: "Home / outside", norwegian: "Hjemme / ute",
+                                 selection: $gymAccess)
+                }
+                TextField(ATHLTHLocalization.choose(
+                    english: "Other available equipment (optional)",
+                    norwegian: "Annet utstyr du har tilgang til (valgfritt)"),
+                          text: $otherEquipment)
+                    .textFieldStyle(.roundedBorder)
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Approximate time budget",
+                        norwegian: "Omtrentlig tidsramme"))
+                        .font(.system(size: 12))
+                    Spacer()
+                    Menu {
+                        ForEach([20,30,40,45,60,75,90,120], id: \.self) { minutes in
+                            Button("\(minutes) min") { sessionDurationMinutes = minutes }
+                        }
+                    } label: {
+                        Text("\(sessionDurationMinutes) min")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    }
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "A guideline only: each workout may have a different duration.",
+                    norwegian: "Kun en veiledende ramme – hver enkelt økt kan ha ulik varighet."))
+                    .font(.system(size: 10))
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                TextField(ATHLTHLocalization.choose(
+                    english: "Movements to avoid (optional)",
+                    norwegian: "Bevegelser du vil unngå (valgfritt)"),
+                          text: $limitations, axis: .vertical)
+                    .lineLimit(1...3)
+                    .textFieldStyle(.roundedBorder)
+                if !limitations.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Toggle(isOn: $shareLimitationsWithAI) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "I consent to share these health-related notes with Coach",
+                            norwegian: "Jeg samtykker til å dele disse helseopplysningene med Coach"))
+                            .font(.system(size: 11))
+                    }
+                    .tint(ATHLTHTrainDesign.bronze)
+                    Text(ATHLTHLocalization.choose(
+                        english: "If disabled, the notes are not sent to the AI service.",
+                        norwegian: "Hvis dette er av, sendes ikke notatene til AI-tjenesten."))
+                        .font(.system(size: 10))
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+            }
+
+            Button {
+                Task { await generatePreview() }
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Build my plan with Coach",
+                    norwegian: "Lag planen min med Coach"),
+                      systemImage: "sparkles")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(ATHLTHTrainDesign.bronze.gradient,
+                                in: RoundedRectangle(cornerRadius: 17))
+            }
+            .buttonStyle(.plain)
+            .disabled(!canGenerate)
+            .opacity(canGenerate ? 1 : 0.5)
+        }
+    }
+
+    private func coachIntakeCard<Content: View>(
+        _ icon: String, _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 9) {
+                Image(systemName: icon)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(width: 34, height: 34)
+                    .background(ATHLTHTrainDesign.paleGold, in: Circle())
+                Text(title).font(.system(size: 17, weight: .medium, design: .serif))
+                Spacer()
+            }
+            content()
+        }
+        .padding(13)
+        .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func intakeOption(
+        _ value: String, english: String, norwegian: String,
+        selection: Binding<String>
+    ) -> some View {
+        let active = selection.wrappedValue == value
+        return Button { selection.wrappedValue = value } label: {
+            Text(ATHLTHLocalization.choose(english: english, norwegian: norwegian))
+                .font(.system(size: 11, weight: active ? .semibold : .regular))
+                .foregroundStyle(active ? .white : ATHLTHTrainDesign.ink)
+                .frame(maxWidth: .infinity, minHeight: 36)
+                .background(active ? ATHLTHTrainDesign.bronze :
+                            ATHLTHTrainDesign.canvas, in: RoundedRectangle(cornerRadius: 11))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
     }
 
     private var seededPlanSummary: some View {
@@ -1486,6 +1838,9 @@ struct AIProgramBuilderView: View {
     private func generatePreview() async {
         guard canGenerate else { return }
 
+        if isStandaloneCoachJourney {
+            coachJourneyStage = .generating
+        }
         isGenerating = true
         defer { isGenerating = false }
 
@@ -1522,6 +1877,7 @@ struct AIProgramBuilderView: View {
             let validationIssues = draftValidationIssues(effectiveProposal)
             guard validationIssues.isEmpty else {
                 preview = nil
+                if isStandaloneCoachJourney { coachJourneyStage = .intake }
                 errorMessage = ATHLTHLocalization.choose(
                     english: "AI returned an incomplete or invalid plan. No changes have been saved. Try again.",
                     norwegian: "AI leverte en ufullstendig eller ugyldig plan. Ingenting er lagret. Prøv på nytt."
@@ -1530,8 +1886,13 @@ struct AIProgramBuilderView: View {
             }
             expandedPreviewWeeks.removeAll()
             preview = effectiveProposal
+            if isStandaloneCoachJourney {
+                coachPreviewWeek = 1
+                coachJourneyStage = .preview
+            }
             errorMessage = nil
         } catch {
+            if isStandaloneCoachJourney { coachJourneyStage = .intake }
             errorMessage = error.localizedDescription
         }
     }
@@ -1649,7 +2010,12 @@ struct AIProgramBuilderView: View {
         onProgramCreatedPlanID?(mode == .generate
             ? generated.id : (completingPlanID ?? generated.id))
         onProgramCreated?()
-        dismiss()
+        if isStandaloneCoachJourney && mode == .generate {
+            coachSavedPlan = generated
+            coachJourneyStage = .ready
+        } else {
+            dismiss()
+        }
     }
 
     @MainActor
