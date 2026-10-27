@@ -352,11 +352,14 @@ final class RecoverySorenessStore: ObservableObject {
     }
 
     private func trimAndPersistIfNeeded() {
+        // Keep a full year of the athlete's own optional check-ins for
+        // longitudinal Insights trends. Retain the original UserDefaults key
+        // and JSON format so existing recordings migrate without data loss.
         let cutoff = Calendar.current.date(
             byAdding: .day,
-            value: -30,
+            value: -365,
             to: Date()
-        ) ?? Date().addingTimeInterval(-2_592_000)
+        ) ?? Date().addingTimeInterval(-365 * 86_400)
 
         entries = entries
             .filter { $0.date >= cutoff }
