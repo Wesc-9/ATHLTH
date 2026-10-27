@@ -177,13 +177,14 @@ struct ATHLTHDailyWellbeingSummaryCard: View {
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
             } else {
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 9) {
-                    ForEach(answers, id: \.0) { title, value in
+                    ForEach(answers.indices, id: \.self) { index in
+                        let answer = answers[index]
                         HStack(spacing: 6) {
-                            Text(title)
+                            Text(answer.0)
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHTrainDesign.secondary)
                             Spacer(minLength: 1)
-                            Text("\(value)/5")
+                            Text("\(answer.1)/5")
                                 .font(.subheadline.weight(.semibold))
                                 .monospacedDigit()
                                 .foregroundStyle(ATHLTHTrainDesign.ink)
