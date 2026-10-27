@@ -13,6 +13,7 @@ struct TrainingLibraryHomeView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     let onStartRunning: (RunningWorkoutTemplate) -> Void
+    var onOpenPlan: ((UUID) -> Void)? = nil
     @State private var showingRecoveryRestPlanner = false
 
     private let ink = ATHLTHPlanDesign.ink
@@ -168,7 +169,7 @@ struct TrainingLibraryHomeView: View {
             )
             VStack(spacing: 0) {
                 NavigationLink {
-                    MyTrainingPlansLibraryView()
+                    MyTrainingPlansLibraryView(onOpenPlan: onOpenPlan)
                 } label: {
                     LibraryHubCollectionRow(
                         title: tr("My training plans", "Mine treningsplaner"),
@@ -3278,6 +3279,8 @@ struct PersonalizeTrainingPlanView: View {
 }
 
 struct MyTrainingPlansLibraryView: View {
+    var onOpenPlan: ((UUID) -> Void)? = nil
+
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var health: HealthKitManager
@@ -3347,29 +3350,45 @@ struct MyTrainingPlansLibraryView: View {
                         let progress = planProgress(plan)
 
                         VStack(spacing: 8) {
-                            NavigationLink {
-                                ScrollView {
-                                    AdvancedPlannerView(
-                                        planID: plan.id
+                            if let onOpenPlan {
+                                Button {
+                                    onOpenPlan(plan.id)
+                                } label: {
+                                    scheduledPlanCard(
+                                        plan,
+                                        progress: progress
                                     )
-                                    .padding()
                                 }
-                                .background(
-                                    ATHLTHPremiumCanvas(
-                                        accent:
-                                            ATHLTHTheme.accent
-                                            .opacity(0.35)
+                                .buttonStyle(.plain)
+                                .accessibilityHint(ATHLTHLocalization.choose(
+                                    english: "Opens this program in Train, Plan.",
+                                    norwegian: "Åpner programmet i Tren, Plan."
+                                ))
+                            } else {
+                                NavigationLink {
+                                    ScrollView {
+                                        AdvancedPlannerView(
+                                            planID: plan.id
+                                        )
+                                        .padding()
+                                    }
+                                    .background(
+                                        ATHLTHPremiumCanvas(
+                                            accent:
+                                                ATHLTHTheme.accent
+                                                .opacity(0.35)
+                                        )
                                     )
-                                )
-                                .navigationTitle(plan.title)
-                                .navigationBarTitleDisplayMode(.inline)
-                            } label: {
-                                scheduledPlanCard(
-                                    plan,
-                                    progress: progress
-                                )
+                                    .navigationTitle(plan.title)
+                                    .navigationBarTitleDisplayMode(.inline)
+                                } label: {
+                                    scheduledPlanCard(
+                                        plan,
+                                        progress: progress
+                                    )
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
 
                             Button {
                                 preparePlanShare(plan)
@@ -3591,13 +3610,17 @@ struct MyTrainingPlansLibraryView: View {
             }
 
             Button {
-                if session.usePlanTemplate(
+                if let created = session.usePlanTemplate(
                     template.id,
                     startDate:
                         session.suggestedTrainingPlanStartDate
-                ) == nil {
-                    scheduleError =
-                        "Another plan overlaps the suggested start date. Choose a different date when creating or scheduling the plan."
+                ) {
+                    onOpenPlan?(created.id)
+                } else {
+                    scheduleError = ATHLTHLocalization.choose(
+                        english: "Another plan overlaps the suggested start date. Choose a different date when creating or scheduling the plan.",
+                        norwegian: "En annen plan overlapper foreslått startdato. Velg en annen periode for planen."
+                    )
                 }
             } label: {
                 HStack {
