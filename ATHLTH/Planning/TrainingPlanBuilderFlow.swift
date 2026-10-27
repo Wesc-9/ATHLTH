@@ -28,6 +28,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     @State private var step: BuilderStep
     @State private var mode: TrainingPlanBuilderMode
+    @State private var entryChoice: ATHLTHPlanEntryChoiceView.Choice
     @State private var selectedSource: SourceOption = .scratch
     @State private var sourceRoute: [ExistingPlanDestination] = []
 
@@ -204,6 +205,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // The entry screen always offers three clear starting paths.
         // The existing basics/profile/week/review steps remain intact.
         _step = State(initialValue: .mode)
+        _entryChoice = State(initialValue: initialAdvanced ? .advanced : .simple)
         _mode = State(
             initialValue:
                 initialAdvanced
@@ -453,7 +455,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .safeAreaInset(edge: .bottom) {
                 if !showingCreatedPlan {
                     if step == .mode {
-                        AnyView(modeSetupContinueBar)
+                        AnyView(entryChoiceContinueBar)
                     } else if step == .goal {
                         AnyView(goalContinueBar)
                     } else if step == .basics && mode == .advanced {
@@ -947,11 +949,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var content: some View {
         switch step {
         case .mode:
-            if mode == .advanced {
-                AnyView(advancedScheduleStep)
-            } else {
-                AnyView(simpleScheduleStep)
-            }
+            AnyView(modeChoice)
         case .goal:
             AnyView(goalChoice)
         case .source:
@@ -1029,243 +1027,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         ATHLTHPlanJourney.position(of: step, advanced: mode == .advanced) ?? 1
     }
 
-    // Live first step: rebuilding the entire approved composition here means
-    // opening Train → Plan → New plan renders this view, not a parallel preview.
-    // The existing builder mode and destination callbacks stay authoritative.
+    // Single visible entry screen, composed as a native photo-first page.
+    // The old mode cards are not rendered or layered underneath.
     private var modeChoice: some View {
-        GeometryReader { geometry in
-            ViewThatFits(in: .vertical) {
-                modeChoiceLayout(compact: false)
-                modeChoiceLayout(compact: true)
-                ScrollView {
-                    modeChoiceLayout(compact: true)
-                }
-                .scrollIndicators(.hidden)
-            }
-            .frame(width: geometry.size.width,
-                   height: geometry.size.height,
-                   alignment: .top)
-        }
-        .background(sourceCanvas.ignoresSafeArea())
-    }
-
-    private func modeChoiceLayout(compact: Bool) -> some View {
-        VStack(alignment: .leading, spacing: compact ? 9 : 12) {
-            referenceModeCreationHeader
-
-            modeCreationHero(compact: compact)
-
-            ATHLTHPlanEntryModeCard(
-                title: ATHLTHLocalization.choose(english: "Simple", norwegian: "Enkel"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Get started quickly with a clear weekly structure and only the most important choices.",
-                    norwegian: "Kom raskt i gang med en enkel ukestruktur og de viktigste valgene."
-                ),
-                symbol: "sparkles",
-                selected: mode == .basic,
-                features: [
-                    .init(symbol: "bolt.fill",
-                          title: ATHLTHLocalization.choose(english: "Quick start", norwegian: "Rask oppstart")),
-                    .init(symbol: "slider.horizontal.3",
-                          title: ATHLTHLocalization.choose(english: "Fewer choices", norwegian: "Færre valg")),
-                    .init(symbol: "pencil",
-                          title: ATHLTHLocalization.choose(english: "Easy to adjust", norwegian: "Enkelt å justere"))
-                ],
-                compact: compact
-            ) {
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                    mode = .basic
-                }
-            }
-
-            ATHLTHPlanEntryModeCard(
-                title: ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert"),
-                subtitle: ATHLTHLocalization.choose(
-                    english: "Build a more detailed plan with full control of workouts, progression and structure.",
-                    norwegian: "Bygg planen mer detaljert med full kontroll over økter, progresjon og struktur."
-                ),
-                symbol: "slider.horizontal.3",
-                selected: mode == .advanced,
-                features: [
-                    .init(symbol: "chart.bar.fill",
-                          title: ATHLTHLocalization.choose(english: "More control", norwegian: "Mer kontroll")),
-                    .init(symbol: "list.bullet",
-                          title: ATHLTHLocalization.choose(english: "Detailed setup", norwegian: "Detaljert oppsett")),
-                    .init(symbol: "gearshape",
-                          title: ATHLTHLocalization.choose(english: "Tailored", norwegian: "Skreddersydd"))
-                ],
-                compact: compact
-            ) {
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                    mode = .advanced
-                }
-            }
-
-            VStack(alignment: .leading, spacing: compact ? 8 : 11) {
-                Text(ATHLTHLocalization.choose(
-                    english: "YOU CAN ALSO PICK UP WHERE YOU LEFT OFF",
-                    norwegian: "DU KAN OGSÅ FORTSETTE DER DU SLAPP"
-                ))
-                .font(.system(size: compact ? 9 : 10, weight: .semibold))
-                .tracking(compact ? 1.8 : 2.2)
-                .foregroundStyle(sourceMuted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.74)
-
-                HStack(alignment: .top, spacing: 9) {
-                    ATHLTHPlanExistingChoice(
-                        title: ATHLTHLocalization.choose(
-                            english: "Plan library", norwegian: "Planbibliotek"
-                        ),
-                        subtitle: ATHLTHLocalization.choose(
-                            english: "Explore ready plans", norwegian: "Utforsk ferdige planer"
-                        ),
-                        symbol: "book.closed",
-                        compact: compact
-                    ) {
-                        sourceRoute.append(.library)
-                    }
-                    ATHLTHPlanExistingChoice(
-                        title: ATHLTHLocalization.choose(
-                            english: "My plans", norwegian: "Mine planer"
-                        ),
-                        subtitle: ATHLTHLocalization.choose(
-                            english: "View and edit existing plans",
-                            norwegian: "Se og rediger eksisterende planer"
-                        ),
-                        symbol: "doc.text",
-                        compact: compact
-                    ) {
-                        sourceRoute.append(.mine)
+        ATHLTHPlanEntryChoiceView(
+            choice: Binding(
+                get: { entryChoice },
+                set: { selected in
+                    entryChoice = selected
+                    switch selected {
+                    case .simple:
+                        mode = .basic
+                    case .advanced, .coach:
+                        mode = .advanced
                     }
                 }
-            }
-            .padding(.top, compact ? 3 : 6)
-        }
-        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth, alignment: .leading)
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 18)
-        .padding(.top, compact ? 6 : 10)
-        .padding(.bottom, compact ? 7 : 11)
-    }
-
-    // A clean 1/5 progress row with the reference's horizontal alignment.
-    // Do not alter the underlying wizard state when showing these labels.
-    private var referenceModeCreationHeader: some View {
-        VStack(spacing: 13) {
-            HStack(spacing: 8) {
-                Button {
-                    dismiss()
-                } label: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Close", norwegian: "Lukk"
-                    ))
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(sourceInk)
-                    .padding(.horizontal, 15)
-                    .frame(height: 38)
-                    .background(.white.opacity(0.85), in: Capsule())
-                    .overlay {
-                        Capsule().strokeBorder(sourceGold.opacity(0.14), lineWidth: 0.7)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Close plan builder", norwegian: "Lukk planbygger"
-                ))
-
-                Spacer(minLength: 0)
-
-                Text("ATHLTH / PLAN")
-                    .font(.system(size: 11, weight: .semibold))
-                    .tracking(2.5)
-                    .foregroundStyle(sourceInk)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-
-                Spacer(minLength: 0)
-
-                Text("1 / 5")
-                    .font(.system(size: 14, weight: .medium))
-                    .monospacedDigit()
-                    .foregroundStyle(sourceInk)
-                    .frame(width: 49, alignment: .trailing)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Step 1 of 5", norwegian: "Steg 1 av 5"
-                    ))
-            }
-            HStack(spacing: 4) {
-                ForEach(0..<5, id: \.self) { index in
-                    Capsule()
-                        .fill(index == 0 ? sourceGold :
-                              Color(red: 0.87, green: 0.85, blue: 0.82))
-                        .frame(height: 3)
-                }
-            }
-            .accessibilityHidden(true)
-        }
-    }
-
-    // Scenic editorial heading. The photo is confined to this hero while
-    // preserving legibility and avoiding a separate overlaid scrolling layer.
-    private func modeCreationHero(compact: Bool) -> some View {
-        ZStack(alignment: .leading) {
-            GeometryReader { bounds in
-                Image("PlanEntrySimple")
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: bounds.size.width, height: bounds.size.height)
-                    .clipped()
-                    .accessibilityHidden(true)
-            }
-
-            LinearGradient(
-                stops: [
-                    .init(color: sourceCanvas, location: 0),
-                    .init(color: sourceCanvas.opacity(0.99), location: 0.30),
-                    .init(color: sourceCanvas.opacity(0.86), location: 0.53),
-                    .init(color: sourceCanvas.opacity(0.24), location: 0.82),
-                    .init(color: sourceCanvas.opacity(0.04), location: 1)
-                ],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-
-            VStack(alignment: .leading, spacing: compact ? 7 : 10) {
-                Text(ATHLTHLocalization.choose(
-                    english: "BUILD YOUR PLAN", norwegian: "BYGG DIN PLAN"
-                ))
-                .font(.system(size: 10, weight: .semibold))
-                .tracking(2.8)
-                .foregroundStyle(sourceMuted)
-
-                Text(ATHLTHLocalization.choose(
-                    english: "How will you\nbuild your plan?",
-                    norwegian: "Hvordan vil du\nbygge planen?"
-                ))
-                .font(.system(size: compact ? 34 : 39,
-                              weight: .regular, design: .serif))
-                .foregroundStyle(sourceInk)
-                .lineSpacing(-1.5)
-                .minimumScaleFactor(0.76)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityAddTraits(.isHeader)
-
-                Text(ATHLTHLocalization.choose(
-                    english: "Choose how much guidance and control you want. You can change and edit this later.",
-                    norwegian: "Velg hvor mye veiledning og kontroll du ønsker. Du kan bytte og redigere senere."
-                ))
-                .font(.system(size: compact ? 12 : 13))
-                .foregroundStyle(sourceMuted)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, 4)
-            .padding(.trailing, compact ? 74 : 95)
-        }
-        .frame(height: compact ? 151 : 174)
-        .clipped()
-        .accessibilityElement(children: .contain)
+            ),
+            onOpenLibrary: { sourceRoute.append(.library) },
+            onCancel: { dismiss() }
+        )
     }
 
     private var existingPlanLibraryButton: some View {
@@ -1298,44 +1078,50 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
-    // New plans start in the actual two-mode setup. No legacy "choose mode"
-    // or redundant goal screen sits in front of the approved design.
-    private var modeSetupContinueBar: some View {
+    // User explicitly chooses between Simple, Advanced, or Coach.
+    // Manual paths open their actual setup, while Coach opens the
+    // existing AIProgramBuilderView via a single sheet, not a nested wizard.
+    private var entryChoiceContinueBar: some View {
         Button {
-            guard canCreatePlan else { return }
-            if mode == .basic {
-                startDate = Calendar.current.startOfDay(for: .now)
-                setSimpleKinds()
-                createPlan(seedSuggestedWeek: true)
-            } else {
+            switch entryChoice {
+            case .simple:
+                switchSetupMode(to: false)
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                    step = .approach
+                    step = .basics
                 }
+            case .advanced:
+                switchSetupMode(to: true)
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                    step = .basics
+                }
+            case .coach:
+                mode = .advanced
+                showingAIBuilder = true
             }
         } label: {
             HStack {
-                Spacer()
-                Text(mode == .basic
-                    ? ATHLTHLocalization.choose(english: "Create simple plan", norwegian: "Lag enkel plan")
-                    : ATHLTHLocalization.choose(english: "Continue to plan builder", norwegian: "Fortsett til planbygger"))
-                    .font(.system(size: 14, weight: .semibold))
-                Spacer()
+                Spacer(minLength: 10)
+                Text(ATHLTHLocalization.choose(
+                    english: "Select and continue", norwegian: "Velg og fortsett"
+                ))
+                .font(.system(size: 14, weight: .semibold))
+                Spacer(minLength: 0)
                 Image(systemName: "arrow.right")
+                    .font(.system(size: 15, weight: .semibold))
             }
             .foregroundStyle(.white)
-            .padding(.horizontal, 19)
-            .frame(maxWidth: .infinity, minHeight: 54)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, minHeight: 53)
             .background(
                 LinearGradient(
-                    colors: [ATHLTHTrainDesign.bronze, Color(red: 0.70, green: 0.52, blue: 0.30)],
+                    colors: [ATHLTHTrainDesign.bronze,
+                             Color(red: 0.69, green: 0.50, blue: 0.28)],
                     startPoint: .leading, endPoint: .trailing
                 ),
-                in: RoundedRectangle(cornerRadius: 20)
+                in: RoundedRectangle(cornerRadius: 19)
             )
         }
         .buttonStyle(.plain)
-        .disabled(!canCreatePlan)
-        .opacity(canCreatePlan ? 1 : 0.45)
         .padding(.horizontal, 18)
         .padding(.top, 8)
         .padding(.bottom, 9)
@@ -7115,6 +6901,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func goBack() {
+        if step == .basics {
+            withAnimation(.easeInOut(duration: 0.18)) { step = .mode }
+            return
+        }
         if step == .approach {
             withAnimation(.easeInOut(duration: 0.18)) { step = .mode }
             return
