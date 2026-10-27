@@ -121,6 +121,94 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
     }
 
     @MainActor
+    func testCopyWeekFillsOnlyEmptyFutureDaysWithoutOverwriting() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let start = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: 2,
+            to: Calendar.current.startOfDay(for: .now)
+        ))
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Reference week",
+            summary: "",
+            weekCount: 3,
+            startDate: start
+        ))
+        let firstSource = plan.weeks[0].days[0]
+        let secondSource = plan.weeks[0].days[1]
+        let firstTarget = plan.weeks[1].days[0]
+        let secondTarget = plan.weeks[1].days[1]
+        let original = workout(name: "Original easy run")
+        let another = workout(name: "Strength")
+        let protected = workout(name: "Personal session")
+        store.addSession(original, toDay: firstSource.id, inPlan: plan.id)
+        store.addSession(another, toDay: secondSource.id, inPlan: plan.id)
+        store.addSession(protected, toDay: secondTarget.id, inPlan: plan.id)
+
+        let populated = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = ATHLTHTrainPlanWeekCopyPolicy.preview(
+            plan: populated, sourceWeekIndex: 0, targetWeekIndex: 1
+        )
+        XCTAssertEqual(preview.eligibleSessions, 1)
+        XCTAssertEqual(preview.protectedDays, 1)
+
+        let result = ATHLTHTrainPlanWeekCopyPolicy.copy(
+            in: store, planID: plan.id,
+            sourceWeekIndex: 0, targetWeekIndex: 1
+        )
+        XCTAssertEqual(result.copiedSessions, 1)
+        XCTAssertEqual(result.protectedDays, 1)
+        XCTAssertEqual(result.failedSessions, 0)
+
+        let updated = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let copied = try XCTUnwrap(
+            updated.weeks[1].days.first(where: { $0.id == firstTarget.id })?
+                .sessions.first
+        )
+        XCTAssertEqual(copied.title, original.title)
+        XCTAssertNotEqual(copied.id, original.id)
+        XCTAssertEqual(
+            updated.weeks[1].days.first(where: { $0.id == secondTarget.id })?
+                .sessions.map(\.id),
+            [protected.id],
+            "Individual customizations in occupied days must survive a week copy"
+        )
+
+        let repeated = ATHLTHTrainPlanWeekCopyPolicy.copy(
+            in: store, planID: plan.id,
+            sourceWeekIndex: 0, targetWeekIndex: 1
+        )
+        XCTAssertEqual(repeated.copiedSessions, 0, "Never duplicate on repeated tap")
+    }
+
+    @MainActor
+    func testCopyWeekDoesNotChangePastTargetDays() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let start = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: -24,
+            to: Calendar.current.startOfDay(for: .now)
+        ))
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Historic schedule", summary: "",
+            weekCount: 3, startDate: start
+        ))
+        let sourceDay = plan.weeks[0].days[0].id
+        store.addSession(workout(), toDay: sourceDay, inPlan: plan.id)
+        let current = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let preview = ATHLTHTrainPlanWeekCopyPolicy.preview(
+            plan: current, sourceWeekIndex: 0, targetWeekIndex: 1
+        )
+        XCTAssertFalse(preview.canCopy)
+        XCTAssertEqual(preview.pastDays, 1)
+        let result = ATHLTHTrainPlanWeekCopyPolicy.copy(
+            in: store, planID: plan.id,
+            sourceWeekIndex: 0, targetWeekIndex: 1
+        )
+        XCTAssertEqual(result.copiedSessions, 0)
+    }
+
+    @MainActor
     func testSavingWorkoutTemplateUpdatesInPlaceAndAllowsIndependentCopy() throws {
         let (store, defaults, suite) = makeStore()
         defer { defaults.removePersistentDomain(forName: suite) }
