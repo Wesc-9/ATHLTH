@@ -106,6 +106,8 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var moveTargetDate = Date()
     @State private var editingPlan: TrainingPlan?
     @State private var trainingPlanPendingDeletion: TrainingPlan?
+    @State private var trainingPlanPendingActivation: TrainingPlan?
+    @State private var planManagementError: String?
 
     @ScaledMetric(relativeTo: .body) private var metricWidth: CGFloat = 110
     private let graphite = ATHLTHTrainDesign.ink
@@ -120,10 +122,10 @@ struct ATHLTHTrainPlanPremiumView: View {
            let selected = session.trainingPlans.first(where: { $0.id == id }) {
             return selected
         }
-        // No active plan means no active plan. Previously the first
-        // historical/saved plan was silently displayed as the current one.
-        // A non-active plan is shown only when explicitly opened from Mine planer.
-        return session.activePlan
+        // Show the next enabled upcoming plan as a preview when no plan
+        // is running. Never mistake a paused, disabled or historical plan
+        // for the user's active plan.
+        return session.activePlan ?? session.nextTrainingPlan
     }
 
     private var selectedWeek: TrainingPlanWeek? {
@@ -424,7 +426,10 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .background(warmGold.gradient, in: Circle())
                         .overlay(Circle().strokeBorder(.white, lineWidth: 2))
                         .padding(.top, -42)
-                    Text(tr("No active plan", "Ingen aktiv plan"))
+                    Text(session.trainingPlans.isEmpty
+                         ? tr("No training plan", "Ingen treningsplan")
+                         : tr("No active or upcoming plan",
+                              "Ingen aktiv eller kommende plan"))
                         .font(.system(size: 24, weight: .semibold, design: .serif))
                         .foregroundStyle(graphite)
                     Text(tr(
@@ -682,8 +687,11 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .foregroundStyle(graphite)
                     .accessibilityAddTraits(.isHeader)
                 Text(plan == nil
-                    ? tr("Build your first plan and reach your goals.",
-                         "Lag din første treningsplan og nå dine mål.")
+                    ? (session.trainingPlans.isEmpty
+                        ? tr("Build your first plan and reach your goals.",
+                             "Lag din første treningsplan og nå dine mål.")
+                        : tr("Choose a saved plan or create a new one.",
+                             "Velg en lagret plan eller opprett en ny."))
                     : tr("Build week by week, with structure and flow.",
                          "Bygg uke for uke, med struktur og flyt."))
                     .font(.system(size: 13, weight: .regular, design: .serif))
@@ -767,20 +775,27 @@ struct ATHLTHTrainPlanPremiumView: View {
                     .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(isActive ? tr("Active plan", "Aktiv plan")
-                                  : tr("Saved plan", "Lagret plan"))
+                                  : planLibraryStatus(plan))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(warmGold)
                     Text(plan.title)
                         .font(.system(size: 18, weight: .semibold, design: .serif))
                         .foregroundStyle(graphite)
                         .lineLimit(2)
-                    Text(tr("Week \(week + 1) of \(plan.weeks.count) · \(weeklyCount) workouts this week",
-                            "Uke \(week + 1) av \(plan.weeks.count) · \(weeklyCount) økter denne uken"))
-                        .font(.system(size: 10))
-                        .foregroundStyle(secondaryInk)
-                        .lineLimit(2)
-                    ProgressView(value: fraction)
-                        .tint(warmGold)
+                    if isActive {
+                        Text(tr("Week \(week + 1) of \(plan.weeks.count) · \(weeklyCount) workouts this week",
+                                "Uke \(week + 1) av \(plan.weeks.count) · \(weeklyCount) økter denne uken"))
+                            .font(.system(size: 10))
+                            .foregroundStyle(secondaryInk)
+                            .lineLimit(2)
+                        ProgressView(value: fraction)
+                            .tint(warmGold)
+                    } else if let start = plan.startDate {
+                        Text(tr("Starts ", "Starter ") +
+                             start.formatted(.dateTime.day().month(.abbreviated).year()))
+                            .font(.system(size: 11))
+                            .foregroundStyle(secondaryInk)
+                    }
                 }
                 Spacer(minLength: 0)
                 VStack {
@@ -2183,6 +2198,41 @@ struct ATHLTHTrainPlanPremiumView: View {
                 "Treningsplanen og de gjenstående planlagte øktene slettes permanent. Registrerte treningsøkter i historikken beholdes."
             ))
         }
+        .confirmationDialog(
+            trainingPlanPendingActivation.map {
+                tr("Activate \($0.title) today?", "Aktivere \($0.title) i dag?")
+            } ?? tr("Activate training plan?", "Aktivere treningsplan?"),
+            isPresented: Binding(
+                get: { trainingPlanPendingActivation != nil },
+                set: { if !$0 { trainingPlanPendingActivation = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(tr("Activate today", "Aktiver i dag")) {
+                guard let selected = trainingPlanPendingActivation else { return }
+                trainingPlanPendingActivation = nil
+                activatePlanFromLibrary(selected)
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                trainingPlanPendingActivation = nil
+            }
+        } message: {
+            Text(tr(
+                "The plan's start date will be moved to today. Its workouts and weeks are kept.",
+                "Planens startdato flyttes til i dag. Øktene og ukene beholdes."
+            ))
+        }
+        .alert(
+            tr("Could not change plan", "Kunne ikke endre planen"),
+            isPresented: Binding(
+                get: { planManagementError != nil },
+                set: { if !$0 { planManagementError = nil } }
+            )
+        ) {
+            Button("OK") { planManagementError = nil }
+        } message: {
+            Text(planManagementError ?? "")
+        }
     }
 
     private var launchFromWorkoutDetails: ((UUID, PlannedSession) -> Void)? {
@@ -2394,11 +2444,63 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
     }
 
+    private func activatePlanFromLibrary(_ selected: TrainingPlan) {
+        // Activation is explicit: bring the selected program's first week
+        // to today. Saved workout structure and history are preserved.
+        guard let item = session.trainingPlan(withID: selected.id) else { return }
+        let today = Calendar.current.startOfDay(for: Date())
+        if let conflict = session.trainingPlanConflict(
+            startDate: today,
+            weekCount: max(item.weeks.count, 1),
+            excludingPlanID: item.id
+        ) {
+            planManagementError = tr(
+                "Deactivate \(conflict.title) first, or choose dates that do not overlap.",
+                "Deaktiver \(conflict.title) først, eller velg datoer som ikke overlapper."
+            )
+            return
+        }
+        guard session.updateTrainingPlan(
+            planID: item.id,
+            title: item.title,
+            summary: item.summary,
+            visibility: item.visibility,
+            tags: item.tags,
+            startDate: today,
+            weekCount: max(item.weeks.count, 1)
+        ) else {
+            planManagementError = tr(
+                "The plan could not be activated. Check its dates.",
+                "Planen kunne ikke aktiveres. Kontroller datoene."
+            )
+            return
+        }
+        if session.isTrainingPlanPaused(item.id) ||
+           session.isTrainingPlanDeactivated(item.id) {
+            guard session.resumeTrainingPlan(item.id) else {
+                planManagementError = tr(
+                    "The plan could not be reactivated.",
+                    "Planen kunne ikke reaktiveres."
+                )
+                return
+            }
+        }
+        session.refreshActivePlanForToday()
+        focusedPlanID = item.id
+        browsingMyPlans = false
+        selectedWeekIndex = nil
+        selectedDayID = nil
+    }
+
     private var savedPlansOverview: some View {
         let plans = session.trainingPlans.sorted { lhs, rhs in
             let firstPriority = planLibraryPriority(lhs)
             let secondPriority = planLibraryPriority(rhs)
             if firstPriority != secondPriority { return firstPriority < secondPriority }
+            if firstPriority == 1 {
+                return (lhs.startDate ?? .distantFuture) <
+                    (rhs.startDate ?? .distantFuture)
+            }
             return (lhs.startDate ?? lhs.createdAt) >
                 (rhs.startDate ?? rhs.createdAt)
         }
@@ -2424,68 +2526,96 @@ struct ATHLTHTrainPlanPremiumView: View {
             ForEach(plans) { item in
                 let selected = item.id == plan?.id
                 let priority = planLibraryPriority(item)
-                Button {
-                    focusedPlanID = item.id
-                    browsingMyPlans = false
-                    selectedWeekIndex = nil
-                    selectedDayID = nil
-                } label: {
-                    HStack(alignment: .center, spacing: 12) {
-                        Image(systemName: priority == 0
-                              ? "checkmark.circle.fill" : "calendar")
-                            .foregroundStyle(warmGold)
-                            .frame(width: 27)
-                        VStack(alignment: .leading, spacing: 5) {
-                            HStack(spacing: 8) {
+                HStack(spacing: 6) {
+                    Button {
+                        focusedPlanID = item.id
+                        browsingMyPlans = false
+                        selectedWeekIndex = nil
+                        selectedDayID = nil
+                    } label: {
+                        HStack(alignment: .center, spacing: 12) {
+                            Image(systemName: priority == 0
+                                  ? "checkmark.circle.fill" : "calendar")
+                                .foregroundStyle(warmGold)
+                                .frame(width: 27)
+                            VStack(alignment: .leading, spacing: 6) {
                                 Text(item.title)
                                     .font(.subheadline.weight(.semibold))
                                     .lineLimit(2)
-                                if priority == 0 {
+                                if let start = item.startDate,
+                                   let end = session.trainingPlanEndDate(item) {
+                                    Text(start.formatted(.dateTime.day().month(.abbreviated).year()) +
+                                         " – " +
+                                         end.formatted(.dateTime.day().month(.abbreviated).year()))
+                                        .font(.caption)
+                                        .foregroundStyle(secondaryInk)
+                                        .lineLimit(2)
+                                } else {
+                                    Text(tr("Dates not set", "Datoer ikke satt"))
+                                        .font(.caption)
+                                        .foregroundStyle(secondaryInk)
+                                }
+                                HStack(spacing: 7) {
                                     Text(planLibraryStatus(item))
                                         .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(warmGold)
-                                        .padding(.horizontal, 6)
-                                        .padding(.vertical, 3)
-                                        .background(
-                                            warmGold.opacity(0.10),
-                                            in: Capsule()
-                                        )
+                                        .foregroundStyle(priority == 0 ? .white : warmGold)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(priority == 0 ? graphite : soft,
+                                                    in: Capsule())
+                                    Text("\(item.weeks.count) " + tr("weeks", "uker"))
+                                        .font(.caption2)
+                                        .foregroundStyle(secondaryInk)
                                 }
                             }
-                            HStack(spacing: 5) {
-                                Text("\(item.weeks.count) " + tr("weeks", "uker"))
-                                Text("·")
-                                if let start = item.startDate {
-                                    Text(start.formatted(
-                                        .dateTime.day().month(.abbreviated).year()
-                                    ))
-                                } else {
-                                    Text(tr("No start date", "Uten startdato"))
-                                }
-                                if priority != 0 {
-                                    Text("·")
-                                    Text(planLibraryStatus(item))
-                                }
-                            }
-                            .font(.caption)
-                            .foregroundStyle(secondaryInk)
+                            Spacer(minLength: 2)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(secondaryInk)
                         }
-                        Spacer(minLength: 3)
-                        Image(systemName: "chevron.right")
-                            .font(.caption)
-                            .foregroundStyle(secondaryInk)
+                        .foregroundStyle(graphite)
+                        .frame(maxWidth: .infinity, minHeight: 78, alignment: .leading)
+                        .contentShape(Rectangle())
                     }
-                    .foregroundStyle(graphite)
-                    .padding(15)
-                    .frame(maxWidth: .infinity, minHeight: 66, alignment: .leading)
-                    .background(
-                        selected ? soft : Color.white,
-                        in: RoundedRectangle(cornerRadius: 17)
+                    .buttonStyle(.plain)
+                    Menu {
+                        if priority != 0 {
+                            Button {
+                                trainingPlanPendingActivation = item
+                            } label: {
+                                Label(tr("Activate now", "Aktiver nå"),
+                                      systemImage: "play.circle")
+                            }
+                        }
+                        if !session.isTrainingPlanDeactivated(item.id) {
+                            Button {
+                                _ = session.deactivateTrainingPlan(item.id)
+                                if focusedPlanID == item.id { focusedPlanID = nil }
+                            } label: {
+                                Label(tr("Deactivate", "Deaktiver"),
+                                      systemImage: "pause.circle")
+                            }
+                        }
+                        Button(role: .destructive) {
+                            trainingPlanPendingDeletion = item
+                        } label: {
+                            Label(tr("Delete plan", "Slett planen"), systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundStyle(graphite)
+                            .frame(width: 38, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel(
+                        tr("Manage ", "Administrer ") + item.title
                     )
-                    .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? .isSelected : [])
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(selected ? soft : Color.white,
+                            in: RoundedRectangle(cornerRadius: 17))
             }
         }
     }
