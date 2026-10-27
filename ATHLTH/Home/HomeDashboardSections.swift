@@ -1795,9 +1795,7 @@ struct HomeHealthMetricStrip: View {
                 alignment: .leading
             )
             .background(
-                Color.white.opacity(
-                    0.92
-                ),
+                ATHLTHTrainDesign.paper,
                 in: RoundedRectangle(
                     cornerRadius: 17,
                     style: .continuous
@@ -1809,9 +1807,7 @@ struct HomeHealthMetricStrip: View {
                     style: .continuous
                 )
                 .stroke(
-                    Color.black.opacity(
-                        0.045
-                    ),
+                    ATHLTHTrainDesign.rule.opacity(0.34),
                     lineWidth: 0.7
                 )
             }
@@ -2949,7 +2945,7 @@ struct HomeWeeklyProgressStrip:
         .padding(.horizontal, 10)
         .padding(.vertical, 9)
         .background(
-            Color.white.opacity(0.90),
+            ATHLTHTrainDesign.paper,
             in: RoundedRectangle(
                 cornerRadius: 19,
                 style: .continuous
@@ -2961,7 +2957,7 @@ struct HomeWeeklyProgressStrip:
                 style: .continuous
             )
             .stroke(
-                Color.black.opacity(0.04),
+                ATHLTHTrainDesign.rule.opacity(0.34),
                 lineWidth: 0.7
             )
         }
