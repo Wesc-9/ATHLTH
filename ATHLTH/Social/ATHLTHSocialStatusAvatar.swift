@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Premium training ring + compact online dot.
+/// Premium status rings: orange for training, green for online.
 /// Both indicators are strictly reserved for mutual followers; the server
 /// also enforces this independently through RLS.
 struct ATHLTHSocialStatusAvatar: View {
@@ -24,7 +24,7 @@ struct ATHLTHSocialStatusAvatar: View {
 
     var body: some View {
         SocialAvatar(profile: profile, size: size)
-            .padding(training ? 4 : 0)
+            .padding(training || online ? 4 : 0)
             .overlay {
                 if training {
                     Circle()
@@ -41,15 +41,15 @@ struct ATHLTHSocialStatusAvatar: View {
                         )
                 }
             }
-            .overlay(alignment: .bottomTrailing) {
-                if online {
+            .overlay {
+                // Active workouts take priority over online presence.
+                if online && !training {
                     Circle()
-                        .fill(Color(red: 0.24, green: 0.68, blue: 0.37))
-                        .frame(width: 14, height: 14)
-                        .overlay {
-                            Circle().stroke(.white, lineWidth: 2)
-                        }
-                        .offset(x: 2, y: 1)
+                        .strokeBorder(
+                            Color(red: 0.24, green: 0.68, blue: 0.37),
+                            lineWidth: 3
+                        )
+                        .allowsHitTesting(false)
                 }
             }
             .accessibilityLabel(

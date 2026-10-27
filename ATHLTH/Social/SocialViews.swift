@@ -1762,17 +1762,10 @@ struct FriendProfileView: View {
                         alignment: .top,
                         spacing: 14
                     ) {
-                        SocialAvatar(
+                        ATHLTHSocialStatusAvatar(
                             profile: profile.card,
                             size: 84
                         )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.white.opacity(0.96),
-                                    lineWidth: 3
-                                )
-                        }
                         .shadow(
                             color:
                                 Color.black.opacity(0.20),

@@ -16247,7 +16247,7 @@ struct ATHLTHProfileView: View {
                         alignment: .top,
                         spacing: 14
                     ) {
-                        ZStack(alignment: .bottomLeading) {
+                        ZStack(alignment: .bottomTrailing) {
                             NavigationLink {
                                 ATHLTHEditProfileView(
                                     onEditHeader: {
@@ -16272,17 +16272,13 @@ struct ATHLTHProfileView: View {
                                                 )
                                                 .padding(-4)
                                                 .allowsHitTesting(false)
-                                        }
-                                    }
-                                    .overlay(alignment: .bottomTrailing) {
-                                        if isOwnProfileOnline {
+                                        } else if isOwnProfileOnline {
                                             Circle()
-                                                .fill(Color(red: 0.24, green: 0.68, blue: 0.37))
-                                                .frame(width: 15, height: 15)
-                                                .overlay {
-                                                    Circle().stroke(.white, lineWidth: 2.5)
-                                                }
-                                                .offset(x: 2, y: 2)
+                                                .strokeBorder(
+                                                    Color(red: 0.24, green: 0.68, blue: 0.37),
+                                                    lineWidth: 3
+                                                )
+                                                .padding(-4)
                                                 .allowsHitTesting(false)
                                         }
                                     }

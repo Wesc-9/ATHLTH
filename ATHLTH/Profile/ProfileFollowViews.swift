@@ -340,7 +340,7 @@ struct ProfileFollowListView: View {
                                 height: 54
                             )
 
-                        SocialAvatar(
+                        ATHLTHSocialStatusAvatar(
                             profile: profile,
                             size: 48
                         )

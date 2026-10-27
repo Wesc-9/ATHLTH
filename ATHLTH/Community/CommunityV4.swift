@@ -6583,101 +6583,15 @@ private struct CommunityV4SectionHeader: View {
 private struct CommunityV4Avatar: View {
     let profile: SocialProfileCard
     let size: CGFloat
+    // Retained for existing call sites. Status visibility is privacy-gated
+    // by the shared avatar and realtime social store.
     let isOnline: Bool
 
     var body: some View {
-        Group {
-            if let raw =
-                    profile.avatarURL,
-               let url = URL(
-                    string: raw
-               ) {
-                ATHLTHStorageImage(
-                    url: url,
-                    maxPixelSize:
-                        max(
-                            Int(
-                                ceil(
-                                    size * 3
-                                )
-                            ),
-                            160
-                        )
-                ) { phase in
-                    switch phase {
-                    case .success(
-                        let image
-                    ):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    default:
-                        placeholder
-                    }
-                }
-            } else {
-                placeholder
-            }
-        }
-        .frame(
-            width: size,
-            height: size
+        ATHLTHSocialStatusAvatar(
+            profile: profile,
+            size: size
         )
-        .clipShape(Circle())
-        .overlay {
-            Circle()
-                .stroke(
-                    isOnline
-                        ? ATHLTHTheme
-                            .vitality
-                        : Color.black
-                            .opacity(0.06),
-                    lineWidth:
-                        isOnline
-                            ? 2.2
-                            : 1
-                )
-        }
-    }
-
-    private var placeholder:
-        some View {
-        Circle()
-            .fill(
-                ATHLTHTheme
-                    .accentSoft
-            )
-            .overlay {
-                Text(initials)
-                    .font(
-                        .system(
-                            size:
-                                size * 0.28,
-                            weight: .bold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .accentDeep
-                    )
-            }
-    }
-
-    private var initials: String {
-        let parts =
-            profile.resolvedName
-                .split(separator: " ")
-        let values =
-            parts.prefix(2)
-                .compactMap {
-                    $0.first
-                }
-        let result =
-            String(values)
-
-        return result.isEmpty
-            ? "A"
-            : result.uppercased()
     }
 }
 
