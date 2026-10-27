@@ -5421,6 +5421,12 @@ struct ATHLTHTrainView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .scrollIndicators(.hidden)
+                    // Today artwork belongs behind the status bar, while
+                    // Plan preserves its standard safe-area positioning.
+                    .ignoresSafeArea(
+                        .container,
+                        edges: selectedSection == .today ? .top : []
+                    )
                     .scrollPosition(
                         selectedSection == .plan
                             ? $planScrollPosition : $todayScrollPosition
@@ -5446,6 +5452,7 @@ struct ATHLTHTrainView: View {
                     .background(
                         ATHLTHTrainDesign.canvas.ignoresSafeArea()
                     )
+                    .toolbar(.hidden, for: .navigationBar)
                 }
             }
             // Keep root Train navigation metadata small regardless of which
