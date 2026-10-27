@@ -3,11 +3,15 @@ import UIKit
 
 struct ATHLTHInsightsView: View {
     var onSelectTab: (Int) -> Void = { _ in }
+    var isActive: Bool = true
 
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedSection: ATHLTHInsightsSection = .overview
+    @StateObject private var checkInStore = RecoverySorenessStore()
+    @State private var showingCheckIn = false
+    @State private var recoverySnapshot = RecoveryTrendSnapshot.empty
     @State private var trainingDays: [ATHLTHInsightsTrainingDay] = []
     @State private var muscleSummary: ATHLTHInsightsMuscleSummary = .empty
 
@@ -32,9 +36,9 @@ struct ATHLTHInsightsView: View {
                 lightweightScrolling: true
             ) {
                 ATHLTHTabHero(
-                    imageName: "ProgressHero",
+                    imageName: insightsHeroImage,
                     title: ATHLTHLocalization.choose(english: "Insights", norwegian: "Innsikt"),
-                    subtitle: ATHLTHLocalization.choose(english: "Understand your body. Train smarter.", norwegian: "Forstå kroppen din. Tren smartere."),
+                    subtitle: insightsHeroSubtitle,
                     height: 236,
                     alignment: .leading,
                     focalOffsetX: immersive ? 4 : 16,
@@ -68,14 +72,21 @@ struct ATHLTHInsightsView: View {
                 .frame(maxWidth: .infinity)
             }
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showingCheckIn) {
+                RecoverySorenessLogView(store: checkInStore)
+            }
             .refreshable {
+                guard isActive else { return }
                 if !health.shouldDeferAutomaticHealthWork {
                     await health.refreshAll()
                 }
                 await loadTrend()
+                await loadRecoverySignals()
             }
-            .task {
+            .task(id: isActive) {
+                guard isActive else { return }
                 await loadTrend()
+                await loadRecoverySignals()
             }
             .onReceive(health.$workouts) { workouts in
                 let updated = InsightsSessionBaselines.calculate(
@@ -93,28 +104,60 @@ struct ATHLTHInsightsView: View {
         }
     }
 
-    // Existing assets are authoritative. ATHLTHTabHero above continues to
-    // use ProgressHero; no downloaded or mockup artwork is bundled here.
+    // Each tab uses a distinct existing licensed image, following the
+    // approved screenshot. Keep text readable and avoid external image loads.
+    private var insightsHeroImage: String {
+        switch selectedSection {
+        case .overview: return "ProgressHero"
+        case .health: return "RecoveryHero"
+        case .training: return "GoalMountain"
+        case .development: return "ProgressHero"
+        }
+    }
+
+    private var insightsHeroSubtitle: String {
+        switch selectedSection {
+        case .overview:
+            return tr("Understand your body. Train smarter.",
+                      "Forstå kroppen din. Tren smartere.")
+        case .health: return tr("Body & health", "Kropp & helse")
+        case .training: return tr("Training", "Trening")
+        case .development: return tr("Progress over time", "Utvikling over tid")
+        }
+    }
+
     private var overviewSection: some View {
         Group {
             readinessOverviewCard
-            whyItMattersCard
-            whatChangedCard
+            dailyRecommendationCard
+            ATHLTHInsightsDailyCheckInCard(store: checkInStore) {
+                showingCheckIn = true
+            }
             detailDestinationsCard
         }
     }
 
     private var healthSection: some View {
         Group {
-            nowCard
-            healthExplanationCard
-            pulseCard
+            ATHLTHInsightsReferenceSignalCard(
+                metric: .sleep, snapshot: recoverySnapshot
+            ) { selectedSection = .development }
+            ATHLTHInsightsReferenceSignalCard(
+                metric: .restingHeartRate, snapshot: recoverySnapshot
+            ) { selectedSection = .development }
+            ATHLTHInsightsReferenceSignalCard(
+                metric: .hrv, snapshot: recoverySnapshot
+            ) { selectedSection = .development }
+            ATHLTHInsightsReferenceSignalCard(
+                metric: .respiratory, snapshot: recoverySnapshot
+            ) { selectedSection = .development }
             NavigationLink {
                 ATHLTHRecoveryView(onSelectTab: onSelectTab)
             } label: {
                 insightDestinationRow(
-                    title: tr("More about recovery", "Mer om restitusjon"),
-                    subtitle: tr("Sleep, soreness and recovery history", "Søvn, stølhet og restitusjonshistorikk"),
+                    title: tr("Recovery details", "Restitusjon"),
+                    subtitle: tr("Sleep, soreness and your personal baseline",
+                                 "Søvn, stølhet og personlige grunnlinjer"),
                     icon: "leaf"
                 )
                 .padding(18)
@@ -126,21 +169,116 @@ struct ATHLTHInsightsView: View {
 
     private var trainingSection: some View {
         Group {
-            ATHLTHInsightsTrainingWeekCard(days: trainingDays)
+            ATHLTHInsightsReferenceLoadCard(snapshot: recoverySnapshot) {
+                selectedSection = .development
+            }
+            ATHLTHInsightsReferenceTimeCard(days: trainingDays)
+            ATHLTHInsightsReferenceDistributionCard(
+                load: recoverySnapshot.trainingLoad,
+                sessionCount: trainingDays.reduce(0) { $0 + $1.sessions }
+            )
             ATHLTHInsightsMuscleCard(summary: muscleSummary)
-            trendCard
-            replayCard
         }
     }
 
     private var developmentSection: some View {
         Group {
+            ATHLTHInsightsDailyCheckInCard(store: checkInStore) {
+                showingCheckIn = true
+            }
             whatChangedCard
             trendCard
+            ATHLTHInsightsReferenceSignalCard(
+                metric: .sleep, snapshot: recoverySnapshot
+            ) { selectedSection = .health }
+            ATHLTHInsightsReferenceSignalCard(
+                metric: .hrv, snapshot: recoverySnapshot
+            ) { selectedSection = .health }
             whatIfCard
-            replayCard
             detailDestinationsCard
         }
+    }
+
+    @MainActor
+    private func loadRecoverySignals() async {
+        guard health.healthDataAvailable,
+              health.hasRequestedAuthorization,
+              !health.shouldDeferAutomaticHealthWork else {
+            recoverySnapshot = .empty
+            return
+        }
+        recoverySnapshot = await health.recoveryTrendSnapshot(days: 7)
+    }
+
+    private var dailyRecommendationCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                Image(systemName: "sparkles")
+                    .foregroundStyle(ATHLTHTrainDesign.gold)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tr("Today's recommendation", "Dagens anbefaling"))
+                        .font(.system(size: 18, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                    Text(tr("Based on your recent recovery signals",
+                            "Basert på dine siste restitusjonssignaler"))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            Button { onSelectTab(1) } label: {
+                HStack(spacing: 13) {
+                    Image("GoalMountain")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 122, height: 94)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(dailyRecommendationTitle)
+                            .font(.system(size: 15, weight: .semibold, design: .serif))
+                            .foregroundStyle(ATHLTHTrainDesign.ink)
+                            .multilineTextAlignment(.leading)
+                        Text(dailyRecommendationDetail)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+                .padding(9)
+                .background(ATHLTHTrainDesign.canvas.opacity(0.83),
+                            in: RoundedRectangle(cornerRadius: 14))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(17)
+        .athlthTrainPaper()
+    }
+
+    private var dailyRecommendationTitle: String {
+        guard health.recovery.score != nil else {
+            return tr("See your training options", "Se treningsmulighetene dine")
+        }
+        switch health.recovery.state {
+        case .ready: return tr("Ready for your planned session", "Klar for planlagt økt")
+        case .balanced: return tr("Keep your training balanced", "Tren med god balanse")
+        case .takeItEasy: return tr("Consider a lighter workout", "Vurder en lettere økt")
+        case .recover: return tr("Prioritize recovery", "Prioriter restitusjon")
+        case .buildingBaseline:
+            return tr("Follow how you feel", "Ta hensyn til dagsformen")
+        }
+    }
+
+    private var dailyRecommendationDetail: String {
+        guard health.recovery.score != nil else {
+            return tr("Your baseline is still being established.",
+                      "Din personlige grunnlinje er ennå ikke etablert.")
+        }
+        return tr("Review and adapt today's plan in Train.",
+                  "Se gjennom og tilpass dagens plan i Trening.")
     }
 
     private var readinessOverviewCard: some View {
@@ -160,9 +298,13 @@ struct ATHLTHInsightsView: View {
             HStack(alignment: .center, spacing: 17) {
                 ZStack {
                     Circle()
-                        .stroke(ATHLTHTrainDesign.paleGold, lineWidth: 12)
+                        .trim(from: 0.10, to: 0.90)
+                        .stroke(ATHLTHTrainDesign.paleGold, style:
+                            StrokeStyle(lineWidth: 12, lineCap: .round))
+                        .rotationEffect(.degrees(90))
                     Circle()
-                        .trim(from: 0, to: CGFloat(health.recovery.score ?? 0) / 100)
+                        .trim(from: 0.10,
+                              to: 0.10 + 0.80 * CGFloat(health.recovery.score ?? 0) / 100)
                         .stroke(
                             AngularGradient(
                                 colors: [ATHLTHTrainDesign.paleGold, ATHLTHTrainDesign.gold,
@@ -171,7 +313,7 @@ struct ATHLTHInsightsView: View {
                             ),
                             style: StrokeStyle(lineWidth: 12, lineCap: .round)
                         )
-                        .rotationEffect(.degrees(-90))
+                        .rotationEffect(.degrees(90))
                     VStack(spacing: 2) {
                         Text(health.recovery.score.map(String.init) ?? "—")
                             .font(.system(size: 37, weight: .regular, design: .serif))
