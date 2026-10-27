@@ -369,16 +369,19 @@ private struct ATHLTHCompatibilityPreviewRootView: View {
 
     @ViewBuilder
     var body: some View {
+        // Keep compatibility/screenshots in the same tab order and route
+        // as the production TabView. Do not restore Recovery as a root tab.
         switch requestedTab {
         case 1:
-            ATHLTHRecoveryView(
+            ATHLTHTrainView(
+                navigationRequest: $trainNavigationRequest,
                 isActive: true
-            ) { _ in }
+            )
 
         case 2:
-            ATHLTHTrainView(
-                navigationRequest:
-                    $trainNavigationRequest
+            ATHLTHInsightsView(
+                onSelectTab: { _ in },
+                isActive: true
             )
 
         case 3:
