@@ -2250,7 +2250,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         }
                     },
                     onCreateGoal: openGoalCreationFromPlan,
-                    onSelectAdvanced: { switchSetupMode(to: true) }
+                    onSelectAdvanced: { openModeStart(advanced: true) }
                 )
                 if let conflictingPlan {
                     conflictCard(conflictingPlan)
@@ -2269,6 +2269,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         private func openGoalCreationFromPlan() {
         goalIDsBeforeCreation = Set(goalStore.goals.map(\.id))
         showingNewGoalFromPlan = true
+    }
+
+    /// The mode pills in the plan-setup hero are navigation shortcuts, not
+    /// in-place controls. Start at the selected mode's original entry image,
+    /// where Continue leads into that mode's own setup sequence.
+    private func openModeStart(advanced: Bool) {
+        let target: TrainingPlanBuilderMode = advanced ? .advanced : .basic
+        guard mode != target else { return }
+
+        switchSetupMode(to: advanced)
+        entryChoice = advanced ? .advanced : .simple
+        sourceRoute.removeAll()
+        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+            step = .mode
+        }
     }
 
     private func switchSetupMode(to advanced: Bool) {
@@ -2501,7 +2516,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         }
                     },
                     onCreateGoal: openGoalCreationFromPlan,
-                    onSelectSimple: { switchSetupMode(to: false) }
+                    onSelectSimple: { openModeStart(advanced: false) }
                 )
                 if let conflictingPlan {
                     conflictCard(conflictingPlan)
