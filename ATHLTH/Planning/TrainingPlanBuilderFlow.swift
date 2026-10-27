@@ -978,7 +978,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         case .none:
                             AnyView(weekStep)
                         case .some(.quick):
-                            AnyView(weekStep)
+                            AnyView(advancedWeekBuilderStep)
                         case .some(.guided):
                             AnyView(guidedWeekStep)
                         }
@@ -1000,8 +1000,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                if step == .week && mode == .advanced &&
-                    weekPlanningApproach == .guided {
+                if step == .week && mode == .advanced {
                     AnyView(sourceChoiceHeader)
                 } else {
                     AnyView(progressHeader)
@@ -4760,6 +4759,142 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                 }
             }
+        }
+    }
+
+    // Advanced → Week-by-week is a new single surface. The original
+    // weekStep is retained exclusively for the Simple/legacy route.
+    private var advancedWeekBuilderStep: some View {
+        ATHLTHAdvancedWeekBuilderView(
+            selectedWeek: $selectedPlanWeekIndex,
+            weekCount: $weekCount,
+            startDate: startDate,
+            days: advancedWeekItems(for: selectedPlanWeekIndex),
+            workoutsPerWeek: (0..<weekCount).map {
+                advancedWeekItems(for: $0).reduce(0) { $0 + $1.workouts.count }
+            },
+            weekSymbols: (0..<weekCount).map { index in
+                advancedWeekItems(for: index)
+                    .sorted(by: { $0.date < $1.date })
+                    .map { day in
+                        day.isRestDay ? "moon.stars" :
+                        day.kind?.systemImage ?? (day.planned ? "plus.circle" : "moon.stars")
+                    }
+            },
+            onEditWorkout: { day, workoutIndex in
+                editPreviewWorkout(day, index: workoutIndex)
+            },
+            onAddExercise: { day, workoutIndex, phase in
+                advancedAddDestination = AdvancedAddDestination(
+                    day: day, week: selectedPlanWeekIndex, phase: phase,
+                    kind: .exercise, workoutIndex: workoutIndex)
+            },
+            onAddWorkout: { day in
+                advancedAddDestination = AdvancedAddDestination(
+                    day: day, week: selectedPlanWeekIndex,
+                    phase: .main, kind: .workout)
+            },
+            onMarkRest: { day in
+                setRestDay(day)
+            },
+            onQuick: { day, choice in
+                addAdvancedWeekQuickContent(day: day, choice: choice)
+            },
+            onCopyWeek: { source, destinations, overwrite in
+                copyAdvancedWeek(from: source, to: destinations, overwrite: overwrite)
+            },
+            onMakeRecoveryWeek: { week in
+                let current = selectedPlanWeekIndex
+                selectedPlanWeekIndex = week
+                for day in 1...7 { setRestDay(day) }
+                selectedPlanWeekIndex = current
+            }
+        )
+    }
+
+    private func advancedWeekItems(for week: Int) -> [ATHLTHAdvancedWeekBuilderView.Day] {
+        (1...7).map { weekday in
+            let edit = weekDayEdits[weekDayKey(weekday, weekIndex: week)]
+            let primary = edit?.detailedWorkout ??
+                (edit?.removeTemplateDetail == true
+                    ? nil : structuredWorkoutsByDay[weekday])
+            let extras = edit?.additionalDetailedWorkouts ?? []
+            let planned = selectedDays.contains(weekday) ||
+                edit?.kind != nil || edit?.title != nil ||
+                primary != nil || !extras.isEmpty
+            let isRest = edit?.isRestDay == true ||
+                (!planned && primary == nil && extras.isEmpty)
+            return ATHLTHAdvancedWeekBuilderView.Day(
+                weekday: weekday,
+                date: dateForWeekDay(weekday, weekIndex: week),
+                isRestDay: isRest,
+                workouts: isRest ? [] : ([primary].compactMap { $0 } + extras),
+                suggestedTitle: edit?.title ?? workoutTitleOverridesByDay[weekday],
+                planned: planned
+            )
+        }
+    }
+
+    private func copyAdvancedWeek(from source: Int, to destinations: [Int],
+                                  overwrite: Bool) {
+        guard (0..<weekCount).contains(source) else { return }
+        let targets = Set(destinations).filter {
+            (0..<weekCount).contains($0) && $0 != source
+        }
+        for week in targets {
+            for weekday in 1...7 {
+                let fromKey = weekDayKey(weekday, weekIndex: source)
+                let toKey = weekDayKey(weekday, weekIndex: week)
+                if !overwrite && weekDayEdits[toKey] != nil {
+                    // Protect each individually edited destination day.
+                    continue
+                }
+                if let sourceEdit = weekDayEdits[fromKey] {
+                    weekDayEdits[toKey] = sourceEdit
+                } else if overwrite {
+                    // Remove its override to restore the unchanged base
+                    // pattern; do not accidentally fabricate a workout.
+                    weekDayEdits.removeValue(forKey: toKey)
+                }
+            }
+        }
+        saveResumableDraft()
+    }
+
+    private func addAdvancedWeekQuickContent(day: Int, choice: String) {
+        switch choice {
+        case "running": chooseQuickWorkout(.run, on: day)
+        case "walking": chooseQuickWorkout(.walk, on: day)
+        case "yoga": chooseQuickWorkout(.yoga, on: day)
+        case "meditation": chooseQuickWorkout(.meditation, on: day)
+        case "cycling", "interval", "superset":
+            // The shared Studio owns the detailed cycling/interval/
+            // superset timeline and can append another session.
+            quickStudioOption = nil
+            editingWorkoutIndex = 0
+            addingExtraWorkout = !previewWorkouts(for: day).isEmpty
+            composingAdvancedDay = WeekDayEditorSelection(id: day)
+        case "rest":
+            let key = weekDayKey(day)
+            guard var edit = weekDayEdits[key],
+                  var workout = edit.detailedWorkout else {
+                composingAdvancedDay = WeekDayEditorSelection(id: day)
+                return
+            }
+            workout.blocks.append(WorkoutTemplateBlock(
+                sequence: (workout.blocks.map(\.sequence).max() ?? 0) + 1,
+                kind: .rest,
+                title: ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause"),
+                exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+                durationSeconds: 90, targetWeightKilograms: nil,
+                loadNote: nil, notes: nil, phase: .main
+            ))
+            edit.detailedWorkout = workout
+            weekDayEdits[key] = edit
+        default:
+            advancedAddDestination = AdvancedAddDestination(
+                day: day, week: selectedPlanWeekIndex,
+                phase: .main, kind: .exercise)
         }
     }
 
