@@ -1227,7 +1227,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 15) {
-                    Text(tr("Week \(min(max((selectedWeekIndex ?? currentWeekIndex(plan)) + 1, 1)) of \(plan.weeks.count) · \(plan.title)",
+                    Text(tr("Week \((selectedWeekIndex ?? currentWeekIndex(plan)) + 1) of \(plan.weeks.count) · \(plan.title)",
                             "Uke \((selectedWeekIndex ?? currentWeekIndex(plan)) + 1) av \(plan.weeks.count) · \(plan.title)"))
                         .font(.caption)
                         .foregroundStyle(secondaryInk)
