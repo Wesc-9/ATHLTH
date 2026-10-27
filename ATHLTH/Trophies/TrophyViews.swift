@@ -779,35 +779,11 @@ struct TrophyCollectionView: View {
                 alignment: .center,
                 spacing: 16
             ) {
-                ZStack {
-                    ATHLTHMedalHexagon()
-                        .fill(
-                            LinearGradient(
-                                colors: ATHLTHMedalMetal.gold.highlights,
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .overlay {
-                            ATHLTHMedalHexagon()
-                                .stroke(
-                                    Color.white.opacity(0.56),
-                                    lineWidth: 1
-                                )
-                                .padding(5)
-                        }
-
-                    ATHLTHMarkShape()
-                        .fill(.white)
-                        .frame(
-                            width: 43,
-                            height: 31
-                        )
-                }
-                .frame(
-                    width: 82,
-                    height: 92
+                ATHLTHMintedBrandSeal(
+                    size: 86,
+                    metal: .gold
                 )
+                .frame(width: 86, height: 92)
                 .shadow(
                     color:
                         ATHLTHTheme
@@ -3118,16 +3094,10 @@ struct TrophyUnlockRevealView: View {
                         athleteName: athleteName
                     )
                 } else {
-                    ATHLTHMedalHexagon()
-                        .fill(LinearGradient(colors: metal.highlights,
-                                             startPoint: .topLeading,
-                                             endPoint: .bottomTrailing))
-                        .overlay {
-                            Image(systemName: unlock.category.medalSystemImage)
-                                .font(.system(size: medalSize * 0.3))
-                                .foregroundStyle(.black.opacity(0.62))
-                        }
-                        .frame(width: medalSize, height: medalSize)
+                    ATHLTHMintedBrandSeal(
+                        size: medalSize,
+                        metal: metal
+                    )
                 }
             }
             .shadow(color: accent.opacity(0.18), radius: 26, y: 8)
