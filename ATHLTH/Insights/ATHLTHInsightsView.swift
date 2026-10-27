@@ -398,64 +398,6 @@ struct ATHLTHInsightsView: View {
                     in: RoundedRectangle(cornerRadius: 14))
     }
 
-    private var healthExplanationCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Label(tr("How your body is responding", "Slik reagerer kroppen"),
-                  systemImage: "waveform.path.ecg")
-                .font(.system(size: 20, weight: .medium, design: .serif))
-                .foregroundStyle(ATHLTHTrainDesign.ink)
-
-            healthSignalRow(
-                title: tr("Sleep", "Søvn"),
-                value: sleepValue,
-                explanation: sleepDetail,
-                symbol: "moon.stars.fill"
-            )
-            Divider().overlay(ATHLTHTrainDesign.rule.opacity(0.4))
-            healthSignalRow(
-                title: tr("Resting heart rate", "Hvilepuls"),
-                value: restingHRValue,
-                explanation: restingHRDetail,
-                symbol: "heart"
-            )
-            Divider().overlay(ATHLTHTrainDesign.rule.opacity(0.4))
-            healthSignalRow(
-                title: "HRV",
-                value: hrvValue,
-                explanation: hrvDetail,
-                symbol: "waveform.path.ecg"
-            )
-        }
-        .padding(18)
-        .athlthTrainPaper()
-    }
-
-    private func healthSignalRow(title: String, value: String, explanation: String, symbol: String) -> some View {
-        HStack(spacing: 13) {
-            Image(systemName: symbol)
-                .foregroundStyle(ATHLTHTrainDesign.bronze)
-                .frame(width: 34, height: 34)
-                .background(ATHLTHTrainDesign.paleGold.opacity(0.35),
-                            in: RoundedRectangle(cornerRadius: 10))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-                Text(explanation)
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTrainDesign.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            Spacer(minLength: 5)
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHTrainDesign.bronze)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        }
-    }
-
     private func insightsPaper<Content: View>(
         @ViewBuilder _ content: () -> Content
     ) -> some View {
@@ -466,106 +408,6 @@ struct ATHLTHInsightsView: View {
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
-    }
-
-    private var pulseCard: some View {
-        insightsPaper {
-            HStack(alignment: .top, spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(pulseTint.opacity(0.12))
-                        .frame(width: 58, height: 58)
-
-                    Image(systemName: pulseIcon)
-                        .font(.system(size: 25, weight: .semibold))
-                        .foregroundStyle(pulseTint)
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("ATHLTH Pulse")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-
-                    Text(pulseTitle)
-                        .font(.system(size: 28, weight: .semibold, design: .serif))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                    Text(pulseDetail)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 4)
-
-                if let score = health.recovery.score {
-                    VStack(spacing: 1) {
-                        Text("\(score)")
-                            .font(.system(size: 29, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(pulseTint)
-                            .contentTransition(.numericText())
-
-                        Text("/100")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-
-        }
-    }
-
-    private var nowCard: some View {
-        insightsPaper {
-            ATHLTHSectionHeader(title: ATHLTHLocalization.choose(english: "Now", norwegian: "Akkurat nå"))
-
-            Text(ATHLTHLocalization.choose(english: "Your current signals, without making you interpret a dashboard first.", norwegian: "Dagens viktigste signaler, enkelt forklart."))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.top, 2)
-
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10)
-                ],
-                spacing: 10
-            ) {
-                insightMetric(
-                    title: ATHLTHLocalization.choose(english: "Sleep", norwegian: "Søvn"),
-                    value: sleepValue,
-                    detail: sleepDetail,
-                    icon: "moon.fill",
-                    tint: .purple
-                )
-
-                insightMetric(
-                    title: "HRV",
-                    value: hrvValue,
-                    detail: hrvDetail,
-                    icon: "waveform.path.ecg",
-                    tint: .blue
-                )
-
-                insightMetric(
-                    title: ATHLTHLocalization.choose(english: "Resting HR", norwegian: "Hvilepuls"),
-                    value: restingHRValue,
-                    detail: restingHRDetail,
-                    icon: "heart.fill",
-                    tint: .red
-                )
-
-                insightMetric(
-                    title: ATHLTHLocalization.choose(english: "Recovery", norwegian: "Restitusjon"),
-                    value: recoveryValue,
-                    detail: health.recovery.state.title,
-                    icon: health.recovery.state.systemImage,
-                    tint: pulseTint
-                )
-            }
-            .padding(.top, 12)
-        }
     }
 
     private var whatChangedCard: some View {
@@ -742,58 +584,6 @@ struct ATHLTHInsightsView: View {
         }
     }
 
-    private var whyItMattersCard: some View {
-        insightsPaper {
-            HStack(alignment: .top, spacing: 13) {
-                Image(systemName: "lightbulb.max.fill")
-                    .font(.system(size: 19, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.premiumGold)
-                    .frame(width: 44, height: 44)
-                    .background(
-                        ATHLTHTheme.champagneSoft,
-                        in: RoundedRectangle(
-                            cornerRadius: 14,
-                            style: .continuous
-                        )
-                    )
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(ATHLTHLocalization.choose(english: "Why it matters", norwegian: "Hva betyr dette?"))
-                        .font(.title3.weight(.bold))
-
-                    Text(whyItMattersText)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineSpacing(2)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                Spacer(minLength: 0)
-            }
-
-            Button {
-                onSelectTab(1)
-            } label: {
-                HStack {
-                    Label(
-                        "Use this in today's training",
-                        systemImage: "dumbbell.fill"
-                    )
-
-                    Spacer()
-
-                    Image(systemName: "arrow.right")
-                }
-                .font(.caption.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 40)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accentDeep)
-            .padding(.top, 12)
-        }
-    }
-
     private var whatIfCard: some View {
         insightsPaper {
             HStack {
@@ -884,48 +674,6 @@ struct ATHLTHInsightsView: View {
         }
     }
 
-    private var replayCard: some View {
-        NavigationLink {
-            GhostReplaySimulatorView()
-        } label: {
-            insightsPaper {
-                HStack(alignment: .top, spacing: 13) {
-                    Image(systemName: "figure.run.circle.fill")
-                        .font(.system(size: 24, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.vitality)
-                        .frame(width: 48, height: 48)
-                        .background(
-                            ATHLTHTheme.vitalitySoft,
-                            in: RoundedRectangle(
-                                cornerRadius: 15,
-                                style: .continuous
-                            )
-                        )
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(ATHLTHLocalization.choose(english: "Race yourself", norwegian: "Utfordre deg selv"))
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text(
-                            "Replay an outdoor run and compare yourself against your previous effort — the Ghost Race engine you already use, now surfaced as an insight tool."
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-
     private var detailDestinationsCard: some View {
         insightsPaper {
             ATHLTHSectionHeader(title: ATHLTHLocalization.choose(english: "Go deeper", norwegian: "Se flere detaljer"))
@@ -956,48 +704,6 @@ struct ATHLTHInsightsView: View {
             }
             .padding(.top, 6)
         }
-    }
-
-    private func insightMetric(
-        title: String,
-        value: String,
-        detail: String,
-        icon: String,
-        tint: Color
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(tint)
-
-                Spacer()
-            }
-
-            Text(value)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
-
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-
-            Text(detail)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 116, alignment: .leading)
-        .background(
-            Color.primary.opacity(0.035),
-            in: RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-        )
     }
 
     private func trendMetric(
@@ -1139,21 +845,6 @@ struct ATHLTHInsightsView: View {
         }
     }
 
-    private var pulseTint: Color {
-        switch health.recovery.state {
-        case .ready:
-            return ATHLTHTheme.vitality
-        case .balanced:
-            return ATHLTHTheme.accent
-        case .takeItEasy:
-            return .orange
-        case .recover:
-            return .red
-        case .buildingBaseline:
-            return .blue
-        }
-    }
-
     private var pulseDetail: String {
         switch health.recovery.state {
         case .ready:
@@ -1174,84 +865,16 @@ struct ATHLTHInsightsView: View {
         return formatDuration(health.sleep.totalAsleep)
     }
 
-    private var sleepDetail: String {
-        guard health.sleep.totalAsleep > 0 else {
-            return "No recent sleep data"
-        }
-
-        if let baseline = health.recovery.averageSleepDuration,
-           baseline > 0 {
-            let deltaMinutes =
-                (health.sleep.totalAsleep - baseline) / 60
-
-            if abs(deltaMinutes) < 15 {
-                return "Near your baseline"
-            }
-
-            return deltaMinutes > 0
-                ? "\(Int(abs(deltaMinutes).rounded())) min above baseline"
-                : "\(Int(abs(deltaMinutes).rounded())) min below baseline"
-        }
-
-        return "Last sleep period"
-    }
-
     private var hrvValue: String {
         health.heart.hrvMilliseconds.map {
             "\(Int($0.rounded())) ms"
         } ?? "—"
     }
 
-    private var hrvDetail: String {
-        guard let current = health.heart.hrvMilliseconds else {
-            return "No recent HRV"
-        }
-
-        guard let baseline = health.recovery.baselineHRVMilliseconds,
-              baseline > 0
-        else {
-            return "Building baseline"
-        }
-
-        let difference = current - baseline
-        if abs(difference) < 2 {
-            return "Near your baseline"
-        }
-
-        return difference > 0
-            ? "\(Int(abs(difference).rounded())) ms above baseline"
-            : "\(Int(abs(difference).rounded())) ms below baseline"
-    }
-
     private var restingHRValue: String {
         health.heart.restingHeartRate.map {
             "\(Int($0.rounded())) bpm"
         } ?? "—"
-    }
-
-    private var restingHRDetail: String {
-        guard let current = health.heart.restingHeartRate else {
-            return "No recent resting HR"
-        }
-
-        guard let baseline = health.recovery.baselineRestingHeartRate,
-              baseline > 0
-        else {
-            return "Building baseline"
-        }
-
-        let difference = current - baseline
-        if abs(difference) < 1.5 {
-            return "Near your baseline"
-        }
-
-        return difference > 0
-            ? "\(Int(abs(difference).rounded())) bpm above baseline"
-            : "\(Int(abs(difference).rounded())) bpm below baseline"
-    }
-
-    private var recoveryValue: String {
-        health.recovery.score.map { "\($0)/100" } ?? "—"
     }
 
     private var whatChangedItems: [InsightsChangeItem] {
@@ -1338,33 +961,6 @@ struct ATHLTHInsightsView: View {
                 percent: percent
             )
         )
-    }
-
-    private var whyItMattersText: String {
-        if health.recovery.state == .recover {
-            return "Recovery signals are currently below your usual pattern. ATHLTH treats this as context for today's decision — not a diagnosis — so consider keeping the planned workout flexible rather than chasing volume."
-        }
-
-        if health.recovery.state == .takeItEasy {
-            return "Your recovery signals are softer than usual. A normal session can still be appropriate, but this is a useful day to pay attention to intensity and how the warm-up feels."
-        }
-
-        if let change = trendSnapshot?.trainingDurationChangePercent,
-           change >= 25 {
-            return "Training time has risen about \(Int(change.rounded()))% versus the previous 28 days. That is a meaningful load shift, so pairing the trend with recovery and how you feel gives more context than either signal alone."
-        }
-
-        if let change = trendSnapshot?.workoutDistanceChangePercent,
-           change >= 25 {
-            return "Distance has risen about \(Int(change.rounded()))% versus the previous period. ATHLTH highlights that change so you can decide whether today's plan still fits the direction you are taking."
-        }
-
-        if let change = trendSnapshot?.sleepChangePercent,
-           change <= -10 {
-            return "Average sleep is lower than the previous 28 days. ATHLTH surfaces the change next to training load so you can judge today's plan with both sides of the picture visible."
-        }
-
-        return "No single signal is dominating the picture right now. The useful pattern is the combination of your current recovery, recent training load and how consistently you are training."
     }
 
     private var baselineSessionMinutes: Double {
