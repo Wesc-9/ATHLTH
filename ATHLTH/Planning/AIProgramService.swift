@@ -118,20 +118,32 @@ struct AIProgramDraft: Codable, Hashable {
             "Friday", "Saturday", "Sunday"
         ]
 
+        // AI draft day indices are selected calendar weekdays (Mon=1),
+        // whereas persisted plan indices are relative to the start date.
+        // The same translation is already used by the manual plan builder.
         let normalizedWeeks = weeks.enumerated().map { weekOffset, week in
             let byDayIndex = Dictionary(
-                uniqueKeysWithValues: week.days.map {
-                    ($0.dayIndex, $0)
+                uniqueKeysWithValues: week.days.map { day in
+                    (
+                        ATHLTHTrainingPlanSchedule.relativeDayIndex(
+                            forCalendarWeekday: day.dayIndex,
+                            planStart: startDate
+                        ),
+                        day
+                    )
                 }
             )
 
             let days = (1...7).map { dayIndex -> TrainingPlanDay in
                 let generatedDay = byDayIndex[dayIndex]
+                let weekday = ATHLTHTrainingPlanSchedule.calendarWeekdayIndex(
+                    forRelativeDayIndex: dayIndex, planStart: startDate
+                )
 
                 return TrainingPlanDay(
                     id: UUID(),
                     dayIndex: dayIndex,
-                    title: generatedDay?.title ?? dayTitles[dayIndex - 1],
+                    title: generatedDay?.title ?? dayTitles[weekday - 1],
                     sessions: generatedDay?.sessions.map {
                         $0.makePlannedSession()
                     } ?? []
