@@ -998,7 +998,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 alignment: .leading,
                 spacing: 16
             ) {
-                AnyView(progressHeader)
+                if step == .week && mode == .advanced &&
+                    weekPlanningApproach == .guided {
+                    AnyView(sourceChoiceHeader)
+                } else {
+                    AnyView(progressHeader)
+                }
                 page
             }
             .padding(.horizontal, 18)
@@ -6627,8 +6632,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                             Text(
                                 step == .basics && mode == .basic
                                 ? ATHLTHLocalization.choose(english: "Create my plan", norwegian: "Lag planen min")
-                                : (step == .week && weekPlanningApproach == .guided && guidedDayCursor >= weekCount * 7
-                                    ? ATHLTHLocalization.choose(english: "Review plan", norwegian: "Se over planen")
+                                : (step == .week && weekPlanningApproach == .guided
+                                    ? (guidedDayCursor >= weekCount * 7
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Review plan", norwegian: "Se over planen")
+                                        : ATHLTHLocalization.choose(
+                                            english: "Next day", norwegian: "Neste dag"))
                                     : ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
                             )
                             .font(.subheadline.weight(.bold))
@@ -6648,7 +6657,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         )
                         .frame(height: 48)
                         .background(
-                            ATHLTHTheme.accentDeep,
+                            step == .week && mode == .advanced &&
+                                weekPlanningApproach == .guided
+                                ? ATHLTHTrainDesign.bronze
+                                : ATHLTHTheme.accentDeep,
                             in: RoundedRectangle(
                                 cornerRadius: 15,
                                 style: .continuous
