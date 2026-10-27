@@ -161,6 +161,9 @@ struct ATHLTHAIProgramIntake: Equatable {
     var injurySeverity: InjurySeverity?
     var injuryRestriction: InjuryRestriction?
     var injuryNotes = ""
+    /// Exact exercise names/movements the athlete must never be prescribed.
+    /// One name per line, comma or semicolon; this is always enforced locally.
+    var excludedMovements = ""
     var healthSharingAuthorized = false
 
     var resolvedTrainingFocus: TrainingFocus? {
@@ -206,6 +209,32 @@ struct ATHLTHAIProgramIntake: Equatable {
         validationIssues.isEmpty
     }
 
+    var excludedExerciseNames: [String] {
+        let candidates = excludedMovements
+            .components(separatedBy: CharacterSet(charactersIn: "\n,;"))
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { $0.count >= 2 }
+        return Array(Set(candidates)).sorted().prefix(40).map { String($0.prefix(100)) }
+    }
+
+    /// Explicitly consented data only; pass separately from generic notes
+    /// so request truncation can never silently remove safety restrictions.
+    var sharedInjurySafetyNotes: String? {
+        guard injuryStatus == .considerations, healthSharingAuthorized else { return nil }
+        return """
+        Athlete-provided injuries / training limitations (use only for exercise avoidance):
+        Affected areas: \(injuryAreas.sorted().joined(separator: ", ")).
+        Severity: \(injurySeverity?.title ?? "Not specified").
+        Mandatory restriction: \(injuryRestriction?.title ?? "Not specified").
+        Athlete description: \(String(injuryNotes.prefix(1_200))).
+        Exercises or movements that must NOT be prescribed: \(excludedExerciseNames.joined(separator: "; ")).
+        Do not include exercises, variations or intensity that violate these restrictions.
+        If the restriction cannot be honored safely, provide a rest/recovery option
+        instead and explain that a qualified professional should be consulted.
+        This is training guidance, not a diagnosis or medical clearance.
+        """
+    }
+
     var coachContext: String {
         let types = trainingTypes.map(\.title).sorted().joined(separator: ", ")
         let outcomeText = outcomes.map(\.title).sorted().joined(separator: ", ")
@@ -222,13 +251,7 @@ struct ATHLTHAIProgramIntake: Equatable {
         let injuryText: String
 
         if injuryStatus == .considerations, healthSharingAuthorized {
-            injuryText = """
-            Affected areas: \(injuryAreas.sorted().joined(separator: ", ")).
-            Severity: \(injurySeverity?.title ?? "Not specified").
-            Required restriction: \(injuryRestriction?.title ?? "Not specified").
-            Athlete notes: \(String(injuryNotes.prefix(500))).
-            This restriction is mandatory. Never prescribe movement that loads an area the athlete said must not be loaded. If lower-body training is excluded, do not prescribe running, jumping, squats, lunges or other lower-body loading. For severe or very painful symptoms, keep the plan conservative and tell the athlete to seek qualified medical guidance before resuming affected movements.
-            """
+            injuryText = "Injury details and excluded movements are supplied in the separate, explicit-consent safety field. Follow them strictly."
         } else if injuryStatus == .considerations {
             injuryText = """
             The athlete has not authorized sharing the details of their limitations.
