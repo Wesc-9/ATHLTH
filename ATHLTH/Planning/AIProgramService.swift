@@ -278,9 +278,11 @@ struct AIProgramDraftSession: Codable, Hashable {
     let targetPaceSecondsPerKilometer: Double?
     let notes: String?
     let exercises: [AIProgramDraftExercise]
+    /// Optional for older deployed Coach functions and stored drafts.
+    var blocks: [AIProgramDraftStep]? = nil
 
     func makePlannedSession() -> PlannedSession {
-        PlannedSession(
+        var workout = PlannedSession(
             id: UUID(),
             title: title,
             kind: WorkoutKind(rawValue: kind) ?? .custom,
@@ -292,6 +294,65 @@ struct AIProgramDraftSession: Codable, Hashable {
             exercises: exercises.map { $0.makePlannedExercise() },
             notes: notes
         )
+        let resolved = (blocks ?? []).prefix(100).enumerated().compactMap {
+            index, step in step.plannedBlock(sequence: index + 1, kind: workout.kind)
+        }
+        if resolved.contains(where: { $0.kind == .run || $0.kind == .exercise }) {
+            ATHLTHUnifiedWorkout.apply(
+                blocks: resolved, title: workout.title, routeID: workout.routeID,
+                estimatedMinutes: workout.durationMinutes, to: &workout
+            )
+        }
+        return workout
+    }
+}
+
+/// A validated, explicit chronological AI workout step. The model never has
+/// to invent a UUID or an exercise weight; missing targets remain nil.
+struct AIProgramDraftStep: Codable, Hashable {
+    let title: String
+    let kind: String
+    let phase: String
+    let durationSeconds: Double?
+    let distanceMeters: Double?
+    let repetitions: Int?
+    let targetPaceSecondsPerKilometer: Double?
+    let treadmillInclinePercent: Double?
+    let targetHeartRateZone: Int?
+    let targetEffortRPE: Int?
+    let notes: String?
+
+    func plannedBlock(sequence: Int, kind workoutKind: WorkoutKind) -> WorkoutTemplateBlock? {
+        guard let blockKind = WorkoutTemplateBlockKind(rawValue: kind),
+              let resolvedPhase = WorkoutPhaseKind(rawValue: phase),
+              !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else { return nil }
+        var block = WorkoutTemplateBlock(
+            sequence: sequence, kind: blockKind,
+            title: String(title.prefix(120)), exerciseSlug: nil,
+            distanceMeters: distanceMeters.flatMap { $0.isFinite && $0 > 0 ? $0 : nil },
+            repetitions: repetitions.flatMap { (1...100).contains($0) ? $0 : nil },
+            durationSeconds: durationSeconds.flatMap { $0.isFinite && $0 > 0 ? $0 : nil },
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: notes.map { String($0.prefix(500)) }, phase: resolvedPhase,
+            targetPaceSecondsPerKilometer: targetPaceSecondsPerKilometer.flatMap {
+                $0.isFinite && (120...1200).contains($0) ? $0 : nil
+            },
+            targetHeartRateZone: targetHeartRateZone.flatMap {
+                (1...5).contains($0) ? $0 : nil
+            }
+        )
+        block.targetEffortRPE = targetEffortRPE.flatMap {
+            (1...10).contains($0) ? $0 : nil
+        }
+        block.treadmillInclinePercent = treadmillInclinePercent.flatMap {
+            $0.isFinite && (0...20).contains($0) ? $0 : nil
+        }
+        if blockKind == .run {
+            block.cardioActivity = workoutKind == .walking ? .walking : .running
+            block.isIndoor = block.treadmillInclinePercent != nil
+        }
+        return block
     }
 }
 
