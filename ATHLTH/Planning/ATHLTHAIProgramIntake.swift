@@ -151,6 +151,9 @@ struct ATHLTHAIProgramIntake: Equatable {
     var availableDays: Set<Int> = []
     var sessionDurationMinutes: Int?
     var locations: Set<Location> = []
+    /// Required only when both gym and outdoor training are selected.
+    /// Nil means the athlete has not chosen a balance yet.
+    var outdoorSharePercent: Int?
     var equipment: Set<String> = []
     var otherEquipment = ""
     var injuryStatus: InjuryStatus?
@@ -183,6 +186,10 @@ struct ATHLTHAIProgramIntake: Equatable {
         }
         if sessionDurationMinutes == nil { issues.append("sessionDurationMinutes") }
         if locations.isEmpty { issues.append("locations") }
+        if locations.contains(.gym) && locations.contains(.outdoors) &&
+            outdoorSharePercent == nil {
+            issues.append("locationBalance")
+        }
         if injuryStatus == nil { issues.append("injuryStatus") }
         if injuryStatus == .considerations {
             if injuryAreas.isEmpty { issues.append("injuryAreas") }
@@ -203,6 +210,13 @@ struct ATHLTHAIProgramIntake: Equatable {
         let muscles = muscleGroups.sorted().joined(separator: ", ")
         let locationText = locations.map(\.title).sorted().joined(separator: ", ")
         let equipmentText = equipment.sorted().joined(separator: ", ")
+        let locationBalance: String
+        if locations.contains(.gym) && locations.contains(.outdoors),
+           let outdoorSharePercent {
+            locationBalance = "\(outdoorSharePercent)% outdoors / \(100 - outdoorSharePercent)% gym"
+        } else {
+            locationBalance = "Not applicable"
+        }
         let injuryText: String
 
         if injuryStatus == .considerations, healthSharingAuthorized {
@@ -228,6 +242,7 @@ struct ATHLTHAIProgramIntake: Equatable {
         Available weekday indexes: \(availableDays.sorted()).
         Approximate session duration: \(sessionDurationMinutes ?? 0) minutes.
         Training locations: \(locationText).
+        Gym/outdoor plan balance: \(locationBalance).
         Available equipment: \(equipmentText.isEmpty ? "No equipment selected" : equipmentText).
         Other equipment: \(otherEquipment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "None" : String(otherEquipment.prefix(300))).
         Injury and limitation instructions:
