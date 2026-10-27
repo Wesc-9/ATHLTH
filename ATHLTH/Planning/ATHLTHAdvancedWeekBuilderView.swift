@@ -27,7 +27,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     let startDate: Date
     let days: [Day]
     let workoutsPerWeek: [Int]
-    let onSelectDay: (Int) -> Void
+    let weekSymbols: [[String]]
     let onEditWorkout: (Int, Int) -> Void
     let onAddExercise: (Int, Int, WorkoutPhaseKind) -> Void
     let onAddWorkout: (Int) -> Void
@@ -42,7 +42,6 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     @State private var copyTargets: Set<Int> = []
     @State private var replaceTargets = false
     @State private var templateSourceWeek: Int? = nil
-    @State private var copyFromTemplate = false
     @State private var pendingRecovery = false
     @State private var pendingRemoveLast = false
 
@@ -245,7 +244,8 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                         .font(.system(size: 9))
                 }
                 .foregroundStyle(secondary)
-                .frame(width: 59, minHeight: 58)
+                .frame(width: 59)
+                .frame(minHeight: 58)
                 .background(paper.opacity(0.9), in: RoundedRectangle(cornerRadius: 12))
                 Image(systemName: day.isRestDay ? "pause.fill" :
                       (day.kind?.systemImage ?? "plus.circle"))
@@ -552,11 +552,9 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                                 VStack(spacing: 6) {
                                     Text(date.formatted(.dateTime.weekday(.abbreviated)))
                                         .font(.system(size: 9))
-                                    Image(systemName: week == selectedWeek
-                                          ? (days.first(where: {
-                                              Calendar.current.isDate($0.date, inSameDayAs: date)
-                                          })?.kind?.systemImage ?? "moon.stars")
-                                          : "calendar")
+                                    Image(systemName: weekSymbols.indices.contains(week) &&
+                                        weekSymbols[week].indices.contains(offset)
+                                        ? weekSymbols[week][offset] : "calendar")
                                         .font(.system(size: 13))
                                         .foregroundStyle(gold)
                                 }
@@ -612,7 +610,6 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     }
 
     private func presentCopy(source: Int) {
-        copyFromTemplate = templateSourceWeek == source
         copyTargets = []
         for index in 0..<weekCount where index != source {
             copyTargets.insert(index)
