@@ -4264,36 +4264,33 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     /// Sample once per 60 seconds of active step time, plus any residual
     /// seconds when the user advances. Do not substitute target speed for
     /// measured Watch distance or mark manually set incline as measured.
+    /// Sample actual Watch distance and time for ordinary treadmill sessions,
+    /// including those without a structured interval workout.
     private func recordRunningMinuteIfDue(force: Bool = false) {
-        guard !awaitingMainStart, state == .running,
-              let step = currentStructuredRunningStep,
-              (kind == .running || kind == .walking) else { return }
+        guard state == .running,
+              kind == .running || kind == .walking,
+              !awaitingMainStart else { return }
 
-        let stepIndex = structuredStepIndex
-        let samples = recordedStructuredRunMinutes.filter { $0.stepIndex == stepIndex }
-        let previousEnd = samples.last?.stepElapsedAtEndSeconds ?? 0
-        let currentEnd = currentStructuredStepElapsedTime
-        let sliceSeconds = max(currentEnd - previousEnd, 0)
-        guard (force && sliceSeconds >= 2) ||
-              (!force && sliceSeconds >= 60) else { return }
-
-        let previouslySampledDistance = samples.reduce(0.0) {
-            $0 + $1.recordedDistanceMeters
-        }
-        let newDistance = max(0,
-            currentStructuredStepDistanceMeters - previouslySampledDistance)
+        let step = currentStructuredRunningStep
+        let index = step == nil ? -1 : structuredStepIndex
+        let history = recordedStructuredRunMinutes.filter { $0.stepIndex == index }
+        let previousEnd = history.last?.stepElapsedAtEndSeconds ?? 0
+        let currentEnd = step == nil ? elapsedTime : currentStructuredStepElapsedTime
+        let seconds = max(currentEnd - previousEnd, 0)
+        guard (force && seconds >= 2) || (!force && seconds >= 60)
+        else { return }
+        let previouslyMeasured = history.reduce(0.0) { $0 + $1.recordedDistanceMeters }
+        let measuredDistance = step == nil ? distanceMeters : currentStructuredStepDistanceMeters
+        let newMeters = max(measuredDistance - previouslyMeasured, 0)
         recordedStructuredRunMinutes.append(ATHLTHRecordedRunningMinute(
-            stepIndex: stepIndex,
+            stepIndex: index,
             stepElapsedAtEndSeconds: currentEnd,
-            activeSeconds: sliceSeconds,
-            recordedDistanceMeters: newDistance,
+            activeSeconds: seconds,
+            recordedDistanceMeters: newMeters,
             watchHeartRateBPM: hasFreshHeartRate ? heartRate : nil,
-            targetPaceSecondsPerKilometer:
-                step.targetPaceMinSecondsPerKilometer,
-            targetTreadmillInclinePercent:
-                step.targetTreadmillInclinePercent,
-            manuallyEnteredTreadmillInclinePercent:
-                treadmillInclinePercent
+            targetPaceSecondsPerKilometer: step?.targetPaceMinSecondsPerKilometer,
+            targetTreadmillInclinePercent: step?.targetTreadmillInclinePercent,
+            manuallyEnteredTreadmillInclinePercent: treadmillInclinePercent
         ))
     }
 
@@ -6869,6 +6866,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             routeTitle:
                 plannedRoute?.title
         )
+
+        if kind == .running || kind == .walking {
+            result.recordedRunningMinutes = recordedStructuredRunMinutes
+        }
 
         if structuredWorkoutComplete,
            let structured = structuredRunningWorkout,
