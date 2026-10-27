@@ -103,29 +103,30 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.entryPlanGoal = entryPlanGoal.flatMap {
             TrainingPlanGoalType(rawValue: $0)?.rawValue
         }
-        self.planningApproach = advanced && ["quick", "guided"].contains(planningApproach ?? "")
+        // Preserve sanitized advanced inputs even when the last visible
+        // screen was Simple. The active mode is presentation, not ownership.
+        self.planningApproach = ["quick", "guided"].contains(planningApproach ?? "")
             ? planningApproach : nil
-        self.guidedDayCursor = advanced ? guidedDayCursor.map { min(max($0, 0), min(max(weekCount, 1), 52) * 7) } : nil
-        self.firstGuidedWeekDecisionMade = advanced ? firstGuidedWeekDecisionMade : nil
-        self.selectedPlanWeekIndex = advanced ? selectedPlanWeekIndex.map {
+        self.guidedDayCursor = guidedDayCursor.map { min(max($0, 0), min(max(weekCount, 1), 52) * 7) }
+        self.firstGuidedWeekDecisionMade = firstGuidedWeekDecisionMade
+        self.selectedPlanWeekIndex = selectedPlanWeekIndex.map {
             min(max($0, 0), min(max(weekCount, 1), 52) - 1)
-        } : nil
+        }
         self.editorDay = advanced && editorKind != nil ? editorDay.flatMap {
             (1...7).contains($0) ? $0 : nil
         } : nil
         self.editorKind = advanced && ["day", "studio", "library"].contains(editorKind ?? "")
             ? editorKind : nil
-        self.simpleMinutes = !advanced ? simpleMinutes.map { min(max($0, 5), 180) } : nil
-        self.simpleActivityKinds = !advanced
-            ? simpleActivityKinds?.filter { ["running", "walking", "strength"].contains($0) }
-            : nil
+        self.simpleMinutes = simpleMinutes.map { min(max($0, 5), 180) }
+        self.simpleActivityKinds = simpleActivityKinds?
+            .filter { ["running", "walking", "strength"].contains($0) }
         if let preferredDayIndexes {
             let valid = Set(preferredDayIndexes.filter { (1...7).contains($0) })
             self.preferredDayIndexes = valid.isEmpty ? nil : valid.sorted()
         } else {
             self.preferredDayIndexes = nil
         }
-        self.varyWeekdays = advanced ? varyWeekdays : false
+        self.varyWeekdays = varyWeekdays
         self.linkedGoalIDs = linkedGoalIDs.map { Array(Set($0)).prefix(20).map { $0 } }
         self.equipmentContext = equipmentContext
         self.weeklyTimeBudgetMinutes = weeklyTimeBudgetMinutes.map {
@@ -140,7 +141,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.workoutMinutesByDay = workoutMinutesByDay?.filter {
             (1...7).contains($0.key) && (15...180).contains($0.value)
         }
-        if advanced, let structuredWorkoutsByDay {
+        if let structuredWorkoutsByDay {
             var sanitized: [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
             for (day, original) in structuredWorkoutsByDay
                 where (1...7).contains(day) && original.isValid {
@@ -163,7 +164,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         } else {
             self.structuredWorkoutsByDay = nil
         }
-        if advanced, let weekDayEdits {
+        if let weekDayEdits {
             var sanitized: [Int: ATHLTHPlanWeekDayEdit] = [:]
             for (day, original) in weekDayEdits
                 where (1...(self.weekCount * 7)).contains(day) {
