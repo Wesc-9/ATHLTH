@@ -245,10 +245,10 @@ enum ATHLTHZonedPlanLibrary {
             detail.append(ATHLTHLocalization.choose(english: "Optional strength recommendations, not automatically scheduled: \(optionalStrength)", norwegian: "Valgfrie styrkeøkter, ikke lagt til automatisk: \(optionalStrength)"))
         }
         if let tips = workout.coachingTipsEn, !tips.isEmpty {
-            detail.append(ATHLTHLocalization.isNorwegian ? "Tips: Følg planlagt intensitet og tilpass treningen til dagsformen." : "Coach tips: " + tips.prefix(3).joined(separator: " · "))
+            detail.append(ATHLTHLocalization.choose(english: "Coach tips: ", norwegian: "Trenertips: ") + tips.prefix(3).map(ATHLTHZonedLocalization.text).joined(separator: " · "))
         }
         if let mistakes = workout.commonMistakesEn, !mistakes.isEmpty {
-            detail.append(ATHLTHLocalization.isNorwegian ? "Unngå: Å øke intensiteten utover det økten foreskriver." : "Avoid: " + mistakes.prefix(2).joined(separator: " · "))
+            detail.append(ATHLTHLocalization.choose(english: "Avoid: ", norwegian: "Unngå: ") + mistakes.prefix(2).map(ATHLTHZonedLocalization.text).joined(separator: " · "))
         }
         if workout.environment?.requiresHills == true { detail.append(ATHLTHLocalization.choose(english: "Requires hills", norwegian: "Krever bakker")) }
         if workout.environment?.requiresTrack == true { detail.append(ATHLTHLocalization.choose(english: "Requires track", norwegian: "Krever løpebane")) }
@@ -353,8 +353,11 @@ enum ATHLTHZonedPlanLibrary {
             let blockPhase: WorkoutPhaseKind = recovery ? .recovery : phase
             let isCycling = sport == "cycling"
             let description = (step.descriptionEn ?? "").lowercased()
-            let isActiveRecovery = ["jog", "run", "spin", "ride", "pedal", "walk", "cycle"]
-                .contains { description.contains($0) }
+            let isActiveRecovery =
+                ["jog", "run", "spin", "ride", "pedal", "walk", "cycle"]
+                    .contains { description.contains($0) } ||
+                (step.distanceM ?? 0) > 0 ||
+                (step.distanceKm ?? 0) > 0
             let passiveRest = blockPhase == .recovery && !isActiveRecovery
             let notes: [String] = [
                 step.vmaPercent.map { ATHLTHLocalization.choose(english: "VMA target: \($0) %", norwegian: "VMA-mål: \($0) %") },
