@@ -1,5 +1,21 @@
 import SwiftUI
 
+/// Relative per-session muscle focus, based on recorded exercises and sets.
+/// These colors do not measure fatigue, tissue damage or injury risk.
+enum ATHLTHStrengthFocusTint {
+    static func color(for intensity: Double) -> Color {
+        let normalized = intensity.isFinite ? min(max(intensity, 0), 1) : 0
+        switch normalized {
+        case 0.85...:
+            return Color(red: 0.85, green: 0.28, blue: 0.30)
+        case 0.55..<0.85:
+            return Color(red: 0.92, green: 0.54, blue: 0.27)
+        default:
+            return Color(red: 0.36, green: 0.64, blue: 0.48)
+        }
+    }
+}
+
 /// Identical premium strength artwork in the workout-complete review and
 /// Home's recent-activity strip. The 2400px studio photograph is bundled:
 /// no blurry 3 KB thumbnail, network fetch or duplicated card artwork.
@@ -17,6 +33,8 @@ struct ATHLTHStrengthCompletedHeroCard: View {
     var cornerRadius: CGFloat? = nil
     // Only the compact Home activity strip uses the clearer photo treatment.
     var recentActivityStrip = false
+    // Opt-in styling for strength details; Home and completion retain their look.
+    var trainDetailStyle = false
 
     private let ink = Color(red: 0.14, green: 0.15, blue: 0.16)
     private let secondaryInk = Color(red: 0.35, green: 0.38, blue: 0.42)
@@ -34,6 +52,23 @@ struct ATHLTHStrengthCompletedHeroCard: View {
             )
         }
         return top.joined(separator: " · ")
+    }
+
+    private var sessionRegionTints: [StrengthMuscleRegion: Color] {
+        guard trainDetailStyle else { return [:] }
+        return Dictionary(uniqueKeysWithValues: profile.activations.map { activation in
+            (activation.region, ATHLTHStrengthFocusTint.color(
+                for: profile.intensity(for: activation.region)
+            ))
+        })
+    }
+
+    private var compactDurationLabel: String {
+        guard duration.isFinite, duration > 0 else { return "—" }
+        let minutes = max(1, Int((duration / 60).rounded()))
+        return minutes >= 60
+            ? "\(minutes / 60)t \(minutes % 60)m"
+            : "\(minutes) min"
     }
 
     private var durationLabel: String {
@@ -71,32 +106,46 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                     .scaledToFill()
                     .frame(width: cardWidth, height: cardHeight)
                     .clipped()
-                    .saturation(recentActivityStrip ? 0.95 : 0.75)
-                    .contrast(recentActivityStrip ? 0.98 : 0.88)
+                    .saturation((trainDetailStyle || recentActivityStrip) ? 0.95 : 0.75)
+                    .contrast(trainDetailStyle ? 0.97 : (recentActivityStrip ? 0.98 : 0.88))
 
-                // Home keeps the photograph clear, while the full workout
-                // result retains its original light, readable presentation.
-                LinearGradient(
-                    stops: [
-                        .init(color: Color.white.opacity(recentActivityStrip ? 0.20 : 0.64), location: 0),
-                        .init(color: Color.white.opacity(recentActivityStrip ? 0.14 : 0.36), location: 0.42),
-                        .init(color: Color(red: 0.98, green: 0.97, blue: 0.95)
-                            .opacity(recentActivityStrip ? 0.46 : 0.79), location: 1)
-                    ],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                LinearGradient(
-                    colors: [
-                        .clear,
-                        .white.opacity(0.10),
-                        .white.opacity(recentActivityStrip ? 0.55 : 0.91)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(height: footerHeight + 28)
-                .frame(maxHeight: .infinity, alignment: .bottom)
+                if trainDetailStyle {
+                    // Preserve the clean studio image and darken only enough
+                    // for the white title and gold caption to be readable.
+                    LinearGradient(
+                        stops: [
+                            .init(color: .black.opacity(0.31), location: 0),
+                            .init(color: .clear, location: 0.36),
+                            .init(color: .clear, location: 0.55),
+                            .init(color: .black.opacity(0.58), location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                } else {
+                    // The existing completion/Home artwork is unchanged.
+                    LinearGradient(
+                        stops: [
+                            .init(color: Color.white.opacity(recentActivityStrip ? 0.20 : 0.64), location: 0),
+                            .init(color: Color.white.opacity(recentActivityStrip ? 0.14 : 0.36), location: 0.42),
+                            .init(color: Color(red: 0.98, green: 0.97, blue: 0.95)
+                                .opacity(recentActivityStrip ? 0.46 : 0.79), location: 1)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    LinearGradient(
+                        colors: [
+                            .clear,
+                            .white.opacity(0.10),
+                            .white.opacity(recentActivityStrip ? 0.55 : 0.91)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: footerHeight + 28)
+                    .frame(maxHeight: .infinity, alignment: .bottom)
+                }
 
                 if !profile.activations.isEmpty {
                     // The figures reach the full artwork height; do not
@@ -106,7 +155,8 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         compact: true,
                         style: .activation,
                         presentation: .home,
-                        activationTint: muscleAccent
+                        activationTint: muscleAccent,
+                        regionTints: sessionRegionTints
                     )
                     .frame(
                         width: tight ? min(cardWidth * 0.60, 210) : min(cardWidth * 0.88, 390),
@@ -132,7 +182,7 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         }
-                        .foregroundStyle(secondaryInk)
+                        .foregroundStyle(trainDetailStyle ? Color.white.opacity(0.94) : secondaryInk)
                     } else if showsCompletionLabel {
                         Label(
                             ATHLTHLocalization.choose(
@@ -155,18 +205,37 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         .font(.system(size: tight ? 20 : (small ? 25 : 35), weight: .bold,
                                       design: .rounded))
                         .tracking(-0.5)
-                        .foregroundStyle(ink)
+                        .foregroundStyle(trainDetailStyle ? Color.white : ink)
 
                         Text(focus)
                             .font(.system(size: tight ? 10 : (small ? 12 : 17),
                                           weight: .medium))
-                            .foregroundStyle(secondaryInk)
+                            .foregroundStyle(trainDetailStyle ? ATHLTHTrainDesign.paleGold : secondaryInk)
                             .lineLimit(1)
                             .minimumScaleFactor(0.77)
                     }
                     .frame(maxWidth: cardWidth * (tight ? 0.52 : (small ? 0.50 : 0.49)),
                            alignment: .leading)
-                    .padding(.bottom, tight ? 2 : (small ? 9 : 16))
+                    .padding(.bottom, trainDetailStyle ? 12 : (tight ? 2 : (small ? 9 : 16)))
+
+                    if trainDetailStyle {
+                        // Only genuine recorded values are displayed in the image.
+                        HStack(spacing: 7) {
+                            if duration.isFinite, duration > 0 {
+                                detailMetric("clock", compactDurationLabel)
+                            }
+                            if let exerciseCount, exerciseCount > 0 {
+                                detailMetric(
+                                    "dumbbell.fill",
+                                    ATHLTHLocalization.format(
+                                        english: "%d exercises",
+                                        norwegian: "%d øvelser",
+                                        exerciseCount
+                                    )
+                                )
+                            }
+                        }
+                    }
 
                     if displaysMetrics {
                     HStack(spacing: 0) {
@@ -206,6 +275,20 @@ struct ATHLTHStrengthCompletedHeroCard: View {
             "\(ATHLTHLocalization.choose(english: "exercises", norwegian: "øvelser")), " +
             "\(volumeLabel)"
         )
+    }
+
+    private func detailMetric(_ icon: String, _ text: String) -> some View {
+        Label(text, systemImage: icon)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(Color.white)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 10)
+            .frame(height: 29)
+            .background(Color.black.opacity(0.34), in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(Color.white.opacity(0.22), lineWidth: 0.7)
+            }
     }
 
     private var metricDivider: some View {
