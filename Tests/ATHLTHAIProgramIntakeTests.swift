@@ -66,10 +66,13 @@ final class ATHLTHAIProgramIntakeTests: XCTestCase {
         intake.injuryRestriction = .avoidAffectedArea
         intake.healthSharingAuthorized = false
 
-        XCTAssertTrue(
+        XCTAssertFalse(
             intake.validationIssues.contains("healthSharingAuthorized")
         )
-        XCTAssertFalse(intake.isComplete)
+        XCTAssertTrue(intake.isComplete)
+        XCTAssertFalse(intake.coachContext.contains("Feet / ankles"))
+        XCTAssertFalse(intake.coachContext.contains("Knees"))
+        XCTAssertTrue(intake.coachContext.contains("not authorized sharing"))
     }
 
     private func completeIntake() -> ATHLTHAIProgramIntake {
