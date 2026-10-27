@@ -16,6 +16,8 @@ struct ATHLTHTrainTodayCoverView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let safeTop = max(geometry.safeAreaInsets.top,
+                              ATHLTHCoverSafeArea.statusBarTop)
             ZStack(alignment: .topLeading) {
                 Image("GoalRecovery")
                     .resizable()
@@ -75,15 +77,22 @@ struct ATHLTHTrainTodayCoverView: View {
                     Spacer(minLength: 0)
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 24)
+                .padding(.top, 24 + safeTop)
                 .padding(.bottom, 22)
                 .frame(maxWidth: .infinity, maxHeight: .infinity,
                        alignment: .topLeading)
             }
             .frame(width: geometry.size.width, height: geometry.size.height)
-            .clipShape(RoundedRectangle(cornerRadius: 25, style: .continuous))
+            // The first pixel is artwork, not a rounded white corner.
+            // Only the lower corners are rounded beneath the overlapping card.
+            .clipShape(UnevenRoundedRectangle(
+                cornerRadii: .init(topLeading: 0, bottomLeading: 25,
+                                   bottomTrailing: 25, topTrailing: 0),
+                style: .continuous
+            ))
         }
-        .frame(height: dynamicTypeSize.isAccessibilitySize ? 465 : 378)
+        .frame(height: (dynamicTypeSize.isAccessibilitySize ? 465 : 378)
+                      + ATHLTHCoverSafeArea.statusBarTop)
         .accessibilityElement(children: .contain)
         .accessibilityValue(day.formatted(.dateTime.weekday(.wide).day().month(.wide)))
     }
