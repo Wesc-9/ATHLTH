@@ -78,6 +78,25 @@ if "ATHLTHInsightsView(" not in two or "ATHLTHTrainView(" in two:
 if "AnyView(ProductRootTabView())" not in preview:
     fail("Authenticated production root no longer uses ProductRootTabView")
 
+# Both image-led sections must paint from the very top of the device.
+# Regression: the root ScrollView began below the Dynamic Island while the
+# cover still rounded its upper corners, leaving a pale horizontal strip.
+train_cover = Path("ATHLTH/Training/ATHLTHTrainTodayCoverView.swift").read_text()
+if "edges: selectedSection == .today ? .top : []" not in root:
+    fail("Train Today ScrollView must ignore the top safe area")
+if "ATHLTHCoverSafeArea.statusBarTop" not in train_cover:
+    fail("Train cover must reserve safe space for the Dynamic Island controls")
+if "topLeading: 0" not in train_cover:
+    fail("Train cover cannot clip the artwork with rounded top corners")
+if "ATHLTHPinnedHeroLayout(" in insights:
+    fail("Insights must share Train's single scrolling cover/card layout")
+if ".ignoresSafeArea(.container, edges: .top)" not in insights:
+    fail("Insights ScrollView must paint artwork through the status bar")
+if "ATHLTHCoverSafeArea.statusBarTop" not in insights:
+    fail("Insights cover must keep tab controls below status bar")
+if "selection: $selectedSection" not in insights:
+    fail("Insights hero must own the four-option segmented navigation")
+
 # Audit the active editorial layout, rather than requiring all of the
 # previous redundant charts. Each tab must have a distinct purpose.
 for token in (
