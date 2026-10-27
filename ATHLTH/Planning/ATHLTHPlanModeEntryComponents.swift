@@ -112,6 +112,8 @@ struct ATHLTHPlanModeIllustration: View {
 
 /// Mode selection does not navigate. The explicit CTA in the plan wizard
 /// advances only after the user has seen both choices.
+/// Complete photo-first mode card for the first real Plan creation step.
+/// Uses existing bundled photographs, and never persists a second plan model.
 struct ATHLTHPlanEntryModeCard: View {
     struct Feature: Identifiable {
         let symbol: String
@@ -124,229 +126,252 @@ struct ATHLTHPlanEntryModeCard: View {
     let symbol: String
     let selected: Bool
     let features: [Feature]
-    var compact: Bool = false
+    var compact = false
     let onSelect: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private let ink = ATHLTHTrainDesign.ink
     private let muted = ATHLTHTrainDesign.secondary
     private let bronze = ATHLTHTrainDesign.bronze
     private let gold = ATHLTHTrainDesign.gold
+    private let paper = ATHLTHTrainDesign.canvas
 
-    // These images were adapted from the approved plan-entry visual and
-    // bundled in Assets.xcassets, so the first step is available offline.
-    private var photoName: String {
+    private var imageName: String {
         symbol == "sparkles" ? "PlanEntrySimple" : "PlanEntryAdvanced"
     }
 
     var body: some View {
         Button(action: onSelect) {
             VStack(spacing: 0) {
-                introduction
-                Rectangle()
-                    .fill(bronze.opacity(0.14))
-                    .frame(height: 0.6)
-                    .padding(.horizontal, 12)
-                featureStrip
+                photoSection
+                featureSection
             }
-            .background(Color.white, in: RoundedRectangle(cornerRadius: 19))
-            .clipShape(RoundedRectangle(cornerRadius: 19))
+            .background(.white, in: RoundedRectangle(cornerRadius: 19, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 19)
+                RoundedRectangle(cornerRadius: 19, style: .continuous)
                     .strokeBorder(
-                        selected ? gold.opacity(0.98) :
-                            ATHLTHTrainDesign.rule.opacity(0.46),
-                        lineWidth: selected ? 1.4 : 0.75
+                        selected ? bronze.opacity(0.95) : ATHLTHTrainDesign.rule.opacity(0.37),
+                        lineWidth: selected ? 1.2 : 0.7
                     )
+                    .allowsHitTesting(false)
             }
-            .shadow(color: ink.opacity(selected ? 0.10 : 0.045),
-                    radius: selected ? 14 : 10, y: 5)
+            .shadow(color: ink.opacity(selected ? 0.085 : 0.04), radius: 13, y: 5)
             .contentShape(RoundedRectangle(cornerRadius: 19))
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title + ". " + subtitle)
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
+        .accessibilityLabel(title + ". " + subtitle + (selected ?
+            ATHLTHLocalization.choose(english: ". Selected", norwegian: ". Valgt") : ""))
+        .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityHint(ATHLTHLocalization.choose(
-            english: "Select this planning mode, then continue.",
-            norwegian: "Velg denne planleggingsmåten, og trykk deretter Fortsett."
+            english: "Select planning mode, then continue.",
+            norwegian: "Velg hvordan du vil bygge planen, og trykk så Fortsett."
         ))
     }
 
-    private var introduction: some View {
+    private var photoSection: some View {
         ZStack(alignment: .leading) {
             GeometryReader { bounds in
-                HStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    Image(photoName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: bounds.size.width * 0.51,
-                               height: bounds.size.height)
-                        .clipped()
-                }
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: bounds.size.width, height: bounds.size.height)
+                    .clipped()
+                    .accessibilityHidden(true)
             }
+
             LinearGradient(
                 stops: [
                     .init(color: .white, location: 0),
-                    .init(color: .white.opacity(0.98), location: 0.34),
-                    .init(color: .white.opacity(0.77), location: 0.57),
-                    .init(color: .white.opacity(0.0), location: 1)
+                    .init(color: .white.opacity(0.98), location: 0.31),
+                    .init(color: .white.opacity(0.79), location: 0.50),
+                    .init(color: .white.opacity(0.22), location: 0.76),
+                    .init(color: .white.opacity(0.04), location: 1)
                 ],
-                startPoint: .leading, endPoint: .trailing
+                startPoint: .leading,
+                endPoint: .trailing
             )
 
-            VStack(alignment: .leading, spacing: compact ? 6 : 10) {
-                Text(title)
-                    .font(.system(size: compact ? 26 : 31,
-                                  weight: .regular, design: .serif))
-                    .foregroundStyle(ink)
-                Text(subtitle)
-                    .font(.system(size: compact ? 11.5 : 13.5))
-                    .foregroundStyle(muted)
-                    .multilineTextAlignment(.leading)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .lineLimit(compact ? 3 : 4)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, compact ? 15 : 19)
-            .padding(.trailing, compact ? 118 : 145)
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: compact ? 7 : 9) {
+                    Text(title)
+                        .font(.system(size: compact ? 27 : 31,
+                                      weight: .medium, design: .serif))
+                        .foregroundStyle(ink)
+                        .minimumScaleFactor(0.8)
+                        .lineLimit(1)
 
-            VStack {
-                HStack {
-                    Spacer()
-                    Image(systemName: selected ? "checkmark" : "circle")
-                        .font(.system(size: selected ? 13 : 27,
-                                      weight: .semibold))
-                        .foregroundStyle(selected ? Color.white :
-                                         ink.opacity(0.34))
-                        .frame(width: 34, height: 34)
-                        .background {
-                            if selected {
-                                Circle().fill(gold)
-                            }
-                        }
+                    Text(subtitle)
+                        .font(.system(size: compact ? 11.5 : 12.5))
+                        .foregroundStyle(muted)
+                        .multilineTextAlignment(.leading)
+                        .lineLimit(typeSize.isAccessibilitySize ? 5 : 3)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                Spacer()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, compact ? 15 : 18)
+                .padding(.top, compact ? 17 : 20)
+                .padding(.trailing, compact ? 123 : 141)
+
+                Spacer(minLength: 0)
             }
-            .padding(14)
-            .accessibilityHidden(true)
+
+            Image(systemName: selected ? "checkmark" : "circle")
+                .font(.system(size: selected ? 14 : 30, weight: .medium))
+                .foregroundStyle(selected ? .white : ink.opacity(0.29))
+                .frame(width: 33, height: 33)
+                .background {
+                    if selected {
+                        Circle().fill(gold.gradient)
+                    }
+                }
+                .overlay {
+                    if selected {
+                        Circle().strokeBorder(.white.opacity(0.8), lineWidth: 0.7)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                .padding(12)
+                .accessibilityHidden(true)
         }
-        .frame(height: compact ? 116 : 140)
+        .frame(height: typeSize.isAccessibilitySize ? 176 : (compact ? 111 : 124))
+        .clipped()
     }
 
-    private var featureStrip: some View {
+    private var featureSection: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(alignment: .center, spacing: compact ? 6 : 9) {
-                ForEach(features) { item in
-                    feature(item)
-                        .frame(maxWidth: .infinity, alignment: .center)
+            HStack(spacing: 0) {
+                ForEach(Array(features.enumerated()), id: \.element.id) { entry in
+                    if entry.offset > 0 {
+                        Rectangle()
+                            .fill(ATHLTHTrainDesign.rule.opacity(0.36))
+                            .frame(width: 0.7, height: 20)
+                    }
+                    feature(entry.element)
+                        .frame(maxWidth: .infinity, minHeight: compact ? 39 : 42)
                 }
             }
-            VStack(alignment: .leading, spacing: 5) {
-                ForEach(features) { item in feature(item) }
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(features) { feature($0) }
             }
         }
-        .padding(.horizontal, 11)
-        .padding(.vertical, compact ? 9 : 11)
         .frame(maxWidth: .infinity)
-        .background(.white.opacity(0.99))
+        .padding(.horizontal, 6)
+        .background(.white)
     }
 
     private func feature(_ item: Feature) -> some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             Image(systemName: item.symbol)
-                .font(.system(size: compact ? 10 : 12, weight: .semibold))
+                .font(.system(size: compact ? 12 : 13, weight: .medium))
                 .foregroundStyle(bronze)
                 .accessibilityHidden(true)
             Text(item.title)
-                .font(.system(size: compact ? 9 : 10))
+                .font(.system(size: compact ? 9.5 : 10.5))
                 .foregroundStyle(muted)
                 .lineLimit(1)
-                .minimumScaleFactor(0.70)
+                .minimumScaleFactor(0.65)
         }
+        .padding(.horizontal, 3)
     }
 }
 
+/// Paired, image-backed shortcuts at the bottom of the first Plan step.
 struct ATHLTHPlanExistingChoice: View {
     let title: String
     let subtitle: String
     let symbol: String
-    var compact: Bool = false
+    var compact = false
     let action: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private let ink = ATHLTHTrainDesign.ink
     private let muted = ATHLTHTrainDesign.secondary
-    private let gold = ATHLTHTrainDesign.bronze
+    private let bronze = ATHLTHTrainDesign.bronze
 
-    private var imageName: String {
+    private var photo: String {
         symbol == "bookmark" ? "GoalMountain" : "GoalAdventure"
     }
 
     var body: some View {
         Button(action: action) {
-            ZStack(alignment: .leading) {
+            ZStack(alignment: .topLeading) {
                 GeometryReader { bounds in
-                    HStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        Image(imageName)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(width: bounds.size.width * 0.76,
-                                   height: bounds.size.height)
-                            .clipped()
-                    }
+                    Image(photo)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: bounds.size.width, height: bounds.size.height)
+                        .clipped()
+                        .accessibilityHidden(true)
                 }
+
                 LinearGradient(
-                    colors: [.white, .white.opacity(0.92),
-                             .white.opacity(0.60), .white.opacity(0.20)],
-                    startPoint: .leading, endPoint: .trailing
+                    stops: [
+                        .init(color: .white.opacity(0.99), location: 0),
+                        .init(color: .white.opacity(0.88), location: 0.46),
+                        .init(color: .white.opacity(0.37), location: 0.82),
+                        .init(color: .white.opacity(0.1), location: 1)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
                 )
 
-                VStack(alignment: .leading, spacing: compact ? 5 : 8) {
-                    HStack(alignment: .top) {
-                        Image(systemName: symbol)
-                            .font(.system(size: compact ? 18 : 20, weight: .medium))
-                            .foregroundStyle(gold)
-                            .frame(width: compact ? 38 : 44, height: compact ? 38 : 44)
-                            .background(
-                                ATHLTHTrainDesign.paleGold.opacity(0.48),
-                                in: RoundedRectangle(cornerRadius: 12)
-                            )
-                        Spacer(minLength: 0)
-                    }
+                VStack(alignment: .leading, spacing: 4) {
+                    Image(systemName: symbol)
+                        .font(.system(size: compact ? 18 : 20, weight: .regular))
+                        .foregroundStyle(bronze)
+                        .frame(width: compact ? 37 : 40,
+                               height: compact ? 37 : 40)
+                        .background(
+                            ATHLTHTrainDesign.paleGold.opacity(0.74),
+                            in: Circle()
+                        )
+
+                    Spacer(minLength: 1)
+
                     Text(title)
-                        .font(.system(size: compact ? 17 : 19, weight: .medium,
-                                      design: .serif))
+                        .font(.system(size: compact ? 16 : 18,
+                                      weight: .medium, design: .serif))
                         .foregroundStyle(ink)
-                        .lineLimit(1).minimumScaleFactor(0.78)
-                    HStack(alignment: .bottom, spacing: 2) {
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    HStack(alignment: .bottom, spacing: 3) {
                         Text(subtitle)
-                            .font(.system(size: compact ? 10 : 12))
+                            .font(.system(size: compact ? 10 : 11))
                             .foregroundStyle(muted)
-                            .lineLimit(2).minimumScaleFactor(0.78)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
                         Spacer(minLength: 0)
                         Image(systemName: "chevron.right")
                             .font(.system(size: 11, weight: .semibold))
-                            .foregroundStyle(ink.opacity(0.75))
+                            .foregroundStyle(ink.opacity(0.80))
                     }
                 }
-                .padding(compact ? 11 : 14)
+                .padding(compact ? 11 : 13)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: compact ? 104 : 122)
-            .clipShape(RoundedRectangle(cornerRadius: 17))
+            .frame(height: typeSize.isAccessibilitySize ? 150 : (compact ? 90 : 106))
+            .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 17)
-                    .stroke(ATHLTHTrainDesign.rule.opacity(0.42),
-                            lineWidth: 0.8)
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .strokeBorder(
+                        ATHLTHTrainDesign.rule.opacity(0.37),
+                        lineWidth: 0.7
+                    )
+                    .allowsHitTesting(false)
             }
-            .shadow(color: ink.opacity(0.05), radius: 10, y: 4)
+            .shadow(color: ink.opacity(0.045), radius: 10, y: 4)
             .contentShape(RoundedRectangle(cornerRadius: 17))
         }
         .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(title + ". " + subtitle)
         .accessibilityHint(ATHLTHLocalization.choose(
-            english: "Open your plans.", norwegian: "Åpne planene."
+            english: "Open this plan collection.",
+            norwegian: "Åpne disse planene."
         ))
     }
 }
