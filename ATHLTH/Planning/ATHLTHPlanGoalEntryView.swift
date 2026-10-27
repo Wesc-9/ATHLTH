@@ -181,7 +181,7 @@ struct ATHLTHPlanGoalEntryView: View {
     private let divider = ATHLTHTrainDesign.rule
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 15) {
             referenceHero
             categoryGrid
             mainGoalList
@@ -248,7 +248,7 @@ struct ATHLTHPlanGoalEntryView: View {
             .padding(.horizontal, 18)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(height: dynamicTypeSize.isAccessibilitySize ? 205 : 145)
+        .frame(height: dynamicTypeSize.isAccessibilitySize ? 205 : 129)
         .clipped()
         .padding(.horizontal, -18)
         .accessibilityElement(children: .contain)
@@ -307,7 +307,7 @@ struct ATHLTHPlanGoalEntryView: View {
                     Image(systemName: item.icon)
                         .font(.system(size: 19, weight: .medium))
                         .foregroundStyle(isSelected ? .white : bronze)
-                        .frame(width: 39, height: 39)
+                        .frame(width: 37, height: 37)
                         .background(
                             isSelected ? gold : ATHLTHTrainDesign.paleGold.opacity(0.72),
                             in: Circle()
@@ -317,21 +317,21 @@ struct ATHLTHPlanGoalEntryView: View {
                     Spacer(minLength: 4)
 
                     Text(item.title)
-                        .font(.system(size: 21, weight: .semibold, design: .serif))
+                        .font(.system(size: 20, weight: .semibold, design: .serif))
                         .foregroundStyle(ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.78)
 
                     Text(item.subtitle)
-                        .font(.system(size: 11))
+                        .font(.system(size: 10.5))
                         .foregroundStyle(muted)
                         .multilineTextAlignment(.leading)
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? 4 : 3)
-                        .frame(maxWidth: .infinity, minHeight: 30, alignment: .topLeading)
+                        .frame(maxWidth: .infinity, minHeight: 27, alignment: .topLeading)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .padding(12)
+                .padding(10)
 
                 if isSelected {
                     Image(systemName: "checkmark")
@@ -345,7 +345,7 @@ struct ATHLTHPlanGoalEntryView: View {
                         .accessibilityHidden(true)
                 }
             }
-            .frame(height: dynamicTypeSize.isAccessibilitySize ? 160 : 128)
+            .frame(height: dynamicTypeSize.isAccessibilitySize ? 170 : 118)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -413,7 +413,7 @@ struct ATHLTHPlanGoalEntryView: View {
                 Image(systemName: option.icon)
                     .font(.system(size: 20, weight: .regular))
                     .foregroundStyle(bronze)
-                    .frame(width: 43, height: 43)
+                    .frame(width: 39, height: 39)
                     .background(
                         ATHLTHTrainDesign.paleGold.opacity(0.34),
                         in: Circle()
@@ -450,9 +450,9 @@ struct ATHLTHPlanGoalEntryView: View {
                 .frame(width: 29, height: 40)
                 .accessibilityHidden(true)
             }
-            .frame(maxWidth: .infinity, minHeight: 57)
+            .frame(maxWidth: .infinity, minHeight: 51)
             .padding(.horizontal, 13)
-            .padding(.vertical, 3)
+            .padding(.vertical, 1)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
