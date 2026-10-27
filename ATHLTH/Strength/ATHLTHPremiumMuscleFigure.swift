@@ -10,6 +10,8 @@ struct ATHLTHPremiumMuscleFigure: View {
     let profile: StrengthMuscleProfile
     let isFront: Bool
     let activationTint: Color
+    /// Optional per-region comparison shades; nil preserves all existing maps.
+    var regionTints: [StrengthMuscleRegion: Color] = [:]
 
     var body: some View {
         Canvas(opaque: false, rendersAsynchronously: false) { context, size in
@@ -18,7 +20,8 @@ struct ATHLTHPremiumMuscleFigure: View {
                 size: size,
                 profile: profile,
                 isFront: isFront,
-                tint: activationTint
+                tint: activationTint,
+                regionTints: regionTints
             )
         }
         .aspectRatio(0.57, contentMode: .fit)
@@ -49,7 +52,8 @@ enum ATHLTHPremiumMuscleAtlas {
         size: CGSize,
         profile: StrengthMuscleProfile,
         isFront: Bool,
-        tint: Color
+        tint: Color,
+        regionTints: [StrengthMuscleRegion: Color] = [:]
     ) {
         guard size.width > 0, size.height > 0 else { return }
         let scale = min(size.width / baseWidth, size.height / baseHeight)
@@ -92,7 +96,10 @@ enum ATHLTHPremiumMuscleAtlas {
                 let secondaryTint = Color(
                     red: 0.971, green: 0.646, blue: 0.602
                 )
-                let base = supporting ? secondaryTint : tint
+                // Insight uses per-region concentration colors: red is a
+                // relative attention cue, not evidence of damage or fatigue.
+                let base = regionTints[panel.region] ??
+                    (supporting ? secondaryTint : tint)
                 context.fill(
                     path,
                     with: .linearGradient(
