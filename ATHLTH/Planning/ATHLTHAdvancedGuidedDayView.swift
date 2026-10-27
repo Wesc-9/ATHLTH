@@ -308,7 +308,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 7) {
-                    Button { onAddExercise(.main) } label: {
+                    Button { onAddExercise(.main, 0) } label: {
                         Label(tr("Exercise", "Øvelse"), systemImage: "dumbbell")
                     }
                     Button(action: onAddWorkout) {
@@ -325,7 +325,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 .buttonStyle(.bordered)
                 .tint(gold)
             }
-            Button { onAddExercise(.main) } label: {
+            Button { onAddExercise(.main, 0) } label: {
                 Label(tr("Add block", "Legg til blokk"), systemImage: "plus")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
