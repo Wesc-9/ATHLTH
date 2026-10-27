@@ -35,7 +35,8 @@ struct ATHLTHTrophyCoreView: View {
                 if trophy.isPrestigeTrophy {
                     ATHLTHGoldPrestigeCupArtwork(
                         size: size,
-                        isUnlocked: trophy.isUnlocked
+                        isUnlocked: trophy.isUnlocked,
+                        engravedName: inscription?.athlete ?? athleteName
                     )
                 } else {
                     ATHLTHMetalMedalArtwork(
