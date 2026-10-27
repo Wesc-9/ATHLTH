@@ -767,17 +767,33 @@ struct AIProgramBuilderView: View {
                         .lineLimit(2...5)
                         .textFieldStyle(.roundedBorder)
 
+                    Text(ATHLTHLocalization.choose(
+                        english: "Exercises you cannot perform (one per line)",
+                        norwegian: "Øvelser eller bevegelser du ikke kan utføre (én per linje)"))
+                        .font(.subheadline.bold())
+                    TextField(ATHLTHLocalization.choose(
+                        english: "E.g. squats, running, jumping",
+                        norwegian: "F.eks. knebøy, løping, hopping"),
+                        text: $standaloneIntake.excludedMovements, axis: .vertical)
+                        .lineLimit(2...5)
+                        .textFieldStyle(.roundedBorder)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Coach will exclude these exercises. Your plan is also checked before it can be saved.",
+                        norwegian: "Coach skal utelukke disse øvelsene. Planen kontrolleres også før den kan lagres."))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+
                     Toggle(isOn: $standaloneIntake.healthSharingAuthorized) {
                         Text(ATHLTHLocalization.choose(
-                            english: "I consent to share these health-related details with Coach",
-                            norwegian: "Jeg samtykker til å dele disse helseopplysningene med Coach"))
+                            english: "I explicitly consent to sharing injury details and forbidden exercises with ATHLTH Coach's AI provider for this plan",
+                            norwegian: "Jeg samtykker uttrykkelig til at skadeopplysninger og øvelser jeg ikke kan utføre deles med AI-leverandøren til ATHLTH Coach for denne planen"))
                             .font(.subheadline)
                     }
                     .tint(ATHLTHTrainDesign.bronze)
 
                     Text(ATHLTHLocalization.choose(
-                        english: "Coach can adapt training, but does not diagnose or replace qualified medical advice.",
-                        norwegian: "Coach kan tilpasse trening, men stiller ikke diagnose og erstatter ikke kvalifisert helsehjelp."))
+                        english: "Sharing is optional and off by default. Without consent, Coach cannot tailor a plan to undisclosed injuries. Coach cannot guarantee medical safety; review your plan before training.",
+                        norwegian: "Deling er frivillig og av som standard. Uten samtykke kan Coach ikke tilpasse planen til skader som ikke er delt. Coach kan ikke garantere medisinsk sikkerhet – gjennomgå planen før trening."))
                         .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
                 }
@@ -2291,6 +2307,15 @@ struct AIProgramBuilderView: View {
             userNotes: String(coachContext.prefix(2_200)) +
                 "\nAdditional preferences: " + String(userNotes.prefix(400)) +
                 "\nRecent training context: " + String(historyContext.prefix(400)),
+            // Sensitive restrictions have an independent, consent-gated
+            // channel so they cannot be truncated by generic coach notes.
+            injurySafetyNotes: isStandaloneCoachJourney
+                ? standaloneIntake.sharedInjurySafetyNotes
+                : (shareLimitationsWithAI && !limitations.isEmpty
+                    ? String(limitations.prefix(1_200)) : nil),
+            excludedMovements: isStandaloneCoachJourney &&
+                standaloneIntake.healthSharingAuthorized
+                ? standaloneIntake.excludedExerciseNames : nil,
             // A linked ATHLTH goal is optional. Direction and outcomes are
             // carried in the explicit Coach intake when this array is empty.
             goals: selectedGoals.map(AIProgramGoalInput.init),
