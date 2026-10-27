@@ -379,7 +379,8 @@ enum ATHLTHZonedPlanLibrary {
                 targetHeartRateZone: zone?.athlthZone,
                 cardioActivity: isCycling ? nil : .running
             )
-            block.activityTag = isCycling ? "cycling" : nil
+            block.activityTag = isCycling ? "cycling" :
+                (recovery && isActiveRecovery ? "active_recovery" : nil)
             block.sourceIntensityZoneLabel = zone?.label
             block.targetHeartRatePercentMin = zone?.minimum
             block.targetHeartRatePercentMax = zone?.maximum
