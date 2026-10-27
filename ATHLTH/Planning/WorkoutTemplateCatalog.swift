@@ -419,7 +419,7 @@ extension Array where Element == WorkoutTemplateBlock {
                         // A recovery at the end of an interval group is a
                         // between-round break, not a mandatory final pause.
                         if round == rounds && position == members.count - 1
-                            && member.kind == .rest && rounds > 1 {
+                            && member.isRestOrActiveRecovery && rounds > 1 {
                             continue
                         }
                         append(member, title: rounds > 1
@@ -458,6 +458,47 @@ extension Array where Element == WorkoutTemplateBlock {
         }
         return output
     }
+}
+
+
+enum ATHLTHActiveRecovery {
+    /// The same timer and interval group survive switching passive/active.
+    static func convert(_ source: WorkoutTemplateBlock, active: Bool) -> WorkoutTemplateBlock {
+        var block = source
+        if active {
+            block.kind = .run
+            block.title = ATHLTHLocalization.choose(english: "Active recovery · easy jog", norwegian: "Aktiv pause · rolig jogg")
+            block.activityTag = "active_recovery"
+            block.cardioActivity = .running
+            block.durationSeconds = block.durationSeconds ?? 60
+            block.distanceMeters = nil
+            block.targetPaceSecondsPerKilometer = nil
+            block.targetHeartRateZone = block.targetHeartRateZone ?? 1
+            block.sourceIntensityZoneLabel = nil
+            block.targetHeartRatePercentMin = nil
+            block.targetHeartRatePercentMax = nil
+            if block.groupID == nil { block.phase = .recovery }
+        } else {
+            block.kind = .rest
+            block.title = ATHLTHLocalization.choose(english: "Rest", norwegian: "Pause")
+            block.activityTag = nil
+            block.cardioActivity = nil
+            block.distanceMeters = nil
+            block.targetPaceSecondsPerKilometer = nil
+            block.targetHeartRateZone = nil
+            block.targetEffortRPE = nil
+            block.sourceIntensityZoneLabel = nil
+            block.targetHeartRatePercentMin = nil
+            block.targetHeartRatePercentMax = nil
+            block.durationSeconds = block.durationSeconds ?? 60
+        }
+        return block
+    }
+}
+
+extension WorkoutTemplateBlock {
+    var isActiveRecovery: Bool { kind == .run && activityTag == "active_recovery" }
+    var isRestOrActiveRecovery: Bool { kind == .rest || isActiveRecovery }
 }
 
 struct WorkoutTemplateCatalogEntry: Identifiable, Codable, Hashable {
@@ -2600,6 +2641,11 @@ struct WorkoutTemplateBuilderView: View {
                         selectedPhase = phase
                         addRestBlock()
                     }
+                    Button(tr("Active recovery · jog", "Aktiv pause · jogg"),
+                           systemImage: "figure.run") {
+                        selectedPhase = phase
+                        addActiveRecoveryBlock()
+                    }
                     Button(tr("Intervals", "Intervaller"), systemImage: "repeat") {
                         selectedPhase = phase
                         createIntervals()
@@ -3020,6 +3066,10 @@ struct WorkoutTemplateBuilderView: View {
                     Button(tr("Rest", "Pause"), systemImage: "pause.fill") {
                         addRestBlock(toGroup: id)
                     }
+                    Button(tr("Active recovery · jog", "Aktiv pause · jogg"),
+                           systemImage: "figure.run") {
+                        addActiveRecoveryBlock(toGroup: id)
+                    }
                 } label: {
                     Label(tr("Add to group", "Legg til i gruppen"),
                           systemImage: "plus.circle")
@@ -3049,7 +3099,9 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func intervalStepLabel(_ block: WorkoutTemplateBlock) -> String {
-        let activity = block.kind == .rest
+        let activity = block.isActiveRecovery
+            ? tr("Active recovery jog", "Aktiv joggepause")
+            : block.kind == .rest
             ? tr("Rest", "Pause")
             : block.kind == .run
             ? (block.cardioActivity ?? .running).title
@@ -3087,7 +3139,7 @@ struct WorkoutTemplateBuilderView: View {
                     ForEach(memberIndices, id: \.self) { index in
                         if !(round == min(max(rounds, 1), 20) &&
                              index == memberIndices.last &&
-                             blocks[index].kind == .rest &&
+                             blocks[index].isRestOrActiveRecovery &&
                              rounds > 1) {
                             HStack(spacing: 8) {
                                 Image(systemName: blocks[index].kind == .rest
@@ -3338,7 +3390,25 @@ struct WorkoutTemplateBuilderView: View {
     @ViewBuilder
     private func blockDetails(_ index: Int) -> some View {
         let block = blocks[index]
-            switch block.kind {
+        if block.isRestOrActiveRecovery {
+            Picker(tr("Recovery type", "Pausetype"), selection: Binding<Bool>(
+                get: { blocks[index].isActiveRecovery },
+                set: { active in
+                    blocks[index] = ATHLTHActiveRecovery.convert(blocks[index], active: active)
+                }
+            )) {
+                Text(tr("Rest", "Hvile")).tag(false)
+                Text(tr("Active jog", "Aktiv jogg")).tag(true)
+            }
+            .pickerStyle(.segmented)
+            Text(tr(
+                "Active recovery keeps the timer running while you jog lightly. Adjust time and HR zone below.",
+                "Ved aktiv pause jogger du rolig mens tiden går. Juster tid og pulssone nedenfor."
+            ))
+            .font(.caption)
+            .foregroundStyle(studioInk.opacity(0.65))
+        }
+        switch block.kind {
             case .run:
                 Picker(tr("Activity", "Aktivitet"), selection: Binding(
                     get: { blocks[index].cardioActivity ?? .running },
@@ -3885,6 +3955,7 @@ struct WorkoutTemplateBuilderView: View {
         case "interval": createIntervals()
         case "superset": createSuperset()
         case "rest": addRestBlock()
+        case "active_recovery": addActiveRecoveryBlock()
         case "stretching": addWellnessBlock(.stretching)
         default: showingBlockPicker = true
         }
@@ -4189,6 +4260,17 @@ struct WorkoutTemplateBuilderView: View {
             targetWeightKilograms: nil, loadNote: nil,
             notes: nil, phase: selectedPhase
         ), toGroup: groupID)
+    }
+
+    private func addActiveRecoveryBlock(toGroup groupID: UUID? = nil) {
+        let rest = WorkoutTemplateBlock(
+            sequence: 0, kind: .rest, title: tr("Rest", "Pause"),
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: 60,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: nil, phase: selectedPhase
+        )
+        insertBlock(ATHLTHActiveRecovery.convert(rest, active: true), toGroup: groupID)
     }
 
     private func addExerciseBlock(_ entry: ExerciseLibraryEntry, toGroup groupID: UUID? = nil) {
