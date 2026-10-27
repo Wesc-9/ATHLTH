@@ -192,6 +192,9 @@ enum ATHLTHZonedPlanLibrary {
         week: Week,
         sourcePlan: Plan
     ) -> PlannedSession? {
+        if source.workoutId == "__race_day__" {
+            return raceDaySession(source, week: week, sourcePlan: sourcePlan)
+        }
         guard let workout = workoutsByID[source.workoutId] else { return nil }
         var blocks = blocks(for: workout)
         guard !blocks.isEmpty else { return nil }
@@ -265,6 +268,47 @@ enum ATHLTHZonedPlanLibrary {
         session.workoutBlocks = blocks
         session.workoutCategory = isCycle ? "cycling" : "running"
         return session
+    }
+
+    /// Zoned marks race days by a sentinel rather than a normal workout ID.
+    /// Preserve those days as executable events without inventing pace or HR.
+    private static func raceDaySession(
+        _ source: Session, week: Week, sourcePlan: Plan
+    ) -> PlannedSession {
+        let distance: Double?
+        switch sourcePlan.raceDistance?.uppercased() {
+        case "5K": distance = 5
+        case "10K": distance = 10
+        case "HALF", "HALF_MARATHON", "SEMI": distance = 21.0975
+        case "MARATHON": distance = 42.195
+        default: distance = source.targetDistanceKm
+        }
+        let notes = [
+            "Zoned race day · \(sourcePlan.nameEn)",
+            "Week \(week.weekNumber) · \(week.phase)",
+            source.notesEn ?? "Event effort and warm-up should be personalized.",
+            "Pace and heart rate zones must be selected for the athlete; no default max-effort target is assumed.",
+            "Source: Zoned (MIT), github.com/alarboulletmarin/zoned"
+        ].joined(separator: "\n")
+        var event = PlannedSession(
+            id: UUID(), title: "Race day",
+            kind: .running, scheduledStart: nil,
+            durationMinutes: source.targetDurationMin ?? source.estimatedDurationMin,
+            targetDistanceKilometers: distance,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: notes
+        )
+        event.workoutCategory = "running"
+        event.workoutBlocks = [WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Race",
+            exerciseSlug: nil,
+            distanceMeters: distance.map { $0 * 1_000 },
+            repetitions: nil, durationSeconds: nil,
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: "Choose a safe, individual effort target.",
+            phase: .main, cardioActivity: .running
+        )]
+        return event
     }
 
     static func blocks(for workout: Workout) -> [WorkoutTemplateBlock] {
