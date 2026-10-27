@@ -1367,7 +1367,31 @@ struct ATHLTHTrainPlanPremiumView: View {
                                         .frame(width: 38, height: 38)
                                 }
                             }
-                            referenceWorkoutPhases(workout, day: day, plan: plan)
+                            // Day details use the same chronological timeline
+                            // as the Plan card, never the legacy phase-only list.
+                            ATHLTHPlanWorkoutExpandableCard(
+                                workout: workout,
+                                completed: isPremiumPlanWorkoutCompleted(workout, plan: plan),
+                                skipped: session.isPlanSessionSkipped(
+                                    planID: plan.id, sessionID: workout.id
+                                ),
+                                onEditBlock: { sourceIndex, executionStepIndex in
+                                    if Calendar.current.startOfDay(
+                                        for: planDayDate(day.dayIndex, plan: plan)
+                                    ) < Calendar.current.startOfDay(for: Date()) {
+                                        preparePlanDayCopy(day, plan: plan)
+                                        copyingSourceWorkoutID = workout.id
+                                    } else {
+                                        pendingDayWorkoutEdit = WorkoutEditDestination(
+                                            planID: plan.id, dayID: day.id,
+                                            version: plan.version, workout: workout,
+                                            focusedBlockIndex: sourceIndex,
+                                            focusedExecutionStepIndex: executionStepIndex
+                                        )
+                                    }
+                                    showingDayDetails = false
+                                }
+                            )
                             Button {
                                 pendingDayWorkoutEdit = WorkoutEditDestination(
                                     planID: plan.id, dayID: day.id,
