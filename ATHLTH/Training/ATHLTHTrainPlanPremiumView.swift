@@ -55,6 +55,8 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingPlanDetails = false
     @State private var showingDayDetails = false
     @State private var planDetailTab = 1
+    @State private var myPlansTab = 0
+    @State private var showingOriginalPlanManager = false
     @State private var browsingMyPlans = false
     @State private var showingTemplates = false
     @State private var showingEditor = false
@@ -1216,7 +1218,399 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
     }
 
-    private func studioPlanCover(_ plan: TrainingPlan) -> some View {
+    // Day details are the approved full-screen drill-down, not a duplicate
+    // always-expanded timeline on the Plan home screen.
+    private func referenceDayDetails(
+        _ day: TrainingPlanDay, plan: TrainingPlan
+    ) -> some View {
+        let workouts = day.sessions.filter { !$0.isExplicitRestDay }
+        return NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    Text(tr("Week \(min(max((selectedWeekIndex ?? currentWeekIndex(plan)) + 1, 1)) of \(plan.weeks.count) · \(plan.title)",
+                            "Uke \((selectedWeekIndex ?? currentWeekIndex(plan)) + 1) av \(plan.weeks.count) · \(plan.title)"))
+                        .font(.caption)
+                        .foregroundStyle(secondaryInk)
+                    if let workout = workouts.first {
+                        ZStack(alignment: .bottomLeading) {
+                            Image(premiumPlanHeroArt(plan))
+                                .resizable()
+                                .scaledToFill()
+                                .frame(height: 210)
+                                .frame(maxWidth: .infinity)
+                                .clipped()
+                            LinearGradient(colors: [.clear, .black.opacity(0.86)],
+                                           startPoint: .center, endPoint: .bottom)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(workout.title)
+                                    .font(.system(size: 26, weight: .semibold, design: .serif))
+                                HStack(spacing: 5) {
+                                    if let duration = ATHLTHPlannedWorkoutPresentation.duration(for: workout) {
+                                        Text(duration)
+                                    }
+                                    Text("·")
+                                    Text(workout.kind.title)
+                                }
+                                .font(.caption)
+                                if onStartWorkout != nil &&
+                                   !isPremiumPlanWorkoutCompleted(workout, plan: plan) &&
+                                   !session.isPlanSessionSkipped(
+                                       planID: plan.id, sessionID: workout.id
+                                   ) {
+                                    Button {
+                                        queuedLaunchPlanID = plan.id
+                                        queuedLaunchWorkout = workout
+                                        showingDayDetails = false
+                                    } label: {
+                                        HStack {
+                                            Spacer()
+                                            Text(tr("Start workout", "Start økt"))
+                                            Image(systemName: "arrow.right")
+                                            Spacer()
+                                        }
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(.white)
+                                        .frame(height: 42)
+                                        .background(warmGold.gradient,
+                                                    in: RoundedRectangle(cornerRadius: 12))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .foregroundStyle(.white)
+                            .padding(15)
+                        }
+                        .frame(height: 210)
+                        .clipShape(RoundedRectangle(cornerRadius: 18))
+                    }
+
+                    if workouts.isEmpty {
+                        ContentUnavailableView(
+                            tr("Rest day", "Hviledag"), systemImage: "leaf",
+                            description: Text(tr("No workouts scheduled for today.",
+                                                 "Ingen treningsøkter planlagt denne dagen."))
+                        )
+                    }
+
+                    ForEach(workouts) { workout in
+                        VStack(alignment: .leading, spacing: 13) {
+                            HStack {
+                                Image(systemName: workout.kind.systemImage)
+                                    .foregroundStyle(warmGold)
+                                Text(workout.title)
+                                    .font(.system(size: 18, weight: .semibold, design: .serif))
+                                Spacer()
+                                Menu {
+                                    Button {
+                                        showingDayDetails = false
+                                        editingWorkout = WorkoutEditDestination(
+                                            planID: plan.id, dayID: day.id,
+                                            version: plan.version, workout: workout
+                                        )
+                                    } label: {
+                                        Label(tr("Edit workout", "Rediger økt"),
+                                              systemImage: "pencil")
+                                    }
+                                    Button {
+                                        beginMovingWorkout(workout, day: day, plan: plan)
+                                        showingDayDetails = false
+                                    } label: {
+                                        Label(tr("Move workout", "Flytt økt"),
+                                              systemImage: "arrow.left.arrow.right")
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis")
+                                        .foregroundStyle(secondaryInk)
+                                        .frame(width: 38, height: 38)
+                                }
+                            }
+                            referenceWorkoutPhases(workout, day: day, plan: plan)
+                            Button {
+                                showingDayDetails = false
+                                editingWorkout = WorkoutEditDestination(
+                                    planID: plan.id, dayID: day.id,
+                                    version: plan.version, workout: workout,
+                                    quickAdd: "picker", quickPhase: .main
+                                )
+                            } label: {
+                                Label(tr("Add block", "Legg til blokk"), systemImage: "plus")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(warmGold)
+                                    .frame(maxWidth: .infinity, minHeight: 42)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(13)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                    }
+                }
+                .padding(16)
+            }
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .navigationTitle(planDayDate(day.dayIndex, plan: plan)
+                .formatted(.dateTime.weekday(.wide).day().month(.wide)))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingDayDetails = false
+                    } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                }
+            }
+        }
+    }
+
+    // Full plan overview with live week/day progress and no fictional metrics.
+    private func referencePlanDetails(_ plan: TrainingPlan) -> some View {
+        let progress = session.trainingPlanProgress(
+            plan, healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        let total = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+            .filter { !$0.isExplicitRestDay }.count
+        let completed = plan.weeks.flatMap(\.days).flatMap(\.sessions)
+            .filter { !$0.isExplicitRestDay &&
+                isPremiumPlanWorkoutCompleted($0, plan: plan) }.count
+        return NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ZStack(alignment: .bottomLeading) {
+                        Image(premiumPlanHeroArt(plan))
+                            .resizable()
+                            .scaledToFill()
+                            .frame(height: 196)
+                            .frame(maxWidth: .infinity)
+                            .clipped()
+                        LinearGradient(colors: [.clear, .black.opacity(0.81)],
+                                       startPoint: .center, endPoint: .bottom)
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text(session.activePlan?.id == plan.id ?
+                                 tr("Active plan", "Aktiv plan") :
+                                 tr("Saved plan", "Lagret plan"))
+                                .font(.caption.weight(.medium))
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 6)
+                                .foregroundStyle(graphite)
+                                .background(ATHLTHTrainDesign.paleGold,
+                                            in: Capsule())
+                            Spacer()
+                            Text(plan.title)
+                                .font(.system(size: 26, weight: .semibold, design: .serif))
+                                .foregroundStyle(.white)
+                            Text(tr("Your structure, your progress.",
+                                    "Din struktur og din progresjon."))
+                                .font(.caption)
+                                .foregroundStyle(.white.opacity(0.89))
+                        }
+                        .padding(14)
+                    }
+                    .frame(height: 196)
+                    .clipShape(RoundedRectangle(cornerRadius: 18))
+                    HStack(spacing: 8) {
+                        referencePlanMetric("\(plan.weeks.count)", tr("Weeks", "Uker"),
+                                            symbol: "calendar")
+                        referencePlanMetric("\(total)", tr("Workouts", "Økter"),
+                                            symbol: "dumbbell")
+                        referencePlanMetric("\(completed)/\(total)", tr("Completed", "Fullført"),
+                                            symbol: "checkmark.circle")
+                    }
+                    VStack(spacing: 7) {
+                        HStack {
+                            Text(tr("Overall progress", "Total fremdrift"))
+                            Spacer()
+                            Text("\(Int((min(max(progress.completionFraction, 0), 1) * 100).rounded())) %")
+                        }
+                        .font(.caption)
+                        ProgressView(value: min(max(progress.completionFraction, 0), 1))
+                            .tint(warmGold)
+                    }
+                    .padding(12)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                    HStack(spacing: 2) {
+                        ForEach(0..<4, id: \.self) { index in
+                            let title = [
+                                tr("Overview", "Oversikt"),
+                                tr("Weeks", "Uker"),
+                                tr("Workouts", "Økter"),
+                                tr("Statistics", "Statistikk")
+                            ][index]
+                            Button { planDetailTab = index } label: {
+                                Text(title)
+                                    .font(.system(size: 11,
+                                                  weight: planDetailTab == index ? .semibold : .regular))
+                                    .foregroundStyle(graphite)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.75)
+                                    .frame(maxWidth: .infinity, minHeight: 35)
+                                    .background(planDetailTab == index ? .white : .clear,
+                                                in: RoundedRectangle(cornerRadius: 10))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(planDetailTab == index ? .isSelected : [])
+                        }
+                    }
+                    .padding(3)
+                    .background(soft, in: RoundedRectangle(cornerRadius: 13))
+                    if planDetailTab == 1 {
+                        ForEach(Array(plan.weeks.enumerated()), id: \.element.id) { item in
+                            referencePlanWeekDetail(item.element, index: item.offset, plan: plan)
+                        }
+                    } else if planDetailTab == 2 {
+                        ForEach(Array(plan.weeks.enumerated()), id: \.element.id) { item in
+                            ForEach(item.element.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                                ForEach(day.sessions.filter { !$0.isExplicitRestDay }) { workout in
+                                    Button {
+                                        selectPremiumPlanWeek(item.offset)
+                                        selectedDayID = day.id
+                                        selectedWorkoutID = workout.id
+                                        showingPlanDetails = false
+                                    } label: {
+                                        HStack {
+                                            Image(systemName: workout.kind.systemImage)
+                                                .foregroundStyle(warmGold)
+                                            VStack(alignment: .leading) {
+                                                Text(workout.title).font(.subheadline.weight(.medium))
+                                                Text(tr("Week \(item.offset + 1)", "Uke \(item.offset + 1)"))
+                                                    .font(.caption2)
+                                                    .foregroundStyle(secondaryInk)
+                                            }
+                                            Spacer()
+                                            Image(systemName: "chevron.right")
+                                        }
+                                        .foregroundStyle(graphite)
+                                        .padding(11)
+                                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                    } else {
+                        VStack(alignment: .leading, spacing: 13) {
+                            Text(planDetailTab == 3 ?
+                                 tr("Progress based on completed workouts",
+                                    "Fremdrift basert på fullførte økter") :
+                                 tr("Your plan at a glance", "Planen din i korte trekk"))
+                                .font(.system(size: 21, weight: .semibold, design: .serif))
+                            Text(tr("\(completed) of \(total) workouts completed across \(plan.weeks.count) weeks.",
+                                    "\(completed) av \(total) økter fullført over \(plan.weeks.count) uker."))
+                                .font(.subheadline)
+                                .foregroundStyle(secondaryInk)
+                            ForEach(Array(plan.weeks.enumerated()), id: \.element.id) { item in
+                                referencePlanWeekDetail(item.element, index: item.offset, plan: plan)
+                            }
+                        }
+                    }
+                }
+                .padding(15)
+            }
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .navigationTitle(plan.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { showingPlanDetails = false } label: {
+                        Image(systemName: "chevron.left")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingPlanDetails = false
+                        showingMyPlans = true
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                }
+            }
+        }
+    }
+
+    private func referencePlanMetric(
+        _ value: String, _ caption: String, symbol: String
+    ) -> some View {
+        HStack(spacing: 7) {
+            Image(systemName: symbol)
+                .font(.caption)
+                .foregroundStyle(warmGold)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(value)
+                    .font(.subheadline.weight(.semibold))
+                Text(caption)
+                    .font(.system(size: 10))
+                    .foregroundStyle(secondaryInk)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(9)
+        .background(.white, in: RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func referencePlanWeekDetail(
+        _ week: TrainingPlanWeek, index: Int, plan: TrainingPlan
+    ) -> some View {
+        let all = week.days.flatMap(\.sessions).filter { !$0.isExplicitRestDay }
+        let done = all.filter { isPremiumPlanWorkoutCompleted($0, plan: plan) }.count
+        return VStack(alignment: .leading, spacing: 9) {
+            Button {
+                selectPremiumPlanWeek(index)
+                showingPlanDetails = false
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: done == all.count && !all.isEmpty ?
+                          "checkmark.circle.fill" : "circle.dotted")
+                        .foregroundStyle(done == all.count && !all.isEmpty ?
+                                         Color.green : warmGold)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tr("Week \(index + 1)", "Uke \(index + 1)"))
+                            .font(.system(size: 15, weight: .semibold, design: .serif))
+                        Text("\(done)/\(all.count) " + tr("workouts", "økter"))
+                            .font(.caption2)
+                            .foregroundStyle(secondaryInk)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(warmGold)
+                }
+            }
+            .buttonStyle(.plain)
+            if planDetailTab == 1 || planDetailTab == 0 {
+                ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                    Button {
+                        selectPremiumPlanWeek(index)
+                        selectedDayID = day.id
+                        showingPlanDetails = false
+                    } label: {
+                        HStack(spacing: 10) {
+                            Text(weekday(day.dayIndex, plan: plan))
+                                .font(.system(size: 10))
+                                .frame(width: 27, alignment: .leading)
+                            Image(systemName: day.sessions.first(where: { !$0.isExplicitRestDay })?
+                                  .kind.systemImage ?? "leaf")
+                                .foregroundStyle(warmGold)
+                                .frame(width: 21)
+                            Text(day.sessions.first(where: { !$0.isExplicitRestDay })?.title ??
+                                 tr("Rest", "Hvile"))
+                                .font(.system(size: 12))
+                                .lineLimit(1)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption2)
+                        }
+                        .foregroundStyle(graphite)
+                        .padding(.vertical, 7)
+                    }
+                    .buttonStyle(.plain)
+                    Divider().overlay(line.opacity(0.6))
+                }
+            }
+        }
+        .padding(13)
+        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+    }
+
+        private func studioPlanCover(_ plan: TrainingPlan) -> some View {
         premiumPlanHeader(plan)
     }
 
@@ -1325,7 +1719,40 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
         }
         .sheet(isPresented: $showingMyPlans) {
+            referenceMyPlansSheet
+        }
+        .sheet(isPresented: $showingOriginalPlanManager) {
             MyTrainingPlansLibraryView()
+        }
+        .sheet(isPresented: $showingPlanDetails) {
+            if let plan {
+                referencePlanDetails(plan)
+            }
+        }
+        .sheet(isPresented: $showingDayDetails, onDismiss: {
+            if let planID = queuedLaunchPlanID,
+               let workout = queuedLaunchWorkout {
+                queuedLaunchPlanID = nil
+                queuedLaunchWorkout = nil
+                if let fresh = session.trainingPlan(withID: planID)?
+                    .weeks.flatMap(\.days).flatMap(\.sessions)
+                    .first(where: { $0.id == workout.id }),
+                   !session.isPlanSessionSkipped(
+                       planID: planID, sessionID: fresh.id
+                   ),
+                   !session.isPlanSessionCompleted(
+                       planID: planID, sessionID: fresh.id,
+                       healthWorkouts: health.workouts,
+                       strengthHistory: strength.workoutHistory
+                   ) {
+                    onStartWorkout?(planID, fresh)
+                }
+            }
+        }) {
+            if let plan, let selectedWeek,
+               let day = premiumSelectedDay(in: selectedWeek, plan: plan) {
+                referenceDayDetails(day, plan: plan)
+            }
         }
         .sheet(isPresented: $showingWorkoutLibrary) {
             NavigationStack {
