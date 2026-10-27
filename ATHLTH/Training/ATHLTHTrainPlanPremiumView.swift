@@ -78,6 +78,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         var quickAdd: String? = nil
         var quickPhase: WorkoutPhaseKind? = nil
         var focusedBlockIndex: Int? = nil
+        var focusedExecutionStepIndex: Int? = nil
         var id: UUID { workout?.id ?? dayID }
     }
     @State private var editingWorkout: WorkoutEditDestination?
@@ -951,11 +952,12 @@ struct ATHLTHTrainPlanPremiumView: View {
             skipped: session.isPlanSessionSkipped(
                 planID: plan.id, sessionID: workout.id
             ),
-            onEditBlock: { sourceIndex in
+            onEditBlock: { sourceIndex, executionStepIndex in
                 editingWorkout = WorkoutEditDestination(
                     planID: plan.id, dayID: day.id,
                     version: plan.version, workout: workout,
-                    focusedBlockIndex: sourceIndex
+                    focusedBlockIndex: sourceIndex,
+                    focusedExecutionStepIndex: executionStepIndex
                 )
             }
         )
@@ -2315,7 +2317,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                 existingWorkout: destination.workout,
                 initialQuickAdd: destination.quickAdd,
                 initialPhase: destination.quickPhase,
-                initialFocusedBlockIndex: destination.focusedBlockIndex
+                initialFocusedBlockIndex: destination.focusedBlockIndex,
+                initialFocusedExecutionStepIndex: destination.focusedExecutionStepIndex
             )
         }
         .sheet(item: $editingTrainingPlaceWorkout) { destination in
