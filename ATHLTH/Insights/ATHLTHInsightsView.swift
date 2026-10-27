@@ -395,7 +395,7 @@ struct ATHLTHInsightsView: View {
                 ZStack {
                     Circle()
                         .trim(from: 0.10, to: 0.90)
-                        .stroke(ATHLTHTrainDesign.paleGold, style:
+                         .stroke(ATHLTHInsightsStyle.track, style:
                             StrokeStyle(lineWidth: 12, lineCap: .round))
                         .rotationEffect(.degrees(90))
                     Circle()
@@ -403,8 +403,8 @@ struct ATHLTHInsightsView: View {
                               to: 0.10 + 0.80 * CGFloat(health.recovery.score ?? 0) / 100)
                         .stroke(
                             AngularGradient(
-                                colors: [ATHLTHTrainDesign.paleGold, ATHLTHTrainDesign.gold,
-                                         ATHLTHTrainDesign.bronze],
+                                colors: [Color(red: 0.89, green: 0.84, blue: 0.76),
+                                         ATHLTHInsightsStyle.accent],
                                 center: .center
                             ),
                             style: StrokeStyle(lineWidth: 12, lineCap: .round)
@@ -928,15 +928,20 @@ struct ATHLTHInsightsView: View {
     private var pulseDetail: String {
         switch health.recovery.state {
         case .ready:
-            return "Your current recovery signals are supportive of a normal training day."
+            return tr("Your recovery signals support a normal training day.",
+                      "Restitusjonssignalene støtter en normal treningsdag.")
         case .balanced:
-            return "Your current signals look broadly steady. Use how you feel and the planned session together."
+            return tr("Your signals are steady. Adjust the plan to how you feel.",
+                      "Signalene er stabile. Tilpass planen til hvordan du føler deg.")
         case .takeItEasy:
-            return "Some recovery signals are softer than your recent baseline. Keep intensity flexible."
+            return tr("Some signals are below your recent baseline. Keep intensity flexible.",
+                      "Noen signaler ligger under normalen din. Tilpass intensiteten.")
         case .recover:
-            return "Recovery signals currently point toward a lighter day and more recovery focus."
+            return tr("Your recent signals suggest prioritizing a lighter day.",
+                      "De siste signalene tyder på at en roligere dag kan være lurt.")
         case .buildingBaseline:
-            return "ATHLTH is still learning enough recent sleep, HRV and resting-heart-rate data to establish your baseline."
+            return tr("ATHLTH is establishing your personal baseline from recent health data.",
+                      "ATHLTH etablerer din personlige normal ut fra helsedata.")
         }
     }
 
