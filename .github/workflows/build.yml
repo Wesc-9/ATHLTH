@@ -80,6 +80,8 @@ jobs:
     runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
+      - name: Guard Insights tab routing and reference design
+        run: python3 scripts/audit_insights_entrypoints.py
       - name: Select Xcode 27
         run: sudo xcode-select -s /Applications/Xcode_27.0.app/Contents/Developer
       - name: Fast Swift syntax preflight
