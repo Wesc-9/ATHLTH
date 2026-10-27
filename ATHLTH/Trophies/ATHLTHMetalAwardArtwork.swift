@@ -421,6 +421,15 @@ struct ATHLTHGoldPrestigeCupArtwork: View {
     private let polishedGold = Color(red: 1.00, green: 0.91, blue: 0.64)
     private let nearBlack = Color(red: 0.12, green: 0.12, blue: 0.14)
 
+    private var plateText: String {
+        guard size >= 145, isUnlocked, let engravedName else {
+            return "ATHLTH"
+        }
+        let value = engravedName.trimmingCharacters(
+            in: .whitespacesAndNewlines).uppercased()
+        return value.isEmpty ? "ATHLTH" : value
+    }
+
     private var spunGold: LinearGradient {
         LinearGradient(
             stops: [
@@ -564,13 +573,7 @@ struct ATHLTHGoldPrestigeCupArtwork: View {
                 .frame(width: size * 0.39, height: size * 0.075)
                 .overlay {
                     if size >= 78 {
-                        Text(size >= 145 && isUnlocked
-                            ? (engravedName?.trimmingCharacters(
-                                  in: .whitespacesAndNewlines)
-                                  .uppercased().isEmpty == false
-                                  ? engravedName!.uppercased()
-                                  : "ATHLTH")
-                            : "ATHLTH")
+                        Text(plateText)
                             .font(.system(size: size * 0.057,
                                           weight: .heavy, design: .rounded))
                             .tracking(size * 0.004)
