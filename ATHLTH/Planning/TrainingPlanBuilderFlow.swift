@@ -6806,29 +6806,27 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         // Restore both Simple and Advanced structural preferences regardless
         // of which mode was shown when this draft was last saved.
-        do {
-            if let equipmentValue = draft.equipmentContext,
-               let restored = EquipmentContext(rawValue: equipmentValue) {
-                equipment = restored
-            }
-            if let minutes = draft.weeklyTimeBudgetMinutes {
-                weeklyTimeBudgetMinutes = minutes
-                let perSession = Double(minutes) / Double(max(1, selectedDays.count))
-                advancedSessionMinutes = min(180, max(5, Int((perSession / 5).rounded()) * 5))
-            }
-            workoutKindOverridesByDay = (draft.workoutKindsByDay ?? [:])
-                .compactMapValues(WorkoutKind.init(rawValue:))
-            workoutTitleOverridesByDay = draft.workoutPresetsByDay ?? [:]
-            workoutMinutesByDay = draft.workoutMinutesByDay ?? [:]
-            structuredWorkoutsByDay = draft.structuredWorkoutsByDay ?? [:]
-            weekDayEdits = draft.weekDayEdits ?? [:]
-            weekPlanningApproach = draft.planningApproach.flatMap(
-                ATHLTHPlanWeekPlanningApproach.init(rawValue:)
-            )
-            guidedDayCursor = min(max(0, draft.guidedDayCursor ?? 0), weekCount * 7)
-            firstGuidedWeekDecisionMade = draft.firstGuidedWeekDecisionMade ?? false
-            selectedPlanWeekIndex = min(max(0, draft.selectedPlanWeekIndex ?? 0), weekCount - 1)
+        if let equipmentValue = draft.equipmentContext,
+           let restored = EquipmentContext(rawValue: equipmentValue) {
+            equipment = restored
         }
+        if let minutes = draft.weeklyTimeBudgetMinutes {
+            weeklyTimeBudgetMinutes = minutes
+            let perSession = Double(minutes) / Double(max(1, selectedDays.count))
+            advancedSessionMinutes = min(180, max(5, Int((perSession / 5).rounded()) * 5))
+        }
+        workoutKindOverridesByDay = (draft.workoutKindsByDay ?? [:])
+            .compactMapValues(WorkoutKind.init(rawValue:))
+        workoutTitleOverridesByDay = draft.workoutPresetsByDay ?? [:]
+        workoutMinutesByDay = draft.workoutMinutesByDay ?? [:]
+        structuredWorkoutsByDay = draft.structuredWorkoutsByDay ?? [:]
+        weekDayEdits = draft.weekDayEdits ?? [:]
+        weekPlanningApproach = draft.planningApproach.flatMap(
+            ATHLTHPlanWeekPlanningApproach.init(rawValue:)
+        )
+        guidedDayCursor = min(max(0, draft.guidedDayCursor ?? 0), weekCount * 7)
+        firstGuidedWeekDecisionMade = draft.firstGuidedWeekDecisionMade ?? false
+        selectedPlanWeekIndex = min(max(0, draft.selectedPlanWeekIndex ?? 0), weekCount - 1)
         simpleMinutes = draft.simpleMinutes ?? simpleMinutes
         if let kinds = draft.simpleActivityKinds {
             let restored = Set(kinds.compactMap(WorkoutKind.init(rawValue:)))
@@ -6860,26 +6858,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             entryPlanFocus: focus.rawValue,
             entryPlanGoal: goal.rawValue,
             preferredDayIndexes: selectedDays.sorted(),
-            varyWeekdays: mode == .advanced ? varyWeekdays : false,
+            // Both modes write their safe structural settings into the same
+            // draft; the visible mode must never remove the other mode's data.
+            varyWeekdays: varyWeekdays,
             linkedGoalIDs: Array(selectedGoalIDs),
-            equipmentContext: mode == .advanced ? equipment.rawValue : nil,
-            weeklyTimeBudgetMinutes: mode == .advanced
-                ? weeklyTimeBudgetMinutes : nil,
-            workoutKindsByDay: mode == .advanced
-                ? workoutKindOverridesByDay.mapValues(\.rawValue) : nil,
-            workoutPresetsByDay: mode == .advanced
-                ? workoutTitleOverridesByDay.filter { day, title in
-                    subtypeTitles(for: resolvedWorkoutKind(for: day)).contains(title)
-                } : nil,
-            workoutMinutesByDay: mode == .advanced
-                ? workoutMinutesByDay : nil,
-            structuredWorkoutsByDay: mode == .advanced
-                ? structuredWorkoutsByDay : nil,
-            weekDayEdits: mode == .advanced ? weekDayEdits : nil,
-            planningApproach: mode == .advanced ? weekPlanningApproach?.rawValue : nil,
-            guidedDayCursor: mode == .advanced ? guidedDayCursor : nil,
-            firstGuidedWeekDecisionMade: mode == .advanced ? firstGuidedWeekDecisionMade : nil,
-            selectedPlanWeekIndex: mode == .advanced ? selectedPlanWeekIndex : nil,
+            equipmentContext: equipment.rawValue,
+            weeklyTimeBudgetMinutes: weeklyTimeBudgetMinutes,
+            workoutKindsByDay: workoutKindOverridesByDay.mapValues(\.rawValue),
+            workoutPresetsByDay: workoutTitleOverridesByDay.filter { day, title in
+                let chosenKind = workoutKindOverridesByDay[day] ??
+                    suggestedKind(slot: trainingSlot(for: day))
+                return subtypeTitles(for: chosenKind).contains(title)
+            },
+            workoutMinutesByDay: workoutMinutesByDay,
+            structuredWorkoutsByDay: structuredWorkoutsByDay,
+            weekDayEdits: weekDayEdits,
+            planningApproach: weekPlanningApproach?.rawValue,
+            guidedDayCursor: guidedDayCursor,
+            firstGuidedWeekDecisionMade: firstGuidedWeekDecisionMade,
+            selectedPlanWeekIndex: selectedPlanWeekIndex,
             editorDay: mode == .advanced
                 ? (composingAdvancedDay?.id ?? selectingLibraryDay?.id ?? editingWeekDay?.id)
                 : nil,
@@ -6887,9 +6884,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 : composingAdvancedDay != nil ? "studio"
                 : selectingLibraryDay != nil ? "library"
                 : editingWeekDay != nil ? "day" : nil,
-            simpleMinutes: mode == .basic ? simpleMinutes : nil,
-            simpleActivityKinds: mode == .basic
-                ? simpleActivities.map(\.rawValue).sorted() : nil
+            simpleMinutes: simpleMinutes,
+            simpleActivityKinds: simpleActivities.map(\.rawValue).sorted()
         )
         draftStore.save(draft, userID: session.profile.userID, draftID: draftID)
     }
