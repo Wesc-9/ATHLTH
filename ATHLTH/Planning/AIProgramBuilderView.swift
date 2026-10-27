@@ -2234,10 +2234,12 @@ struct AIProgramBuilderView: View {
             aiChoosesFrequency: aiChoosesFrequency && mode == .generate,
             preferredDays: availableDays.sorted(),
             sessionDurationMinutes: sessionDurationMinutes,
-            userNotes: historyContext + String(coachContext.prefix(1900)) + "\nAdditional preferences: " + String(userNotes.prefix(500)),
-            goals: selectedGoals.isEmpty
-                ? [AIProgramGoalInput(focus: trainingFocus)]
-                : selectedGoals.map(AIProgramGoalInput.init),
+            userNotes: String(coachContext.prefix(2_200)) +
+                "\nAdditional preferences: " + String(userNotes.prefix(400)) +
+                "\nRecent training context: " + String(historyContext.prefix(400)),
+            // A linked ATHLTH goal is optional. Direction and outcomes are
+            // carried in the explicit Coach intake when this array is empty.
+            goals: selectedGoals.map(AIProgramGoalInput.init),
             existingDays: existingDays
         )
 
