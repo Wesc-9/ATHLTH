@@ -75,6 +75,18 @@ final class ATHLTHAIProgramIntakeTests: XCTestCase {
         XCTAssertTrue(intake.coachContext.contains("not authorized sharing"))
     }
 
+    func testOptOutDoesNotRequireAdditionalInjuryFields() {
+        var intake = completeIntake()
+        intake.injuryStatus = .considerations
+        intake.injuryAreas = []
+        intake.injurySeverity = nil
+        intake.injuryRestriction = nil
+        intake.healthSharingAuthorized = false
+        XCTAssertTrue(intake.isComplete)
+        intake.healthSharingAuthorized = true
+        XCTAssertTrue(intake.validationIssues.contains("injuryAreas"))
+    }
+
     private func completeIntake() -> ATHLTHAIProgramIntake {
         var intake = ATHLTHAIProgramIntake()
         intake.trainingTypes = [.running]
