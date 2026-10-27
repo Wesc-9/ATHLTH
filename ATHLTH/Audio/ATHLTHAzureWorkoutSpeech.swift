@@ -13,7 +13,14 @@ enum ATHLTHAzureCoachVoice {
             return nil
         }
         let value = String(identifier.dropFirst(prefix.count))
-        return supported.contains(value) ? value : nil
+        if supported.contains(value) { return value }
+        // New Norwegian neural voices are verified against Azure's live voice
+        // directory on the server. Accept only safe, full Azure ShortNames.
+        let range = value.range(
+            of: #"^nb-NO-[A-Za-z0-9]+Neural$"#,
+            options: .regularExpression
+        )
+        return range != nil ? value : nil
     }
 
     static var consentGranted: Bool {
@@ -49,7 +56,8 @@ final class ATHLTHAzureWorkoutSpeech:
     private var fallbackHandler: (() -> Void)?
     private(set) var isBusy = false
     private var ownsAudioSession = false
-    private var offlineForWorkout = false
+    private var consecutiveFailures = 0
+    private var retryAfter: Date?
 
     @discardableResult
     func begin(
@@ -61,7 +69,8 @@ final class ATHLTHAzureWorkoutSpeech:
     ) -> Bool {
         guard let key = ATHLTHAzureCoachVoice.key(voiceIdentifier),
               ATHLTHAzureCoachVoice.consentGranted,
-              !offlineForWorkout,
+              consecutiveFailures < 3,
+              (retryAfter == nil || Date() >= retryAfter!),
               !phrase.isEmpty,
               phrase.count <= 220,
               !isBusy
@@ -75,7 +84,7 @@ final class ATHLTHAzureWorkoutSpeech:
 
         // Never wait for an external service before giving workout feedback.
         timeoutTask = Task { [weak self] in
-            try? await Task.sleep(for: .seconds(3.5))
+            try? await Task.sleep(for: .seconds(5.0))
             guard !Task.isCancelled else { return }
             self?.fallback(generation)
         }
@@ -115,6 +124,8 @@ final class ATHLTHAzureWorkoutSpeech:
                         return
                     }
                     self.audio = player
+                    self.consecutiveFailures = 0
+                    self.retryAfter = nil
                     self.timeoutTask?.cancel()
                     self.requestTask = nil
                     // Some Bluetooth routes omit AVAudioPlayer's finish
@@ -144,8 +155,10 @@ final class ATHLTHAzureWorkoutSpeech:
 
     private func fallback(_ generation: UUID) {
         guard identity == generation, isBusy else { return }
-        // Avoid hammering a broken provider, missing entitlement or quota.
-        offlineForWorkout = true
+        // Transient cold starts should not disable the chosen voice for the
+        // entire session. Retry at most twice with a short backoff.
+        consecutiveFailures += 1
+        retryAfter = Date().addingTimeInterval(30 * Double(consecutiveFailures))
         let callback = fallbackHandler
         cleanup()
         callback?()
