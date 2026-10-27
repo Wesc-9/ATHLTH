@@ -1610,7 +1610,253 @@ struct ATHLTHTrainPlanPremiumView: View {
         .background(.white, in: RoundedRectangle(cornerRadius: 16))
     }
 
-        private func studioPlanCover(_ plan: TrainingPlan) -> some View {
+        // Personal plan collection. Status comes from the real plan library and
+    // draft store; the legacy manager remains available for lifecycle actions.
+    private var referenceMyPlansSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    HStack(spacing: 6) {
+                        ForEach(0..<4, id: \.self) { index in
+                            let title = [
+                                tr("Active", "Aktiv"),
+                                tr("Drafts", "Utkast"),
+                                tr("Saved", "Lagrede"),
+                                tr("Archive", "Arkiv")
+                            ][index]
+                            Button { myPlansTab = index } label: {
+                                Text(title)
+                                    .font(.system(size: 11,
+                                                  weight: index == myPlansTab ? .semibold : .medium))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .foregroundStyle(index == myPlansTab ? Color.white : graphite)
+                                    .frame(maxWidth: .infinity, minHeight: 34)
+                                    .background(index == myPlansTab ? warmGold : .white,
+                                                in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(index == myPlansTab ? .isSelected : [])
+                        }
+                    }
+                    .padding(4)
+                    .background(soft, in: RoundedRectangle(cornerRadius: 16))
+
+                    if myPlansTab == 0 {
+                        if let active = session.activePlan {
+                            Button {
+                                focusedPlanID = active.id
+                                browsingMyPlans = false
+                                selectedWeekIndex = nil
+                                showingMyPlans = false
+                            } label: {
+                                ZStack(alignment: .bottomLeading) {
+                                    Image(premiumPlanHeroArt(active))
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(height: 180)
+                                        .frame(maxWidth: .infinity)
+                                        .clipped()
+                                    LinearGradient(colors: [.clear, .black.opacity(0.87)],
+                                                   startPoint: .center, endPoint: .bottom)
+                                    VStack(alignment: .leading, spacing: 7) {
+                                        Text(tr("Active plan", "Aktiv plan"))
+                                            .font(.caption.weight(.medium))
+                                            .foregroundStyle(graphite)
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 5)
+                                            .background(ATHLTHTrainDesign.paleGold,
+                                                        in: Capsule())
+                                        Spacer(minLength: 0)
+                                        Text(active.title)
+                                            .font(.system(size: 24, weight: .semibold, design: .serif))
+                                            .foregroundStyle(.white)
+                                        Text(tr("\(active.weeks.count) weeks",
+                                                "\(active.weeks.count) uker"))
+                                            .font(.caption)
+                                            .foregroundStyle(.white.opacity(0.85))
+                                    }
+                                    .padding(14)
+                                }
+                                .frame(height: 180)
+                                .clipShape(RoundedRectangle(cornerRadius: 18))
+                            }
+                            .buttonStyle(.plain)
+
+                            VStack(spacing: 0) {
+                                referenceManagementAction(
+                                    tr("See entire plan", "Se hele planen"),
+                                    symbol: "calendar") {
+                                        focusedPlanID = active.id
+                                        showingMyPlans = false
+                                        planDetailTab = 1
+                                        showingPlanDetails = true
+                                    }
+                                referenceManagementAction(
+                                    tr("Edit plan", "Rediger plan"),
+                                    symbol: "pencil") {
+                                        showingMyPlans = false
+                                        editingPlan = active
+                                    }
+                                referenceManagementAction(
+                                    tr("Pause, deactivate or change plan",
+                                       "Sett på pause, deaktiver eller bytt plan"),
+                                    symbol: "pause") {
+                                        showingOriginalPlanManager = true
+                                    }
+                            }
+                            .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        } else {
+                            referencePlanCollectionEmpty(
+                                tr("No active plan", "Ingen aktiv plan"),
+                                tr("Choose a saved plan or build your first one.",
+                                   "Velg en lagret plan eller opprett din første.")
+                            )
+                        }
+                    } else if myPlansTab == 1 {
+                        if unfinishedPlanDrafts.isEmpty {
+                            referencePlanCollectionEmpty(
+                                tr("No drafts", "Ingen utkast"),
+                                tr("Unfinished plans appear here.",
+                                   "Uferdige planer vises her.")
+                            )
+                        } else {
+                            ForEach(unfinishedPlanDrafts) { draft in
+                                continuePlanDraftCard(draft)
+                            }
+                        }
+                    } else {
+                        let items = session.trainingPlans.filter { item in
+                            if myPlansTab == 3 { return planLibraryPriority(item) == 3 }
+                            return item.id != session.activePlan?.id &&
+                                   planLibraryPriority(item) != 3
+                        }
+                        if items.isEmpty {
+                            referencePlanCollectionEmpty(
+                                tr("No plans here yet", "Ingen planer her ennå"),
+                                tr("Your programs will be stored here.",
+                                   "Treningsplanene dine blir lagret her.")
+                            )
+                        } else {
+                            ForEach(items) { item in
+                                Button {
+                                    focusedPlanID = item.id
+                                    browsingMyPlans = false
+                                    selectedWeekIndex = nil
+                                    showingMyPlans = false
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        Image(premiumPlanHeroArt(item))
+                                            .resizable()
+                                            .scaledToFill()
+                                            .frame(width: 71, height: 66)
+                                            .clipped()
+                                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text(item.title)
+                                                .font(.system(size: 16,
+                                                              weight: .semibold,
+                                                              design: .serif))
+                                            Text(tr("\(item.weeks.count) weeks",
+                                                    "\(item.weeks.count) uker")
+                                                 + " · " + planLibraryStatus(item))
+                                                .font(.caption2)
+                                                .foregroundStyle(secondaryInk)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(warmGold)
+                                    }
+                                    .foregroundStyle(graphite)
+                                    .padding(9)
+                                    .background(.white,
+                                                in: RoundedRectangle(cornerRadius: 15))
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    Button {
+                        showingOriginalPlanManager = true
+                    } label: {
+                        Label(tr("Manage plans", "Administrer planer"),
+                              systemImage: "slider.horizontal.3")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 45)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                .padding(15)
+            }
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .navigationTitle(tr("My plans", "Mine planer"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingMyPlans = false
+                    } label: {
+                        Image(systemName: "xmark")
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingMyPlans = false
+                        beginNewPlanCreation()
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(warmGold)
+                    }
+                }
+            }
+            .sheet(isPresented: $showingOriginalPlanManager) {
+                MyTrainingPlansLibraryView()
+            }
+        }
+    }
+
+    private func referenceManagementAction(
+        _ title: String, symbol: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .foregroundStyle(warmGold)
+                    .frame(width: 23)
+                Text(title)
+                    .font(.subheadline)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(secondaryInk)
+            }
+            .foregroundStyle(graphite)
+            .padding(.horizontal, 15)
+            .frame(minHeight: 50)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func referencePlanCollectionEmpty(
+        _ title: String, _ explanation: String
+    ) -> some View {
+        VStack(spacing: 10) {
+            Image(systemName: "calendar")
+                .font(.system(size: 28, weight: .light))
+                .foregroundStyle(warmGold)
+            Text(title)
+                .font(.system(size: 21, weight: .semibold, design: .serif))
+            Text(explanation)
+                .font(.subheadline)
+                .foregroundStyle(secondaryInk)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 160)
+        .padding(16)
+        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+    }
+
+    private func studioPlanCover(_ plan: TrainingPlan) -> some View {
         premiumPlanHeader(plan)
     }
 
@@ -1720,9 +1966,6 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .sheet(isPresented: $showingMyPlans) {
             referenceMyPlansSheet
-        }
-        .sheet(isPresented: $showingOriginalPlanManager) {
-            MyTrainingPlansLibraryView()
         }
         .sheet(isPresented: $showingPlanDetails) {
             if let plan {
