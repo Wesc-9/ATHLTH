@@ -699,25 +699,15 @@ struct StrengthAIExercisePlannerView: View {
                             alignment: .top,
                             spacing: 11
                         ) {
-                            Text(
-                                "\(index + 1)"
-                            )
-                            .font(
-                                .caption.bold()
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .accent
-                            )
-                            .frame(
-                                width: 27,
-                                height: 27
-                            )
-                            .background(
-                                ATHLTHTheme
-                                    .accentSoft,
-                                in: Circle()
-                            )
+                            ATHLTHAIExerciseSuggestionImage(entry: entry)
+                                .overlay(alignment: .topLeading) {
+                                    Text("\(index + 1)")
+                                        .font(.system(size: 10, weight: .bold))
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                        .frame(width: 22, height: 22)
+                                        .background(.regularMaterial, in: Circle())
+                                        .padding(5)
+                                }
 
                             VStack(
                                 alignment:
@@ -1308,6 +1298,44 @@ struct StrengthAIExercisePlannerView: View {
                     style: .continuous
                 )
         )
+    }
+}
+
+
+private struct ATHLTHAIExerciseSuggestionImage: View {
+    let entry: ExerciseLibraryEntry
+
+    var body: some View {
+        ZStack {
+            ATHLTHPlanDesign.warmSurface
+
+            if let url = entry.exercise.imageURL {
+                if url.isFileURL, let picture = UIImage(contentsOfFile: url.path) {
+                    Image(uiImage: picture)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    ATHLTHStorageImage(url: url) { phase in
+                        if let image = phase.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            placeholder
+                        }
+                    }
+                }
+            } else {
+                placeholder
+            }
+        }
+        .frame(width: 72, height: 72)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .accessibilityLabel(entry.name)
+    }
+
+    private var placeholder: some View {
+        Image(systemName: "figure.strengthtraining.traditional")
+            .font(.title2)
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
     }
 }
 
