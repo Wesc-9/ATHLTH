@@ -11,7 +11,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
     let workouts: [ATHLTHPlanStructuredWorkoutBlueprint]
     let isRestDay: Bool
     let onSelectDay: (Int) -> Void
-    let onAddExercise: (WorkoutPhaseKind) -> Void
+    let onAddExercise: (WorkoutPhaseKind, Int) -> Void
     let onAddWorkout: () -> Void
     let onQuick: (String) -> Void
     let onEditWorkout: (Int) -> Void
@@ -145,7 +145,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 .font(.caption).foregroundStyle(secondary)
             HStack(spacing: 8) {
                 actionButton(tr("Exercise", "Øvelse"), symbol: "dumbbell") {
-                    onAddExercise(.main)
+                    onAddExercise(.main, 0)
                 }
                 actionButton(tr("Workout", "Treningsøkt"), symbol: "list.bullet") {
                     onAddWorkout()
@@ -206,11 +206,11 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 }
             }
             .buttonStyle(.plain)
-            phaseSection(.warmup, workout: workout)
-            phaseSection(.main, workout: workout)
-            phaseSection(.cooldown, workout: workout)
+            phaseSection(.warmup, workout: workout, workoutIndex: index)
+            phaseSection(.main, workout: workout, workoutIndex: index)
+            phaseSection(.cooldown, workout: workout, workoutIndex: index)
             if workout.blocks.contains(where: { $0.resolvedPhase == .recovery }) {
-                phaseSection(.recovery, workout: workout)
+                phaseSection(.recovery, workout: workout, workoutIndex: index)
             }
             if index == 0 {
                 Button(action: onAddWorkout) {
@@ -234,7 +234,8 @@ struct ATHLTHAdvancedGuidedDayView: View {
 
     private func phaseSection(
         _ phase: WorkoutPhaseKind,
-        workout: ATHLTHPlanStructuredWorkoutBlueprint
+        workout: ATHLTHPlanStructuredWorkoutBlueprint,
+        workoutIndex: Int
     ) -> some View {
         let blocks = workout.blocks.filter { $0.resolvedPhase == phase }
         return VStack(alignment: .leading, spacing: 5) {
@@ -247,7 +248,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 Text("(\(blocks.count))")
                     .font(.caption2).foregroundStyle(secondary)
                 Spacer()
-                Button { onAddExercise(phase) } label: {
+                Button { onAddExercise(phase, workoutIndex) } label: {
                     Image(systemName: "plus")
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(gold)
@@ -316,7 +317,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                     quick("interval", "waveform.path", tr("Interval", "Intervall"))
                     quick("superset", "link", "Supersett")
                     quick("rest", "pause.fill", tr("Rest", "Pause"))
-                    Button { onAddExercise(.cooldown) } label: {
+                    Button { onAddExercise(.cooldown, 0) } label: {
                         Label(tr("Stretching", "Uttøying"), systemImage: "figure.cooldown")
                     }
                 }
