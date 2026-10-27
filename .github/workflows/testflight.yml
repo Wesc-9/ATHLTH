@@ -31,11 +31,13 @@ on:
       - release/v1.9.7
       - release/v1.9.8
       - release/v1.9.9
+      - release/v2.0.0
     paths:
       - .github/testflight-trigger
 
 concurrency:
-  group: athlth-testflight
+  # Independent release trains must not cancel one another's authorized upload.
+  group: athlth-testflight-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:

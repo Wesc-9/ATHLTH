@@ -7,6 +7,7 @@ on:
       - release/v1.9.2
       - release/v1.9.3
       - release/v1.9.4
+      - release/v2.0.0
     paths:
       - .github/workflows/hybrid-engine-tests.yml
       - .github/workflows/launch-smoke.yml
