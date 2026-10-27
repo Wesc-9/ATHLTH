@@ -1158,8 +1158,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     // AnyView boundary just like the other stages in this large wizard.
     private var goalChoice: some View {
         ScrollView {
-            LazyVStack(alignment: .leading, spacing: 15) {
-                sourceChoiceHeader
+            LazyVStack(alignment: .leading, spacing: 16) {
+                referenceGoalProgressHeader
                 ATHLTHPlanGoalEntryView(
                     area: selectedGoalArea,
                     selectedChoice: selectedGoalChoice,
@@ -1183,6 +1183,72 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .scrollIndicators(.hidden)
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+    }
+
+    // Goal selection is the first actual plan-building screen; the preceding
+    // simple/advanced chooser is an entry route rather than a plan detail.
+    // Keep the canonical journey untouched while matching the approved 1/5
+    // visual on this step, including the Cancel action and five-step bar.
+    private var referenceGoalProgressHeader: some View {
+        VStack(spacing: 13) {
+            HStack(spacing: 8) {
+                Button {
+                    dismiss()
+                } label: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    ))
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(sourceInk)
+                    .padding(.horizontal, 13)
+                    .frame(height: 38)
+                    .background(
+                        .white.opacity(0.84),
+                        in: Capsule()
+                    )
+                    .overlay {
+                        Capsule()
+                            .strokeBorder(sourceGold.opacity(0.12), lineWidth: 0.7)
+                    }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Cancel plan creation",
+                    norwegian: "Avbryt planopprettelse"
+                ))
+
+                Spacer(minLength: 0)
+
+                Text("ATHLTH / PLAN")
+                    .font(.system(size: 11, weight: .semibold))
+                    .tracking(2.6)
+                    .foregroundStyle(sourceInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+
+                Spacer(minLength: 0)
+
+                Text("1 / 5")
+                    .font(.system(size: 14, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(sourceInk)
+                    .frame(width: 49, alignment: .trailing)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Step 1 of 5", norwegian: "Steg 1 av 5"
+                    ))
+            }
+
+            HStack(spacing: 4) {
+                ForEach(0..<5, id: \.self) { index in
+                    Capsule()
+                        .fill(index == 0 ? sourceGold :
+                              Color(red: 0.87, green: 0.85, blue: 0.82))
+                        .frame(height: 3)
+                }
+            }
+            .accessibilityHidden(true)
+        }
+        .padding(.top, 4)
     }
 
     private func selectGoalArea(_ newArea: ATHLTHPlanGoalArea) {
