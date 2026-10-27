@@ -479,9 +479,9 @@ struct AIProgramBuilderView: View {
                     ForEach(goalStore.activeGoals) { goal in
                         Button {
                             if selectedGoalIDs.contains(goal.id) {
-                                selectedGoalIDs.remove(goal.id)
+                                selectedGoalIDs.removeAll()
                             } else {
-                                selectedGoalIDs.insert(goal.id)
+                                selectedGoalIDs = [goal.id]
                             }
                         } label: {
                             HStack(spacing: 10) {
@@ -784,14 +784,29 @@ struct AIProgramBuilderView: View {
             }
 
             if !standaloneIntake.validationIssues.isEmpty {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Complete the required choices before Coach builds the plan.",
-                        norwegian: "Fullfør de nødvendige valgene før Coach lager planen."),
-                    systemImage: "info.circle"
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(
+                        ATHLTHLocalization.format(
+                            english: "%d required choices remain",
+                            norwegian: "%d nødvendige valg gjenstår",
+                            standaloneIntake.validationIssues.count
+                        ),
+                        systemImage: "info.circle"
+                    )
+                    .font(.subheadline.bold())
+
+                    ForEach(standaloneIntake.validationIssues, id: \.self) { issue in
+                        Text("• \(localizedMissingRequirement(issue))")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    }
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    ATHLTHTrainDesign.paleGold.opacity(0.45),
+                    in: RoundedRectangle(cornerRadius: 14)
                 )
-                .font(.caption)
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
             }
 
             Button {
@@ -941,6 +956,45 @@ struct AIProgramBuilderView: View {
         shareLimitationsWithAI =
             standaloneIntake.injuryStatus == .considerations &&
             standaloneIntake.healthSharingAuthorized
+    }
+
+    private func localizedMissingRequirement(_ issue: String) -> String {
+        switch issue {
+        case "trainingTypes":
+            return ATHLTHLocalization.choose(english: "Choose what you want to train", norwegian: "Velg hva du ønsker å trene")
+        case "outcomes":
+            return ATHLTHLocalization.choose(english: "Choose what you want to achieve", norwegian: "Velg hva du ønsker å oppnå")
+        case "muscleGroups":
+            return ATHLTHLocalization.choose(english: "Choose muscle focus", norwegian: "Velg muskelgrupper")
+        case "experience":
+            return ATHLTHLocalization.choose(english: "Choose experience level", norwegian: "Velg erfaringsnivå")
+        case "durationWeeks":
+            return ATHLTHLocalization.choose(english: "Choose plan duration", norwegian: "Velg planens varighet")
+        case "sessionsPerWeek":
+            return ATHLTHLocalization.choose(english: "Choose sessions per week", norwegian: "Velg antall økter per uke")
+        case "availableDays", "availableDayCount":
+            return ATHLTHLocalization.choose(english: "Choose enough available training days", norwegian: "Velg nok tilgjengelige treningsdager")
+        case "sessionDurationMinutes":
+            return ATHLTHLocalization.choose(english: "Choose time per session", norwegian: "Velg tid per økt")
+        case "locations":
+            return ATHLTHLocalization.choose(english: "Choose training location", norwegian: "Velg treningssted")
+        case "locationBalance":
+            return ATHLTHLocalization.choose(english: "Set the gym/outdoor balance", norwegian: "Angi fordeling mellom ute og gym")
+        case "equipment":
+            return ATHLTHLocalization.choose(english: "Choose available equipment or bodyweight", norwegian: "Velg tilgjengelig utstyr eller kroppsvekt")
+        case "injuryStatus":
+            return ATHLTHLocalization.choose(english: "Confirm injury status", norwegian: "Bekreft skadestatus")
+        case "injuryAreas":
+            return ATHLTHLocalization.choose(english: "Choose affected areas", norwegian: "Velg berørte områder")
+        case "injurySeverity":
+            return ATHLTHLocalization.choose(english: "Choose injury severity", norwegian: "Velg hvor alvorlig skaden er")
+        case "injuryRestriction":
+            return ATHLTHLocalization.choose(english: "Choose the required restriction", norwegian: "Velg nødvendig treningshensyn")
+        case "healthSharingAuthorized":
+            return ATHLTHLocalization.choose(english: "Confirm sharing of injury details", norwegian: "Bekreft deling av skadeopplysninger")
+        default:
+            return ATHLTHLocalization.choose(english: "Complete the remaining choice", norwegian: "Fullfør gjenstående valg")
+        }
     }
 
     private func localizedMuscleGroup(_ value: String) -> String {
