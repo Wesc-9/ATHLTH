@@ -217,9 +217,19 @@ struct ATHLTHInsightsMuscleCard: View {
 
             if focus.most.isEmpty {
                 VStack(alignment: .leading, spacing: 8) {
-                    Image(systemName: "figure.strengthtraining.traditional")
-                        .font(.title)
-                        .foregroundStyle(ATHLTHInsightsStyle.accent)
+                    StrengthMuscleMapView(
+                        profile: .empty,
+                        compact: true,
+                        style: .activation,
+                        presentation: .insight,
+                        activationTint: ATHLTHInsightsStyle.accent
+                    )
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 188)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "No recorded muscle activation",
+                        norwegian: "Ingen registrert muskelaktivering"
+                    ))
                     Text(ATHLTHLocalization.choose(
                         english: "Muscle balance appears after completed strength training with recorded muscle metadata.",
                         norwegian: "Muskelbalansen vises etter fullført styrketrening med registrerte muskelgrupper."
