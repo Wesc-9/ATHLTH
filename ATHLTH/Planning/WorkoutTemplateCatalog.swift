@@ -1803,6 +1803,7 @@ struct WorkoutTemplateBuilderView: View {
     private var durationInputMode = "clock"
     private let draftContext: String
     private let initialQuickAdd: String?
+    private let initialFocusedBlockIndex: Int?
     private let plannedDate: Date?
     private let planCopyDays: [ATHLTHPlanCopyDay]
     private let onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)?
@@ -1817,6 +1818,7 @@ struct WorkoutTemplateBuilderView: View {
         initialRouteID: UUID? = nil,
         initialQuickAdd: String? = nil,
         initialPhase: WorkoutPhaseKind? = nil,
+        initialFocusedBlockIndex: Int? = nil,
         initialDurationOverrideMinutes: Int? = nil,
         draftContext: String = "shared-template",
         plannedDate: Date? = nil,
@@ -1840,6 +1842,7 @@ struct WorkoutTemplateBuilderView: View {
             ATHLTHWorkoutDurationEstimator.minutes(for: initialBlocks)).map(String.init) ?? "")
         self.draftContext = draftContext
         self.initialQuickAdd = initialQuickAdd
+        self.initialFocusedBlockIndex = initialFocusedBlockIndex
         self.plannedDate = plannedDate
         self.planCopyDays = planCopyDays
         self.onCopyToPlan = onCopyToPlan
@@ -2242,6 +2245,14 @@ struct WorkoutTemplateBuilderView: View {
                 restoreWorkoutDraft()
                 if !draftRestored {
                     collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
+                }
+                if let focused = initialFocusedBlockIndex,
+                   blocks.indices.contains(focused) {
+                    expandedBlockIndex = focused
+                    selectedPhase = blocks[focused].resolvedPhase
+                    if let groupID = blocks[focused].groupID {
+                        collapsedGroupIDs.remove(groupID)
+                    }
                 }
                 draftActive = true
                 // Apply one explicitly requested block after the draft is
