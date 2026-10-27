@@ -444,8 +444,8 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
               seconds.isFinite, (120...1200).contains(seconds),
               let data = try? JSONEncoder().encode(WatchWorkoutMirrorCommand(
                   command: .setTreadmillTargetPace,
-                  workoutStartedAt: startedAt,
-                  treadmillTargetPaceSecondsPerKilometer: seconds
+                  treadmillTargetPaceSecondsPerKilometer: seconds,
+                  workoutStartedAt: startedAt
               )) else { return false }
         Task {
             do {
