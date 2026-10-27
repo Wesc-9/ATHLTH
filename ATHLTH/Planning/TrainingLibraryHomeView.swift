@@ -2456,7 +2456,9 @@ struct TrainingPlanCatalogDetailView: View {
     }
 
     private func previewWeekCard(_ week: Int) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        let zonedWeek = ATHLTHZonedPlanLibrary.plan(for: entry.slug)?
+            .weeks.first(where: { $0.weekNumber == week })
+        return VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Text(ATHLTHLocalization.format(
                     english: "Week %d", norwegian: "Uke %d", week
@@ -2464,27 +2466,59 @@ struct TrainingPlanCatalogDetailView: View {
                 .font(.headline.weight(.bold))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
                 Spacer()
-                if week.isMultiple(of: 4) && week < entry.durationWeeks {
-                    weekPhaseLabel(
-                        ATHLTHLocalization.choose(
-                            english: "RECOVERY WEEK", norwegian: "ROLIG UKE"
-                        )
-                    )
+                if let zonedWeek {
+                    weekPhaseLabel(zonedWeek.isRecoveryWeek
+                        ? ATHLTHLocalization.choose(english: "RECOVERY", norwegian: "RESTITUSJON")
+                        : zonedWeek.phase.uppercased())
+                } else if week.isMultiple(of: 4) && week < entry.durationWeeks {
+                    weekPhaseLabel(ATHLTHLocalization.choose(
+                        english: "RECOVERY WEEK", norwegian: "ROLIG UKE"
+                    ))
                 } else if entry.usesCompetitionTaper &&
                           week >= max(entry.durationWeeks - 1, 1) {
-                    weekPhaseLabel(
-                        ATHLTHLocalization.choose(
-                            english: "TAPER", norwegian: "NEDTRAPPING"
-                        )
-                    )
+                    weekPhaseLabel(ATHLTHLocalization.choose(
+                        english: "TAPER", norwegian: "NEDTRAPPING"
+                    ))
                 }
             }
-            ForEach(
-                Array(entry.sessionBlueprints
-                    .prefix(entry.sessionsPerWeek).enumerated()),
-                id: \.offset
-            ) { index, blueprint in
-                previewWeekSessionRow(blueprint, week: week, index: index)
+
+            if let zonedWeek,
+               let zonedPlan = ATHLTHZonedPlanLibrary.plan(for: entry.slug) {
+                HStack(spacing: 9) {
+                    if let km = zonedWeek.targetKm {
+                        Label("\(km.formatted()) km", systemImage: "figure.run")
+                    }
+                    if let load = zonedWeek.weeklyLoadScore {
+                        Label("Zoned load \(load.formatted())", systemImage: "waveform.path.ecg")
+                    }
+                }
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                ForEach(
+                    Array(ATHLTHZonedPlanLibrary.orderedRequiredSessions(in: zonedWeek).enumerated()),
+                    id: \.offset
+                ) { index, source in
+                    if let workout = ATHLTHZonedPlanLibrary.plannedSession(
+                        source, week: zonedWeek, sourcePlan: zonedPlan
+                    ) {
+                        previewDetailedSessionRow(workout, week: week, index: index)
+                    }
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Original Zoned heart-rate zones and percentages are shown for each step. Pace examples require individual calibration.",
+                    norwegian: "Originale pulssoner og prosent av makspuls fra Zoned vises for hver del. Tempoeksempler må tilpasses individuelt."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else {
+                ForEach(
+                    Array(entry.sessionBlueprints
+                        .prefix(entry.sessionsPerWeek).enumerated()),
+                    id: \.offset
+                ) { index, blueprint in
+                    previewWeekSessionRow(blueprint, week: week, index: index)
+                }
             }
         }
         .padding(14)
@@ -2511,6 +2545,14 @@ struct TrainingPlanCatalogDetailView: View {
         let workout = ATHLTHCatalogPlanSessionFactory.session(
             entry: entry, blueprint: blueprint, week: week
         )
+        return previewDetailedSessionRow(workout, week: week, index: index)
+    }
+
+    private func previewDetailedSessionRow(
+        _ workout: PlannedSession,
+        week: Int,
+        index: Int
+    ) -> some View {
         let key = "\(week):\(index)"
         return VStack(alignment: .leading, spacing: 0) {
             Button {
