@@ -24,6 +24,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     // Only structural preferences; health, injuries and private notes are excluded.
     var preferredDayIndexes: [Int]?
     var varyWeekdays: Bool? = nil
+    var linkedGoalIDs: [UUID]? = nil
     var equipmentContext: String?
     var weeklyTimeBudgetMinutes: Int?
     // Only structural week choices and built-in subtype labels are stored.
@@ -61,6 +62,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         entryPlanGoal: String? = nil,
         preferredDayIndexes: [Int]? = nil,
         varyWeekdays: Bool = false,
+        linkedGoalIDs: [UUID]? = nil,
         equipmentContext: String? = nil,
         weeklyTimeBudgetMinutes: Int? = nil,
         workoutKindsByDay: [Int: String]? = nil,
@@ -124,6 +126,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
             self.preferredDayIndexes = nil
         }
         self.varyWeekdays = advanced ? varyWeekdays : false
+        self.linkedGoalIDs = linkedGoalIDs.map { Array(Set($0)).prefix(20).map { $0 } }
         self.equipmentContext = equipmentContext
         self.weeklyTimeBudgetMinutes = weeklyTimeBudgetMinutes.map {
             min(max($0, 60), 1200)
