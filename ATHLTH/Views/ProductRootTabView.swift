@@ -1851,7 +1851,7 @@ struct ATHLTHHomeView: View {
             standalone: session.standalonePlannedSessions
         ).first
         let plannedActivity: HomeDailyRecommendationPolicy.PlannedActivity? =
-            first.map { workout in
+            first.map { workout -> HomeDailyRecommendationPolicy.PlannedActivity in
                 switch workout.kind {
                 case .running: return .running
                 case .strength: return .strength
