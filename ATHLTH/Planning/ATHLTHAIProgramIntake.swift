@@ -186,6 +186,7 @@ struct ATHLTHAIProgramIntake: Equatable {
         }
         if sessionDurationMinutes == nil { issues.append("sessionDurationMinutes") }
         if locations.isEmpty { issues.append("locations") }
+        if equipment.isEmpty { issues.append("equipment") }
         if locations.contains(.gym) && locations.contains(.outdoors) &&
             outdoorSharePercent == nil {
             issues.append("locationBalance")
