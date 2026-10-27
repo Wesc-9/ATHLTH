@@ -152,12 +152,10 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
     func testBuildMethodCardFitsCompactPhones() {
         for width in [320.0, 375.0, 430.0] {
             let selector = ATHLTHPlanBuildMethodEntryView(
-                prefersAI: false,
-                planWeeks: 4,
-                trainingDays: 3,
-                focusTitle: "Løping",
-                onSelectManual: {},
-                onSelectAI: {}
+                selected: .dayByDay,
+                onSelect: { _ in },
+                onOpenLibrary: {},
+                onOpenMyPlans: {}
             )
             let host = UIHostingController(rootView: selector)
             host.loadViewIfNeeded()
