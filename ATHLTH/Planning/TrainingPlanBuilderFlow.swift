@@ -729,9 +729,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             ATHLTHAdvancedPlanAddContentView(
                 initialKind: destination.kind,
                 phase: destination.phase,
-                onExercise: { block in
+                onExercise: { blocks in
                     insertGuidedLibraryExercise(
-                        block, day: destination.day, week: destination.week)
+                        blocks, day: destination.day, week: destination.week)
                 },
                 onWorkout: { workout in
                     insertGuidedLibraryWorkout(
@@ -4187,8 +4187,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
 
     private func insertGuidedLibraryExercise(
-        _ block: WorkoutTemplateBlock, day: Int, week: Int
+        _ blocks: [WorkoutTemplateBlock], day: Int, week: Int
     ) {
+        guard !blocks.isEmpty else { return }
         let key = weekDayKey(day, weekIndex: week)
         var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
         var workout = edit.detailedWorkout ??
@@ -4196,23 +4197,24 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 title: ATHLTHLocalization.choose(
                     english: "Strength workout", norwegian: "Styrkeøkt"),
                 kind: .strength, durationMinutes: 30, routeID: nil, blocks: [])
-        var next = block
-        next = WorkoutTemplateBlock(
-            sequence: (workout.blocks.map(\.sequence).max() ?? 0) + 1,
-            kind: block.kind, title: block.title,
-            exerciseSlug: block.exerciseSlug,
-            distanceMeters: block.distanceMeters,
-            repetitions: block.repetitions,
-            durationSeconds: block.durationSeconds,
-            targetWeightKilograms: block.targetWeightKilograms,
-            loadNote: block.loadNote, notes: block.notes,
-            phase: block.phase
-        )
-        next.setCount = block.setCount
-        next.restBetweenSetsSeconds = block.restBetweenSetsSeconds
-        next.exerciseID = block.exerciseID
-        next.exerciseSnapshot = block.exerciseSnapshot
-        workout.blocks.append(next)
+        for block in blocks {
+            var next = WorkoutTemplateBlock(
+                sequence: (workout.blocks.map(\.sequence).max() ?? 0) + 1,
+                kind: block.kind, title: block.title,
+                exerciseSlug: block.exerciseSlug,
+                distanceMeters: block.distanceMeters,
+                repetitions: block.repetitions,
+                durationSeconds: block.durationSeconds,
+                targetWeightKilograms: block.targetWeightKilograms,
+                loadNote: block.loadNote, notes: block.notes,
+                phase: block.phase
+            )
+            next.setCount = block.setCount
+            next.restBetweenSetsSeconds = block.restBetweenSetsSeconds
+            next.exerciseID = block.exerciseID
+            next.exerciseSnapshot = block.exerciseSnapshot
+            workout.blocks.append(next)
+        }
         workout.kind = workoutKind(for: workout.blocks)
         if let estimate = ATHLTHWorkoutDurationEstimator.minutes(for: workout.blocks) {
             workout.durationMinutes = estimate
