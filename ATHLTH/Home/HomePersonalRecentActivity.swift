@@ -1655,7 +1655,8 @@ private struct HomePersonalHorizontalWorkoutCard:
                     strengthWorkout: strengthWorkout,
                     phoneWorkout: phoneWorkout,
                     height: 114,
-                    precomputedStrengthProfile: isStrength ? muscleProfile : nil
+                    precomputedStrengthProfile: isStrength ? muscleProfile : nil,
+                    recentActivityStrip: true
                 )
             }
             .buttonStyle(.plain)
@@ -1680,6 +1681,15 @@ private struct HomePersonalHorizontalWorkoutCard:
                             .foregroundStyle(ATHLTHTheme.mutedText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.77)
+
+                            if workout.duration.isFinite, workout.duration > 0 {
+                                Label(
+                                    HomeRecentCardFormat.duration(workout.duration),
+                                    systemImage: "clock"
+                                )
+                                .font(.system(size: 9.5, weight: .medium))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
                         }
                         Spacer(minLength: 0)
                     }
@@ -1981,6 +1991,15 @@ private struct HomeFollowingHorizontalWorkoutCard: View {
                             .foregroundStyle(ATHLTHTheme.mutedText)
                             .lineLimit(1)
                             .minimumScaleFactor(0.77)
+
+                            if let seconds {
+                                Label(
+                                    HomeRecentCardFormat.duration(seconds),
+                                    systemImage: "clock"
+                                )
+                                .font(.system(size: 9.5, weight: .medium))
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
                         }
                         Spacer(minLength: 0)
                     }
@@ -5384,6 +5403,7 @@ private struct HomePersonalWorkoutVisual:
     let height: CGFloat
     var precomputedStrengthProfile:
         StrengthMuscleProfile? = nil
+    var recentActivityStrip = false
 
     @State private var hasLoadedRoute = false
     @State private var routePreviewImage: UIImage?
@@ -5491,7 +5511,8 @@ private struct HomePersonalWorkoutVisual:
                 ?? strengthWorkout?.totalVolumeKilograms,
             height: height,
             compact: height < 250,
-            showsCompletionLabel: height >= 220
+            showsCompletionLabel: height >= 220,
+            recentActivityStrip: recentActivityStrip
         )
     }
 
