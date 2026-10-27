@@ -64,7 +64,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? defaultPlanTitle : trimmed
     }
-    @State private var weekCount = 8
+    @State private var weekCount = 4
     @State private var startDate =
         ATHLTHTrainingPlanBuilderFlow.defaultStartDate()
 
@@ -561,6 +561,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }) {
                 applyExistingGoalFocus(linked)
             }
+            saveResumableDraft()
         }
         .onChange(of: varyWeekdays) { _, _ in saveResumableDraft() }
         .onChange(of: selectedSource) { _, _ in saveResumableDraft() }
@@ -1288,7 +1289,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             selectedGoalArea = .specific
             selectedGoalChoice = "event"
             if mode == .basic { simpleActivities = [.running] }
-            if let deadline = linked.deadline {
+            if let deadline = linked.deadline,
+               deadline >= Calendar.current.startOfDay(for: .now) {
                 hasCompetitionDate = true
                 competitionDate = deadline
             }
