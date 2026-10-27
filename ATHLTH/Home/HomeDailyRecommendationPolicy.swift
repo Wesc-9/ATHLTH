@@ -11,7 +11,7 @@ enum HomeDailyRecommendationPolicy {
         case insights, training
     }
 
-    enum PlannedActivity {
+    enum PlannedActivity: Equatable {
         case running, strength, other
     }
 
@@ -97,7 +97,7 @@ enum HomeDailyRecommendationPolicy {
                 source: tr("Based on readiness", "Basert på dagsform"),
                 symbol: "leaf",
                 destination: .insights,
-                evidence: ratio != nil && ratio! >= 1.5 ? loadEvidence : nil
+                evidence: (ratio ?? 0) >= 1.5 ? loadEvidence : nil
             )
         }
 
