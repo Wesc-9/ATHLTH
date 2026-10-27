@@ -24,6 +24,10 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingEntirePlan = false
     @State private var showingWorkoutLibrary = false
     @State private var showingCopyDay = false
+    @State private var showingCopyWeek = false
+    @State private var copySourceWeekIndex = 0
+    @State private var copyTargetWeekIndex = 0
+    @State private var copyWeekMessage: String?
     @State private var copyingSourceDayID: UUID?
     @State private var copyingSourceWorkoutID: UUID?
     @State private var copyTargetWeekIndex = 0
@@ -515,36 +519,53 @@ struct ATHLTHTrainPlanPremiumView: View {
 
                     HStack(spacing: 8) {
                         Button {
+                            copySourceWeekIndex = weekIndex
+                            copyTargetWeekIndex = min(weekIndex + 1, plan.weeks.count - 1)
+                            if copyTargetWeekIndex == weekIndex {
+                                copyTargetWeekIndex = max(0, weekIndex - 1)
+                            }
+                            showingCopyWeek = true
+                        } label: {
+                            Label(tr("Copy week", "Kopier uke"),
+                                  systemImage: "square.on.square")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 47)
+                                .foregroundStyle(warmGold)
+                                .background(soft, in: RoundedRectangle(cornerRadius: 14))
+                        }
+                        .disabled(plan.weeks.count < 2)
+
+                        Button {
                             selectedWeekIndex = weekIndex
                             showingEditor = true
                         } label: {
-                            Label(tr("Edit / copy week", "Rediger / kopier uke"),
-                                  systemImage: "square.on.square")
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity, minHeight: 48)
+                            Label(tr("Edit week", "Rediger uke"), systemImage: "pencil")
+                                .font(.subheadline.weight(.medium))
+                                .frame(maxWidth: .infinity, minHeight: 47)
+                                .foregroundStyle(graphite)
+                                .background(.white, in: RoundedRectangle(cornerRadius: 14))
                         }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(warmGold)
-                        .background(soft, in: RoundedRectangle(cornerRadius: 14))
-
-                        Button {
-                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                                showingEntirePlan.toggle()
-                            }
-                        } label: {
-                            Label(
-                                showingEntirePlan
-                                    ? tr("Hide weeks", "Skjul uker")
-                                    : tr("All weeks", "Alle uker"),
-                                systemImage: "calendar"
-                            )
-                            .font(.subheadline.weight(.medium))
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(graphite)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 14))
                     }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                            showingEntirePlan.toggle()
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "calendar")
+                            Text(showingEntirePlan
+                                ? tr("Hide other weeks", "Skjul andre uker")
+                                : tr("Show all weeks", "Vis alle uker"))
+                            Spacer()
+                            Image(systemName: showingEntirePlan ? "chevron.up" : "chevron.down")
+                        }
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(secondaryInk)
+                        .frame(minHeight: 42)
+                    }
+                    .buttonStyle(.plain)
                     if showingEntirePlan {
                         premiumAllWeeks(plan)
                             .padding(.top, 4)
@@ -877,6 +898,107 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .padding(.horizontal, 3)
         .padding(.top, 3)
+    }
+
+    private func referenceCopyWeekSheet(_ sourcePlan: TrainingPlan) -> some View {
+        let preview = ATHLTHTrainPlanWeekCopyPolicy.preview(
+            plan: sourcePlan,
+            sourceWeekIndex: copySourceWeekIndex,
+            targetWeekIndex: copyTargetWeekIndex
+        )
+        return NavigationStack {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(tr("Choose the destination week", "Velg uken du vil kopiere til"))
+                    .font(.system(size: 23, weight: .medium, design: .serif))
+                    .foregroundStyle(graphite)
+
+                Text(tr(
+                    "Workouts from week \(copySourceWeekIndex + 1) are copied to the same weekdays in a future week. Existing workouts and planned rest days are left unchanged.",
+                    "Øktene fra uke \(copySourceWeekIndex + 1) kopieres til samme ukedager i en fremtidig uke. Eksisterende økter og planlagte hviledager beholdes."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(secondaryInk)
+
+                Picker(
+                    tr("Destination week", "Måluke"),
+                    selection: $copyTargetWeekIndex
+                ) {
+                    ForEach(sourcePlan.weeks.indices, id: \.self) { index in
+                        if index != copySourceWeekIndex {
+                            Text(tr("Week \(index + 1)", "Uke \(index + 1)"))
+                                .tag(index)
+                        }
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(warmGold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(15)
+                .background(soft, in: RoundedRectangle(cornerRadius: 14))
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(
+                        tr("\(preview.eligibleSessions) workouts ready to copy",
+                           "\(preview.eligibleSessions) økter kan kopieres"),
+                        systemImage: "checkmark.circle"
+                    )
+                    if preview.protectedDays > 0 {
+                        Label(
+                            tr("\(preview.protectedDays) populated/rest days protected",
+                               "\(preview.protectedDays) eksisterende/hviledager beskyttes"),
+                            systemImage: "lock"
+                        )
+                    }
+                    if preview.pastDays > 0 {
+                        Label(
+                            tr("\(preview.pastDays) past dates cannot be edited",
+                               "\(preview.pastDays) tidligere dager kan ikke endres"),
+                            systemImage: "calendar.badge.exclamationmark"
+                        )
+                    }
+                }
+                .font(.subheadline)
+                .foregroundStyle(graphite)
+                .padding(15)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .athlthTrainPaper()
+
+                Spacer(minLength: 4)
+
+                Button {
+                    let result = ATHLTHTrainPlanWeekCopyPolicy.copy(
+                        in: session, planID: sourcePlan.id,
+                        sourceWeekIndex: copySourceWeekIndex,
+                        targetWeekIndex: copyTargetWeekIndex
+                    )
+                    copyWeekMessage = tr(
+                        "\(result.copiedSessions) workouts copied. \(result.protectedDays) days preserved. \(result.failedSessions) could not be copied.",
+                        "\(result.copiedSessions) økter kopiert. \(result.protectedDays) dager beholdt. \(result.failedSessions) kunne ikke kopieres."
+                    )
+                    if result.copiedSessions > 0 {
+                        selectPremiumPlanWeek(copyTargetWeekIndex)
+                    }
+                    showingCopyWeek = false
+                } label: {
+                    Label(tr("Copy workouts", "Kopier øktene"),
+                          systemImage: "square.on.square")
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                }
+                .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
+                .disabled(!preview.canCopy)
+            }
+            .padding(18)
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .navigationTitle(tr("Copy week", "Kopier uke"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Cancel", "Avbryt")) {
+                        showingCopyWeek = false
+                    }
+                }
+            }
+        }
     }
 
     private func referenceDayWorkspace(
@@ -1442,6 +1564,22 @@ struct ATHLTHTrainPlanPremiumView: View {
             if let plan, let copyingSourceDayID {
                 planCopyDaySheet(plan: plan, sourceDayID: copyingSourceDayID)
             }
+        }
+        .sheet(isPresented: $showingCopyWeek) {
+            if let plan {
+                referenceCopyWeekSheet(plan)
+            }
+        }
+        .alert(
+            tr("Copy training week", "Kopier treningsuke"),
+            isPresented: Binding(
+                get: { copyWeekMessage != nil },
+                set: { if !$0 { copyWeekMessage = nil } }
+            )
+        ) {
+            Button("OK") { copyWeekMessage = nil }
+        } message: {
+            Text(copyWeekMessage ?? "")
         }
         .alert(tr("Copy workout", "Kopier økt"),
                isPresented: Binding(
