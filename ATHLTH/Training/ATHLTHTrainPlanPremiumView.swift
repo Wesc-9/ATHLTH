@@ -77,6 +77,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         let workout: PlannedSession?
         var quickAdd: String? = nil
         var quickPhase: WorkoutPhaseKind? = nil
+        var focusedBlockIndex: Int? = nil
         var id: UUID { workout?.id ?? dayID }
     }
     @State private var editingWorkout: WorkoutEditDestination?
@@ -921,58 +922,20 @@ struct ATHLTHTrainPlanPremiumView: View {
     private func referenceSessionCard(
         _ workout: PlannedSession, day: TrainingPlanDay, plan: TrainingPlan
     ) -> some View {
-        let done = isPremiumPlanWorkoutCompleted(workout, plan: plan)
-        let skipped = session.isPlanSessionSkipped(
-            planID: plan.id, sessionID: workout.id
-        )
-        return Button {
-            selectedDayID = day.id
-            selectedWorkoutID = workout.id
-            showingDayDetails = true
-        } label: {
-            HStack(spacing: 10) {
-                Image(workout.kind == .running ? "GoalRunning" :
-                      (workout.kind == .strength ? "StrengthQuickHero" : "GoalWalking"))
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: 59, height: 59)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 11))
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 6) {
-                    Text(workout.title)
-                        .font(.system(size: 15, weight: .semibold, design: .serif))
-                        .foregroundStyle(graphite)
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                    HStack(spacing: 5) {
-                        if let duration = ATHLTHPlannedWorkoutPresentation.duration(for: workout) {
-                            Text(duration)
-                        }
-                        Text("·")
-                        Text(workout.kind.title)
-                    }
-                    .font(.system(size: 11))
-                    .foregroundStyle(secondaryInk)
-                    Text(done ? tr("Completed", "Fullført") :
-                         (skipped ? tr("Skipped", "Hoppet over") :
-                          tr("Tap to view workout", "Trykk for øktdetaljer")))
-                        .font(.system(size: 10))
-                        .foregroundStyle(done ? Color.green : secondaryInk)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: done ? "checkmark.circle.fill" :
-                      (skipped ? "minus.circle" : "chevron.right"))
-                    .font(.system(size: 16))
-                    .foregroundStyle(done ? .green : warmGold)
+        ATHLTHPlanWorkoutExpandableCard(
+            workout: workout,
+            completed: isPremiumPlanWorkoutCompleted(workout, plan: plan),
+            skipped: session.isPlanSessionSkipped(
+                planID: plan.id, sessionID: workout.id
+            ),
+            onEditBlock: { sourceIndex in
+                editingWorkout = WorkoutEditDestination(
+                    planID: plan.id, dayID: day.id,
+                    version: plan.version, workout: workout,
+                    focusedBlockIndex: sourceIndex
+                )
             }
-            .padding(10)
-            .frame(maxWidth: .infinity, minHeight: 76)
-            .background(ATHLTHTrainDesign.canvas.opacity(0.68),
-                        in: RoundedRectangle(cornerRadius: 15))
-            .contentShape(RoundedRectangle(cornerRadius: 15))
-        }
-        .buttonStyle(.plain)
+        )
     }
 
     private func referenceWeekPulse(
@@ -2313,7 +2276,8 @@ struct ATHLTHTrainPlanPremiumView: View {
                 expectedPlanVersion: destination.version,
                 existingWorkout: destination.workout,
                 initialQuickAdd: destination.quickAdd,
-                initialPhase: destination.quickPhase
+                initialPhase: destination.quickPhase,
+                initialFocusedBlockIndex: destination.focusedBlockIndex
             )
         }
         .sheet(item: $editingTrainingPlaceWorkout) { destination in
