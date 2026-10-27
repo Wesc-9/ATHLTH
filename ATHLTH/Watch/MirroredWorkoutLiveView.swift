@@ -563,8 +563,12 @@ struct MirroredWorkoutLiveView: View {
                         Button(ATHLTHLocalization.choose(
                             english: "Save", norwegian: "Lagre"
                         )) {
-                            enteredTargetPaceSeconds = targetPaceDraftSeconds
-                            showingTargetPaceEditor = false
+                            if mirroring.sendTreadmillTargetPaceSecondsPerKilometer(
+                                targetPaceDraftSeconds
+                            ) {
+                                enteredTargetPaceSeconds = targetPaceDraftSeconds
+                                showingTargetPaceEditor = false
+                            }
                         }
                     }
                 }
@@ -1476,13 +1480,16 @@ struct MirroredWorkoutLiveView: View {
                 if snapshot.treadmillInclinePercent != nil &&
                    snapshot.runningStepTitle == nil {
                     Button {
-                        targetPaceDraftSeconds = enteredTargetPaceSeconds ?? 330
+                        targetPaceDraftSeconds =
+                            snapshot.treadmillTargetPaceSecondsPerKilometer ??
+                            enteredTargetPaceSeconds ?? 330
                         showingTargetPaceEditor = true
                     } label: {
                         runningMetric(
                             title: ATHLTHLocalization.choose(
                                 english: "TARGET PACE", norwegian: "MÅLTEMPO"),
-                            value: enteredTargetPaceSeconds.map(paceText) ?? "Legg inn",
+                            value: (snapshot.treadmillTargetPaceSecondsPerKilometer ??
+                                    enteredTargetPaceSeconds).map(paceText) ?? "Legg inn",
                             unit: "/km"
                         )
                     }

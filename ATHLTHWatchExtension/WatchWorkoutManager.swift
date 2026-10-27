@@ -175,6 +175,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         WatchRunningWorkoutTransfer?
     @Published private(set) var treadmillInclinePercent:
         Double?
+    @Published private(set) var treadmillTargetPaceSecondsPerKilometer:
+        Double?
     @Published private(set) var structuredStepIndex = 0
     @Published private(set) var awaitingMainStart = false
     @Published private(set) var strengthSession:
@@ -561,6 +563,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 workout.steps.isEmpty ? nil : workout
             self.treadmillInclinePercent =
                 workout.treadmillInclinePercent
+            self.treadmillTargetPaceSecondsPerKilometer = nil
             self.structuredStepIndex = 0
             self.awaitingMainStart = false
 
@@ -660,6 +663,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if !hasActivePart {
             announceCurrentStructuredStep(prefix: "Starting")
         }
+        Task { @MainActor [weak self] in
+            await self?.sendLiveSnapshot(force: true)
+        }
+    }
+
+    func setTreadmillTargetPaceSecondsPerKilometer(_ seconds: Double) {
+        guard treadmillInclinePercent != nil,
+              seconds.isFinite, (120...1200).contains(seconds) else { return }
+        publish {
+            self.treadmillTargetPaceSecondsPerKilometer =
+                (seconds / 5).rounded() * 5
+        }
+        persistWorkoutRecoveryState()
         Task { @MainActor [weak self] in
             await self?.sendLiveSnapshot(force: true)
         }
@@ -3513,6 +3529,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.audioCoachConfiguration = .disabled
             self.structuredRunningWorkout = nil
             self.treadmillInclinePercent = nil
+            self.treadmillTargetPaceSecondsPerKilometer = nil
             self.structuredStepIndex = 0
             self.plannedRoute = nil
             self.routeProgressPercent = nil
@@ -3688,6 +3705,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.audioCoachConfiguration = .disabled
             self.structuredRunningWorkout = nil
             self.treadmillInclinePercent = nil
+            self.treadmillTargetPaceSecondsPerKilometer = nil
             self.structuredStepIndex = 0
             self.strengthSession = nil
             self.strengthActionPending = false
@@ -7188,6 +7206,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 currentStepProgress: awaitingMainStart ? 0 : progress
             )
         }
+        snapshot.treadmillTargetPaceSecondsPerKilometer =
+            treadmillTargetPaceSecondsPerKilometer
         snapshot.runningStepTargetTreadmillInclinePercent =
             currentRunningStep?.targetTreadmillInclinePercent
         snapshot.runningStepTargetPaceSecondsPerKilometer =
@@ -7819,12 +7839,15 @@ extension WatchWorkoutManager:
                 case .resume:
                     self.resume()
                 case .setTreadmillIncline:
-                    if let value =
-                            command
-                                .treadmillInclinePercent {
-                        self.setTreadmillInclinePercent(
-                            value
-                        )
+                    if let value = command.treadmillInclinePercent {
+                        self.setTreadmillInclinePercent(value)
+                    }
+                case .setTreadmillTargetPace:
+                    if let value = command.treadmillTargetPaceSecondsPerKilometer,
+                       let requested = command.workoutStartedAt,
+                       let activeStart = self.startedAt,
+                       abs(requested.timeIntervalSince(activeStart)) < 5 {
+                        self.setTreadmillTargetPaceSecondsPerKilometer(value)
                     }
                 case .advanceRunningStep:
                     if let requestedStart = command.workoutStartedAt,

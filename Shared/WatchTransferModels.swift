@@ -1530,6 +1530,7 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var currentPaceSecondsPerKilometer: TimeInterval? = nil
     // Non-nil identifies a treadmill run and carries the user-selected incline.
     var treadmillInclinePercent: Double? = nil
+    var treadmillTargetPaceSecondsPerKilometer: Double? = nil // user goal, not sensor data
     var routeRemainingMeters: Double? = nil
     var routeDeviationMeters: Double? = nil
     var routeDeviationThresholdMeters: Double? = nil
@@ -1792,6 +1793,7 @@ struct WatchWorkoutMirrorCommand: Codable, Hashable {
     // Optional keeps pause/resume/end payloads and older paired builds
     // decodable while allowing treadmill incline changes during a workout.
     var treadmillInclinePercent: Double? = nil
+    var treadmillTargetPaceSecondsPerKilometer: Double? = nil
     // Only return-route commands need a workout identity; default nil
     // preserves pause/resume/end compatibility with existing Watch versions.
     var workoutStartedAt: Date? = nil
@@ -1810,6 +1812,7 @@ enum WatchWorkoutCommand: String, Codable, Hashable {
     case pause
     case resume
     case setTreadmillIncline
+    case setTreadmillTargetPace
     case returnToStart
     case appendRunningWorkout
     case advanceRunningStep
