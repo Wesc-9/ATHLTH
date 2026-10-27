@@ -285,3 +285,86 @@ struct ATHLTHAIProgramIntake: Equatable {
         """
     }
 }
+
+
+/// Defensive post-generation screen. AI instructions are not a guarantee;
+/// reject clearly forbidden exercises before preview or persistence. A
+/// heuristic does not replace clinical review or justify an "all safe" badge.
+enum ATHLTHAIInjurySafetyValidator {
+    private static let aliases: [[String]] = [
+        ["knebøy", "squat", "squats"],
+        ["utfall", "lunge", "lunges"],
+        ["markløft", "deadlift", "deadlifts"],
+        ["beinpress", "benpress", "leg press"],
+        ["løping", "løp", "running", "run", "jogging"],
+        ["gange", "gåtur", "gåing", "walking", "walk"],
+        ["hopping", "hopp", "jump", "jumping", "jumps"],
+        ["sykling", "sykkel", "cycling", "bike", "biking"],
+        ["tåhev", "calf raise", "calf raises"],
+        ["step up", "step-ups", "step ups"],
+        ["burpee", "burpees"]
+    ]
+
+    private static func norm(_ text: String) -> String {
+        text.folding(options: [.caseInsensitive, .diacriticInsensitive],
+                     locale: Locale(identifier: "nb_NO"))
+            .replacingOccurrences(of: "-", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func matches(_ text: String, forbidden: String) -> Bool {
+        let normalized = " " + norm(text) + " "
+        let blocked = norm(forbidden)
+        guard blocked.count >= 2 else { return false }
+        let names = aliases.first(where: { group in
+            group.contains { norm($0) == blocked }
+        }) ?? [blocked]
+        return names.contains { alias in
+            let phrase = norm(alias)
+            guard !phrase.isEmpty else { return false }
+            // Treat whole words/phrases, not a substring of an unrelated word.
+            return normalized.contains(" " + phrase + " ") ||
+                normalized.contains(" " + phrase + "s ") ||
+                normalized.contains(" " + phrase + ",") ||
+                normalized.contains(" " + phrase + ".")
+        }
+    }
+
+    static func violations(
+        in draft: AIProgramDraft,
+        excludedMovements: [String],
+        avoidLowerBody: Bool
+    ) -> [String] {
+        let noLowerBody = [
+            "knebøy", "utfall", "markløft", "beinpress", "løping",
+            "gåtur", "hopping", "sykling", "tåhev", "step up", "burpee"
+        ]
+        let blocked = excludedMovements + (avoidLowerBody ? noLowerBody : [])
+        guard !blocked.isEmpty else { return [] }
+
+        var rejected = Set<String>()
+        for week in draft.weeks {
+            for day in week.days {
+                for session in day.sessions {
+                    let kindWords: String
+                    switch session.kind {
+                    case "running": kindWords = "running"
+                    case "walking": kindWords = "walking"
+                    case "cycling": kindWords = "cycling"
+                    default: kindWords = ""
+                    }
+                    let candidates: [String] =
+                        [session.title, kindWords] +
+                        session.exercises.map(\.name) +
+                        (session.blocks ?? []).map(\.title)
+                    for item in candidates {
+                        if blocked.contains(where: { matches(item, forbidden: $0) }) {
+                            rejected.insert(item)
+                        }
+                    }
+                }
+            }
+        }
+        return rejected.sorted()
+    }
+}
