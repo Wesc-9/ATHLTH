@@ -769,38 +769,6 @@ struct ATHLTHInsightsView: View {
         }
     }
 
-    private var detailDestinationsCard: some View {
-        insightsPaper {
-            ATHLTHSectionHeader(title: ATHLTHLocalization.choose(english: "Go deeper", norwegian: "Se flere detaljer"))
-
-            VStack(spacing: 0) {
-                NavigationLink {
-                    ATHLTHRecoveryView(onSelectTab: onSelectTab)
-                } label: {
-                    insightDestinationRow(
-                        title: ATHLTHLocalization.choose(english: "Recovery details", norwegian: "Restitusjon"),
-                        subtitle: ATHLTHLocalization.choose(english: "Readiness, sleep, soreness and recovery tools", norwegian: "Dagsform, søvn, stølhet og restitusjon"),
-                        icon: "leaf.fill"
-                    )
-                }
-
-                Divider()
-                    .padding(.leading, 46)
-
-                NavigationLink {
-                    ATHLTHProgressView()
-                } label: {
-                    insightDestinationRow(
-                        title: ATHLTHLocalization.choose(english: "Progress details", norwegian: "Fremgang"),
-                        subtitle: ATHLTHLocalization.choose(english: "Charts, records, consistency and achievements", norwegian: "Grafer, rekorder, kontinuitet og prestasjoner"),
-                        icon: "chart.bar.fill"
-                    )
-                }
-            }
-            .padding(.top, 6)
-        }
-    }
-
     private func trendMetric(
         title: String,
         value: String,
@@ -873,43 +841,6 @@ struct ATHLTHInsightsView: View {
                 style: .continuous
             )
         )
-    }
-
-    private func insightDestinationRow(
-        title: String,
-        subtitle: String,
-        icon: String
-    ) -> some View {
-        HStack(spacing: 11) {
-            Image(systemName: icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .frame(width: 34, height: 34)
-                .background(
-                    ATHLTHTheme.accentSoft,
-                    in: RoundedRectangle(
-                        cornerRadius: 11,
-                        style: .continuous
-                    )
-                )
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
-                Text(subtitle)
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer()
-
-            Image(systemName: "chevron.right")
-                .font(.caption2.bold())
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.vertical, 10)
     }
 
     private var pulseTitle: String {
