@@ -28,6 +28,9 @@ type ProgramRequest = {
   preferredDays?: number[];
   sessionDurationMinutes?: number;
   userNotes?: string;
+  // Explicitly opted-in by the athlete, only for this request.
+  injurySafetyNotes?: string | null;
+  excludedMovements?: string[] | null;
   goals?: GoalInput[];
   existingDays?: ExistingDay[];
 };
@@ -548,6 +551,17 @@ Deno.serve(async (req: Request) => {
     preferredDayNames: preferredDays.map((day) => DAY_NAMES[day - 1]),
     sessionDurationMinutes,
     userNotes: String(body.userNotes ?? "").slice(0, 3000),
+    // Do not merge this into generic notes: generic note limits previously
+    // truncated safety-critical restrictions placed near the end.
+    injurySafetyNotes: typeof body.injurySafetyNotes === "string"
+      ? body.injurySafetyNotes.slice(0, 3_000) : null,
+    excludedMovements: Array.isArray(body.excludedMovements)
+      ? body.excludedMovements
+          .filter((name): name is string => typeof name === "string")
+          .map((name) => name.trim().slice(0, 100))
+          .filter((name) => name.length >= 2)
+          .slice(0, 40)
+      : [],
     goals,
     existingDays: mode === "complete" ? existingDays : [],
   };
@@ -567,6 +581,12 @@ Hard rules:
 - Do not invent personal medical conditions, diagnoses, injuries, medications, or lab values.
 - Do not promise that a goal will be achieved by a deadline.
 - Use conservative progression, recovery, and rest. Avoid repeated maximal-effort sessions.
+- The injurySafetyNotes field, when present, contains the athlete's expressly consented health restrictions. It is a mandatory exercise-exclusion safety constraint, not optional context.
+- Never prescribe, suggest or include any exercise explicitly listed in excludedMovements, including close variations and exercises that put load on an area the user said cannot be loaded.
+- If the athlete forbids lower-body loading, no running, walking, squats, lunges, jumping, cycling or lower-body strength blocks are allowed. If activities selected earlier conflict with these restrictions, the injury restrictions always take priority.
+- Respect the athlete's injury description even if it conflicts with their preferred sport, goals or session count. If a safe workout cannot be selected, leave that day as a rest day and explain the limitation in the summary. Do not replace an excluded exercise with a similarly aggravating variation.
+- If there is no injurySafetyNotes field, do not assume you know a diagnosis or which exercises are individually safe. Do not claim a generated workout is medically cleared.
+- Use health notes to avoid contraindicated exercises; do not diagnose, treat or promise any medical result.
 - If a goal or note suggests a medical limitation, keep recommendations general and low-risk rather than treating the condition.
 - Strength work should use exercise names, sets, reps, sensible RPE, and rest, but never invent target weights.
 - Running/walking sessions can include duration and/or distance. Only include a target pace when the provided goal genuinely supports one.
