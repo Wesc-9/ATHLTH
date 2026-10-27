@@ -611,6 +611,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     let expectedPlanVersion: Int
     let initialQuickAdd: String?
     let initialPhase: WorkoutPhaseKind?
+    let initialFocusedBlockIndex: Int?
 
     @State private var draft: PlannedSession
     @State private var showExerciseSearch = false
@@ -679,7 +680,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         expectedPlanVersion: Int,
         existingWorkout: PlannedSession? = nil,
         initialQuickAdd: String? = nil,
-        initialPhase: WorkoutPhaseKind? = nil
+        initialPhase: WorkoutPhaseKind? = nil,
+        initialFocusedBlockIndex: Int? = nil
     ) {
         self.planID = planID
         self.dayID = dayID
@@ -687,6 +689,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         self.expectedPlanVersion = expectedPlanVersion
         self.initialQuickAdd = initialQuickAdd
         self.initialPhase = initialPhase
+        self.initialFocusedBlockIndex = initialFocusedBlockIndex
         _draft = State(initialValue: existingWorkout ?? PlannedSession(
             id: UUID(), title: "", kind: .strength,
             scheduledStart: nil, durationMinutes: 50,
@@ -710,7 +713,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 guard !localDraftReady else { return }
                 restoreLocalDraft()
                 localDraftReady = true
-                if initialQuickAdd != nil && !didLaunchQuickComposer {
+                if (initialQuickAdd != nil || initialFocusedBlockIndex != nil) &&
+                    !didLaunchQuickComposer {
                     didLaunchQuickComposer = true
                     Task { @MainActor in
                         await Task.yield()
@@ -840,6 +844,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     initialRouteID: draft.routeID,
                     initialQuickAdd: initialQuickAdd,
                     initialPhase: initialPhase,
+                    initialFocusedBlockIndex: initialFocusedBlockIndex,
                     initialDurationOverrideMinutes: durationWasEditedManually
                         ? draft.durationMinutes : nil,
                     draftContext: "plan-\(planID.uuidString)-day-\(dayID.uuidString)-workout-\(existingWorkout?.id.uuidString ?? "new")",
