@@ -1051,8 +1051,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                 }
             }
             if selectedDayTab == .workouts {
-            if workouts.isEmpty {
-                VStack(alignment: .leading, spacing: 10) {
+                if workouts.isEmpty {
                     Label(
                         day.sessions.contains(where: \.isExplicitRestDay)
                             ? tr("Rest and recovery", "Hvile og restitusjon")
@@ -1061,29 +1060,18 @@ struct ATHLTHTrainPlanPremiumView: View {
                     )
                     .font(.subheadline)
                     .foregroundStyle(secondaryInk)
-                    Button {
-                        editingWorkout = WorkoutEditDestination(
-                            planID: plan.id, dayID: day.id,
-                            version: plan.version, workout: nil
+                    .frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                    .padding(12)
+                    .background(soft, in: RoundedRectangle(cornerRadius: 14))
+                } else {
+                    ForEach(workouts) { workout in
+                        referenceSessionCard(
+                            workout, day: day, plan: plan,
+                            expanded: (selectedWorkoutID ?? workouts[0].id) == workout.id
+                                && !collapsedWorkoutCards.contains(workout.id)
                         )
-                    } label: {
-                        Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
-                            .font(.subheadline.weight(.semibold))
                     }
-                    .buttonStyle(ATHLTHTrainPrimaryButtonStyle())
                 }
-                .padding(15)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(soft, in: RoundedRectangle(cornerRadius: 14))
-            } else {
-                ForEach(workouts) { workout in
-                    referenceSessionCard(
-                        workout, day: day, plan: plan,
-                        expanded: (selectedWorkoutID ?? workouts[0].id) == workout.id
-                            && !collapsedWorkoutCards.contains(workout.id)
-                    )
-                }
-            }
             } else {
                 // Reuse the real advanced detail panel: duration, intervals,
                 // structure, location and the existing workout editor.
