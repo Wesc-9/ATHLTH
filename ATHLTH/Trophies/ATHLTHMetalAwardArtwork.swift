@@ -326,6 +326,55 @@ struct ATHLTHMedalReededEdge: Shape {
     }
 }
 
+/// Decorative ATHLTH mint stamp for collection headers and rare fallback
+/// unlocks where a cached TrophyProgressItem is not yet available.
+struct ATHLTHMintedBrandSeal: View {
+    let size: CGFloat
+    let metal: ATHLTHMedalMetal
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(AngularGradient(
+                    colors: [
+                        metal.highlights[2], metal.highlights[0],
+                        metal.highlights[3], metal.highlights[4],
+                        metal.highlights[0], metal.highlights[2]
+                    ],
+                    center: .center))
+                .shadow(color: metal.shadow.opacity(0.38),
+                        radius: size * 0.068, y: size * 0.036)
+
+            ATHLTHMedalReededEdge()
+                .stroke(Color.white.opacity(0.49),
+                        lineWidth: max(0.5, size * 0.006))
+                .padding(size * 0.040)
+
+            Circle()
+                .fill(LinearGradient(
+                    colors: metal.face,
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
+                .padding(size * 0.110)
+                .overlay {
+                    Circle()
+                        .strokeBorder(Color.white.opacity(0.48),
+                                      lineWidth: max(0.7, size * 0.010))
+                        .padding(size * 0.122)
+                }
+
+            ATHLTHMarkShape()
+                .fill(LinearGradient(
+                    colors: [metal.highlights[0], metal.highlights[3],
+                             metal.highlights[2]],
+                    startPoint: .topLeading, endPoint: .bottomTrailing))
+                .frame(width: size * 0.48, height: size * 0.34)
+                .shadow(color: metal.shadow.opacity(0.75),
+                        radius: size * 0.015, y: size * 0.020)
+        }
+        .frame(width: size, height: size)
+    }
+}
+
 private struct ATHLTHGoldCupBowl: Shape {
     func path(in rect: CGRect) -> Path {
         let w = rect.width, h = rect.height
