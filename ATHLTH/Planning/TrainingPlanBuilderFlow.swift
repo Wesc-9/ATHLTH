@@ -791,7 +791,41 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     // SwiftUI generic type-checking in the plan creation flow.
     @ViewBuilder
     private var createdPlanReviewDestination: some View {
-                if let createdPlanID,
+        // Simple skips Advanced's method chooser and lands straight in
+        // the actual Plan week view, without an extra success/question card.
+        if mode == .basic, let createdPlanID {
+            ScrollView {
+                ATHLTHTrainPlanPremiumView(highlightedPlanID: createdPlanID)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 14)
+            }
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Your training week", norwegian: "Din treningsuke"))
+            .navigationBarTitleDisplayMode(.inline)
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    onCreated?(createdPlanID)
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Done · Open Plan", norwegian: "Ferdig · Åpne Plan"))
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .padding(16)
+                    .background(ATHLTHTrainDesign.bronze.gradient,
+                                in: RoundedRectangle(cornerRadius: 18))
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(ATHLTHTrainDesign.canvas.opacity(0.98))
+            }
+        } else if let createdPlanID,
                    let savedPlan = session.trainingPlan(withID: createdPlanID) {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 12) {
