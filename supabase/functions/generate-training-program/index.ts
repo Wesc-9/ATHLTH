@@ -461,10 +461,9 @@ Deno.serve(async (req: Request) => {
     180,
     60,
   );
+  // A saved ATHLTH goal is optional. Standalone Coach requests carry
+  // explicitly selected training types and outcomes in userNotes.
   const goals = Array.isArray(body.goals) ? body.goals.slice(0, 8) : [];
-  if (goals.length === 0) {
-    return json({ error: "Choose at least one goal." }, 400);
-  }
 
   const existingDays = Array.isArray(body.existingDays)
     ? body.existingDays.slice(0, 52 * 7)
@@ -486,7 +485,7 @@ Deno.serve(async (req: Request) => {
 
   const instructions = `
 You are ATHLTH AI, a conservative training-program planning assistant.
-Create a practical general-fitness program from the user's explicit goals and constraints.
+Create a practical program from the user's explicit goals, selected outcomes and constraints. A saved goal may be absent; in that case use only the stated intake and never invent a target.
 
 Hard rules:
 - Return exactly the requested number of weeks.
