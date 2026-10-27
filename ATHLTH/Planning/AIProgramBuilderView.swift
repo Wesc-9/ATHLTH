@@ -288,6 +288,16 @@ struct AIProgramBuilderView: View {
             .onChange(of: coachContext) { _, _ in
                 if coachJourneyStage != .ready { preview = nil }
             }
+            .onChange(of: standaloneIntake) { _, _ in
+                // The consented injury details are intentionally NOT in
+                // coachContext. Invalidate an old AI draft whenever the
+                // athlete changes injury notes, forbidden movements, or
+                // consent, so old suggestions cannot be accepted unchanged.
+                if isStandaloneCoachJourney, preview != nil {
+                    preview = nil
+                    coachJourneyStage = .intake
+                }
+            }
             .onChange(of: intakePreferences) { _, value in
                 guard didLoadDefaults, session.signedIn else { return }
                 AccountLocalStorage.write(
