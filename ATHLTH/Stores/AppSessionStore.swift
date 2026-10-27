@@ -1582,6 +1582,8 @@ final class AppSessionStore: ObservableObject {
 
         return trainingPlans.first { plan in
             guard plan.id != excludingPlanID,
+                  !pausedTrainingPlanIDs.contains(plan.id),
+                  !deactivatedTrainingPlanIDs.contains(plan.id),
                   let rawStart = plan.startDate,
                   let rawEnd = trainingPlanEndDate(plan)
             else {
@@ -1692,8 +1694,16 @@ final class AppSessionStore: ObservableObject {
     /// allowed and existing overlapping schedules must still be resolved.
     @discardableResult
     func resumeTrainingPlan(_ id: UUID) -> Bool {
-        guard let plan = trainingPlan(withID: id),
-              activePlan == nil || activePlan?.id == id else { return false }
+        guard let plan = trainingPlan(withID: id) else { return false }
+        // A paused program may overlap a newer active program. Reject a
+        // conflicting resume instead of silently making two plans active.
+        if let start = plan.startDate,
+           let end = trainingPlanEndDate(plan),
+           trainingPlanConflict(
+               startDate: start, endDate: end, excludingPlanID: id
+           ) != nil {
+            return false
+        }
         let wasPaused = pausedTrainingPlanIDs.remove(id) != nil
         let wasDeactivated = deactivatedTrainingPlanIDs.remove(id) != nil
         guard wasPaused || wasDeactivated else { return true }
