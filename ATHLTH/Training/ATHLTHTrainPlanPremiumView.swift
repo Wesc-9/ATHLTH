@@ -599,6 +599,29 @@ struct ATHLTHTrainPlanPremiumView: View {
                 referencePlanSummary(active, isActive: true)
             }
             referencePlanSummary(plan, isActive: session.activePlan?.id == plan.id)
+            if session.isTrainingPlanPaused(plan.id) ||
+               session.isTrainingPlanDeactivated(plan.id) {
+                HStack(spacing: 9) {
+                    Label(session.isTrainingPlanPaused(plan.id)
+                          ? tr("Paused plan", "Plan på pause")
+                          : tr("Deactivated plan", "Deaktivert plan"),
+                          systemImage: "pause.circle")
+                        .font(.subheadline.weight(.medium))
+                    Spacer(minLength: 0)
+                    Button {
+                        if session.resumeTrainingPlan(plan.id) {
+                            selectedWeekIndex = nil
+                        }
+                    } label: {
+                        Label(tr("Reactivate", "Reaktiver"),
+                              systemImage: "play.circle.fill")
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(warmGold)
+                }
+                .padding(11)
+                .athlthTrainPaper()
+            }
             HStack(spacing: 3) {
                 referenceModePill(tr("Simple", "Enkel"), selected: !advanced) {
                     advanced = false
@@ -1708,9 +1731,24 @@ struct ATHLTHTrainPlanPremiumView: View {
                                         showingMyPlans = false
                                     }
                                 referenceManagementAction(
-                                    tr("Pause, deactivate or change plan",
-                                       "Sett på pause, deaktiver eller bytt plan"),
-                                    symbol: "pause") {
+                                    tr("Pause plan", "Sett planen på pause"),
+                                    symbol: "pause.circle") {
+                                        if session.pauseTrainingPlan(active.id) {
+                                            focusedPlanID = nil
+                                            showingMyPlans = false
+                                        }
+                                    }
+                                referenceManagementAction(
+                                    tr("Deactivate plan", "Deaktiver planen"),
+                                    symbol: "stop.circle") {
+                                        if session.deactivateTrainingPlan(active.id) {
+                                            focusedPlanID = nil
+                                            showingMyPlans = false
+                                        }
+                                    }
+                                referenceManagementAction(
+                                    tr("Change active plan", "Bytt aktiv plan"),
+                                    symbol: "arrow.left.arrow.right") {
                                         showingOriginalPlanManager = true
                                     }
                             }
@@ -2534,6 +2572,12 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
 
     private func planLibraryStatus(_ item: TrainingPlan) -> String {
+        if session.isTrainingPlanPaused(item.id) {
+            return tr("Paused", "På pause")
+        }
+        if session.isTrainingPlanDeactivated(item.id) {
+            return tr("Deactivated", "Deaktivert")
+        }
         switch planLibraryPriority(item) {
         case 0: return tr("Active", "Aktiv")
         case 1: return tr("Upcoming", "Kommende")
