@@ -11893,6 +11893,86 @@ private struct StrengthActiveExerciseQueueView: View {
     @State private var pendingRemovalID: UUID?
     @State private var showingRemovalBlocked = false
 
+    private var exercisePendingRemovalName: String {
+        guard let id = pendingRemovalID,
+              let workout = strength.activeWorkout,
+              let exercise = workout.exercises.first(where: { $0.id == id })
+        else {
+            return ATHLTHLocalization.choose(
+                english: "this exercise", norwegian: "denne øvelsen")
+        }
+        return exercise.exercise.displayName
+    }
+
+    private var exerciseRemovalSheet: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack {
+                Image(systemName: "trash")
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(.red)
+                    .frame(width: 49, height: 49)
+                    .background(Color.red.opacity(0.08),
+                                in: RoundedRectangle(cornerRadius: 15))
+                Spacer()
+                Button {
+                    pendingRemovalID = nil
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(width: 34, height: 34)
+                        .background(ATHLTHPlanDesign.warmSurface, in: Circle())
+                }
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Cancel", norwegian: "Avbryt"))
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Remove exercise?",
+                norwegian: "Fjerne øvelsen?"
+            ))
+            .font(.system(size: 23, weight: .semibold, design: .serif))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+            Text(exercisePendingRemovalName)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(ATHLTHLocalization.choose(
+                english: "Only the workout in progress is changed. The saved training plan stays as it is. Completed sets cannot be removed.",
+                norwegian: "Kun den pågående økten endres. Treningsplanen beholdes, og fullførte sett kan ikke fjernes."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
+
+            Spacer(minLength: 0)
+
+            Button(role: .destructive) {
+                if let id = pendingRemovalID {
+                    let removed = strength.removeActiveExercise(id)
+                    pendingRemovalID = nil
+                    if !removed { showingRemovalBlocked = true }
+                }
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Remove from this workout",
+                    norwegian: "Fjern fra denne økten"
+                ), systemImage: "trash")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .frame(height: 48)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.red)
+        }
+        .padding(23)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(ATHLTHPremiumCanvas(accent: ATHLTHTheme.premiumGold.opacity(0.12)))
+    }
+
     private func requestRemoval(_ id: UUID) {
         guard strength.canRemoveActiveExercise(id) else {
             showingRemovalBlocked = true
@@ -12346,30 +12426,15 @@ private struct StrengthActiveExerciseQueueView: View {
                 )
             }
         }
-        .confirmationDialog(
-            ATHLTHLocalization.choose(
-                english: "Remove exercise from this workout?",
-                norwegian: "Slette øvelsen fra denne økten?"
-            ),
+        .sheet(
             isPresented: Binding(
                 get: { pendingRemovalID != nil },
                 set: { if !$0 { pendingRemovalID = nil } }
-            ),
-            titleVisibility: .visible
+            )
         ) {
-            Button(ATHLTHLocalization.choose(
-                english: "Delete exercise", norwegian: "Slett øvelse"
-            ), role: .destructive) {
-                if let id = pendingRemovalID {
-                    _ = strength.removeActiveExercise(id)
-                }
-                pendingRemovalID = nil
-            }
-        } message: {
-            Text(ATHLTHLocalization.choose(
-                english: "Only this active workout is changed. Your saved training plan is untouched.",
-                norwegian: "Bare den aktive økten endres. Treningsplanen din beholdes."
-            ))
+            exerciseRemovalSheet
+                .presentationDetents([.height(342)])
+                .presentationDragIndicator(.visible)
         }
         .alert(ATHLTHLocalization.choose(
             english: "Recorded sets are protected",
