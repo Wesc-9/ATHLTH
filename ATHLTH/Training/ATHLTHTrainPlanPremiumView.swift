@@ -941,6 +941,32 @@ struct ATHLTHTrainPlanPremiumView: View {
                     )
                 }
             }
+            HStack(spacing: 10) {
+                Button {
+                    editingWorkout = WorkoutEditDestination(
+                        planID: plan.id, dayID: day.id,
+                        version: plan.version, workout: nil
+                    )
+                } label: {
+                    Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 45)
+                        .foregroundStyle(.white)
+                        .background(warmGold, in: RoundedRectangle(cornerRadius: 13))
+                }
+                Button {
+                    preparePlanDayCopy(day, plan: plan)
+                    copyingSourceWorkoutID = nil
+                } label: {
+                    Label(tr("Copy day", "Kopier dag"), systemImage: "doc.on.doc")
+                        .font(.subheadline.weight(.medium))
+                        .frame(maxWidth: .infinity, minHeight: 45)
+                        .foregroundStyle(warmGold)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                }
+                .disabled(workouts.isEmpty)
+            }
+            .buttonStyle(.plain)
         }
         .padding(9)
         .background(
@@ -1027,7 +1053,22 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
             if expanded {
                 referenceWorkoutPhases(workout, day: day, plan: plan)
-                referenceBlockPicker(workout, day: day, plan: plan)
+                if advanced {
+                    referenceBlockPicker(workout, day: day, plan: plan)
+                }
+                Button {
+                    editingWorkout = WorkoutEditDestination(
+                        planID: plan.id, dayID: day.id,
+                        version: plan.version, workout: workout
+                    )
+                } label: {
+                    Label(tr("Edit workout", "Rediger økt"), systemImage: "pencil")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(warmGold, in: RoundedRectangle(cornerRadius: 13))
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(12)
