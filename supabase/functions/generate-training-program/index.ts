@@ -629,11 +629,11 @@ Hard rules:
   await recordGroqQuota(aiResponse, "training-program");
 
   if (!aiResponse.ok) {
-    const failure = await aiResponse.text();
+    // Provider response bodies can echo consented injury details.
+    // Keep health information out of persistent application logs.
     console.error("Groq program generation failed", {
       status: aiResponse.status,
-      body: failure.slice(0, 2000),
-      userID: user.id,
+      feature: "generate-training-program",
     });
     return json({ error: "AI program generation failed. Please try again." }, 502);
   }
@@ -648,9 +648,9 @@ Hard rules:
   try {
     program = JSON.parse(outputText);
   } catch {
+    // Never log AI output: it can contain sensitive training limitations.
     console.error("Unable to parse structured AI program", {
-      userID: user.id,
-      output: outputText.slice(0, 2000),
+      feature: "generate-training-program",
     });
     return json({ error: "AI returned an invalid program." }, 502);
   }
