@@ -230,7 +230,11 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                     distanceMeters: workout.distanceMeters
                 ).map { isMetric ? $0 : $0 * 1.609344 }
                 : nil
-            let displayedPace = currentPace ?? treadmillAveragePace
+            let measuredAveragePace = ATHLTHRunningPace.average(
+                elapsedSeconds: elapsed, distanceMeters: workout.distanceMeters
+            ).map { isMetric ? $0 : $0 * 1.609344 }
+            // Manual belt speed is clearly a user-entered target, not GPS.
+            let displayedPace = currentPace
 
             VStack(spacing: 0) {
                 let hierarchy = ATHLTHPhoneLiveHierarchyResolver.resolve(
@@ -239,13 +243,10 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
 
                 heroMetric(
                     title: hierarchy.primary == .pace
-                        ? (currentPace != nil
-                            ? ATHLTHLocalization.choose(
-                                english: "PACE", norwegian: "TEMPO"
-                              )
-                            : ATHLTHLocalization.choose(
-                                english: "AVERAGE PACE", norwegian: "SNITTEMPO"
-                              ))
+                        ? ATHLTHLocalization.choose(
+                            english: isTreadmill ? "BELT PACE" : "CURRENT PACE",
+                            norwegian: isTreadmill ? "MØLLETEMPO" : "TEMPO NÅ"
+                          )
                         : ATHLTHLocalization.choose(
                             english: "DISTANCE", norwegian: "DISTANSE"
                           ),
@@ -277,6 +278,30 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                             english: "ELAPSED TIME", norwegian: "ØKTTID"
                         ),
                         value: elapsedText(elapsed),
+                        unit: nil
+                    )
+                }
+
+                Divider()
+                    .opacity(0.42)
+                    .padding(.horizontal, 15)
+                HStack(spacing: 0) {
+                    focusedMetric(
+                        title: ATHLTHLocalization.choose(
+                            english: "WORKOUT AVERAGE PACE",
+                            norwegian: "SNITTEMPO ØKTEN"),
+                        value: paceValue(measuredAveragePace),
+                        unit: isMetric ? "/km" : "/mi"
+                    )
+                    focusedDivider
+                    focusedMetric(
+                        title: ATHLTHLocalization.choose(
+                            english: "PACE SOURCE",
+                            norwegian: "TEMPOKILDE"),
+                        value: isTreadmill
+                            ? ATHLTHLocalization.choose(
+                                english: "Belt", norwegian: "Mølle")
+                            : "GPS",
                         unit: nil
                     )
                 }
@@ -946,15 +971,40 @@ private struct IPhoneStructuredStepCard: View {
                                             .font(.title3.weight(.bold))
                                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                     } else {
-                                    Text(
-                                        structuredRemainingText(
-                                            step: step,
-                                            workout: workout,
-                                            date: context.date
-                                        )
-                                    )
-                                    .font(.system(size: 28, weight: .bold, design: .rounded))
-                                    .monospacedDigit()
+                                    ZStack {
+                                        Circle()
+                                            .stroke(ATHLTHTheme.accent.opacity(0.14),
+                                                    lineWidth: 8)
+                                        Circle()
+                                            .trim(from: 0, to: min(max(progress, 0), 1))
+                                            .stroke(ATHLTHTheme.accentDeep,
+                                                    style: StrokeStyle(
+                                                        lineWidth: 8, lineCap: .round))
+                                            .rotationEffect(.degrees(-90))
+                                            .animation(.easeInOut(duration: 0.5),
+                                                       value: progress)
+                                        VStack(spacing: 6) {
+                                            Text(structuredRemainingText(
+                                                step: step, workout: workout,
+                                                date: context.date
+                                            ))
+                                            .font(.system(
+                                                size: 57, weight: .bold, design: .rounded))
+                                            .monospacedDigit()
+                                            .minimumScaleFactor(0.45)
+                                            .lineLimit(1)
+                                            .contentTransition(.numericText(countsDown: true))
+                                            Text(ATHLTHLocalization.choose(
+                                                english: "REMAINING", norwegian: "GJENSTÅR"))
+                                                .font(.caption2.weight(.bold))
+                                                .tracking(1.5)
+                                        }
+                                        .padding(.horizontal, 16)
+                                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                                    }
+                                    .frame(width: 242, height: 242)
+                                    .frame(maxWidth: .infinity)
+                                    .transition(.scale.combined(with: .opacity))
                                     }
 
                                     if let pace = step.targetPaceMinSecondsPerKilometer,
