@@ -1302,6 +1302,7 @@ struct StrengthMuscleMapView: View {
             green: 0.60,
             blue: 0.45
         )
+    var regionTints: [StrengthMuscleRegion: Color] = [:]
 
     var body: some View {
         HStack(spacing: compact ? 5 : 12) {
@@ -1342,7 +1343,8 @@ struct StrengthMuscleMapView: View {
                     ATHLTHPremiumMuscleFigure(
                         profile: profile,
                         isFront: side == .front,
-                        activationTint: activationTint
+                        activationTint: activationTint,
+                        regionTints: regionTints
                     )
                 } else {
                     StrengthBodyFigureCanvas(
