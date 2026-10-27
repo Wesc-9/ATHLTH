@@ -15,7 +15,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
         var title: String {
             if isRestDay { return ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag") }
             if let first = workouts.first { return first.title }
-            if planned { return ATHLTHLocalization.choose(english: "Plan workout", norwegian: "Planlegg økt") }
+            if planned { return suggestedTitle ?? ATHLTHLocalization.choose(english: "Plan workout", norwegian: "Planlegg økt") }
             return ATHLTHLocalization.choose(english: "Not planned", norwegian: "Ikke planlagt")
         }
         var kind: WorkoutKind? { workouts.first?.kind }
@@ -233,52 +233,85 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     }
 
     private func dayRow(_ day: Day) -> some View {
-        Button {
-            selectedDay = day.weekday
-        } label: {
-            HStack(spacing: 8) {
-                VStack(spacing: 5) {
-                    Text(day.date.formatted(.dateTime.weekday(.abbreviated)))
-                        .font(.system(size: 11, weight: .semibold))
-                    Text(day.date.formatted(.dateTime.day().month(.abbreviated)))
-                        .font(.system(size: 9))
+        HStack(spacing: 5) {
+            Button {
+                selectedDay = day.weekday
+            } label: {
+                HStack(spacing: 8) {
+                    VStack(spacing: 5) {
+                        Text(day.date.formatted(.dateTime.weekday(.abbreviated)))
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(day.date.formatted(.dateTime.day().month(.abbreviated)))
+                            .font(.system(size: 9))
+                    }
+                    .foregroundStyle(secondary)
+                    .frame(width: 59)
+                    .frame(minHeight: 58)
+                    .background(paper.opacity(0.9), in: RoundedRectangle(cornerRadius: 12))
+
+                    Image(systemName: day.isRestDay ? "pause.fill" :
+                          (day.kind?.systemImage ?? "plus.circle"))
+                        .foregroundStyle(gold)
+                        .font(.system(size: 17))
+                        .frame(width: 29)
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(day.title)
+                            .font(.system(size: 13, weight: .semibold, design: .serif))
+                            .foregroundStyle(ink)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                        Text(day.isRestDay ? tr("Recovery", "Restitusjon") :
+                             day.workouts.isEmpty ? tr("Add your workout", "Legg inn økt") :
+                             "\(day.workouts.count) " + tr("workouts", "økter") +
+                             " · \(day.totalBlocks) " + tr("blocks", "blokker"))
+                            .font(.system(size: 10))
+                            .foregroundStyle(secondary)
+                    }
+                    Spacer(minLength: 0)
                 }
-                .foregroundStyle(secondary)
-                .frame(width: 59)
-                .frame(minHeight: 58)
-                .background(paper.opacity(0.9), in: RoundedRectangle(cornerRadius: 12))
-                Image(systemName: day.isRestDay ? "pause.fill" :
-                      (day.kind?.systemImage ?? "plus.circle"))
-                    .foregroundStyle(gold)
-                    .font(.system(size: 17))
-                    .frame(width: 29)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(day.title)
-                        .font(.system(size: 13, weight: .semibold, design: .serif))
-                        .foregroundStyle(ink)
-                        .multilineTextAlignment(.leading)
-                        .lineLimit(2)
-                    Text(day.isRestDay ? tr("Recovery", "Restitusjon") :
-                         day.workouts.isEmpty ? tr("Add your workout", "Legg inn økt") :
-                         "\(day.workouts.count) " + tr("workouts", "økter") +
-                         " · \(day.totalBlocks) " + tr("blocks", "blokker"))
-                        .font(.system(size: 10))
-                        .foregroundStyle(secondary)
+                .frame(maxWidth: .infinity, minHeight: 65, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            Menu {
+                Button {
+                    selectedDay = day.weekday
+                } label: {
+                    Label(tr("View day", "Vis dag"), systemImage: "calendar")
                 }
-                Spacer(minLength: 0)
-                Image(systemName: "ellipsis").foregroundStyle(secondary)
-                    .frame(width: 24, height: 36)
+                Button {
+                    onAddWorkout(day.weekday)
+                } label: {
+                    Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
+                }
+                Button {
+                    onAddExercise(day.weekday, 0, .main)
+                } label: {
+                    Label(tr("Add exercise", "Legg til øvelse"), systemImage: "dumbbell")
+                }
+                Button {
+                    onMarkRest(day.weekday)
+                } label: {
+                    Label(tr("Set rest day", "Sett som hviledag"), systemImage: "moon.stars")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.subheadline)
+                    .foregroundStyle(secondary)
+                    .frame(width: 31, height: 54)
             }
-            .padding(8)
-            .frame(maxWidth: .infinity, minHeight: 72, alignment: .leading)
-            .background(.white.opacity(0.92), in: RoundedRectangle(cornerRadius: 14))
-            .overlay {
-                RoundedRectangle(cornerRadius: 14)
-                    .strokeBorder(divider.opacity(0.36), lineWidth: 0.6)
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 14))
+            .accessibilityLabel(tr("Actions for", "Handlinger for") + " " +
+                                day.date.formatted(.dateTime.weekday(.wide)))
         }
-        .buttonStyle(.plain)
+        .padding(7)
+        .background(.white.opacity(0.94), in: RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(divider.opacity(0.36), lineWidth: 0.6)
+                .allowsHitTesting(false)
+        }
     }
 
     private func detail(_ day: Day) -> some View {
@@ -491,7 +524,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 }
                 Spacer()
                 Menu {
-                    ForEach(1...52, id: \.self) { count in
+                    ForEach(weekCount...52, id: \.self) { count in
                         Button("\(count) " + tr("weeks", "uker")) {
                             weekCount = count
                             selectedWeek = min(selectedWeek, count - 1)
