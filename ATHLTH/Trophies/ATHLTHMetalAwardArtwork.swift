@@ -414,6 +414,7 @@ private struct ATHLTHGoldCupHandles: Shape {
 struct ATHLTHGoldPrestigeCupArtwork: View {
     let size: CGFloat
     let isUnlocked: Bool
+    var engravedName: String? = nil
 
     private let brass = Color(red: 0.54, green: 0.31, blue: 0.065)
     private let warmGold = Color(red: 0.86, green: 0.65, blue: 0.28)
@@ -563,10 +564,18 @@ struct ATHLTHGoldPrestigeCupArtwork: View {
                 .frame(width: size * 0.39, height: size * 0.075)
                 .overlay {
                     if size >= 78 {
-                        Text("ATHLTH")
+                        Text(size >= 145 && isUnlocked
+                            ? (engravedName?.trimmingCharacters(
+                                  in: .whitespacesAndNewlines)
+                                  .uppercased().isEmpty == false
+                                  ? engravedName!.uppercased()
+                                  : "ATHLTH")
+                            : "ATHLTH")
                             .font(.system(size: size * 0.057,
                                           weight: .heavy, design: .rounded))
-                            .tracking(size * 0.006)
+                            .tracking(size * 0.004)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.55)
                             .foregroundStyle(nearBlack.opacity(0.92))
                     }
                 }
