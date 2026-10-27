@@ -205,7 +205,7 @@ struct AIProgramBuilderView: View {
         let limit = aiChoosesFrequency && mode == .generate
             ? availableDays.count
             : sessionsPerWeek
-        return ATHLTHPlanDraftValidator.issues(
+        var issues = ATHLTHPlanDraftValidator.issues(
             in: draft,
             expectedWeeks: resolvedWeeks,
             allowedDayIndexes: availableDays,
@@ -213,6 +213,15 @@ struct AIProgramBuilderView: View {
             lockedDayKeys: lockedDays,
             requireFullWeeks: true
         )
+        if isStandaloneCoachJourney &&
+           standaloneIntake.injuryStatus == .considerations {
+            issues += ATHLTHAIInjurySafetyValidator.violations(
+                in: draft,
+                excludedMovements: standaloneIntake.excludedExerciseNames,
+                avoidLowerBody: standaloneIntake.injuryRestriction == .avoidLowerBody
+            ).map { "excludedExercise:($0)" }
+        }
+        return issues
     }
 
     private var canGenerate: Bool {
@@ -2339,10 +2348,20 @@ struct AIProgramBuilderView: View {
             guard validationIssues.isEmpty else {
                 preview = nil
                 if isStandaloneCoachJourney { coachJourneyStage = .intake }
-                errorMessage = ATHLTHLocalization.choose(
-                    english: "AI returned an incomplete or invalid plan. No changes have been saved. Try again.",
-                    norwegian: "AI leverte en ufullstendig eller ugyldig plan. Ingenting er lagret. Prøv på nytt."
-                )
+                let excluded = validationIssues
+                    .filter { $0.hasPrefix("excludedExercise:") }
+                    .map { String($0.dropFirst("excludedExercise:".count)) }
+                if !excluded.isEmpty {
+                    errorMessage = ATHLTHLocalization.choose(
+                        english: "AI suggested an exercise you said you cannot do: (excluded.joined(separator: ", ")). Nothing was saved. Review your restrictions before trying again.",
+                        norwegian: "AI foreslo en øvelse du har oppgitt at du ikke kan utføre: (excluded.joined(separator: ", ")). Ingenting ble lagret. Kontroller begrensningene før du prøver igjen."
+                    )
+                } else {
+                    errorMessage = ATHLTHLocalization.choose(
+                        english: "AI returned an incomplete or invalid plan. No changes have been saved. Try again.",
+                        norwegian: "AI leverte en ufullstendig eller ugyldig plan. Ingenting er lagret. Prøv på nytt."
+                    )
+                }
                 return
             }
             expandedPreviewWeeks.removeAll()
