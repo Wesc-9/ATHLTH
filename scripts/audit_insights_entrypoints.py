@@ -4,7 +4,7 @@
 Regression prevented: production tab 2 once displayed ATHLTHRecoveryView while
 the replacement ATHLTHInsightsView existed but was not mounted. The compatibility
 preview had Train and Insights in the wrong order, masking the issue in smoke
-screenshots. Keep Recovery as a detail destination, not a second root.
+screenshots. Retire the old Recovery screen; Readiness explanations stay in a modern sheet.
 """
 from __future__ import annotations
 
@@ -112,7 +112,7 @@ for token in (
     "whatChangedCard",
     "whatIfCard",
     "recoveryTrendSnapshot(days: 7)",
-    "ATHLTHRecoveryView(onSelectTab: onSelectTab)",
+    "ATHLTHReadinessExplanationSheet(",
 ):
     if token not in insights:
         fail(f"Required Insights element or data route is missing: {token}")
@@ -138,5 +138,11 @@ for token in (
         fail(f"Required real-data dependency missing: {token}")
 
 print("PASS: production and preview tab 2 both use the reference Insights view.")
-print("PASS: legacy Recovery remains a detail page only.")
+if "struct ATHLTHRecoveryView: View" in root or "ATHLTHRecoveryView(" in insights:
+    fail("The obsolete Recovery/Insights view or route must stay removed")
+if "regionTints: atlasTints" not in sections or "ForEach(allMuscles)" not in sections:
+    fail("Muscle map and expanded list must cover every recorded region")
+if "ATHLTHInsightsMuscleRanking.all(summary)" not in sections:
+    fail("All-muscle 100% reference ranking missing")
+print("PASS: obsolete Recovery screen removed; readiness opens a local factor explanation.")
 print("PASS: nonrepetitive editorial cards consume recorded Health, workout and check-in data.")
