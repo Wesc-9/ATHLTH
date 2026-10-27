@@ -11,6 +11,7 @@ struct ATHLTHInsightsView: View {
     @State private var selectedSection: ATHLTHInsightsSection = .overview
     @StateObject private var checkInStore = RecoverySorenessStore()
     @State private var showingCheckIn = false
+    @State private var showingReadinessExplanation = false
     @State private var recoverySnapshot = RecoveryTrendSnapshot.empty
     @State private var trainingDays: [ATHLTHInsightsTrainingDay] = []
     @State private var muscleSummary: ATHLTHInsightsMuscleSummary = .empty
@@ -66,6 +67,13 @@ struct ATHLTHInsightsView: View {
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showingCheckIn) {
                 RecoverySorenessLogView(store: checkInStore)
+            }
+            .sheet(isPresented: $showingReadinessExplanation) {
+                ATHLTHReadinessExplanationSheet(
+                    recovery: health.recovery,
+                    sleep: health.sleep,
+                    heart: health.heart
+                )
             }
             .refreshable {
                 guard isActive else { return }
@@ -436,14 +444,19 @@ struct ATHLTHInsightsView: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHTrainDesign.secondary)
                         .fixedSize(horizontal: false, vertical: true)
-                    NavigationLink {
-                        ATHLTHRecoveryView(onSelectTab: onSelectTab)
+                    Button {
+                        showingReadinessExplanation = true
                     } label: {
                         Label(tr("See details", "Se detaljer"),
                               systemImage: "arrow.up.right")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHTrainDesign.bronze)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(tr(
+                        "Opens a score breakdown without leaving Insights",
+                        "Åpner en detaljert forklaring uten å forlate Innsikt"
+                    ))
                 }
             }
 
