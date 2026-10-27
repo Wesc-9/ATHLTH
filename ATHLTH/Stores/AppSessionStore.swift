@@ -4350,6 +4350,25 @@ final class AppSessionStore: ObservableObject {
 
         var weeks = (1...weekCount).map(makeEmptyWeek)
 
+        if let zoned = ATHLTHZonedPlanLibrary.plan(for: entry.slug) {
+            // Zoned plans are real week-by-week programmes: never repeat the
+            // same generic recipe across all weeks or lose their HR targets.
+            for weekIndex in weeks.indices where weekIndex < zoned.weeks.count {
+                let sourceWeek = zoned.weeks[weekIndex]
+                let prescribed = ATHLTHZonedPlanLibrary.orderedRequiredSessions(in: sourceWeek)
+                for (slot, sourceSession) in prescribed.enumerated() {
+                    let dayIndex = slot < targetDayIndexes.count
+                        ? targetDayIndexes[slot]
+                        : ATHLTHZonedPlanLibrary.weekday(sourceSession.dayOfWeek)
+                    guard let destination = weeks[weekIndex].days.firstIndex(where: {
+                        $0.dayIndex == dayIndex
+                    }), let workout = ATHLTHZonedPlanLibrary.plannedSession(
+                        sourceSession, week: sourceWeek, sourcePlan: zoned
+                    ) else { continue }
+                    weeks[weekIndex].days[destination].sessions.append(workout)
+                }
+            }
+        } else {
         for weekIndex in weeks.indices {
             for (slot, dayIndex) in
                 targetDayIndexes.enumerated() {
@@ -4377,6 +4396,8 @@ final class AppSessionStore: ObservableObject {
                         )
                     ]
             }
+        }
+
         }
 
         let catalogTag = "catalog:\(entry.slug)"
