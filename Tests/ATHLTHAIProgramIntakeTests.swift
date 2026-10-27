@@ -43,7 +43,7 @@ final class ATHLTHAIProgramIntakeTests: XCTestCase {
         XCTAssertTrue(intake.coachContext.contains("70% outdoors / 30% gym"))
     }
 
-    func testSevereKneeRestrictionIsMandatoryInCoachContext() {
+    func testSevereKneeRestrictionIsDeliveredInDedicatedConsentField() throws {
         var intake = completeIntake()
         intake.injuryStatus = .considerations
         intake.injuryAreas = ["Knees"]
@@ -53,9 +53,12 @@ final class ATHLTHAIProgramIntakeTests: XCTestCase {
         intake.healthSharingAuthorized = true
 
         XCTAssertTrue(intake.isComplete)
-        XCTAssertTrue(intake.coachContext.contains("No lower-body training"))
-        XCTAssertTrue(intake.coachContext.contains("do not prescribe running"))
-        XCTAssertTrue(intake.coachContext.contains("Knees"))
+        let shared = try XCTUnwrap(intake.sharedInjurySafetyNotes)
+        XCTAssertTrue(shared.contains("No lower-body training"))
+        XCTAssertTrue(shared.contains("Knees"))
+        XCTAssertTrue(shared.contains("Knee is very painful"))
+        XCTAssertFalse(intake.coachContext.contains("Knee is very painful"))
+        XCTAssertFalse(intake.coachContext.contains("Knees"))
     }
 
     func testInjuryDetailsCannotBeSentWithoutConsent() {
@@ -73,6 +76,7 @@ final class ATHLTHAIProgramIntakeTests: XCTestCase {
         XCTAssertFalse(intake.coachContext.contains("Feet / ankles"))
         XCTAssertFalse(intake.coachContext.contains("Knees"))
         XCTAssertTrue(intake.coachContext.contains("not authorized sharing"))
+        XCTAssertNil(intake.sharedInjurySafetyNotes)
     }
 
     func testOptOutDoesNotRequireAdditionalInjuryFields() {
@@ -85,6 +89,80 @@ final class ATHLTHAIProgramIntakeTests: XCTestCase {
         XCTAssertTrue(intake.isComplete)
         intake.healthSharingAuthorized = true
         XCTAssertTrue(intake.validationIssues.contains("injuryAreas"))
+    }
+
+    func testExplicitlyForbiddenExerciseNamesReachConsentedSafetyField() throws {
+        var intake = completeIntake()
+        intake.injuryStatus = .considerations
+        intake.injuryAreas = ["Knees"]
+        intake.injurySeverity = .moderate
+        intake.injuryRestriction = .avoidAffectedArea
+        intake.injuryNotes = "No impact at all; painful knee."
+        intake.excludedMovements = "Knebøy\nLøping, hopping"
+        intake.healthSharingAuthorized = true
+
+        let shared = try XCTUnwrap(intake.sharedInjurySafetyNotes)
+        XCTAssertTrue(shared.contains("No impact at all"))
+        XCTAssertTrue(shared.contains("Knebøy"))
+        XCTAssertTrue(shared.contains("Løping"))
+        XCTAssertTrue(shared.contains("hopping"))
+        XCTAssertFalse(intake.coachContext.contains("No impact at all"))
+
+        intake.healthSharingAuthorized = false
+        XCTAssertNil(intake.sharedInjurySafetyNotes)
+        XCTAssertFalse(intake.coachContext.contains("Knebøy"))
+    }
+
+    func testForbiddenKneeExercisesAndEnglishSynonymsAreRejectedLocally() {
+        let squat = AIProgramDraftExercise(
+            name: "Barbell squats", sets: 3, reps: 8, targetRPE: nil,
+            restSeconds: 90, notes: nil
+        )
+        let session = AIProgramDraftSession(
+            title: "Strength", kind: "strength", durationMinutes: 40,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            notes: nil, exercises: [squat]
+        )
+        let draft = AIProgramDraft(
+            title: "Test", summary: "", weeks: [
+                AIProgramDraftWeek(
+                    weekNumber: 1, title: "Week 1", days: [
+                        AIProgramDraftDay(
+                            dayIndex: 1, title: "Monday", sessions: [session]
+                        )
+                    ]
+                )
+            ]
+        )
+        let forbidden = ATHLTHAIInjurySafetyValidator.violations(
+            in: draft, excludedMovements: ["Knebøy"], avoidLowerBody: false
+        )
+        XCTAssertEqual(forbidden, ["Barbell squats"])
+        XCTAssertTrue(ATHLTHAIInjurySafetyValidator.violations(
+            in: draft, excludedMovements: [], avoidLowerBody: true
+        ).contains("Barbell squats"))
+    }
+
+    func testRunningPlanIsRejectedWhenLowerBodyLoadingIsForbidden() {
+        let session = AIProgramDraftSession(
+            title: "Intervals", kind: "running", durationMinutes: 45,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            notes: nil, exercises: []
+        )
+        let draft = AIProgramDraft(
+            title: "Test", summary: "", weeks: [
+                AIProgramDraftWeek(
+                    weekNumber: 1, title: "Week 1", days: [
+                        AIProgramDraftDay(
+                            dayIndex: 1, title: "Monday", sessions: [session]
+                        )
+                    ]
+                )
+            ]
+        )
+        XCTAssertTrue(ATHLTHAIInjurySafetyValidator.violations(
+            in: draft, excludedMovements: [], avoidLowerBody: true
+        ).contains("running"))
     }
 
     private func completeIntake() -> ATHLTHAIProgramIntake {
