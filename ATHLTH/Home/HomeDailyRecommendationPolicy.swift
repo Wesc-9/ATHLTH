@@ -3,11 +3,11 @@ import Foundation
 /// Personalized, conservative suggestions derived from known plan + Health
 /// signals only. Never rewrites a user's plan or infers injury/medical status.
 enum HomeDailyRecommendationPolicy {
-    enum Readiness {
+    enum Readiness: Equatable {
         case ready, balanced, takeItEasy, recover, unavailable
     }
 
-    enum Destination {
+    enum Destination: Equatable {
         case insights, training
     }
 
