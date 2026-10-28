@@ -31,6 +31,8 @@ struct RecoveryAIContext: Codable, Hashable {
     let chronicWeeklyAverageMinutes: Double?
     let muscles: [RecoveryAIMuscleInput]
     let checkIn: RecoveryAICheckIn
+    /// Optional for compatibility with older local Coach snapshots.
+    var evidence: ATHLTHCoachHealthEvidence? = nil
 }
 
 
