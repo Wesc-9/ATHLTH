@@ -213,7 +213,8 @@ type StrengthCoachContext = {
 function normalizeCoachStrengthContext(value: unknown): StrengthCoachContext | null {
   if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
   const obj = value as Record<string, unknown>;
-  if (!Number.isInteger(obj.windowDays) || obj.windowDays !== 56) return null;
+  if (typeof obj.windowDays !== "number" ||
+      !Number.isInteger(obj.windowDays) || obj.windowDays !== 56) return null;
   const bounded = (raw: unknown, maximum: number): number => {
     const n = Number(raw);
     return Number.isFinite(n) ? Math.max(0, Math.min(n, maximum)) : 0;
