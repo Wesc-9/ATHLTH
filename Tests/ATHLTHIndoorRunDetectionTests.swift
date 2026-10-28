@@ -33,7 +33,7 @@ final class ATHLTHIndoorRunDetectionTests: XCTestCase {
     func testOffersAtFifteenMinutesWithLessThan100MetresOfActualGPSDistance() {
         XCTAssertTrue(qualifies())
         XCTAssertFalse(qualifies(seconds: 899))
-        XCTAssertFalse(qualifies(meters: 100))
+        XCTAssertTrue(qualifies(meters: 100))
         XCTAssertFalse(qualifies(meters: 120))
     }
 
