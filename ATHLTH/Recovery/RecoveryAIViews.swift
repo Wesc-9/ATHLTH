@@ -1394,8 +1394,8 @@ struct RecoveryCoachView: View {
         } message: {
             Text(
                 recoveryAIText(
-                    "ATHLTH will send your question, up to 16 recent chat messages, your current recovery measurements and a local summary of up to eight weeks of recorded strength and running training to Groq. The summary can include exercise names, working weights, repetitions, estimated 1RM and progress. This approval applies to this question only. Cancel to keep these records on your device.",
-                    "ATHLTH sender spørsmålet ditt, inntil 16 tidligere chatmeldinger, restitusjonsmålingene dine og en lokal analyse av inntil åtte ukers registrert styrke- og løpstrening til Groq. Analysen kan inneholde øvelsesnavn, vekt, repetisjoner, estimert 1RM og fremgang. Du godkjenner bare dette spørsmålet. Avbryt for å beholde disse dataene på telefonen."
+                    "With your approval, ATHLTH sends this question, up to 16 prior messages, source-dated recovery values, summaries of up to eight weeks of completed strength and running workouts, and a limited view of your active plan, upcoming workouts and goal titles. Training summaries can include exercise names, measured weights, repetitions, pace and estimated 1RM. For an active-plan change request, the plan schedule is sent to the plan-review service. Groq processes the AI request. This approval applies to this question only.",
+                    "Ved godkjenning sendes dette spørsmålet, inntil 16 tidligere meldinger, tidsstemplede restitusjonsverdier, sammendrag fra inntil åtte uker med fullførte styrke- og løpeøkter, samt begrenset informasjon om aktiv plan, kommende økter og måltitler. Treningsdata kan omfatte øvelsesnavn, registrerte vekter, repetisjoner, tempo og estimert 1RM. Ved planendring sendes planoppsettet til tjenesten for plangjennomgang. Groq behandler AI-forespørselen. Godkjenningen gjelder kun dette spørsmålet."
                 )
             )
         }
