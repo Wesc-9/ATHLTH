@@ -559,6 +559,21 @@ struct AIProgramBuilderView: View {
                     }
                 }
 
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Training profile notes (editable for this plan)",
+                        norwegian: "Notater fra treningsprofilen (kan endres her)"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    Spacer()
+                    if !coachFocusNotes.isEmpty {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Clear", norwegian: "Fjern"
+                        )) { coachFocusNotes = "" }
+                        .font(.caption.weight(.semibold))
+                    }
+                }
                 TextField(ATHLTHLocalization.choose(
                     english: "Other wishes for the plan (optional)",
                     norwegian: "Andre ønsker for planen (valgfritt)"),
@@ -819,6 +834,24 @@ struct AIProgramBuilderView: View {
                         }
                     }
 
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your saved profile notes — edit for this plan",
+                            norwegian: "Notater fra profilen – rediger for denne planen"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        Spacer()
+                        if !standaloneIntake.injuryNotes.isEmpty {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Clear", norwegian: "Fjern"
+                            )) {
+                                standaloneIntake.injuryNotes = ""
+                                standaloneIntake.healthSharingAuthorized = false
+                            }
+                            .font(.caption.weight(.semibold))
+                        }
+                    }
                     TextField(ATHLTHLocalization.choose(
                         english: "Describe pain, diagnosis or movements to avoid",
                         norwegian: "Beskriv smerte, diagnose eller bevegelser som må unngås"),
@@ -1797,6 +1830,21 @@ struct AIProgramBuilderView: View {
                     Text("Tell Coach what matters most")
                         .font(.subheadline.weight(.semibold))
 
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Prefilled from Training Profile — edit freely",
+                            norwegian: "Forhåndsutfylt fra Treningsprofil – rediger fritt"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        Spacer()
+                        if !coachFocusNotes.isEmpty {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Clear", norwegian: "Fjern"
+                            )) { coachFocusNotes = "" }
+                            .font(.caption.weight(.semibold))
+                        }
+                    }
                     TextField(
                         "Example: Improve my 10K pace without losing strength. Keep Mondays light and prioritize recovery after long runs.",
                         text: $coachFocusNotes,
