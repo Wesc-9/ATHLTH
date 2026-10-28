@@ -19,6 +19,7 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
     @State private var draftWorkoutTitle = ""
     @State private var draftWorkoutNotes = ""
     @State private var showingSaveToLibraryOptions = false
+    @State private var showingOverwritePicker = false
 
     private var currentWorkout: PlannedSession {
         session.standalonePlannedSessions.first {
@@ -86,7 +87,18 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                         difficulty: nil,
                         durationMinutes: currentWorkout.durationMinutes,
                         blocks: detailedBlocks,
-                        embeddedInDetails: true
+                        embeddedInDetails: true,
+                        onUpdateBlock: { index, block in
+                            var updated = currentWorkout
+                            var steps = detailedBlocks
+                            guard steps.indices.contains(index) else { return }
+                            steps[index] = block
+                            updated.workoutBlocks = steps
+                            // Edited blocks are the executable source of truth for this copy.
+                            updated.runningWorkout = nil
+                            updated.runningWorkouts = []
+                            session.updateStandalonePlannedSession(updated)
+                        }
                     )
                 }
 
@@ -144,6 +156,9 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
         .sheet(isPresented: $showingWorkoutTextEditor) {
             workoutTextEditor
         }
+        .sheet(isPresented: $showingOverwritePicker) {
+            overwriteWorkoutPicker
+        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Save to My Workouts?", norwegian: "Lagre i Mine økter?"
@@ -154,6 +169,11 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                 english: "Save as new workout", norwegian: "Lagre som ny økt"
             )) {
                 _ = session.saveSharedWorkout(currentWorkout)
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Overwrite saved workout", norwegian: "Lagre over eksisterende"
+            )) {
+                showingOverwritePicker = true
             }
             Button(ATHLTHLocalization.choose(
                 english: "Cancel", norwegian: "Avbryt"
@@ -176,6 +196,51 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                 }
             )
             .presentationDetents([.large])
+        }
+    }
+
+    private var overwriteWorkoutPicker: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose which saved workout to replace. Training plans will not change.",
+                        norwegian: "Velg hvilken lagret økt som skal erstattes. Treningsplaner endres ikke."
+                    ))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                }
+                ForEach(session.savedWorkoutTemplates) { saved in
+                    Button {
+                        if session.updateSavedWorkoutTemplate(currentWorkout, id: saved.id) {
+                            showingOverwritePicker = false
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: saved.kind.systemImage)
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            VStack(alignment: .leading) {
+                                Text(saved.title).font(.subheadline.weight(.semibold))
+                                Text(saved.kind.title).font(.caption).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "arrow.triangle.2.circlepath")
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Replace saved workout", norwegian: "Erstatt lagret økt"
+            ))
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
+                        showingOverwritePicker = false
+                    }
+                }
+            }
         }
     }
 
