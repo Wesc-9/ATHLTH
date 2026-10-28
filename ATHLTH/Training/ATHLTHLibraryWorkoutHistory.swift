@@ -57,8 +57,10 @@ enum ATHLTHLibraryWorkoutHistory {
         for workout in workouts where workout.isFinished {
             for exercise in workout.exercises {
                 let matchesIdentity = exercise.plannedExerciseID == id
+                // Planned exercise IDs may be plan-specific rather than library
+                // IDs. For built-in moves an exact canonical name is a safe
+                // fallback; custom exercises stay strictly identity-matched.
                 let matchesLegacyName = !isCustom &&
-                    exercise.plannedExerciseID == nil &&
                     ATHLTHExerciseReferenceResolver.key(exercise.exercise.name) == exactName
                 guard matchesIdentity || matchesLegacyName else { continue }
                 let completed = exercise.sets.filter(\.isCompleted)
