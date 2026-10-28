@@ -3883,10 +3883,29 @@ private struct ATHLTHNotificationSettingsView: View {
                             english: "Daily check-in reminder",
                             norwegian: "Daglig påminnelse om innsjekk"))
                         Text(ATHLTHLocalization.choose(
-                            english: "At most one reminder per day in the Home notification center. No push alert.",
-                            norwegian: "Høyst én påminnelse per dag i varslingssenteret på Hjem. Ingen push-varsel."))
+                            english: "One reminder in Activity plus a local iPhone notification at 09:00 if you have not checked in. Turn off here at any time.",
+                            norwegian: "Én påminnelse i Aktivitet og et lokalt iPhone-varsel kl. 09.00 hvis du ikke har sjekket inn. Kan slås av her."))
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+                }
+                if settings.dailyCheckInRemindersEnabled {
+                    if notifications.authorizationStatus == .notDetermined {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Enable iPhone notifications",
+                            norwegian: "Aktiver iPhone-varsler"
+                        )) {
+                            Task {
+                                await notifications.requestSystemNotificationPermission()
+                            }
+                        }
+                    } else if notifications.authorizationStatus == .denied {
+                        Text(ATHLTHLocalization.choose(
+                            english: "iPhone notifications are disabled for ATHLTH in iOS Settings. The reminder will still appear in Activity.",
+                            norwegian: "iPhone-varsler for ATHLTH er deaktivert i iOS-innstillinger. Påminnelsen vises fortsatt i Aktivitet."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
             }
