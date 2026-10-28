@@ -1721,179 +1721,141 @@ struct GoalCreationView: View {
         }
     }
 
+    /// A single light, readable wizard for all five steps, with one
+    /// navigation row and one pinned CTA. No duplicated hero/header layers.
     private var goalTypeScreen: some View {
-        ZStack(alignment: .top) {
-            goalStaticHeroBackdrop(height: 252)
-
-            ZStack(alignment: .bottom) {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        goalTypeHero
-
-                        VStack(spacing: 0) {
-                            categoryStep
-                                .padding(.horizontal, 16)
-                                .padding(.top, 12)
-                                .padding(.bottom, 90)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .background(
-                            goalFlowCanvas,
-                            in: UnevenRoundedRectangle(
-                                topLeadingRadius: 30,
-                                bottomLeadingRadius: 0,
-                                bottomTrailingRadius: 0,
-                                topTrailingRadius: 30,
-                                style: .continuous
-                            )
-                        )
-                        .offset(y: -22)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .scrollIndicators(.hidden)
-                .background(Color.clear)
-                .clipped()
-
-                footer
-            }
-        }
-        .background(goalFlowCanvas)
-        .clipped()
-        .ignoresSafeArea(edges: .top)
+        goalWizardContent
     }
 
     private var goalStepScreen: some View {
-        ZStack(alignment: .bottom) {
-            ScrollView {
-                VStack(spacing: 0) {
-                    goalLightStepHeader
+        goalWizardContent
+    }
 
-                    VStack(spacing: 14) {
-                        goalSelectedCategoryCard
+    private var goalWizardContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 19) {
+                goalWizardHeader
 
-                        Group {
-                            switch step {
-                            case 1:
-                                targetStep
-                            case 2:
-                                identityStep
-                            case 3:
-                                milestoneStep
-                            default:
-                                reviewStep
-                            }
+                if step == 0 {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "CHOOSE A DIRECTION",
+                            norwegian: "VELG RETNING"
+                        ))
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(2)
+                        .foregroundStyle(goalFlowGold)
+                        Spacer()
+                        Text(ATHLTHLocalization.choose(
+                            english: "7 choices", norwegian: "7 valg"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondary)
+                    }
+                    categoryStep
+                } else {
+                    goalSelectedCategoryCard
+                    Group {
+                        switch step {
+                        case 1: targetStep
+                        case 2: identityStep
+                        case 3: milestoneStep
+                        default: reviewStep
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 112)
                 }
-                .frame(maxWidth: .infinity)
             }
-            .scrollIndicators(.hidden)
-            .background(goalFlowCanvas)
-
+            .padding(.horizontal, 18)
+            .padding(.top, 18)
+            .padding(.bottom, 32)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+        .scrollDismissesKeyboard(.interactively)
+        .background(goalFlowCanvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             footer
         }
-        .background(goalFlowCanvas)
-        .ignoresSafeArea(edges: .top)
     }
 
-    // Small, consistent dismissal control for every step of the goal wizard.
-    // Dismiss works both when Goals opens from Home navigation and as a sheet.
-    private func goalCloseButton(onHero: Bool) -> some View {
-        Button {
-            dismiss()
-        } label: {
-            Image(systemName: "xmark")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(
-                    onHero ? Color.white : ATHLTHTheme.primaryText
-                )
-                .frame(width: 44, height: 44)
-                .background(
-                    onHero
-                        ? Color.black.opacity(0.24)
-                        : Color.white.opacity(0.94),
-                    in: Circle()
-                )
-                .overlay {
-                    Circle()
-                        .stroke(
-                            onHero
-                                ? Color.white.opacity(0.30)
-                                : Color.black.opacity(0.055),
-                            lineWidth: 0.8
-                        )
-                }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(
-            ATHLTHLocalization.choose(
-                english: "Close goals",
-                norwegian: "Lukk mål"
-            )
-        )
-    }
-
-    private var goalLightStepHeader: some View {
-        VStack(alignment: .leading, spacing: 19) {
+    private var goalWizardHeader: some View {
+        VStack(alignment: .leading, spacing: 20) {
             HStack(spacing: 12) {
-                Button {
-                    withAnimation(.snappy(duration: 0.22)) {
-                        step = max(0, step - 1)
+                if step > 0 {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.20)) {
+                            step = max(0, step - 1)
+                        }
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 15, weight: .semibold))
+                            .frame(width: 43, height: 43)
+                            .background(Color.white, in: Circle())
+                            .overlay {
+                                Circle().strokeBorder(
+                                    ATHLTHPlanDesign.warmDivider.opacity(0.7),
+                                    lineWidth: 0.8
+                                )
+                            }
                     }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 17, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .frame(width: 42, height: 42)
-                        .background(Color.white, in: Circle())
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Previous step", norwegian: "Forrige steg"
+                    ))
+                } else {
+                    Image(systemName: "target")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(goalFlowGold)
+                        .frame(width: 43, height: 43)
+                        .background(ATHLTHPlanDesign.selectedSurface,
+                                    in: RoundedRectangle(cornerRadius: 14))
+                        .accessibilityHidden(true)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Back",
-                        norwegian: "Tilbake"
-                    )
-                )
-
                 Spacer()
-
-                Text("ATHLTH")
-                    .font(.system(size: 13, weight: .semibold))
-                    .tracking(4)
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-
+                Text("ATHLTH / GOALS")
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(2.6)
+                    .foregroundStyle(ATHLTHPlanDesign.secondary)
                 Spacer()
-
-                goalCloseButton(onHero: false)
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(width: 43, height: 43)
+                        .background(Color.white, in: Circle())
+                        .overlay {
+                            Circle().strokeBorder(
+                                ATHLTHPlanDesign.warmDivider.opacity(0.7),
+                                lineWidth: 0.8
+                            )
+                        }
+                }
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Close goal builder", norwegian: "Lukk målopprettelse"
+                ))
             }
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .buttonStyle(.plain)
 
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Text(
-                        ATHLTHLocalization.format(
-                            english: "Step %d of 5",
-                            norwegian: "Steg %d av 5",
-                            step + 1
-                        )
-                    )
+                    Text(ATHLTHLocalization.format(
+                        english: "STEP %d OF 5", norwegian: "STEG %d AV 5", step + 1
+                    ))
+                    .tracking(1.5)
                     Spacer()
                     Text(stepTitle)
                 }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(ATHLTHPlanDesign.secondary)
 
                 HStack(spacing: 5) {
                     ForEach(0..<5, id: \.self) { index in
                         Capsule()
-                            .fill(
-                                index <= step
-                                    ? goalFlowGold
-                                    : ATHLTHPlanDesign.warmDivider.opacity(0.8)
-                            )
+                            .fill(index <= step
+                                ? goalFlowGold
+                                : ATHLTHPlanDesign.warmDivider)
                             .frame(maxWidth: .infinity)
                             .frame(height: 4)
                     }
@@ -1901,325 +1863,29 @@ struct GoalCreationView: View {
                 .accessibilityHidden(true)
             }
 
-            VStack(alignment: .leading, spacing: 7) {
-                Text(goalStepHeroTitle)
-                    .font(.system(size: 29, weight: .bold, design: .rounded))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+            VStack(alignment: .leading, spacing: 9) {
+                Text(step == 0
+                    ? ATHLTHLocalization.choose(
+                        english: "What would you like to achieve?",
+                        norwegian: "Hva vil du oppnå?"
+                    ) : goalStepHeroTitle
+                )
+                .font(.system(size: 34, weight: .regular, design: .serif))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
 
-                Text(goalStepHeroSubtitle)
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(step == 0
+                     ? ATHLTHLocalization.choose(
+                         english: "Start with the goal that matters to you.",
+                         norwegian: "Velg det som betyr mest for deg. Vi tilpasser resten."
+                     ) : goalStepHeroSubtitle
+                )
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHPlanDesign.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(.horizontal, 20)
-        .padding(.top, 56)
-        .padding(.bottom, 20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white,
-                    ATHLTHPlanDesign.warmSurface
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-        )
-    }
-
-    private func goalStaticHeroBackdrop(
-        height: CGFloat
-    ) -> some View {
-        GeometryReader { proxy in
-            ZStack {
-                Color.black
-
-                Image(goalHeroAssetName)
-                    .resizable()
-                    .interpolation(.high)
-                    .antialiased(true)
-                    .scaledToFill()
-                    .frame(
-                        width: proxy.size.width,
-                        height: height
-                    )
-                    .clipped()
-
-                LinearGradient(
-                    stops: [
-                        .init(
-                            color: Color.black.opacity(0.10),
-                            location: 0
-                        ),
-                        .init(
-                            color: Color.black.opacity(0.02),
-                            location: 0.48
-                        ),
-                        .init(
-                            color: Color.black.opacity(0.18),
-                            location: 1
-                        )
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-            }
-            .frame(
-                width: proxy.size.width,
-                height: height
-            )
-            .clipped()
-        }
-        .frame(height: height)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    private var goalHeroAssetName: String {
-        switch category {
-        case .endurance, .event:
-            return "GoalRunning"
-        case .strength:
-            return "GoalStrength"
-        case .body:
-            return "GoalRecovery"
-        case .consistency:
-            return "GoalConsistency"
-        case .recovery:
-            return "GoalRelax"
-        case .custom:
-            return "GoalMountain"
-        }
-    }
-
-    private var goalStepHero: some View {
-        GeometryReader { proxy in
-            ZStack {
-                LinearGradient(
-                    stops: [
-                        .init(
-                            color: Color.black.opacity(0.30),
-                            location: 0
-                        ),
-                        .init(
-                            color: Color.black.opacity(0.15),
-                            location: 0.38
-                        ),
-                        .init(
-                            color: Color.black.opacity(0.76),
-                            location: 1
-                        )
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 0
-                ) {
-                    HStack(spacing: 11) {
-                        Button {
-                            withAnimation(
-                                .snappy(duration: 0.22)
-                            ) {
-                                step = max(
-                                    0,
-                                    step - 1
-                                )
-                            }
-                        } label: {
-                            Image(
-                                systemName:
-                                    "chevron.left"
-                            )
-                            .font(
-                                .system(
-                                    size: 15,
-                                    weight: .bold
-                                )
-                            )
-                            .foregroundStyle(.white)
-                            .frame(
-                                width: 40,
-                                height: 40
-                            )
-                            .background(
-                                .ultraThinMaterial,
-                                in: Circle()
-                            )
-                            .overlay {
-                                Circle()
-                                    .stroke(
-                                        Color.white.opacity(0.24),
-                                        lineWidth: 0.8
-                                    )
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            ATHLTHLocalization.format(
-                                english: "Back",
-                                norwegian: "Tilbake"
-                            )
-                        )
-
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
-                            Text("ATHLTH")
-                                .font(
-                                    .system(
-                                        size: 15,
-                                        weight: .bold,
-                                        design: .rounded
-                                    )
-                                )
-                                .tracking(4.0)
-
-                            Text(
-                                "MOVE BETTER  LIVE LONGER"
-                            )
-                            .font(
-                                .system(
-                                    size: 8.2,
-                                    weight: .semibold
-                                )
-                            )
-                            .tracking(2.0)
-                            .opacity(0.78)
-                        }
-                        .foregroundStyle(.white)
-
-                        Spacer()
-
-                        Button {
-                            dismiss()
-                        } label: {
-                            Text(
-                                ATHLTHLocalization.format(
-                                    english: "Cancel",
-                                    norwegian: "Avbryt"
-                                )
-                            )
-                            .font(
-                                .system(
-                                    size: 11.5,
-                                    weight: .semibold
-                                )
-                            )
-                            .foregroundStyle(.white)
-                            .padding(.horizontal, 12)
-                            .frame(height: 34)
-                            .background(
-                                .ultraThinMaterial,
-                                in: Capsule()
-                            )
-                            .overlay {
-                                Capsule()
-                                    .stroke(
-                                        Color.white.opacity(0.20),
-                                        lineWidth: 0.7
-                                    )
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    Spacer(minLength: 18)
-
-                    HStack {
-                        Text(
-                            ATHLTHLocalization.format(
-                                english: "Step %d of 5",
-                                norwegian: "Steg %d av 5",
-                                step + 1
-                            )
-                        )
-
-                        Spacer()
-
-                        Text(stepTitle)
-                    }
-                    .font(
-                        .system(
-                            size: 11.5,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        .white.opacity(0.90)
-                    )
-
-                    GeometryReader { barProxy in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(
-                                    Color.white.opacity(0.28)
-                                )
-
-                            Capsule()
-                                .fill(goalFlowGold)
-                                .frame(
-                                    width:
-                                        barProxy.size.width
-                                        * CGFloat(step + 1)
-                                        / 5
-                                )
-                        }
-                    }
-                    .frame(height: 4)
-                    .padding(.top, 7)
-                    .padding(.bottom, 15)
-
-                    Text(goalStepHeroTitle)
-                        .font(
-                            .system(
-                                size: 27,
-                                weight: .bold,
-                                design: .rounded
-                            )
-                        )
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.82)
-
-                    Text(goalStepHeroSubtitle)
-                        .font(
-                            .system(
-                                size: 13,
-                                weight: .medium
-                            )
-                        )
-                        .foregroundStyle(
-                            .white.opacity(0.88)
-                        )
-                        .lineLimit(2)
-                        .fixedSize(
-                            horizontal: false,
-                            vertical: true
-                        )
-                        .padding(.top, 4)
-                }
-                .padding(.horizontal, 18)
-                .padding(.top, 50)
-                .padding(.bottom, 31)
-                .shadow(
-                    color: Color.black.opacity(0.22),
-                    radius: 10,
-                    y: 3
-                )
-            }
-            .frame(
-                width: proxy.size.width,
-                height: 286
-            )
-            .clipped()
-        }
-        .frame(height: 286)
-        .clipped()
     }
 
     private var goalSelectedCategoryCard:
@@ -2380,315 +2046,10 @@ struct GoalCreationView: View {
         }
     }
 
-    private var goalTypeHero: some View {
-        GeometryReader { proxy in
-            ZStack {
-                LinearGradient(
-                    stops: [
-                        .init(
-                            color: Color.black.opacity(0.28),
-                            location: 0
-                        ),
-                        .init(
-                            color: Color.black.opacity(0.12),
-                            location: 0.40
-                        ),
-                        .init(
-                            color: Color.black.opacity(0.76),
-                            location: 1
-                        )
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 0
-                ) {
-                    HStack(alignment: .center, spacing: 8) {
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "chevron.left")
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    Color.black.opacity(0.24),
-                                    in: Circle()
-                                )
-                                .overlay {
-                                    Circle()
-                                        .stroke(
-                                            Color.white.opacity(0.30),
-                                            lineWidth: 0.8
-                                        )
-                                }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            ATHLTHLocalization.choose(
-                                english: "Back to previous screen",
-                                norwegian: "Tilbake til forrige skjerm"
-                            )
-                        )
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("ATHLTH")
-                                .font(.system(size: 20, weight: .medium))
-                                .tracking(5)
-
-                            Text("MOVE BETTER  LIVE LONGER")
-                                .font(.system(size: 8, weight: .semibold))
-                                .tracking(1.5)
-                                .opacity(0.82)
-                        }
-                        .foregroundStyle(.white)
-
-                        Spacer(minLength: 0)
-
-                        goalCloseButton(onHero: true)
-                    }
-
-                    Spacer(minLength: 10)
-
-                    HStack {
-                        Text(
-                            ATHLTHLocalization.format(
-                                english: "Step 1 of 5",
-                                norwegian: "Steg 1 av 5"
-                            )
-                        )
-
-                        Spacer()
-
-                        Text(
-                            ATHLTHLocalization.format(
-                                english: "Goal type",
-                                norwegian: "Måltype"
-                            )
-                        )
-                    }
-                    .font(
-                        .system(
-                            size: 12,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        .white.opacity(0.92)
-                    )
-
-                    GeometryReader { barProxy in
-                        ZStack(alignment: .leading) {
-                            Capsule()
-                                .fill(
-                                    Color.white.opacity(0.30)
-                                )
-
-                            Capsule()
-                                .fill(goalFlowGold)
-                                .frame(
-                                    width:
-                                        barProxy.size.width
-                                        * 0.20
-                                )
-                        }
-                    }
-                    .frame(height: 4)
-                    .padding(.top, 6)
-                    .padding(.bottom, 12)
-
-                    Text(
-                        ATHLTHLocalization.format(
-                            english:
-                                "What do you want to achieve?",
-                            norwegian:
-                                "Hva vil du oppnå?"
-                        )
-                    )
-                    .font(
-                        .system(
-                            size: 30,
-                            weight: .bold,
-                            design: .rounded
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .minimumScaleFactor(0.78)
-                    .lineLimit(1)
-
-                    Text(
-                        ATHLTHLocalization.format(
-                            english:
-                                "Choose the goal type that fits best. You can adjust the target in the next step.",
-                            norwegian:
-                                "Velg måltypen som passer best. Du kan justere målet i neste steg."
-                        )
-                    )
-                    .font(
-                        .system(
-                            size: 13.5,
-                            weight: .medium
-                        )
-                    )
-                    .foregroundStyle(
-                        .white.opacity(0.90)
-                    )
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                    .padding(.top, 6)
-                }
-                .padding(.horizontal, 22)
-                .padding(.top, 40)
-                .padding(.bottom, 18)
-                .shadow(
-                    color: Color.black.opacity(0.24),
-                    radius: 10,
-                    y: 3
-                )
-            }
-            .frame(
-                width: proxy.size.width,
-                height: 252
-            )
-            .clipped()
-        }
-        .frame(height: 252)
-        .clipped()
-    }
-
-    private var goalFlowHeader: some View {
-        ZStack {
-            HStack {
-                Button {
-                    withAnimation(
-                        .snappy(duration: 0.22)
-                    ) {
-                        step = max(0, step - 1)
-                    }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(
-                            .system(
-                                size: 15,
-                                weight: .bold
-                            )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme.primaryText
-                        )
-                        .frame(
-                            width: 40,
-                            height: 40
-                        )
-                        .background(
-                            Color.white.opacity(0.90),
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    Color.black.opacity(0.05),
-                                    lineWidth: 0.7
-                                )
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.format(
-                        english: "Back",
-                        norwegian: "Tilbake"
-                    )
-                )
-
-                Spacer()
-
-                Button {
-                    dismiss()
-                } label: {
-                    Text(
-                        ATHLTHLocalization.format(
-                            english: "Cancel",
-                            norwegian: "Avbryt"
-                        )
-                    )
-                    .font(
-                        .subheadline.weight(
-                            .semibold
-                        )
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
-                    .padding(.horizontal, 10)
-                    .frame(height: 36)
-                }
-                .buttonStyle(.plain)
-            }
-
-            Text(
-                ATHLTHLocalization.format(
-                    english: "Create Goal",
-                    norwegian: "Opprett mål"
-                )
-            )
-            .font(.headline.weight(.bold))
-            .foregroundStyle(
-                ATHLTHTheme.primaryText
-            )
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 6)
-        .padding(.bottom, 10)
-    }
-
     private var goalImageButtonTitle: String {
         imageData == nil
             ? "Choose from Photos"
             : "Change photo"
-    }
-
-    private var progressHeader: some View {
-        VStack(spacing: 7) {
-            HStack {
-                Text(
-                    ATHLTHLocalization.format(
-                        english: "Step %d of 5",
-                        norwegian: "Steg %d av 5",
-                        step + 1
-                    )
-                )
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-
-                Spacer()
-
-                Text(stepTitle)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-            }
-
-            ProgressView(
-                value: Double(step + 1),
-                total: 5
-            )
-            .tint(goalFlowGold)
-            .scaleEffect(
-                x: 1,
-                y: 0.72,
-                anchor: .center
-            )
-        }
-        .padding(.horizontal, 18)
-        .padding(.bottom, 4)
     }
 
     private var categoryStep: some View {
