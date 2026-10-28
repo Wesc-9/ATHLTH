@@ -779,33 +779,41 @@ struct RecoveryCoachInboxDestinationView:
 
     private var coachContext:
         RecoveryAIContext {
-        RecoveryAIContext(
-            recoveryScore:
-                health.recovery.score,
-            recoveryState:
-                health.recovery.state.title,
-            recoveryDetail:
-                health.recovery.detail,
-            sleepSeconds:
-                health.sleep.totalAsleep > 0
-                    ? health.sleep
-                        .totalAsleep
-                    : nil,
-            baselineSleepSeconds:
-                health.recovery
-                    .averageSleepDuration,
-            hrvMilliseconds:
-                health.heart
-                    .hrvMilliseconds,
-            baselineHRVMilliseconds:
-                health.recovery
-                    .baselineHRVMilliseconds,
-            restingHeartRate:
-                health.heart
-                    .restingHeartRate,
-            baselineRestingHeartRate:
-                health.recovery
-                    .baselineRestingHeartRate,
+        let now = Date()
+        let sleepIsRecent = ATHLTHCoachHealthEvidence.valid(
+            health.sleep.sleepEnd, now: now, maxAgeHours: 48
+        )
+        let hrvIsRecent = ATHLTHCoachHealthEvidence.valid(
+            health.heart.hrvDate, now: now, maxAgeHours: 72
+        )
+        let restingIsRecent = ATHLTHCoachHealthEvidence.valid(
+            health.heart.restingHeartRateDate, now: now, maxAgeHours: 72
+        )
+        let someSourceIsRecent = sleepIsRecent || hrvIsRecent || restingIsRecent
+        var result = RecoveryAIContext(
+            recoveryScore: someSourceIsRecent ? health.recovery.score : nil,
+            recoveryState: someSourceIsRecent
+                ? health.recovery.state.title : recoveryAIText(
+                    "No recent measurements", "Ingen nyere målinger"
+                ),
+            recoveryDetail: someSourceIsRecent
+                ? recoveryAIText(
+                    "Locally calculated readiness. Individual measurements are dated and may be missing or stale.",
+                    "Lokalt beregnet dagsform. Enkelte målinger er tidsstemplet og kan mangle eller være eldre."
+                ) : recoveryAIText(
+                    "Insufficient recent measurements for a current readiness assessment.",
+                    "For få nyere målinger til å vurdere dagsformen i dag."
+                ),
+            sleepSeconds: sleepIsRecent && health.sleep.totalAsleep > 0
+                ? health.sleep.totalAsleep : nil,
+            baselineSleepSeconds: sleepIsRecent
+                ? health.recovery.averageSleepDuration : nil,
+            hrvMilliseconds: hrvIsRecent ? health.heart.hrvMilliseconds : nil,
+            baselineHRVMilliseconds: hrvIsRecent
+                ? health.recovery.baselineHRVMilliseconds : nil,
+            restingHeartRate: restingIsRecent ? health.heart.restingHeartRate : nil,
+            baselineRestingHeartRate: restingIsRecent
+                ? health.recovery.baselineRestingHeartRate : nil,
             yesterdayTrainingMinutes:
                 yesterdayTrainingMinutes,
             acuteTrainingMinutes:
@@ -855,6 +863,14 @@ struct RecoveryCoachInboxDestinationView:
                             .todayMotivation
                 )
         )
+        result.evidence = ATHLTHCoachHealthEvidence(
+            capturedAt: ISO8601DateFormatter().string(from: now),
+            sleepEndedAt: ATHLTHCoachHealthEvidence.iso(health.sleep.sleepEnd),
+            hrvSampledAt: ATHLTHCoachHealthEvidence.iso(health.heart.hrvDate),
+            restingPulseSampledAt:
+                ATHLTHCoachHealthEvidence.iso(health.heart.restingHeartRateDate)
+        )
+        return result
     }
 
     private var yesterdayTrainingMinutes:
