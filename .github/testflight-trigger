@@ -175,3 +175,4 @@ ATHLTH 2.0.1 build 109 — TestFlight explicitly requested 2026-10-28. Latest go
 ATHLTH 2.0.1 build 109 — 2026-10-28 retry after replacing removed ATHLTHRecoveryView with RecoverySorenessLogView in daily check-in notifications; require green same-commit iOS tests and backend, signed iPhone/Watch/Widget archive, and verified App Store Connect upload.
 
 ATHLTH 2.0.1 build 109 — user-approved retry 2026-10-28 after updating two stale XCTest expectations (91 strength templates and 30s/180s active jog recovery), code unchanged; require green same-commit XCTest/backend and signed archive before Apple upload.
+ATHLTH 2.0.2 build 110 — explicit user-authorized TestFlight upload 2026-10-28 Europe/Oslo; require same-commit successful iOS XCTest and backend regression workflows, validated signed iPhone/Watch/Widget archive, verified App Store Connect upload. Preserve release/v2.0.2 for continued development; do not merge main.
