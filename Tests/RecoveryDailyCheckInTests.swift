@@ -124,4 +124,73 @@ final class RecoveryDailyCheckInTests: XCTestCase {
         XCTAssertNil(store.todayEnergy)
         XCTAssertEqual(store.todayRatings["Quads"], .moderate)
     }
+    func testSystemReminderSchedulesSevenAccountScopedDaysAndSkipsCompletedToday() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Oslo")!
+        let now = calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 28, hour: 7, minute: 30))!
+        let account = UUID()
+        let expected = ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
+            enabled: true, completedToday: false,
+            accountID: account, now: now, calendar: calendar
+        )
+        XCTAssertEqual(expected.count, 7)
+        XCTAssertEqual(calendar.component(.hour, from: expected[0].date), 9)
+        XCTAssertTrue(expected.allSatisfy {
+            $0.key.hasPrefix("insights.daily-check-in." + account.uuidString)
+        })
+        let done = ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
+            enabled: true, completedToday: true,
+            accountID: account, now: now, calendar: calendar
+        )
+        XCTAssertEqual(done.count, 6)
+        XCTAssertFalse(done.contains { $0.key == expected[0].key })
+        XCTAssertEqual(done.first?.key, expected[1].key)
+    }
+
+    func testPastMorningReminderNotDeliveredLateAndDisabledMeansNone() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Oslo")!
+        let now = calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 28, hour: 10))!
+        let account = UUID()
+        let future = ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
+            enabled: true, completedToday: false, accountID: account,
+            now: now, calendar: calendar
+        )
+        XCTAssertEqual(future.count, 6)
+        XCTAssertFalse(future.contains {
+            calendar.isDate($0.date, inSameDayAs: now)
+        })
+        XCTAssertTrue(ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
+            enabled: false, completedToday: false, accountID: account,
+            now: now, calendar: calendar
+        ).isEmpty)
+    }
+
+    func testCheckInNotificationTapCannotOpenOtherAccountsData() {
+        let account = UUID()
+        let info: [AnyHashable: Any] = [
+            "athlth_kind": "daily_check_in",
+            "athlthCheckInAccountID": account.uuidString
+        ]
+        XCTAssertTrue(
+            ATHLTHDailyCheckInReminderScheduler.isCurrentAccountCheckInTap(
+                info, accountID: account
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHDailyCheckInReminderScheduler.isCurrentAccountCheckInTap(
+                info, accountID: UUID()
+            )
+        )
+        XCTAssertFalse(
+            ATHLTHDailyCheckInReminderScheduler.isCurrentAccountCheckInTap(
+                ["athlth_kind": "challenge",
+                 "athlthCheckInAccountID": account.uuidString],
+                accountID: account
+            )
+        )
+    }
+
 }
