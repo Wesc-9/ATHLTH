@@ -46,6 +46,7 @@ final class APNsPushManager: ObservableObject {
         ATHLTHPushNavigationTarget?
     @Published private(set) var pendingChallengeNotification:
         ATHLTHChallengeNotificationRoute?
+    @Published private(set) var pendingDailyCheckInAccountID: UUID?
 
     private let client: SupabaseClient
     private var deviceTokenHex: String?
@@ -81,6 +82,12 @@ final class APNsPushManager: ObservableObject {
         // Persist the target on the singleton before notifying SwiftUI.
         // This handles both a running app and a cold launch where the root
         // tab view has not yet subscribed to the notification event.
+        if (userInfo["athlth_kind"] as? String) == "daily_check_in",
+           let value = userInfo["athlthCheckInAccountID"] as? String,
+           let accountID = UUID(uuidString: value) {
+            pendingDailyCheckInAccountID = accountID
+            return
+        }
         if let route = ATHLTHChallengeNotificationRoute.resolve(
             userInfo: userInfo
         ) {
@@ -136,6 +143,10 @@ final class APNsPushManager: ObservableObject {
 
     func clearPendingChallengeNotification() {
         pendingChallengeNotification = nil
+    }
+
+    func clearPendingDailyCheckIn() {
+        pendingDailyCheckInAccountID = nil
     }
 
     func receive(deviceToken: Data) {
