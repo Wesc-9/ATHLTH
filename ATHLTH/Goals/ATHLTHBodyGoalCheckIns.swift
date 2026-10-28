@@ -74,6 +74,21 @@ enum ATHLTHBodyGoalCheckInPolicy {
         return result
     }
 
+    static func completedPeriod(
+        goal: ATHLTHGoal, due: Date,
+        profile: ATHLTHTrainingProfile,
+        calendar: Calendar = .current
+    ) -> Bool {
+        guard let config = goal.bodyMeasurementGoal,
+              let prior = calendar.date(
+                byAdding: .day, value: -config.checkInIntervalDays,
+                to: calendar.startOfDay(for: due)
+              ) else { return true }
+        return profile.readings(for: config.metric).contains {
+            $0.date > prior && $0.date <= Date()
+        }
+    }
+
     /// One in-app activity per actual measurement period, max 3 days late.
     /// A reading between two due dates counts as completing that period.
     static func dueUnmeasuredPeriod(
@@ -93,16 +108,13 @@ enum ATHLTHBodyGoalCheckInPolicy {
                 byAdding: .day, value: index * config.checkInIntervalDays,
                 to: start
             ) else { continue }
-            if due > now { break }
-            if now.timeIntervalSince(due) > 3 * 86_400 { continue }
-            let previous = calendar.date(
-                byAdding: .day, value: (index - 1) * config.checkInIntervalDays,
-                to: start
-            ) ?? start
-            let recorded = profile.readings(for: config.metric).contains {
-                $0.date > previous && $0.date <= now
-            }
-            if !recorded { return due }
+            let fire = calendar.date(
+                bySettingHour: 9, minute: 0, second: 0, of: due
+            ) ?? due
+            if fire > now { break }
+            if now.timeIntervalSince(fire) > 3 * 86_400 { continue }
+            if !completedPeriod(goal: goal, due: due, profile: profile,
+                                calendar: calendar) { return due }
         }
         return nil
     }
@@ -123,7 +135,10 @@ enum ATHLTHBodyGoalReminderScheduler {
     private static let prefix = "athlth.bodyGoal."
     private static var generation = 0
 
-    static func sync(goals: [ATHLTHGoal], userID: UUID) async {
+    static func sync(
+        goals: [ATHLTHGoal], profile: ATHLTHTrainingProfile,
+        userID: UUID
+    ) async {
         generation += 1
         let requestGeneration = generation
         let center = UNUserNotificationCenter.current()
@@ -142,7 +157,11 @@ enum ATHLTHBodyGoalReminderScheduler {
 
         let now = Date()
         let active = goals.flatMap { goal -> [(Date, ATHLTHGoal)] in
-            dueDatesForSchedule(goal, now: now).map { ($0, goal) }
+            dueDatesForSchedule(goal, now: now).filter {
+                !ATHLTHBodyGoalCheckInPolicy.completedPeriod(
+                    goal: goal, due: $0, profile: profile
+                )
+            }.map { ($0, goal) }
         }.sorted { $0.0 < $1.0 }.prefix(40)
         for (date, goal) in active {
             guard generation == requestGeneration else { return }
