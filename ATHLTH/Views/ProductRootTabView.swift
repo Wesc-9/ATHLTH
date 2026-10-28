@@ -751,6 +751,8 @@ struct ATHLTHHomeView: View {
     @State private var showingGlobalSearch = false
     @State private var showingHomeTodayCalendarAll = false
     @State private var showingHomeCalendarWorkoutPicker = false
+    @State private var homeCalendarPendingKind: WorkoutKind?
+    @State private var homeCalendarPendingCustom = false
     @State private var selectedHomeStandaloneWorkout: PlannedSession?
     @State private var selectedHomeAllStandaloneWorkout: PlannedSession?
     @State private var selectedHomeStrengthSession: PlannedSession?
@@ -1228,7 +1230,15 @@ struct ATHLTHHomeView: View {
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
             }
-            .sheet(isPresented: $showingHomeCalendarWorkoutPicker) {
+            .sheet(isPresented: $showingHomeCalendarWorkoutPicker, onDismiss: {
+                if let kind = homeCalendarPendingKind {
+                    homeCalendarPendingKind = nil
+                    pendingHomeQuickStartKind = kind
+                } else if homeCalendarPendingCustom {
+                    homeCalendarPendingCustom = false
+                    showingCustomQuickStart = true
+                }
+            }) {
                 homeCalendarWorkoutPicker
                     .presentationDetents([.medium, .large])
                     .presentationDragIndicator(.visible)
@@ -2147,8 +2157,8 @@ struct ATHLTHHomeView: View {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
                         ForEach(quickStartKinds) { kind in
                             Button {
+                                homeCalendarPendingKind = kind
                                 showingHomeCalendarWorkoutPicker = false
-                                pendingHomeQuickStartKind = kind
                             } label: {
                                 VStack(alignment: .leading, spacing: 12) {
                                     Image(systemName: kind.systemImage)
@@ -2167,8 +2177,8 @@ struct ATHLTHHomeView: View {
                         }
 
                         Button {
+                            homeCalendarPendingCustom = true
                             showingHomeCalendarWorkoutPicker = false
-                            showingCustomQuickStart = true
                         } label: {
                             VStack(alignment: .leading, spacing: 12) {
                                 Image(systemName: "plus.circle")
