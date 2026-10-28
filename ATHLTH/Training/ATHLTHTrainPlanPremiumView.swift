@@ -1222,11 +1222,20 @@ struct ATHLTHTrainPlanPremiumView: View {
             plan, healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
-        let total = plan.weeks.flatMap(\.days).flatMap(\.sessions)
-            .filter { !$0.isExplicitRestDay }.count
-        let completed = plan.weeks.flatMap(\.days).flatMap(\.sessions)
-            .filter { !$0.isExplicitRestDay &&
-                isPremiumPlanWorkoutCompleted($0, plan: plan) }.count
+        // Traverse scheduled sessions once instead of flattening the whole
+        // plan twice and allocating intermediate arrays for both counts.
+        var total = 0
+        var completed = 0
+        for week in plan.weeks {
+            for day in week.days {
+                for workout in day.sessions where !workout.isExplicitRestDay {
+                    total += 1
+                    if isPremiumPlanWorkoutCompleted(workout, plan: plan) {
+                        completed += 1
+                    }
+                }
+            }
+        }
         return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
