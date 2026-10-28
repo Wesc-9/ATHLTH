@@ -563,16 +563,16 @@ struct RunningWorkoutDetailView: View {
         }
         .sheet(isPresented: $showingIntervalEditor) {
             ATHLTHTrainIntervalComposerView(initial: previewWorkout) { edited in
+                var personalized = edited
+                personalized.sharedSourceWorkoutID = edited.sharedSourceWorkoutID ??
+                    (workout.isBuiltIn ? workout.id : workout.sharedSourceWorkoutID)
+                // A pace or incline entered before a run is personal, too.
+                // Persist it so the next library visit can restore those settings.
+                library.save(personalized)
                 if editingBeforeStart, let onStart {
-                    onStart(edited)
-                } else {
-                    var saved = edited
-                    saved.sharedSourceWorkoutID = edited.sharedSourceWorkoutID ??
-                        (workout.isBuiltIn ? workout.id : workout.sharedSourceWorkoutID)
-                    library.save(saved)
-                    if pendingAddToPlan {
-                        onSelect?(saved)
-                    }
+                    onStart(personalized)
+                } else if pendingAddToPlan {
+                    onSelect?(personalized)
                 }
                 dismiss()
             }
