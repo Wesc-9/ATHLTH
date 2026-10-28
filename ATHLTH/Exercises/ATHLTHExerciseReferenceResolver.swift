@@ -63,7 +63,12 @@ enum ATHLTHExerciseReferenceResolver {
     ]
 
     static func nativeSourceIdentifier(for name: String) -> String? {
-        guard let slug = nativeAliases[key(name)] else { return nil }
+        let normalized = key(name)
+        // Treat spaces, hyphens and underscores as equivalent for reviewed English names.
+        // Do not guess across different equipment or movement variations.
+        guard let slug = nativeAliases[normalized] ?? nativeAliases.first(where: {
+            key($0.key) == normalized
+        })?.value else { return nil }
         return "athlth-native-" + slug
     }
 
@@ -84,7 +89,8 @@ enum ATHLTHExerciseReferenceResolver {
             }
         }
         if let slug = block.exerciseSlug, !slug.isEmpty {
-            let byIdentifier = library.filter { $0.sourceIdentifier == slug }
+            let byIdentifier = library.filter { $0.sourceIdentifier == slug ||
+                ($0.sourceIdentifier != nil && key($0.sourceIdentifier!) == key(slug)) }
             if byIdentifier.count == 1 { return byIdentifier[0] }
         }
 
