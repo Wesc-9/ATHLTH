@@ -15,7 +15,7 @@ enum ATHLTHCoachProposalBridge {
         case "running": kind = .running
         case "walking": kind = .walking
         case "strength": kind = .strength
-        case "hybrid": kind = .hybrid
+        case "hybrid": kind = .custom
         default: return nil
         }
 
@@ -32,7 +32,7 @@ enum ATHLTHCoachProposalBridge {
                 blockKind = .rest
             } else if kind == .strength {
                 blockKind = .exercise
-            } else if kind == .hybrid {
+            } else if activity == "hybrid" {
                 blockKind = (item.sets > 0 || item.repetitions > 0) ? .exercise : .run
             } else {
                 blockKind = .run
