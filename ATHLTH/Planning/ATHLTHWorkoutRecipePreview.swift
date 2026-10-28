@@ -25,6 +25,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     }
 
     private var recipeTint: Color {
+        if embeddedInDetails { return ATHLTHPlanDesign.accentInk }
         switch category {
         case "running": return ATHLTHTheme.vitality
         case "hybrid": return ATHLTHTheme.accentDeep
@@ -70,7 +71,11 @@ struct ATHLTHWorkoutRecipePreview: View {
                 ))
             }
             modeControl
-            timeline
+            if advanced {
+                timeline
+            } else {
+                simpleOutline
+            }
         }
         .sheet(item: $selectedExercise) { step in
             ATHLTHLinkedExerciseDetailView(block: step)
@@ -184,6 +189,37 @@ struct ATHLTHWorkoutRecipePreview: View {
         }
     }
 
+    // Simple mode is a concise prescription, not the advanced step-by-step timeline.
+    private var simpleOutline: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
+                HStack(alignment: .top, spacing: 11) {
+                    Image(systemName: block.resolvedPhase.symbol)
+                        .font(.subheadline)
+                        .foregroundStyle(recipeTint)
+                        .frame(width: 26)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(localizedTitle(block))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                        if let target = block.targetText, !target.isEmpty {
+                            Text(target)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(.vertical, 8)
+                if index < blocks.count - 1 {
+                    Divider().overlay(ATHLTHPlanDesign.outline)
+                }
+            }
+        }
+        .padding(15)
+        .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 19))
+    }
+
     private var timeline: some View {
         VStack(alignment: .leading, spacing: 11) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
@@ -245,7 +281,13 @@ struct ATHLTHWorkoutRecipePreview: View {
                 norwegian: "Vis utførelse, muskler og øvelsesinformasjon"
             ))
         } else {
-            recipeStepCard(block)
+            Button {
+                selectedExercise = block
+            } label: {
+                recipeStepCard(block)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint(tr("View step details", "Vis detaljer for øktdelen"))
         }
     }
 
