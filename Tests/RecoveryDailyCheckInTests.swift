@@ -124,6 +124,7 @@ final class RecoveryDailyCheckInTests: XCTestCase {
         XCTAssertNil(store.todayEnergy)
         XCTAssertEqual(store.todayRatings["Quads"], .moderate)
     }
+    @MainActor
     func testSystemReminderSchedulesSevenAccountScopedDaysAndSkipsCompletedToday() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Europe/Oslo")!
@@ -148,6 +149,7 @@ final class RecoveryDailyCheckInTests: XCTestCase {
         XCTAssertEqual(done.first?.key, expected[1].key)
     }
 
+    @MainActor
     func testPastMorningReminderNotDeliveredLateAndDisabledMeansNone() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Europe/Oslo")!
@@ -168,6 +170,7 @@ final class RecoveryDailyCheckInTests: XCTestCase {
         ).isEmpty)
     }
 
+    @MainActor
     func testCheckInNotificationTapCannotOpenOtherAccountsData() {
         let account = UUID()
         let info: [AnyHashable: Any] = [
