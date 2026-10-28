@@ -1,4 +1,5 @@
 import Foundation
+import HealthKit
 import XCTest
 @testable import ATHLTH
 
@@ -22,6 +23,14 @@ final class ATHLTHWorkoutMirrorContinuityTests: XCTestCase {
             maxHeartRate: 153,
             routePointCount: 24
         )
+    }
+
+    func testHealthKitSessionEndDoesNotPretendWorkoutWasSaved() {
+        XCTAssertEqual(ATHLTHWorkoutMirrorStatePolicy.state(for: .stopped), .ending)
+        XCTAssertEqual(ATHLTHWorkoutMirrorStatePolicy.state(for: .ended), .ending)
+        XCTAssertEqual(ATHLTHWorkoutMirrorStatePolicy.state(for: .running), .running)
+        XCTAssertEqual(ATHLTHWorkoutMirrorStatePolicy.state(for: .paused), .paused)
+        XCTAssertNotEqual(ATHLTHWorkoutMirrorStatePolicy.state(for: .ended), .completed)
     }
 
     func testCompletionBelongsToExactWorkoutRatherThanAnotherNearbyRun() {

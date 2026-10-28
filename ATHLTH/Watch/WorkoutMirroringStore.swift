@@ -875,22 +875,6 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
     }
 
-    private func mirrorState(
-        for state: HKWorkoutSessionState
-    ) -> WatchWorkoutMirrorState {
-        switch state {
-        case .running:
-            return .running
-        case .paused:
-            return .paused
-        case .ended, .stopped:
-            return .completed
-        case .prepared, .notStarted:
-            return .preparing
-        @unknown default:
-            return .preparing
-        }
-    }
 
     private func publish(_ changes: () -> Void) {
         changes()
@@ -920,7 +904,7 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
                 return
             }
 
-            let newState = self.mirrorState(for: sessionState)
+            let newState = ATHLTHWorkoutMirrorStatePolicy.state(for: sessionState)
 
             guard var snapshot = self.snapshot else { return }
             snapshot.state = newState
@@ -946,15 +930,20 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             }
 
             self.connectionText =
-                newState == .completed
+                newState == .ending
                     ? ATHLTHLocalization.choose(
-                        english: "Workout completed",
-                        norwegian: "Økt fullført"
+                        english: "Saving Apple Watch workout",
+                        norwegian: "Lagrer Apple Watch-økten"
                     )
-                    : ATHLTHLocalization.choose(
-                        english: "Live from Apple Watch",
-                        norwegian: "Direkte fra Apple Watch"
-                    )
+                    : newState == .completed
+                        ? ATHLTHLocalization.choose(
+                            english: "Workout completed",
+                            norwegian: "Økt fullført"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Live from Apple Watch",
+                            norwegian: "Direkte fra Apple Watch"
+                        )
             if newState == .completed ||
                 newState == .failed {
                 self.isPresentationRequested = false

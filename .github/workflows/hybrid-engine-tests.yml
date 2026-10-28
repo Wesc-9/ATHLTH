@@ -29,6 +29,9 @@ on:
       - ATHLTHWatchExtension/WatchWorkoutManager.swift
       - ATHLTHWatchExtension/WatchStrengthTimedSetPage.swift
       - ATHLTH/Watch/ATHLTHStrengthWatchSyncObserver.swift
+      - ATHLTH/Watch/WorkoutMirroringStore.swift
+      - ATHLTH/Watch/ATHLTHWorkoutMirrorStatePolicy.swift
+      - Tests/ATHLTHWorkoutMirrorContinuityTests.swift
       - Shared/WatchTransferModels.swift
       - ATHLTH/Training/**
       - ATHLTH/DesignSystem/ATHLTHTrainDesign.swift
