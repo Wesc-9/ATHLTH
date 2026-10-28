@@ -20,6 +20,12 @@ struct ATHLTHBodyGoalNotificationRoute: Identifiable, Equatable {
     var id: UUID { goalID }
 }
 
+struct ATHLTHBodyGoalNotificationRoute: Identifiable, Equatable {
+    let goalID: UUID
+    let accountID: UUID
+    var id: UUID { goalID }
+}
+
 struct ATHLTHPushNavigationTarget:
     Identifiable,
     Equatable
@@ -53,6 +59,8 @@ final class APNsPushManager: ObservableObject {
     @Published private(set) var pendingChallengeNotification:
         ATHLTHChallengeNotificationRoute?
     @Published private(set) var pendingDailyCheckInAccountID: UUID?
+    @Published private(set) var pendingBodyGoalCheckIn:
+        ATHLTHBodyGoalNotificationRoute?
     @Published private(set) var pendingBodyGoalCheckIn: ATHLTHBodyGoalNotificationRoute?
 
     private let client: SupabaseClient
@@ -102,6 +110,16 @@ final class APNsPushManager: ObservableObject {
             )
             return
         }
+        if let goalRaw = userInfo["athlth_body_goal_checkin_id"] as? String,
+           let accountRaw = userInfo["athlth_body_goal_account_id"] as? String,
+           let goalID = UUID(uuidString: goalRaw),
+           let accountID = UUID(uuidString: accountRaw) {
+            pendingBodyGoalCheckIn = ATHLTHBodyGoalNotificationRoute(
+                goalID: goalID, accountID: accountID
+            )
+            return
+        }
+
         if (userInfo["athlth_kind"] as? String) == "daily_check_in",
            let value = userInfo["athlthCheckInAccountID"] as? String,
            let accountID = UUID(uuidString: value) {
@@ -167,6 +185,10 @@ final class APNsPushManager: ObservableObject {
 
     func clearPendingDailyCheckIn() {
         pendingDailyCheckInAccountID = nil
+    }
+
+    func clearPendingBodyGoalCheckIn() {
+        pendingBodyGoalCheckIn = nil
     }
 
     func receive(deviceToken: Data) {
