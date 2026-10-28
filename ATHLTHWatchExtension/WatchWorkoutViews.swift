@@ -2951,6 +2951,11 @@ private struct WatchStrengthPrimaryCrownMetric: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(english: "Decrease", norwegian: "Reduser") +
+                    " " + title
+                )
+                .accessibilityValue(valueText)
                 .disabled(value <= range.lowerBound)
 
                 Spacer(minLength: 0)
@@ -2973,6 +2978,11 @@ private struct WatchStrengthPrimaryCrownMetric: View {
                         )
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(english: "Increase", norwegian: "Øk") +
+                    " " + title
+                )
+                .accessibilityValue(valueText)
                 .disabled(value >= range.upperBound)
             }
             .foregroundStyle(tint)
@@ -3170,6 +3180,11 @@ private struct WatchStrengthCrownControl: View {
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(english: "Decrease", norwegian: "Reduser") +
+                " " + title
+            )
+            .accessibilityValue(valueText)
             .disabled(value <= range.lowerBound)
 
             Image(systemName: "digitalcrown.horizontal.arrow.clockwise")
@@ -3185,6 +3200,11 @@ private struct WatchStrengthCrownControl: View {
                     .frame(width: 32, height: 32)
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(english: "Increase", norwegian: "Øk") +
+                " " + title
+            )
+            .accessibilityValue(valueText)
             .disabled(value >= range.upperBound)
         }
         .padding(9)
@@ -3255,6 +3275,7 @@ private struct WatchStrengthRestView: View {
                                 norwegian: "Gjenstående pause"
                             )
                         )
+                        .accessibilityValue(durationText(remaining))
                 } else {
                     Label(
                         ATHLTHLocalization.choose(
