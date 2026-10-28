@@ -1627,12 +1627,12 @@ struct TrainingPlanLibraryView: View {
             let favoriteMatches = !favoritesOnly || favorites.isFavorite(
                 .plan, itemID: entry.id.uuidString
             )
-            let searchMatches =
-                cleanQuery.isEmpty ||
-                [entry.title, entry.summary, entry.goal, entry.level,
-                 entry.categoryTitle, entry.sessionOutline,
-                 entry.tags.joined(separator: " ")]
-                    .contains { $0.localizedCaseInsensitiveContains(cleanQuery) }
+            let searchMatches = ATHLTHWorkoutSearch.matches(
+                cleanQuery,
+                texts: [entry.title, entry.summary, entry.goal, entry.level,
+                        entry.categoryTitle, entry.sessionOutline,
+                        entry.tags.joined(separator: " ")]
+            )
 
             return categoryMatches && muscleMatches && favoriteMatches &&
                 (sessionsPerWeekFilter == nil ||
