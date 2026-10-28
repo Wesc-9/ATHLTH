@@ -1025,6 +1025,7 @@ struct RecoveryCoachView: View {
     @State private var selectedCoachProposal: RecoveryCoachProposal?
     @State private var showingCoachWorkoutBuilder = false
     @State private var showingCoachPlanBuilder = false
+    @State private var showingCoachPlanAdaptation = false
     @State private var showingCoachAddConfirmation = false
     @State private var saveCoachPlanAsTemplate = false
     @State private var shareHealthForNextQuestion = false
@@ -1287,6 +1288,9 @@ struct RecoveryCoachView: View {
                     draftContext: "coach-workout-\(proposal.title)"
                 )
             }
+        }
+        .sheet(isPresented: $showingCoachPlanAdaptation) {
+            CoachPlanAdaptationView(initialNotes: question)
         }
         .sheet(isPresented: $showingCoachPlanBuilder) {
             if let proposal = selectedCoachProposal,
@@ -1690,6 +1694,16 @@ struct RecoveryCoachView: View {
             }
         } trailing: {
             Menu {
+                Button {
+                    showingCoachPlanAdaptation = true
+                } label: {
+                    Label(
+                        recoveryAIText("Adjust active plan", "Juster aktiv plan"),
+                        systemImage: "calendar.badge.clock"
+                    )
+                }
+                .disabled(session.activePlan == nil)
+
                 Button {
                     coachPinned.toggle()
 
