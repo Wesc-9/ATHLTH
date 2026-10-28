@@ -993,6 +993,9 @@ struct RecoveryCoachInboxDestinationView:
             isLoading = false
         }
 
+        // Sync the locally authorized HealthKit data before deriving a
+        // Coach snapshot. This operation does not contact the AI provider.
+        await health.refreshAll()
         recoverySnapshot =
             await health
                 .recoveryTrendSnapshot()
@@ -1093,7 +1096,10 @@ struct RecoveryCoachView: View {
                                 )
                             ) {
                                 if context.recoveryScore != nil || !context.muscles.isEmpty {
-                                    coachInsightCard
+                                    VStack(alignment: .leading, spacing: 9) {
+                                        coachInsightCard
+                                        ATHLTHCoachHealthSourcesView(context: context)
+                                    }
                                 } else {
                                     Text(recoveryAIText(
                                         "No recovery measurements available. You can still ask training questions.",
