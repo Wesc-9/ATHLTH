@@ -156,7 +156,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     private var planContent: some View {
         VStack(alignment: .leading, spacing: 15) {
             referencePageIntro
-            workspaceNavigation
+            // Plan overview is the default; switch views from the compact header icon.
 
             // The true active-plan state is the source of truth. Never show an
             // archived or saved plan as active simply because it exists.
@@ -693,15 +693,26 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
             Spacer(minLength: 3)
             HStack(spacing: 7) {
-                Button {
-                    showingMyPlans = true
+                Menu {
+                    Button {
+                        browsingMyPlans = false
+                    } label: {
+                        Label(tr("Plan overview", "Planoversikt"),
+                              systemImage: browsingMyPlans ? "calendar" : "checkmark.circle.fill")
+                    }
+                    Button {
+                        browsingMyPlans = true
+                    } label: {
+                        Label(tr("My plans", "Mine planer"),
+                              systemImage: browsingMyPlans ? "checkmark.circle.fill" : "square.stack")
+                    }
                 } label: {
-                    Image(systemName: "calendar")
+                    Image(systemName: browsingMyPlans ? "square.stack" : "calendar")
                         .font(.system(size: 17))
                         .frame(width: 37, height: 37)
                         .background(.white.opacity(0.85), in: Circle())
                 }
-                .accessibilityLabel(tr("My plans", "Mine planer"))
+                .accessibilityLabel(tr("Choose plan section", "Velg planområde"))
                 Menu {
                     Button {
                         showPlanWeekOverview = true
@@ -2544,40 +2555,6 @@ struct ATHLTHTrainPlanPremiumView: View {
         }
         .padding(20)
         .athlthTrainPaper()
-    }
-
-    private var workspaceNavigation: some View {
-        HStack(spacing: 5) {
-            Button {
-                browsingMyPlans = false
-            } label: {
-                Text(tr("Plan overview", "Planoversikt"))
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .foregroundStyle(browsingMyPlans ? secondaryInk : Color.white)
-                    .background(
-                        browsingMyPlans ? Color.clear : graphite,
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
-            }
-            Button {
-                browsingMyPlans = true
-            } label: {
-                Text(tr("My plans", "Mine planer"))
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 42)
-                    .foregroundStyle(browsingMyPlans ? Color.white : secondaryInk)
-                    .background(
-                        browsingMyPlans ? graphite : Color.clear,
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
-            }
-        }
-        .buttonStyle(.plain)
-        .padding(5)
-        .background(soft, in: RoundedRectangle(cornerRadius: 17))
     }
 
     private func planLibraryPriority(_ item: TrainingPlan) -> Int {
