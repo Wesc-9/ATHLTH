@@ -757,8 +757,11 @@ struct ATHLTHTrainPlanPremiumView: View {
         let fraction = min(max(progress.completionFraction, 0), 1)
         let week = currentWeekIndex(plan)
         let weeklyCount = plan.weeks.indices.contains(week)
-            ? plan.weeks[week].days.flatMap(\.sessions)
-                .filter { !$0.isExplicitRestDay }.count : 0
+            ? plan.weeks[week].days.reduce(into: 0) { count, day in
+                for workout in day.sessions where !workout.isExplicitRestDay {
+                    count += 1
+                }
+            } : 0
         return Button {
             focusedPlanID = plan.id
             browsingMyPlans = false
