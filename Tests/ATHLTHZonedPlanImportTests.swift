@@ -184,4 +184,32 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         XCTAssertEqual(ATHLTHZonedLocalization.text("Progressive jog"), "Progressiv jogg")
     }
 
+
+    @MainActor
+    func testZonedIntervalJogIsRecognizedAsActiveRecovery() throws {
+        let source = try XCTUnwrap(ATHLTHZonedPlanLibrary.workouts.first { $0.id == "VMA-001" })
+        let timeline = ATHLTHZonedPlanLibrary.blocks(for: source)
+        let recoveries = timeline.filter(\.isActiveRecovery)
+        XCTAssertFalse(recoveries.isEmpty)
+        XCTAssertTrue(recoveries.allSatisfy { $0.kind == .run })
+        XCTAssertTrue(recoveries.allSatisfy { $0.resolvedPhase == .recovery })
+        XCTAssertTrue(recoveries.allSatisfy {
+            $0.sourceIntensityZoneLabel == "Z1" &&
+            $0.targetHeartRateZone == 1 &&
+            $0.durationSeconds == 30
+        })
+    }
+
+    @MainActor
+    func testImportedWorkoutsNeverExposeSourceZoneSix() {
+        for workout in ATHLTHZonedPlanLibrary.workouts where workout.discipline != "swimming" {
+            for block in ATHLTHZonedPlanLibrary.blocks(for: workout) {
+                XCTAssertFalse(block.sourceIntensityZoneLabel?.contains("6") ?? false, workout.id)
+                if let zone = block.targetHeartRateZone {
+                    XCTAssertTrue((1...5).contains(zone), workout.id)
+                }
+            }
+        }
+    }
+
 }
