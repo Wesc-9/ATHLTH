@@ -48,6 +48,8 @@ type RecoveryRequest = {
   shareHealthData?: boolean;
   // Mandatory future-mode signal. Automatic transport is not released.
   healthSharingMode?: "confirmEachQuestion" | "automatic";
+  // Structured, consented strength evidence: never included without this turn's health approval.
+  coachStrengthContext?: unknown;
 };
 
 const json = (body: Record<string, unknown>, status = 200) =>
@@ -389,6 +391,65 @@ function sanitizeContext(input: RecoveryContext | undefined) {
   };
 }
 
+type StrengthCoachContext = {
+  windowDays: number;
+  completedStrengthSessions: number;
+  strengthSessionsLastSevenDays: number;
+  completedWorkingSets: number;
+  recordedVolumeKg: number;
+  exerciseSignals: Array<{
+    exercise: string;
+    completedSessions: number;
+    mostRecentWorkingWeightKg: number | null;
+    bestEstimatedOneRepMaxKg: number | null;
+    trend: string;
+    recommendation: string;
+  }>;
+};
+
+// Explicit allowlist: no hidden symptoms, diagnoses, notes or unbounded
+// user-supplied prose can be copied from the request into the AI prompt.
+function normalizeCoachStrengthContext(value: unknown): StrengthCoachContext | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  if (typeof obj.windowDays !== "number" ||
+      !Number.isInteger(obj.windowDays) || obj.windowDays !== 56) return null;
+  const bounded = (raw: unknown, maximum: number): number => {
+    const n = Number(raw);
+    return Number.isFinite(n) ? Math.max(0, Math.min(n, maximum)) : 0;
+  };
+  const optionalWeight = (raw: unknown): number | null => {
+    if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return null;
+    return Math.min(raw, 2_000);
+  };
+  const validTrends = new Set(["plateau", "improving", "insufficient_evidence"]);
+  const validAdvice = new Set(["review_small_increase", "review_plateau", "hold_and_collect_evidence"]);
+  const entries = Array.isArray(obj.exerciseSignals) ? obj.exerciseSignals.slice(0, 10) : [];
+  const exerciseSignals = entries.flatMap((raw: unknown) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+    const item = raw as Record<string, unknown>;
+    const exercise = typeof item.exercise === "string" ? item.exercise.trim().slice(0, 100) : "";
+    if (!exercise || /[<>{}\n\r]/.test(exercise)) return [];
+    return [{
+      exercise,
+      completedSessions: bounded(item.completedSessions, 56),
+      mostRecentWorkingWeightKg: optionalWeight(item.mostRecentWorkingWeightKg),
+      bestEstimatedOneRepMaxKg: optionalWeight(item.bestEstimatedOneRepMaxKg),
+      trend: validTrends.has(String(item.trend)) ? String(item.trend) : "insufficient_evidence",
+      recommendation: validAdvice.has(String(item.recommendation))
+        ? String(item.recommendation) : "hold_and_collect_evidence",
+    }];
+  });
+  return {
+    windowDays: 56,
+    completedStrengthSessions: bounded(obj.completedStrengthSessions, 70),
+    strengthSessionsLastSevenDays: bounded(obj.strengthSessionsLastSevenDays, 14),
+    completedWorkingSets: bounded(obj.completedWorkingSets, 2_000),
+    recordedVolumeKg: bounded(obj.recordedVolumeKg, 1_000_000),
+    exerciseSignals,
+  };
+}
+
 function sanitizeHistory(
   input: RecoveryChatTurn[] | undefined,
 ) {
@@ -462,6 +523,10 @@ Deno.serve(async (req: Request) => {
   const context = sanitizeContext(
     canShareHealth ? body.context : undefined,
   );
+  const coachStrengthContext =
+    canShareHealth && body.mode === "ask"
+      ? normalizeCoachStrengthContext(body.coachStrengthContext)
+      : null;
   const responseLanguage =
     body.language === "nb" ? "Norwegian Bokmål" : "English";
   const languageInstruction =
@@ -497,6 +562,10 @@ You are continuing an ATHLTH Coach conversation.
 - Answer the latest question directly in 2-5 short sentences.
 - If no recovery metrics were shared, say you do not have access to personal health data for this question. Never infer or invent such metrics.
 - Make the relationship to the supplied recovery data clear when relevant.
+- When coachStrengthContext is present, you are ATHLTH's evidence-first strength AND endurance coach: base strength advice on actual confirmed working sets, exercise history, trend, prescribed load vs estimated 1RM, not invented personal records. Two successful sessions may warrant reviewing a modest increase but NEVER applying changes. Plateau is a discussion prompt, not a diagnosis.
+- Do not infer that missing strength metrics imply the athlete has not exercised. Explain data limitations and account for running/cycling and recovery instead of prescribing strength in isolation.
+- User consent for this question governs coachStrengthContext. When absent, do not claim access to strength history. Do not expose raw input context back verbatim unless needed for the requested recommendation.
+- You cannot change, activate or save training plans through this chat; offer the athlete an editable plan review with explicit approval instead.
 - Do not repeat information from earlier answers unless it helps answer the latest question.
 - Return exactly three short follow-up questions that are useful next steps based on today's recovery context and the conversation so far.
 - Follow-up questions must be meaningfully different from questions the user already asked.
@@ -504,6 +573,7 @@ You are continuing an ATHLTH Coach conversation.
 `,
         input: JSON.stringify({
           context,
+          coachStrengthContext,
           history,
           question,
         }),
