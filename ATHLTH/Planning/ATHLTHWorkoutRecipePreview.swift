@@ -429,7 +429,7 @@ struct ATHLTHWorkoutRecipePreview: View {
             result.append(tr("Target load: ", "Målvekt: ") + "\(weight) kg")
         }
         if let zone = block.targetHeartRateZone {
-            result.append(tr("Heart-rate zone ", "Pulssone ") + "\(zone)")
+            result.append(tr("Heart-rate zone Z", "Pulssone S") + "\(zone)")
         }
         if let pace = block.targetPaceSecondsPerKilometer, pace > 0 {
             let seconds = Int(pace.rounded())
@@ -491,9 +491,9 @@ private struct ATHLTHWorkoutStepEditor: View {
                             .multilineTextAlignment(.trailing)
                     }
                     HStack {
-                        Text(ATHLTHLocalization.choose(english: "Heart-rate zone", norwegian: "Pulssone"))
+                        Text(ATHLTHLocalization.choose(english: "Heart-rate zone (Z1–Z5)", norwegian: "Pulssone (S1–S5)"))
                         Spacer()
-                        TextField("1–5", value: $draft.targetHeartRateZone, format: .number)
+                        TextField(ATHLTHLocalization.choose(english: "Z1–Z5", norwegian: "S1–S5"), value: $draft.targetHeartRateZone, format: .number)
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                     }
