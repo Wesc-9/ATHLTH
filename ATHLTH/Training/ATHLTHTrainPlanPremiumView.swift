@@ -878,6 +878,11 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     // Plan is a seven-day overview. Individual day timelines belong to
     // Today / the day detail sheet, not the main Plan landing screen.
+    private func referenceWorkoutSubtitle(_ workout: PlannedSession) -> String {
+        guard let minutes = workout.durationMinutes else { return workout.kind.title }
+        return workout.kind.title + " · " + String(minutes) + " min"
+    }
+
     private func referenceFullWeekOverview(
         _ week: TrainingPlanWeek, plan: TrainingPlan
     ) -> some View {
@@ -932,8 +937,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                                 .font(.subheadline.weight(.semibold))
                                                 .foregroundStyle(graphite)
                                                 .lineLimit(2)
-                                            Text(workout.kind.title +
-                                                 (workout.durationMinutes.map { " · \\($0) min" } ?? ""))
+                                            Text(referenceWorkoutSubtitle(workout))
                                                 .font(.caption2)
                                                 .foregroundStyle(secondaryInk)
                                         }
@@ -1525,8 +1529,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                                         Text(entry.workout.title)
                                             .font(.subheadline.weight(.semibold))
                                             .foregroundStyle(graphite)
-                                        Text(entry.workout.kind.title +
-                                             (entry.workout.durationMinutes.map { " · \\($0) min" } ?? ""))
+                                        Text(referenceWorkoutSubtitle(entry.workout))
                                             .font(.caption2)
                                             .foregroundStyle(secondaryInk)
                                     }

@@ -20,12 +20,6 @@ struct ATHLTHBodyGoalNotificationRoute: Identifiable, Equatable {
     var id: UUID { goalID }
 }
 
-struct ATHLTHBodyGoalNotificationRoute: Identifiable, Equatable {
-    let goalID: UUID
-    let accountID: UUID
-    var id: UUID { goalID }
-}
-
 struct ATHLTHPushNavigationTarget:
     Identifiable,
     Equatable
@@ -61,7 +55,6 @@ final class APNsPushManager: ObservableObject {
     @Published private(set) var pendingDailyCheckInAccountID: UUID?
     @Published private(set) var pendingBodyGoalCheckIn:
         ATHLTHBodyGoalNotificationRoute?
-    @Published private(set) var pendingBodyGoalCheckIn: ATHLTHBodyGoalNotificationRoute?
 
     private let client: SupabaseClient
     private var deviceTokenHex: String?
@@ -90,10 +83,6 @@ final class APNsPushManager: ObservableObject {
             : "Sandbox"
     }
 
-    func clearPendingBodyGoalCheckIn() {
-        pendingBodyGoalCheckIn = nil
-    }
-
     func captureTappedNotification(
         _ userInfo:
             [AnyHashable: Any]
@@ -105,15 +94,6 @@ final class APNsPushManager: ObservableObject {
            let rawAccount = userInfo["athlth_body_goal_account_id"] as? String,
            let goalID = UUID(uuidString: rawGoal),
            let accountID = UUID(uuidString: rawAccount) {
-            pendingBodyGoalCheckIn = ATHLTHBodyGoalNotificationRoute(
-                goalID: goalID, accountID: accountID
-            )
-            return
-        }
-        if let goalRaw = userInfo["athlth_body_goal_checkin_id"] as? String,
-           let accountRaw = userInfo["athlth_body_goal_account_id"] as? String,
-           let goalID = UUID(uuidString: goalRaw),
-           let accountID = UUID(uuidString: accountRaw) {
             pendingBodyGoalCheckIn = ATHLTHBodyGoalNotificationRoute(
                 goalID: goalID, accountID: accountID
             )
