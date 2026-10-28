@@ -5485,6 +5485,7 @@ struct SessionEditorView: View {
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
     @State private var showingRecoveryRestPlanner = false
+    @State private var showingRestDayPlanner = false
     @State private var selectedPartnerID: UUID?
     @State private var partnerPlanningExpanded = false
     @State private var showingAllTrainingPartners = false
@@ -6183,6 +6184,9 @@ struct SessionEditorView: View {
             },
             onRecoveryRest: onPreparedWorkout == nil
                 ? { showingRecoveryRestPlanner = true }
+                : nil,
+            onRestDay: onPreparedWorkout == nil
+                ? { showingRestDayPlanner = true }
                 : nil
         )
     }
@@ -6429,7 +6433,22 @@ struct SessionEditorView: View {
                 }
             }
             .sheet(isPresented: $showingRecoveryRestPlanner) {
-                ATHLTHRecoveryRestPlanningSheet(date: scheduledTime) {
+                ATHLTHRecoveryRestPlanningSheet(
+                    date: scheduledTime,
+                    allowPlanSelection: false,
+                    includesRestDay: false
+                ) {
+                    finishDraft()
+                    dismiss()
+                }
+                .presentationDetents([.large])
+            }
+            .sheet(isPresented: $showingRestDayPlanner) {
+                ATHLTHRecoveryRestPlanningSheet(
+                    date: scheduledTime,
+                    allowPlanSelection: false,
+                    initialMode: .rest
+                ) {
                     finishDraft()
                     dismiss()
                 }
