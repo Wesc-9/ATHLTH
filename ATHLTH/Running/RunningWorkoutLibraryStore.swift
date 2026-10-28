@@ -1,5 +1,45 @@
 import Foundation
 
+/// Keeps published running intervals intact while leaving personal pace,
+/// heart-rate targets and incline empty until the athlete enters them.
+enum ATHLTHRunningLibraryDefaults {
+    static func unpersonalized(_ source: RunningWorkoutTemplate) -> RunningWorkoutTemplate {
+        var result = source
+        result.intervalGhostPaceSecondsPerKilometer = nil
+        result.blocks = source.blocks.map { sourceBlock in
+            var block = sourceBlock
+            block.work = blankTarget(block.work)
+            if let recovery = block.recovery {
+                block.recovery = blankTarget(recovery)
+            }
+            block.repetitionOverrides = block.repetitionOverrides?.map { original in
+                var item = original
+                if let work = item.work {
+                    item.work = blankTarget(work)
+                }
+                if let recovery = item.recovery {
+                    item.recovery = blankTarget(recovery)
+                }
+                return item
+            }
+            return block
+        }
+        return result
+    }
+
+    private static func blankTarget(_ source: RunningStepTarget) -> RunningStepTarget {
+        var target = source
+        target.intensity.paceMinSecondsPerKilometer = nil
+        target.intensity.paceMaxSecondsPerKilometer = nil
+        target.intensity.heartRateZone = nil
+        if target.intensity.kind == .pace || target.intensity.kind == .heartRateZone {
+            target.intensity.kind = .none
+        }
+        target.treadmillInclinePercent = nil
+        return target
+    }
+}
+
 @MainActor
 final class RunningWorkoutLibraryStore: ObservableObject {
     @Published private(set) var customTemplates: [RunningWorkoutTemplate] = []
@@ -131,6 +171,8 @@ final class RunningWorkoutLibraryStore: ObservableObject {
     }
 
     func duplicate(_ source: RunningWorkoutTemplate) -> RunningWorkoutTemplate {
+        let source = source.isBuiltIn
+            ? ATHLTHRunningLibraryDefaults.unpersonalized(source) : source
         let duplicate = RunningWorkoutTemplate(
             id: UUID(),
             title: "\(source.title) Copy",
