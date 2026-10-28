@@ -1536,17 +1536,18 @@ enum HomeHealthMetricKind:
     }
 
     var tint: Color {
-        // Desaturated accent colors sit naturally on Home's warm ivory paper
-        // while preserving a distinguishable visual identity per metric.
+        // Restore the four distinct, saturated health accents. Keep the
+        // neutral cards and typography unchanged; color belongs to the icon
+        // and chart, not to the whole card background.
         switch self {
         case .sleep:
-            return Color(red: 0.55, green: 0.50, blue: 0.65)
+            return Color(red: 0.52, green: 0.34, blue: 0.79)
         case .respiratoryRate:
-            return Color(red: 0.38, green: 0.57, blue: 0.69)
+            return Color(red: 0.16, green: 0.54, blue: 0.82)
         case .hrv:
-            return Color(red: 0.73, green: 0.44, blue: 0.44)
+            return Color(red: 0.85, green: 0.32, blue: 0.38)
         case .load:
-            return Color(red: 0.38, green: 0.57, blue: 0.45)
+            return Color(red: 0.20, green: 0.61, blue: 0.39)
         }
     }
 
@@ -1990,7 +1991,7 @@ private struct HomeMetricMiniBars: View {
                         .fill(
                             value == nil
                                 ? color.opacity(0.10)
-                                : color.opacity(0.66)
+                                : color.opacity(0.88)
                         )
                         .frame(maxWidth: .infinity)
                         .frame(
