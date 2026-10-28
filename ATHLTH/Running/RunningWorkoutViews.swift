@@ -18,6 +18,12 @@ struct RunningWorkoutLibraryView: View {
     @EnvironmentObject private var library: RunningWorkoutLibraryStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var lastRuns: [ATHLTHCompletedRunningPerformance] = []
+
+    private func refreshRunHistory() {
+        lastRuns = ATHLTHRunningPerformanceHistory.load(userID: session.profile.userID)
+    }
 
     let source: RunningWorkoutLibrarySection?
     let selectionTitle: String?
@@ -207,6 +213,10 @@ struct RunningWorkoutLibraryView: View {
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .navigationTitle(selectionTitle ?? "Running Workouts")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear(perform: refreshRunHistory)
+        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+            refreshRunHistory()
+        }
         .task {
             recents.refresh()
             await favorites.refresh()
@@ -284,6 +294,12 @@ struct RunningWorkoutLibraryView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.leading)
+
+            if let last = ATHLTHLibraryWorkoutHistory.running(
+                id: workout.id, records: lastRuns
+            ) {
+                ATHLTHLastWorkoutHistoryLabel(summary: last)
+            }
 
             HStack(spacing: 10) {
                 Label(
