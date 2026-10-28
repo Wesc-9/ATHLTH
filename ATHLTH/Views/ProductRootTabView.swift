@@ -138,23 +138,19 @@ struct ProductRootTabView: View {
         // notification center imports the same backend row. Count only the
         // uncovered invites so one event never becomes two app-icon badges.
         let backendChallengeInvites =
-            social.inboxEvents.filter {
-                $0.kind ==
-                    "challenge_invite" &&
-                $0.readAt == nil
+            social.inboxEvents.reduce(into: 0) { count, event in
+                if event.kind == "challenge_invite" && event.readAt == nil {
+                    count += 1
+                }
             }
-            .count
 
         let importedChallengeInvites =
-            notifications
-                .notificationCenterItems
-                .filter {
-                    $0.isUnread &&
-                    $0.socialEventKind?
-                        .lowercased() ==
-                        "challenge_invite"
+            notifications.notificationCenterItems.reduce(into: 0) { count, item in
+                if item.isUnread &&
+                    item.socialEventKind?.lowercased() == "challenge_invite" {
+                    count += 1
                 }
-                .count
+            }
 
         let uncoveredChallengeInvites =
             max(
