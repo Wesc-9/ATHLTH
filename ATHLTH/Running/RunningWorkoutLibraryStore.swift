@@ -20,6 +20,7 @@ enum ATHLTHRunningLibraryDefaults {
                 if let recovery = item.recovery {
                     item.recovery = blankTarget(recovery)
                 }
+                item.ghostPaceSecondsPerKilometer = nil
                 return item
             }
             return block
