@@ -46,13 +46,16 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
     /// Set only after a separate, in-session workout data opt-in. Never
     /// poll or proactively stream metrics. Resolved on each AI tool request.
     private var liveStatusProvider: (@MainActor () -> ATHLTHLiveCoachWorkoutStatus)?
+    /// Separate, session-only opt-in. No history is sent unless the model asks.
+    private var localStrengthProvider: (@MainActor () -> String)?
 
     func start(
         microphoneConsent: Bool,
         providerConsent: Bool,
         language: WatchAudioCoachLanguage,
         style: ATHLTHCoachSpeechStyle,
-        liveStatusProvider: (@MainActor () -> ATHLTHLiveCoachWorkoutStatus)?
+        liveStatusProvider: (@MainActor () -> ATHLTHLiveCoachWorkoutStatus)?,
+        localStrengthProvider: (@MainActor () -> String)? = nil
     ) async {
         guard !state.isActive else { return }
         guard microphoneConsent && providerConsent else {
@@ -65,6 +68,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
 
         state = .connecting
         self.liveStatusProvider = liveStatusProvider
+        self.localStrengthProvider = localStrengthProvider
         lastTranscript = nil
         let sessionID = UUID()
         generation = sessionID
@@ -197,6 +201,22 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
                     } else {
                         updatedSession["tools"] = [Any]()
                     }
+                    if localStrengthProvider != nil {
+                        var tools = updatedSession["tools"] as? [[String: Any]] ?? []
+                        tools.append([
+                            "type": "function",
+                            "name": "get_consented_strength_summary",
+                            "description": "Read a bounded, on-device, eight-week ATHLTH strength progress summary only if the user separately approved sharing strength history for this session. No GPS, raw health metrics or injury information.",
+                            "parameters": [
+                                "type": "object",
+                                "properties": [String: Any](),
+                                "required": [String](),
+                                "additionalProperties": false
+                            ]
+                        ])
+                        updatedSession["tools"] = tools
+                        updatedSession["tool_choice"] = "auto"
+                    }
                     try await send([
                         "type": "session.update",
                         "session": updatedSession
@@ -253,18 +273,25 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
         var replied = false
         for item in output {
             guard item["type"] as? String == "function_call",
-                  item["name"] as? String == "get_live_workout_status",
+                  let functionName = item["name"] as? String,
+                  ["get_live_workout_status", "get_consented_strength_summary"]
+                    .contains(functionName),
                   let callID = item["call_id"] as? String,
                   !callID.isEmpty, callID.count < 256
             else { continue }
 
-            let current = liveStatusProvider?() ?? .unavailable
+            let output: String
+            if functionName == "get_consented_strength_summary" {
+                output = localStrengthProvider?() ?? "{\"status\":\"not_authorized\"}"
+            } else {
+                output = (liveStatusProvider?() ?? .unavailable).json
+            }
             try await send([
                 "type": "conversation.item.create",
                 "item": [
                     "type": "function_call_output",
                     "call_id": callID,
-                    "output": current.json
+                    "output": output
                 ]
             ])
             replied = true
@@ -502,6 +529,7 @@ final class ATHLTHLiveAICoachConversation: ObservableObject {
         senderTask = nil
         waitingAudio.removeAll(keepingCapacity: false)
         liveStatusProvider = nil
+        localStrengthProvider = nil
         socket?.cancel(with: .normalClosure, reason: nil)
         socket = nil
         if let engine = audioEngine {
@@ -554,12 +582,14 @@ struct ATHLTHLiveAICoachConversationView: View {
     @EnvironmentObject private var mirroring: WorkoutMirroringStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var conversation = ATHLTHLiveAICoachConversation()
     @State private var allowMicrophone = false
     @State private var allowProviderProcessing = false
     @State private var allowLiveWorkoutMetrics = false
+    @State private var allowLocalStrengthHistory = false
     @State private var restoreCoachVoice = false
     @State private var watchVoiceConnectionUnavailable = false
 
@@ -626,10 +656,14 @@ struct ATHLTHLiveAICoachConversationView: View {
                                     english: "Allow AI to read current workout status when I ask",
                                     norwegian: "La AI lese øktstatus når jeg spør"
                                 ), isOn: $allowLiveWorkoutMetrics)
+                                Toggle(ATHLTHLocalization.choose(
+                                    english: "Allow Coach to access my eight-week strength history during this voice session",
+                                    norwegian: "Gi Coach tilgang til åtte ukers styrkehistorikk i denne talesamtalen"
+                                ), isOn: $allowLocalStrengthHistory)
                             }
                             Text(ATHLTHLocalization.choose(
-                                english: "Live metrics are shared only if you enable the separate option and the AI requests your workout status. No GPS positions, route geometry or history are shared. The workout continues and the chat stops after five minutes.",
-                                norwegian: "Øktdata deles kun hvis du aktiverer det egne valget og AI-en spør etter øktstatus. GPS-posisjon, rutekart og historikk deles ikke. Treningen fortsetter, og samtalen avsluttes etter fem minutter."
+                                english: "The AI sees live metrics only with your permission and when it requests them. Strength history is shared only if you separately enable it for this conversation: up to eight weeks of exercise names, weights, estimated 1RM and progress, never GPS or injury notes. All permissions reset after five minutes.",
+                                norwegian: "AI får bare øktdata etter ditt valg og når den ber om det. Styrkehistorikk deles kun hvis du aktiverer det særskilt for denne samtalen: inntil åtte uker med øvelsesnavn, vekt, estimert 1RM og fremgang, aldri GPS eller skadenotater. Samtalen avsluttes innen fem minutter."
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHTheme.mutedText)
@@ -776,13 +810,30 @@ struct ATHLTHLiveAICoachConversationView: View {
         } else {
             statusProvider = nil
         }
+        let strengthProvider: (@MainActor () -> String)?
+        if allowLocalStrengthHistory {
+            strengthProvider = {
+                let snapshot = ATHLTHCoachStrengthIntelligence.snapshot(
+                    from: strengthWorkout.workoutHistory
+                )
+                let encoder = JSONEncoder()
+                guard let data = try? encoder.encode(snapshot),
+                      let json = String(data: data, encoding: .utf8) else {
+                    return "{\"status\":\"unavailable\"}"
+                }
+                return json
+            }
+        } else {
+            strengthProvider = nil
+        }
         Task {
             await conversation.start(
                 microphoneConsent: allowMicrophone,
                 providerConsent: allowProviderProcessing,
                 language: settings.audioCoachLanguage,
                 style: settings.audioCoachSpeechStyle,
-                liveStatusProvider: statusProvider
+                liveStatusProvider: statusProvider,
+                localStrengthProvider: strengthProvider
             )
         }
     }
