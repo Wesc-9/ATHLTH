@@ -98,11 +98,11 @@ enum ATHLTHBodyGoalCheckInPolicy {
         // Activity check-ins remain available even without device-alert permission.
         guard let config = goal.bodyMeasurementGoal,
               goal.status == .active,
-              (7...30).contains(config.checkInIntervalDays),
-              goal.deadline.map {
-                  now <= (calendar.date(byAdding: .day, value: 1,
-                      to: calendar.startOfDay(for: $0)) ?? $0)
-              } ?? true else { return nil }
+              (7...30).contains(config.checkInIntervalDays) else { return nil }
+        if let deadline = goal.deadline,
+           let followingDay = calendar.date(byAdding: .day, value: 1,
+                                            to: calendar.startOfDay(for: deadline)),
+           now > followingDay { return nil }
         let start = calendar.startOfDay(for: goal.startDate)
         for index in 1...240 {
             guard let due = calendar.date(
