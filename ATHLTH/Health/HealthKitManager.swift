@@ -399,11 +399,10 @@ final class HealthKitManager: ObservableObject {
 
             let changes = try await fetchWorkoutImportChanges()
 
-            if let newAnchor = changes.anchor {
-                workoutImportAnchor = newAnchor
-                persistWorkoutImportAnchor(newAnchor)
-            }
-
+            // Do not advance the persisted HealthKit anchor until the
+            // fetched additions/deletions have been reconciled and saved.
+            // A termination during reconciliation must replay the delta
+            // rather than silently lose unprocessed workouts.
             let deletedIDs = Set(changes.deleted.map(\.uuid))
             if !deletedIDs.isEmpty {
                 if workouts.contains(where: { deletedIDs.contains($0.id) }) {
@@ -483,6 +482,10 @@ final class HealthKitManager: ObservableObject {
                 $0.summary.endDate > $1.summary.endDate
             }
             persistWorkoutImportState()
+            if let newAnchor = changes.anchor {
+                workoutImportAnchor = newAnchor
+                persistWorkoutImportAnchor(newAnchor)
+            }
 
             if acceptedWorkoutChanged {
                 invalidateWorkoutDerivedCaches()

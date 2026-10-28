@@ -130,6 +130,7 @@ struct AIProgramBuilderView: View {
     @State private var currentSessionsPerWeek = 0
     @State private var useProfileInterests = true
     @State private var standaloneIntake = ATHLTHAIProgramIntake()
+    @State private var savedProfileInjuryNotes = ""
 
     private let equipmentOptions = [
         "Bodyweight / no equipment", "Dumbbells", "Kettlebells",
@@ -858,6 +859,25 @@ struct AIProgramBuilderView: View {
                               text: $standaloneIntake.injuryNotes, axis: .vertical)
                         .lineLimit(2...5)
                         .textFieldStyle(.roundedBorder)
+                    if !savedProfileInjuryNotes.isEmpty {
+                        Button {
+                            standaloneIntake.injuryNotes = savedProfileInjuryNotes
+                            // Restoring private notes never grants permission
+                            // to send them to the AI provider.
+                            standaloneIntake.healthSharingAuthorized = false
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Use limitations from training profile",
+                                norwegian: "Bruk treningshensyn fra profilen"
+                            ), systemImage: "square.and.arrow.down")
+                        }
+                        .font(.caption.weight(.semibold))
+                        .buttonStyle(.borderless)
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Restores your private notes for this draft. Sharing with Coach remains off.",
+                            norwegian: "Henter private notater til denne planen. Deling med Coach forblir av."
+                        ))
+                    }
 
                     Text(ATHLTHLocalization.choose(
                         english: "Exercises you cannot perform (one per line)",
@@ -2635,6 +2655,7 @@ struct AIProgramBuilderView: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         let savedLimitations = storedTrainingProfile.injuryAndLimitations
             .trimmingCharacters(in: .whitespacesAndNewlines)
+        savedProfileInjuryNotes = String(savedLimitations.prefix(1_200))
         if !savedTrainingNotes.isEmpty {
             coachFocusNotes = String(savedTrainingNotes.prefix(700))
         }
