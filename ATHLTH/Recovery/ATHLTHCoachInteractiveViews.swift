@@ -201,3 +201,57 @@ struct ATHLTHCoachProposalCard: View {
         }
     }
 }
+
+struct ATHLTHCoachHealthSourcesView: View {
+    let context: RecoveryAIContext
+
+    private func label(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    private func entry(_ name: String, _ timestamp: String?, available: Bool) -> some View {
+        HStack(spacing: 9) {
+            Image(systemName: available ? "checkmark.circle" : "clock.badge.questionmark")
+                .foregroundStyle(available ? ATHLTHPlanDesign.accentInk :
+                                    ATHLTHPlanDesign.secondaryInk)
+            Text(name)
+                .font(.caption.weight(.semibold))
+            Spacer(minLength: 8)
+            if available, let timestamp,
+               let when = ISO8601DateFormatter().date(from: timestamp) {
+                Text(when.formatted(date: .abbreviated, time: .shortened))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else {
+                Text(label("No recent sample", "Ingen nyere måling"))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(label("MEASUREMENT SOURCES", "MÅLEKILDER"),
+                  systemImage: "checkmark.shield")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            entry(label("Sleep", "Søvn"),
+                  context.evidence?.sleepEndedAt,
+                  available: context.sleepSeconds != nil)
+            entry("HRV", context.evidence?.hrvSampledAt,
+                  available: context.hrvMilliseconds != nil)
+            entry(label("Resting heart rate", "Hvilepuls"),
+                  context.evidence?.restingPulseSampledAt,
+                  available: context.restingHeartRate != nil)
+            Text(label(
+                "Measurements from Apple Health. Readiness is an estimate, not a direct measurement. Missing or outdated values are excluded from Coach.",
+                "Målinger hentet via Apple Helse. Dagsform er en beregning, ikke en direkte måling. Manglende eller utdaterte verdier utelates fra Coach."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+        .padding(14)
+        .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 17))
+    }
+}
