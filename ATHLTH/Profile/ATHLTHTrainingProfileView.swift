@@ -5,6 +5,10 @@ import SwiftUI
 /// A changed reading does not silently overwrite Apple Health body mass.
 struct ATHLTHTrainingProfileView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var goalStore: GoalStore
+    @StateObject private var checkInStore = RecoverySorenessStore()
+    @State private var showingDailyCheckIn = false
+    @State private var showingGoalCreation = false
     @State private var profile = ATHLTHTrainingProfile()
     @State private var selectedMetric: ATHLTHBodyMetric = .weight
     @State private var measureDate = Date()
@@ -22,12 +26,14 @@ struct ATHLTHTrainingProfileView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 19) {
                 intro
-                notesCard
+                goalsCard
+                checkInCard
                 metricsCard
                 if !profile.readings(for: selectedMetric).isEmpty {
                     trendCard
                     historyCard
                 }
+                notesCard
                 Text(localized(
                     "Private to this account on this device. Body measurements are not automatically shared with Coach, Apple Health or your public profile. If you reinstall the app, locally stored readings may be lost until cloud backup is supported.",
                     "Privat for denne kontoen på denne enheten. Kroppsmål sendes ikke automatisk til Coach, Apple Helse eller din offentlige profil. Ved reinstallasjon kan lokale målinger gå tapt til sikkerhetskopiering i skyen er støttet."
@@ -46,26 +52,218 @@ struct ATHLTHTrainingProfileView: View {
         .sheet(isPresented: $showingMeasurementEditor) {
             measurementEditor
         }
+        .sheet(isPresented: $showingDailyCheckIn) {
+            RecoverySorenessLogView(store: checkInStore)
+        }
+        .sheet(isPresented: $showingGoalCreation) {
+            GoalCreationView()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .athlthTrainingDataDidChange
+        )) { _ in
+            profile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
+        }
     }
 
     private var intro: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Label(localized("YOUR TRAINING BACKGROUND", "DITT TRENINGSGRUNNLAG"),
+            Label(localized("MY TRAINING PROFILE", "MIN TRENINGSPROFIL"),
                   systemImage: "person.crop.rectangle.stack")
                 .font(.caption.weight(.bold))
                 .tracking(1)
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
-            Text(localized("One profile. Better personal training.",
-                           "Én profil. Mer personlig trening."))
+            Text(localized("Your training, in one place.",
+                           "Din trening. Samlet på ett sted."))
                 .font(.system(size: 26, weight: .semibold, design: .serif))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
             Text(localized(
-                "Save your training conditions once, track changes over time and review these notes before AI creates a plan. You can edit or remove them for each request.",
-                "Lagre treningsforutsetningene dine én gang, følg utviklingen og gjennomgå notatene før AI lager en plan. Du kan endre eller fjerne dem for hvert forslag."
+                "Keep your goals, daily check-ins and body measurements together. Your training profile is private and independent of Coach.",
+                "Samle målsetninger, daglig innsjekk og kroppsmål. Treningsprofilen er privat og fungerer uavhengig av Coach."
             ))
             .font(.subheadline)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
+    }
+
+    private var activeGoals: [ATHLTHGoal] {
+        goalStore.goals.filter { $0.status == .active }
+    }
+
+    private func goalProgress(_ goal: ATHLTHGoal) -> Double {
+        if goal.bodyMeasurementGoal != nil {
+            return min(max(ATHLTHBodyGoalCheckInPolicy.progress(goal, profile: profile), 0), 1)
+        }
+        return min(max(goal.progress, 0), 1)
+    }
+
+    private var goalsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                Label(localized("My goals", "Mine mål"), systemImage: "target")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer()
+                Text("\(activeGoals.count) " +
+                     localized("active", "aktive"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+
+            if let primary = goalStore.primaryGoal {
+                NavigationLink {
+                    GoalDetailView(goalID: primary.id)
+                } label: {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Label(localized("MAIN GOAL", "HOVEDMÅL"), systemImage: "star.fill")
+                            .font(.caption2.weight(.bold))
+                            .tracking(1)
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        HStack(alignment: .center, spacing: 9) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(primary.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    .lineLimit(2)
+                                Text(primary.deadline.map {
+                                    localized("Target ", "Måldato ") +
+                                        $0.formatted(date: .abbreviated, time: .omitted)
+                                } ?? localized("No deadline", "Ingen måldato"))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            Spacer()
+                            Text("\(Int((goalProgress(primary) * 100).rounded()))%")
+                                .font(.title3.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+                        ProgressView(value: goalProgress(primary))
+                            .tint(ATHLTHPlanDesign.accentInk)
+                    }
+                    .padding(13)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 15))
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(goalStore.goals.isEmpty
+                     ? localized(
+                        "Set a goal for your training. You can track progress and milestones here.",
+                        "Sett deg et treningsmål. Her kan du følge fremgang og delmål."
+                     )
+                     : localized(
+                        "No active main goal. Manage your goals or choose a new priority.",
+                        "Du har ikke et aktivt hovedmål. Administrer målene eller velg en ny prioritet."
+                     ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+
+            HStack(spacing: 9) {
+                NavigationLink {
+                    GoalsHubView()
+                } label: {
+                    Label(localized("View all goals", "Se alle mål"),
+                          systemImage: "list.bullet")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                Button {
+                    showingGoalCreation = true
+                } label: {
+                    Label(localized("New goal", "Nytt mål"), systemImage: "plus")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHPlanDesign.accentInk)
+            }
+            .font(.caption.weight(.semibold))
+        }
+        .padding(16)
+        .athlthPlanCard(radius: 19)
+    }
+
+    private var checkInCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Label(localized("Daily check-in", "Daglig innsjekk"),
+                      systemImage: "heart.text.clipboard")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer()
+                Label(
+                    checkInStore.hasTodayCheckIn
+                        ? localized("Completed today", "Registrert i dag")
+                        : localized("Not recorded", "Ikke registrert"),
+                    systemImage: checkInStore.hasTodayCheckIn
+                        ? "checkmark.circle.fill" : "circle.dashed"
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(checkInStore.hasTodayCheckIn
+                    ? ATHLTHPlanDesign.accentInk
+                    : ATHLTHPlanDesign.secondaryInk)
+            }
+            Text(localized(
+                "How do you feel? Track energy, stress, soreness and motivation without changing your watch measurements.",
+                "Hvordan har du det? Følg energi, stress, ømhet og motivasjon – uavhengig av målingene fra klokken."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+            if checkInStore.hasTodayCheckIn {
+                HStack(spacing: 8) {
+                    checkInMetric(localized("Energy", "Energi"), checkInStore.todayEnergy)
+                    checkInMetric(localized("Stress", "Stress"), checkInStore.todayStress)
+                    checkInMetric(localized("Soreness", "Ømhet"), checkInStore.todayOverallSoreness)
+                    checkInMetric(localized("Motivation", "Motivasjon"), checkInStore.todayMotivation)
+                }
+            }
+
+            let week = checkInStore.entries.filter {
+                $0.date >= Calendar.current.startOfDay(
+                    for: Calendar.current.date(byAdding: .day, value: -6,
+                                               to: Date()) ?? Date()
+                ) && $0.date <= Date()
+            }
+            if !week.isEmpty {
+                Text(localized("Check-ins last 7 days", "Innsjekker siste 7 dager") +
+                     " · \(week.count)/7")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+
+            Button {
+                showingDailyCheckIn = true
+            } label: {
+                Label(
+                    checkInStore.hasTodayCheckIn
+                        ? localized("Update today's check-in", "Oppdater dagens innsjekk")
+                        : localized("Check in", "Registrer innsjekk"),
+                    systemImage: "square.and.pencil"
+                )
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHPlanDesign.accentInk)
+        }
+        .padding(16)
+        .athlthPlanCard(radius: 19)
+    }
+
+    private func checkInMetric(_ label: String, _ value: Int?) -> some View {
+        VStack(spacing: 5) {
+            Text(value.map { "\($0)/5" } ?? "—")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            Text(label)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, minHeight: 48)
+        .padding(.vertical, 8)
+        .background(ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 13))
     }
 
     private var notesCard: some View {
@@ -74,8 +272,8 @@ struct ATHLTHTrainingProfileView: View {
                   systemImage: "figure.strengthtraining.traditional")
                 .font(.headline)
             Text(localized(
-                "Experience, activities, equipment, goals or other things Coach should take into account.",
-                "Erfaring, treningsformer, utstyr, mål eller annet Coach bør ta hensyn til."
+                "Your experience, preferred activities, equipment and training conditions. This is your personal note.",
+                "Din erfaring, treningsformer, utstyr og treningsforutsetninger. Dette er dine egne notater."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
