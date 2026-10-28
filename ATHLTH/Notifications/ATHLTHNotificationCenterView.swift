@@ -1782,7 +1782,9 @@ struct ATHLTHNotificationCenterView: View {
 
                     LinearGradient(
                         colors: [
-                            tint.opacity(0.055),
+                            item.kind == .dailyCheckIn
+                                ? Color(red: 0.98, green: 0.94, blue: 0.84).opacity(0.75)
+                                : tint.opacity(0.055),
                             .clear
                         ],
                         startPoint: .topLeading,
@@ -1975,6 +1977,11 @@ struct ATHLTHNotificationCenterView: View {
     private func notificationTint(
         _ item: ATHLTHNotificationItem
     ) -> Color {
+        if item.kind == .dailyCheckIn {
+            // A gentle champagne-gold accent for unread daily check-ins.
+            // Read notifications are still rendered in neutral gray.
+            return Color(red: 0.70, green: 0.52, blue: 0.25)
+        }
         if isChallengeItem(item) {
             return .orange
         }
