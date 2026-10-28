@@ -1520,58 +1520,126 @@ struct TrainingPlanLibrarySheet: View {
 struct TrainingPlanLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var onPlanCreated: (() -> Void)? = nil
 
     @StateObject private var catalog = TrainingPlanLibraryStore()
     @State private var query = ""
-    @State private var selectedCategory = "All"
+    @State private var selectedCategory = "all"
     @State private var selectedMuscle: ExerciseMuscleGroup?
     @State private var favoritesOnly = false
     @State private var sessionsPerWeekFilter: Int?
     @State private var weeklySortAscending: Bool?
+    @FocusState private var searchFocused: Bool
+
+    private let ink = ATHLTHTrainDesign.ink
+    private let muted = ATHLTHTrainDesign.secondary
+    private let bronze = ATHLTHTrainDesign.bronze
+    private let canvas = ATHLTHTrainDesign.canvas
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
 
     private var sessionsPerWeekOptions: [Int] {
         Array(Set(catalog.entries.map(\.sessionsPerWeek))).sorted()
     }
 
     private var categories: [String] {
-        ["All"] +
-        Array(Set(catalog.entries.map(\.categoryTitle)))
-            .sorted()
+        let available = Set(catalog.entries.map(\.category))
+        let preferred = [
+            "running", "strength", "hybrid", "competition",
+            "general_fitness", "muscle_focus"
+        ]
+        return ["all"] + preferred.filter { available.contains($0) } +
+            available.subtracting(preferred).sorted()
+    }
+
+    private func categoryTitle(_ category: String) -> String {
+        switch category {
+        case "all": return tr("All", "Alle")
+        case "running": return tr("Running", "Løping")
+        case "strength": return tr("Strength", "Styrke")
+        case "hybrid": return "Hybrid"
+        case "competition": return tr("Competition", "Konkurranse")
+        case "general_fitness": return tr("Everyday fitness", "Hverdagsform")
+        case "muscle_focus": return tr("Muscle focus", "Muskelgrupper")
+        default:
+            return catalog.entries.first(where: { $0.category == category })?
+                .categoryTitle ?? category
+        }
+    }
+
+    private func categoryIcon(_ category: String) -> String {
+        switch category {
+        case "all": return "square.grid.2x2"
+        case "running": return "figure.run"
+        case "strength", "muscle_focus": return "dumbbell"
+        case "hybrid": return "figure.mixed.cardio"
+        case "competition": return "trophy"
+        case "general_fitness": return "heart"
+        default: return "square.stack"
+        }
+    }
+
+    /// Only use artwork bundled with ATHLTH; the cards never need remote
+    /// image requests and the library stays usable when offline.
+    private func categoryArtwork(_ entry: TrainingPlanCatalogEntry) -> String {
+        switch entry.category {
+        case "strength", "muscle_focus": return "StrengthFeedGym"
+        case "hybrid": return "GoalEndurance"
+        case "competition": return "GoalEvent"
+        case "general_fitness": return "GoalWalking"
+        default: return "GoalRunning"
+        }
+    }
+
+    private func localizedLevel(_ level: String) -> String {
+        switch level.lowercased() {
+        case "beginner", "novice": return tr("Beginner", "Nybegynner")
+        case "intermediate": return tr("Intermediate", "Middels")
+        case "advanced": return tr("Advanced", "Avansert")
+        case "expert": return tr("Expert", "Erfaren")
+        default: return level
+        }
+    }
+
+    private var hasActiveFilters: Bool {
+        !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        selectedCategory != "all" || favoritesOnly ||
+        selectedMuscle != nil || sessionsPerWeekFilter != nil
+    }
+
+    private var filterCount: Int {
+        (selectedMuscle == nil ? 0 : 1) +
+        (sessionsPerWeekFilter == nil ? 0 : 1) +
+        (weeklySortAscending == nil ? 0 : 1)
     }
 
     private var filteredEntries: [TrainingPlanCatalogEntry] {
-        let cleanQuery = query.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
-
+        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
         let results = catalog.entries.filter { entry in
             let categoryMatches =
-                selectedCategory == "All" ||
-                entry.categoryTitle == selectedCategory
-            let muscleMatches = selectedMuscle.map { entry.explicitlyTargets($0) } ?? true
-            let favoriteMatches =
-                !favoritesOnly ||
-                favorites.isFavorite(
-                    .plan,
-                    itemID: entry.id.uuidString
-                )
+                selectedCategory == "all" || entry.category == selectedCategory
+            let muscleMatches =
+                selectedMuscle.map { entry.explicitlyTargets($0) } ?? true
+            let favoriteMatches = !favoritesOnly || favorites.isFavorite(
+                .plan, itemID: entry.id.uuidString
+            )
             let searchMatches =
                 cleanQuery.isEmpty ||
-                entry.title.localizedCaseInsensitiveContains(cleanQuery) ||
-                entry.summary.localizedCaseInsensitiveContains(cleanQuery) ||
-                entry.goal.localizedCaseInsensitiveContains(cleanQuery) ||
-                entry.level.localizedCaseInsensitiveContains(cleanQuery) ||
-                entry.tags.joined(separator: " ").localizedCaseInsensitiveContains(cleanQuery)
+                [entry.title, entry.summary, entry.goal, entry.level,
+                 entry.categoryTitle, entry.sessionOutline,
+                 entry.tags.joined(separator: " ")]
+                    .contains { $0.localizedCaseInsensitiveContains(cleanQuery) }
 
-            return categoryMatches &&
-                muscleMatches &&
-                favoriteMatches &&
+            return categoryMatches && muscleMatches && favoriteMatches &&
                 (sessionsPerWeekFilter == nil ||
                     entry.sessionsPerWeek == sessionsPerWeekFilter) &&
                 searchMatches
         }
+
         guard let weeklySortAscending else { return results }
         return results.sorted { left, right in
             if left.sessionsPerWeek != right.sessionsPerWeek {
@@ -1579,302 +1647,87 @@ struct TrainingPlanLibraryView: View {
                     ? left.sessionsPerWeek < right.sessionsPerWeek
                     : left.sessionsPerWeek > right.sessionsPerWeek
             }
-            return left.sortOrder == right.sortOrder
-                ? left.slug < right.slug
-                : left.sortOrder < right.sortOrder
+            if left.sortOrder == right.sortOrder { return left.slug < right.slug }
+            return left.sortOrder < right.sortOrder
         }
     }
 
-    var body: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                LibraryPremiumIntro(
-                    eyebrow: ATHLTHLocalization.choose(english: "TRAINING PLANS", norwegian: "TRENINGSPLANER"),
-                    title: ATHLTHLocalization.choose(english: "Train with a clear direction", norwegian: "Finn en plan som passer deg"),
-                    subtitle:
-                        ATHLTHLocalization.choose(english: "Choose a plan, set its start date, then adapt your workouts.", norwegian: "Velg en plan og startdato. Etterpå kan du tilpasse dagene og øktene."),
-                    icon: "calendar.badge.clock",
-                    accent: ATHLTHPlanDesign.accentInk
-                ) {
-                    HStack(spacing: 8) {
-                        LibraryStatPill(
-                            value: "\(catalog.entries.count)",
-                            label: ATHLTHLocalization.choose(english: "plans", norwegian: "planer"),
-                            icon: "square.stack.3d.up.fill",
-                            tint: ATHLTHPlanDesign.accentInk
-                        )
-
-                        LibraryStatPill(
-                            value: "\(favorites.count(for: .plan))",
-                            label: ATHLTHLocalization.choose(english: "saved", norwegian: "lagret"),
-                            icon: "star.fill",
-                            tint: ATHLTHTheme.premiumGold
-                        )
-                    }
-                }
-
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        Button {
-                            favoritesOnly.toggle()
-                        } label: {
-                            catalogChip(
-                                "Favorites",
-                                systemImage: "star.fill",
-                                selected: favoritesOnly
-                            )
-                        }
-                        .buttonStyle(.plain)
-
-                        ForEach(categories, id: \.self) { category in
-                            Button {
-                                selectedCategory = category
-                            } label: {
-                                catalogChip(
-                                    category,
-                                    systemImage: nil,
-                                    selected:
-                                        selectedCategory == category
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                HStack(spacing: 9) {
-                    Menu {
-                        Button {
-                            selectedMuscle = nil
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "All muscle groups",
-                                    norwegian: "Alle muskelgrupper"
-                                ),
-                                systemImage: selectedMuscle == nil ? "checkmark" : "circle"
-                            )
-                        }
-                        Divider()
-                        ForEach(ExerciseMuscleGroup.allCases) { muscle in
-                            Button {
-                                selectedMuscle = muscle
-                            } label: {
-                                if selectedMuscle == muscle {
-                                    Label(muscle.title, systemImage: "checkmark")
-                                } else {
-                                    Text(muscle.title)
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "figure.strengthtraining.traditional")
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            Text(selectedMuscle?.title ?? ATHLTHLocalization.choose(
-                                english: "Muscle group", norwegian: "Muskelgruppe"
-                            ))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                            Image(systemName: "chevron.down")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 42)
-                        .background(
-                            ATHLTHPlanDesign.selectedSurface,
-                            in: RoundedRectangle(cornerRadius: 13)
-                        )
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 13)
-                                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
-                        }
-                    }
-                    Menu {
-                        Button {
-                            sessionsPerWeekFilter = nil
-                        } label: {
-                            if sessionsPerWeekFilter == nil {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "All weekly frequencies",
-                                        norwegian: "Alle antall økter"
-                                    ), systemImage: "checkmark"
-                                )
-                            } else {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "All weekly frequencies",
-                                    norwegian: "Alle antall økter"
-                                ))
-                            }
-                        }
-                        Divider()
-                        ForEach(sessionsPerWeekOptions, id: \.self) { count in
-                            Button {
-                                sessionsPerWeekFilter = count
-                            } label: {
-                                if sessionsPerWeekFilter == count {
-                                    Label(
-                                        ATHLTHLocalization.format(
-                                            english: "%d sessions/week",
-                                            norwegian: "%d økter/uke", count
-                                        ), systemImage: "checkmark"
-                                    )
-                                } else {
-                                    Text(ATHLTHLocalization.format(
-                                        english: "%d sessions/week",
-                                        norwegian: "%d økter/uke", count
-                                    ))
-                                }
-                            }
-                        }
-                        Divider()
-                        Button {
-                            weeklySortAscending = true
-                        } label: {
-                            if weeklySortAscending == true {
-                                Label(ATHLTHLocalization.choose(
-                                    english: "Fewest sessions first",
-                                    norwegian: "Færrest økter først"
-                                ), systemImage: "checkmark")
-                            } else {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Fewest sessions first",
-                                    norwegian: "Færrest økter først"
-                                ))
-                            }
-                        }
-                        Button {
-                            weeklySortAscending = false
-                        } label: {
-                            if weeklySortAscending == false {
-                                Label(ATHLTHLocalization.choose(
-                                    english: "Most sessions first",
-                                    norwegian: "Flest økter først"
-                                ), systemImage: "checkmark")
-                            } else {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Most sessions first",
-                                    norwegian: "Flest økter først"
-                                ))
-                            }
-                        }
-                        Button {
-                            weeklySortAscending = nil
-                        } label: {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Recommended order",
-                                norwegian: "Anbefalt rekkefølge"
-                            ))
-                        }
-                    } label: {
-                        HStack(spacing: 7) {
-                            Image(systemName: "calendar")
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            Text(sessionsPerWeekFilter.map {
-                                ATHLTHLocalization.format(
-                                    english: "%d/week", norwegian: "%d/uke", $0
-                                )
-                            } ?? (weeklySortAscending == true
-                                ? ATHLTHLocalization.choose(
-                                    english: "Fewest first", norwegian: "Færrest først"
-                                  )
-                                : weeklySortAscending == false
-                                    ? ATHLTHLocalization.choose(
-                                        english: "Most first", norwegian: "Flest først"
-                                      )
-                                    : ATHLTHLocalization.choose(
-                                        english: "Per week", norwegian: "Per uke"
-                                      )))
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            Image(systemName: "chevron.down")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        .padding(.horizontal, 12)
-                        .frame(minHeight: 42)
-                        .background(ATHLTHPlanDesign.selectedSurface,
-                                    in: RoundedRectangle(cornerRadius: 13))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 13)
-                                .stroke(ATHLTHPlanDesign.warmDivider, lineWidth: 1)
-                        }
-                    }
-                    Spacer(minLength: 0)
-                    if selectedMuscle != nil || sessionsPerWeekFilter != nil {
-                        Button {
-                            selectedMuscle = nil
-                            sessionsPerWeekFilter = nil
-                        } label: {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Clear", norwegian: "Nullstill"
-                            ))
-                            .font(.caption.weight(.semibold))
-                        }
-                        .buttonStyle(.plain)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    }
-                }
-                .accessibilityElement(children: .contain)
-
-                if filteredEntries.isEmpty {
-                    ContentUnavailableView(
-                        favoritesOnly
-                            ? "No favorite plans yet"
-                            : "No plans found",
-                        systemImage:
-                            favoritesOnly
-                                ? "star"
-                                : "calendar.badge.exclamationmark",
-                        description: Text(
-                            favoritesOnly
-                                ? "Tap the star on a plan to keep it here."
-                                : "Try another search or category."
-                        )
-                    )
-                    .padding(.top, 32)
-                } else {
-                    ForEach(filteredEntries) { entry in
-                        ZStack(alignment: .topTrailing) {
-                            NavigationLink {
-                                TrainingPlanCatalogDetailView(
-                                    entry: entry,
-                                    onPlanCreated: onPlanCreated
-                                )
-                            } label: {
-                                catalogCard(entry)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-
-                            LibraryFavoriteButton(
-                                kind: .plan,
-                                itemID: entry.id.uuidString,
-                                title: entry.title,
-                                subtitle:
-                                    "\(entry.durationWeeks) weeks · \(entry.level)",
-                                icon: "calendar.badge.clock"
-                            )
-                            .padding(12)
-                        }
-                    }
-                }
+    /// Editorial picks: one running and one strength option if available.
+    /// These are real catalog entries, never hard-coded demonstration plans.
+    private var featuredEntries: [TrainingPlanCatalogEntry] {
+        var selected: [TrainingPlanCatalogEntry] = []
+        for category in ["running", "strength"] {
+            if let entry = catalog.entries.first(where: { $0.category == category }) {
+                selected.append(entry)
             }
-            .padding(18)
-            .frame(maxWidth: 760)
-            .frame(maxWidth: .infinity)
         }
-        .background(
-            ATHLTHPlanDesign.warmCanvas
-        )
-        .navigationTitle(ATHLTHLocalization.choose(english: "Training plans", norwegian: "Treningsplaner"))
+        for entry in catalog.entries where selected.count < 2 {
+            if !selected.contains(where: { $0.id == entry.id }) {
+                selected.append(entry)
+            }
+        }
+        return selected
+    }
+
+    private var listedEntries: [TrainingPlanCatalogEntry] {
+        if hasActiveFilters { return filteredEntries }
+        let featuredIDs = Set(featuredEntries.map(\.id))
+        let remaining = filteredEntries.filter { !featuredIDs.contains($0.id) }
+        return remaining.isEmpty ? filteredEntries : remaining
+    }
+
+    var body: some View {
+        ScrollViewReader { scroll in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 18) {
+                    libraryHeading
+                    inlineSearch
+                    categoryStrip
+
+                    if !hasActiveFilters && !featuredEntries.isEmpty {
+                        featuredSection {
+                            withAnimation(.easeInOut(duration: 0.25)) {
+                                scroll.scrollTo("all-training-plans", anchor: .top)
+                            }
+                        }
+                    }
+
+                    resultsHeader
+                        .id("all-training-plans")
+
+                    if filteredEntries.isEmpty {
+                        ContentUnavailableView(
+                            favoritesOnly
+                                ? tr("No favorite plans yet", "Ingen favorittplaner ennå")
+                                : tr("No plans found", "Fant ingen treningsplaner"),
+                            systemImage: favoritesOnly
+                                ? "star" : "calendar.badge.exclamationmark",
+                            description: Text(favoritesOnly
+                                ? tr("Save a plan with the star to see it here.",
+                                     "Trykk på stjernen på en plan for å lagre den her.")
+                                : tr("Try a different search or remove a filter.",
+                                     "Prøv et annet søk eller fjern et filter."))
+                        )
+                        .padding(.top, 20)
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        ForEach(listedEntries) { entry in
+                            planListItem(entry)
+                        }
+                    }
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 18)
+                .padding(.bottom, 44)
+                .frame(maxWidth: 760)
+                .frame(maxWidth: .infinity)
+            }
+            .scrollIndicators(.hidden)
+            .scrollDismissesKeyboard(.interactively)
+        }
+        .background(canvas.ignoresSafeArea())
+        .navigationTitle(tr("Training plans", "Treningsplaner"))
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(
-            text: $query,
-            prompt: ATHLTHLocalization.choose(english: "Search plans or goals", norwegian: "Søk etter planer eller mål")
-        )
         .task {
             async let plans: Void = catalog.refresh()
             async let saved: Void = favorites.refresh()
@@ -1887,152 +1740,457 @@ struct TrainingPlanLibraryView: View {
         }
     }
 
-    private func catalogChip(
+    // Deliberately no full-width hero or photo at the top. The content
+    // starts immediately, matching Train's restrained editorial styling.
+    private var libraryHeading: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(tr("PLAN LIBRARY", "PLANBIBLIOTEK"))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(2.3)
+                .foregroundStyle(bronze)
+
+            Text(tr("Find your next plan", "Finn din neste plan"))
+                .font(.system(size: 34, weight: .regular, design: .serif))
+                .foregroundStyle(ink)
+                .accessibilityAddTraits(.isHeader)
+
+            Text(tr("Choose a plan and make it yours.",
+                    "Finn en treningsplan som passer målene dine."))
+                .font(.subheadline)
+                .foregroundStyle(muted)
+
+            HStack(spacing: 9) {
+                Label(
+                    tr("\(catalog.entries.count) plans", "\(catalog.entries.count) planer"),
+                    systemImage: "square.stack.3d.up"
+                )
+                Label(
+                    tr("\(favorites.count(for: .plan)) saved",
+                       "\(favorites.count(for: .plan)) lagret"),
+                    systemImage: "star"
+                )
+            }
+            .font(.caption.weight(.medium))
+            .foregroundStyle(ink.opacity(0.78))
+            .padding(.top, 5)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var inlineSearch: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 19, weight: .regular))
+                .foregroundStyle(ink)
+                .accessibilityHidden(true)
+
+            TextField(
+                tr("Search plans, goals or workouts",
+                   "Søk etter planer, mål eller økter"),
+                text: $query
+            )
+            .font(.subheadline)
+            .foregroundStyle(ink)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .submitLabel(.search)
+            .focused($searchFocused)
+            .accessibilityLabel(tr("Search training plans", "Søk i treningsplaner"))
+
+            if !query.isEmpty {
+                Button {
+                    query = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(muted)
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Clear search", "Tøm søk"))
+            }
+        }
+        .padding(.horizontal, 17)
+        .frame(minHeight: 54)
+        .background(Color.white.opacity(0.85),
+                    in: RoundedRectangle(cornerRadius: 21))
+        .overlay {
+            RoundedRectangle(cornerRadius: 21)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.55),
+                              lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var categoryStrip: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(categories, id: \.self) { category in
+                    Button {
+                        searchFocused = false
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selectedCategory = category
+                        }
+                    } label: {
+                        categoryChip(
+                            categoryTitle(category),
+                            systemImage: categoryIcon(category),
+                            selected: selectedCategory == category
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        favoritesOnly.toggle()
+                    }
+                } label: {
+                    categoryChip(
+                        tr("Favorites", "Favoritter"),
+                        systemImage: "star",
+                        selected: favoritesOnly
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            .padding(.vertical, 4)
+        }
+        .contentMargins(.trailing, 2)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func categoryChip(
         _ title: String,
-        systemImage: String?,
+        systemImage: String,
         selected: Bool
     ) -> some View {
-        HStack(spacing: 6) {
-            if let systemImage {
-                Image(systemName: systemImage)
+        Label(title, systemImage: systemImage)
+            .font(.system(size: 12, weight: .medium))
+            .foregroundStyle(selected ? Color.white : ink)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 39)
+            .background(selected ? ink : Color.white.opacity(0.90),
+                        in: Capsule())
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        selected ? Color.clear : ATHLTHPlanDesign.outline.opacity(0.50),
+                        lineWidth: 0.8
+                    )
+                    .allowsHitTesting(false)
             }
-            Text(title)
-        }
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(
-            selected
-                ? Color.white
-                : ATHLTHTheme.primaryText.opacity(0.82)
-        )
-        .padding(.horizontal, 13)
-        .frame(height: 38)
-        .background(
-            selected
-                ? ATHLTHTheme.accentDeep
-                : Color.white.opacity(0.86),
-            in: Capsule()
-        )
-        .overlay {
-            Capsule()
-                .stroke(
-                    selected
-                        ? Color.white.opacity(0.18)
-                        : Color.black.opacity(0.035),
-                    lineWidth: 0.8
-                )
-        }
-        .shadow(
-            color: ATHLTHTheme.accentDeep.opacity(
-                selected ? 0.10 : 0.025
-            ),
-            radius: selected ? 8 : 5,
-            y: 3
-        )
+            .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func catalogCard(
-        _ entry: TrainingPlanCatalogEntry
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: entry.trainingTypeIcon)
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .frame(width: 48, height: 48)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 14))
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(entry.trainingTypeTitle.uppercased())
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.2)
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-
-                    Text(entry.title)
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-
-                    Text(entry.goal)
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        .lineLimit(2)
-                }
-                // Leave room for the independent favorite control.
-                .padding(.trailing, 35)
-                Spacer(minLength: 0)
-            }
-
-            Text(entry.summary)
-                .font(.subheadline)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .lineLimit(3)
-                .multilineTextAlignment(.leading)
-
-            HStack(spacing: 8) {
-                Image(systemName: "list.bullet.rectangle")
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(entry.sessionOutline)
+    private func featuredSection(onSeeAll: @escaping () -> Void) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Text(tr("Featured plans", "Utvalgte planer"))
+                    .font(.system(size: 24, weight: .regular, design: .serif))
+                    .foregroundStyle(ink)
+                    .accessibilityAddTraits(.isHeader)
+                Spacer()
+                Button(action: onSeeAll) {
+                    HStack(spacing: 5) {
+                        Text(tr("See all", "Se alle"))
+                        Image(systemName: "chevron.right")
+                    }
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .lineLimit(2)
-                Spacer(minLength: 2)
+                    .foregroundStyle(muted)
+                }
+                .buttonStyle(.plain)
             }
-            .padding(11)
-            .background(ATHLTHPlanDesign.warmSurface,
-                        in: RoundedRectangle(cornerRadius: 12))
 
-            HStack(spacing: 7) {
-                planMetric(
-                    ATHLTHLocalization.format(
-                        english: "%d weeks", norwegian: "%d uker",
-                        entry.durationWeeks
-                    ), icon: "calendar"
-                )
-                planMetric(
-                    ATHLTHLocalization.format(
-                        english: "%d/week", norwegian: "%d/uke",
-                        entry.sessionsPerWeek
-                    ), icon: "repeat"
-                )
-                planMetric(entry.level, icon: "speedometer")
-                Spacer(minLength: 3)
-                Image(systemName: "arrow.up.right")
-                    .font(.caption.bold())
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    .frame(width: 32, height: 32)
-                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(featuredEntries) { entry in
+                        featuredPlanItem(entry)
+                    }
+                }
+                .padding(.vertical, 3)
             }
         }
-        .padding(16)
-        .athlthPlanCard()
     }
 
-    private func planMetric(
-        _ text: String,
-        icon: String
-    ) -> some View {
-        Label(text, systemImage: icon)
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(ATHLTHTheme.mutedText)
-            .padding(.horizontal, 8)
-            .frame(height: 28)
-            .background(
-                Color.white.opacity(0.62),
-                in: Capsule()
+    private func featuredPlanItem(_ entry: TrainingPlanCatalogEntry) -> some View {
+        ZStack(alignment: .topTrailing) {
+            NavigationLink {
+                TrainingPlanCatalogDetailView(
+                    entry: entry,
+                    onPlanCreated: onPlanCreated
+                )
+            } label: {
+                ZStack(alignment: .bottomLeading) {
+                    GeometryReader { geometry in
+                        Image(categoryArtwork(entry))
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width,
+                                   height: geometry.size.height)
+                            .clipped()
+                            .accessibilityHidden(true)
+                    }
+                    LinearGradient(
+                        colors: [.black.opacity(0.06), .black.opacity(0.23),
+                                 .black.opacity(0.84)],
+                        startPoint: .top, endPoint: .bottom
+                    )
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(entry.trainingTypeTitle.uppercased())
+                            .font(.system(size: 10, weight: .semibold))
+                            .tracking(1.2)
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 5)
+                            .background(.white.opacity(0.88), in: Capsule())
+                            .foregroundStyle(ink)
+                        Spacer(minLength: 8)
+                        Text(entry.title)
+                            .font(.system(size: 24, weight: .regular, design: .serif))
+                            .foregroundStyle(.white)
+                            .lineLimit(2)
+                        Text(entry.goal)
+                            .font(.caption)
+                            .foregroundStyle(.white.opacity(0.92))
+                            .lineLimit(2)
+                        HStack(spacing: 10) {
+                            Label(
+                                tr("\(entry.durationWeeks) weeks",
+                                   "\(entry.durationWeeks) uker"),
+                                systemImage: "calendar"
+                            )
+                            Label(localizedLevel(entry.level), systemImage: "chart.bar")
+                        }
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(.white)
+                    }
+                    .padding(15)
+                    .padding(.trailing, 6)
+                }
+                .frame(
+                    width: dynamicTypeSize.isAccessibilitySize ? 300 : 246,
+                    height: dynamicTypeSize.isAccessibilitySize ? 280 : 228
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 22))
+                .contentShape(RoundedRectangle(cornerRadius: 22))
+            }
+            .buttonStyle(.plain)
+
+            LibraryFavoriteButton(
+                kind: .plan,
+                itemID: entry.id.uuidString,
+                title: entry.title,
+                subtitle: "\(entry.durationWeeks) weeks · \(entry.level)",
+                icon: "calendar.badge.clock"
             )
+            .padding(9)
+        }
     }
 
-    private func planAccent(
-        _ entry: TrainingPlanCatalogEntry
-    ) -> Color {
-        switch entry.category {
-        case "strength":
-            return Color.indigo
-        case "hybrid":
-            return ATHLTHTheme.premiumGold
-        default:
-            return ATHLTHTheme.vitality
+    private var resultsHeader: some View {
+        HStack(spacing: 8) {
+            Text(hasActiveFilters
+                 ? tr("Search results", "Søkeresultater")
+                 : tr("All plans", "Alle planer"))
+                .font(.system(size: 24, weight: .regular, design: .serif))
+                .foregroundStyle(ink)
+                .accessibilityAddTraits(.isHeader)
+            Text("\(hasActiveFilters ? filteredEntries.count : listedEntries.count)")
+                .font(.caption.weight(.medium))
+                .foregroundStyle(muted)
+            Spacer(minLength: 6)
+            catalogFiltersMenu
+        }
+    }
+
+    private var catalogFiltersMenu: some View {
+        Menu {
+            Menu(tr("Muscle group", "Muskelgruppe")) {
+                Button {
+                    selectedMuscle = nil
+                } label: {
+                    if selectedMuscle == nil {
+                        Label(tr("All muscle groups", "Alle muskelgrupper"),
+                              systemImage: "checkmark")
+                    } else {
+                        Text(tr("All muscle groups", "Alle muskelgrupper"))
+                    }
+                }
+                ForEach(ExerciseMuscleGroup.allCases) { muscle in
+                    Button {
+                        selectedMuscle = muscle
+                    } label: {
+                        if selectedMuscle == muscle {
+                            Label(muscle.title, systemImage: "checkmark")
+                        } else {
+                            Text(muscle.title)
+                        }
+                    }
+                }
+            }
+            Menu(tr("Sessions per week", "Økter per uke")) {
+                Button {
+                    sessionsPerWeekFilter = nil
+                } label: {
+                    if sessionsPerWeekFilter == nil {
+                        Label(tr("All", "Alle"), systemImage: "checkmark")
+                    } else {
+                        Text(tr("All", "Alle"))
+                    }
+                }
+                ForEach(sessionsPerWeekOptions, id: \.self) { count in
+                    Button {
+                        sessionsPerWeekFilter = count
+                    } label: {
+                        if sessionsPerWeekFilter == count {
+                            Label(tr("\(count) / week", "\(count) / uke"),
+                                  systemImage: "checkmark")
+                        } else {
+                            Text(tr("\(count) / week", "\(count) / uke"))
+                        }
+                    }
+                }
+            }
+            Menu(tr("Sort by", "Sorter etter")) {
+                Button {
+                    weeklySortAscending = nil
+                } label: {
+                    if weeklySortAscending == nil {
+                        Label(tr("Recommended order", "Anbefalt rekkefølge"),
+                              systemImage: "checkmark")
+                    } else {
+                        Text(tr("Recommended order", "Anbefalt rekkefølge"))
+                    }
+                }
+                Button {
+                    weeklySortAscending = true
+                } label: {
+                    if weeklySortAscending == true {
+                        Label(tr("Fewest sessions first", "Færrest økter først"),
+                              systemImage: "checkmark")
+                    } else {
+                        Text(tr("Fewest sessions first", "Færrest økter først"))
+                    }
+                }
+                Button {
+                    weeklySortAscending = false
+                } label: {
+                    if weeklySortAscending == false {
+                        Label(tr("Most sessions first", "Flest økter først"),
+                              systemImage: "checkmark")
+                    } else {
+                        Text(tr("Most sessions first", "Flest økter først"))
+                    }
+                }
+            }
+            if hasActiveFilters || filterCount > 0 {
+                Divider()
+                Button {
+                    query = ""
+                    selectedCategory = "all"
+                    selectedMuscle = nil
+                    favoritesOnly = false
+                    sessionsPerWeekFilter = nil
+                    weeklySortAscending = nil
+                } label: {
+                    Label(tr("Reset filters", "Nullstill filtre"),
+                          systemImage: "arrow.counterclockwise")
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "slider.horizontal.3")
+                Text(tr("Filters", "Filtre"))
+                if filterCount > 0 {
+                    Text("\(filterCount)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(bronze)
+                }
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ink)
+            .padding(.horizontal, 11)
+            .frame(minHeight: 37)
+            .background(.white.opacity(0.88), in: Capsule())
+        }
+        .accessibilityLabel(tr("Plan filters and sorting", "Filtre og sortering av planer"))
+    }
+
+    private func planListItem(_ entry: TrainingPlanCatalogEntry) -> some View {
+        ZStack(alignment: .topTrailing) {
+            NavigationLink {
+                TrainingPlanCatalogDetailView(
+                    entry: entry, onPlanCreated: onPlanCreated
+                )
+            } label: {
+                HStack(alignment: .center, spacing: 12) {
+                    GeometryReader { geometry in
+                        Image(categoryArtwork(entry))
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: geometry.size.width,
+                                   height: geometry.size.height)
+                            .clipped()
+                    }
+                    .frame(width: dynamicTypeSize.isAccessibilitySize ? 83 : 92,
+                           height: dynamicTypeSize.isAccessibilitySize ? 113 : 103)
+                    .clipShape(RoundedRectangle(cornerRadius: 14))
+                    .accessibilityHidden(true)
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(entry.trainingTypeTitle.uppercased())
+                            .font(.system(size: 9, weight: .semibold))
+                            .tracking(1.1)
+                            .foregroundStyle(bronze)
+                            .lineLimit(1)
+                        Text(entry.title)
+                            .font(.system(size: 19, weight: .semibold, design: .serif))
+                            .foregroundStyle(ink)
+                            .lineLimit(2)
+                        Text(entry.summary)
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                            .lineLimit(2)
+                        HStack(spacing: 9) {
+                            Label(tr("\(entry.durationWeeks) weeks",
+                                     "\(entry.durationWeeks) uker"),
+                                  systemImage: "calendar")
+                            Label(tr("\(entry.sessionsPerWeek) / week",
+                                     "\(entry.sessionsPerWeek) / uke"),
+                                  systemImage: "repeat")
+                            if !dynamicTypeSize.isAccessibilitySize {
+                                Text(localizedLevel(entry.level))
+                                    .lineLimit(1)
+                            }
+                        }
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(muted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    }
+                    .padding(.trailing, 24)
+                    Spacer(minLength: 0)
+                }
+                .padding(11)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.white.opacity(0.92),
+                            in: RoundedRectangle(cornerRadius: 19))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 19)
+                        .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.55),
+                                      lineWidth: 0.7)
+                        .allowsHitTesting(false)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 19))
+            }
+            .buttonStyle(.plain)
+
+            LibraryFavoriteButton(
+                kind: .plan,
+                itemID: entry.id.uuidString,
+                title: entry.title,
+                subtitle: "\(entry.durationWeeks) weeks · \(entry.level)",
+                icon: "calendar.badge.clock"
+            )
+            .padding(8)
         }
     }
 }
