@@ -1536,18 +1536,14 @@ enum HomeHealthMetricKind:
     }
 
     var tint: Color {
-        // Restore the four distinct, saturated health accents. Keep the
-        // neutral cards and typography unchanged; color belongs to the icon
-        // and chart, not to the whole card background.
+        // The four Home metrics use vivid, undiluted system accents.
+        // Keep the paper cards neutral; full color is reserved for each
+        // metric's icon and real measurements, never missing values.
         switch self {
-        case .sleep:
-            return Color(red: 0.52, green: 0.34, blue: 0.79)
-        case .respiratoryRate:
-            return Color(red: 0.16, green: 0.54, blue: 0.82)
-        case .hrv:
-            return Color(red: 0.85, green: 0.32, blue: 0.38)
-        case .load:
-            return Color(red: 0.20, green: 0.61, blue: 0.39)
+        case .sleep: return .indigo
+        case .respiratoryRate: return .blue
+        case .hrv: return .red
+        case .load: return .green
         }
     }
 
@@ -1991,7 +1987,7 @@ private struct HomeMetricMiniBars: View {
                         .fill(
                             value == nil
                                 ? color.opacity(0.10)
-                                : color.opacity(0.88)
+                                : color
                         )
                         .frame(maxWidth: .infinity)
                         .frame(
