@@ -462,7 +462,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             .safeAreaInset(edge: .bottom) {
                 if !showingCreatedPlan {
                     if step == .mode {
-                        AnyView(entryChoiceContinueBar)
+                        EmptyView()
                     } else if step == .goal {
                         AnyView(goalContinueBar)
                     } else if step == .basics && mode == .advanced {
@@ -1039,19 +1039,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     // The old mode cards are not rendered or layered underneath.
     private var modeChoice: some View {
         ATHLTHPlanEntryChoiceView(
-            choice: Binding(
-                get: { entryChoice },
-                set: { selected in
-                    entryChoice = selected
-                    switch selected {
-                    case .simple:
-                        mode = .basic
-                    case .advanced, .coach:
-                        mode = .advanced
-                    }
+            choice: $entryChoice,
+            onChoose: { selected in
+                switch selected {
+                case .simple:
+                    switchSetupMode(to: false)
+                case .advanced:
+                    switchSetupMode(to: true)
+                case .coach:
+                    // Coach remains available from the previous Plan screen.
+                    return
                 }
-            ),
-            onOpenLibrary: { sourceRoute.append(.library) },
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
+                    step = .basics
+                }
+            },
             onCancel: { dismiss() }
         )
     }
@@ -1089,53 +1091,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     // User explicitly chooses between Simple, Advanced, or Coach.
     // Manual paths open their actual setup, while Coach opens the
     // existing AIProgramBuilderView via a single sheet, not a nested wizard.
-    private var entryChoiceContinueBar: some View {
-        Button {
-            switch entryChoice {
-            case .simple:
-                switchSetupMode(to: false)
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                    step = .basics
-                }
-            case .advanced:
-                switchSetupMode(to: true)
-                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.18)) {
-                    step = .basics
-                }
-            case .coach:
-                mode = .advanced
-                showingAIBuilder = true
-            }
-        } label: {
-            HStack {
-                Spacer(minLength: 10)
-                Text(ATHLTHLocalization.choose(
-                    english: "Select and continue", norwegian: "Velg og fortsett"
-                ))
-                .font(.system(size: 14, weight: .semibold))
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.right")
-                    .font(.system(size: 15, weight: .semibold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity, minHeight: 53)
-            .background(
-                LinearGradient(
-                    colors: [ATHLTHTrainDesign.bronze,
-                             Color(red: 0.69, green: 0.50, blue: 0.28)],
-                    startPoint: .leading, endPoint: .trailing
-                ),
-                in: RoundedRectangle(cornerRadius: 19)
-            )
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 18)
-        .padding(.top, 8)
-        .padding(.bottom, 9)
-        .background(ATHLTHTrainDesign.canvas.opacity(0.99))
-    }
-
     private func applyExistingGoalFocus(_ linked: ATHLTHGoal) {
         switch linked.category {
         case .strength:
