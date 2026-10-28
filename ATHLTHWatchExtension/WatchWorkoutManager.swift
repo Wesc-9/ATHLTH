@@ -99,6 +99,7 @@ private struct WatchPersistedWorkoutState: Codable {
     var lastLapDistanceMeters: Double
     var automaticPauseCount: Int
     var automaticPauseEnabled: Bool? = nil
+    var indoorVenue: ATHLTHIndoorRunVenue? = nil
     var returningToRouteStart: Bool? = nil
     var routeLegDistanceOffsetMeters: Double? = nil
     var strengthSession:
@@ -3225,8 +3226,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
             synchronizeHybridTreadmillSensors()
 
-            if configuration.locationType ==
-                .outdoor,
+            if usesOutdoorGPS,
                let seriesBuilder =
                     builder.seriesBuilder(
                         for:
@@ -3378,6 +3378,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     automaticPauseCount,
                 automaticPauseEnabled:
                     automaticPauseEnabled,
+                indoorVenue: switchedIndoorVenue,
                 returningToRouteStart: returningToRouteStart,
                 routeLegDistanceOffsetMeters: routeLegDistanceOffsetMeters,
                 strengthSession:
@@ -3420,6 +3421,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         startedAt =
             startedAt ??
             snapshot.startedAt
+        switchedIndoorVenue = snapshot.indoorVenue
+        if let venue = snapshot.indoorVenue {
+            indoorPromptedInThisWorkout = true
+            indoorSuggestionAvailable = false
+            automaticPauseEnabled = false
+            treadmillInclinePercent = venue == .treadmill ? 0 : nil
+        }
         ghostRaceConfiguration =
             snapshot.ghostRace
         returningToRouteStart = snapshot.returningToRouteStart ?? false
