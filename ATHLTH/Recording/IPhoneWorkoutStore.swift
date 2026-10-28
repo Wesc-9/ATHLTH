@@ -5436,6 +5436,15 @@ final class IPhoneWorkoutStore:
                 continue
             }
 
+            // Reliable GPS fixes must be counted even while GPS auto-pause
+            // is active; otherwise a stationary treadmill session would
+            // never meet the 15-minute eligibility window.
+            if indoorFirstReliableFix == nil {
+                indoorFirstReliableFix = location.timestamp
+            }
+            indoorLastReliableFix = location.timestamp
+            indoorAcceptedFixCount += 1
+
             if workout.autoPauseEnabled == true {
                 if let action =
                         autoPauseDetector.evaluate(
@@ -5496,12 +5505,6 @@ final class IPhoneWorkoutStore:
                         distance
                 }
             }
-
-            if indoorFirstReliableFix == nil {
-                indoorFirstReliableFix = location.timestamp
-            }
-            indoorLastReliableFix = location.timestamp
-            indoorAcceptedFixCount += 1
 
             lastLocation = location
             workout.points.append(
