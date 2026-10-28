@@ -10154,16 +10154,20 @@ struct ATHLTHTrainView: View {
     }
 
     private var trainMyPlansSubtitle: String {
-        let upcoming =
-            session.trainingPlans.filter {
-                session.trainingPlanStatus($0) ==
-                    .upcoming
-            }.count
-        let completed =
-            session.trainingPlans.filter {
-                session.trainingPlanStatus($0) ==
-                    .completed
-            }.count
+        // Evaluate each plan's status once and avoid allocating two arrays
+        // whenever the Train plan subtitle is refreshed.
+        var upcoming = 0
+        var completed = 0
+        for plan in session.trainingPlans {
+            switch session.trainingPlanStatus(plan) {
+            case .upcoming:
+                upcoming += 1
+            case .completed:
+                completed += 1
+            default:
+                break
+            }
+        }
 
         if upcoming > 0 {
             return ATHLTHLocalization.choose(
