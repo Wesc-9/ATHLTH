@@ -1363,28 +1363,31 @@ struct ATHLTHTrainPlanPremiumView: View {
                         }
                         .padding(14)
                     }
-                    .frame(height: 196)
+                    .frame(height: 170)
                     .clipShape(RoundedRectangle(cornerRadius: 18))
-                    HStack(spacing: 8) {
-                        referencePlanMetric("\(plan.weeks.count)", tr("Weeks", "Uker"),
-                                            symbol: "calendar")
-                        referencePlanMetric("\(total)", tr("Workouts", "Økter"),
-                                            symbol: "dumbbell")
-                        referencePlanMetric("\(completed)/\(total)", tr("Completed", "Fullført"),
-                                            symbol: "checkmark.circle")
-                    }
-                    VStack(spacing: 7) {
-                        HStack {
-                            Text(tr("Overall progress", "Total fremdrift"))
-                            Spacer()
-                            Text("\(Int((min(max(progress.completionFraction, 0), 1) * 100).rounded())) %")
+                    VStack(spacing: 10) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("\\(plan.weeks.count) " + tr("weeks", "uker"))
+                            Text("·").foregroundStyle(secondaryInk)
+                            Text("\\(total) " + tr("workouts", "økter"))
+                            Spacer(minLength: 4)
+                            Text("\\(Int((min(max(progress.completionFraction, 0), 1) * 100).rounded())) %")
+                                .foregroundStyle(warmGold)
                         }
-                        .font(.caption)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(graphite)
                         ProgressView(value: min(max(progress.completionFraction, 0), 1))
                             .tint(warmGold)
+                        HStack {
+                            Text("\\(completed)/\\(total) " + tr("completed", "fullført"))
+                            Spacer()
+                            Text(tr("Total progress", "Total fremdrift"))
+                        }
+                        .font(.caption2)
+                        .foregroundStyle(secondaryInk)
                     }
-                    .padding(12)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                    .padding(13)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 16))
                     HStack(spacing: 2) {
                         ForEach(0..<4, id: \.self) { index in
                             let title = [
