@@ -768,7 +768,30 @@ final class ExerciseLibraryStore: ObservableObject {
         }
         let queryTokens = cleanQuery.split(whereSeparator: { $0.isWhitespace }).map(String.init)
 
+        let selectedBodyPart = bodyPart.flatMap { $0 == "All" ? nil : Self.canonicalMuscleFilter($0) }
         let matches = selectableExercises.filter { entry in
+            let matchesBodyPart: Bool
+            if let selected = selectedBodyPart {
+                matchesBodyPart =
+                    (entry.bodyPart.map {
+                        Self.canonicalMuscleFilter($0)
+                            .localizedCaseInsensitiveCompare(selected) == .orderedSame
+                    } ?? false) ||
+                    entry.exercise.primaryMuscles.contains {
+                        Self.canonicalMuscleFilter($0)
+                            .localizedCaseInsensitiveCompare(selected) == .orderedSame
+                    }
+            } else {
+                matchesBodyPart = true
+            }
+
+            let matchesEquipment = equipment.map {
+                $0 == "All" ||
+                entry.exercise.equipment.contains($0)
+            } ?? true
+
+
+            guard matchesBodyPart && matchesEquipment else { return false }
             let matchesText: Bool
             if cleanQuery.isEmpty {
                 matchesText = true
@@ -814,28 +837,7 @@ final class ExerciseLibraryStore: ObservableObject {
                 }
             }
 
-            let matchesBodyPart: Bool
-            if let bodyPart, bodyPart != "All" {
-                let selected = Self.canonicalMuscleFilter(bodyPart)
-                matchesBodyPart =
-                    (entry.bodyPart.map {
-                        Self.canonicalMuscleFilter($0)
-                            .localizedCaseInsensitiveCompare(selected) == .orderedSame
-                    } ?? false) ||
-                    entry.exercise.primaryMuscles.contains {
-                        Self.canonicalMuscleFilter($0)
-                            .localizedCaseInsensitiveCompare(selected) == .orderedSame
-                    }
-            } else {
-                matchesBodyPart = true
-            }
-
-            let matchesEquipment = equipment.map {
-                $0 == "All" ||
-                entry.exercise.equipment.contains($0)
-            } ?? true
-
-            return matchesText && matchesBodyPart && matchesEquipment
+            return matchesText
         }
         lastSearchRequest = request
         lastSearchTranslationRevision = translationRevision
