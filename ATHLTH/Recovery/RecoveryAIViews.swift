@@ -1021,6 +1021,10 @@ struct RecoveryCoachView: View {
     @State private var selectedCoachProposal: RecoveryCoachProposal?
     @State private var showingCoachWorkoutBuilder = false
     @State private var showingCoachPlanBuilder = false
+    @State private var activeQuickWizard: ATHLTHCoachQuickAction?
+    @State private var pendingWizardPrompt: String?
+    @State private var pendingWizardScope: ATHLTHCoachProgressScope?
+    @State private var progressScopeForNextQuestion: ATHLTHCoachProgressScope?
     @State private var showingCoachPlanAdaptation = false
     @State private var showingCoachWorkoutProfileReview = false
     @State private var pendingWorkoutCreationPrompt = ""
@@ -1286,6 +1290,37 @@ struct RecoveryCoachView: View {
                         return true
                     }
                 )
+            }
+        }
+        .sheet(item: $activeQuickWizard, onDismiss: deliverQuickWizardResult) { action in
+            switch action {
+            case .createWorkout:
+                ATHLTHCoachWorkoutWizardView { prompt in
+                    pendingWizardPrompt = prompt
+                    pendingWizardScope = nil
+                    activeQuickWizard = nil
+                }
+            case .postponeWorkout:
+                ATHLTHCoachPostponeWizardView { notice in
+                    proposalActionNotice = notice
+                    activeQuickWizard = nil
+                }
+            case .createPlan:
+                AIProgramBuilderView(
+                    mode: .generate,
+                    onProgramCreated: {
+                        proposalActionNotice = recoveryAIText(
+                            "Training plan saved after your approval.",
+                            "Treningsplanen ble lagret etter godkjenning."
+                        )
+                    }
+                )
+            case .reviewProgress:
+                ATHLTHCoachProgressWizardView { prompt, scope in
+                    pendingWizardPrompt = prompt
+                    pendingWizardScope = scope
+                    activeQuickWizard = nil
+                }
             }
         }
         .sheet(isPresented: $showingCoachPlanAdaptation) {
@@ -2159,7 +2194,7 @@ struct RecoveryCoachView: View {
         VStack(spacing: 8) {
             // Four quick actions remain visible even with a long chat history.
             ATHLTHCoachStarterActions(
-                onPrompt: { requestAnswer($0) },
+                onSelect: { activeQuickWizard = $0 },
                 isDisabled: isAsking
             )
 
@@ -2611,6 +2646,19 @@ struct RecoveryCoachView: View {
     }
 
     @MainActor
+    private func deliverQuickWizardResult() {
+        guard let pendingWizardPrompt else { return }
+        self.pendingWizardPrompt = nil
+        progressScopeForNextQuestion = pendingWizardScope
+        pendingWizardScope = nil
+        if progressScopeForNextQuestion != nil {
+            shareHealthForNextQuestion = true
+        }
+        question = pendingWizardPrompt
+        requestAnswer(pendingWizardPrompt)
+    }
+
+    @MainActor
     private func requestAnswer(
         _ rawQuestion: String, reviewedWorkout: Bool = false
     ) {
@@ -2631,6 +2679,14 @@ struct RecoveryCoachView: View {
         else {
             pendingShareAfterConsent = false
             draftHealthPermission = false
+            showingCoachConsentSheet = true
+            return
+        }
+
+        if shareHealthForNextQuestion && !healthConsentApproved {
+            pendingShareAfterConsent = true
+            draftHealthPermission = false
+            draftAutomaticHealthPermission = false
             showingCoachConsentSheet = true
             return
         }
@@ -2682,8 +2738,9 @@ struct RecoveryCoachView: View {
             return
         }
 
-        let priorHistory =
-            messages
+        let selectedScope = progressScopeForNextQuestion
+        // Do not include unrelated past messages in a scoped review.
+        let priorHistory = selectedScope == nil ? messages : []
         messages.append(
             RecoveryCoachMessage(
                 role: .user,
@@ -2697,6 +2754,10 @@ struct RecoveryCoachView: View {
         persistConversation()
         defer {
             isAsking = false
+            progressScopeForNextQuestion = nil
+            if selectedScope != nil {
+                shareHealthForNextQuestion = false
+            }
         }
 
         do {
@@ -2713,29 +2774,42 @@ struct RecoveryCoachView: View {
             let reply =
                 try await service.ask(
                     clean,
-                    context: context,
+                    context: shareHealthData &&
+                        (selectedScope?.contains(.recovery) ?? true)
+                        ? context : .withoutHealthData,
                     history: priorHistory,
                     shareHealthData: shareHealthData,
                     shareHealthAutomatically:
                         RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
                             userID: session.profile.userID
                         ),
-                    coachStrengthContext: shareHealthData
+                    coachStrengthContext: shareHealthData &&
+                        (selectedScope?.contains(.strength) ?? true)
                         ? ATHLTHCoachStrengthIntelligence.snapshot(
-                            from: strengthWorkout.workoutHistory
+                            from: strengthWorkout.workoutHistory,
+                            windowDays: selectedScope?.windowDays ?? 56
                           )
                         : nil,
-                    coachRunningContext: shareHealthData
+                    coachRunningContext: shareHealthData &&
+                        (selectedScope?.contains(.running) ?? true)
                         ? ATHLTHCoachRunningIntelligence.snapshot(
                             from: ATHLTHRunningPerformanceHistory.load(
                                 userID: session.profile.userID
-                            )
+                            ),
+                            windowDays: selectedScope?.windowDays ?? 56
                           )
                         : nil,
-                    coachTrainingContext: shareHealthData
+                    coachTrainingContext: shareHealthData &&
+                        (selectedScope == nil ||
+                         selectedScope?.contains(.goals) == true ||
+                         selectedScope?.contains(.plan) == true)
                         ? ATHLTHCoachTrainingContext.snapshot(
-                            activePlan: session.activePlan,
-                            goals: goalStore.activeGoals
+                            activePlan: selectedScope == nil ||
+                                selectedScope?.contains(.plan) == true
+                                ? session.activePlan : nil,
+                            goals: selectedScope == nil ||
+                                selectedScope?.contains(.goals) == true
+                                ? goalStore.activeGoals : []
                           )
                         : nil
                 )

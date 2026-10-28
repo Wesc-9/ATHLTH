@@ -29,6 +29,18 @@ final class ATHLTHCoachPlanChatAndHealthEvidenceTests: XCTestCase {
         XCTAssertTrue(actions.allSatisfy { !$0.title.isEmpty && !$0.prompt.isEmpty })
     }
 
+    func testCoachProgressScopeHonorsSelectedDataClassesAndPeriod() {
+        let scope = ATHLTHCoachProgressScope(
+            selected: [.running, .goals], windowDays: 14
+        )
+        XCTAssertTrue(scope.contains(.running))
+        XCTAssertTrue(scope.contains(.goals))
+        XCTAssertFalse(scope.contains(.strength))
+        XCTAssertFalse(scope.contains(.recovery))
+        XCTAssertFalse(scope.contains(.plan))
+        XCTAssertEqual(scope.windowDays, 14)
+    }
+
     func testSourceFreshnessAllowsCurrentMeasurementsAndRejectsStaleOrFuture() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         XCTAssertTrue(ATHLTHCoachHealthEvidence.valid(

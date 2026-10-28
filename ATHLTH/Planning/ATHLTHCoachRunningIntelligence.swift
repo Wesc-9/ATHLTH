@@ -21,9 +21,11 @@ enum ATHLTHCoachRunningIntelligence {
 
     static func snapshot(
         from performances: [ATHLTHCompletedRunningPerformance],
-        now: Date = Date()
+        now: Date = Date(),
+        windowDays: Int = 56
     ) -> Snapshot {
-        let start = now.addingTimeInterval(-56 * 86_400)
+        let days = min(max(windowDays, 1), 56)
+        let start = now.addingTimeInterval(-Double(days) * 86_400)
         var seen = Set<UUID>()
         let recent = performances.filter {
             $0.completedAt <= now && $0.completedAt >= start &&
@@ -47,7 +49,7 @@ enum ATHLTHCoachRunningIntelligence {
             )
         }
         return Snapshot(
-            windowDays: 56,
+            windowDays: days,
             completedRuns: recent.count,
             runsLastSevenDays: recent.filter {
                 $0.completedAt >= now.addingTimeInterval(-7 * 86_400)

@@ -116,7 +116,7 @@ enum ATHLTHCoachQuickAction: String, CaseIterable, Identifiable {
 }
 
 struct ATHLTHCoachStarterActions: View {
-    let onPrompt: (String) -> Void
+    let onSelect: (ATHLTHCoachQuickAction) -> Void
     var isDisabled: Bool = false
 
     var body: some View {
@@ -134,7 +134,7 @@ struct ATHLTHCoachStarterActions: View {
                 GridItem(.flexible(), spacing: 8)
             ], spacing: 8) {
                 ForEach(ATHLTHCoachQuickAction.allCases) { action in
-                    Button { onPrompt(action.prompt) } label: {
+                    Button { onSelect(action) } label: {
                         HStack(spacing: 8) {
                             Image(systemName: action.symbol)
                                 .font(.system(size: 13, weight: .semibold))

@@ -72,9 +72,11 @@ enum ATHLTHCoachStrengthIntelligence {
     static func snapshot(
         from history: [StrengthWorkoutLog],
         now: Date = Date(),
-        maxExercises: Int = 10
+        maxExercises: Int = 10,
+        windowDays: Int = 56
     ) -> Snapshot {
-        let start = now.addingTimeInterval(-56 * 86_400)
+        let days = min(max(windowDays, 1), 56)
+        let start = now.addingTimeInterval(-Double(days) * 86_400)
         let recentCutoff = now.addingTimeInterval(-7 * 86_400)
         var seenLogs = Set<UUID>()
         let completed = history.filter { log in
@@ -176,7 +178,7 @@ enum ATHLTHCoachStrengthIntelligence {
                 : $0.date > $1.date
         }
         return Snapshot(
-            windowDays: 56,
+            windowDays: days,
             completedStrengthSessions: completed.count,
             strengthSessionsLastSevenDays: completed.filter {
                 ($0.endedAt ?? $0.startedAt) >= recentCutoff
