@@ -1407,86 +1407,17 @@ struct ATHLTHTrainPlanPremiumView: View {
     // A compact workout library, grouped by week instead of repeating
     // the week number on every workout card.
     private func planWorkoutLibrary(_ plan: TrainingPlan) -> some View {
-        VStack(alignment: .leading, spacing: 13) {
-            HStack {
-                Text(tr("All workouts", "Alle økter"))
-                    .font(.system(size: 21, weight: .semibold, design: .serif))
-                    .foregroundStyle(graphite)
-                Spacer()
-                Text("\\(plan.weeks.reduce(0) { count, week in count + week.days.reduce(0) { $0 + $1.sessions.filter { !$0.isExplicitRestDay }.count } }) " +
-                     tr("workouts", "økter"))
-                    .font(.caption)
-                    .foregroundStyle(secondaryInk)
+        ATHLTHPlanWorkoutLibrary(
+            plan: plan,
+            weekday: { weekday($0, plan: plan) },
+            isCompleted: { isPremiumPlanWorkoutCompleted($0, plan: plan) },
+            onSelectWorkout: { weekIndex, dayID, workoutID in
+                selectPremiumPlanWeek(weekIndex)
+                selectedDayID = dayID
+                selectedWorkoutID = workoutID
+                showingPlanDetails = false
             }
-            ForEach(Array(plan.weeks.enumerated()), id: \.element.id) { item in
-                let entries = item.element.days
-                    .sorted(by: { $0.dayIndex < $1.dayIndex })
-                    .flatMap { day in
-                        day.sessions.filter { !$0.isExplicitRestDay }
-                            .map { (day: day, workout: $0) }
-                    }
-                if !entries.isEmpty {
-                    VStack(alignment: .leading, spacing: 0) {
-                        HStack {
-                            Text(tr("Week \\(item.offset + 1)", "Uke \\(item.offset + 1)"))
-                                .font(.system(size: 17, weight: .semibold, design: .serif))
-                                .foregroundStyle(graphite)
-                            Spacer()
-                            Text("\\(entries.count) " + tr("workouts", "økter"))
-                                .font(.caption2)
-                                .foregroundStyle(secondaryInk)
-                        }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 13)
-
-                        ForEach(entries, id: \.workout.id) { entry in
-                            Button {
-                                selectPremiumPlanWeek(item.offset)
-                                selectedDayID = entry.day.id
-                                selectedWorkoutID = entry.workout.id
-                                showingPlanDetails = false
-                            } label: {
-                                HStack(spacing: 11) {
-                                    Text(weekday(entry.day.dayIndex, plan: plan))
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(secondaryInk)
-                                        .frame(width: 31, alignment: .leading)
-                                    Image(systemName: entry.workout.kind.systemImage)
-                                        .font(.system(size: 15))
-                                        .foregroundStyle(warmGold)
-                                        .frame(width: 22)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(entry.workout.title)
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundStyle(graphite)
-                                        Text(referenceWorkoutSubtitle(entry.workout))
-                                            .font(.caption2)
-                                            .foregroundStyle(secondaryInk)
-                                    }
-                                    Spacer(minLength: 0)
-                                    if isPremiumPlanWorkoutCompleted(entry.workout, plan: plan) {
-                                        Image(systemName: "checkmark.circle.fill")
-                                            .foregroundStyle(warmGold)
-                                    } else {
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption)
-                                            .foregroundStyle(secondaryInk)
-                                    }
-                                }
-                                .padding(.horizontal, 14)
-                                .padding(.vertical, 11)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            if entry.workout.id != entries.last?.workout.id {
-                                Divider().padding(.leading, 58)
-                            }
-                        }
-                    }
-                    .background(.white, in: RoundedRectangle(cornerRadius: 18))
-                }
-            }
-        }
+        )
     }
 
     private func referencePlanMetric(
