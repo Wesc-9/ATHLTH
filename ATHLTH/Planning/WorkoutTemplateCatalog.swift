@@ -1712,14 +1712,21 @@ struct WorkoutTemplateDetailView: View {
             Text(shareError ?? "")
         }
         .fullScreenCover(isPresented: $showingWorkout) {
-            StructuredWorkoutSessionView(workout: entry.plannedSession())
+            StructuredWorkoutSessionView(workout: savedPersonalWorkout ??
+                {
+                    var original = entry.plannedSession()
+                    original.workoutBlocks =
+                        ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+                    return original
+                }())
                 .environmentObject(session)
         }
         .sheet(isPresented: $showingEditor) {
             WorkoutTemplateBuilderView(
                 initialTitle: entry.title,
-                initialBlocks: entry.blocks,
-                draftContext: "catalog-copy-\(entry.slug)"
+                initialBlocks: libraryDisplayBlocks,
+                draftContext: "catalog-copy-\(entry.slug)",
+                sourceTemplateID: entry.id
             )
         }
     }
@@ -2328,6 +2335,7 @@ struct WorkoutTemplateBuilderView: View {
     @AppStorage("athlth.workoutBuilder.durationInput.v1")
     private var durationInputMode = "clock"
     private let draftContext: String
+    private let sourceTemplateID: UUID?
     private let initialQuickAdd: String?
     private let initialFocusedBlockIndex: Int?
     private let initialFocusedExecutionStepIndex: Int?
@@ -2349,6 +2357,7 @@ struct WorkoutTemplateBuilderView: View {
         initialFocusedExecutionStepIndex: Int? = nil,
         initialDurationOverrideMinutes: Int? = nil,
         draftContext: String = "shared-template",
+        sourceTemplateID: UUID? = nil,
         plannedDate: Date? = nil,
         planCopyDays: [ATHLTHPlanCopyDay] = [],
         initialCopyWeekIndex: Int = 0,
@@ -2369,6 +2378,7 @@ struct WorkoutTemplateBuilderView: View {
         _durationInputText = State(initialValue: (initialDurationOverrideMinutes ??
             ATHLTHWorkoutDurationEstimator.minutes(for: initialBlocks)).map(String.init) ?? "")
         self.draftContext = draftContext
+        self.sourceTemplateID = sourceTemplateID
         self.initialQuickAdd = initialQuickAdd
         self.initialFocusedBlockIndex = initialFocusedBlockIndex
         self.initialFocusedExecutionStepIndex = initialFocusedExecutionStepIndex
@@ -4843,7 +4853,15 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
         } else {
-            session.saveSharedWorkout(workout)
+            if let sourceTemplateID {
+                var personalized = workout
+                personalized.workoutTemplateID = sourceTemplateID
+                session.saveSharedWorkout(
+                    personalized, sourceSessionID: sourceTemplateID
+                )
+            } else {
+                session.saveSharedWorkout(workout)
+            }
         }
         draftFinished = true
         UserDefaults.standard.removeObject(forKey: draftStorageKey)
