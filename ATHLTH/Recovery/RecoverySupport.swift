@@ -205,6 +205,22 @@ final class RecoverySorenessStore: ObservableObject {
         trimAndPersistIfNeeded()
     }
 
+    /// Refresh a shared daily check-in after another ATHLTH screen saves it.
+    /// Reuses the existing local record instead of creating profile-specific
+    /// duplicate measurements.
+    func reloadFromStorage() {
+        guard let data = defaults.data(forKey: storageKey),
+              let stored = try? JSONDecoder().decode(
+                [RecoverySorenessEntry].self, from: data
+              ) else { return }
+        let cutoff = Calendar.current.date(
+            byAdding: .day, value: -30, to: Date()
+        ) ?? Date().addingTimeInterval(-2_592_000)
+        let cleaned = stored.filter { $0.date >= cutoff }
+            .sorted { $0.date > $1.date }
+        if cleaned != entries { entries = cleaned }
+    }
+
     private var todayEntry: RecoverySorenessEntry? {
         let calendar = Calendar.current
         return entries.first {
