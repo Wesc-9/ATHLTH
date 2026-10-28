@@ -114,6 +114,14 @@ struct ProductRootTabView: View {
     @State private var selectedTab: Int
     @State private var trainNavigationRequest:
         ATHLTHTrainNavigationRequest?
+    @State private var showingDailyCheckInFromNotification = false
+
+    private func openPendingDailyCheckInIfNeeded() {
+        guard pushManager.pendingDailyCheckInAccountID ==
+                session.profile.userID else { return }
+        pushManager.clearPendingDailyCheckIn()
+        showingDailyCheckInFromNotification = true
+    }
 
     private func updateDailyCheckInReminder() {
         let store = RecoverySorenessStore()
@@ -277,12 +285,23 @@ struct ProductRootTabView: View {
                     }
             }
         }
+        .sheet(isPresented: $showingDailyCheckInFromNotification) {
+            NavigationStack {
+                RecoverySorenessLogView(store: RecoverySorenessStore())
+            }
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: .athlthRemoteNotificationTapped
             )
         ) { notification in
             let info = notification.userInfo ?? [:]
+            if ATHLTHDailyCheckInReminderScheduler.isCurrentAccountCheckInTap(
+                info, accountID: session.profile.userID
+            ) {
+                openPendingDailyCheckInIfNeeded()
+                return
+            }
 
             // Personal and official weekly challenge reminders are local
             // notifications with an entity ID, but no athlth_kind. Never
@@ -308,7 +327,11 @@ struct ProductRootTabView: View {
         }
         .task {
             updateDailyCheckInReminder()
+            openPendingDailyCheckInIfNeeded()
             await syncApplicationIconBadge()
+        }
+        .onChange(of: pushManager.pendingDailyCheckInAccountID) { _, _ in
+            openPendingDailyCheckInIfNeeded()
         }
         .onChange(of: selectedTab) { _, _ in
             // Completing a check-in on Insights clears its Home reminder.
@@ -318,7 +341,9 @@ struct ProductRootTabView: View {
             updateDailyCheckInReminder()
         }
         .onChange(of: session.profile.userID) { _, _ in
+            showingDailyCheckInFromNotification = false
             updateDailyCheckInReminder()
+            openPendingDailyCheckInIfNeeded()
         }
         .onChange(
             of: visibleAppBadgeCount
@@ -336,6 +361,7 @@ struct ProductRootTabView: View {
             }
 
             updateDailyCheckInReminder()
+            openPendingDailyCheckInIfNeeded()
             Task {
                 await syncApplicationIconBadge()
             }
