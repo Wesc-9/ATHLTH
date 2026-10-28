@@ -32,6 +32,7 @@ on:
       - ATHLTH/Watch/WorkoutMirroringStore.swift
       - ATHLTH/Watch/ATHLTHWorkoutMirrorStatePolicy.swift
       - Tests/ATHLTHWorkoutMirrorContinuityTests.swift
+      - Tests/ATHLTHWorkoutLibraryPersonalizationTests.swift
       - Shared/WatchTransferModels.swift
       - ATHLTH/Training/**
       - ATHLTH/DesignSystem/ATHLTHTrainDesign.swift

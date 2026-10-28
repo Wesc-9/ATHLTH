@@ -54,7 +54,6 @@ final class ATHLTHWorkoutLibraryPersonalizationTests: XCTestCase {
             RunningWorkoutLibraryStore.builtInTemplates.first {
                 ATHLTHWorkoutSearch.normalized($0.title) == "4x4 intervaller"
             })
-        )
         original.blocks[0].work.intensity = RunningIntensityTarget(
             kind: .pace,
             paceMinSecondsPerKilometer: 330,
