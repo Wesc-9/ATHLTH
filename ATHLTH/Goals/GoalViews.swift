@@ -1655,7 +1655,7 @@ struct GoalCreationView: View {
     @State private var whyItMatters = ""
     @State private var notes = ""
     @State private var privacy: GoalPrivacy = .privateOnly
-    @State private var makePrimary = true
+    @State private var makePrimary = false
     @State private var selectedTrainingPlanID: UUID?
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var imageData: Data?
@@ -1687,6 +1687,11 @@ struct GoalCreationView: View {
             )
             .toolbar(.hidden, for: .navigationBar)
             .toolbar(.hidden, for: .tabBar)
+            .onAppear {
+                // A first goal becomes the main goal; a new goal must not
+                // silently replace an existing main goal by default.
+                makePrimary = goalStore.primaryGoal == nil
+            }
             .onChange(of: category) { _, newValue in
                 applyDefaults(for: newValue)
                 automaticTracking = newValue != .custom
@@ -2053,185 +2058,69 @@ struct GoalCreationView: View {
     }
 
     private var categoryStep: some View {
-        VStack(
-            alignment: .leading,
-            spacing: 8
-        ) {
-            ForEach(
-                [
-                    GoalCategory.endurance,
-                    .strength,
-                    .body,
-                    .consistency,
-                    .event,
-                    .recovery,
-                    .custom
-                ]
-            ) { option in
-                let isSelected =
-                    category == option
-                let tint =
-                    goalCategoryTint(option)
-
+        VStack(spacing: 10) {
+            ForEach([
+                GoalCategory.endurance, .strength, .body, .consistency,
+                .event, .recovery, .custom
+            ]) { option in
+                let selected = category == option
                 Button {
-                    withAnimation(
-                        .snappy(duration: 0.20)
-                    ) {
+                    withAnimation(.easeInOut(duration: 0.18)) {
                         category = option
                     }
                 } label: {
-                    HStack(spacing: 12) {
-                        Image(
-                            systemName:
-                                option.systemImage
-                        )
-                        .font(
-                            .system(
-                                size: 18,
-                                weight: .semibold
-                            )
-                        )
-                        .foregroundStyle(
-                            isSelected
+                    HStack(spacing: 13) {
+                        Image(systemName: option.systemImage)
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundStyle(selected
                                 ? ATHLTHPlanDesign.ink
-                                : tint
-                        )
-                        .frame(
-                            width: 42,
-                            height: 42
-                        )
-                        .background(
-                            isSelected
-                                ? goalFlowGold
-                                : tint.opacity(0.11),
-                            in: RoundedRectangle(
-                                cornerRadius: 13,
-                                style: .continuous
-                            )
-                        )
+                                : goalFlowGold)
+                            .frame(width: 48, height: 48)
+                            .background(selected
+                                ? ATHLTHPlanDesign.selectedSurface
+                                : ATHLTHPlanDesign.warmSurface,
+                                in: RoundedRectangle(cornerRadius: 15))
 
-                        VStack(
-                            alignment: .leading,
-                            spacing: 2
-                        ) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(option.title)
-                                .font(
-                                    .system(
-                                        size: 16,
-                                        weight: .bold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.primaryText
-                                )
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.86)
-
-                            Text(option.subtitle)
-                                .font(
-                                    .system(
-                                        size: 12.5,
-                                        weight: .regular
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHTheme.mutedText
-                                )
+                                .font(.system(size: 17, weight: .semibold,
+                                              design: .serif))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
                                 .lineLimit(2)
-                                .multilineTextAlignment(
-                                    .leading
-                                )
+                            Text(option.subtitle)
+                                .font(.system(size: 12))
+                                .foregroundStyle(ATHLTHPlanDesign.secondary)
+                                .lineLimit(2)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-
-                        Spacer(minLength: 4)
-
-                        ZStack {
-                            Circle()
-                                .stroke(
-                                    isSelected
-                                        ? goalFlowGold
-                                        : Color.black.opacity(0.16),
-                                    lineWidth:
-                                        isSelected
-                                            ? 1.8
-                                            : 1.2
-                                )
-                                .frame(
-                                    width: 26,
-                                    height: 26
-                                )
-
-                            if isSelected {
-                                Circle()
-                                    .fill(
-                                        goalFlowGold
-                                    )
-                                    .frame(
-                                        width: 26,
-                                        height: 26
-                                    )
-
-                                Image(
-                                    systemName:
-                                        "checkmark"
-                                )
-                                .font(
-                                    .system(
-                                        size: 12,
-                                        weight: .bold
-                                    )
-                                )
-                                .foregroundStyle(
-                                    ATHLTHPlanDesign.ink
-                                )
-                            }
-                        }
+                        Spacer(minLength: 3)
+                        Image(systemName: selected
+                              ? "checkmark.circle.fill"
+                              : "circle")
+                            .font(.system(size: 22))
+                            .foregroundStyle(selected
+                                ? goalFlowGold
+                                : ATHLTHPlanDesign.warmDivider)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 60
-                    )
-                    .background(
-                        isSelected
-                            ? ATHLTHPlanDesign.warmSurface
-                            : ATHLTHPlanDesign.surface,
-                        in: RoundedRectangle(
-                            cornerRadius: 19,
-                            style: .continuous
-                        )
-                    )
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(selected
+                        ? ATHLTHPlanDesign.selectedSurface.opacity(0.42)
+                        : Color.white,
+                        in: RoundedRectangle(cornerRadius: 20))
                     .overlay {
-                        RoundedRectangle(
-                            cornerRadius: 19,
-                            style: .continuous
-                        )
-                        .stroke(
-                            isSelected
-                                ? goalFlowGold.opacity(0.90)
-                                : ATHLTHPlanDesign.warmDivider.opacity(0.60),
-                            lineWidth:
-                                isSelected
-                                    ? 1.35
-                                    : 0.8
-                        )
+                        RoundedRectangle(cornerRadius: 20)
+                            .strokeBorder(selected
+                                ? goalFlowGold.opacity(0.78)
+                                : ATHLTHPlanDesign.warmDivider.opacity(0.62),
+                                lineWidth: selected ? 1.25 : 0.8)
+                            .allowsHitTesting(false)
                     }
-                    .shadow(
-                        color:
-                            Color.black.opacity(
-                                isSelected
-                                    ? 0.07
-                                    : 0.045
-                            ),
-                        radius:
-                            isSelected
-                                ? 13
-                                : 10,
-                        y: 5
-                    )
+                    .contentShape(RoundedRectangle(cornerRadius: 20))
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
         }
     }
