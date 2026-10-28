@@ -2577,6 +2577,29 @@ struct AIProgramBuilderView: View {
     private func loadDefaultsIfNeeded() {
         guard !didLoadDefaults else { return }
         didLoadDefaults = true
+
+        // One canonical, private athlete profile. Prefill only this draft;
+        // edits here do not silently update the saved profile.
+        let storedTrainingProfile = ATHLTHTrainingProfile.load(
+            userID: session.profile.userID
+        )
+        let savedTrainingNotes = storedTrainingProfile.trainingNotes
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let savedLimitations = storedTrainingProfile.injuryAndLimitations
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !savedTrainingNotes.isEmpty {
+            coachFocusNotes = String(savedTrainingNotes.prefix(700))
+        }
+        if !savedLimitations.isEmpty {
+            limitations = String(savedLimitations.prefix(1_200))
+            if isStandaloneCoachJourney {
+                standaloneIntake.injuryStatus = .considerations
+                standaloneIntake.injuryNotes = limitations
+                // Existing injuries are NEVER forwarded on default.
+                standaloneIntake.healthSharingAuthorized = false
+            }
+        }
+
         if !isStandaloneCoachJourney {
             trainingFocus = session.onboardingProfile?.trainingFocus ?? .generalFitness
         }
@@ -2599,6 +2622,17 @@ struct AIProgramBuilderView: View {
             sessionsPerWeek = min(max(saved.sessionsPerWeek, 1), max(availableDays.count, 1))
             sessionDurationMinutes = min(max(saved.sessionDurationMinutes, 20), 180)
         }
+
+        // The profile is the default source. A saved Coach intake draft can
+        // still supply non-profile fields, but must not override it with
+        // an unrelated, older injury statement.
+        if !savedTrainingNotes.isEmpty {
+            coachFocusNotes = String(savedTrainingNotes.prefix(700))
+        }
+        if !savedLimitations.isEmpty {
+            limitations = String(savedLimitations.prefix(1_200))
+        }
+        shareLimitationsWithAI = false
 
         if mode == .generate {
             startDate = session.suggestedTrainingPlanStartDate
@@ -2678,9 +2712,9 @@ struct AIProgramBuilderView: View {
             trainingFocus =
                 seed.trainingFocus
             limitations =
-                seed.limitations
+                seed.limitations.isEmpty ? limitations : seed.limitations
             coachFocusNotes =
-                seed.coachFocusNotes
+                seed.coachFocusNotes.isEmpty ? coachFocusNotes : seed.coachFocusNotes
             selectedGoalIDs =
                 seed.selectedGoalIDs
 
