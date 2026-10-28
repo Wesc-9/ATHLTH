@@ -2,265 +2,444 @@ import PhotosUI
 import SwiftUI
 import UIKit
 
+// MARK: - Goals / Train-style overview
+
 struct GoalsHubView: View {
     @EnvironmentObject private var goalStore: GoalStore
     @State private var showingCreateGoal = false
+    @State private var filter: GoalHubFilter = .all
+
+    private let ink = ATHLTHPlanDesign.ink
+    private let accent = ATHLTHPlanDesign.accent
+    private let canvas = ATHLTHPlanDesign.canvas
+
+    private enum GoalHubFilter: String, CaseIterable, Identifiable {
+        case all, active, paused
+
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .all: return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
+            case .active: return ATHLTHLocalization.choose(english: "Active", norwegian: "Aktive")
+            case .paused: return ATHLTHLocalization.choose(english: "Paused", norwegian: "Deaktiverte")
+            }
+        }
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    private var activeCount: Int {
+        goalStore.goals.filter { $0.status == .active }.count
+    }
+
+    private var inactiveCount: Int {
+        goalStore.goals.filter { $0.status == .paused }.count
+    }
+
+    private var listedGoals: [ATHLTHGoal] {
+        goalStore.goals
+            .filter { goal in
+                switch filter {
+                case .all: return true
+                case .active: return goal.status == .active
+                case .paused: return goal.status == .paused
+                }
+            }
+            .sorted { lhs, rhs in
+                // Active primary on top, followed by other active and saved goals.
+                func rank(_ goal: ATHLTHGoal) -> Int {
+                    if goal.isPrimary && goal.status == .active { return 0 }
+                    switch goal.status {
+                    case .active: return 1
+                    case .paused: return 2
+                    case .completed: return 3
+                    case .abandoned: return 4
+                    }
+                }
+                if rank(lhs) != rank(rhs) { return rank(lhs) < rank(rhs) }
+                return lhs.createdAt > rhs.createdAt
+            }
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                HStack(alignment: .top, spacing: 12) {
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text("ATHLTH  /  GOALS")
-                            .font(.caption2.weight(.bold))
-                            .tracking(2)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+            VStack(alignment: .leading, spacing: 22) {
+                heading
 
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Your goals",
-                                norwegian: "Målene dine"
-                            )
-                        )
-                        .font(.system(size: 32, weight: .bold, design: .rounded))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "From ambition to progress. One milestone at a time.",
-                                norwegian: "Fra ambisjon til fremgang. Ett delmål av gangen."
-                            )
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-
-                    Spacer(minLength: 0)
-
-                    Button {
-                        showingCreateGoal = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.headline.weight(.bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 46, height: 46)
-                            .background(
-                                ATHLTHTheme.accentDeep,
-                                in: RoundedRectangle(
-                                    cornerRadius: 15,
-                                    style: .continuous
+                if goalStore.goals.isEmpty {
+                    noGoalsView
+                } else {
+                    overviewBar
+                    filterControl
+                    if listedGoals.isEmpty {
+                        noFilteredGoalsView
+                    } else {
+                        if let primary = listedGoals.first(where: {
+                            $0.isPrimary && $0.status == .active
+                        }) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                sectionHeading(
+                                    tr("Your main goal", "Ditt hovedmål"),
+                                    detail: tr("Your highest priority", "Din viktigste prioritet")
                                 )
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(
-                        ATHLTHLocalization.choose(
-                            english: "Create goal",
-                            norwegian: "Opprett mål"
-                        )
-                    )
-                }
-                .padding(.bottom, 10)
-
-                if let primary = goalStore.primaryGoal {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Primary goal",
-                            norwegian: "Hovedmål"
-                        ).uppercased(),
-                        systemImage: "star.fill"
-                    )
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.2)
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-
-                    NavigationLink {
-                        GoalDetailView(goalID: primary.id)
-                    } label: {
-                        GoalSummaryCard(goal: primary, prominent: true)
-                    }
-                    .buttonStyle(.plain)
-                }
-
-                let secondary = goalStore.activeGoals.filter { !$0.isPrimary }
-                if !secondary.isEmpty {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Other goals",
-                            norwegian: "Andre mål"
-                        ).uppercased()
-                    )
-                    .font(.caption2.weight(.bold))
-                    .tracking(1.3)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .padding(.top, 5)
-
-                    ForEach(secondary) { goal in
-                        NavigationLink {
-                            GoalDetailView(goalID: goal.id)
-                        } label: {
-                            GoalSummaryCard(goal: goal, prominent: false)
+                                goalRow(primary, prominent: true)
+                            }
                         }
-                        .buttonStyle(.plain)
-                    }
-                }
 
-                if goalStore.activeGoals.isEmpty {
-                    VStack(spacing: 16) {
-                        Image(systemName: "target")
-                            .font(.system(size: 34, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 76, height: 76)
-                            .background(
-                                ATHLTHTheme.accentSoft,
-                                in: RoundedRectangle(
-                                    cornerRadius: 24,
-                                    style: .continuous
+                        let otherGoals = listedGoals.filter {
+                            !($0.isPrimary && $0.status == .active)
+                        }
+                        if !otherGoals.isEmpty {
+                            VStack(alignment: .leading, spacing: 11) {
+                                sectionHeading(
+                                    filter == .paused
+                                        ? tr("Deactivated goals", "Deaktiverte mål")
+                                        : tr("My goals", "Mine mål"),
+                                    detail: "\(otherGoals.count)"
                                 )
-                            )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Your next goal starts here",
-                                norwegian: "Ditt neste mål starter her"
-                            )
-                        )
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Set a goal, break it into milestones and track your progress.",
-                                norwegian: "Sett deg et mål, del det opp og følg fremgangen."
-                            )
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .multilineTextAlignment(.center)
-
-                        Button {
-                            showingCreateGoal = true
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Create your first goal",
-                                    norwegian: "Opprett ditt første mål"
-                                ),
-                                systemImage: "arrow.right"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 52)
-                            .background(
-                                ATHLTHTheme.accentDeep,
-                                in: Capsule()
-                            )
+                                ForEach(otherGoals) { goal in
+                                    goalRow(goal, prominent: false)
+                                }
+                            }
                         }
-                        .buttonStyle(.plain)
                     }
-                    .padding(24)
-                    .frame(maxWidth: .infinity)
-                    .goalCard()
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 18)
+            .padding(.top, 24)
+            .padding(.bottom, 110)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
-        .background(
-            Color(red: 0.965, green: 0.975, blue: 0.992)
-                .ignoresSafeArea()
-        )
-        .navigationTitle(
-            ATHLTHLocalization.choose(
-                english: "Goals",
-                norwegian: "Mål"
-            )
-        )
+        .background(canvas.ignoresSafeArea())
+        .navigationTitle(tr("Goals", "Mål"))
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingCreateGoal) {
             GoalCreationView()
         }
     }
+
+    private var heading: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("ATHLTH  /  GOALS")
+                        .font(.system(size: 10, weight: .semibold))
+                        .tracking(2.5)
+                        .foregroundStyle(accent)
+                    Text(tr("Your goals", "Målene dine"))
+                        .font(.system(size: 35, weight: .regular, design: .serif))
+                        .foregroundStyle(ink)
+                        .accessibilityAddTraits(.isHeader)
+                }
+                Spacer(minLength: 0)
+                Button {
+                    showingCreateGoal = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 18, weight: .medium))
+                        .foregroundStyle(.white)
+                        .frame(width: 48, height: 48)
+                        .background(ink, in: RoundedRectangle(cornerRadius: 16))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Create goal", "Opprett mål"))
+            }
+
+            Text(tr("One clear priority. Progress at your pace.",
+                    "Din retning, dine delmål og fremgangen din."))
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHPlanDesign.secondary)
+        }
+    }
+
+    private var overviewBar: some View {
+        HStack(spacing: 10) {
+            overviewStat(count: activeCount,
+                         title: tr("Active", "Aktive"),
+                         symbol: "checkmark.circle")
+            overviewStat(count: inactiveCount,
+                         title: tr("Deactivated", "Deaktiverte"),
+                         symbol: "pause.circle")
+            overviewStat(count: goalStore.goals.filter {
+                $0.status == .completed
+            }.count, title: tr("Completed", "Fullført"),
+               symbol: "trophy")
+        }
+    }
+
+    private func overviewStat(count: Int, title: String, symbol: String) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Image(systemName: symbol)
+                .font(.caption)
+                .foregroundStyle(accent)
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("\(count)")
+                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                    .foregroundStyle(ink)
+                Text(title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white.opacity(0.92),
+                    in: RoundedRectangle(cornerRadius: 17))
+    }
+
+    private var filterControl: some View {
+        HStack(spacing: 5) {
+            ForEach(GoalHubFilter.allCases) { option in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        filter = option
+                    }
+                } label: {
+                    Text(option.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(filter == option ? .white : ink)
+                        .frame(maxWidth: .infinity, minHeight: 40)
+                        .background(filter == option ? ink : Color.clear,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(filter == option ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(ATHLTHPlanDesign.warmSurface,
+                    in: RoundedRectangle(cornerRadius: 17))
+    }
+
+    private func sectionHeading(_ title: String, detail: String) -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title)
+                .font(.system(size: 24, weight: .regular, design: .serif))
+                .foregroundStyle(ink)
+                .accessibilityAddTraits(.isHeader)
+            Spacer()
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondary)
+        }
+    }
+
+    private func goalRow(_ goal: ATHLTHGoal, prominent: Bool) -> some View {
+        HStack(alignment: .center, spacing: 0) {
+            NavigationLink {
+                GoalDetailView(goalID: goal.id)
+            } label: {
+                GoalSummaryCard(goal: goal, prominent: prominent)
+            }
+            .buttonStyle(.plain)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Menu {
+                if goal.status == .active {
+                    if !goal.isPrimary {
+                        Button {
+                            goalStore.setPrimary(goal.id)
+                        } label: {
+                            Label(tr("Set as main goal", "Sett som hovedmål"),
+                                  systemImage: "star")
+                        }
+                    }
+                    Button {
+                        goalStore.setStatus(.paused, for: goal.id)
+                    } label: {
+                        Label(tr("Deactivate goal", "Deaktiver mål"),
+                              systemImage: "pause.circle")
+                    }
+                } else if goal.status == .paused {
+                    Button {
+                        goalStore.setStatus(.active, for: goal.id)
+                    } label: {
+                        Label(tr("Activate goal", "Aktiver mål"),
+                              systemImage: "play.circle")
+                    }
+                }
+                NavigationLink {
+                    GoalDetailView(goalID: goal.id)
+                } label: {
+                    Label(tr("View details", "Se detaljer"), systemImage: "arrow.up.right")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ink)
+                    .frame(width: 40, height: 46)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(tr("Manage", "Administrer") + " " + goal.title)
+            .padding(.trailing, 10)
+        }
+        .padding(.vertical, 8)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 22))
+        .overlay {
+            RoundedRectangle(cornerRadius: 22)
+                .strokeBorder(ATHLTHPlanDesign.warmDivider.opacity(0.6),
+                              lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+    }
+
+    private var noGoalsView: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Image(systemName: "target")
+                    .font(.system(size: 24, weight: .regular))
+                    .foregroundStyle(accent)
+                    .frame(width: 55, height: 55)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 16))
+                Spacer()
+                Text(tr("A fresh start", "En ny start"))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondary)
+            }
+
+            Text(tr("A goal worth working toward",
+                    "Et mål å jobbe mot"))
+                .font(.system(size: 29, weight: .regular, design: .serif))
+                .foregroundStyle(ink)
+
+            Text(tr(
+                "Create your first goal, add milestones and follow your progress.",
+                "Sett deg et mål, del det opp i mindre steg og se fremgangen."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHPlanDesign.secondary)
+
+            Button {
+                showingCreateGoal = true
+            } label: {
+                HStack {
+                    Text(tr("Create your first goal", "Opprett ditt første mål"))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
+                .padding(.horizontal, 18)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(ink, in: RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(22)
+        .background(Color.white, in: RoundedRectangle(cornerRadius: 24))
+        .overlay {
+            RoundedRectangle(cornerRadius: 24)
+                .strokeBorder(ATHLTHPlanDesign.warmDivider.opacity(0.5),
+                              lineWidth: 0.8)
+        }
+    }
+
+    private var noFilteredGoalsView: some View {
+        VStack(spacing: 13) {
+            Image(systemName: "line.3.horizontal.decrease.circle")
+                .font(.title)
+                .foregroundStyle(accent)
+            Text(tr("No goals here yet", "Ingen mål i denne kategorien"))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ink)
+            Button(tr("Show all goals", "Vis alle mål")) {
+                filter = .all
+            }
+            .font(.subheadline)
+            .foregroundStyle(accent)
+        }
+        .frame(maxWidth: .infinity, minHeight: 170)
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
+    }
 }
 
 struct GoalSummaryCard: View {
-    @EnvironmentObject private var goalStore: GoalStore
-
     let goal: ATHLTHGoal
     let prominent: Bool
 
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            GoalCoverView(goal: goal)
-                .frame(maxWidth: .infinity)
-                .frame(height: prominent ? 220 : 145)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    private var statusLabel: String {
+        switch goal.status {
+        case .active:
+            return ATHLTHLocalization.choose(english: "Active", norwegian: "Aktiv")
+        case .paused:
+            return ATHLTHLocalization.choose(english: "Deactivated", norwegian: "Deaktivert")
+        case .completed:
+            return ATHLTHLocalization.choose(english: "Completed", norwegian: "Fullført")
+        case .abandoned:
+            return ATHLTHLocalization.choose(english: "Archived", norwegian: "Arkivert")
+        }
+    }
 
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.72)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            GoalCoverView(goal: goal)
+                .frame(width: prominent ? 100 : 80,
+                       height: prominent ? 126 : 95)
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                .opacity(goal.status == .paused ? 0.55 : 1)
+                .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    if goal.isPrimary {
-                        Label("Primary", systemImage: "star.fill")
-                            .font(.caption2.weight(.bold))
-                            .padding(.horizontal, 9)
-                            .padding(.vertical, 5)
-                            .background(.white.opacity(0.18), in: Capsule())
+                HStack(spacing: 5) {
+                    if goal.isPrimary && goal.status == .active {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Main goal", norwegian: "Hovedmål"
+                        ), systemImage: "star.fill")
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
                     }
-
-                    Spacer()
-
-                    if let deadline = goal.deadline {
-                        Text(deadline, style: .relative)
-                            .font(.caption2.weight(.semibold))
-                    }
+                    Text(statusLabel)
+                        .foregroundStyle(goal.status == .active
+                            ? ATHLTHPlanDesign.ink
+                            : ATHLTHPlanDesign.secondary)
                 }
-
-                Spacer()
+                .font(.system(size: 10, weight: .semibold))
+                .lineLimit(1)
 
                 Text(goal.title)
-                    .font(prominent ? .title2.bold() : .headline)
+                    .font(.system(size: prominent ? 21 : 18,
+                                  weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
                     .lineLimit(2)
+                    .multilineTextAlignment(.leading)
 
-                HStack {
-                    Text(ATHLTHLocalization.format(
-                            english: "%d/%d milestones",
-                            norwegian: "%d/%d milepæler",
-                            goal.completedMilestones,
-                            goal.milestones.count
-                        ))
-                        .font(.caption)
-                    Spacer()
+                Text(goal.category.title)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondary)
+                    .lineLimit(1)
+
+                HStack(spacing: 6) {
                     Text("\(Int((goal.progress * 100).rounded()))%")
-                        .font(.caption.bold())
-                }
-
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(.white.opacity(0.24))
-                        Capsule()
-                            .fill(.white)
-                            .frame(width: proxy.size.width * goal.progress)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(ATHLTHPlanDesign.warmDivider)
+                            Capsule().fill(ATHLTHPlanDesign.accent)
+                                .frame(width: proxy.size.width *
+                                       min(1, max(0, goal.progress)))
+                        }
                     }
+                    .frame(height: 5)
                 }
-                .frame(height: 6)
+                if let deadline = goal.deadline {
+                    Text(deadline.formatted(.dateTime.day().month(.abbreviated).year()))
+                        .font(.system(size: 10))
+                        .foregroundStyle(ATHLTHPlanDesign.secondary)
+                }
             }
-            .foregroundStyle(.white)
-            .padding(16)
+            Spacer(minLength: 0)
         }
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(.white.opacity(0.16), lineWidth: 1)
-        }
+        .padding(.leading, 11)
+        .padding(.trailing, 4)
     }
 }
 
