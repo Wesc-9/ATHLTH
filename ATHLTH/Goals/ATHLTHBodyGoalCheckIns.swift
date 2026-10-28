@@ -19,7 +19,9 @@ enum ATHLTHBodyGoalCheckInPolicy {
         _ goal: ATHLTHGoal, profile: ATHLTHTrainingProfile
     ) -> String {
         guard let config = goal.bodyMeasurementGoal else { return "" }
-        let tr = ATHLTHLocalization.choose(english:norwegian:)
+        func tr(_ en: String, _ no: String) -> String {
+            ATHLTHLocalization.choose(english: en, norwegian: no)
+        }
         let samples = profile.readings(for: config.metric)
             .filter { $0.date >= goal.startDate }
         guard let current = samples.last else {
@@ -81,10 +83,10 @@ enum ATHLTHBodyGoalCheckInPolicy {
         guard let config = goal.bodyMeasurementGoal,
               config.notificationsEnabled, goal.status == .active,
               (7...30).contains(config.checkInIntervalDays),
-              (goal.deadline.map { now <= calendar.date(
-                byAdding: .day, value: 1,
-                to: calendar.startOfDay(for: $0)
-              ) ?? $0 } ?? true) else { return nil }
+              goal.deadline.map {
+                  now <= (calendar.date(byAdding: .day, value: 1,
+                      to: calendar.startOfDay(for: $0)) ?? $0)
+              } ?? true else { return nil }
         let start = calendar.startOfDay(for: goal.startDate)
         for index in 1...240 {
             guard let due = calendar.date(
@@ -125,7 +127,12 @@ enum ATHLTHBodyGoalReminderScheduler {
         generation += 1
         let requestGeneration = generation
         let center = UNUserNotificationCenter.current()
-        let pending = await center.pendingNotificationRequests()
+        let pending: [UNNotificationRequest] = await withCheckedContinuation {
+            continuation in
+            center.getPendingNotificationRequests {
+                continuation.resume(returning: $0)
+            }
+        }
         center.removePendingNotificationRequests(withIdentifiers:
             pending.map(\.identifier).filter { $0.hasPrefix(prefix) }
         )
