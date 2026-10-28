@@ -2056,6 +2056,18 @@ struct MyWorkoutTemplatesView: View {
 
     @State private var completionHistory:
         [StructuredWorkoutCompletion] = []
+    @State private var runningCompletionHistory:
+        [ATHLTHCompletedRunningPerformance] = []
+
+    private func refreshHistory() {
+        completionHistory = StructuredWorkoutCompletionStore.load(
+            userID: session.profile.userID
+        )
+        runningCompletionHistory = ATHLTHRunningPerformanceHistory.load(
+            userID: session.profile.userID
+        )
+    }
+
     @State private var showingRunningBuilder = false
     @State private var showingHybridBuilder = false
 
@@ -2102,12 +2114,19 @@ struct MyWorkoutTemplatesView: View {
                                 Label(workout.title, systemImage: "figure.run")
                                     .font(.subheadline.weight(.semibold))
                                 Spacer()
-                                Text("\(workout.blocks.count) " +
-                                     ATHLTHLocalization.choose(
-                                         english: "phases", norwegian: "deler"
-                                     ))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                VStack(alignment: .trailing, spacing: 5) {
+                                    Text("\(workout.blocks.count) " +
+                                         ATHLTHLocalization.choose(
+                                             english: "phases", norwegian: "deler"
+                                         ))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    if let last = ATHLTHLibraryWorkoutHistory.running(
+                                        id: workout.id, records: runningCompletionHistory
+                                    ) {
+                                        ATHLTHLastWorkoutHistoryLabel(summary: last)
+                                    }
+                                }
                                 Image(systemName: "chevron.right")
                             }
                             .padding(14)
@@ -2210,11 +2229,9 @@ struct MyWorkoutTemplatesView: View {
         .sheet(isPresented: $showingHybridBuilder) {
             WorkoutTemplateBuilderView()
         }
-        .task {
-            completionHistory =
-                StructuredWorkoutCompletionStore.load(
-                    userID: session.profile.userID
-                )
+        .onAppear(perform: refreshHistory)
+        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+            refreshHistory()
         }
     }
 
@@ -2247,6 +2264,12 @@ struct MyWorkoutTemplatesView: View {
                     Text(savedWorkoutSubtitle(workout))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                    if let last = ATHLTHLibraryWorkoutHistory.savedWorkout(
+                        id: workout.id, completions: completionHistory
+                    ) {
+                        ATHLTHLastWorkoutHistoryLabel(summary: last)
+                            .padding(.top, 4)
+                    }
                 }
 
                 Spacer()
