@@ -889,6 +889,55 @@ struct ATHLTHHomeView: View {
 
                     homeDailyRecommendationAndCalendarRow
 
+                    // A compact route into the same Coach used by Messages
+                    // and Train. Never let another large insight card take
+                    // over the Home screen.
+                    NavigationLink {
+                        RecoveryCoachInboxDestinationView()
+                    } label: {
+                        HStack(spacing: 11) {
+                            Image(systemName: "sparkles")
+                                .font(.system(size: 18, weight: .medium))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 42, height: 42)
+                                .background(ATHLTHPlanDesign.selectedSurface,
+                                            in: RoundedRectangle(cornerRadius: 13))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("ATHLTH Coach")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                                Text(homeTodayPlanWorkout == nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Plan a workout or ask about your progress",
+                                        norwegian: "Planlegg en økt eller spør om fremgangen din"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Ask about today's workout",
+                                        norwegian: "Spør om dagens økt"
+                                    ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(2)
+                            }
+                            Spacer(minLength: 2)
+                            if !session.hasPaidAccess {
+                                Image(systemName: "lock.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        }
+                        .padding(12)
+                        .athlthPlanCard(radius: 17)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Open ATHLTH Coach",
+                        norwegian: "Åpne ATHLTH Coach"
+                    ))
+
                     HomeActiveFriendsStrip()
 
                     HomePersonalRecentActivitySection()
