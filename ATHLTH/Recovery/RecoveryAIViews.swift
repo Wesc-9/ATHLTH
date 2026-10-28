@@ -1021,7 +1021,6 @@ struct RecoveryCoachView: View {
     @State private var didLoadConversation =
         false
     @State private var coachPinned = true
-    @State private var insightExpanded = false
     @State private var proposalActionNotice: String?
     @State private var selectedCoachProposal: RecoveryCoachProposal?
     @State private var showingCoachWorkoutBuilder = false
@@ -1277,9 +1276,6 @@ struct RecoveryCoachView: View {
                         userID: session.profile.userID
                     )
             loadCoachConsent()
-            insightExpanded = UserDefaults.standard.bool(
-                forKey: "athlth.coach.insightExpanded.\(session.profile.userID.uuidString)"
-            )
         }
         .sheet(isPresented: $showingCoachWorkoutBuilder) {
             if let proposal = selectedCoachProposal,
@@ -1783,6 +1779,26 @@ struct RecoveryCoachView: View {
         }
     }
 
+    @MainActor
+    private func addCoachWorkout(dayOffset: Int) {
+        guard let proposal = selectedCoachProposal,
+              var workout = ATHLTHCoachProposalBridge.workout(proposal) else {
+            proposalActionNotice = recoveryAIText(
+                "Review the proposal in the editor before adding.",
+                "Gjennomgå forslaget i øktbyggeren før du legger det til."
+            )
+            return
+        }
+        let date = Calendar.current.date(byAdding: .day, value: dayOffset, to: Date())
+            ?? Date()
+        workout.scheduledStart = dayOffset == 0 ? Date() :
+            (Calendar.current.date(bySettingHour: 18, minute: 0, second: 0, of: date) ?? date)
+        session.addStandalonePlannedSession(workout)
+        proposalActionNotice = recoveryAIText(
+            "Added to your upcoming workouts.", "Lagt til blant dine kommende økter."
+        )
+    }
+
     private var coachInsightCard:
         some View {
         ATHLTHUnifiedCard {
@@ -1839,7 +1855,8 @@ struct RecoveryCoachView: View {
                     )
 
                     Text(
-                        insight.summary
+                        context.recoveryDetail.isEmpty ? insight.summary
+                            : context.recoveryDetail
                     )
                     .font(.caption)
                     .foregroundStyle(
