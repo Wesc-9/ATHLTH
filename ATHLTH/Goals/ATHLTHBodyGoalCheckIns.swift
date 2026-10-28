@@ -150,10 +150,12 @@ enum ATHLTHBodyGoalReminderScheduler {
                 continuation.resume(returning: $0)
             }
         }
+        guard generation == requestGeneration else { return }
         center.removePendingNotificationRequests(withIdentifiers:
             pending.map(\.identifier).filter { $0.hasPrefix(prefix) }
         )
         let authorization = await center.notificationSettings().authorizationStatus
+        guard generation == requestGeneration else { return }
         guard authorization == .authorized || authorization == .provisional ||
                 authorization == .ephemeral else { return }
 
@@ -200,6 +202,6 @@ enum ATHLTHBodyGoalReminderScheduler {
     private static func dueDatesForSchedule(
         _ goal: ATHLTHGoal, now: Date
     ) -> [Date] {
-        ATHLTHBodyGoalCheckInPolicy.dueDates(for: goal, after: now, count: 3)
+        ATHLTHBodyGoalCheckInPolicy.dueDates(for: goal, after: now, count: 24)
     }
 }
