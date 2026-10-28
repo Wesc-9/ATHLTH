@@ -1292,12 +1292,13 @@ struct RecoveryCoachView: View {
             if let proposal = selectedCoachProposal,
                let seed = ATHLTHCoachProposalBridge.planSeed(proposal) {
                 AIProgramBuilderView(
-                    mode: .generate, seed: seed,
-                    onProgramCreatedPlanID: { planID in
-                        if saveCoachPlanAsTemplate,
-                           let saved = session.trainingPlan(withID: planID) {
-                            session.saveSharedPlan(saved)
-                        }
+                    mode: .generate,
+                    seed: seed,
+                    saveAsTemplateOnly: saveCoachPlanAsTemplate,
+                    onProgramCreated: {
+                        proposalActionNotice = saveCoachPlanAsTemplate
+                            ? recoveryAIText("Plan saved in My Plans.", "Planen er lagret i Mine planer.")
+                            : recoveryAIText("Plan added to your training calendar.", "Planen er lagt til i treningskalenderen.")
                         saveCoachPlanAsTemplate = false
                     }
                 )
