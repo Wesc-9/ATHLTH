@@ -337,24 +337,46 @@ struct ATHLTHPlanSetupFields: View {
                         tr("Training days", "Treningsdager"),
                         detail: tr("Other days are rest days",
                                    "Resterende dager blir hviledager"))
-            HStack(spacing: 4) {
-                ForEach(weekdays, id: \.index) { day in
-                    let chosen = selectedDays.contains(day.index)
-                    Button { onToggleDay(day.index) } label: {
-                        Text(tr(day.en, day.no))
-                            .font(.system(size: 10, weight: chosen ? .semibold : .medium))
-                            .foregroundStyle(chosen ? .white : ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .frame(maxWidth: .infinity, minHeight: 40)
-                            .background(chosen ? bronze : canvas, in: Capsule())
-                            .overlay {
-                                Capsule().strokeBorder(border.opacity(chosen ? 0 : 0.42),
-                                                       lineWidth: 0.6)
-                            }
+            if advanced {
+                // The approved circular weekday selector: a full 44-point
+                // touch target, gold ring and a visible check on chosen days.
+                // Scroll horizontally if seven circles cannot fit a narrow
+                // iPhone or an accessibility-size window.
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 3) {
+                        ForEach(weekdays, id: \.index) { day in
+                            circularWeekday(day)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(chosen ? .isSelected : [])
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 9) {
+                            ForEach(weekdays, id: \.index) { day in
+                                circularWeekday(day)
+                            }
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
+            } else {
+                HStack(spacing: 4) {
+                    ForEach(weekdays, id: \.index) { day in
+                        let chosen = selectedDays.contains(day.index)
+                        Button { onToggleDay(day.index) } label: {
+                            Text(tr(day.en, day.no))
+                                .font(.system(size: 10, weight: chosen ? .semibold : .medium))
+                                .foregroundStyle(chosen ? .white : ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                                .background(chosen ? bronze : canvas, in: Capsule())
+                                .overlay {
+                                    Capsule().strokeBorder(border.opacity(chosen ? 0 : 0.42),
+                                                           lineWidth: 0.6)
+                                }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(chosen ? .isSelected : [])
+                    }
                 }
             }
             if advanced {
@@ -378,6 +400,68 @@ struct ATHLTHPlanSetupFields: View {
                 .padding(.top, 5)
             }
         }
+    }
+
+    /// Reusable day button for Advanced. Both its visual state and the
+    /// saved plan's weekdays read from the same selectedDays source.
+    private func circularWeekday(
+        _ day: (index: Int, en: String, no: String)
+    ) -> some View {
+        let selected = selectedDays.contains(day.index)
+        let english = ["Monday", "Tuesday", "Wednesday", "Thursday",
+                       "Friday", "Saturday", "Sunday"]
+        let norwegian = ["Mandag", "Tirsdag", "Onsdag", "Torsdag",
+                         "Fredag", "Lørdag", "Søndag"]
+
+        return Button {
+            onToggleDay(day.index)
+        } label: {
+            ZStack {
+                Circle()
+                    .fill(selected
+                          ? ATHLTHTrainDesign.paleGold.opacity(0.74)
+                          : canvas.opacity(0.74))
+                Circle()
+                    .strokeBorder(
+                        selected ? bronze : border.opacity(0.52),
+                        lineWidth: selected ? 2.4 : 1.2
+                    )
+                Circle()
+                    .strokeBorder(.white.opacity(selected ? 0.96 : 0.75),
+                                  lineWidth: 1.7)
+                    .padding(4)
+
+                Text(tr(day.en, day.no))
+                    .font(.system(size: 11, weight: selected ? .semibold : .medium))
+                    .foregroundStyle(selected ? ink : muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+                    .padding(.horizontal, 3)
+            }
+            .frame(width: 44, height: 44)
+            .overlay(alignment: .topTrailing) {
+                if selected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(.white)
+                        .frame(width: 17, height: 17)
+                        .background(bronze, in: Circle())
+                        .overlay {
+                            Circle().strokeBorder(.white, lineWidth: 1.2)
+                        }
+                        .offset(x: 2, y: -3)
+                        .accessibilityHidden(true)
+                }
+            }
+            .frame(width: 44, height: 48)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tr(english[day.index - 1], norwegian[day.index - 1]))
+        .accessibilityValue(selected
+            ? tr("Training day", "Treningsdag")
+            : tr("Not selected", "Ikke valgt"))
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     private var startCard: some View {
