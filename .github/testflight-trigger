@@ -171,3 +171,4 @@ ATHLTH 2.0.0 build 108 — user-authorized TestFlight retry 2026-10-27 after fix
 ATHLTH 2.0.0 build 108 — user-authorized fresh TestFlight run 2026-10-27 after fixing ambiguous kilometerSplits GPS route XCTest overload; require same-commit passing iOS tests and backend regressions, signed archive, successful App Store Connect upload. Keep release/v2.0.0 active.
 
 ATHLTH 2.0.0 build 108 — retry user-authorized TestFlight workflow after fixing the remaining ambiguous recorded-minute kilometerSplits XCTest on 2026-10-27. Require successful exact-commit iOS and backend tests before verified signed App Store Connect upload.
+ATHLTH 2.0.1 build 109 — TestFlight explicitly requested 2026-10-28. Latest goals redesign, Audio Coach cleanup, Train improvements. Require same-commit green iOS XCTest/backend regressions; signed iPhone, Watch, Widget archive and verified Apple upload. Retry code/signing issues as needed; keep release/v2.0.1 active.
