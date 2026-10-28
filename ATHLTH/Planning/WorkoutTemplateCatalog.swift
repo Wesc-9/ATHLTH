@@ -744,7 +744,9 @@ struct WorkoutTemplateLibraryView: View {
             onSelectPlanned?(existing)
             return
         }
-        if advancedMode {
+        if ATHLTHWorkoutFirstUsePolicy.asksForTargets(
+            advanced: advancedMode, hasPersonalCopy: false
+        ) {
             pendingCatalogAddition = entry
             pendingRunningAddition = nil
             showingPersonalizationQuestion = true
@@ -755,8 +757,11 @@ struct WorkoutTemplateLibraryView: View {
     }
 
     private func chooseRunningForPlan(_ source: RunningWorkoutTemplate) {
-        guard source.isBuiltIn, runningLibrary.savedCopy(for: source) == nil,
-              advancedMode else {
+        guard source.isBuiltIn,
+              ATHLTHWorkoutFirstUsePolicy.asksForTargets(
+                advanced: advancedMode,
+                hasPersonalCopy: runningLibrary.savedCopy(for: source) != nil
+              ) else {
             addRunningToPlan(source)
             return
         }
@@ -1440,6 +1445,13 @@ struct WorkoutTemplateLibraryView: View {
     }
 }
 
+/// Explicit first-add choice; simple users never see a personalization prompt.
+enum ATHLTHWorkoutFirstUsePolicy {
+    static func asksForTargets(advanced: Bool, hasPersonalCopy: Bool) -> Bool {
+        advanced && !hasPersonalCopy
+    }
+}
+
 /// A library workout describes the structure, not the athlete's personal targets.
 /// Leave time, prescribed repetitions and exercise names alone. Targets are
 /// intentionally empty until the athlete saves them to My Workouts.
@@ -1524,7 +1536,9 @@ struct WorkoutTemplateDetailView: View {
     private func addToMyWorkouts() {
         if savedPersonalWorkout != nil {
             saved = true
-        } else if advancedMode {
+        } else if ATHLTHWorkoutFirstUsePolicy.asksForTargets(
+            advanced: advancedMode, hasPersonalCopy: false
+        ) {
             askingForPersonalTargets = true
         } else {
             savePersonalWorkout(blocks:
