@@ -99,6 +99,13 @@ struct PhoneWorkout: Codable, Identifiable {
     var pauses: [PhoneWorkoutPauseInterval]? = nil
     var autoPauseEnabled: Bool? = nil
     var runEnvironment: RunEnvironment? = nil
+    /// Set only after an athlete explicitly confirms an indoor venue mid-run.
+    /// Optional keeps saved workouts from prior releases compatible.
+    var indoorVenue: ATHLTHIndoorRunVenue? = nil
+    var indoorPromptedThisSession: Bool? = nil
+    var indoorPromptPending: Bool? = nil
+    var gpsDistanceBeforeIndoorSwitchMeters: Double? = nil
+    var indoorSwitchActiveSeconds: TimeInterval? = nil
     var treadmillInclinePercent: Double? = nil
     var distanceMeters: Double = 0
     // Optional for compatibility with workouts from earlier builds.
@@ -252,6 +259,11 @@ final class IPhoneWorkoutStore:
     @Published private(set) var message: String?
     @Published private(set) var saving = false
     @Published private(set) var automaticPauseActive = false
+    /// A question, not an automatic classification. A manual choice is always available.
+    @Published private(set) var indoorSuggestionAvailable = false
+    private var indoorFirstReliableFix: Date?
+    private var indoorLastReliableFix: Date?
+    private var indoorAcceptedFixCount = 0
     /// Temporary voice mute: does not stop recording or critical haptics.
     @Published private(set) var coachSpeechPaused = false
     @Published private(set) var lastCoachMessage: String?
@@ -386,6 +398,7 @@ final class IPhoneWorkoutStore:
         structuredTickTask?.cancel()
         structuredTickTask = nil
         manager.stopUpdatingLocation()
+        resetIndoorProbe()
         accountID = userID
         pendingWalking = nil
         pendingPlannedPlanID = nil
@@ -460,6 +473,7 @@ final class IPhoneWorkoutStore:
 
         recoveredWorkoutLastCheckpoint =
             active?.lastCheckpoint
+        indoorSuggestionAvailable = active?.indoorPromptPending == true
 
         if let active {
             restoreRouteGeometry(
@@ -717,6 +731,7 @@ final class IPhoneWorkoutStore:
         requestLiveWorkoutPresentationAfterLaunch()
 
         lastLocation = nil
+        resetIndoorProbe()
         coachPaceSampleAt = nil
         automaticPauseActive = false
         autoPauseDetector.reset(
@@ -1528,6 +1543,7 @@ final class IPhoneWorkoutStore:
         livePresentationRetryTask?.cancel()
         automaticPauseActive = false
         autoPauseDetector.reset(enabled: false)
+        resetIndoorProbe()
         manager.distanceFilter = 5
         resetRouteRuntime()
         persistActiveCheckpoint(force: true)
@@ -2187,6 +2203,7 @@ final class IPhoneWorkoutStore:
         }
 
         active = workout
+        evaluateIndoorSuggestion(now: now)
         persistActiveCheckpoint(force: force)
         syncLiveActivity()
     }
@@ -5291,6 +5308,111 @@ final class IPhoneWorkoutStore:
         }
     }
 
+    private func resetIndoorProbe() {
+        indoorSuggestionAvailable = false
+        indoorFirstReliableFix = nil
+        indoorLastReliableFix = nil
+        indoorAcceptedFixCount = 0
+    }
+
+    /// The recorded GPS path is cumulative: a runner circling a small track
+    /// must not be mistaken for someone standing still.
+    private func evaluateIndoorSuggestion(now: Date = Date()) {
+        guard var workout = active else { return }
+        guard ATHLTHIndoorRunDetection.shouldOffer(
+            elapsedWallSeconds: now.timeIntervalSince(workout.start),
+            acceptedDistanceMeters: workout.distanceMeters,
+            firstReliableFix: indoorFirstReliableFix,
+            lastReliableFix: indoorLastReliableFix,
+            acceptedFixCount: indoorAcceptedFixCount,
+            now: now,
+            isOutdoor: workout.runEnvironment == .outdoor,
+            manualPause: workout.resumedAt == nil && !automaticPauseActive,
+            hasPlannedRouteOrGhost: workout.plannedRouteID != nil ||
+                workout.ghostRaceTitle != nil,
+            alreadyPrompted: workout.indoorPromptedThisSession == true
+        ) else { return }
+        workout.indoorPromptedThisSession = true
+        workout.indoorPromptPending = true
+        active = workout
+        indoorSuggestionAvailable = true
+        persistActiveCheckpoint(force: true)
+    }
+
+    func dismissIndoorSuggestion() {
+        indoorSuggestionAvailable = false
+        guard var workout = active else { return }
+        workout.indoorPromptedThisSession = true
+        workout.indoorPromptPending = false
+        active = workout
+        persistActiveCheckpoint(force: true)
+    }
+
+    /// Only the athlete may switch the capture mode. Retain the ongoing
+    /// workout identity, active time, structured steps and existing evidence.
+    /// Never treat noisy GPS distance as indoor movement. A treadmill belt
+    /// speed must be entered explicitly to estimate future distance.
+    @discardableResult
+    func switchRunningEnvironmentToIndoor(_ venue: ATHLTHIndoorRunVenue) -> Bool {
+        guard var workout = active, workout.runEnvironment == .outdoor,
+              !saving else { return false }
+        let now = Date()
+        let originalDistance = max(0, workout.distanceMeters)
+        workout.gpsDistanceBeforeIndoorSwitchMeters = originalDistance
+        workout.indoorSwitchActiveSeconds = workout.elapsed(at: now)
+        workout.indoorVenue = venue
+        workout.indoorPromptedThisSession = true
+        workout.indoorPromptPending = false
+        workout.runEnvironment = .treadmill
+        workout.autoPauseEnabled = false
+        workout.treadmillInclinePercent = venue == .treadmill ? 0 : nil
+        workout.treadmillSpeedKilometersPerHour = nil
+        workout.treadmillDistanceElapsedSeconds = workout.elapsed(at: now)
+        workout.distanceMeters = 0
+        workout.structuredStepStartDistanceMeters = 0
+        workout.currentPaceSecondsPerKilometer = nil
+        workout.finalLeaderboardEligible = false
+        workout.plannedRouteID = nil
+        workout.plannedComparisonRouteID = nil
+        workout.plannedRouteTitle = nil
+        workout.plannedRouteDistanceKilometers = nil
+        workout.plannedRouteCoordinates = nil
+        workout.plannedRouteSource = nil
+        workout.ghostDisabledDuringWorkout = true
+        workout.ghostAudioConfiguration = nil
+        // A user choosing indoors during auto-pause should not remain
+        // incorrectly paused because the GPS device is stationary.
+        if automaticPauseActive {
+            if var pauses = workout.pauses,
+               let last = pauses.indices.last,
+               pauses[last].endedAt == nil {
+                pauses[last].endedAt = now
+                workout.pauses = pauses
+            }
+            workout.resumedAt = now
+            workout.lastCheckpoint = now
+        }
+        active = workout
+        automaticPauseActive = false
+        autoPauseDetector.reset(enabled: false)
+        resetIndoorProbe()
+        manager.stopUpdatingLocation()
+        manager.allowsBackgroundLocationUpdates = false
+        manager.distanceFilter = 5
+        lastLocation = nil
+        coachPaceSampleAt = nil
+        resetRouteRuntime()
+        resetGhostRuntime(configuration: nil)
+        startTreadmillTicksIfNeeded()
+        persistActiveCheckpoint(force: true)
+        syncLiveActivity()
+        message = ATHLTHLocalization.choose(
+            english: "Indoor mode active. GPS tracking stopped; workout time and intervals continue.",
+            norwegian: "Innendørsmodus er aktiv. GPS-sporing stoppet; økttid og intervaller fortsetter."
+        )
+        return true
+    }
+
     private func accept(
         _ locations: [CLLocation]
     ) {
@@ -5374,6 +5496,12 @@ final class IPhoneWorkoutStore:
                         distance
                 }
             }
+
+            if indoorFirstReliableFix == nil {
+                indoorFirstReliableFix = location.timestamp
+            }
+            indoorLastReliableFix = location.timestamp
+            indoorAcceptedFixCount += 1
 
             lastLocation = location
             workout.points.append(
