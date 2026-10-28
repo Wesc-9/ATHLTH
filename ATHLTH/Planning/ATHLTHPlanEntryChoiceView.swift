@@ -54,12 +54,10 @@ struct ATHLTHPlanEntryChoiceView: View {
                     ),
                     icon: "chart.bar.fill",
                     photo: "PlanEntryAdvanced",
-                    features: [
-                        ("chart.bar.fill", tr("More control", "Mer kontroll")),
-                        ("list.bullet", tr("Detailed setup", "Detaljert oppsett")),
-                        ("gearshape", tr("Tailored", "Skreddersydd"))
-                    ],
-                    height: 133
+                    // Keep Advanced the same compact height as Coach.
+                    // The extra feature strip was inflating this card by 35 pt.
+                    features: [],
+                    height: 124
                 )
 
                 modeCard(
