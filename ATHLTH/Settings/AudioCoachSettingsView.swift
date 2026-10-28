@@ -218,7 +218,8 @@ struct ATHLTHAudioCoachSettingsView: View {
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 16)
-                .padding(.bottom, 42)
+                // Keep the final controls clear of ATHLTH's floating tab bar.
+                .padding(.bottom, 110)
             }
             .scrollIndicators(.hidden)
         }
@@ -608,9 +609,9 @@ struct ATHLTHAudioCoachSettingsView: View {
                         duckOtherAudio: settings.audioCoachDuckOtherAudio,
                         speechStyle: settings.audioCoachSpeechStyle
                     )
-                    if settings.audioCoachLanguage == .norwegian {
-                        ATHLTHAzureCoachVoicePreviewView()
-                    }
+                    // Azure voices always follow installed device voices.
+                    // Selecting one explicitly switches language to Norwegian.
+                    ATHLTHAzureCoachVoicePreviewView()
                     if showAdvancedSettings {
                         Divider().padding(.vertical, 8)
                         sliderSetting(
