@@ -34,6 +34,8 @@ struct WatchRunWorkoutExperienceView: View {
 
     @State private var coachOutputName: String?
     @State private var confirmingEnd = false
+    @State private var showingAutomaticIndoorSuggestion = false
+    @State private var showingManualIndoorChoice = false
     @State private var ghostMapPosition:
         MapCameraPosition = .automatic
     @State private var navigationMapPosition:
@@ -115,6 +117,12 @@ struct WatchRunWorkoutExperienceView: View {
             )
             coachOutputName = AVAudioSession.sharedInstance()
                 .currentRoute.outputs.first?.portName
+            if workoutManager.indoorSuggestionAvailable {
+                showingAutomaticIndoorSuggestion = true
+            }
+        }
+        .onChange(of: workoutManager.indoorSuggestionAvailable) { _, available in
+            if available { showingAutomaticIndoorSuggestion = true }
         }
         .onChange(of: workoutManager.liveSurfaceConfiguration.preferredRunPageRaw) { _, _ in
             selectedPage = ATHLTHWatchDisplayPreferences.startingRunPage(
@@ -129,6 +137,43 @@ struct WatchRunWorkoutExperienceView: View {
         ) { _ in
             coachOutputName = AVAudioSession.sharedInstance()
                 .currentRoute.outputs.first?.portName
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Are you running indoors?", norwegian: "Trener du innendørs?"
+            ),
+            isPresented: $showingAutomaticIndoorSuggestion,
+            titleVisibility: .visible
+        ) {
+            ForEach(ATHLTHIndoorRunVenue.allCases) { venue in
+                Button(venue.title) {
+                    _ = workoutManager.switchToIndoorRunning(venue)
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Continue outdoors", norwegian: "Fortsett utendørs"
+            )) { workoutManager.dismissIndoorSuggestion() }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "15 minutes and no more than 100 metres of GPS movement. Choose the correct environment.",
+                norwegian: "15 minutter og maks 100 meter GPS-forflytning. Velg riktig treningsmiljø."
+            ))
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Running environment", norwegian: "Treningsmiljø"
+            ),
+            isPresented: $showingManualIndoorChoice,
+            titleVisibility: .visible
+        ) {
+            ForEach(ATHLTHIndoorRunVenue.allCases) { venue in
+                Button(venue.title) {
+                    _ = workoutManager.switchToIndoorRunning(venue)
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
         }
         .confirmationDialog(
             "End workout?",
@@ -3613,6 +3658,27 @@ struct WatchRunWorkoutExperienceView: View {
                 "CONTROLS",
                 icon: "slider.horizontal.3"
             )
+
+            if workoutManager.usesOutdoorGPS ||
+               workoutManager.switchedIndoorVenue != nil {
+                Button {
+                    showingManualIndoorChoice = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "location.circle")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Running environment",
+                            norwegian: "Treningsmiljø"
+                        ))
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .font(.system(size: 11, weight: .semibold))
+                    .padding(10)
+                    .watchSurface(radius: 14)
+                }
+                .buttonStyle(.plain)
+            }
 
             HStack(spacing: 8) {
                 controlButton(
