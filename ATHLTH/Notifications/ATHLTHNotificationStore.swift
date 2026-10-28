@@ -272,6 +272,59 @@ final class ATHLTHNotificationStore: ObservableObject {
         }
     }
 
+    /// Goal measurement reminders live in Activity even when iOS permission
+    /// is declined. The scheduled device alert is handled separately so
+    /// reopening ATHLTH does not cause a duplicate push/banner.
+    func reconcileBodyGoalCheckIns(
+        goals: [ATHLTHGoal], accountID: UUID,
+        profile: ATHLTHTrainingProfile, now: Date = Date()
+    ) {
+        let prefix = "body-goal-checkin."
+        let dueByGoal: [UUID: Date] = Dictionary(
+            uniqueKeysWithValues: goals.compactMap { goal in
+                ATHLTHBodyGoalCheckInPolicy.dueUnmeasuredPeriod(
+                    goal: goal, profile: profile, now: now
+                ).map { (goal.id, $0) }
+            }
+        )
+        let validEventKeys = Set(dueByGoal.map { id, due in
+            ATHLTHBodyGoalCheckInPolicy.eventKey(
+                accountID: accountID, goalID: id, due: due
+            )
+        })
+        let before = items.count
+        items.removeAll { item in
+            guard item.eventKey.hasPrefix(prefix) else { return false }
+            // Do not leak another account's private goal reminder.
+            guard item.eventKey.hasPrefix(prefix + accountID.uuidString + ".")
+            else { return true }
+            // Keep past read entries, but never leave a stale unread badge
+            // once the check-in was completed or the goal was disabled.
+            return item.isUnread && !validEventKeys.contains(item.eventKey)
+        }
+        if before != items.count { persist() }
+
+        for (goalID, due) in dueByGoal {
+            add(ATHLTHNotificationDraft(
+                eventKey: ATHLTHBodyGoalCheckInPolicy.eventKey(
+                    accountID: accountID, goalID: goalID, due: due
+                ),
+                kind: .system,
+                title: ATHLTHLocalization.choose(
+                    english: "Time for a goal check-in",
+                    norwegian: "Tid for en målinnsjekk"
+                ),
+                message: ATHLTHLocalization.choose(
+                    english: "Record a new measurement to track your progress.",
+                    norwegian: "Registrer en ny måling for å følge utviklingen."
+                ),
+                createdAt: now,
+                goalID: goalID,
+                socialEventKind: "body_goal_checkin"
+            ), deliverSystemAlert: false)
+        }
+    }
+
     /// One transient in-app reminder per local day. This intentionally does
     /// not schedule an iOS push/alert or repeatedly resurrect a dismissed
     /// notification. Only the user can enable it in ATHLTH Settings.
