@@ -2201,12 +2201,12 @@ final class CommunityGroupStore: ObservableObject {
         _ announcementID: UUID,
         in groupID: UUID
     ) -> Int {
-        announcementReactionsByGroup[groupID]?
-            .filter {
-                $0.announcementID == announcementID &&
-                $0.reaction == "like"
+        (announcementReactionsByGroup[groupID] ?? []).reduce(into: 0) { count, reaction in
+            if reaction.announcementID == announcementID &&
+                reaction.reaction == "like" {
+                count += 1
             }
-            .count ?? 0
+        }
     }
 
     func hasLikedAnnouncement(
