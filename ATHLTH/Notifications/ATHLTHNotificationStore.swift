@@ -296,6 +296,20 @@ final class ATHLTHNotificationStore: ObservableObject {
                 (!enabled || completed || $0.eventKey != eventKey)
         }
         if items.count != previousCount { persist() }
+
+        // In-app Activity and the system notification share the same
+        // account/day key. Future alerts remain queued even when ATHLTH
+        // is closed; today's alert is cancelled after a completed check-in.
+        Task {
+            await ATHLTHDailyCheckInReminderScheduler.reconcile(
+                enabled: enabled,
+                accountID: accountID,
+                completedToday: completed,
+                now: now,
+                calendar: calendar
+            )
+        }
+
         let issuedKey = "insights.daily-check-in.last-issued." + accountID.uuidString
         guard ATHLTHDailyCheckInReminderPolicy.shouldShow(
             enabled: enabled, completed: completed,
