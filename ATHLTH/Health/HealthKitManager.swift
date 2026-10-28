@@ -4501,16 +4501,9 @@ final class HealthKitManager: ObservableObject {
             return
         }
 
-        let start = min(
-            workoutImportCutoverDate,
-            Date().addingTimeInterval(-90 * 24 * 60 * 60)
-        )
-
-        guard let fetched = try? await fetchRawWorkouts(
-            startDate: start,
-            endDate: Date(),
-            limit: 250
-        ) else {
+        // Rehydrate exact pending workouts, not just the 250 newest samples.
+        // Large HealthKit histories must not silently drop older Inbox items.
+        guard let fetched = try? await fetchPendingWorkoutObjects() else {
             return
         }
 
@@ -4520,22 +4513,37 @@ final class HealthKitManager: ObservableObject {
                 !ignoredExternalWorkoutIDs.contains($0.uuid)
         }
 
-        cacheWorkoutObjects(
-            matching
-        )
-
+        cacheWorkoutObjects(matching)
         pendingWorkoutImports = matching
             .map(makePendingWorkoutImport)
-            .sorted {
-                $0.summary.endDate > $1.summary.endDate
+            .sorted { $0.summary.endDate > $1.summary.endDate }
+
+        // HealthKit deliberately hides denied reads as empty results.
+        // Missing samples are not proof of deletion. Keep pending IDs until
+        // the incremental observer returns explicit HKDeletedObject events.
+    }
+
+    private func fetchPendingWorkoutObjects() async throws -> [HKWorkout] {
+        let identifiers = pendingExternalWorkoutIDs
+        guard !identifiers.isEmpty else { return [] }
+        let predicate = HKQuery.predicateForObjects(with: identifiers)
+        return try await withCheckedThrowingContinuation {
+            (continuation: CheckedContinuation<[HKWorkout], Error>) in
+            let query = HKSampleQuery(
+                sampleType: HKObjectType.workoutType(),
+                predicate: predicate,
+                limit: HKObjectQueryNoLimit,
+                sortDescriptors: nil
+            ) { _, samples, error in
+                if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(
+                        returning: (samples as? [HKWorkout]) ?? []
+                    )
+                }
             }
-
-        let foundIDs = Set(matching.map(\.uuid))
-        let missingIDs = pendingExternalWorkoutIDs.subtracting(foundIDs)
-
-        if !missingIDs.isEmpty {
-            pendingExternalWorkoutIDs.subtract(missingIDs)
-            persistWorkoutImportState()
+            healthStore.execute(query)
         }
     }
 
