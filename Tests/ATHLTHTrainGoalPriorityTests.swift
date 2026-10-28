@@ -110,4 +110,45 @@ final class ATHLTHTrainGoalPriorityTests: XCTestCase {
             )?.id, linked.id
         )
     }
+
+    @MainActor
+    func testDeactivatedGoalKeepsProgressButLosesActivePrimaryStatus() {
+        let store = GoalStore()
+        var main = goal("First goal", category: .endurance, primary: true)
+        main.milestones = [
+            GoalMilestone(title: "First milestone", targetDescription: "Run 1K")
+        ]
+        let second = goal("Second goal", category: .strength)
+        store.add(main)
+        store.add(second)
+        XCTAssertEqual(store.primaryGoal?.id, main.id)
+
+        store.setStatus(.paused, for: main.id)
+        XCTAssertEqual(store.goals.first(where: { $0.id == main.id })?.status, .paused)
+        XCTAssertFalse(store.goals.first(where: { $0.id == main.id })?.isPrimary ?? true)
+        XCTAssertEqual(store.primaryGoal?.id, second.id)
+        XCTAssertEqual(store.goals.first(where: { $0.id == main.id })?.milestones.count, 1)
+
+        store.setPrimary(main.id)
+        XCTAssertEqual(store.primaryGoal?.id, second.id,
+                       "Deactivated goals cannot be made primary")
+
+        store.setStatus(.active, for: main.id)
+        XCTAssertEqual(store.goals.first(where: { $0.id == main.id })?.status, .active)
+        store.setPrimary(main.id)
+        XCTAssertEqual(store.primaryGoal?.id, main.id)
+    }
+
+    @MainActor
+    func testFirstGoalIsPrimaryWithoutOverwritingAnExistingMainGoal() {
+        let store = GoalStore()
+        let main = goal("Main", category: .endurance)
+        let other = goal("Another", category: .strength)
+        store.add(main)
+        XCTAssertEqual(store.primaryGoal?.id, main.id)
+        store.add(other)
+        XCTAssertEqual(store.primaryGoal?.id, main.id)
+        XCTAssertFalse(store.goals.first(where: { $0.id == other.id })?.isPrimary ?? true)
+    }
+
 }
