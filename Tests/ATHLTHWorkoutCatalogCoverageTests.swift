@@ -7,7 +7,12 @@ final class ATHLTHWorkoutCatalogCoverageTests: XCTestCase {
     func testOfflineCatalogIncludesHybridAndStrengthPrescriptions() {
         let entries = WorkoutTemplateCatalogEntry.bundledCatalog
         XCTAssertEqual(entries.filter { $0.category == "hybrid" }.count, 3)
-        XCTAssertEqual(entries.filter { $0.category == "strength" }.count, 15)
+        let strengthEntries = entries.filter { $0.category == "strength" }
+        let expectedStrengthEntries = ATHLTHCuratedStrengthWorkouts.entries
+            + ATHLTHPremiumStrengthSessions.entries
+            + ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries
+        XCTAssertEqual(strengthEntries.count, expectedStrengthEntries.count)
+        XCTAssertEqual(Set(strengthEntries.map(\.id)), Set(expectedStrengthEntries.map(\.id)))
         XCTAssertEqual(Set(entries.map(\.id)).count, entries.count)
         XCTAssertEqual(Set(entries.map(\.slug)).count, entries.count)
     }
