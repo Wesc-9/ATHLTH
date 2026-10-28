@@ -274,6 +274,7 @@ final class HealthKitManager: ObservableObject {
     private var workoutImportCutoverDate = Date()
     private var workoutImportAnchor: HKQueryAnchor?
     private var workoutImportRefreshInProgress = false
+    private var workoutImportRefreshPending = false
     private var pendingExternalWorkoutIDs: Set<UUID> = []
     private var importedExternalWorkoutIDs: Set<UUID> = []
     private var ignoredExternalWorkoutIDs: Set<UUID> = []
@@ -385,7 +386,10 @@ final class HealthKitManager: ObservableObject {
         // Observer, foreground and manual refreshes may overlap. Keep one
         // reader/anchor writer in flight so an older delta cannot commit
         // after a newer import or resurface a completed inbox item.
-        guard !workoutImportRefreshInProgress else { return false }
+        if workoutImportRefreshInProgress {
+            workoutImportRefreshPending = true
+            return false
+        }
         guard integrationEnabled,
               healthDataAvailable,
               hasRequestedAuthorization,
@@ -395,7 +399,15 @@ final class HealthKitManager: ObservableObject {
         }
 
         workoutImportRefreshInProgress = true
-        defer { workoutImportRefreshInProgress = false }
+        defer {
+            workoutImportRefreshInProgress = false
+            if workoutImportRefreshPending {
+                workoutImportRefreshPending = false
+                Task { @MainActor [weak self] in
+                    _ = await self?.refreshWorkoutImportInbox()
+                }
+            }
+        }
         var acceptedWorkoutChanged = false
 
         do {

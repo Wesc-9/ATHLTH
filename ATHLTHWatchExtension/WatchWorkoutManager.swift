@@ -3271,6 +3271,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
             persistWorkoutRecoveryState()
 
+            // A crash during finalization can restore an already-ended
+            // HealthKit session. Resume its save sequence rather than leave
+            // an indefinitely "ending" workout or lose its recorded data.
+            if recovered.state == .ended {
+                finishWorkout(at: recovered.endDate ?? Date())
+            } else if recovered.state == .stopped {
+                // .stopped is not .ended; end the recovered session so the
+                // normal delegate can save the workout builder once.
+                recovered.end()
+            }
+
             if recovered.state == .running ||
                 recovered.state == .paused {
                 do {
