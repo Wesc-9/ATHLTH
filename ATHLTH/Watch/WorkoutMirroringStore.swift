@@ -570,7 +570,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         let initialSnapshot = WatchWorkoutLiveSnapshot(
             kind: incomingKind,
-            state: mirrorState(for: session.state),
+            state: ATHLTHWorkoutMirrorStatePolicy.state(for: session.state),
             startedAt: session.startDate,
             capturedAt: Date(),
             elapsedTime: elapsedTime(for: session),

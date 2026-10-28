@@ -144,15 +144,17 @@ enum ATHLTHBodyGoalReminderScheduler {
         generation += 1
         let requestGeneration = generation
         let center = UNUserNotificationCenter.current()
-        let pending: [UNNotificationRequest] = await withCheckedContinuation {
+        // Keep UserNotifications objects on their callback queue. Only
+        // cross the Swift 6 actor boundary with Sendable identifiers.
+        let pendingIDs: [String] = await withCheckedContinuation {
             continuation in
-            center.getPendingNotificationRequests {
-                continuation.resume(returning: $0)
+            center.getPendingNotificationRequests { requests in
+                continuation.resume(returning: requests.map(\.identifier))
             }
         }
         guard generation == requestGeneration else { return }
         center.removePendingNotificationRequests(withIdentifiers:
-            pending.map(\.identifier).filter { $0.hasPrefix(prefix) }
+            pendingIDs.filter { $0.hasPrefix(prefix) }
         )
         let authorization = await center.notificationSettings().authorizationStatus
         guard generation == requestGeneration else { return }
