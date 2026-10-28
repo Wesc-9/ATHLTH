@@ -77,7 +77,7 @@ struct ATHLTHWorkoutRecipePreview: View {
     var onUpdateBlock: ((Int, WorkoutTemplateBlock) -> Void)? = nil
 
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
-    @State private var advanced = false
+    @AppStorage("athlth.workoutPreview.advanced.v1") private var advanced = false
     @State private var selectedExercise: WorkoutTemplateBlock?
     @State private var editingStep: IndexedWorkoutStep?
     @State private var inspectedCardioStep: IndexedWorkoutStep?
