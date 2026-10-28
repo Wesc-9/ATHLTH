@@ -628,10 +628,60 @@ private struct ATHLTHWorkoutStepEditor: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                     }
+                    if draft.kind == .run {
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Speed (km/h)", norwegian: "Fart (km/t)"
+                            ))
+                            Spacer()
+                            TextField("—", value: Binding<Double?>(
+                                get: {
+                                    guard let pace = draft.targetPaceSecondsPerKilometer,
+                                          pace.isFinite, pace > 0 else { return nil }
+                                    return 3_600 / pace
+                                },
+                                set: { speed in
+                                    draft.targetPaceSecondsPerKilometer =
+                                        (speed != nil && speed!.isFinite && speed! > 0)
+                                        ? 3_600 / speed! : nil
+                                }
+                            ), format: .number.precision(.fractionLength(1)))
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                        }
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Treadmill incline (%)",
+                                norwegian: "Stigning på tredemølle (%)"
+                            ))
+                            Spacer()
+                            TextField("—", value: Binding<Double?>(
+                                get: { draft.treadmillInclinePercent },
+                                set: { incline in
+                                    draft.treadmillInclinePercent = incline
+                                    if incline != nil { draft.isIndoor = true }
+                                }
+                            ), format: .number.precision(.fractionLength(1)))
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                        }
+                    }
+                    if draft.kind == .exercise {
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Personal weight (kg)",
+                                norwegian: "Personlig vekt (kg)"
+                            ))
+                            Spacer()
+                            TextField("—", value: $draft.targetWeightKilograms, format: .number)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
                     HStack {
                         Text(ATHLTHLocalization.choose(english: "Rest (sec)", norwegian: "Pause (sek)"))
                         Spacer()
-                        TextField("0", value: $draft.restBetweenSetsSeconds, format: .number)
+                        TextField("—", value: $draft.restBetweenSetsSeconds, format: .number)
                             .keyboardType(.decimalPad)
                             .multilineTextAlignment(.trailing)
                     }
@@ -659,6 +709,10 @@ private struct ATHLTHWorkoutStepEditor: View {
                               (draft.durationSeconds ?? 0) < 0 ||
                               (draft.restBetweenSetsSeconds ?? 0) < 0 ||
                               (draft.targetPaceSecondsPerKilometer ?? 0) < 0 ||
+                              (draft.treadmillInclinePercent.map {
+                                  !$0.isFinite || !(0...20).contains($0)
+                              } ?? false) ||
+                              (draft.targetWeightKilograms ?? 0) < 0 ||
                               (draft.targetHeartRateZone != nil &&
                                !(1...5).contains(draft.targetHeartRateZone!)))
                 }
