@@ -413,7 +413,9 @@ private struct ATHLTHLaunchGateView: View {
             VStack(spacing: 16) {
                 ATHLTHBrandMark(
                     size: .compact,
-                    showTagline: false
+                    showTagline: false,
+                    wordmarkWeight: .medium,
+                    markStrokeScale: 0.72
                 )
 
                 ProgressView()
