@@ -2220,7 +2220,7 @@ struct ATHLTHNotificationCenterView: View {
         _ item: ATHLTHNotificationItem
     ) -> some View {
         if item.kind == .dailyCheckIn {
-            ATHLTHRecoveryView(openCheckInOnAppear: true)
+            RecoverySorenessLogView(store: RecoverySorenessStore())
         } else if item.socialEntityType?.lowercased() == "arena_series",
            let seriesID = item.socialEntityID {
             ATHLTHArenaNotificationDestination(seriesID: seriesID)
