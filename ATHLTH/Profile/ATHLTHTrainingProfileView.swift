@@ -47,8 +47,19 @@ struct ATHLTHTrainingProfileView: View {
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .navigationTitle(localized("Training profile", "Treningsprofil"))
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear(perform: loadProfile)
-        .onChange(of: session.profile.userID) { _, _ in loadProfile() }
+        .onAppear {
+            loadProfile()
+            checkInStore.reloadFromStorage()
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            loadProfile()
+            checkInStore.reloadFromStorage()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: Notification.Name("athlth.dailyCheckInDidUpdate")
+        )) { _ in
+            checkInStore.reloadFromStorage()
+        }
         .sheet(isPresented: $showingMeasurementEditor) {
             measurementEditor
         }
@@ -62,6 +73,7 @@ struct ATHLTHTrainingProfileView: View {
             for: .athlthTrainingDataDidChange
         )) { _ in
             profile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
+            checkInStore.reloadFromStorage()
         }
     }
 
