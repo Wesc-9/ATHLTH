@@ -330,6 +330,8 @@ struct RunningWorkoutLibraryView: View {
 struct RunningWorkoutDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: RunningWorkoutLibraryStore
+    @EnvironmentObject private var session: AppSessionStore
+    @AppStorage("athlth.workoutPreview.advanced.v1") private var advancedMode = false
 
     let workout: RunningWorkoutTemplate
     let selectionTitle: String?
@@ -339,21 +341,89 @@ struct RunningWorkoutDetailView: View {
     @State private var showingDelete = false
     @State private var showingIntervalEditor = false
     @State private var editingBeforeStart = false
+    @State private var askingForTargets = false
+    @State private var pendingAddToPlan = false
+    @State private var recentPerformance: ATHLTHCompletedRunningPerformance?
+
+    private var personalCopy: RunningWorkoutTemplate? {
+        library.savedCopy(for: workout)
+    }
+
+    /// Open the athlete's copy, if one exists, without modifying the library master.
+    private var previewWorkout: RunningWorkoutTemplate {
+        personalCopy ?? workout
+    }
+
+    private func continueWithSavedCopy() {
+        if let saved = personalCopy {
+            onSelect?(saved)
+        } else if workout.isBuiltIn {
+            let copy = library.duplicate(workout)
+            onSelect?(copy)
+        } else {
+            onSelect?(workout)
+        }
+        dismiss()
+    }
+
+    private func handleFirstAddition(toPlan: Bool) {
+        pendingAddToPlan = toPlan
+        if workout.isBuiltIn && personalCopy == nil && advancedMode {
+            askingForTargets = true
+        } else if toPlan {
+            continueWithSavedCopy()
+        } else if personalCopy == nil && workout.isBuiltIn {
+            _ = library.duplicate(workout)
+        }
+    }
+
+    private func editPersonalizedCopy() {
+        editingBeforeStart = false
+        showingIntervalEditor = true
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 ATHLTHWorkoutRecipePreview(
-                    title: workout.title,
-                    summary: workout.summary,
+                    title: previewWorkout.title,
+                    summary: previewWorkout.summary,
                     category: "running",
-                    symbol: workout.type.systemImage,
+                    symbol: previewWorkout.type.systemImage,
                     difficulty: nil,
-                    durationMinutes: workout.estimatedDurationSeconds.map {
+                    durationMinutes: previewWorkout.estimatedDurationSeconds.map {
                         Int(($0 / 60).rounded(.up))
                     },
-                    blocks: workout.recipePreviewBlocks
+                    blocks: previewWorkout.recipePreviewBlocks
                 )
+
+                if advancedMode, let record = recentPerformance,
+                   let speed = record.averageWorkSpeed, speed.isFinite, speed > 0 {
+                    HStack(alignment: .top, spacing: 9) {
+                        Image(systemName: "clock.arrow.circlepath")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Your previous run",
+                                norwegian: "Din forrige gjennomføring"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Recorded pace, not a new target: ",
+                                    norwegian: "Registrert tempo, ikke nytt mål: "
+                                ) + String(format: "%d:%02d min/km",
+                                           Int((3_600 / speed).rounded()) / 60,
+                                           Int((3_600 / speed).rounded()) % 60)
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(13)
+                    .athlthPlanCard(radius: 16)
+                }
 
                 if let onStart {
                     Button {
@@ -370,10 +440,10 @@ struct RunningWorkoutDetailView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
-                    .tint(ATHLTHTheme.accentDeep)
+                    .tint(ATHLTHPlanDesign.accentInk)
 
                     Button {
-                        onStart(workout)
+                        onStart(previewWorkout)
                         dismiss()
                     } label: {
                         Label("Start Workout", systemImage: "play.fill")
@@ -381,12 +451,11 @@ struct RunningWorkoutDetailView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(ATHLTHTheme.accent)
+                    .tint(ATHLTHPlanDesign.accentInk)
                 }
 
                 Button {
-                        editingBeforeStart = false
-                        showingIntervalEditor = true
+                        editPersonalizedCopy()
                     } label: {
                         Label(
                             ATHLTHLocalization.choose(
@@ -397,16 +466,28 @@ struct RunningWorkoutDetailView: View {
                         .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accent)
+                    .tint(ATHLTHPlanDesign.accentInk)
 
                 if workout.isBuiltIn {
                     Button {
-                        _ = library.duplicate(workout)
+                        handleFirstAddition(toPlan: false)
                     } label: {
-                        Label("Save Editable Copy", systemImage: "doc.on.doc")
-                            .frame(maxWidth: .infinity)
+                        Label(
+                            personalCopy == nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "Save in My Workouts",
+                                    norwegian: "Lagre i Mine økter"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Saved in My Workouts",
+                                    norwegian: "Lagret i Mine økter"
+                                ),
+                            systemImage: personalCopy == nil ? "doc.on.doc" : "checkmark.circle"
+                        )
+                        .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.bordered)
+                    .disabled(personalCopy != nil)
                 } else {
                     Button("Delete Workout", role: .destructive) {
                         showingDelete = true
@@ -426,8 +507,7 @@ struct RunningWorkoutDetailView: View {
                         .opacity(0.35)
 
                     Button {
-                        onSelect(workout)
-                        dismiss()
+                        handleFirstAddition(toPlan: true)
                     } label: {
                         Label(
                             selectionTitle ?? "Use Workout",
@@ -439,7 +519,7 @@ struct RunningWorkoutDetailView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
-                    .tint(ATHLTHTheme.accent)
+                    .tint(ATHLTHPlanDesign.accentInk)
                     .padding(.horizontal, 16)
                     .padding(.top, 10)
                     .padding(.bottom, 8)
@@ -447,17 +527,64 @@ struct RunningWorkoutDetailView: View {
                 .background(.ultraThinMaterial)
             }
         }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Add your pace and other personal targets?",
+                norwegian: "Vil du legge inn fart og andre personlige mål?"
+            ),
+            isPresented: $askingForTargets,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Enter targets in Advanced", norwegian: "Legg inn mål i Avansert"
+            )) {
+                editPersonalizedCopy()
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Use workout without personal targets",
+                norwegian: "Bruk økten uten personlige mål"
+            )) {
+                if pendingAddToPlan {
+                    continueWithSavedCopy()
+                } else if personalCopy == nil {
+                    _ = library.duplicate(workout)
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "The workout structure stays as it is. Pace, incline and personal zones are optional and you can add them later.",
+                norwegian: "Øktoppsettet beholdes. Fart, stigning og egne pulssoner er valgfrie og kan legges inn senere."
+            ))
+        }
         .sheet(isPresented: $showingIntervalEditor) {
-            ATHLTHTrainIntervalComposerView(initial: workout) { edited in
+            ATHLTHTrainIntervalComposerView(initial: previewWorkout) { edited in
                 if editingBeforeStart, let onStart {
-                    // Run the athlete's edited copy without overwriting the
-                    // official library recipe or its leaderboard identity.
                     onStart(edited)
                 } else {
-                    library.save(edited)
-                    onSelect?(edited)
+                    var saved = edited
+                    saved.sharedSourceWorkoutID = edited.sharedSourceWorkoutID ??
+                        (workout.isBuiltIn ? workout.id : workout.sharedSourceWorkoutID)
+                    library.save(saved)
+                    if pendingAddToPlan {
+                        onSelect?(saved)
+                    }
                 }
                 dismiss()
+            }
+        }
+        .task {
+            guard workout.isBuiltIn else { return }
+            let candidates = ATHLTHRunningPerformanceHistory.load(
+                userID: session.profile.userID
+            )
+            recentPerformance = candidates.first {
+                $0.workoutID == workout.id ||
+                $0.workoutID == personalCopy?.id ||
+                ATHLTHWorkoutSearch.normalized($0.title) ==
+                    ATHLTHWorkoutSearch.normalized(workout.title)
             }
         }
         .confirmationDialog(
