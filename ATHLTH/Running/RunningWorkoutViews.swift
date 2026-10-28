@@ -370,7 +370,10 @@ struct RunningWorkoutDetailView: View {
 
     private func handleFirstAddition(toPlan: Bool) {
         pendingAddToPlan = toPlan
-        if workout.isBuiltIn && personalCopy == nil && advancedMode {
+        if workout.isBuiltIn &&
+            ATHLTHWorkoutFirstUsePolicy.asksForTargets(
+                advanced: advancedMode, hasPersonalCopy: personalCopy != nil
+            ) {
             askingForTargets = true
         } else if toPlan {
             continueWithSavedCopy()
