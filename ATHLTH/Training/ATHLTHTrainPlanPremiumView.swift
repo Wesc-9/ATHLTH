@@ -886,87 +886,17 @@ struct ATHLTHTrainPlanPremiumView: View {
     private func referenceFullWeekOverview(
         _ week: TrainingPlanWeek, plan: TrainingPlan
     ) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack {
-                Text(tr("Week overview", "Ukeoversikt"))
-                    .font(.system(size: 20, weight: .semibold, design: .serif))
-                    .foregroundStyle(graphite)
-                Spacer()
-                Text(plan.builderProfile?.mode == .advanced
-                     ? tr("Advanced plan", "Avansert plan")
-                     : tr("Simple plan", "Enkel plan"))
-                    .font(.caption2.weight(.medium))
-                    .foregroundStyle(secondaryInk)
+        ATHLTHPlanWeekOverview(
+            week: week,
+            plan: plan,
+            weekday: { weekday($0, plan: plan) },
+            planDayDate: { planDayDate($0, plan: plan) },
+            isCompleted: { isPremiumPlanWorkoutCompleted($0, plan: plan) },
+            onSelectDay: { dayID in
+                selectedDayID = dayID
+                showingDayDetails = true
             }
-
-            ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
-                let workouts = day.sessions.filter { !$0.isExplicitRestDay }
-                Button {
-                    selectedDayID = day.id
-                    showingDayDetails = true
-                } label: {
-                    HStack(alignment: .top, spacing: 12) {
-                        VStack(spacing: 3) {
-                            Text(weekday(day.dayIndex, plan: plan))
-                                .font(.caption2.weight(.semibold))
-                            Text(planDayDate(day.dayIndex, plan: plan)
-                                .formatted(.dateTime.day()))
-                                .font(.system(size: 20, weight: .semibold, design: .serif))
-                        }
-                        .foregroundStyle(graphite)
-                        .frame(width: 43)
-
-                        VStack(alignment: .leading, spacing: 7) {
-                            if workouts.isEmpty {
-                                Label(
-                                    day.sessions.contains(where: \.isExplicitRestDay)
-                                        ? tr("Rest and recovery", "Hvile og restitusjon")
-                                        : tr("No workout planned", "Ingen økt planlagt"),
-                                    systemImage: "leaf"
-                                )
-                                .font(.subheadline)
-                                .foregroundStyle(secondaryInk)
-                            } else {
-                                ForEach(workouts) { workout in
-                                    HStack(spacing: 7) {
-                                        Image(systemName: workout.kind.systemImage)
-                                            .foregroundStyle(warmGold)
-                                            .frame(width: 18)
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(workout.title)
-                                                .font(.subheadline.weight(.semibold))
-                                                .foregroundStyle(graphite)
-                                                .lineLimit(2)
-                                            Text(referenceWorkoutSubtitle(workout))
-                                                .font(.caption2)
-                                                .foregroundStyle(secondaryInk)
-                                        }
-                                        Spacer(minLength: 0)
-                                        if isPremiumPlanWorkoutCompleted(workout, plan: plan) {
-                                            Image(systemName: "checkmark.circle.fill")
-                                                .foregroundStyle(warmGold)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(secondaryInk)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
-                    .background(
-                        Color.white,
-                        in: RoundedRectangle(cornerRadius: 16)
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(13)
-        .background(soft.opacity(0.65), in: RoundedRectangle(cornerRadius: 20))
+        )
     }
 
     private func referenceDayWorkspace(
