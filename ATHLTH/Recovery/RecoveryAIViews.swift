@@ -3153,10 +3153,16 @@ struct RecoveryCoachView: View {
         let linkedGoals = goalStore.goals.filter {
             $0.linkedTrainingPlanID == plan.id
         }
+        let recentTraining = ATHLTHCoachTrainingContext.recentCompletedTraining(
+            running: ATHLTHRunningPerformanceHistory.load(
+                userID: requestOwnerID
+            ),
+            strength: strengthWorkout.workoutHistory
+        )
         let details = CoachPlanAdaptationService.makeRequest(
             plan: plan,
             goals: linkedGoals,
-            recentTraining: [],
+            recentTraining: recentTraining,
             userNotes: requestText
         )
         do {
