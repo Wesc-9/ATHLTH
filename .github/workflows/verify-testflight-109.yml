@@ -1,0 +1,125 @@
+name: Verify ATHLTH 2.0.1 TestFlight availability
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - release/v2.0.1
+    paths:
+      - .github/workflows/verify-testflight-109.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-testflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+    steps:
+      - name: Install App Store Connect authentication dependency
+        run: python3 -m pip install --quiet PyJWT cryptography
+      - name: Check Apple processing and internal TestFlight access
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          import jwt
+
+          for key in ("ASC_KEY_ID", "ASC_ISSUER_ID", "ASC_API_KEY_P8"):
+              if not os.environ.get(key):
+                  raise SystemExit("Missing configured App Store Connect credentials: " + key)
+
+          private_key = os.environ["ASC_API_KEY_P8"].strip()
+          if len(private_key) >= 2 and private_key[0] == private_key[-1] and private_key[0] in ("'", '"'):
+              if private_key[0] == '"':
+                  try:
+                      private_key = json.loads(private_key)
+                  except json.JSONDecodeError:
+                      private_key = private_key[1:-1]
+              else:
+                  private_key = private_key[1:-1]
+          private_key = private_key.replace("\\r\\n", "\n").replace("\\n", "\n")
+
+          def fetch(path, params=None):
+              now = int(time.time())
+              token = jwt.encode(
+                  {"iss": os.environ["ASC_ISSUER_ID"], "iat": now - 30, "exp": now + 600, "aud": "appstoreconnect-v1"},
+                  private_key, algorithm="ES256",
+                  headers={"kid": os.environ["ASC_KEY_ID"], "typ": "JWT"},
+              )
+              url = "https://api.appstoreconnect.apple.com" + path
+              if params:
+                  url += "?" + urllib.parse.urlencode(params)
+              request = urllib.request.Request(url, headers={"Authorization": "Bearer " + token})
+              try:
+                  with urllib.request.urlopen(request, timeout=35) as response:
+                      return json.load(response)
+              except urllib.error.HTTPError as error:
+                  raise RuntimeError("App Store Connect HTTP " + str(error.code) + " for " + path) from None
+
+          apps = fetch("/v1/apps", {"filter[bundleId]": "com.wesc9.athlth", "limit": 5}).get("data", [])
+          if len(apps) != 1:
+              raise SystemExit("Expected one ATHLTH App Store Connect app, got " + str(len(apps)))
+          app_id = apps[0]["id"]
+          print("ATHLTH App Store Connect app found", flush=True)
+
+          for attempt in range(1, 31):
+              builds = fetch("/v1/builds", {
+                  "filter[app]": app_id, "filter[version]": "109",
+                  "include": "preReleaseVersion,buildBetaDetail,betaGroups",
+                  "limit": "20",
+              })
+              included = {(x.get("type"), x.get("id")): x for x in builds.get("included", [])}
+              candidates = []
+              for item in builds.get("data", []):
+                  a = item.get("attributes", {})
+                  if str(a.get("version")) != "109":
+                      continue
+                  rels = item.get("relationships", {})
+                  prerelease = rels.get("preReleaseVersion", {}).get("data")
+                  version = included.get((prerelease.get("type"), prerelease.get("id")), {}).get("attributes", {}).get("version") if prerelease else None
+                  if version != "2.0.1":
+                      continue
+                  detail = rels.get("buildBetaDetail", {}).get("data")
+                  detail_attrs = included.get((detail.get("type"), detail.get("id")), {}).get("attributes", {}) if detail else {}
+                  groups = rels.get("betaGroups", {}).get("data", [])
+                  candidates.append((item, detail_attrs, groups))
+
+              if not candidates:
+                  print(f"Attempt {attempt}: 2.0.1 (109) not yet listed in App Store Connect", flush=True)
+              else:
+                  build, detail, groups = candidates[0]
+                  state = build.get("attributes", {}).get("processingState")
+                  internal = detail.get("internalBuildState")
+                  external = detail.get("externalBuildState")
+                  print(f"Attempt {attempt}: processingState={state}, internalBuildState={internal}, externalBuildState={external}, assignedBetaGroups={len(groups)}", flush=True)
+                  if state in ("INVALID", "FAILED"):
+                      raise SystemExit("Apple rejected build 109; inspect App Store Connect.")
+                  if internal in ("MISSING_EXPORT_COMPLIANCE", "PROCESSING_EXCEPTION"):
+                      raise SystemExit("Apple requires TestFlight attention: " + str(internal))
+                  if state == "VALID":
+                      beta_groups = fetch("/v1/betaGroups", {"filter[app]": app_id, "limit": 200}).get("data", [])
+                      internal_groups = [g for g in beta_groups if g.get("attributes", {}).get("isInternalGroup")]
+                      auto_access = any(g.get("attributes", {}).get("hasAccessToAllBuilds") for g in internal_groups)
+                      assigned = {g.get("id") for g in groups}
+                      explicitly_assigned_internal = any(g.get("id") in assigned for g in internal_groups)
+                      print(f"Internal beta groups: {len(internal_groups)}; auto-access={auto_access}; explicitly assigned={explicitly_assigned_internal}", flush=True)
+                      if internal in ("READY_FOR_TESTING", "IN_BETA_TESTING") and (auto_access or explicitly_assigned_internal):
+                          print("VERIFIED: ATHLTH 2.0.1 build 109 is Apple-processed and available to internal TestFlight testers.", flush=True)
+                          raise SystemExit(0)
+                      print("Build valid, but internal tester availability not yet confirmed.", flush=True)
+              if attempt < 30:
+                  time.sleep(120)
+
+          raise SystemExit("Build 109 was not confirmed available to internal TestFlight testers within this diagnostic window.")
+          PY
