@@ -12967,6 +12967,38 @@ struct ATHLTHProfileView: View {
             profileHero
         } content: {
             LazyVStack(spacing: 12) {
+                NavigationLink {
+                    ATHLTHTrainingProfileView()
+                } label: {
+                    HStack(spacing: 13) {
+                        Image(systemName: "figure.strengthtraining.traditional")
+                            .font(.system(size: 19, weight: .medium))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            .frame(width: 45, height: 45)
+                            .background(ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 14))
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "My training profile",
+                                norwegian: "Min treningsprofil"
+                            ))
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Measurements · Progress · Training considerations",
+                                norwegian: "Kroppsmål · Utvikling · Treningshensyn"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Spacer(minLength: 3)
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .padding(15)
+                    .athlthPlanCard(radius: 19)
+                }
+                .buttonStyle(.plain)
                 trophyCabinetSection
                 personalRecordsSection
                 gearSection
