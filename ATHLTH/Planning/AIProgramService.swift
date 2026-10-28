@@ -96,6 +96,9 @@ struct AIProgramRequest: Encodable {
     // Defaults preserve existing non-injury plan-generation call sites.
     var injurySafetyNotes: String? = nil
     var excludedMovements: [String]? = nil
+    // Optional, explicitly consented training-derived signals. Nothing is uploaded
+    // until Coach History access is enabled by the athlete.
+    var coachStrengthContext: ATHLTHCoachStrengthIntelligence.Snapshot? = nil
     let goals: [AIProgramGoalInput]
     let existingDays: [AIProgramExistingDay]
 }
