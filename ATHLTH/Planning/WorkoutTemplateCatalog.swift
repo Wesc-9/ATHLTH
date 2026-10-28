@@ -338,8 +338,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
                 ATHLTHLocalization.choose(english: "max HR", norwegian: "makspuls"))
         } else if let targetHeartRateZone, (1...5).contains(targetHeartRateZone) {
             parts.append(ATHLTHLocalization.choose(
-                english: "HR zone \(targetHeartRateZone)",
-                norwegian: "Pulssone \(targetHeartRateZone)"
+                english: "HR zone Z\(targetHeartRateZone)",
+                norwegian: "Pulssone S\(targetHeartRateZone)"
             ))
         }
         if let targetEffortRPE, (1...10).contains(targetEffortRPE) {
@@ -655,6 +655,40 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
     }
 }
 
+/// Shared bilingual, spacing-tolerant workout search. Original titles are never modified.
+enum ATHLTHWorkoutSearch {
+    static func normalized(_ value: String) -> String {
+        let folded = value.folding(
+            options: [.diacriticInsensitive, .caseInsensitive],
+            locale: Locale(identifier: "nb_NO")
+        ).replacingOccurrences(
+            of: #"(?<=[0-9])\s*[x×]\s*(?=[0-9])"#,
+            with: "x", options: .regularExpression
+        )
+        return folded.components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    static func matches(_ query: String, texts: [String]) -> Bool {
+        let needle = normalized(query)
+        guard !needle.isEmpty else { return true }
+        var candidates = texts
+        if texts.contains(where: { normalized($0).contains("4x4") }) {
+            candidates += [
+                "4x4 intervals", "4x4 interval run", "4x4 intervaller",
+                "norwegian 4x4", "norwegian 4x4 intervals",
+                "4x4 training", "4x4 running"
+            ]
+        }
+        return candidates.contains {
+            let haystack = normalized($0)
+            return haystack.contains(needle) ||
+                haystack.replacingOccurrences(of: " ", with: "")
+                    .contains(needle.replacingOccurrences(of: " ", with: ""))
+        }
+    }
+}
+
 struct WorkoutTemplateLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
@@ -729,25 +763,21 @@ struct WorkoutTemplateLibraryView: View {
                 selectedMuscleFocus == "all" && selectedWorkoutLevel == "all"
         else { return [] }
 
-        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = query
         return builtInRunningTemplates.filter { workout in
             let favoriteMatches =
                 !favoritesOnly ||
                 favorites.isFavorite(.workout, itemID: workout.id.uuidString)
-            let searchMatches =
-                clean.isEmpty ||
-                workout.title.localizedCaseInsensitiveContains(clean) ||
-                workout.summary.localizedCaseInsensitiveContains(clean) ||
-                workout.type.title.localizedCaseInsensitiveContains(clean)
+            let searchMatches = ATHLTHWorkoutSearch.matches(
+                clean, texts: [workout.title, workout.summary, workout.type.title]
+            )
             return favoriteMatches && searchMatches
         }
     }
 
     private var filteredEntries:
         [WorkoutTemplateCatalogEntry] {
-        let clean = query.trimmingCharacters(
-            in: .whitespacesAndNewlines
-        )
+        let clean = query
 
         return catalog.entries.filter { entry in
             let categoryMatches =
@@ -761,12 +791,10 @@ struct WorkoutTemplateLibraryView: View {
                     itemID: entry.id.uuidString
                 )
 
-            let searchMatches =
-                clean.isEmpty ||
-                entry.title.localizedCaseInsensitiveContains(clean) ||
-                entry.summary.localizedCaseInsensitiveContains(clean) ||
-                entry.tags.joined(separator: " ")
-                    .localizedCaseInsensitiveContains(clean)
+            let searchMatches = ATHLTHWorkoutSearch.matches(
+                clean, texts: [entry.title, entry.summary, entry.categoryTitle,
+                               entry.tags.joined(separator: " ")]
+            )
 
             let muscleMatches = selectedMuscleFocus == "all" ||
                 entry.tags.contains(selectedMuscleFocus)
@@ -778,9 +806,9 @@ struct WorkoutTemplateLibraryView: View {
 
     private var filteredSavedWorkouts: [PlannedSession] {
         guard onSelectPlanned != nil else { return [] }
-        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        let clean = query
         return session.savedWorkoutTemplates.filter {
-            (clean.isEmpty || $0.title.localizedCaseInsensitiveContains(clean)) &&
+            ATHLTHWorkoutSearch.matches(clean, texts: [$0.title, $0.notes ?? ""]) &&
             (selectedCategory == "All" || $0.kind.title == selectedCategory)
         }
     }
@@ -794,14 +822,14 @@ struct WorkoutTemplateLibraryView: View {
                     subtitle:
                         "A workout is the session you actually perform. It can combine running, exercises, rest, routes and targets in one structure.",
                     icon: "rectangle.stack.fill",
-                    accent: ATHLTHTheme.accent
+                    accent: ATHLTHPlanDesign.accentInk
                 ) {
                     HStack(spacing: 8) {
                         LibraryStatPill(
                             value: "\(catalog.entries.count + builtInRunningTemplates.count)",
                             label: "workouts",
                             icon: "rectangle.stack.fill",
-                            tint: ATHLTHTheme.accent
+                            tint: ATHLTHPlanDesign.accentInk
                         )
 
                         LibraryStatPill(
@@ -1041,14 +1069,14 @@ struct WorkoutTemplateLibraryView: View {
         }
         .background(
             ATHLTHPremiumCanvas(
-                accent: ATHLTHTheme.accent.opacity(0.16)
+                accent: ATHLTHPlanDesign.accent.opacity(0.16)
             )
         )
-        .navigationTitle("Workouts")
+        .navigationTitle(ATHLTHLocalization.choose(english: "Workouts", norwegian: "Treningsøkter"))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(
             text: $query,
-            prompt: "Search workouts"
+            prompt: ATHLTHLocalization.choose(english: "Search workouts", norwegian: "Søk etter treningsøkter")
         )
         .task {
             async let workoutRefresh: Void =
@@ -1157,10 +1185,10 @@ struct WorkoutTemplateLibraryView: View {
         HStack(alignment: .top, spacing: 14) {
             Image(systemName: workout.type.systemImage)
                 .font(.system(size: 21, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.vitality)
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 .frame(width: 50, height: 50)
                 .background(
-                    ATHLTHTheme.vitality.opacity(0.10),
+                    ATHLTHPlanDesign.accent.opacity(0.10),
                     in: RoundedRectangle(cornerRadius: 16, style: .continuous)
                 )
 
@@ -1212,11 +1240,7 @@ struct WorkoutTemplateLibraryView: View {
         _ entry: WorkoutTemplateCatalogEntry
     ) -> Color {
         switch entry.category {
-        case "hybrid": return .orange
-        case "strength": return .indigo
-        case "running": return ATHLTHTheme.vitality
-        case "mobility": return .teal
-        default: return ATHLTHTheme.accent
+        default: return ATHLTHPlanDesign.accentInk
         }
     }
 
@@ -1242,7 +1266,7 @@ struct WorkoutTemplateLibraryView: View {
         .frame(height: 38)
         .background(
             selected
-                ? ATHLTHTheme.accentDeep
+                ? ATHLTHPlanDesign.accentInk
                 : Color.white.opacity(0.86),
             in: Capsule()
         )
