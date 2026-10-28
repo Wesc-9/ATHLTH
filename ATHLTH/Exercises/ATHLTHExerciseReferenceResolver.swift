@@ -62,13 +62,15 @@ enum ATHLTHExerciseReferenceResolver {
         "mountain climber": "mountain-climber"
     ]
 
+    private static let normalizedNativeAliases: [String: String] = {
+        Dictionary(uniqueKeysWithValues: nativeAliases.map { (key($0.key), $0.value) })
+    }()
+
     static func nativeSourceIdentifier(for name: String) -> String? {
         let normalized = key(name)
         // Treat spaces, hyphens and underscores as equivalent for reviewed English names.
         // Do not guess across different equipment or movement variations.
-        guard let slug = nativeAliases[normalized] ?? nativeAliases.first(where: {
-            key($0.key) == normalized
-        })?.value else { return nil }
+        guard let slug = normalizedNativeAliases[normalized] else { return nil }
         return "athlth-native-" + slug
     }
 
@@ -89,8 +91,11 @@ enum ATHLTHExerciseReferenceResolver {
             }
         }
         if let slug = block.exerciseSlug, !slug.isEmpty {
-            let byIdentifier = library.filter { $0.sourceIdentifier == slug ||
-                ($0.sourceIdentifier != nil && key($0.sourceIdentifier!) == key(slug)) }
+            let normalizedSlug = key(slug)
+            let byIdentifier = library.filter { entry in
+                guard let identifier = entry.sourceIdentifier else { return false }
+                return identifier == slug || key(identifier) == normalizedSlug
+            }
             if byIdentifier.count == 1 { return byIdentifier[0] }
         }
 
