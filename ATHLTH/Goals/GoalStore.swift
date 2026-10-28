@@ -36,7 +36,7 @@ final class GoalStore: ObservableObject {
     }
 
     var primaryGoal: ATHLTHGoal? {
-        goals.first { $0.isPrimary && ($0.status == .active || $0.status == .paused) }
+        goals.first { $0.isPrimary && $0.status == .active }
     }
 
     func add(_ goal: ATHLTHGoal) {
@@ -108,7 +108,7 @@ final class GoalStore: ObservableObject {
     }
 
     func setPrimary(_ goalID: UUID) {
-        guard goals.contains(where: { $0.id == goalID }) else { return }
+        guard goals.contains(where: { $0.id == goalID && $0.status == .active }) else { return }
 
         for index in goals.indices {
             goals[index].isPrimary = goals[index].id == goalID
@@ -302,8 +302,10 @@ final class GoalStore: ObservableObject {
     }
 
     private func normalizePrimaryGoal() {
+        // A paused/deactivated goal is preserved but is never an active
+        // primary goal. The primary badge always reflects an active goal.
         let eligibleIndices = goals.indices.filter {
-            goals[$0].status == .active || goals[$0].status == .paused
+            goals[$0].status == .active
         }
 
         let primaryIndices = eligibleIndices.filter { goals[$0].isPrimary }
@@ -317,7 +319,7 @@ final class GoalStore: ObservableObject {
             goals[first].isPrimary = true
         }
 
-        for index in goals.indices where goals[index].status == .completed || goals[index].status == .abandoned {
+        for index in goals.indices where goals[index].status != .active {
             goals[index].isPrimary = false
         }
     }
