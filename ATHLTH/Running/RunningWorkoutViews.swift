@@ -582,11 +582,14 @@ struct RunningWorkoutDetailView: View {
             let candidates = ATHLTHRunningPerformanceHistory.load(
                 userID: session.profile.userID
             )
-            recentPerformance = candidates.first {
-                $0.workoutID == workout.id ||
-                $0.workoutID == personalCopy?.id ||
-                ATHLTHWorkoutSearch.normalized($0.title) ==
-                    ATHLTHWorkoutSearch.normalized(workout.title)
+            let personalID = personalCopy?.id
+            let originalName = ATHLTHWorkoutSearch.normalized(workout.title)
+            recentPerformance = candidates.first { record in
+                let recordTitle = ATHLTHWorkoutSearch.normalized(record.title)
+                return record.workoutID == workout.id ||
+                    (personalID != nil && record.workoutID == personalID) ||
+                    recordTitle == originalName ||
+                    recordTitle == originalName + " copy"
             }
         }
         .confirmationDialog(
