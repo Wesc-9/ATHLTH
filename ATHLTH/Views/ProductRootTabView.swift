@@ -1837,7 +1837,7 @@ struct ATHLTHHomeView: View {
 
     // The calendar keeps its place; a useful daily insight replaces the
     // former Home goal shortcut without deleting any saved goals.
-    private let homeCalendarContentMinHeight: CGFloat = 82
+    private let homeCalendarContentMinHeight: CGFloat = 70
 
     private var homeDailyRecommendation: HomeDailyRecommendationPolicy.Advice {
         let readiness: HomeDailyRecommendationPolicy.Readiness
@@ -2123,7 +2123,7 @@ struct ATHLTHHomeView: View {
             }
         }
         .padding(11)
-        .frame(maxWidth: .infinity, minHeight: 196, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 158, alignment: .topLeading)
         .background(
             ATHLTHTrainDesign.paper,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
