@@ -435,6 +435,41 @@ struct AIProgramBuilderView: View {
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
 
+            if let local = coachStrengthSnapshot {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Coach understands your training",
+                            norwegian: "Coach kjenner treningsgrunnlaget ditt"
+                        ),
+                        systemImage: "chart.line.uptrend.xyaxis"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+
+                    Text(local.summary)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Calculated on your device from completed strength logs. Shared for plan creation because Coach History is enabled. Nothing is changed until you approve the plan.",
+                        norwegian: "Beregnet lokalt fra fullførte styrkeøkter. Deles ved planoppretting fordi Coach-historikk er aktivert. Ingen endringer lagres før du godkjenner planen."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(14)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 15))
+            } else {
+                Text(ATHLTHLocalization.choose(
+                    english: "Training-history analysis is disabled until you enable Coach History. Your locally saved workouts remain unchanged.",
+                    norwegian: "Analyse av treningshistorikk er deaktivert til du aktiverer Coach-historikk. Lokalt lagrede økter endres ikke."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            }
+
             coachIntakeCard("figure.mixed.cardio", ATHLTHLocalization.choose(
                 english: "What do you want to train?", norwegian: "Hva ønsker du å trene?")) {
                 coachChoiceGrid {
@@ -2337,6 +2372,7 @@ struct AIProgramBuilderView: View {
                 ? standaloneIntake.excludedExerciseNames : nil,
             // A linked ATHLTH goal is optional. Direction and outcomes are
             // carried in the explicit Coach intake when this array is empty.
+            coachStrengthContext: coachStrengthSnapshot,
             goals: selectedGoals.map(AIProgramGoalInput.init),
             existingDays: existingDays
         )
@@ -2385,6 +2421,17 @@ struct AIProgramBuilderView: View {
             if isStandaloneCoachJourney { coachJourneyStage = .intake }
             errorMessage = error.localizedDescription
         }
+    }
+
+    /// Local analysis is calculated on device. Data reaches the external AI
+    /// provider only when Coach History permission has been explicitly enabled.
+    private var coachStrengthSnapshot: ATHLTHCoachStrengthIntelligence.Snapshot? {
+        guard session.signedIn,
+              CoachHistoryPermission.isEnabled(userID: session.profile.userID)
+        else { return nil }
+        return ATHLTHCoachStrengthIntelligence.snapshot(
+            from: strength.workoutHistory
+        )
     }
 
     private var historyContext: String {
