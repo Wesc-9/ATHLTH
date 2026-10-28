@@ -38,6 +38,43 @@ final class ATHLTHTrainingProfileAndExerciseProgressTests: XCTestCase {
         XCTAssertEqual(decoded.injuryAndLimitations, profile.injuryAndLimitations)
     }
 
+    func testStructuredInjuriesAreOptionalAndRespectLegacyProfile() throws {
+        let legacy = ATHLTHTrainingProfile(
+            trainingNotes: "Strength",
+            injuryAndLimitations: "Previous knee note",
+            measurements: []
+        )
+        let encoded = try JSONEncoder().encode(legacy)
+        let dictionary = try XCTUnwrap(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        var previousVersion = dictionary
+        previousVersion.removeValue(forKey: "injuryRestrictions")
+        let decoded = try JSONDecoder().decode(
+            ATHLTHTrainingProfile.self,
+            from: JSONSerialization.data(withJSONObject: previousVersion)
+        )
+        XCTAssertNil(decoded.injuryRestrictions)
+        XCTAssertEqual(decoded.coachLimitationsSummary, "Previous knee note")
+    }
+
+    func testRestrictionLevelsAndCoachNotesPreserveTheStrongestSafetyRule() throws {
+        var profile = ATHLTHTrainingProfile()
+        profile.injuryRestrictions = [
+            ATHLTHInjuryRestriction(area: .knee, side: .left, level: .avoid),
+            ATHLTHInjuryRestriction(area: .neck, side: .unspecified,
+                                    level: .moderate, notes: "Avoid overhead work")
+        ]
+        let summary = profile.coachLimitationsSummary
+        XCTAssertTrue(summary.contains("DO NOT prescribe"))
+        XCTAssertTrue(summary.contains("left knee"))
+        XCTAssertTrue(summary.contains("neck"))
+        XCTAssertTrue(summary.contains("Avoid overhead work"))
+        let restored = try JSONDecoder().decode(
+            ATHLTHTrainingProfile.self, from: JSONEncoder().encode(profile)
+        )
+        XCTAssertEqual(restored.injuryRestrictions?.count, 2)
+        XCTAssertEqual(restored.coachLimitationsSummary, summary)
+    }
+
     func testWorkoutCreationIntentNotTriggeredByQuestionsOrPlanCreation() {
         XCTAssertTrue(ATHLTHCoachWorkoutCreationIntent.isRequest(
             "Lag en treningsøkt for bryst på 45 minutter"))

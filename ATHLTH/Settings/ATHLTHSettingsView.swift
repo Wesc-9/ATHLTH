@@ -793,8 +793,14 @@ settingsSection("Profile") {
                             } label: {
                                 PremiumSettingsRow(
                                     icon: "heart.text.square",
-                                    title: "Health Profile",
-                                    subtitle: "Private health details and Apple Health source"
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Health & training profile",
+                                        norwegian: "Helse- og treningsprofil"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Apple Health, measurements, goals and limitations",
+                                        norwegian: "Apple Helse, kroppsmål, mål og treningshensyn"
+                                    )
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))

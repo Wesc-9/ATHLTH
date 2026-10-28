@@ -2676,7 +2676,7 @@ struct AIProgramBuilderView: View {
         )
         let savedTrainingNotes = storedTrainingProfile.trainingNotes
             .trimmingCharacters(in: .whitespacesAndNewlines)
-        let savedLimitations = storedTrainingProfile.injuryAndLimitations
+        let savedLimitations = storedTrainingProfile.coachLimitationsSummary
             .trimmingCharacters(in: .whitespacesAndNewlines)
         savedProfileInjuryNotes = String(savedLimitations.prefix(1_200))
         // Do not use private profile notes in AI-bound requests by default.

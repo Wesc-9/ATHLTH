@@ -4,8 +4,21 @@ import Foundation
 /// public profile or sent to Coach without a separate per-request decision.
 struct ATHLTHTrainingProfile: Codable, Equatable {
     var trainingNotes: String = ""
+    // Historical free-text stays readable after migrating to structured restrictions.
     var injuryAndLimitations: String = ""
+    // Optional so existing saved profiles decode without a migration or data loss.
+    var injuryRestrictions: [ATHLTHInjuryRestriction]? = nil
     var measurements: [ATHLTHBodyMeasurement] = []
+
+    var coachLimitationsSummary: String {
+        let structured = (injuryRestrictions ?? [])
+            .map(\.coachInstruction)
+            .joined(separator: "\n")
+        let previous = injuryAndLimitations.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        )
+        return [structured, previous].filter { !$0.isEmpty }.joined(separator: "\n")
+    }
     var updatedAt: Date = .now
 
     static func load(userID: UUID) -> Self {

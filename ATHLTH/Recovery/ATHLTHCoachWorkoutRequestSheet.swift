@@ -19,7 +19,7 @@ struct ATHLTHCoachWorkoutRequestSheet: View {
         self.onContinue = onContinue
         _workoutRequest = State(initialValue: request)
         _trainingNotes = State(initialValue: profile.trainingNotes)
-        _injuryNotes = State(initialValue: profile.injuryAndLimitations)
+        _injuryNotes = State(initialValue: profile.coachLimitationsSummary)
     }
 
     private func tr(_ en: String, _ no: String) -> String {

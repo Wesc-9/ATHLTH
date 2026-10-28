@@ -85,39 +85,6 @@ struct ATHLTHEditProfileView: View {
                         trainingIdentityCard
                     }
 
-                    NavigationLink {
-                        ATHLTHTrainingProfileView()
-                    } label: {
-                        ATHLTHCard {
-                            HStack(spacing: 13) {
-                                Image(systemName: "figure.strengthtraining.traditional")
-                                    .font(.system(size: 18))
-                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                    .frame(width: 42, height: 42)
-                                    .background(ATHLTHPlanDesign.selectedSurface,
-                                                in: RoundedRectangle(cornerRadius: 13))
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "My training profile",
-                                        norwegian: "Min treningsprofil"
-                                    ))
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "Measurements, progress, injuries and training preferences",
-                                        norwegian: "Kroppsmål, utvikling, skader og treningshensyn"
-                                    ))
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                }
-                                Spacer(minLength: 2)
-                                Image(systemName: "chevron.right")
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-
                     activityStatusCard
 
                     VStack(spacing: 12) {
@@ -2046,6 +2013,7 @@ struct PersonalHealthProfileView: View {
             VStack(alignment: .leading, spacing: 24) {
                 sourceSection
                 detailsSection
+                ATHLTHPrivateProfileDetailsView()
                 privacySection
             }
             .padding(.horizontal, 18)
@@ -2066,7 +2034,9 @@ struct PersonalHealthProfileView: View {
             )
             .ignoresSafeArea()
         )
-        .navigationTitle("Health Profile")
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Health & training profile", norwegian: "Helse- og treningsprofil"
+        ))
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: loadFromSession)
         .sheet(item: $editingField) { field in

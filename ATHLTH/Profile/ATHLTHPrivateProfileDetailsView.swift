@@ -3,7 +3,7 @@ import SwiftUI
 
 /// One private place for reusable athlete context and dated body measurements.
 /// A changed reading does not silently overwrite Apple Health body mass.
-struct ATHLTHTrainingProfileView: View {
+struct ATHLTHPrivateProfileDetailsView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
     @StateObject private var checkInStore = RecoverySorenessStore()
@@ -23,30 +23,30 @@ struct ATHLTHTrainingProfileView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 19) {
-                intro
-                goalsCard
-                checkInCard
-                metricsCard
-                if !profile.readings(for: selectedMetric).isEmpty {
-                    trendCard
-                    historyCard
+        VStack(alignment: .leading, spacing: 19) {
+            goalsCard
+            checkInCard
+            ATHLTHInjuryRestrictionsEditor(restrictions: Binding(
+                get: { profile.injuryRestrictions ?? [] },
+                set: { updated in
+                    profile.injuryRestrictions = updated
+                    profile.updatedAt = .now
+                    persist()
                 }
-                notesCard
-                Text(localized(
-                    "Private to this account on this device. Body measurements are not automatically shared with Coach, Apple Health or your public profile. If you reinstall the app, locally stored readings may be lost until cloud backup is supported.",
-                    "Privat for denne kontoen på denne enheten. Kroppsmål sendes ikke automatisk til Coach, Apple Helse eller din offentlige profil. Ved reinstallasjon kan lokale målinger gå tapt til sikkerhetskopiering i skyen er støttet."
-                ))
-                .font(.caption2)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            ))
+            metricsCard
+            if !profile.readings(for: selectedMetric).isEmpty {
+                trendCard
+                historyCard
             }
-            .padding(16)
-            .padding(.bottom, 45)
+            notesCard
+            Text(localized(
+                "Private to this account on this device. Body measurements are not automatically shared with Coach, Apple Health or your public profile. If you reinstall the app, locally stored readings may be lost until cloud backup is supported.",
+                "Privat for denne kontoen på denne enheten. Kroppsmål sendes ikke automatisk til Coach, Apple Helse eller din offentlige profil. Ved reinstallasjon kan lokale målinger gå tapt til sikkerhetskopiering i skyen er støttet."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
-        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-        .navigationTitle(localized("Training profile", "Treningsprofil"))
-        .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             loadProfile()
             checkInStore.reloadFromStorage()
@@ -74,26 +74,6 @@ struct ATHLTHTrainingProfileView: View {
         )) { _ in
             profile = ATHLTHTrainingProfile.load(userID: session.profile.userID)
             checkInStore.reloadFromStorage()
-        }
-    }
-
-    private var intro: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Label(localized("MY TRAINING PROFILE", "MIN TRENINGSPROFIL"),
-                  systemImage: "person.crop.rectangle.stack")
-                .font(.caption.weight(.bold))
-                .tracking(1)
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-            Text(localized("Your training, in one place.",
-                           "Din trening. Samlet på ett sted."))
-                .font(.system(size: 26, weight: .semibold, design: .serif))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-            Text(localized(
-                "Keep your goals, daily check-ins and body measurements together. Your training profile is private and independent of Coach.",
-                "Samle målsetninger, daglig innsjekk og kroppsmål. Treningsprofilen er privat og fungerer uavhengig av Coach."
-            ))
-            .font(.subheadline)
-            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
     }
 
@@ -290,26 +270,34 @@ struct ATHLTHTrainingProfileView: View {
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            TextEditor(text: $profile.trainingNotes)
-                .frame(minHeight: 90)
-                .scrollContentBackground(.hidden)
-                .padding(8)
+            TextField(
+                localized("Training preferences", "Treningspreferanser"),
+                text: $profile.trainingNotes, axis: .vertical
+            )
+            .lineLimit(3...6)
+            .padding(8)
                 .background(ATHLTHPlanDesign.selectedSurface,
                             in: RoundedRectangle(cornerRadius: 13))
 
-            Label(localized("Injuries and limitations", "Skader og begrensninger"),
-                  systemImage: "cross.case")
-                .font(.headline)
             Text(localized(
-                "Describe movements to avoid, current limitations, pain or medical guidance you want to remember. Never shared automatically.",
-                "Beskriv bevegelser du må unngå, utfordringer, smerter eller andre hensyn du ønsker å huske. Deles aldri automatisk."
+                "Additional training considerations (optional)",
+                "Andre treningshensyn (valgfritt)"
+            ))
+            .font(.subheadline.weight(.semibold))
+            Text(localized(
+                "Existing notes are kept. Use the structured injury list above for each affected area.",
+                "Tidligere notater beholdes. Bruk skadeoversikten over for hvert berørte område."
             ))
             .font(.caption)
             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            TextEditor(text: $profile.injuryAndLimitations)
-                .frame(minHeight: 95)
-                .scrollContentBackground(.hidden)
-                .padding(8)
+            TextField(
+                localized("Other notes", "Andre notater"),
+                text: $profile.injuryAndLimitations, axis: .vertical
+            )
+            .lineLimit(2...4)
+            .padding(8)
+            .background(ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 13))
                 .background(ATHLTHPlanDesign.selectedSurface,
                             in: RoundedRectangle(cornerRadius: 13))
 
@@ -321,7 +309,7 @@ struct ATHLTHTrainingProfileView: View {
                 persist()
                 savedNotice = true
             } label: {
-                Label(localized("Save training profile", "Lagre treningsprofil"),
+                Label(localized("Save training details", "Lagre treningsopplysninger"),
                       systemImage: "checkmark")
                     .frame(maxWidth: .infinity)
             }
