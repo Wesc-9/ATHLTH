@@ -28,7 +28,8 @@ struct ATHLTHPlanWeekOverview: View {
         VStack(alignment: .leading, spacing: 11) {
             HStack {
                 Text(localized("Week overview", "Ukeoversikt"))
-                    .font(.system(size: 20, weight: .semibold, design: .serif))
+                    .font(.system(.title3, design: .serif, weight: .semibold))
+                    .accessibilityAddTraits(.isHeader)
                     .foregroundStyle(graphite)
                 Spacer()
                 Text(plan.builderProfile?.mode == .advanced
@@ -49,10 +50,10 @@ struct ATHLTHPlanWeekOverview: View {
                                 .font(.caption2.weight(.semibold))
                             Text(planDayDate(day.dayIndex)
                                 .formatted(.dateTime.day()))
-                                .font(.system(size: 20, weight: .semibold, design: .serif))
+                                .font(.system(.title3, design: .serif, weight: .semibold))
                         }
                         .foregroundStyle(graphite)
-                        .frame(width: 43)
+                        .frame(minWidth: 43)
 
                         VStack(alignment: .leading, spacing: 7) {
                             if workouts.isEmpty {
@@ -101,6 +102,7 @@ struct ATHLTHPlanWeekOverview: View {
                     )
                 }
                 .buttonStyle(.plain)
+                .accessibilityHint(localized("Open day details", "Åpne dagsdetaljer"))
             }
         }
         .padding(13)

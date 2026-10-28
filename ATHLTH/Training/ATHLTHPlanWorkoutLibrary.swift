@@ -33,7 +33,7 @@ struct ATHLTHPlanWorkoutLibrary: View {
         VStack(alignment: .leading, spacing: 13) {
             HStack {
                 Text(localized("All workouts", "Alle økter"))
-                    .font(.system(size: 21, weight: .semibold, design: .serif))
+                    .font(.system(.title3, design: .serif, weight: .semibold))
                     .foregroundStyle(graphite)
                 Spacer()
                 Text(String(totalWorkoutCount) + " " + localized("workouts", "økter"))
@@ -51,7 +51,7 @@ struct ATHLTHPlanWorkoutLibrary: View {
                     VStack(alignment: .leading, spacing: 0) {
                         HStack {
                             Text(localized("Week", "Uke") + " " + String(item.offset + 1))
-                                .font(.system(size: 17, weight: .semibold, design: .serif))
+                                .font(.system(.headline, design: .serif, weight: .semibold))
                                 .foregroundStyle(graphite)
                             Spacer()
                             Text(String(entries.count) + " " + localized("workouts", "økter"))
@@ -69,9 +69,9 @@ struct ATHLTHPlanWorkoutLibrary: View {
                                     Text(weekday(entry.day.dayIndex))
                                         .font(.caption2.weight(.semibold))
                                         .foregroundStyle(secondaryInk)
-                                        .frame(width: 31, alignment: .leading)
+                                        .frame(minWidth: 31, alignment: .leading)
                                     Image(systemName: entry.workout.kind.systemImage)
-                                        .font(.system(size: 15))
+                                        .font(.body)
                                         .foregroundStyle(warmGold)
                                         .frame(width: 22)
                                     VStack(alignment: .leading, spacing: 3) {
@@ -97,6 +97,7 @@ struct ATHLTHPlanWorkoutLibrary: View {
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
+                            .accessibilityHint(localized("Open workout details", "Åpne øktdetaljer"))
                             if entry.workout.id != entries.last?.workout.id {
                                 Divider().padding(.leading, 58)
                             }

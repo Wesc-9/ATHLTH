@@ -163,19 +163,10 @@ struct ProductRootTabView: View {
                 return
             }
 
-            let kind = (
-                info["athlth_kind"] as? String
-            )?.lowercased() ?? ""
-
-            if kind.contains("message") ||
-                kind.contains("friend") ||
-                kind.contains("challenge") ||
-                kind.contains("reaction") ||
-                kind.contains("workout") ||
-                kind.contains("event") {
-                selectedTab = 4
-            } else if !kind.isEmpty {
-                selectedTab = 0
+            if let destination = ATHLTHRootNotificationTabPolicy.destinationTab(
+                for: info["athlth_kind"] as? String
+            ) {
+                selectedTab = destination
             }
     }
 
