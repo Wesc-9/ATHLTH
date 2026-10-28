@@ -237,6 +237,21 @@ struct ATHLTHStorageImage<Content: View>: View {
             return
         }
 
+        // Public thumbnails can be served immediately from memory, without
+        // resolving a URL or starting a download. Private media remains uncached.
+        let isPrivate = ATHLTHStorageImageURL.privateWorkoutPath(url) != nil
+        let cacheKey: String? = maxPixelSize.map {
+            [accountID?.uuidString ?? "anonymous", String($0), url.absoluteString]
+                .joined(separator: "|")
+        }
+        if !isPrivate,
+           let cacheKey,
+           let cached = ATHLTHSizedStorageImageCache.shared.image(for: cacheKey) {
+            resolvedAccountID = accountID
+            sizedImage = cached
+            return
+        }
+
         do {
             let resolved =
                 try await ATHLTHStorageImageURL
@@ -251,37 +266,6 @@ struct ATHLTHStorageImage<Content: View>: View {
                     accountID
                 resolvedURL =
                     resolved
-                return
-            }
-
-            let isPrivate =
-                ATHLTHStorageImageURL
-                    .privateWorkoutPath(
-                        url
-                    ) != nil
-            let cacheKey =
-                [
-                    accountID?
-                        .uuidString ??
-                        "anonymous",
-                    String(
-                        maxPixelSize
-                    ),
-                    url.absoluteString
-                ]
-                .joined(separator: "|")
-
-            if !isPrivate,
-               let cached =
-                    ATHLTHSizedStorageImageCache
-                        .shared
-                        .image(
-                            for:
-                                cacheKey
-                        ) {
-                resolvedAccountID =
-                    accountID
-                sizedImage = cached
                 return
             }
 
@@ -332,13 +316,11 @@ struct ATHLTHStorageImage<Content: View>: View {
                 )
             }
 
-            if !isPrivate {
-                ATHLTHSizedStorageImageCache
-                    .shared
-                    .store(
-                        prepared.image,
-                        for: cacheKey
-                    )
+            if !isPrivate, let cacheKey {
+                ATHLTHSizedStorageImageCache.shared.store(
+                    prepared.image,
+                    for: cacheKey
+                )
             }
 
             resolvedAccountID =
