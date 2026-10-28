@@ -4372,6 +4372,26 @@ final class AppSessionStore: ObservableObject {
                     weeks[weekIndex].days[destination].sessions.append(workout)
                 }
             }
+        } else if let gymcoach = ATHLTHGymCoachStrengthLibrary.program(for: entry.slug) {
+            // This is a source-authentic strength microcycle, not a generic
+            // training-plan recipe. A/B rotations alternate across weeks.
+            // No weights are guessed from uncalibrated training max values.
+            for weekIndex in weeks.indices {
+                let workouts = ATHLTHGymCoachStrengthLibrary.sourceWorkouts(
+                    for: gymcoach, week: weekIndex + 1
+                )
+                for (slot, template) in workouts.enumerated() {
+                    guard slot < targetDayIndexes.count,
+                          let destination = weeks[weekIndex].days.firstIndex(where: {
+                            $0.dayIndex == targetDayIndexes[slot]
+                          }) else { continue }
+                    weeks[weekIndex].days[destination].sessions.append(
+                        ATHLTHGymCoachStrengthLibrary.plannedSession(
+                            template, program: gymcoach, week: weekIndex + 1
+                        )
+                    )
+                }
+            }
         } else {
         for weekIndex in weeks.indices {
             for (slot, dayIndex) in
