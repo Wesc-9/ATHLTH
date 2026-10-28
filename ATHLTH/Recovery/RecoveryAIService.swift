@@ -184,6 +184,7 @@ private struct RecoveryAIRequest: Encodable {
     var coachStrengthContext: ATHLTHCoachStrengthIntelligence.Snapshot? = nil
     /// Explicitly consented, bounded running evidence from ATHLTH records.
     var coachRunningContext: ATHLTHCoachRunningIntelligence.Snapshot? = nil
+    var coachTrainingContext: ATHLTHCoachTrainingContext.Snapshot? = nil
 }
 
 // Separate, versioned first-use consent for automatic Insights AI.
@@ -906,7 +907,8 @@ final class RecoveryAIService {
         shareHealthData: Bool = false,
         shareHealthAutomatically: Bool = false,
         coachStrengthContext: ATHLTHCoachStrengthIntelligence.Snapshot? = nil,
-        coachRunningContext: ATHLTHCoachRunningIntelligence.Snapshot? = nil
+        coachRunningContext: ATHLTHCoachRunningIntelligence.Snapshot? = nil,
+        coachTrainingContext: ATHLTHCoachTrainingContext.Snapshot? = nil
     ) async throws -> RecoveryCoachReply {
         // Defense in depth: a caller cannot use an unreleased automatic
         // mode even if the UI check is bypassed.
@@ -956,7 +958,9 @@ final class RecoveryAIService {
                         coachStrengthContext: shareHealthData
                             ? coachStrengthContext : nil,
                         coachRunningContext: shareHealthData
-                            ? coachRunningContext : nil
+                            ? coachRunningContext : nil,
+                        coachTrainingContext: shareHealthData
+                            ? coachTrainingContext : nil
                     )
                 )
             )
