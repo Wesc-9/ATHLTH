@@ -4150,8 +4150,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         routeNavigationLatitude = nil
         routeNavigationLongitude = nil
         routeNavigationCourseDegrees = nil
-        ghostRaceConfiguration = nil
-        ghostRaceTitle = nil
+        disableGhostDuringWorkout()
+        configurePlannedRoute(nil)
+        returningToRouteStart = false
         persistWorkoutRecoveryState()
         return true
     }
