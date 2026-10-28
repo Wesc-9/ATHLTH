@@ -1902,6 +1902,11 @@ struct ATHLTHNotificationCenterView: View {
     private func notificationCategoryTitle(
         _ item: ATHLTHNotificationItem
     ) -> String {
+        if item.socialEventKind == "body_goal_checkin" {
+            return ATHLTHLocalization.choose(
+                english: "GOAL CHECK-IN", norwegian: "MÅLINNSJEKK"
+            )
+        }
         if isChallengeItem(item) {
             return ATHLTHLocalization.choose(
                 english: "CHALLENGE",
@@ -1977,6 +1982,9 @@ struct ATHLTHNotificationCenterView: View {
     private func notificationTint(
         _ item: ATHLTHNotificationItem
     ) -> Color {
+        if item.socialEventKind == "body_goal_checkin" {
+            return ATHLTHPlanDesign.accentInk
+        }
         if item.kind == .dailyCheckIn {
             // A gentle champagne-gold accent for unread daily check-ins.
             // Read notifications are still rendered in neutral gray.
@@ -2242,7 +2250,9 @@ struct ATHLTHNotificationCenterView: View {
                     }
                   ) {
             GoalDetailView(
-                goalID: goalID
+                goalID: goalID,
+                openMeasurementCheckIn:
+                    item.socialEventKind == "body_goal_checkin"
             )
         } else if item.goalID != nil {
             ContentUnavailableView(
