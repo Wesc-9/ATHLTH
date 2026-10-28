@@ -565,9 +565,9 @@ struct WorkoutTemplateCatalogEntry: Identifiable, Codable, Hashable {
         }
     }
 
-    func plannedSession() -> PlannedSession {
+    func plannedSession(useOriginalID: Bool = false) -> PlannedSession {
         var result = PlannedSession(
-            id: UUID(),
+            id: useOriginalID ? id : UUID(),
             title: title,
             kind: workoutKind,
             scheduledStart: nil,
@@ -713,6 +713,17 @@ struct WorkoutTemplateLibraryView: View {
     @State private var showingCatalogPersonalization = false
     @State private var showingRunningPersonalization = false
     @State private var catalogPersonalBlocks: [WorkoutTemplateBlock] = []
+    @State private var libraryCompletions: [StructuredWorkoutCompletion] = []
+    @State private var runningCompletions: [ATHLTHCompletedRunningPerformance] = []
+
+    private func loadHistory() {
+        libraryCompletions = StructuredWorkoutCompletionStore.load(
+            userID: session.profile.userID
+        )
+        runningCompletions = ATHLTHRunningPerformanceHistory.load(
+            userID: session.profile.userID
+        )
+    }
 
     /// Library selection is shared by Plan and My Workouts. It must not
     /// automatically make a public recipe's targets the athlete's targets.
@@ -1250,6 +1261,10 @@ struct WorkoutTemplateLibraryView: View {
                 }
             }
         }
+        .onAppear(perform: loadHistory)
+        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+            loadHistory()
+        }
         .task {
             async let workoutRefresh: Void =
                 catalog.refresh()
@@ -1329,6 +1344,13 @@ struct WorkoutTemplateLibraryView: View {
                     ATHLTHTheme.mutedText
                 )
                 .padding(.top, 2)
+
+                if let last = ATHLTHLibraryWorkoutHistory.catalogOriginal(
+                    id: entry.id, completions: libraryCompletions
+                ) {
+                    ATHLTHLastWorkoutHistoryLabel(summary: last)
+                        .padding(.top, 4)
+                }
             }
 
             Spacer(minLength: 34)
@@ -1393,6 +1415,13 @@ struct WorkoutTemplateLibraryView: View {
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(ATHLTHTheme.mutedText)
                 .padding(.top, 2)
+
+                if let last = ATHLTHLibraryWorkoutHistory.running(
+                    id: workout.id, records: runningCompletions
+                ) {
+                    ATHLTHLastWorkoutHistoryLabel(summary: last)
+                        .padding(.top, 4)
+                }
             }
 
             Spacer(minLength: 34)
@@ -1489,6 +1518,7 @@ struct WorkoutTemplateDetailView: View {
     @State private var askingForPersonalTargets = false
     @State private var editingPersonalTargets = false
     @State private var personalBlocks: [WorkoutTemplateBlock]?
+    @State private var originalCompletions: [StructuredWorkoutCompletion] = []
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
 
@@ -1510,15 +1540,15 @@ struct WorkoutTemplateDetailView: View {
     }
 
     private var libraryDisplayBlocks: [WorkoutTemplateBlock] {
-        savedPersonalWorkout?.resolvedWorkoutBlocks ??
-            ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+        // The original catalogue page never inherits personalized targets.
+        ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
     }
 
     private var workoutForStarting: PlannedSession {
-        if let savedPersonalWorkout { return savedPersonalWorkout }
-        var original = entry.plannedSession()
-        original.workoutBlocks =
-            ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+        // A stable source ID lets original completions remain separate from
+        // personal My Workouts copies and their distinct session IDs.
+        var original = entry.plannedSession(useOriginalID: true)
+        original.workoutBlocks = libraryDisplayBlocks
         return original
     }
 
@@ -1557,6 +1587,12 @@ struct WorkoutTemplateDetailView: View {
                     difficulty: entry.difficulty,
                     durationMinutes: entry.estimatedDurationMinutes,
                     blocks: libraryDisplayBlocks
+                )
+
+                ATHLTHLastWorkoutHistoryCard(summary:
+                    ATHLTHLibraryWorkoutHistory.catalogOriginal(
+                        id: entry.id, completions: originalCompletions
+                    )
                 )
 
                 Button {
@@ -1736,6 +1772,16 @@ struct WorkoutTemplateDetailView: View {
         .fullScreenCover(isPresented: $showingWorkout) {
             StructuredWorkoutSessionView(workout: workoutForStarting)
                 .environmentObject(session)
+        }
+        .onAppear {
+            originalCompletions = StructuredWorkoutCompletionStore.load(
+                userID: session.profile.userID
+            )
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+            originalCompletions = StructuredWorkoutCompletionStore.load(
+                userID: session.profile.userID
+            )
         }
         .sheet(isPresented: $showingEditor) {
             WorkoutTemplateBuilderView(
