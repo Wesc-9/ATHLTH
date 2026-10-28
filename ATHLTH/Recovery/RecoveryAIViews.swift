@@ -1046,6 +1046,8 @@ struct RecoveryCoachView: View {
     @State private var showingCoachWorkoutBuilder = false
     @State private var showingCoachPlanBuilder = false
     @State private var showingCoachPlanAdaptation = false
+    @State private var showingCoachWorkoutProfileReview = false
+    @State private var pendingWorkoutCreationPrompt = ""
     @State private var showingCoachAddConfirmation = false
     @State private var saveCoachPlanAsTemplate = false
     @State private var shareHealthForNextQuestion = false
@@ -1325,6 +1327,22 @@ struct RecoveryCoachView: View {
         }
         .sheet(isPresented: $showingCoachPlanAdaptation) {
             CoachPlanAdaptationView(initialNotes: question)
+        }
+        .sheet(isPresented: $showingCoachWorkoutProfileReview) {
+            ATHLTHCoachWorkoutRequestSheet(
+                request: pendingWorkoutCreationPrompt,
+                profile: ATHLTHTrainingProfile.load(
+                    userID: session.profile.userID
+                )
+            ) { reviewedPrompt, includesInjury in
+                // Adding injury details must go through the existing
+                // per-question confirmation before the model sees them.
+                if includesInjury { shareHealthForNextQuestion = true }
+                Task { @MainActor in
+                    await Task.yield()
+                    requestAnswer(reviewedPrompt, reviewedWorkout: true)
+                }
+            }
         }
         .sheet(isPresented: $showingCoachPlanBuilder) {
             if let proposal = selectedCoachProposal,
@@ -2896,9 +2914,18 @@ struct RecoveryCoachView: View {
     }
 
     @MainActor
-    private func requestAnswer(_ rawQuestion: String) {
+    private func requestAnswer(
+        _ rawQuestion: String, reviewedWorkout: Bool = false
+    ) {
         let clean = rawQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, !isAsking else { return }
+
+        if !reviewedWorkout &&
+           ATHLTHCoachWorkoutCreationIntent.isRequest(clean) {
+            pendingWorkoutCreationPrompt = clean
+            showingCoachWorkoutProfileReview = true
+            return
+        }
 
         guard aiConsentApproved,
               RecoveryCoachConsentPreferences.load(
