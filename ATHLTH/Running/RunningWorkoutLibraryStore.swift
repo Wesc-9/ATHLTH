@@ -176,7 +176,7 @@ final class RunningWorkoutLibraryStore: ObservableObject {
             ? ATHLTHRunningLibraryDefaults.unpersonalized(source) : source
         let duplicate = RunningWorkoutTemplate(
             id: UUID(),
-            title: "\(source.title) Copy",
+            title: source.isBuiltIn ? source.title : "\(source.title) Copy",
             type: source.type,
             summary: source.summary,
             blocks: source.blocks.map {
