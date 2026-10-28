@@ -1413,28 +1413,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return nil
         }
 
-        let later =
-            queue
-                .filter {
-                    $0.index >
-                        snapshot.exerciseIndex &&
-                    $0.isCompleted != true
-                }
-                .sorted {
-                    $0.index < $1.index
-                }
-                .first
-        let earlier =
-            queue
-                .filter {
-                    $0.index <
-                        snapshot.exerciseIndex &&
-                    $0.isCompleted != true
-                }
-                .sorted {
-                    $0.index < $1.index
-                }
-                .first
+        // A spoken cue only needs the first pending index, not two
+        // filtered and fully sorted copies of the exercise queue.
+        let later = queue.lazy
+            .filter {
+                $0.index > snapshot.exerciseIndex &&
+                $0.isCompleted != true
+            }
+            .min { $0.index < $1.index }
+        let earlier = queue.lazy
+            .filter {
+                $0.index < snapshot.exerciseIndex &&
+                $0.isCompleted != true
+            }
+            .min { $0.index < $1.index }
 
         guard let next =
                 later ?? earlier
