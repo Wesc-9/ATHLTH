@@ -1236,7 +1236,7 @@ struct ATHLTHHomeView: View {
                     pendingHomeQuickStartKind = kind
                 } else if homeCalendarPendingCustom {
                     homeCalendarPendingCustom = false
-                    showingCustomQuickStart = true
+                    onOpenTrain(.customQuick)
                 }
             }) {
                 homeCalendarWorkoutPicker
@@ -2155,7 +2155,7 @@ struct ATHLTHHomeView: View {
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
 
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                        ForEach(quickStartKinds) { kind in
+                        ForEach([WorkoutKind.running, .walking, .strength]) { kind in
                             Button {
                                 homeCalendarPendingKind = kind
                                 showingHomeCalendarWorkoutPicker = false
@@ -2197,7 +2197,9 @@ struct ATHLTHHomeView: View {
                             .background(.white, in: RoundedRectangle(cornerRadius: 18))
                         }
                         .buttonStyle(.plain)
-                        .disabled(!customQuickStartAvailable)
+                        .disabled(phoneWorkout.active != nil ||
+                            strengthWorkout.activeWorkout != nil ||
+                            watchConnection.hasActiveWatchWorkout)
                     }
                 }
                 .padding(22)
