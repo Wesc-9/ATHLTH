@@ -138,6 +138,47 @@ struct ProductRootTabView: View {
         }
     }
 
+    /// Keep push-routing decisions independent from the root SwiftUI view builder.
+    private func handleRemoteNotification(_ notification: Notification) {
+            let info = notification.userInfo ?? [:]
+            if let rawGoal = info["athlth_body_goal_checkin_id"] as? String,
+               let goalID = UUID(uuidString: rawGoal),
+               let rawAccount = info["athlth_body_goal_account_id"] as? String,
+               rawAccount == session.profile.userID.uuidString,
+               goalStore.goals.contains(where: { $0.id == goalID }) {
+                pushManager.captureTappedNotification(info)
+                return
+            }
+            if ATHLTHDailyCheckInReminderScheduler.isCurrentAccountCheckInTap(
+                info, accountID: session.profile.userID
+            ) {
+                openPendingDailyCheckInIfNeeded()
+                return
+            }
+
+            // Personal and official weekly challenge reminders are local
+            // notifications with an entity ID, but no athlth_kind. Never
+            // fall back to Home or a generic Community tab for those taps.
+            if ATHLTHChallengeNotificationRoute.resolve(userInfo: info) != nil {
+                return
+            }
+
+            let kind = (
+                info["athlth_kind"] as? String
+            )?.lowercased() ?? ""
+
+            if kind.contains("message") ||
+                kind.contains("friend") ||
+                kind.contains("challenge") ||
+                kind.contains("reaction") ||
+                kind.contains("workout") ||
+                kind.contains("event") {
+                selectedTab = 4
+            } else if !kind.isEmpty {
+                selectedTab = 0
+            }
+    }
+
     private func updateDailyCheckInReminder() {
         let store = RecoverySorenessStore()
         notifications.reconcileDailyCheckIn(
@@ -220,7 +261,7 @@ struct ProductRootTabView: View {
         )
     }
 
-    var body: some View {
+    private var rootTabs: some View {
         TabView(selection: $selectedTab) {
             ATHLTHHomeView(
                 onSelectTab: { tab in
@@ -274,6 +315,10 @@ struct ProductRootTabView: View {
         // TabView is already a complex generic container. Erase its type
         // before attaching global notifications, overlays and state hooks.
         .athlthStablePresentationBoundary()
+    }
+
+    private var tabsWithNotificationSheets: some View {
+        rootTabs
         // Render the actual challenge detail above the root tabs. The
         // singleton retains the route if iOS delivers the tap before this
         // view is created (cold launch).
@@ -333,48 +378,16 @@ struct ProductRootTabView: View {
                     }
             }
         }
+    }
+
+    private var tabsWithNotifications: some View {
+        tabsWithNotificationSheets
         .onReceive(
             NotificationCenter.default.publisher(
                 for: .athlthRemoteNotificationTapped
             )
         ) { notification in
-            let info = notification.userInfo ?? [:]
-            if let rawGoal = info["athlth_body_goal_checkin_id"] as? String,
-               let goalID = UUID(uuidString: rawGoal),
-               let rawAccount = info["athlth_body_goal_account_id"] as? String,
-               rawAccount == session.profile.userID.uuidString,
-               goalStore.goals.contains(where: { $0.id == goalID }) {
-                pushManager.captureTappedNotification(info)
-                return
-            }
-            if ATHLTHDailyCheckInReminderScheduler.isCurrentAccountCheckInTap(
-                info, accountID: session.profile.userID
-            ) {
-                openPendingDailyCheckInIfNeeded()
-                return
-            }
-
-            // Personal and official weekly challenge reminders are local
-            // notifications with an entity ID, but no athlth_kind. Never
-            // fall back to Home or a generic Community tab for those taps.
-            if ATHLTHChallengeNotificationRoute.resolve(userInfo: info) != nil {
-                return
-            }
-
-            let kind = (
-                info["athlth_kind"] as? String
-            )?.lowercased() ?? ""
-
-            if kind.contains("message") ||
-                kind.contains("friend") ||
-                kind.contains("challenge") ||
-                kind.contains("reaction") ||
-                kind.contains("workout") ||
-                kind.contains("event") {
-                selectedTab = 4
-            } else if !kind.isEmpty {
-                selectedTab = 0
-            }
+            handleRemoteNotification(notification)
         }
         .task {
             updateDailyCheckInReminder()
@@ -428,6 +441,10 @@ struct ProductRootTabView: View {
                 await syncApplicationIconBadge()
             }
         }
+    }
+
+    var body: some View {
+        tabsWithNotifications
         .background {
             ATHLTHMirroredWorkoutPresenter()
                 .frame(width: 0, height: 0)
