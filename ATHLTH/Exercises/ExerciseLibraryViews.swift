@@ -58,6 +58,14 @@ struct ExerciseLibraryView: View {
     @State private var scannerTask: Task<Void, Never>?
     @State private var scanIdentity = UUID()
     @State private var selectedSection: ExerciseLibrarySection = .library
+    @State private var exerciseHistory: [StrengthWorkoutLog] = []
+
+    private func refreshExerciseHistory() {
+        exerciseHistory = AccountLocalStorage.read(
+            [StrengthWorkoutLog].self, name: "strengthHistory",
+            userID: session.profile.userID
+        ) ?? []
+    }
 
     init(
         source: ExerciseLibrarySection? = nil,
@@ -609,6 +617,10 @@ struct ExerciseLibraryView: View {
             if section == .mine, scannerResultsActive {
                 resetEquipmentScan()
             }
+        }
+        .onAppear(perform: refreshExerciseHistory)
+        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+            refreshExerciseHistory()
         }
         .task {
             recents.refresh()
@@ -1228,6 +1240,14 @@ struct ExerciseLibraryView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                if let last = ATHLTHLibraryWorkoutHistory.strengthExercise(
+                    id: entry.id, canonicalName: entry.canonicalName,
+                    isCustom: entry.source == .custom, workouts: exerciseHistory
+                ) {
+                    ATHLTHLastWorkoutHistoryLabel(summary: last)
+                        .padding(.top, 2)
+                }
+
                 if onSelect != nil, let count = selectedExerciseCounts[entry.id], count > 0 {
                     Label(
                         count == 1
@@ -1310,7 +1330,15 @@ struct ExerciseDetailView: View {
 
     @State private var showingDelete = false
     @State private var showingEdit = false
+    @State private var exerciseHistory: [StrengthWorkoutLog] = []
     @State private var preparedShare: MessageShareDraft?
+
+    private func refreshExerciseHistory() {
+        exerciseHistory = AccountLocalStorage.read(
+            [StrengthWorkoutLog].self, name: "strengthHistory",
+            userID: session.profile.userID
+        ) ?? []
+    }
     @State private var shareError: String?
 
     private var currentEntry: ExerciseLibraryEntry {
@@ -1358,6 +1386,15 @@ struct ExerciseDetailView: View {
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                 }
+
+                ATHLTHLastWorkoutHistoryCard(summary:
+                    ATHLTHLibraryWorkoutHistory.strengthExercise(
+                        id: currentEntry.id,
+                        canonicalName: currentEntry.canonicalName,
+                        isCustom: currentEntry.source == .custom,
+                        workouts: exerciseHistory
+                    )
+                )
 
                 if let summary = displayedSummary, !summary.isEmpty {
                     detailCard(ATHLTHLocalization.choose(
@@ -1563,6 +1600,10 @@ struct ExerciseDetailView: View {
                     ))
                 }
             }
+        }
+        .onAppear(perform: refreshExerciseHistory)
+        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+            refreshExerciseHistory()
         }
         .sheet(isPresented: $showingEdit) {
             CustomExerciseEditorView(editing: currentEntry)
