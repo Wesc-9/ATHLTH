@@ -547,6 +547,13 @@ function sanitizeHistory(
     .filter((turn) => turn.content.length > 0);
 }
 
+function requestsPersonalMeasurements(question: string): boolean {
+  const text = question.toLocaleLowerCase();
+  const measurements = /(søvn|sovet|søvnkvalitet|hrv|hvilepuls|restitusjon|dagsform|sleep|resting heart rate|readiness|recovery score)/i.test(text);
+  const personalized = /(mitt|mine|min |jeg |meg |siste nettene|siste natt|my |i slept|did i|last nights?|my recent|hvordan har|hvor mye|what was|how was|how have i)/i.test(text);
+  return measurements && personalized;
+}
+
 const sharedInstructions = `
 You are ATHLTH Coach, a unified assistant for strength, running, cycling, training plans and recovery inside a fitness app.
 For Insight requests, focus on recovery interpretation. For user questions, respond as a complete fitness coach.
@@ -620,6 +627,22 @@ Deno.serve(async (req: Request) => {
     const history = body.shareHealthData === true
       ? sanitizeHistory(body.history)
       : [];
+
+    // Never ask a language model to fill in personal measurements when the
+    // athlete has not authorized forwarding those measurements in this turn.
+    // A guaranteed, deterministic answer prevents invented sleep/HRV/RHR.
+    if (!canShareHealth && requestsPersonalMeasurements(question)) {
+      const norwegian = body.language === "nb";
+      return json({
+        answer: norwegian
+          ? "Jeg har ikke fått tilgang til helsemålingene dine i dette spørsmålet, så jeg kan ikke si hvordan søvn, HRV eller restitusjon faktisk har vært. Du kan velge å dele helse- og treningsdata for dette spørsmålet, eller jeg kan gi generelle treningsråd uten personlige tall."
+          : "I don't have your health measurements for this question, so I can't verify how your sleep, HRV or recovery has been. You can approve sharing health and training data for this question, or I can give general training guidance without personal figures.",
+        quickQuestions: norwegian
+          ? ["Hvordan deler jeg helsedata for ett spørsmål?", "Hvordan påvirker lite søvn trening generelt?", "Lag en rolig økt uten personlige helsedata"]
+          : ["How can I share health data for one question?", "How does short sleep affect training?", "Create an easy workout without personal health data"],
+        proposal: null,
+      });
+    }
 
     const response = await fetch("https://api.groq.com/openai/v1/responses", {
       method: "POST",
