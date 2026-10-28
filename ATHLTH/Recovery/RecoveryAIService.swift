@@ -948,7 +948,6 @@ final class RecoveryAIService {
 
         return RecoveryCoachReply(
             answer: response.answer,
-            proposal: response.proposal,
             quickQuestions:
                 Array(
                     (
@@ -964,7 +963,8 @@ final class RecoveryAIService {
                             .isEmpty
                     }
                     .prefix(3)
-                )
+                ),
+            proposal: response.proposal
         )
     }
 }
