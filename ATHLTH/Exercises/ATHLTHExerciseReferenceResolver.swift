@@ -114,6 +114,14 @@ enum ATHLTHExerciseReferenceResolver {
             if native.count == 1 { return native[0] }
         }
 
+        // Match an English canonical name even when the workout title uses
+        // hyphens/underscores instead of spaces. Never infer a different exercise.
+        let canonicalMatches = library.filter {
+            ($0.source == .repDB || $0.source == .athlthCatalog) &&
+            key($0.canonicalName) == clean
+        }
+        if canonicalMatches.count == 1 { return canonicalMatches[0] }
+
         let matchingNative = library.filter {
             $0.source == .athlthCatalog && key($0.canonicalName) == clean
         }
