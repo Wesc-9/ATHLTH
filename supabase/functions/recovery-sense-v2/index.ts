@@ -142,6 +142,7 @@ const chatReplySchema = {
   required: [
     "answer",
     "quickQuestions",
+    "proposal",
   ],
   properties: {
     answer: {
@@ -151,9 +152,45 @@ const chatReplySchema = {
       type: "array",
       minItems: 3,
       maxItems: 3,
-      items: {
-        type: "string",
-      },
+      items: { type: "string" },
+    },
+    proposal: {
+      anyOf: [
+        { type: "null" },
+        {
+          type: "object",
+          additionalProperties: false,
+          required: [
+            "kind", "title", "summary", "activity",
+            "durationMinutes", "weekCount", "sessionsPerWeek", "steps"
+          ],
+          properties: {
+            kind: { type: "string", enum: ["workout", "plan"] },
+            title: { type: "string" },
+            summary: { type: "string" },
+            activity: { type: "string", enum: ["running", "strength", "walking", "hybrid"] },
+            durationMinutes: { type: "integer", minimum: 10, maximum: 180 },
+            weekCount: { type: "integer", minimum: 1, maximum: 52 },
+            sessionsPerWeek: { type: "integer", minimum: 1, maximum: 7 },
+            steps: {
+              type: "array", maxItems: 20,
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["title", "phase", "minutes", "sets", "repetitions", "restSeconds"],
+                properties: {
+                  title: { type: "string" },
+                  phase: { type: "string", enum: ["warmup", "main", "recovery", "cooldown"] },
+                  minutes: { type: "integer", minimum: 0, maximum: 180 },
+                  sets: { type: "integer", minimum: 0, maximum: 20 },
+                  repetitions: { type: "integer", minimum: 0, maximum: 100 },
+                  restSeconds: { type: "integer", minimum: 0, maximum: 600 },
+                },
+              },
+            },
+          },
+        },
+      ],
     },
   },
 };
@@ -566,7 +603,11 @@ You are continuing an ATHLTH Coach conversation.
 - When coachStrengthContext is present, you are ATHLTH's evidence-first strength AND endurance coach: base strength advice on actual confirmed working sets, exercise history, trend, prescribed load vs estimated 1RM, not invented personal records. Two successful sessions may warrant reviewing a modest increase but NEVER applying changes. Plateau is a discussion prompt, not a diagnosis.
 - Do not infer that missing strength metrics imply the athlete has not exercised. Explain data limitations and account for running/cycling and recovery instead of prescribing strength in isolation.
 - User consent for this question governs coachStrengthContext. When absent, do not claim access to strength history. Do not expose raw input context back verbatim unless needed for the requested recommendation.
-- You cannot change, activate or save training plans through this chat; offer the athlete an editable plan review with explicit approval instead.
+- You can propose structured workouts and plan briefs. The app will validate and let the athlete approve every add/save action; never claim an action was performed.
+- For requests to build a specific workout, include a proposal with kind workout and 2-12 realistic ordered steps. For running, include warmup/work/cooldown and duration minutes; for strength include named exercises, sets, repetitions and rest; never invent the athlete's working weights or target pace. A step is an exercise or run segment, not prose. No medical guarantees.
+- For requests to build a training program, include a plan proposal with title, activity, duration per session, weeks and weekly frequency. The ATHLTH plan builder will flesh it out after the athlete approves. Set steps [] for plan.
+- If the request is only a question, advice, an injury assessment or an adjustment without a clear draft request, return proposal null. If details are insufficient for a safely usable workout, ask a follow-up question instead of guessing.
+- When health data is not shared, never assert personal sleep, HRV, RHR, readiness score or muscle-recovery values from old conversation content. Previously mentioned numbers are not verified current measurements.
 - Do not repeat information from earlier answers unless it helps answer the latest question.
 - Return exactly three short follow-up questions that are useful next steps based on today's recovery context and the conversation so far.
 - Follow-up questions must be meaningfully different from questions the user already asked.
@@ -620,10 +661,43 @@ You are continuing an ATHLTH Coach conversation.
         throw new Error("Incomplete chat reply.");
       }
 
-      return json({
-        answer,
-        quickQuestions,
-      });
+      const rawProposal = parsed?.proposal;
+      const validActivity = new Set(["running", "strength", "walking", "hybrid"]);
+      const validPhase = new Set(["warmup", "main", "recovery", "cooldown"]);
+      let proposal: Record<string, unknown> | null = null;
+      if (rawProposal && typeof rawProposal === "object" &&
+          (rawProposal.kind === "workout" || rawProposal.kind === "plan") &&
+          validActivity.has(rawProposal.activity) &&
+          typeof rawProposal.title === "string" &&
+          rawProposal.title.trim().length > 2) {
+        const steps = Array.isArray(rawProposal.steps)
+          ? rawProposal.steps.slice(0, 20).flatMap((step: any) => {
+            if (typeof step?.title !== "string" ||
+                !step.title.trim() ||
+                !validPhase.has(step.phase)) return [];
+            return [{
+              title: step.title.trim().slice(0, 110),
+              phase: step.phase,
+              minutes: Math.min(180, Math.max(0, Math.round(Number(step.minutes) || 0))),
+              sets: Math.min(20, Math.max(0, Math.round(Number(step.sets) || 0))),
+              repetitions: Math.min(100, Math.max(0, Math.round(Number(step.repetitions) || 0))),
+              restSeconds: Math.min(600, Math.max(0, Math.round(Number(step.restSeconds) || 0))),
+            }];
+          }) : [];
+        if (rawProposal.kind === "plan" || steps.length > 0) {
+          proposal = {
+            kind: rawProposal.kind,
+            title: rawProposal.title.trim().slice(0, 110),
+            summary: String(rawProposal.summary ?? "").trim().slice(0, 700),
+            activity: rawProposal.activity,
+            durationMinutes: Math.min(180, Math.max(10, Math.round(Number(rawProposal.durationMinutes) || 45))),
+            weekCount: Math.min(52, Math.max(1, Math.round(Number(rawProposal.weekCount) || 8))),
+            sessionsPerWeek: Math.min(7, Math.max(1, Math.round(Number(rawProposal.sessionsPerWeek) || 3))),
+            steps,
+          };
+        }
+      }
+      return json({ answer, quickQuestions, proposal });
     } catch (error) {
       console.error("Unable to parse ATHLTH Coach chat reply", {
         kind: "invalid_response_format",
