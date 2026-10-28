@@ -7,7 +7,7 @@ final class ATHLTHGymCoachStrengthLibraryTests: XCTestCase {
     func testAllElevenTemplatesLoadWithExecutableExercises() {
         XCTAssertEqual(ATHLTHGymCoachStrengthLibrary.programs.count, 11)
         XCTAssertEqual(ATHLTHGymCoachStrengthLibrary.catalogEntries.count, 11)
-        XCTAssertEqual(ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries.count, 35)
+        XCTAssertEqual(ATHLTHGymCoachStrengthLibrary.workoutCatalogEntries.count, 40)
         XCTAssertTrue(ATHLTHGymCoachStrengthLibrary.programs.allSatisfy {
             !$0.program.workouts.isEmpty && $0.program.workouts.allSatisfy {
                 !$0.exercises.isEmpty
