@@ -47,7 +47,7 @@ final class ATHLTHTrainingProfileIntegrationTests: XCTestCase {
         store.add(second)
         XCTAssertEqual(store.primaryGoal?.id, first.id)
         store.setStatus(.paused, for: first.id)
-        XCTAssertNil(store.primaryGoal)
+        XCTAssertEqual(store.primaryGoal?.id, second.id)
         XCTAssertEqual(store.goals.filter { $0.status == .active }.count, 1)
     }
 }
