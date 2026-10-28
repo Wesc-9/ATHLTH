@@ -57,6 +57,7 @@ on:
       - release/v1.9.9
       - release/v2.0.0
       - release/v2.0.1
+      - release/v2.0.2
       - fix/v1.4.2-swift6-release
   pull_request:
     branches:
@@ -72,6 +73,7 @@ on:
       - release/v1.7.6
       - release/v2.0.0
       - release/v2.0.1
+      - release/v2.0.2
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
