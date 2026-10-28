@@ -3,18 +3,6 @@ import CoreLocation
 import Foundation
 @preconcurrency import HealthKit
 
-private final class HealthObserverCompletion: @unchecked Sendable {
-    private let handler: () -> Void
-
-    init(_ handler: @escaping () -> Void) {
-        self.handler = handler
-    }
-
-    func call() {
-        handler()
-    }
-}
-
 private final class HealthRouteQueryAccumulator:
     @unchecked Sendable {
 
@@ -908,13 +896,25 @@ final class HealthKitManager: ObservableObject {
                     return
                 }
 
-                let completion = HealthObserverCompletion(completionHandler)
-
-                Task { @MainActor [weak self] in
-                    guard let self else {
-                        completion.call()
+                let completion = ATHLTHHealthObserverCompletion(completionHandler)
+                // HealthKit disables background delivery after repeated
+                // missing completions. Never let a stalled refresh hold its
+                // callback indefinitely, and never call it twice.
+                let deadline = Task.detached(priority: .utility) {
+                    do {
+                        try await Task.sleep(for: .seconds(20))
+                    } catch {
                         return
                     }
+                    completion.call()
+                }
+
+                Task { @MainActor [weak self] in
+                    defer {
+                        deadline.cancel()
+                        completion.call()
+                    }
+                    guard let self else { return }
 
                     let isWorkoutEvent =
                         type.identifier ==
@@ -927,7 +927,6 @@ final class HealthKitManager: ObservableObject {
                     await self.coalescedBackgroundRefresh(
                         requireFullRefresh: isWorkoutEvent
                     )
-                    completion.call()
                 }
             }
 
