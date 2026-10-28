@@ -14,6 +14,12 @@ private struct ATHLTHTapCompletion: @unchecked Sendable {
 }
 
 
+struct ATHLTHBodyGoalNotificationRoute: Identifiable, Equatable {
+    let goalID: UUID
+    let accountID: UUID
+    var id: UUID { goalID }
+}
+
 struct ATHLTHPushNavigationTarget:
     Identifiable,
     Equatable
@@ -47,6 +53,7 @@ final class APNsPushManager: ObservableObject {
     @Published private(set) var pendingChallengeNotification:
         ATHLTHChallengeNotificationRoute?
     @Published private(set) var pendingDailyCheckInAccountID: UUID?
+    @Published private(set) var pendingBodyGoalCheckIn: ATHLTHBodyGoalNotificationRoute?
 
     private let client: SupabaseClient
     private var deviceTokenHex: String?
@@ -75,6 +82,10 @@ final class APNsPushManager: ObservableObject {
             : "Sandbox"
     }
 
+    func clearPendingBodyGoalCheckIn() {
+        pendingBodyGoalCheckIn = nil
+    }
+
     func captureTappedNotification(
         _ userInfo:
             [AnyHashable: Any]
@@ -82,6 +93,15 @@ final class APNsPushManager: ObservableObject {
         // Persist the target on the singleton before notifying SwiftUI.
         // This handles both a running app and a cold launch where the root
         // tab view has not yet subscribed to the notification event.
+        if let rawGoal = userInfo["athlth_body_goal_checkin_id"] as? String,
+           let rawAccount = userInfo["athlth_body_goal_account_id"] as? String,
+           let goalID = UUID(uuidString: rawGoal),
+           let accountID = UUID(uuidString: rawAccount) {
+            pendingBodyGoalCheckIn = ATHLTHBodyGoalNotificationRoute(
+                goalID: goalID, accountID: accountID
+            )
+            return
+        }
         if (userInfo["athlth_kind"] as? String) == "daily_check_in",
            let value = userInfo["athlthCheckInAccountID"] as? String,
            let accountID = UUID(uuidString: value) {
