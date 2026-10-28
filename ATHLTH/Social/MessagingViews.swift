@@ -572,10 +572,19 @@ struct MessageInboxView: View {
                     groups.messages(in: club.id).last?.createdAt
                 let fetchedLastMessageAt =
                     groups.recentChatActivityByGroup[club.id]
-                let lastActivityAt = [
-                    loadedLastMessageAt,
-                    fetchedLastMessageAt
-                ].compactMap { $0 }.max()
+                // Compare the two optional timestamps directly; no array
+                // allocation or traversal is needed for every club.
+                let lastActivityAt: Date?
+                switch (loadedLastMessageAt, fetchedLastMessageAt) {
+                case let (loaded?, fetched?):
+                    lastActivityAt = max(loaded, fetched)
+                case let (loaded?, nil):
+                    lastActivityAt = loaded
+                case let (nil, fetched?):
+                    lastActivityAt = fetched
+                case (nil, nil):
+                    lastActivityAt = nil
+                }
 
                 guard let lastActivityAt else { return nil }
 
