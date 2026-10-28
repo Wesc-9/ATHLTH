@@ -152,7 +152,7 @@ struct GoalsHubView: View {
             Text(tr("One clear priority. Progress at your pace.",
                     "Din retning, dine delmål og fremgangen din."))
                 .font(.subheadline)
-                .foregroundStyle(ATHLTHPlanDesign.secondary)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
     }
 
@@ -182,7 +182,7 @@ struct GoalsHubView: View {
                     .foregroundStyle(ink)
                 Text(title)
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(ATHLTHPlanDesign.secondary)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -227,7 +227,7 @@ struct GoalsHubView: View {
             Spacer()
             Text(detail)
                 .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondary)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
     }
 
@@ -303,7 +303,7 @@ struct GoalsHubView: View {
                 Spacer()
                 Text(tr("A fresh start", "En ny start"))
                     .font(.caption.weight(.medium))
-                    .foregroundStyle(ATHLTHPlanDesign.secondary)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
 
             Text(tr("A goal worth working toward",
@@ -316,7 +316,7 @@ struct GoalsHubView: View {
                 "Sett deg et mål, del det opp i mindre steg og se fremgangen."
             ))
             .font(.subheadline)
-            .foregroundStyle(ATHLTHPlanDesign.secondary)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
             Button {
                 showingCreateGoal = true
@@ -399,7 +399,7 @@ struct GoalSummaryCard: View {
                     Text(statusLabel)
                         .foregroundStyle(goal.status == .active
                             ? ATHLTHPlanDesign.ink
-                            : ATHLTHPlanDesign.secondary)
+                            : ATHLTHPlanDesign.secondaryInk)
                 }
                 .font(.system(size: 10, weight: .semibold))
                 .lineLimit(1)
@@ -413,7 +413,7 @@ struct GoalSummaryCard: View {
 
                 Text(goal.category.title)
                     .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondary)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
@@ -433,7 +433,7 @@ struct GoalSummaryCard: View {
                 if let deadline = goal.deadline {
                     Text(deadline.formatted(.dateTime.day().month(.abbreviated).year()))
                         .font(.system(size: 10))
-                        .foregroundStyle(ATHLTHPlanDesign.secondary)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
             }
             Spacer(minLength: 0)
@@ -1755,7 +1755,7 @@ struct GoalCreationView: View {
                             english: "7 choices", norwegian: "7 valg"
                         ))
                         .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondary)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                     categoryStep
                 } else {
@@ -1820,7 +1820,7 @@ struct GoalCreationView: View {
                 Text("ATHLTH / GOALS")
                     .font(.system(size: 10, weight: .semibold))
                     .tracking(2.6)
-                    .foregroundStyle(ATHLTHPlanDesign.secondary)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 Spacer()
                 Button {
                     dismiss()
@@ -1853,7 +1853,7 @@ struct GoalCreationView: View {
                     Text(stepTitle)
                 }
                 .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(ATHLTHPlanDesign.secondary)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
                 HStack(spacing: 5) {
                     ForEach(0..<5, id: \.self) { index in
@@ -1887,7 +1887,7 @@ struct GoalCreationView: View {
                      ) : goalStepHeroSubtitle
                 )
                 .font(.subheadline)
-                .foregroundStyle(ATHLTHPlanDesign.secondary)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -2089,7 +2089,7 @@ struct GoalCreationView: View {
                                 .lineLimit(2)
                             Text(option.subtitle)
                                 .font(.system(size: 12))
-                                .foregroundStyle(ATHLTHPlanDesign.secondary)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                                 .lineLimit(2)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
