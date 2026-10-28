@@ -3007,6 +3007,12 @@ struct RecoveryCoachView: View {
                                 userID: session.profile.userID
                             )
                           )
+                        : nil,
+                    coachTrainingContext: shareHealthData
+                        ? ATHLTHCoachTrainingContext.snapshot(
+                            activePlan: session.activePlan,
+                            goals: goalStore.activeGoals
+                          )
                         : nil
                 )
 
