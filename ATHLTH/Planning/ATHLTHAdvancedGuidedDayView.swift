@@ -18,6 +18,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
     let onRestDay: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
+    @State private var confirmingRestReplacement = false
     private let ink = ATHLTHTrainDesign.ink
     private let secondary = ATHLTHTrainDesign.secondary
     private let gold = ATHLTHTrainDesign.bronze
@@ -41,9 +42,30 @@ struct ATHLTHAdvancedGuidedDayView: View {
                     workoutCard(pair.element, index: pair.offset)
                 }
             }
-            quickActions
+            if !isRestDay && !workouts.isEmpty {
+                Button {
+                    confirmingRestReplacement = true
+                } label: {
+                    Label(tr("Set rest day", "Sett som hviledag"), systemImage: "moon.stars")
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(gold)
+            }
+            if !isRestDay { quickActions }
         }
         .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+        .confirmationDialog(
+            tr("Replace workouts with a rest day?", "Erstatte øktene med en hviledag?"),
+            isPresented: $confirmingRestReplacement, titleVisibility: .visible
+        ) {
+            Button(tr("Replace with rest day", "Erstatt med hviledag"),
+                   role: .destructive, action: onRestDay)
+        } message: {
+            Text(tr("The planned workouts for this date will be removed.",
+                    "Planlagte økter på denne datoen blir fjernet."))
+        }
     }
 
     private var header: some View {
@@ -168,14 +190,22 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 .font(.system(size: 28)).foregroundStyle(gold)
             Text(tr("Rest and recovery", "Hvile og restitusjon"))
                 .font(.system(size: 20, weight: .semibold, design: .serif))
-            Button {
-                onAddWorkout()
-            } label: {
-                Label(tr("Replace with workout", "Legg inn en treningsøkt"),
-                      systemImage: "plus")
+            Button(action: onRestDay) {
+                Label(tr("Remove rest day", "Fjern hviledag"),
+                      systemImage: "arrow.uturn.backward")
                     .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
+            .tint(gold)
+            Button(action: onAddWorkout) {
+                Label(tr("Add workout instead", "Legg til treningsøkt i stedet"),
+                      systemImage: "plus")
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(gold)
         }
         .frame(maxWidth: .infinity, minHeight: 152)
         .background(.white, in: RoundedRectangle(cornerRadius: 17))

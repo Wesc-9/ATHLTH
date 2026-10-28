@@ -23,6 +23,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     }
 
     @Binding var selectedWeek: Int
+    @Binding var selectedDay: Int?
     @Binding var weekCount: Int
     let startDate: Date
     let days: [Day]
@@ -36,8 +37,10 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     let onCopyWeek: (Int, [Int], Bool) -> Void
     let onMakeRecoveryWeek: (Int) -> Void
 
-    @State private var selectedDay: Int? = nil
     @State private var showingStructure = false
+    @State private var showingQuickActions = false
+    @State private var pendingRestReplacementDay: Int?
+    @State private var confirmingRestReplacement = false
     @State private var showingCopy = false
     @State private var copyTargets: Set<Int> = []
     @State private var replaceTargets = false
@@ -113,8 +116,28 @@ struct ATHLTHAdvancedWeekBuilderView: View {
             Text(tr("Any edits in the last week will be excluded from the plan.",
                     "Endringer i den siste uken blir ikke med videre."))
         }
+        .confirmationDialog(
+            tr("Replace workouts with a rest day?", "Erstatte øktene med en hviledag?"),
+            isPresented: $confirmingRestReplacement,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Replace with rest day", "Erstatt med hviledag"),
+                   role: .destructive) {
+                if let day = pendingRestReplacementDay {
+                    onMarkRest(day)
+                }
+                pendingRestReplacementDay = nil
+            }
+        } message: {
+            Text(tr("The workouts planned for this date will be removed.",
+                    "Planlagte økter på denne datoen blir fjernet."))
+        }
         .onChange(of: selectedWeek) { _, _ in
             selectedDay = nil
+            showingQuickActions = false
+        }
+        .onChange(of: selectedDay) { _, _ in
+            showingQuickActions = false
         }
     }
 
@@ -150,9 +173,18 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 dayRow(day)
             }
             HStack(spacing: 9) {
-                action(tr("Add workout", "Legg til økt"), icon: "plus") {
-                    onAddWorkout(orderedDays.first(where: { !$0.isRestDay })?.weekday ??
-                                 orderedDays.first?.weekday ?? 1)
+                Menu {
+                    ForEach(orderedDays) { day in
+                        Button(day.date.formatted(.dateTime.weekday(.wide).day().month())) {
+                            onAddWorkout(day.weekday)
+                        }
+                    }
+                } label: {
+                    Label(tr("Add workout", "Legg til økt"), systemImage: "plus")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(gold)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 12))
                 }
                 action(tr("Copy week", "Kopier uke"), icon: "square.on.square") {
                     presentCopy(source: selectedWeek)
@@ -292,9 +324,12 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                     Label(tr("Add exercise", "Legg til øvelse"), systemImage: "dumbbell")
                 }
                 Button {
-                    onMarkRest(day.weekday)
+                    requestRestDayChange(for: day)
                 } label: {
-                    Label(tr("Set rest day", "Sett som hviledag"), systemImage: "moon.stars")
+                    Label(day.isRestDay
+                          ? tr("Remove rest day", "Fjern hviledag")
+                          : tr("Set rest day", "Sett som hviledag"),
+                          systemImage: day.isRestDay ? "arrow.uturn.backward" : "moon.stars")
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -316,41 +351,51 @@ struct ATHLTHAdvancedWeekBuilderView: View {
 
     private func detail(_ day: Day) -> some View {
         VStack(alignment: .leading, spacing: 11) {
-            HStack {
-                Button { selectedDay = nil } label: {
-                    Label(tr("Back to week", "Til uken"), systemImage: "chevron.left")
-                        .font(.caption.weight(.medium))
-                }
-                Spacer()
-                Text(day.date.formatted(.dateTime.weekday(.wide).day().month()))
-                    .font(.caption).foregroundStyle(secondary)
-            }
-            .foregroundStyle(gold)
-            ZStack(alignment: .bottomLeading) {
-                GeometryReader { proxy in
-                    Image("PlanGoalHero").resizable().scaledToFill()
-                        .frame(width: proxy.size.width, height: proxy.size.height)
-                        .clipped()
-                }
-                LinearGradient(colors: [.clear, .black.opacity(0.65)],
-                               startPoint: .center, endPoint: .bottom)
+            Text(day.date.formatted(.dateTime.weekday(.wide).day().month()))
+                .font(.subheadline)
+                .foregroundStyle(secondary)
+            HStack(spacing: 13) {
+                Image(systemName: day.isRestDay ? "moon.stars.fill"
+                      : (day.kind?.systemImage ?? "calendar.badge.plus"))
+                    .font(.title2)
+                    .foregroundStyle(gold)
+                    .frame(width: 54, height: 54)
+                    .background(ATHLTHTrainDesign.paleGold,
+                                in: RoundedRectangle(cornerRadius: 14))
+                    .accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: 5) {
                     Text(day.title)
-                        .font(.system(size: 29, weight: .semibold, design: .serif))
-                        .foregroundStyle(.white)
-                    Text("\(day.workouts.count) " + tr("workouts", "økter"))
-                        .font(.caption).foregroundStyle(.white.opacity(0.88))
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(day.isRestDay
+                         ? tr("Rest and recovery", "Hvile og restitusjon")
+                         : "\(day.workouts.count) " + tr("workouts", "økter"))
+                        .font(.footnote)
+                        .foregroundStyle(secondary)
                 }
-                .padding(13)
+                Spacer(minLength: 0)
             }
-            .frame(height: 166)
-            .clipShape(RoundedRectangle(cornerRadius: 17))
+            .padding(15)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.white, in: RoundedRectangle(cornerRadius: 18))
             if day.isRestDay || day.workouts.isEmpty {
                 VStack(alignment: .leading, spacing: 13) {
                     Label(day.isRestDay ? tr("Rest and recovery", "Hvile og restitusjon") :
                           tr("No workouts here yet", "Ingen treningsøkter ennå"),
                           systemImage: day.isRestDay ? "moon.stars" : "calendar.badge.plus")
                         .font(.subheadline.weight(.semibold))
+                    if day.isRestDay {
+                        Button {
+                            onMarkRest(day.weekday)
+                        } label: {
+                            Label(tr("Remove rest day", "Fjern hviledag"),
+                                  systemImage: "arrow.uturn.backward")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(gold)
+                    }
                     HStack(spacing: 9) {
                         action(tr("Add workout", "Legg til økt"), icon: "plus") {
                             onAddWorkout(day.weekday)
@@ -368,7 +413,29 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                                   index: workoutIndex)
                 }
             }
-            quickActions(day.weekday)
+            if !day.isRestDay {
+                Button {
+                    requestRestDayChange(for: day)
+                } label: {
+                    Label(tr("Set rest day", "Sett som hviledag"), systemImage: "moon.stars")
+                        .font(.subheadline)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(gold)
+
+                DisclosureGroup(isExpanded: $showingQuickActions) {
+                    quickActions(day.weekday)
+                        .padding(.top, 8)
+                } label: {
+                    Label(tr("More activities and options", "Flere aktiviteter og valg"),
+                          systemImage: "slider.horizontal.3")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ink)
+                }
+                .padding(13)
+                .background(.white, in: RoundedRectangle(cornerRadius: 14))
+            }
             HStack(spacing: 9) {
                 action(tr("Previous day", "Forrige dag"), icon: "arrow.left") {
                     moveDetail(from: day.weekday, by: -1)
@@ -377,6 +444,15 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                     moveDetail(from: day.weekday, by: 1)
                 }
             }
+        }
+    }
+
+    private func requestRestDayChange(for day: Day) {
+        if day.isRestDay || day.workouts.isEmpty {
+            onMarkRest(day.weekday)
+        } else {
+            pendingRestReplacementDay = day.weekday
+            confirmingRestReplacement = true
         }
     }
 

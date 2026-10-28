@@ -99,10 +99,18 @@ struct ATHLTHAdvancedPlanAddContentView: View {
                         Text(tr("Workouts", "Treningsøkter")).tag(Kind.workout)
                     }
                     .pickerStyle(.segmented)
+                    Text(kind == .exercise
+                         ? tr("Choose an exercise, then set your sets and rest.",
+                              "Velg en øvelse, og tilpass sett og pauser.")
+                         : tr("Choose a complete workout to add to this day.",
+                              "Velg en ferdig treningsøkt for denne dagen."))
+                        .font(.footnote)
+                        .foregroundStyle(secondary)
                     HStack(spacing: 8) {
                         Image(systemName: "magnifyingglass").foregroundStyle(secondary)
-                        TextField(tr("Search exercises or workouts",
-                                     "Søk etter øvelser eller treningsøkter"), text: $search)
+                        TextField(kind == .exercise
+                                  ? tr("Search exercises", "Søk etter øvelser")
+                                  : tr("Search workouts", "Søk etter treningsøkter"), text: $search)
                             .font(.subheadline)
                             .autocorrectionDisabled()
                         if !search.isEmpty {
@@ -131,7 +139,14 @@ struct ATHLTHAdvancedPlanAddContentView: View {
                 .padding(15)
             }
             .background(canvas.ignoresSafeArea())
-            .navigationTitle(tr("Add", "Legg til"))
+            .onAppear { kind = initialKind }
+            .onChange(of: kind) { _, _ in
+                search = ""
+                muscle = nil
+            }
+            .navigationTitle(kind == .exercise
+                             ? tr("Add exercise", "Legg til øvelse")
+                             : tr("Add workout", "Legg til treningsøkt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {

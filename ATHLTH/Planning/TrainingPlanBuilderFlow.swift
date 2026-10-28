@@ -98,6 +98,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var structuredWorkoutsByDay:
         [Int: ATHLTHPlanStructuredWorkoutBlueprint] = [:]
     @State private var selectedPlanWeekIndex = 0
+    @State private var selectedAdvancedWeekDay: Int?
     /// Keys use weekIndex * 7 + weekday, so different weeks expand independently.
     @State private var expandedWeekPreviewDays: Set<Int> = []
     @State private var guidedTrainingPlaceExpanded = false
@@ -435,7 +436,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             )
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(step == .source || step == .mode || step == .goal || step == .approach ? .hidden : .visible, for: .navigationBar)
+            .toolbar(step == .source || step == .mode || step == .goal ||
+                     step == .approach || step == .week ? .hidden : .visible,
+                     for: .navigationBar)
             .toolbar {
                 #if DEBUG
                 if step != .source && step != .mode && step != .goal && step != .approach {
@@ -447,7 +450,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                 }
                 #endif
-                if step != .source && step != .mode && step != .goal && step != .approach {
+                if step != .source && step != .mode && step != .goal &&
+                    step != .approach && step != .week {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(backButtonTitle) {
                             goBack()
@@ -1556,12 +1560,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         VStack(spacing: step == .mode ? 12 : 22) {
             HStack(spacing: 8) {
                 Button {
-                    if step == .mode { dismiss() } else { goBack() }
+                    if step == .mode { dismiss() } else { goBackInPlanBuilder() }
                 } label: {
                     Text(
                         step == .mode
                         ? ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")
-                        : ATHLTHLocalization.choose(english: "Back", norwegian: "Tilbake")
+                        : (step == .week && weekPlanningApproach == .quick &&
+                           selectedAdvancedWeekDay != nil
+                           ? ATHLTHLocalization.choose(english: "To week", norwegian: "Til uken")
+                           : ATHLTHLocalization.choose(english: "Back", norwegian: "Tilbake"))
                     )
                     .font(.subheadline)
                     .foregroundStyle(sourceInk)
@@ -1580,7 +1587,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .accessibilityLabel(
                     step == .mode
                     ? ATHLTHLocalization.choose(english: "Close plan builder", norwegian: "Lukk planbygger")
-                    : ATHLTHLocalization.choose(english: "Previous step", norwegian: "Forrige steg")
+                    : (step == .week && weekPlanningApproach == .quick &&
+                       selectedAdvancedWeekDay != nil
+                       ? ATHLTHLocalization.choose(english: "Back to week", norwegian: "Til ukeoversikten")
+                       : ATHLTHLocalization.choose(english: "Previous step", norwegian: "Forrige steg"))
                 )
 
                 Spacer(minLength: 0)
@@ -3967,7 +3977,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selectedPlanWeekIndex = guidedCurrentWeek
                 editPreviewWorkout(guidedCurrentWeekday, index: index)
             },
-            onRestDay: { setRestDay(guidedCurrentWeekday) }
+            onRestDay: {
+                selectedPlanWeekIndex = guidedCurrentWeek
+                toggleRestDay(guidedCurrentWeekday)
+            }
         )
     }
 
@@ -4300,6 +4313,23 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    /// Reopening a rest day keeps the date empty and does not resurrect a
+    /// previously removed template workout.
+    private func toggleRestDay(_ day: Int) {
+        let key = weekDayKey(day)
+        let currentlyResting = weekDayEdits[key]?.isRestDay == true ||
+            advancedWeekItems(for: selectedPlanWeekIndex)
+                .first(where: { $0.weekday == day })?.isRestDay == true
+        if currentlyResting {
+            updateWeekDay(day) { edit in
+                edit.isRestDay = false
+                edit.removeTemplateDetail = true
+            }
+        } else {
+            setRestDay(day)
+        }
+    }
+
     private func setRestDay(_ day: Int) {
         updateWeekDay(day) { edit in
             edit.isRestDay = true
@@ -4551,6 +4581,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private var advancedWeekBuilderStep: some View {
         ATHLTHAdvancedWeekBuilderView(
             selectedWeek: $selectedPlanWeekIndex,
+            selectedDay: $selectedAdvancedWeekDay,
             weekCount: $weekCount,
             startDate: startDate,
             days: advancedWeekItems(for: selectedPlanWeekIndex),
@@ -4579,7 +4610,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     phase: .main, kind: .workout)
             },
             onMarkRest: { day in
-                setRestDay(day)
+                toggleRestDay(day)
             },
             onQuick: { day, choice in
                 addAdvancedWeekQuickContent(day: day, choice: choice)
@@ -4604,6 +4635,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     ? nil : structuredWorkoutsByDay[weekday])
             let extras = edit?.additionalDetailedWorkouts ?? []
             let planned = selectedDays.contains(weekday) ||
+                edit?.isRestDay == false ||
                 edit?.kind != nil || edit?.title != nil ||
                 primary != nil || !extras.isEmpty
             let isRest = edit?.isRestDay == true ||
@@ -6517,7 +6549,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 .opacity(0.35)
 
             HStack(spacing: 10) {
-                if step != .mode {
+                if step != .mode &&
+                    !(step == .week && mode == .advanced &&
+                      weekPlanningApproach == .quick) {
                     Button {
                         if step == .week && mode == .advanced &&
                            weekPlanningApproach == .guided && guidedDayCursor > 0 {
@@ -6897,6 +6931,21 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         withAnimation(.easeInOut(duration: 0.18)) {
             step = next
         }
+    }
+
+    /// Day detail is an internal route, not an instruction to leave the plan.
+    private func goBackInPlanBuilder() {
+        if step == .week && mode == .advanced {
+            if weekPlanningApproach == .quick, selectedAdvancedWeekDay != nil {
+                selectedAdvancedWeekDay = nil
+                return
+            }
+            if weekPlanningApproach == .guided && guidedDayCursor > 0 {
+                guidedDayCursor -= 1
+                return
+            }
+        }
+        goBack()
     }
 
     private func goBack() {
