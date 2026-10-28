@@ -595,9 +595,8 @@ extension WorkoutTemplateCatalogEntry {
 
 @MainActor
 final class WorkoutTemplateCatalogStore: ObservableObject {
-    @Published private(set) var entries:
-        [WorkoutTemplateCatalogEntry] =
-            WorkoutTemplateCatalogEntry.bundledCatalog
+    @Published private(set) var entries: [WorkoutTemplateCatalogEntry]
+    private let offlineEntries: [WorkoutTemplateCatalogEntry]
     @Published private(set) var isLoading = false
     /// Whether the catalogue contains live published data rather than the
     /// bundled HYROX-only fallback. Used by general Train suggestions.
@@ -609,6 +608,9 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
+        let baseline = WorkoutTemplateCatalogEntry.bundledCatalog
+        self.offlineEntries = baseline
+        self.entries = baseline
     }
 
     func refresh(force: Bool = false) async {
@@ -634,7 +636,7 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
             // Replace identical slugs with their published version, but do
             // not hide offline running/strength recommendations when online.
             let publishedSlugs = Set(remote.map(\.slug))
-            let localOnly = WorkoutTemplateCatalogEntry.bundledCatalog
+            let localOnly = offlineEntries
                 .filter { !publishedSlugs.contains($0.slug) }
             entries = (remote + localOnly).sorted {
                 $0.sortOrder == $1.sortOrder
@@ -646,7 +648,7 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
         } catch {
             // The full offline collection remains available on network errors.
             if !hasPublishedCatalog {
-                entries = WorkoutTemplateCatalogEntry.bundledCatalog
+                entries = offlineEntries
             }
             errorMessage = error.localizedDescription
         }
