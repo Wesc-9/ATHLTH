@@ -89,6 +89,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     }
     @State private var openingWorkout: WorkoutDestination?
     @State private var editingTrainingPlaceWorkout: WorkoutDestination?
+    @State private var showPlanWeekOverview = true
     @State private var selectedDayID: UUID?
     @State private var selectedWorkoutID: UUID?
     @State private var collapsedWorkoutCards: Set<UUID> = []
@@ -633,7 +634,14 @@ struct ATHLTHTrainPlanPremiumView: View {
                                 plan.weeks.count - 1)
                 let week = plan.weeks[index]
                 referenceWeekNavigator(plan, weekIndex: index)
-                referenceFullWeekOverview(week, plan: plan)
+                if showPlanWeekOverview {
+                    referenceFullWeekOverview(week, plan: plan)
+                } else {
+                    premiumWeekDayStrip(week, plan: plan)
+                    if let day = premiumSelectedDay(in: week, plan: plan) {
+                        referenceDayWorkspace(day, plan: plan)
+                    }
+                }
                 referenceWeekPulse(plan, week: week)
             } else {
                 Button { showingEditor = true } label: {
@@ -694,9 +702,18 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .background(.white.opacity(0.85), in: Circle())
                 }
                 .accessibilityLabel(tr("My plans", "Mine planer"))
-                Button {
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
-                        showingPlanTools.toggle()
+                Menu {
+                    Button {
+                        showPlanWeekOverview = true
+                    } label: {
+                        Label(tr("Whole week", "Hele uken"),
+                              systemImage: showPlanWeekOverview ? "checkmark.circle.fill" : "calendar")
+                    }
+                    Button {
+                        showPlanWeekOverview = false
+                    } label: {
+                        Label(tr("One day", "Én dag"),
+                              systemImage: !showPlanWeekOverview ? "checkmark.circle.fill" : "calendar.day.timeline.left")
                     }
                 } label: {
                     Image(systemName: "slider.horizontal.3")
@@ -704,7 +721,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .frame(width: 37, height: 37)
                         .background(.white.opacity(0.85), in: Circle())
                 }
-                .accessibilityLabel(tr("Plan tools", "Planverktøy"))
+                .accessibilityLabel(tr("Choose plan view", "Velg planvisning"))
             }
             .foregroundStyle(graphite)
             .buttonStyle(.plain)
