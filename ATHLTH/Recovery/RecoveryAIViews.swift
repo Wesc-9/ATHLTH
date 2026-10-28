@@ -1285,7 +1285,17 @@ struct RecoveryCoachView: View {
                     initialTitle: prepared.title,
                     initialBlocks: prepared.resolvedWorkoutBlocks,
                     initialDurationOverrideMinutes: prepared.durationMinutes,
-                    draftContext: "coach-workout-\(proposal.title)"
+                    draftContext: "coach-workout-\(proposal.title)",
+                    onAddStandalone: { reviewed in
+                        var scheduled = reviewed
+                        scheduled.scheduledStart = Date()
+                        session.addStandalonePlannedSession(scheduled)
+                        proposalActionNotice = recoveryAIText(
+                            "Edited workout added to today.",
+                            "Redigert økt lagt til i dag."
+                        )
+                        return true
+                    }
                 )
             }
         }
