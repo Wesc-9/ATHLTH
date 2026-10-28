@@ -127,19 +127,27 @@ struct RecoveryCoachMessage:
     let text: String
     let createdAt: Date
     let proposal: RecoveryCoachProposal?
+    /// Only the already staged, version-checked plan proposal may be shown.
+    /// These optional identifiers keep old saved chat messages compatible.
+    let planReviewPlanID: UUID?
+    let planReviewPlanVersion: Int?
 
     init(
         id: UUID = UUID(),
         role: RecoveryCoachMessageRole,
         text: String,
         createdAt: Date = Date(),
-        proposal: RecoveryCoachProposal? = nil
+        proposal: RecoveryCoachProposal? = nil,
+        planReviewPlanID: UUID? = nil,
+        planReviewPlanVersion: Int? = nil
     ) {
         self.id = id
         self.role = role
         self.text = text
         self.createdAt = createdAt
         self.proposal = proposal
+        self.planReviewPlanID = planReviewPlanID
+        self.planReviewPlanVersion = planReviewPlanVersion
     }
 }
 
