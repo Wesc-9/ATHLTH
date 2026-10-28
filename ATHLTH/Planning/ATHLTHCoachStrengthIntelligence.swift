@@ -89,7 +89,7 @@ enum ATHLTHCoachStrengthIntelligence {
 
         for log in completed {
             let day = log.endedAt ?? log.startedAt
-            for exercise in log.exercises where !exercise.isEmbeddedRunningInterval.orFalse {
+            for exercise in log.exercises where exercise.isEmbeddedRunningInterval != true {
                 let key = ATHLTHTrainTrendEngine.normalize(exercise.exercise.name)
                 guard !key.isEmpty else { continue }
                 let sets = exercise.sets.filter {
@@ -119,7 +119,10 @@ enum ATHLTHCoachStrengthIntelligence {
         }
 
         let entries: [(date: Date, signal: ExerciseSignal)] = grouped.values.compactMap { group in
-            let records = group.entries.sorted { $0.date > $1.date }
+            var observedSessionIDs = Set<UUID>()
+            let records = group.entries
+                .sorted { $0.date > $1.date }
+                .filter { observedSessionIDs.insert($0.id).inserted }
             guard let latest = records.first else { return nil }
             let best = records.compactMap(\.oneRepMax).max()
             let qualified = records.filter { $0.oneRepMax != nil }
@@ -198,7 +201,7 @@ enum ATHLTHCoachStrengthIntelligence {
         } else {
             values = []
         }
-        let weight = values.map(\.weight).max()
+        let weight = values.map { $0.weight }.max()
         let maxEstimate = values.compactMap {
             estimatedOneRepMax(weightKg: $0.weight, reps: $0.reps)
         }.max()
@@ -207,7 +210,7 @@ enum ATHLTHCoachStrengthIntelligence {
            targetWeight.isFinite, targetWeight > 0,
            let targetReps = set.plannedReps, targetReps > 0 {
             met = !values.isEmpty &&
-                set.resolvedCompletedReps ?? 0 >= targetReps &&
+                (set.resolvedCompletedReps ?? 0) >= targetReps &&
                 values.allSatisfy { $0.weight >= targetWeight }
         } else {
             met = nil
@@ -221,6 +224,3 @@ enum ATHLTHCoachStrengthIntelligence {
     }
 }
 
-private extension Optional where Wrapped == Bool {
-    var orFalse: Bool { self ?? false }
-}
