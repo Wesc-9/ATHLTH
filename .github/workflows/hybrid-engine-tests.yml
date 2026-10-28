@@ -27,6 +27,8 @@ on:
       - ATHLTH/Strength/StrengthWorkoutModels.swift
       - ATHLTH/Exercises/ExerciseLibraryViews.swift
       - ATHLTHWatchExtension/WatchWorkoutManager.swift
+      - ATHLTHWatchExtension/WatchWorkoutViews.swift
+      - ATHLTHWatchExtension/WatchRunWorkoutExperienceView.swift
       - ATHLTHWatchExtension/WatchStrengthTimedSetPage.swift
       - ATHLTH/Watch/ATHLTHStrengthWatchSyncObserver.swift
       - ATHLTH/Watch/WorkoutMirroringStore.swift
