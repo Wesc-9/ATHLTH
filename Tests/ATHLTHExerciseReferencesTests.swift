@@ -61,6 +61,25 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
         )
     }
 
+    func testSeparatorVariantsResolveToSameEnglishExercise() {
+        let sidePlank = entry(
+            "Side Plank", id: UUID(), source: .athlthCatalog,
+            sourceIdentifier: "athlth-native-side-plank"
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(for: "Side-Plank"),
+            "athlth-native-side-plank"
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.nativeSourceIdentifier(for: "side_plank"),
+            "athlth-native-side-plank"
+        )
+        XCTAssertEqual(
+            ATHLTHExerciseReferenceResolver.resolve(block("Side-Plank"), in: [sidePlank])?.id,
+            sidePlank.id
+        )
+    }
+
     func testSimilarExerciseNamesAreNotSilentlySubstituted() {
         let barbell = entry(
             "Incline Bench Press", id: UUID(), source: .athlthCatalog,
