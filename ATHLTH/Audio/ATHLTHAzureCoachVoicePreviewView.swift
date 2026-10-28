@@ -145,13 +145,20 @@ final class ATHLTHAzureVoicePreviewPlayer:
     }
 }
 
+/// One compact list directly below the installed iOS voices. ATHLTH+ is
+/// evaluated separately from the general Audio Coach settings so Free users
+/// can see (but cannot choose or preview) the premium voices.
 struct ATHLTHAzureCoachVoicePreviewView: View {
-    @StateObject private var preview = ATHLTHAzureVoicePreviewPlayer()
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var session: AppSessionStore
+    @StateObject private var preview = ATHLTHAzureVoicePreviewPlayer()
+
     @AppStorage("settings.audioCoach.azureThirdPartyConsent")
     private var allowsAzureWorkoutText = false
     @State private var discoveredVoices: [Voice]?
     @State private var catalogMessage: String?
+    @State private var pendingConsentVoice: Voice?
+    @State private var showingRevokeConsent = false
 
     private struct CatalogRequest: Encodable {
         let action: String
@@ -159,9 +166,19 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
     private struct CatalogReply: Decodable {
         let voices: [Voice]
     }
+    private struct Voice: Identifiable, Decodable {
+        let id: String
+        let name: String
+        let detail: String
+    }
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
 
     @MainActor
     private func loadAzureVoices() async {
+        guard session.hasPaidAccess else { return }
         do {
             let response: CatalogReply = try await
                 SupabaseEnvironment.client.functions.invoke(
@@ -170,98 +187,62 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                         body: CatalogRequest(action: "catalog")
                     )
                 )
-            guard !response.voices.isEmpty else { return }
-            discoveredVoices = response.voices
-            catalogMessage = nil
+            if !response.voices.isEmpty {
+                discoveredVoices = response.voices
+                catalogMessage = nil
+            }
         } catch {
             catalogMessage = ATHLTHAzureVoicePreviewPlayer.diagnostic(error)
         }
     }
 
-
-    private struct Voice: Identifiable, Decodable {
-        let id: String
-        let name: String
-        let detail: String
-    }
-
     private var voices: [Voice] {
         discoveredVoices ?? [
-            Voice(id: "finn", name: "Finn", detail: ATHLTHLocalization.choose(
-                english: "Norwegian · male",
-                norwegian: "Norsk · mannlig"
-            )),
-            Voice(id: "iselin", name: "Iselin", detail: ATHLTHLocalization.choose(
-                english: "Norwegian · female",
-                norwegian: "Norsk · kvinnelig"
-            )),
-            Voice(id: "pernille", name: "Pernille", detail: ATHLTHLocalization.choose(
-                english: "Norwegian · female",
-                norwegian: "Norsk · kvinnelig"
-            ))
+            Voice(id: "finn", name: "Finn",
+                  detail: tr("Norwegian · male", "Norsk · mannlig")),
+            Voice(id: "iselin", name: "Iselin",
+                  detail: tr("Norwegian · female", "Norsk · kvinnelig")),
+            Voice(id: "pernille", name: "Pernille",
+                  detail: tr("Norwegian · female", "Norsk · kvinnelig"))
         ]
+    }
+
+    private func select(_ voice: Voice) {
+        guard session.hasPaidAccess else { return }
+        guard allowsAzureWorkoutText else {
+            pendingConsentVoice = voice
+            return
+        }
+        settings.audioCoachLanguage = .norwegian
+        settings.audioCoachVoiceIdentifier =
+            ATHLTHAzureCoachVoice.prefix + voice.id
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(
-                ATHLTHLocalization.choose(
-                    english: "ATHLTH+ · Natural Norwegian voices",
-                    norwegian: "ATHLTH+ · Naturlige norske stemmer"
-                ),
-                systemImage: "waveform.badge.mic"
-            )
-            .font(.subheadline.weight(.semibold))
-            .foregroundStyle(ATHLTHTheme.primaryText)
-
-            Text(ATHLTHLocalization.choose(
-                english: "Pick an Azure voice for spoken workout guidance, or listen before choosing. If Azure is slow, unavailable or the free budget runs out, ATHLTH uses the offline iPhone voice.",
-                norwegian: "Velg en Azure-stemme til talebeskjeder under trening, eller forhåndslytt. Hvis Azure er treg, utilgjengelig eller gratiskvoten er brukt opp, brukes iPhone-stemmen offline."
-            ))
-            .font(.caption)
-            .foregroundStyle(ATHLTHTheme.mutedText)
-            .fixedSize(horizontal: false, vertical: true)
-
-            Toggle(isOn: $allowsAzureWorkoutText) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Allow Azure voices during workouts",
-                        norwegian: "Tillat Azure-stemmer under trening"
-                    ))
-                    .font(.subheadline.weight(.medium))
-                    Text(ATHLTHLocalization.choose(
-                        english: "Workout speech (possibly including pace, distance, time or heart rate) is sent to Microsoft to create audio. No GPS track or health history is sent. Turn off anytime.",
-                        norwegian: "Talebeskjeder (som kan inneholde tempo, distanse, tid eller puls) sendes til Microsoft for å lage lyd. GPS-spor og helsehistorikk sendes ikke. Kan slås av når som helst."
-                    ))
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                }
+            HStack(spacing: 7) {
+                Image(systemName: "waveform")
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                Text("ATHLTH+")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
             }
-            .tint(ATHLTHTheme.accentDeep)
-            .onChange(of: allowsAzureWorkoutText) { _, enabled in
-                if !enabled,
-                   ATHLTHAzureCoachVoice.key(
-                       settings.audioCoachVoiceIdentifier
-                   ) != nil {
-                    settings.audioCoachVoiceIdentifier = nil
-                }
-            }
+            .padding(.top, 7)
+            .accessibilityAddTraits(.isHeader)
 
             ForEach(voices) { voice in
-                HStack(spacing: 9) {
+                HStack(spacing: 10) {
                     Button {
-                        guard allowsAzureWorkoutText else { return }
-                        settings.audioCoachLanguage = .norwegian
-                        settings.audioCoachVoiceIdentifier =
-                            ATHLTHAzureCoachVoice.prefix + voice.id
+                        select(voice)
                     } label: {
-                        HStack(spacing: 9) {
+                        HStack(spacing: 10) {
                             Image(systemName:
                                 settings.audioCoachVoiceIdentifier ==
-                                  ATHLTHAzureCoachVoice.prefix + voice.id
+                                ATHLTHAzureCoachVoice.prefix + voice.id
                                     ? "checkmark.circle.fill" : "circle"
                             )
                             .foregroundStyle(ATHLTHTheme.accentDeep)
+
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(voice.name)
                                     .font(.subheadline.weight(.medium))
@@ -270,14 +251,18 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                                     .font(.caption2)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                             }
-                            Spacer(minLength: 4)
+                            Spacer(minLength: 0)
                         }
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .disabled(!allowsAzureWorkoutText)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Use \(voice.name) for Audio Coach",
-                        norwegian: "Bruk \(voice.name) i Audio Coach"
+                    .accessibilityAddTraits(
+                        settings.audioCoachVoiceIdentifier ==
+                        ATHLTHAzureCoachVoice.prefix + voice.id
+                            ? .isSelected : []
+                    )
+                    .accessibilityLabel(tr(
+                        "Choose \(voice.name)", "Velg \(voice.name)"
                     ))
 
                     Button {
@@ -287,51 +272,99 @@ struct ATHLTHAzureCoachVoicePreviewView: View {
                         )
                     } label: {
                         if preview.loadingVoice == voice.id {
-                            ProgressView().frame(width: 35, height: 35)
+                            ProgressView()
+                                .frame(width: 40, height: 40)
                         } else {
                             Image(systemName: "play.circle.fill")
                                 .font(.title2)
-                                .frame(width: 35, height: 35)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 40, height: 40)
                         }
                     }
                     .disabled(preview.loadingVoice != nil)
                     .buttonStyle(.plain)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Preview \(voice.name)",
-                        norwegian: "Forhåndslytt på \(voice.name)"
+                    .accessibilityLabel(tr(
+                        "Preview \(voice.name)", "Forhåndslytt på \(voice.name)"
                     ))
                 }
                 .padding(10)
-                .background(
-                    ATHLTHTheme.accentSoft.opacity(0.65),
-                    in: RoundedRectangle(cornerRadius: 14)
-                )
+                .background(ATHLTHTheme.accentSoft.opacity(0.65),
+                            in: RoundedRectangle(cornerRadius: 14))
+                .opacity(session.hasPaidAccess ? 1 : 0.38)
+                .disabled(!session.hasPaidAccess)
             }
 
-            if let message = preview.message {
+            if !session.hasPaidAccess {
+                Text(tr(
+                    "Azure voices require ATHLTH+.",
+                    "Azure-stemmer krever ATHLTH+."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+            } else if allowsAzureWorkoutText {
+                Button {
+                    showingRevokeConsent = true
+                } label: {
+                    Text(tr("Turn off Microsoft voice", "Slå av Microsoft-tale"))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .underline()
+                }
+                .buttonStyle(.plain)
+            }
+
+            if session.hasPaidAccess, let message = preview.message ?? catalogMessage {
                 Text(message)
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            if let catalogMessage, preview.message == nil {
-                Label(catalogMessage, systemImage: "info.circle")
                     .font(.caption2)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
             }
-
-            Text(ATHLTHLocalization.choose(
-                english: "Azure voices require ATHLTH+. Apple Watch uses its own local voice whenever iPhone audio is unavailable. The existing system-voice menu is always available.",
-                norwegian: "Azure-stemmer krever ATHLTH+. Apple Watch bruker lokal stemme når iPhone-lyden ikke er tilgjengelig. De vanlige systemstemmene er fortsatt tilgjengelige."
-            ))
-            .font(.caption2)
-            .foregroundStyle(ATHLTHTheme.mutedText)
-            .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(14)
-        .task { await loadAzureVoices() }
-        .onDisappear { preview.stop() }
+        .alert(
+            tr("Allow Microsoft voice?", "Tillate Microsoft-tale?"),
+            isPresented: Binding(
+                get: { pendingConsentVoice != nil },
+                set: { if !$0 { pendingConsentVoice = nil } }
+            )
+        ) {
+            Button(tr("Allow and select", "Tillat og velg")) {
+                guard let voice = pendingConsentVoice, session.hasPaidAccess else {
+                    pendingConsentVoice = nil
+                    return
+                }
+                allowsAzureWorkoutText = true
+                pendingConsentVoice = nil
+                select(voice)
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                pendingConsentVoice = nil
+            }
+        } message: {
+            Text(tr(
+                "Workout speech can include pace, distance, time and heart rate. The speech text is sent to Microsoft for audio generation. GPS tracks and workout history are not sent. You can withdraw consent at any time.",
+                "Talebeskjeder kan inneholde tempo, distanse, tid og puls. Teksten sendes til Microsoft for å lage tale. GPS-spor og treningshistorikk sendes ikke. Du kan trekke tilbake samtykket når som helst."
+            ))
+        }
+        .confirmationDialog(
+            tr("Turn off Microsoft voice?", "Slå av Microsoft-tale?"),
+            isPresented: $showingRevokeConsent,
+            titleVisibility: .visible
+        ) {
+            Button(tr("Turn off", "Slå av"), role: .destructive) {
+                allowsAzureWorkoutText = false
+                if ATHLTHAzureCoachVoice.key(
+                    settings.audioCoachVoiceIdentifier
+                ) != nil {
+                    settings.audioCoachVoiceIdentifier = nil
+                }
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+        }
+        .task {
+            await loadAzureVoices()
+        }
+        .onDisappear {
+            preview.stop()
+        }
     }
 }
