@@ -92,12 +92,11 @@ enum ATHLTHPremiumStrengthSessions {
     }
 
     static func blocks(for recipe: Recipe) -> [WorkoutTemplateBlock] {
-        let tr = ATHLTHLocalization.choose
         var result: [WorkoutTemplateBlock] = [
             WorkoutTemplateBlock(
                 sequence: 1,
                 kind: .note,
-                title: tr(english: "Warm-up and lighter practice sets",
+                title: ATHLTHLocalization.choose(english: "Warm-up and lighter practice sets",
                           norwegian: "Oppvarming og lette innkjøringssett"),
                 exerciseSlug: nil,
                 distanceMeters: nil,
@@ -105,7 +104,7 @@ enum ATHLTHPremiumStrengthSessions {
                 durationSeconds: TimeInterval(recipe.warmupMinutes * 60),
                 targetWeightKilograms: nil,
                 loadNote: nil,
-                notes: tr(
+                notes: ATHLTHLocalization.choose(
                     english: "Start with gentle movement. Practise the first lift with a light weight of your own choosing before working sets. Stop or adapt if you feel pain.",
                     norwegian: "Start med rolig bevegelse. Øv inn første løft med en lett vekt du velger selv før arbeidssettene. Stopp eller tilpass ved smerte."
                 ),
@@ -123,7 +122,7 @@ enum ATHLTHPremiumStrengthSessions {
                  : move.name)
             let repTarget = move.durationSeconds.map { "\($0) s" } ??
                 "\(move.repsMin ?? 0)–\(move.repsMax ?? 0)"
-            let instruction = tr(
+            let instruction = ATHLTHLocalization.choose(
                 english: "\(repTarget) per set · \(move.rir) reps in reserve (RIR). You choose the weight and may change it before or between sets.",
                 norwegian: "\(repTarget) per sett · \(move.rir) repetisjoner i reserve (RIR). Du velger vekten og kan endre den før eller mellom settene."
             )
