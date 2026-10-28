@@ -1498,8 +1498,16 @@ struct WorkoutTemplateDetailView: View {
     }
 
     private var libraryDisplayBlocks: [WorkoutTemplateBlock] {
-        savedPersonalWorkout?.workoutBlocks.map { $0 } ??
+        savedPersonalWorkout?.resolvedWorkoutBlocks ??
             ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+    }
+
+    private var workoutForStarting: PlannedSession {
+        if let savedPersonalWorkout { return savedPersonalWorkout }
+        var original = entry.plannedSession()
+        original.workoutBlocks =
+            ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+        return original
     }
 
     private func savePersonalWorkout(blocks: [WorkoutTemplateBlock]) {
@@ -1712,13 +1720,7 @@ struct WorkoutTemplateDetailView: View {
             Text(shareError ?? "")
         }
         .fullScreenCover(isPresented: $showingWorkout) {
-            StructuredWorkoutSessionView(workout: savedPersonalWorkout ??
-                {
-                    var original = entry.plannedSession()
-                    original.workoutBlocks =
-                        ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
-                    return original
-                }())
+            StructuredWorkoutSessionView(workout: workoutForStarting)
                 .environmentObject(session)
         }
         .sheet(isPresented: $showingEditor) {
