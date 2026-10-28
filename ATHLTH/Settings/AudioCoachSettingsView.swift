@@ -191,6 +191,7 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
 struct ATHLTHAudioCoachSettingsView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @State private var showAdvancedSettings = false
+    @State private var showGuidanceChoices = false
     @State private var showingCustomTimeInterval = false
     @State private var customTimeMinutes = 5
     @State private var customTimeSeconds = 0
@@ -198,46 +199,26 @@ struct ATHLTHAudioCoachSettingsView: View {
     var body: some View {
         ZStack {
             premiumBackground
-
             ScrollView {
-                ATHLTHPlusFeatureGate(
-                    feature: .audioCoach,
-                    title:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Audio Coach is part of ATHLTH+",
-                            norwegian:
-                                "Audio Coach er en del av ATHLTH+"
-                        ),
-                    message:
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Unlock spoken workout updates, route progress and structured workout guidance.",
-                            norwegian:
-                                "Få talte treningsoppdateringer, rutefremdrift og veiledning i strukturerte økter."
-                        )
-                ) {
-                    VStack(spacing: 0) {
-                        defaultsSection
-                        experienceSection
-                        speakingToneQuickSection
-                        voiceSection
-                        advancedOptionsToggle
-                        if showAdvancedSettings {
-                            contentLevelSection
-                            speechStyleSection
-                            triggerSection
-                            updateSection
-                            eventSection
-                            routeAndStructureSection
-                            fuelHydrationSection
-                            musicSection
-                        }
+                VStack(spacing: 0) {
+                    // ATHLTH+ applies to premium voices and workout features,
+                    // not to discovering local voices or editing preferences.
+                    experienceSection
+                    speakingToneQuickSection
+                    voiceSection
+                    advancedOptionsToggle
+                    if showAdvancedSettings {
+                        triggerSection
+                        updateSection
+                        eventSection
+                        routeAndStructureSection
+                        fuelHydrationSection
+                        musicSection
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.top, 16)
-                    .padding(.bottom, 42)
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 42)
             }
             .scrollIndicators(.hidden)
         }
@@ -432,99 +413,143 @@ struct ATHLTHAudioCoachSettingsView: View {
             preset.distanceIntervalKilometers
     }
 
+    /// Single, tappable guidance control. The previous second guidance-level
+    /// card exposed the same settings and caused conflicting UI states.
     private var experienceSection: some View {
         premiumSection(ATHLTHLocalization.choose(
-            english: "How much guidance?",
-            norwegian: "Hvor mye veiledning?"
+            english: "Guidance", norwegian: "Veiledning"
         )) {
             premiumCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose a level. ATHLTH adapts messages to the workout.",
-                        norwegian: "Velg et nivå. ATHLTH tilpasser meldingene til treningen."
-                    ))
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    HStack(spacing: 7) {
-                        ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
-                            Button {
-                                applyExperience(preset)
-                            } label: {
-                                VStack(spacing: 5) {
-                                    Text(preset.title)
-                                        .font(.subheadline.weight(.semibold))
-                                    Text(preset.subtitle)
-                                        .font(.caption2)
-                                        .multilineTextAlignment(.center)
-                                        .lineLimit(2)
-                                        .minimumScaleFactor(0.85)
-                                }
-                                .frame(maxWidth: .infinity, minHeight: 75)
-                                .foregroundStyle(selectedExperience == preset
-                                    ? Color.white : ATHLTHTheme.primaryText)
-                                .background(selectedExperience == preset
-                                    ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 15))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityAddTraits(
-                                selectedExperience == preset ? .isSelected : []
-                            )
+                VStack(spacing: 0) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            showGuidanceChoices.toggle()
                         }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "waveform.path")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                                .frame(width: 32, height: 32)
+                                .background(ATHLTHTheme.accentSoft,
+                                            in: RoundedRectangle(cornerRadius: 10))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "How much guidance?",
+                                    norwegian: "Hvor mye veiledning?"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Text(selectedExperience?.title ??
+                                     ATHLTHLocalization.choose(
+                                        english: "Custom", norwegian: "Tilpasset"
+                                     ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer(minLength: 0)
+                            Image(systemName: showGuidanceChoices
+                                  ? "chevron.up" : "chevron.down")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .padding(16)
+                        .contentShape(Rectangle())
                     }
-                    if selectedExperience == nil {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Custom settings are kept until you select a preset.",
-                            norwegian: "Ditt tilpassede oppsett beholdes til du velger et nivå."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    .buttonStyle(.plain)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Show or hide guidance levels",
+                        norwegian: "Vis eller skjul veiledningsnivåer"
+                    ))
+                    .accessibilityValue(showGuidanceChoices
+                        ? ATHLTHLocalization.choose(english: "Expanded", norwegian: "Utvidet")
+                        : ATHLTHLocalization.choose(english: "Collapsed", norwegian: "Lukket"))
+
+                    if showGuidanceChoices {
+                        premiumDivider
+                        VStack(spacing: 8) {
+                            ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
+                                Button {
+                                    applyExperience(preset)
+                                } label: {
+                                    HStack(spacing: 12) {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(preset.title)
+                                                .font(.subheadline.weight(.semibold))
+                                            Text(preset.subtitle)
+                                                .font(.caption)
+                                                .foregroundStyle(
+                                                    selectedExperience == preset
+                                                        ? Color.white.opacity(0.8)
+                                                        : ATHLTHTheme.mutedText
+                                                )
+                                        }
+                                        Spacer(minLength: 0)
+                                        if selectedExperience == preset {
+                                            Image(systemName: "checkmark.circle.fill")
+                                        }
+                                    }
+                                    .foregroundStyle(selectedExperience == preset
+                                        ? Color.white : ATHLTHTheme.primaryText)
+                                    .padding(13)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(selectedExperience == preset
+                                        ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
+                                        in: RoundedRectangle(cornerRadius: 13))
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(
+                                    selectedExperience == preset ? .isSelected : []
+                                )
+                            }
+                        }
+                        .padding(14)
                     }
                 }
-                .padding(16)
             }
         }
     }
 
     private var speakingToneQuickSection: some View {
         premiumSection(ATHLTHLocalization.choose(
-            english: "How should the coach sound?",
-            norwegian: "Hvordan skal coachen snakke?"
+            english: "Speaking style", norwegian: "Talemåte"
         )) {
             premiumCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose a motivating or calm tone, independently of how many updates you hear.",
-                        norwegian: "Velg rolig eller motiverende talemåte, uavhengig av hvor ofte du får meldinger."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                    HStack(spacing: 8) {
-                        ForEach([
-                            ATHLTHCoachSpeechStyle.balanced,
-                            .motivating
-                        ]) { style in
-                            Button {
-                                settings.audioCoachSpeechStyle = style
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: style == .motivating
-                                        ? "flame.fill" : "waveform")
-                                    Text(style.title)
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 8),
+                    GridItem(.flexible(), spacing: 8)
+                ], spacing: 8) {
+                    ForEach(ATHLTHCoachSpeechStyle.allCases) { style in
+                        Button {
+                            settings.audioCoachSpeechStyle = style
+                        } label: {
+                            HStack(spacing: 7) {
+                                Text(style.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.85)
+                                Spacer(minLength: 0)
+                                if settings.audioCoachSpeechStyle == style {
+                                    Image(systemName: "checkmark")
+                                        .font(.caption.bold())
                                 }
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity, minHeight: 50)
-                                .foregroundStyle(settings.audioCoachSpeechStyle == style
-                                    ? Color.white : ATHLTHTheme.primaryText)
-                                .background(settings.audioCoachSpeechStyle == style
-                                    ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 14))
                             }
-                            .buttonStyle(.plain)
+                            .padding(12)
+                            .frame(maxWidth: .infinity, minHeight: 48)
+                            .foregroundStyle(settings.audioCoachSpeechStyle == style
+                                ? Color.white : ATHLTHTheme.primaryText)
+                            .background(settings.audioCoachSpeechStyle == style
+                                ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
+                                in: RoundedRectangle(cornerRadius: 13))
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            settings.audioCoachSpeechStyle == style ? .isSelected : []
+                        )
                     }
                 }
-                .padding(16)
+                .padding(14)
             }
         }
     }
@@ -739,21 +764,13 @@ struct ATHLTHAudioCoachSettingsView: View {
     }
 
     private var voiceSection: some View {
-        premiumSection(
-            ATHLTHLocalization.choose(
-                english: "Voice",
-                norwegian: "Stemme"
-            )
-        ) {
+        premiumSection(ATHLTHLocalization.choose(
+            english: "Voices", norwegian: "Stemmer"
+        )) {
             premiumCard {
                 languageMenu
-
                 premiumDivider
-
-                voiceMenu
-
-                if settings.audioCoachLanguage == .norwegian {
-                    premiumDivider
+                VStack(alignment: .leading, spacing: 0) {
                     ATHLTHCoachVoiceChoices(
                         selectedIdentifier: $settings.audioCoachVoiceIdentifier,
                         language: settings.audioCoachLanguage,
@@ -762,145 +779,32 @@ struct ATHLTHAudioCoachSettingsView: View {
                         duckOtherAudio: settings.audioCoachDuckOtherAudio,
                         speechStyle: settings.audioCoachSpeechStyle
                     )
-                }
-
-                premiumDivider
-                ATHLTHAzureCoachVoicePreviewView()
-
-                premiumDivider
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 18
-                ) {
+                    if settings.audioCoachLanguage == .norwegian {
+                        ATHLTHAzureCoachVoicePreviewView()
+                    }
                     if showAdvancedSettings {
-                    sliderSetting(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Speaking speed",
-                                norwegian:
-                                    "Talehastighet"
+                        Divider().padding(.vertical, 8)
+                        sliderSetting(
+                            title: ATHLTHLocalization.choose(
+                                english: "Speaking speed", norwegian: "Talehastighet"
                             ),
-                        valueTitle:
-                            speechRateTitle,
-                        value:
-                            $settings
-                                .audioCoachSpeechRate,
-                        range:
-                            0.38...0.60,
-                        step: 0.01
-                    )
-
-                    sliderSetting(
-                        title:
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Voice volume",
-                                norwegian:
-                                    "Stemmevolum"
+                            valueTitle: speechRateTitle,
+                            value: $settings.audioCoachSpeechRate,
+                            range: 0.38...0.60,
+                            step: 0.01
+                        )
+                        sliderSetting(
+                            title: ATHLTHLocalization.choose(
+                                english: "Voice volume", norwegian: "Stemmevolum"
                             ),
-                        valueTitle:
-                            "\(Int((settings.audioCoachSpeechVolume * 100).rounded()))%",
-                        value:
-                            $settings
-                                .audioCoachSpeechVolume,
-                        range:
-                            0.3...1.0,
-                        step: 0.05
-                    )
-
-                    }
-
-                    Button {
-                        ATHLTHAudioCoachPreviewSpeaker
-                            .shared
-                            .speak(
-                                language:
-                                    settings
-                                        .audioCoachLanguage,
-                                voiceIdentifier:
-                                    settings
-                                        .audioCoachVoiceIdentifier,
-                                speechRate:
-                                    settings
-                                        .audioCoachSpeechRate,
-                                speechVolume:
-                                    settings
-                                        .audioCoachSpeechVolume,
-                                duckOtherAudio:
-                                    settings
-                                        .audioCoachDuckOtherAudio,
-                                speechStyle:
-                                    settings
-                                        .audioCoachSpeechStyle
-                            )
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(
-                                systemName:
-                                    "speaker.wave.2.fill"
-                            )
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .premiumGold
-                            )
-
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Preview voice & style",
-                                    norwegian:
-                                        "Forhåndslytt på stemme og talemåte"
-                                )
-                            )
-                            .foregroundStyle(
-                                Color.white
-                            )
-                        }
-                        .font(
-                            .headline
-                        )
-                        .frame(
-                            maxWidth: .infinity
-                        )
-                        .frame(height: 52)
-                        .background(
-                            ATHLTHTheme.primaryText,
-                            in:
-                                RoundedRectangle(
-                                    cornerRadius: 17,
-                                    style: .continuous
-                                )
+                            valueTitle: "\(Int((settings.audioCoachSpeechVolume * 100).rounded()))%",
+                            value: $settings.audioCoachSpeechVolume,
+                            range: 0.3...1.0,
+                            step: 0.05
                         )
                     }
-                    .buttonStyle(.plain)
-
-                    HStack(
-                        alignment: .top,
-                        spacing: 8
-                    ) {
-                        Image(
-                            systemName:
-                                "info.circle"
-                        )
-                        .font(.caption)
-                        .padding(.top, 1)
-
-                        Text(
-                            voiceAvailabilityText
-                        )
-                        .font(.caption)
-                        .fixedSize(
-                            horizontal: false,
-                            vertical: true
-                        )
-                    }
-                    .foregroundStyle(
-                        ATHLTHTheme.mutedText
-                    )
                 }
-                .padding(16)
+                .padding(14)
             }
         }
     }
@@ -1647,15 +1551,6 @@ struct ATHLTHAudioCoachSettingsView: View {
         )
     }
 
-    private var voiceAvailabilityText: String {
-        ATHLTHLocalization.choose(
-            english:
-                "Automatic selects the best installed compatible voice. Enhanced and premium voices can be downloaded in iOS Settings; Apple Watch has its own voices.",
-            norwegian:
-                "Automatisk velger den beste kompatible stemmen som er installert. Forbedrede og premium-stemmer kan lastes ned i iOS-innstillinger. Apple Watch har egne stemmer."
-        )
-    }
-
     private var speechRateTitle: String {
         switch settings
             .audioCoachSpeechRate {
@@ -2147,14 +2042,8 @@ struct ATHLTHCoachVoiceChoices: View {
                 )
             }
 
-            Text(ATHLTHLocalization.choose(
-                english: "Only voices installed on this iPhone appear here. For more Norwegian voices and improved quality: Settings → Accessibility → Spoken Content → Voices → Norwegian. Download an available enhanced or premium voice, then return to ATHLTH. Apple Watch has a separate voice catalog.",
-                norwegian: "Her vises bare stemmer installert på denne iPhonen. Se etter flere norske stemmer og bedre kvalitet under Innstillinger → Tilgjengelighet → Opplest innhold → Stemmer → Norsk. Last ned en forbedret eller premium-stemme dersom den tilbys, og gå tilbake til ATHLTH. Apple Watch har egne stemmer."
-            ))
-            .font(.caption)
-            .foregroundStyle(ATHLTHTheme.mutedText)
-            .fixedSize(horizontal: false, vertical: true)
+
         }
-        .padding(14)
+        .padding(.horizontal, 0)
     }
 }
