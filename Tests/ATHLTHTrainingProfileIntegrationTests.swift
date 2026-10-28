@@ -40,7 +40,7 @@ final class ATHLTHTrainingProfileIntegrationTests: XCTestCase {
     func testGoalsKeepExistingPrimaryAndStatusSemantics() {
         let store = GoalStore()
         let first = ATHLTHGoal(title: "Run 10 km", category: .endurance,
-                               dataSource: .manual, isPrimary: true)
+                               isPrimary: true, dataSource: .manual)
         let second = ATHLTHGoal(title: "Build strength", category: .strength,
                                 dataSource: .manual)
         store.add(first)
