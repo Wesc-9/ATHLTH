@@ -70,9 +70,9 @@ enum GoalCategory: String, CaseIterable, Identifiable, Codable, Hashable {
                 norwegian: "Mål knyttet til spesifikke øvelser."
             )
         case .body:
-            return ATHLTHLocalization.format(
-                english: "Body-weight goals.",
-                norwegian: "Mål for kroppsvekt og sammensetning."
+            return ATHLTHLocalization.choose(
+                english: "Weight, waist, arm and other body measurements.",
+                norwegian: "Vekt, midje, overarm og andre kroppsmål."
             )
         case .consistency:
             return ATHLTHLocalization.format(
@@ -381,6 +381,15 @@ struct GoalTarget: Codable, Hashable {
     var exerciseName: String?
 }
 
+/// Per-goal, voluntary measurement check-ins; stored with goals.
+struct ATHLTHBodyGoalConfiguration: Codable, Hashable {
+    var metric: ATHLTHBodyMetric
+    var baseline: Double
+    var target: Double
+    var checkInIntervalDays: Int
+    var notificationsEnabled: Bool
+}
+
 struct ATHLTHGoal: Identifiable, Codable, Hashable {
     let id: UUID
     var title: String
@@ -400,6 +409,8 @@ struct ATHLTHGoal: Identifiable, Codable, Hashable {
     var milestones: [GoalMilestone]
     var linkedTrainingPlanID: UUID?
     var completedAt: Date?
+    /// Optional so previously created goals continue decoding unchanged.
+    var bodyMeasurementGoal: ATHLTHBodyGoalConfiguration?
 
     init(
         id: UUID = UUID(),
@@ -419,7 +430,8 @@ struct ATHLTHGoal: Identifiable, Codable, Hashable {
         target: GoalTarget? = nil,
         milestones: [GoalMilestone] = [],
         linkedTrainingPlanID: UUID? = nil,
-        completedAt: Date? = nil
+        completedAt: Date? = nil,
+        bodyMeasurementGoal: ATHLTHBodyGoalConfiguration? = nil
     ) {
         self.id = id
         self.title = title
@@ -439,6 +451,7 @@ struct ATHLTHGoal: Identifiable, Codable, Hashable {
         self.milestones = milestones
         self.linkedTrainingPlanID = linkedTrainingPlanID
         self.completedAt = completedAt
+        self.bodyMeasurementGoal = bodyMeasurementGoal
     }
 
     var progress: Double {
