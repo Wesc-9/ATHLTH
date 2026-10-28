@@ -59,6 +59,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var showingOriginalPlanManager = false
     @State private var browsingMyPlans = false
     @State private var showingTemplates = false
+    @State private var showingFavoritePlans = false
     @State private var showingEditor = false
     @State private var showingProgress = false
     @State private var showingGoals = false
@@ -463,15 +464,15 @@ struct ATHLTHTrainPlanPremiumView: View {
                         ),
                         spacing: 9
                     ) {
-                        referenceEmptyAction(tr("Use template", "Bruk mal"),
-                                             caption: tr("Ready plans", "Ferdige planer"),
-                                             symbol: "doc.text") {
+                        referenceEmptyAction(tr("Plans", "Planer"),
+                                             caption: tr("Browse plans", "Utforsk planer"),
+                                             symbol: "books.vertical") {
                             showingTemplates = true
                         }
-                        referenceEmptyAction(tr("Build yourself", "Lag selv"),
-                                             caption: tr("From scratch", "Fra bunnen av"),
-                                             symbol: "square.and.pencil") {
-                            beginNewPlanCreation()
+                        referenceEmptyAction(tr("Favorites", "Favoritter"),
+                                             caption: tr("Saved plans", "Lagrede planer"),
+                                             symbol: "star") {
+                            showingFavoritePlans = true
                         }
                         referenceEmptyAction(tr("AI coach", "AI-coach"),
                                              caption: tr("Personal guidance", "Personlig hjelp"),
@@ -1978,7 +1979,17 @@ struct ATHLTHTrainPlanPremiumView: View {
             Text(copyFeedback ?? "")
         }
         .sheet(isPresented: $showingTemplates) {
-            TrainingPlanLibrarySheet()
+            TrainingPlanLibrarySheet(onOpenSavedPlan: { planID in
+                focusedPlanID = planID
+                browsingMyPlans = false
+                selectedWeekIndex = nil
+                selectedDayID = nil
+                selectedWorkoutID = nil
+                showingTemplates = false
+            })
+        }
+        .sheet(isPresented: $showingFavoritePlans) {
+            TrainingPlanLibrarySheet(favoritePlansOnly: true)
         }
         .sheet(isPresented: $showingProgress) {
             if let plan {

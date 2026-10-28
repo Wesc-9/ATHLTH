@@ -1496,23 +1496,60 @@ extension TrainingPlanCatalogEntry {
     ]
 }
 
-/// A library presented as a sheet needs its own navigation and exit.
-/// Keep the content view reusable in existing navigation destinations.
+/// Plan collections: catalog and owned plans share one place. A separate
+/// Favorites shortcut opens a dedicated catalog list with a fixed star filter.
 struct TrainingPlanLibrarySheet: View {
+    enum Section: String, Hashable {
+        case library
+        case mine
+    }
+
     @Environment(\.dismiss) private var dismiss
+    var favoritePlansOnly = false
+    var onOpenSavedPlan: ((UUID) -> Void)? = nil
+    @State private var selectedSection: Section = .library
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
 
     var body: some View {
         NavigationStack {
-            TrainingPlanLibraryView(onPlanCreated: { dismiss() })
-                .toolbar(.visible, for: .navigationBar)
-                .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(ATHLTHLocalization.choose(english: "Close", norwegian: "Lukk")) {
-                            dismiss()
-                        }
-                        .fontWeight(.semibold)
+            VStack(spacing: 0) {
+                if !favoritePlansOnly {
+                    Picker(tr("Plans", "Planer"), selection: $selectedSection) {
+                        Text(tr("Library plans", "Bibliotekets planer")).tag(Section.library)
+                        Text(tr("My plans", "Mine planer")).tag(Section.mine)
                     }
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 12)
+                    .padding(.bottom, 4)
+                    .accessibilityLabel(tr("Choose plan collection", "Velg plansamling"))
                 }
+
+                if favoritePlansOnly {
+                    TrainingPlanLibraryView(onPlanCreated: { dismiss() },
+                                            favoritePlansOnly: true)
+                } else if selectedSection == .library {
+                    TrainingPlanLibraryView(onPlanCreated: { dismiss() })
+                } else if let onOpenSavedPlan {
+                    MyTrainingPlansLibraryView(onOpenPlan: { planID in
+                        dismiss()
+                        onOpenSavedPlan(planID)
+                    })
+                } else {
+                    MyTrainingPlansLibraryView()
+                }
+            }
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .toolbar(.visible, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button(tr("Close", "Lukk")) { dismiss() }
+                        .fontWeight(.medium)
+                }
+            }
         }
     }
 }
@@ -1523,12 +1560,13 @@ struct TrainingPlanLibraryView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var onPlanCreated: (() -> Void)? = nil
+    /// Dedicated Favorites view only. Not exposed as a catalog list filter.
+    var favoritePlansOnly = false
 
     @StateObject private var catalog = TrainingPlanLibraryStore()
     @State private var query = ""
     @State private var selectedCategory = "all"
     @State private var selectedMuscle: ExerciseMuscleGroup?
-    @State private var favoritesOnly = false
     @State private var sessionsPerWeekFilter: Int?
     @State private var weeklySortAscending: Bool?
     @FocusState private var searchFocused: Bool
@@ -1607,7 +1645,7 @@ struct TrainingPlanLibraryView: View {
 
     private var hasActiveFilters: Bool {
         !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-        selectedCategory != "all" || favoritesOnly ||
+        selectedCategory != "all" || favoritePlansOnly ||
         selectedMuscle != nil || sessionsPerWeekFilter != nil
     }
 
@@ -1624,7 +1662,7 @@ struct TrainingPlanLibraryView: View {
                 selectedCategory == "all" || entry.category == selectedCategory
             let muscleMatches =
                 selectedMuscle.map { entry.explicitlyTargets($0) } ?? true
-            let favoriteMatches = !favoritesOnly || favorites.isFavorite(
+            let favoriteMatches = !favoritePlansOnly || favorites.isFavorite(
                 .plan, itemID: entry.id.uuidString
             )
             let searchMatches = ATHLTHWorkoutSearch.matches(
@@ -1697,14 +1735,14 @@ struct TrainingPlanLibraryView: View {
 
                     if filteredEntries.isEmpty {
                         ContentUnavailableView(
-                            favoritesOnly
+                            favoritePlansOnly
                                 ? tr("No favorite plans yet", "Ingen favorittplaner ennå")
                                 : tr("No plans found", "Fant ingen treningsplaner"),
-                            systemImage: favoritesOnly
+                            systemImage: favoritePlansOnly
                                 ? "star" : "calendar.badge.exclamationmark",
-                            description: Text(favoritesOnly
-                                ? tr("Save a plan with the star to see it here.",
-                                     "Trykk på stjernen på en plan for å lagre den her.")
+                            description: Text(favoritePlansOnly
+                                ? tr("Mark a library plan with a star to save it here.",
+                                     "Trykk på stjernen på en plan i biblioteket for å lagre den her.")
                                 : tr("Try a different search or remove a filter.",
                                      "Prøv et annet søk eller fjern et filter."))
                         )
@@ -1726,7 +1764,9 @@ struct TrainingPlanLibraryView: View {
             .scrollDismissesKeyboard(.interactively)
         }
         .background(canvas.ignoresSafeArea())
-        .navigationTitle(tr("Training plans", "Treningsplaner"))
+        .navigationTitle(favoritePlansOnly
+            ? tr("Favorite plans", "Favorittplaner")
+            : tr("Plans", "Planer"))
         .navigationBarTitleDisplayMode(.inline)
         .task {
             async let plans: Void = catalog.refresh()
@@ -1744,18 +1784,25 @@ struct TrainingPlanLibraryView: View {
     // starts immediately, matching Train's restrained editorial styling.
     private var libraryHeading: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(tr("PLAN LIBRARY", "PLANBIBLIOTEK"))
+            Text(favoritePlansOnly
+                 ? tr("FAVORITE PLANS", "FAVORITTPLANER")
+                 : tr("PLAN LIBRARY", "PLANBIBLIOTEK"))
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(2.3)
                 .foregroundStyle(bronze)
 
-            Text(tr("Find your next plan", "Finn din neste plan"))
+            Text(favoritePlansOnly
+                 ? tr("Your favorite plans", "Dine favorittplaner")
+                 : tr("Find your next plan", "Finn din neste plan"))
                 .font(.system(size: 34, weight: .regular, design: .serif))
                 .foregroundStyle(ink)
                 .accessibilityAddTraits(.isHeader)
 
-            Text(tr("Choose a plan and make it yours.",
-                    "Finn en treningsplan som passer målene dine."))
+            Text(favoritePlansOnly
+                 ? tr("Plans you've starred, ready when you need them.",
+                      "Planene du har merket med stjerne, samlet på ett sted.")
+                 : tr("Choose a plan and make it yours.",
+                      "Finn en treningsplan som passer målene dine."))
                 .font(.subheadline)
                 .foregroundStyle(muted)
 
@@ -1839,18 +1886,6 @@ struct TrainingPlanLibraryView: View {
                     }
                     .buttonStyle(.plain)
                 }
-                Button {
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        favoritesOnly.toggle()
-                    }
-                } label: {
-                    categoryChip(
-                        tr("Favorites", "Favoritter"),
-                        systemImage: "star",
-                        selected: favoritesOnly
-                    )
-                }
-                .buttonStyle(.plain)
             }
             .padding(.vertical, 4)
         }
@@ -2081,13 +2116,14 @@ struct TrainingPlanLibraryView: View {
                     }
                 }
             }
-            if hasActiveFilters || filterCount > 0 {
+            if !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                selectedCategory != "all" || selectedMuscle != nil ||
+                filterCount > 0 {
                 Divider()
                 Button {
                     query = ""
                     selectedCategory = "all"
                     selectedMuscle = nil
-                    favoritesOnly = false
                     sessionsPerWeekFilter = nil
                     weeklySortAscending = nil
                 } label: {
