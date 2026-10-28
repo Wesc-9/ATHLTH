@@ -99,6 +99,7 @@ enum ATHLTHBodyGoalCheckInPolicy {
         guard let config = goal.bodyMeasurementGoal,
               goal.status == .active,
               (7...30).contains(config.checkInIntervalDays) else { return nil }
+        if progress(goal, profile: profile) >= 1 { return nil }
         if let deadline = goal.deadline,
            let followingDay = calendar.date(byAdding: .day, value: 1,
                                             to: calendar.startOfDay(for: deadline)),
@@ -158,7 +159,10 @@ enum ATHLTHBodyGoalReminderScheduler {
 
         let now = Date()
         let active = goals.flatMap { goal -> [(Date, ATHLTHGoal)] in
-            dueDatesForSchedule(goal, now: now).filter {
+            guard ATHLTHBodyGoalCheckInPolicy.progress(
+                goal, profile: profile
+            ) < 1 else { return [] }
+            return dueDatesForSchedule(goal, now: now).filter {
                 !ATHLTHBodyGoalCheckInPolicy.completedPeriod(
                     goal: goal, due: $0, profile: profile, now: now
                 )
