@@ -101,7 +101,14 @@ jobs:
           import subprocess
           import sys
 
-          roots = [Path("ATHLTH"), Path("ATHLTHWatchApp"), Path("Shared")]
+          # Parse every Swift target including unit tests and the actual
+          # Watch extension. Syntax errors in Tests previously escaped this
+          # preflight and wasted the long simulator XCTest build.
+          roots = [
+              Path("ATHLTH"), Path("ATHLTHWatchExtension"),
+              Path("ATHLTHWatchWidgets"), Path("ATHLTHWidgets"),
+              Path("Shared"), Path("Tests"),
+          ]
           sources = sorted(
               str(source)
               for root in roots if root.is_dir()
