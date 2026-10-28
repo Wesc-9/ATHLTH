@@ -351,7 +351,9 @@ struct RunningWorkoutDetailView: View {
 
     /// Open the athlete's copy, if one exists, without modifying the library master.
     private var previewWorkout: RunningWorkoutTemplate {
-        personalCopy ?? workout
+        personalCopy ?? (workout.isBuiltIn
+            ? ATHLTHRunningLibraryDefaults.unpersonalized(workout)
+            : workout)
     }
 
     private func continueWithSavedCopy() {
