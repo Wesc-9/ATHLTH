@@ -49,6 +49,19 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         }
     }
 
+    /// Finds a user's saved copy without changing the immutable source workout.
+    /// Older copies are recognized by their original title.
+    func savedCopy(for source: RunningWorkoutTemplate) -> RunningWorkoutTemplate? {
+        guard source.isBuiltIn else { return nil }
+        let original = ATHLTHWorkoutSearch.normalized(source.title)
+        return customTemplates.sorted { $0.updatedAt > $1.updatedAt }.first { candidate in
+            if candidate.sharedSourceWorkoutID == source.id { return true }
+            guard candidate.sharedSourceWorkoutID == nil else { return false }
+            let name = ATHLTHWorkoutSearch.normalized(candidate.title)
+            return name == original || name == original + " copy"
+        }
+    }
+
     /// Curated, recognizable sessions. Reuse the actual library templates
     /// instead of duplicating workouts in a separate discovery catalog.
     static let featuredIntervalNumbers: [Int] = [51, 52, 53, 26, 5, 54]
@@ -148,6 +161,8 @@ final class RunningWorkoutLibraryStore: ObservableObject {
         editable.intervalGhostFollowRecovery = source.intervalGhostFollowRecovery
         editable.intervalGhostRecoverySlowdownPercent =
             source.intervalGhostRecoverySlowdownPercent
+        editable.sharedSourceWorkoutID = source.sharedSourceWorkoutID ??
+            (source.isBuiltIn ? source.id : nil)
         customTemplates.append(editable)
         persist()
         return editable
