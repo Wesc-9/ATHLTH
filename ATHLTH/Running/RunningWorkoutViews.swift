@@ -343,17 +343,27 @@ struct RunningWorkoutDetailView: View {
     @State private var editingBeforeStart = false
     @State private var askingForTargets = false
     @State private var pendingAddToPlan = false
-    @State private var recentPerformance: ATHLTHCompletedRunningPerformance?
+    @State private var lastHistory: ATHLTHLibraryWorkoutHistory.Summary?
+
+    private func refreshLastHistory() {
+        let records = ATHLTHRunningPerformanceHistory.load(
+            userID: session.profile.userID
+        )
+        lastHistory = ATHLTHLibraryWorkoutHistory.running(
+            id: workout.id, records: records
+        )
+    }
 
     private var personalCopy: RunningWorkoutTemplate? {
         library.savedCopy(for: workout)
     }
 
-    /// Open the athlete's copy, if one exists, without modifying the library master.
+    /// A catalogue page always shows the catalogue original. Personalized
+    /// copies appear only when opening that specific workout in My Workouts.
     private var previewWorkout: RunningWorkoutTemplate {
-        personalCopy ?? (workout.isBuiltIn
+        workout.isBuiltIn
             ? ATHLTHRunningLibraryDefaults.unpersonalized(workout)
-            : workout)
+            : workout
     }
 
     private func continueWithSavedCopy() {
@@ -402,33 +412,7 @@ struct RunningWorkoutDetailView: View {
                     blocks: previewWorkout.recipePreviewBlocks
                 )
 
-                if advancedMode, let record = recentPerformance,
-                   let speed = record.averageWorkSpeed, speed.isFinite, speed > 0 {
-                    HStack(alignment: .top, spacing: 9) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Your previous run",
-                                norwegian: "Din forrige gjennomføring"
-                            ))
-                            .font(.subheadline.weight(.semibold))
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Recorded pace, not a new target: ",
-                                    norwegian: "Registrert tempo, ikke nytt mål: "
-                                ) + String(format: "%d:%02d min/km",
-                                           Int((3_600 / speed).rounded()) / 60,
-                                           Int((3_600 / speed).rounded()) % 60)
-                            )
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        Spacer(minLength: 0)
-                    }
-                    .padding(13)
-                    .athlthPlanCard(radius: 16)
-                }
+                ATHLTHLastWorkoutHistoryCard(summary: lastHistory)
 
                 if let onStart {
                     Button {
@@ -580,20 +564,9 @@ struct RunningWorkoutDetailView: View {
                 dismiss()
             }
         }
-        .task {
-            guard workout.isBuiltIn else { return }
-            let candidates = ATHLTHRunningPerformanceHistory.load(
-                userID: session.profile.userID
-            )
-            let personalID = personalCopy?.id
-            let originalName = ATHLTHWorkoutSearch.normalized(workout.title)
-            recentPerformance = candidates.first { record in
-                let recordTitle = ATHLTHWorkoutSearch.normalized(record.title)
-                return record.workoutID == workout.id ||
-                    (personalID != nil && record.workoutID == personalID) ||
-                    recordTitle == originalName ||
-                    recordTitle == originalName + " copy"
-            }
+        .onAppear(perform: refreshLastHistory)
+        .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
+            refreshLastHistory()
         }
         .confirmationDialog(
             "Delete this running workout?",
