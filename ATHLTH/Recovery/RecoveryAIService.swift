@@ -93,6 +93,31 @@ enum RecoveryCoachMessageRole:
     case assistant
 }
 
+/// A structured Coach suggestion, not a persisted workout or plan. The
+/// athlete must review and approve any changes to ATHLTH training data.
+struct RecoveryCoachProposalStep: Codable, Hashable {
+    let title: String
+    let phase: String
+    let minutes: Int
+    let sets: Int
+    let repetitions: Int
+    let restSeconds: Int
+}
+
+struct RecoveryCoachProposal: Codable, Hashable {
+    let kind: String
+    let title: String
+    let summary: String
+    let activity: String
+    let durationMinutes: Int
+    let weekCount: Int
+    let sessionsPerWeek: Int
+    let steps: [RecoveryCoachProposalStep]
+
+    var isWorkout: Bool { kind == "workout" }
+    var isPlan: Bool { kind == "plan" }
+}
+
 struct RecoveryCoachMessage:
     Identifiable,
     Codable,
@@ -101,23 +126,27 @@ struct RecoveryCoachMessage:
     let role: RecoveryCoachMessageRole
     let text: String
     let createdAt: Date
+    let proposal: RecoveryCoachProposal?
 
     init(
         id: UUID = UUID(),
         role: RecoveryCoachMessageRole,
         text: String,
-        createdAt: Date = Date()
+        createdAt: Date = Date(),
+        proposal: RecoveryCoachProposal? = nil
     ) {
         self.id = id
         self.role = role
         self.text = text
         self.createdAt = createdAt
+        self.proposal = proposal
     }
 }
 
 struct RecoveryCoachReply: Hashable {
     let answer: String
     let quickQuestions: [String]
+    let proposal: RecoveryCoachProposal?
 }
 
 struct RecoveryCoachConversationState:
@@ -340,6 +369,7 @@ private struct RecoveryAICacheSignature: Codable {
 private struct RecoveryAIAnswer: Decodable {
     let answer: String
     let quickQuestions: [String]?
+    let proposal: RecoveryCoachProposal?
 }
 
 enum RecoveryCoachInboxPreferences {
@@ -918,6 +948,7 @@ final class RecoveryAIService {
 
         return RecoveryCoachReply(
             answer: response.answer,
+            proposal: response.proposal,
             quickQuestions:
                 Array(
                     (
