@@ -29,10 +29,16 @@ final class ATHLTHWorkoutSearchAndPresentationTests: XCTestCase {
         ), "Jogging")
         XCTAssertEqual(ATHLTHWorkoutStepCopy.title(
             for: steps[1], workoutTitle: workoutTitle, compact: true
-        ), "4x4 intervall · drag 1/4")
+        ), ATHLTHLocalization.choose(
+            english: "4x4 intervals · rep 1/4",
+            norwegian: "4x4 intervall · drag 1/4"
+        ))
         XCTAssertEqual(ATHLTHWorkoutStepCopy.title(
             for: steps[2], workoutTitle: workoutTitle, compact: true
-        ), "Aktiv pause · rolig jogg")
+        ), ATHLTHLocalization.choose(
+            english: "Active recovery · easy jog",
+            norwegian: "Aktiv pause · rolig jogg"
+        ))
         XCTAssertEqual(steps.filter { $0.resolvedPhase == .main }.count, 4)
     }
 
@@ -43,10 +49,16 @@ final class ATHLTHWorkoutSearchAndPresentationTests: XCTestCase {
         let steps = workout.recipePreviewBlocks
         XCTAssertEqual(ATHLTHWorkoutStepCopy.suggestedZone(
             for: steps[0], workoutTitle: workoutTitle
-        ), "Anbefalt pulssone S1–2")
+        ), ATHLTHLocalization.choose(
+            english: "Suggested HR zone Z1–2",
+            norwegian: "Anbefalt pulssone S1–2"
+        ))
         XCTAssertEqual(ATHLTHWorkoutStepCopy.suggestedZone(
             for: steps[1], workoutTitle: workoutTitle
-        ), "Anbefalt pulssone S4")
+        ), ATHLTHLocalization.choose(
+            english: "Suggested HR zone Z4",
+            norwegian: "Anbefalt pulssone S4"
+        ))
         XCTAssertNil(steps[1].targetHeartRateZone)
         var prescribed = steps[1]
         prescribed.targetHeartRateZone = 3
