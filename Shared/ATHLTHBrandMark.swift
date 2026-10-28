@@ -39,6 +39,10 @@ enum ATHLTHBrandSize {
 }
 
 struct ATHLTHMarkShape: Shape {
+    // Default remains the canonical ATHLTH mark; lighter presentations,
+    // such as the launch gate, can reduce stroke without replacing artwork.
+    var strokeScale: CGFloat = 1
+
     func path(in rect: CGRect) -> Path {
         func p(
             _ x: CGFloat,
@@ -58,7 +62,7 @@ struct ATHLTHMarkShape: Shape {
             min(
                 rect.width,
                 rect.height
-            ) * 0.155
+            ) * 0.155 * strokeScale
 
         var centerline =
             Path()
@@ -137,10 +141,14 @@ private struct ATHLTHFoldShape: Shape {
 struct ATHLTHBrandMark: View {
     var size: ATHLTHBrandSize = .standard
     var showTagline = false
+    // Opt-in weight adjustments keep the established logo unchanged
+    // throughout onboarding, headers, widgets and Apple Watch.
+    var wordmarkWeight: Font.Weight = .black
+    var markStrokeScale: CGFloat = 1
 
     var body: some View {
         VStack(spacing: size == .watch ? 2 : 3) {
-            ATHLTHMarkShape()
+            ATHLTHMarkShape(strokeScale: markStrokeScale)
                 .fill(Color.primary)
                 .frame(
                     width:
@@ -151,7 +159,7 @@ struct ATHLTHBrandMark: View {
             .accessibilityHidden(true)
 
             Text("ATHLTH")
-                .font(.system(size: size.wordmarkSize, weight: .black))
+                .font(.system(size: size.wordmarkSize, weight: wordmarkWeight))
                 .tracking(size.tracking)
                 .lineLimit(1)
                 .fixedSize()
