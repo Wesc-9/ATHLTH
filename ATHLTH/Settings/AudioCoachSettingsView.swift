@@ -1959,30 +1959,61 @@ struct ATHLTHCoachVoiceChoices: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
             }
 
-            Button {
-                selectedIdentifier = nil
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: selectedIdentifier == nil
-                          ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Automatic · best available",
-                            norwegian: "Automatisk · beste tilgjengelige"
-                        ))
-                        .font(.subheadline.weight(.medium))
-                        Text(ATHLTHLocalization.choose(
-                            english: "Prefers a higher-quality installed voice",
-                            norwegian: "Foretrekker en installert stemme med høyere kvalitet"
-                        ))
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+            HStack(spacing: 10) {
+                Button {
+                    selectedIdentifier = nil
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: selectedIdentifier == nil
+                              ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Automatic · best available",
+                                norwegian: "Automatisk · beste tilgjengelige"
+                            ))
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Best installed voice",
+                                norwegian: "Beste installerte stemme"
+                            ))
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer(minLength: 0)
                     }
-                    Spacer(minLength: 0)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(
+                    selectedIdentifier == nil ? .isSelected : []
+                )
+
+                Button {
+                    ATHLTHAudioCoachPreviewSpeaker.shared.speak(
+                        language: language,
+                        voiceIdentifier: nil,
+                        speechRate: speechRate,
+                        speechVolume: speechVolume,
+                        duckOtherAudio: duckOtherAudio,
+                        speechStyle: speechStyle
+                    )
+                } label: {
+                    Image(systemName: "play.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Preview automatic voice",
+                    norwegian: "Forhåndslytt på automatisk stemme"
+                ))
             }
-            .buttonStyle(.plain)
+            .padding(10)
+            .background(ATHLTHTheme.accentSoft.opacity(0.65),
+                        in: RoundedRectangle(cornerRadius: 14))
 
             ForEach(voices) { voice in
                 HStack(spacing: 10) {
@@ -2041,9 +2072,6 @@ struct ATHLTHCoachVoiceChoices: View {
                     in: RoundedRectangle(cornerRadius: 14)
                 )
             }
-
-
         }
-        .padding(.horizontal, 0)
     }
 }
