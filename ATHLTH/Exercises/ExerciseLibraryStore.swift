@@ -190,6 +190,7 @@ final class ExerciseLibraryStore: ObservableObject {
 
     private var accountID: UUID?
     private var cachedAllExercises: [ExerciseLibraryEntry]?
+    private var cachedSelectableExercises: [ExerciseLibraryEntry]?
     private var cachedBodyParts: [String]?
     private var cachedEquipmentOptions: [String]?
 
@@ -690,6 +691,7 @@ final class ExerciseLibraryStore: ObservableObject {
 
     private func invalidateDerivedCaches() {
         cachedAllExercises = nil
+        cachedSelectableExercises = nil
         cachedBodyParts = nil
         cachedEquipmentOptions = nil
         cachedSearchText = [:]
@@ -745,8 +747,15 @@ final class ExerciseLibraryStore: ObservableObject {
     /// Keep historical native exercise IDs available for old workout logs,
     /// but offer RepDB (and personal exercises) as the primary choices.
     var selectableExercises: [ExerciseLibraryEntry] {
-        guard !repDBExercises.isEmpty else { return allExercises }
-        return allExercises.filter { $0.source == .repDB || $0.source == .custom }
+        if let cachedSelectableExercises { return cachedSelectableExercises }
+        let resolved: [ExerciseLibraryEntry]
+        if repDBExercises.isEmpty {
+            resolved = allExercises
+        } else {
+            resolved = allExercises.filter { $0.source == .repDB || $0.source == .custom }
+        }
+        cachedSelectableExercises = resolved
+        return resolved
     }
 
     func search(
