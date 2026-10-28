@@ -64,7 +64,7 @@ enum ATHLTHIndoorRunDetection {
         guard isOutdoor, !manualPause, !hasPlannedRouteOrGhost, !alreadyPrompted,
               elapsedWallSeconds >= minimumElapsed,
               acceptedDistanceMeters.isFinite,
-              (0..<maximumDistanceMeters).contains(acceptedDistanceMeters),
+              (0...maximumDistanceMeters).contains(acceptedDistanceMeters),
               acceptedFixCount >= 3,
               let firstReliableFix, let lastReliableFix,
               lastReliableFix >= firstReliableFix,
