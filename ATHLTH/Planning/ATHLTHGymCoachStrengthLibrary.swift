@@ -207,7 +207,9 @@ enum ATHLTHGymCoachStrengthLibrary {
                 for: exercise.name
             )
             let title = NorwegianExerciseText.name(for: slug) ??
-                exercise.name
+                (ATHLTHLocalization.isNorwegian
+                    ? ATHLTHExerciseNameLocalization.norwegianName(for: exercise.name)
+                    : exercise.name)
             let loadDescription = ATHLTHLocalization.choose(
                 english: "\(exercise.targetRepsMin)–\(exercise.targetRepsMax) reps · \(exercise.targetRIR) reps in reserve",
                 norwegian: "\(exercise.targetRepsMin)–\(exercise.targetRepsMax) repetisjoner · \(exercise.targetRIR) i reserve"
