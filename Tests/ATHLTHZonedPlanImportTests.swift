@@ -194,10 +194,13 @@ final class ATHLTHZonedPlanImportTests: XCTestCase {
         XCTAssertTrue(recoveries.allSatisfy { $0.kind == .run })
         XCTAssertTrue(recoveries.allSatisfy { $0.resolvedPhase == .recovery })
         XCTAssertTrue(recoveries.allSatisfy {
-            $0.sourceIntensityZoneLabel == "Z1" &&
-            $0.targetHeartRateZone == 1 &&
-            $0.durationSeconds == 30
+            $0.sourceIntensityZoneLabel == "Z1" && $0.targetHeartRateZone == 1
         })
+        // Each 30-second jog between reps and the 3-minute jog between sets
+        // are active recoveries. Both must survive the Zoned import.
+        XCTAssertEqual(recoveries.filter { $0.durationSeconds == 30 }.count, 22)
+        XCTAssertEqual(recoveries.filter { $0.durationSeconds == 180 }.count, 1)
+        XCTAssertEqual(recoveries.count, 23)
     }
 
     @MainActor
