@@ -4209,36 +4209,90 @@ private struct HomeWeeklyProgressDaySheet: View {
             }
             .background(dayCanvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
-            .confirmationDialog(
-                ATHLTHLocalization.choose(
-                    english: "Remove planned workout?",
-                    norwegian: "Fjerne planlagt økt?"
-                ),
-                isPresented: $showingRemoveConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(
-                    ATHLTHLocalization.choose(
-                        english: "Remove from calendar",
-                        norwegian: "Fjern fra kalenderen"
-                    ),
-                    role: .destructive
-                ) {
-                    if let workoutPendingRemoval {
-                        removePlannedWorkout(workoutPendingRemoval)
+            .sheet(isPresented: $showingRemoveConfirmation, onDismiss: {
+                workoutPendingRemoval = nil
+            }) {
+                VStack(spacing: 18) {
+                    Capsule()
+                        .fill(Color.black.opacity(0.12))
+                        .frame(width: 38, height: 5)
+                        .padding(.top, 10)
+
+                    Image(systemName: "calendar.badge.minus")
+                        .font(.system(size: 24, weight: .medium))
+                        .foregroundStyle(Color(red: 0.56, green: 0.37, blue: 0.24))
+                        .frame(width: 58, height: 58)
+                        .background(Color(red: 0.97, green: 0.94, blue: 0.89), in: Circle())
+
+                    VStack(spacing: 8) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Remove from calendar?",
+                            norwegian: "Fjerne fra kalenderen?"
+                        ))
+                        .font(.system(size: 24, weight: .semibold, design: .serif))
+                        .foregroundStyle(dayInk)
+
+                        if let workoutPendingRemoval {
+                            Text(workoutPendingRemoval.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(dayInk)
+                                .lineLimit(2)
+                        }
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Only this scheduled workout will be removed. Your completed activities and saved workouts are kept.",
+                            norwegian: "Bare denne planlagte økten fjernes. Fullførte aktiviteter og lagrede økter beholdes."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
-                    self.workoutPendingRemoval = nil
+
+                    VStack(spacing: 10) {
+                        Button {
+                            guard let workout = workoutPendingRemoval else {
+                                showingRemoveConfirmation = false
+                                return
+                            }
+                            showingRemoveConfirmation = false
+                            removePlannedWorkout(workout)
+                        } label: {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Remove workout", norwegian: "Fjern økten"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .foregroundStyle(.white)
+                            .background(Color(red: 0.66, green: 0.29, blue: 0.27),
+                                        in: RoundedRectangle(cornerRadius: 16))
+                        }
+                        .buttonStyle(.plain)
+
+                        Button {
+                            showingRemoveConfirmation = false
+                        } label: {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Keep workout", norwegian: "Behold økten"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .foregroundStyle(dayInk)
+                            .background(Color.black.opacity(0.045),
+                                        in: RoundedRectangle(cornerRadius: 16))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                Button(ATHLTHLocalization.choose(
-                    english: "Cancel", norwegian: "Avbryt"
-                ), role: .cancel) {
-                    workoutPendingRemoval = nil
-                }
-            } message: {
-                Text(ATHLTHLocalization.choose(
-                    english: "Only this scheduled workout is removed. Completed activities and saved workouts remain.",
-                    norwegian: "Bare denne planlagte økten fjernes. Fullførte aktiviteter og lagrede økter beholdes."
-                ))
+                .padding(.horizontal, 25)
+                .padding(.bottom, 20)
+                .frame(maxWidth: .infinity)
+                .background(dayCanvas.ignoresSafeArea())
+                .presentationDetents([.height(370)])
+                .presentationDragIndicator(.hidden)
+                .presentationCornerRadius(30)
             }
             .alert(ATHLTHLocalization.choose(
                 english: "Could not remove workout",
