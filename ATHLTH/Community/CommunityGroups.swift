@@ -2390,13 +2390,14 @@ final class CommunityGroupStore: ObservableObject {
         eventID: UUID,
         status: String
     ) -> Int {
-        eventRSVPsByGroup.values
-            .flatMap { $0 }
-            .filter {
-                $0.eventID == eventID &&
-                $0.status == status
+        // Count directly across groups instead of flattening all RSVPs
+        // into an intermediate array for every count request.
+        eventRSVPsByGroup.values.reduce(into: 0) { count, responses in
+            for response in responses
+            where response.eventID == eventID && response.status == status {
+                count += 1
             }
-            .count
+        }
     }
 
     func mentionCandidates(
