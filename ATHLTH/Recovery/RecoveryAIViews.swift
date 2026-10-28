@@ -1021,6 +1021,13 @@ struct RecoveryCoachView: View {
     @State private var didLoadConversation =
         false
     @State private var coachPinned = true
+    @State private var insightExpanded = false
+    @State private var proposalActionNotice: String?
+    @State private var selectedCoachProposal: RecoveryCoachProposal?
+    @State private var showingCoachWorkoutBuilder = false
+    @State private var showingCoachPlanBuilder = false
+    @State private var showingCoachAddConfirmation = false
+    @State private var saveCoachPlanAsTemplate = false
     @State private var shareHealthForNextQuestion = false
     @State private var pendingHealthQuestion: String?
     @State private var showingHealthShareConfirmation = false
@@ -1058,13 +1065,11 @@ struct RecoveryCoachView: View {
                             alignment: .leading,
                             spacing: 14
                         ) {
-                            // Locally derived insight; opening this card never
-                            // sends health information to the AI provider.
-                            if context.recoveryScore != nil || !context.muscles.isEmpty {
-                                coachInsightCard
-                            }
+                            // The athlete's disclosure choice persists between visits.
+                            coachInsightDisclosure
 
                             if messages.isEmpty {
+                                coachStarterActions
                                 Text(
                                     recoveryAIText(
                                         "Ask a question to start a conversation. Coach remembers what you talk about on this device.",
@@ -1242,6 +1247,56 @@ struct RecoveryCoachView: View {
                         userID: session.profile.userID
                     )
             loadCoachConsent()
+            insightExpanded = UserDefaults.standard.bool(
+                forKey: "athlth.coach.insightExpanded.\(session.profile.userID.uuidString)"
+            )
+        }
+        .sheet(isPresented: $showingCoachWorkoutBuilder) {
+            if let proposal = selectedCoachProposal,
+               let prepared = ATHLTHCoachProposalBridge.workout(proposal) {
+                WorkoutTemplateBuilderView(
+                    initialTitle: prepared.title,
+                    initialBlocks: prepared.resolvedWorkoutBlocks,
+                    initialDurationOverrideMinutes: prepared.durationMinutes,
+                    draftContext: "coach-workout-\(proposal.title)"
+                )
+            }
+        }
+        .sheet(isPresented: $showingCoachPlanBuilder) {
+            if let proposal = selectedCoachProposal,
+               let seed = ATHLTHCoachProposalBridge.planSeed(proposal) {
+                AIProgramBuilderView(
+                    mode: .generate, seed: seed,
+                    onProgramCreatedPlanID: { planID in
+                        if saveCoachPlanAsTemplate,
+                           let saved = session.trainingPlan(withID: planID) {
+                            session.saveSharedPlan(saved)
+                        }
+                        saveCoachPlanAsTemplate = false
+                    }
+                )
+            }
+        }
+        .confirmationDialog(
+            recoveryAIText("Add this workout", "Legg til økten"),
+            isPresented: $showingCoachAddConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(recoveryAIText("Add to today", "Legg til i dag")) {
+                addCoachWorkout(dayOffset: 0)
+            }
+            Button(recoveryAIText("Add to tomorrow", "Legg til i morgen")) {
+                addCoachWorkout(dayOffset: 1)
+            }
+            Button(recoveryAIText("Edit before adding", "Rediger før du legger til")) {
+                showingCoachWorkoutBuilder = true
+            }
+            Button(recoveryAIText("Cancel", "Avbryt"), role: .cancel) {}
+        } message: {
+            Text(recoveryAIText(
+                "This adds a separate planned session. It does not overwrite your active plan or save a copy to My Workouts.",
+                "Dette legger til en separat planlagt økt. Aktiv plan endres ikke, og økten lagres ikke automatisk i Mine økter."
+            ))
         }
         .sheet(isPresented: $showingCoachConsentSheet) {
             coachConsentSheet
