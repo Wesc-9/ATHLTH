@@ -164,6 +164,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var lapSummaries: [WatchWorkoutLapSummary] = []
     @Published private(set) var automaticPauseActive = false
     @Published private(set) var automaticPauseEnabled = false
+    @Published private(set) var indoorSuggestionAvailable = false
+    @Published private(set) var switchedIndoorVenue: ATHLTHIndoorRunVenue?
+    private var indoorPromptedInThisWorkout = false
+    private var indoorFirstFix: Date?
+    private var indoorLastFix: Date?
+    private var indoorFixCount = 0
+    private var indoorProbeDistanceMeters = 0.0
+    private var indoorPreviousReliableLocation: CLLocation?
     @Published private(set) var automaticPauseCount = 0
     @Published private(set) var averageHeartRate: Double?
     @Published private(set) var maxHeartRate: Double?
@@ -867,8 +875,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     // Location type is configured on the actual HealthKit session; .running
     // alone is not proof of an outdoor workout (e.g. treadmill sessions).
-    private var usesOutdoorGPS: Bool {
-        workoutSession?.workoutConfiguration.locationType == .outdoor
+    var usesOutdoorGPS: Bool {
+        switchedIndoorVenue == nil &&
+            workoutSession?.workoutConfiguration.locationType == .outdoor
     }
 
     var averagePaceSecondsPerKilometer: TimeInterval? {
@@ -3611,6 +3620,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workoutLocation = nil
         workoutLocationMetadataAttached = false
         startedAt = nil
+        resetIndoorProbeForNewWorkout()
         finishing = false
         mirroringActive = false
         mirroringRetryPending = false
@@ -3781,6 +3791,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         automaticPauseActive = false
         automaticPauseCount = 0
         manualPauseActive = false
+        resetIndoorProbeForNewWorkout()
         autoPauseDetector.reset(
             enabled:
                 (kind == .running ||
@@ -4033,6 +4044,110 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         startOrResumeTimedStrengthSet()
     }
 
+    private func resetIndoorProbeForNewWorkout() {
+        indoorSuggestionAvailable = false
+        switchedIndoorVenue = nil
+        indoorPromptedInThisWorkout = false
+        indoorFirstFix = nil
+        indoorLastFix = nil
+        indoorFixCount = 0
+        indoorProbeDistanceMeters = 0
+        indoorPreviousReliableLocation = nil
+    }
+
+    private func collectIndoorProbe(_ location: CLLocation) {
+        guard switchedIndoorVenue == nil, location.horizontalAccuracy >= 0,
+              location.horizontalAccuracy <= 30,
+              abs(location.timestamp.timeIntervalSinceNow) < 15 else { return }
+        if indoorFirstFix == nil { indoorFirstFix = location.timestamp }
+        indoorLastFix = location.timestamp
+        indoorFixCount += 1
+        if let previous = indoorPreviousReliableLocation {
+            let seconds = location.timestamp.timeIntervalSince(previous.timestamp)
+            if seconds > 0, seconds <= 30 {
+                let metres = location.distance(from: previous)
+                if metres.isFinite, metres >= 0, metres / seconds <= 12 {
+                    indoorProbeDistanceMeters += metres
+                }
+            }
+        }
+        indoorPreviousReliableLocation = location
+    }
+
+    private func evaluateIndoorSuggestion(now: Date) {
+        guard kind == .running, let startedAt else { return }
+        guard ATHLTHIndoorRunDetection.shouldOffer(
+            elapsedWallSeconds: now.timeIntervalSince(startedAt),
+            acceptedDistanceMeters: indoorProbeDistanceMeters,
+            firstReliableFix: indoorFirstFix,
+            lastReliableFix: indoorLastFix,
+            acceptedFixCount: indoorFixCount,
+            now: now,
+            isOutdoor: usesOutdoorGPS,
+            manualPause: manualPauseActive,
+            hasPlannedRouteOrGhost: plannedRoute != nil ||
+                ghostRaceConfiguration != nil,
+            alreadyPrompted: indoorPromptedInThisWorkout
+        ) else { return }
+        indoorPromptedInThisWorkout = true
+        indoorSuggestionAvailable = true
+        WKInterfaceDevice.current().play(.notification)
+    }
+
+    func dismissIndoorSuggestion() {
+        indoorSuggestionAvailable = false
+        indoorPromptedInThisWorkout = true
+    }
+
+    /// Start a new *activity* with indoor sensors inside the existing HealthKit
+    /// workout. Do not create a second session, reset intervals, or fake speed.
+    @discardableResult
+    func switchToIndoorRunning(_ venue: ATHLTHIndoorRunVenue) -> Bool {
+        guard kind == .running,
+              let session = workoutSession,
+              state == .running || automaticPauseActive,
+              !manualPauseActive else { return false }
+        if switchedIndoorVenue != nil {
+            switchedIndoorVenue = venue
+            indoorSuggestionAvailable = false
+            return true
+        }
+        let indoor = HKWorkoutConfiguration()
+        indoor.activityType = .running
+        indoor.locationType = .indoor
+        if automaticPauseActive {
+            automaticPauseActive = false
+            session.resume()
+        }
+        session.beginNewActivity(
+            configuration: indoor,
+            date: Date(),
+            metadata: ["ATHLTHIndoorVenue": venue.rawValue,
+                       "ATHLTHDetectedFromStationaryGPS": true]
+        )
+        switchedIndoorVenue = venue
+        indoorSuggestionAvailable = false
+        indoorPromptedInThisWorkout = true
+        automaticPauseEnabled = false
+        autoPauseDetector.reset(enabled: false)
+        locationManager.stopUpdatingLocation()
+        locationManager.allowsBackgroundLocationUpdates = false
+        lastAcceptedOutdoorLocation = nil
+        lastRenderedRouteLocation = nil
+        treadmillInclinePercent = venue == .treadmill ? 0 : nil
+        treadmillTargetPaceSecondsPerKilometer = nil
+        routeProgressPercent = nil
+        routeRemainingMeters = nil
+        routeDeviationMeters = nil
+        routeNavigationLatitude = nil
+        routeNavigationLongitude = nil
+        routeNavigationCourseDegrees = nil
+        ghostRaceConfiguration = nil
+        ghostRaceTitle = nil
+        persistWorkoutRecoveryState()
+        return true
+    }
+
     private func startTimer() {
         stopTimer()
 
@@ -4061,6 +4176,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         0
                     )
 
+                self.evaluateIndoorSuggestion(now: Date())
                 self.recordRunningMinuteIfDue()
                 self.advanceEmbeddedHybridIntervalIfNeeded(at: Date())
                 self.evaluateStructuredRunningWorkout()
@@ -8016,6 +8132,12 @@ private extension WatchWorkoutManager {
             filtered.sorted {
                 $0.timestamp < $1.timestamp
             }
+
+        if kind == .running {
+            for location in orderedLocations {
+                collectIndoorProbe(location)
+            }
+        }
 
         if automaticPauseEnabled &&
             (kind == .running ||
