@@ -44,10 +44,11 @@ enum ATHLTHWorkoutStepCopy {
     static func suggestedZone(for block: WorkoutTemplateBlock, workoutTitle: String) -> String? {
         guard isFourByFour(workoutTitle), block.kind == .run,
               block.targetHeartRateZone == nil else { return nil }
-        let zone = block.resolvedPhase == .main ? "4" : "1–2"
+        let isWork = block.resolvedPhase == .main
         return ATHLTHLocalization.choose(
-            english: "Suggested HR zone Z", norwegian: "Anbefalt pulssone S"
-        ) + zone
+            english: isWork ? "Suggested HR zone Z4" : "Suggested HR zone Z1–Z2",
+            norwegian: isWork ? "Anbefalt pulssone S4" : "Anbefalt pulssone S1–S2"
+        )
     }
 
     static func duration(_ seconds: TimeInterval) -> String {
