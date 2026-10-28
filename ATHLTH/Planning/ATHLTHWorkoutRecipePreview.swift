@@ -15,10 +15,12 @@ struct ATHLTHWorkoutRecipePreview: View {
     // Hide the duplicate hero/statistics when this detailed timeline is
     // embedded below an existing workout overview sheet.
     var embeddedInDetails = false
+    var onUpdateBlock: ((Int, WorkoutTemplateBlock) -> Void)? = nil
 
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @State private var advanced = false
     @State private var selectedExercise: WorkoutTemplateBlock?
+    @State private var editingStep: IndexedWorkoutStep?
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -75,6 +77,11 @@ struct ATHLTHWorkoutRecipePreview: View {
                 timeline
             } else {
                 simpleOutline
+            }
+        }
+        .sheet(item: $editingStep) { item in
+            ATHLTHWorkoutStepEditor(block: item.block) { updated in
+                onUpdateBlock?(item.index, updated)
             }
         }
         .sheet(item: $selectedExercise) { step in
@@ -240,7 +247,7 @@ struct ATHLTHWorkoutRecipePreview: View {
                         .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
                         .padding(.top, 10)
 
-                    recipeStep(block)
+                    recipeStep(block, index: index)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .background(alignment: .leading) {
@@ -268,18 +275,21 @@ struct ATHLTHWorkoutRecipePreview: View {
     }
 
     @ViewBuilder
-    private func recipeStep(_ block: WorkoutTemplateBlock) -> some View {
-        if block.kind == .exercise {
+    private func recipeStep(_ block: WorkoutTemplateBlock, index: Int) -> some View {
+        if advanced && onUpdateBlock != nil {
+            Button {
+                editingStep = IndexedWorkoutStep(index: index, block: block)
+            } label: {
+                recipeStepCard(block)
+            }
+            .buttonStyle(.plain)
+        } else if block.kind == .exercise {
             Button {
                 selectedExercise = block
             } label: {
                 recipeStepCard(block)
             }
             .buttonStyle(.plain)
-            .accessibilityHint(ATHLTHLocalization.choose(
-                english: "View exercise instructions, muscles and demonstration",
-                norwegian: "Vis utførelse, muskler og øvelsesinformasjon"
-            ))
         } else {
             Button {
                 selectedExercise = block
@@ -437,6 +447,92 @@ struct ATHLTHWorkoutRecipePreview: View {
             result.append(notes)
         }
         return result
+    }
+}
+
+private struct IndexedWorkoutStep: Identifiable {
+    let index: Int
+    let block: WorkoutTemplateBlock
+    var id: Int { index }
+}
+
+private struct ATHLTHWorkoutStepEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let block: WorkoutTemplateBlock
+    let onSave: (WorkoutTemplateBlock) -> Void
+    @State private var draft: WorkoutTemplateBlock
+
+    init(block: WorkoutTemplateBlock, onSave: @escaping (WorkoutTemplateBlock) -> Void) {
+        self.block = block
+        self.onSave = onSave
+        _draft = State(initialValue: block)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(ATHLTHLocalization.choose(english: "Step", norwegian: "Øktdel")) {
+                    TextField(ATHLTHLocalization.choose(english: "Name", norwegian: "Navn"),
+                              text: $draft.title)
+                    HStack {
+                        Text(ATHLTHLocalization.choose(english: "Duration (sec)", norwegian: "Varighet (sek)"))
+                        Spacer()
+                        TextField("0", value: $draft.durationSeconds, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+                Section(ATHLTHLocalization.choose(english: "Targets", norwegian: "Mål")) {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(english: "Pace (sec/km)", norwegian: "Tempo (sek/km)"))
+                        Spacer()
+                        TextField("0", value: $draft.targetPaceSecondsPerKilometer, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text(ATHLTHLocalization.choose(english: "Heart-rate zone", norwegian: "Pulssone"))
+                        Spacer()
+                        TextField("1–5", value: $draft.targetHeartRateZone, format: .number)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    HStack {
+                        Text(ATHLTHLocalization.choose(english: "Rest (sec)", norwegian: "Pause (sek)"))
+                        Spacer()
+                        TextField("0", value: $draft.restBetweenSetsSeconds, format: .number)
+                            .keyboardType(.decimalPad)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+                Section(ATHLTHLocalization.choose(english: "Notes", norwegian: "Notater")) {
+                    TextField(ATHLTHLocalization.choose(english: "Optional", norwegian: "Valgfritt"),
+                              text: Binding(get: { draft.notes ?? "" },
+                                            set: { draft.notes = $0.isEmpty ? nil : $0 }))
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(english: "Edit step", norwegian: "Rediger øktdel"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Save", norwegian: "Lagre")) {
+                        onSave(draft)
+                        dismiss()
+                    }
+                    .disabled(draft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                              (draft.durationSeconds ?? 0) < 0 ||
+                              (draft.restBetweenSetsSeconds ?? 0) < 0 ||
+                              (draft.targetPaceSecondsPerKilometer ?? 0) < 0 ||
+                              (draft.targetHeartRateZone != nil &&
+                               !(1...5).contains(draft.targetHeartRateZone!)))
+                }
+            }
+        }
     }
 }
 
