@@ -564,7 +564,7 @@ function normalizeCoachTrainingContext(input: unknown) {
   if (!input || typeof input !== "object" || Array.isArray(input)) return null;
   const obj = input as Record<string, unknown>;
   const clean = (value: unknown, limit = 100) =>
-    typeof value === "string" && !/[<>{}\\n\\r]/.test(value)
+    typeof value === "string" && !/[<>{}\n\r]/.test(value)
       ? value.trim().slice(0, limit) : "";
   const upcoming = Array.isArray(obj.upcoming) ? obj.upcoming.slice(0, 12)
     .flatMap((entry: unknown) => {
@@ -573,7 +573,7 @@ function normalizeCoachTrainingContext(input: unknown) {
       const title = clean(event.title);
       const date = clean(event.date, 40);
       const activity = clean(event.activity, 30);
-      if (!title || !/^\\d{4}-\\d{2}-\\d{2}T/.test(date)) return [];
+      if (!title || !/^\d{4}-\d{2}-\d{2}T/.test(date)) return [];
       const rawDuration = Number(event.durationMinutes);
       return [{
         title, activity, date,
