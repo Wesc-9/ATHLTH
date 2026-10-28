@@ -4,6 +4,7 @@ import SwiftUI
 /// A short, dedicated path for measurement goals. It reuses Training Profile
 /// measurements rather than inventing another progress database.
 struct ATHLTHBodyGoalCreationView: View {
+    var onCreated: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var session: AppSessionStore
@@ -18,7 +19,6 @@ struct ATHLTHBodyGoalCreationView: View {
     @State private var interval = 14
     @State private var enableNotifications = true
     @State private var errorMessage: String?
-    @State private var initialMetricLoaded = false
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -217,11 +217,19 @@ struct ATHLTHBodyGoalCreationView: View {
         goalStore.add(goal)
         NotificationCenter.default.post(name: .athlthTrainingDataDidChange, object: nil)
         if enableNotifications {
+            let userID = session.profile.userID
+            let currentGoals = goalStore.goals
             Task {
-                _ = await notifications.requestSystemNotificationPermissionIfNeeded()
+                let allowed = await notifications
+                    .requestSystemNotificationPermissionIfNeeded()
+                guard allowed, session.profile.userID == userID else { return }
+                await ATHLTHBodyGoalReminderScheduler.sync(
+                    goals: currentGoals, profile: profile, userID: userID
+                )
             }
         }
         dismiss()
+        onCreated?()
     }
 }
 
