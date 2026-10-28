@@ -706,6 +706,75 @@ struct WorkoutTemplateLibraryView: View {
     @State private var favoritesOnly = false
     @State private var selectedMuscleFocus = "all"
     @State private var selectedWorkoutLevel = "all"
+    @AppStorage("athlth.workoutPreview.advanced.v1") private var advancedMode = false
+    @State private var pendingCatalogAddition: WorkoutTemplateCatalogEntry?
+    @State private var pendingRunningAddition: RunningWorkoutTemplate?
+    @State private var showingPersonalizationQuestion = false
+    @State private var showingCatalogPersonalization = false
+    @State private var showingRunningPersonalization = false
+    @State private var catalogPersonalBlocks: [WorkoutTemplateBlock] = []
+
+    /// Library selection is shared by Plan and My Workouts. It must not
+    /// automatically make a public recipe's targets the athlete's targets.
+    private func addCatalogToPlan(
+        _ entry: WorkoutTemplateCatalogEntry,
+        blocks: [WorkoutTemplateBlock]
+    ) {
+        var source = entry.plannedSession()
+        source.workoutBlocks = blocks
+        let personalID = session.saveSharedWorkout(
+            source, sourceSessionID: entry.id
+        )
+        onSelectPlanned?(session.savedWorkoutTemplates.first {
+            $0.id == personalID
+        } ?? source)
+    }
+
+    private func addRunningToPlan(_ source: RunningWorkoutTemplate) {
+        let personal = runningLibrary.savedCopy(for: source) ??
+            (source.isBuiltIn ? runningLibrary.duplicate(source) : source)
+        onSelectPlanned?(personal.plannedSession())
+    }
+
+    private func chooseCatalogForPlan(_ entry: WorkoutTemplateCatalogEntry) {
+        if let existing = session.savedWorkoutTemplates.first(where: {
+            $0.workoutTemplateID == entry.id ||
+                $0.sharedSourceSessionID == entry.id
+        }) {
+            onSelectPlanned?(existing)
+            return
+        }
+        if advancedMode {
+            pendingCatalogAddition = entry
+            pendingRunningAddition = nil
+            showingPersonalizationQuestion = true
+        } else {
+            addCatalogToPlan(entry, blocks:
+                ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks))
+        }
+    }
+
+    private func chooseRunningForPlan(_ source: RunningWorkoutTemplate) {
+        guard source.isBuiltIn, runningLibrary.savedCopy(for: source) == nil,
+              advancedMode else {
+            addRunningToPlan(source)
+            return
+        }
+        pendingRunningAddition = source
+        pendingCatalogAddition = nil
+        showingPersonalizationQuestion = true
+    }
+
+    private func saveFirstAdditionWithoutTargets() {
+        if let entry = pendingCatalogAddition {
+            addCatalogToPlan(entry, blocks:
+                ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks))
+        } else if let source = pendingRunningAddition {
+            addRunningToPlan(source)
+        }
+        pendingCatalogAddition = nil
+        pendingRunningAddition = nil
+    }
 
     private let strengthFocuses = [
         "all", "chest", "back", "legs", "shoulders",
@@ -974,7 +1043,7 @@ struct WorkoutTemplateLibraryView: View {
                         ZStack(alignment: .topTrailing) {
                             if let onSelectPlanned {
                                 Button {
-                                    onSelectPlanned(entry.plannedSession())
+                                    chooseCatalogForPlan(entry)
                                 } label: {
                                     workoutCard(entry)
                                 }
@@ -1020,7 +1089,7 @@ struct WorkoutTemplateLibraryView: View {
                         ZStack(alignment: .topTrailing) {
                             if let onSelectPlanned {
                                 Button {
-                                    onSelectPlanned(workout.plannedSession())
+                                    chooseRunningForPlan(workout)
                                 } label: {
                                     runningWorkoutCard(workout)
                                 }
@@ -1078,6 +1147,104 @@ struct WorkoutTemplateLibraryView: View {
             text: $query,
             prompt: ATHLTHLocalization.choose(english: "Search workouts", norwegian: "Søk etter treningsøkter")
         )
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Set personal workout targets now?",
+                norwegian: "Vil du legge inn personlige øktmål nå?"
+            ),
+            isPresented: $showingPersonalizationQuestion,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Customize in Advanced", norwegian: "Tilpass i Avansert"
+            )) {
+                if let entry = pendingCatalogAddition {
+                    catalogPersonalBlocks =
+                        ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
+                    showingCatalogPersonalization = true
+                } else if pendingRunningAddition != nil {
+                    showingRunningPersonalization = true
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Add without personal targets",
+                norwegian: "Legg til uten personlige mål"
+            )) {
+                saveFirstAdditionWithoutTargets()
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {
+                pendingCatalogAddition = nil
+                pendingRunningAddition = nil
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Pace, heart-rate targets and incline are optional. Your library original stays unchanged.",
+                norwegian: "Fart, pulsmål og stigning er valgfrie. Originaløkten i biblioteket endres ikke."
+            ))
+        }
+        .sheet(isPresented: $showingCatalogPersonalization, onDismiss: {
+            pendingCatalogAddition = nil
+        }) {
+            if let entry = pendingCatalogAddition {
+                NavigationStack {
+                    ScrollView {
+                        ATHLTHWorkoutRecipePreview(
+                            title: entry.title,
+                            summary: entry.summary,
+                            category: entry.category,
+                            symbol: entry.systemImage,
+                            difficulty: entry.difficulty,
+                            durationMinutes: entry.estimatedDurationMinutes,
+                            blocks: catalogPersonalBlocks,
+                            onUpdateBlock: { index, updated in
+                                guard catalogPersonalBlocks.indices.contains(index) else {
+                                    return
+                                }
+                                catalogPersonalBlocks[index] = updated
+                            }
+                        )
+                        .padding(18)
+                    }
+                    .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+                    .navigationTitle(ATHLTHLocalization.choose(
+                        english: "Personal targets", norwegian: "Personlige øktmål"
+                    ))
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Cancel", norwegian: "Avbryt"
+                            )) {
+                                showingCatalogPersonalization = false
+                            }
+                        }
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Save and add", norwegian: "Lagre og legg til"
+                            )) {
+                                addCatalogToPlan(entry, blocks: catalogPersonalBlocks)
+                                showingCatalogPersonalization = false
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .sheet(isPresented: $showingRunningPersonalization, onDismiss: {
+            pendingRunningAddition = nil
+        }) {
+            if let source = pendingRunningAddition {
+                ATHLTHTrainIntervalComposerView(initial: source) { personalized in
+                    var saved = personalized
+                    saved.sharedSourceWorkoutID = source.id
+                    runningLibrary.save(saved)
+                    onSelectPlanned?(saved.plannedSession())
+                    showingRunningPersonalization = false
+                }
+            }
+        }
         .task {
             async let workoutRefresh: Void =
                 catalog.refresh()
