@@ -206,28 +206,25 @@ struct ATHLTHInsightsMuscleCard: View {
     private let active = Color(red: 0.66, green: 0.50, blue: 0.32)
     private let elevated = Color(red: 0.86, green: 0.52, blue: 0.22)
 
-    private var allMuscles: [ATHLTHInsightsMuscleFocus] {
-        ATHLTHInsightsMuscleRanking.all(summary)
-    }
-
-    private var focus: (most: [ATHLTHInsightsMuscleFocus],
-                        least: [ATHLTHInsightsMuscleFocus]) {
-        ATHLTHInsightsMuscleRanking.extremes(summary)
-    }
-
     private func tint(for muscle: ATHLTHInsightsMuscleFocus) -> Color {
         if muscle.needsLoadBalanceAttention { return concentrated }
         return muscle.percentage >= 60 ? elevated : active
     }
 
-    private var atlasTints: [StrengthMuscleRegion: Color] {
-        Dictionary(uniqueKeysWithValues: allMuscles.map {
+    var body: some View {
+        // Compute muscle ranking once per render; the same result drives the
+        // empty state, map colors and most/least-trained summaries.
+        let allMuscles = ATHLTHInsightsMuscleRanking.all(summary)
+        let most = Array(allMuscles.prefix(2))
+        let mostRegions = Set(most.map(\.region))
+        let least = Array(allMuscles.reversed().filter {
+            !mostRegions.contains($0.region)
+        }.prefix(2))
+        let atlasTints = Dictionary(uniqueKeysWithValues: allMuscles.map {
             ($0.region, tint(for: $0))
         })
-    }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        return VStack(alignment: .leading, spacing: 13) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Label(ATHLTHLocalization.choose(
                     english: "Your muscle balance", norwegian: "Din muskelbalanse"
@@ -281,14 +278,14 @@ struct ATHLTHInsightsMuscleCard: View {
                             title: ATHLTHLocalization.choose(
                                 english: "MOST TRAINED", norwegian: "MEST TRENT"
                             ),
-                            rows: focus.most
+                            rows: most
                         )
-                        if !focus.least.isEmpty {
+                        if !least.isEmpty {
                             rankingSection(
                                 title: ATHLTHLocalization.choose(
                                     english: "LEAST TRAINED", norwegian: "MINST TRENT"
                                 ),
-                                rows: focus.least
+                                rows: least
                             )
                         }
                     }
