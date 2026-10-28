@@ -19,14 +19,19 @@ enum ATHLTHCoachProposalBridge {
         default: return nil
         }
 
-        let blocks: [WorkoutTemplateBlock] = proposal.steps.enumerated().compactMap {
-            index, item in
-            guard !item.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                  let phase = WorkoutPhaseKind(rawValue: item.phase),
-                  (0...180).contains(item.minutes),
-                  (0...20).contains(item.sets),
-                  (0...100).contains(item.repetitions),
-                  (0...600).contains(item.restSeconds) else { return nil }
+        // Reject malformed steps before constructing any ATHLTH workout data.
+        guard proposal.steps.allSatisfy({ item in
+            !item.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                WorkoutPhaseKind(rawValue: item.phase) != nil &&
+                (0...180).contains(item.minutes) &&
+                (0...20).contains(item.sets) &&
+                (0...100).contains(item.repetitions) &&
+                (0...600).contains(item.restSeconds)
+        }) else { return nil }
+
+        var blocks: [WorkoutTemplateBlock] = []
+        for (index, item) in proposal.steps.enumerated() {
+            guard let phase = WorkoutPhaseKind(rawValue: item.phase) else { return nil }
             let blockKind: WorkoutTemplateBlockKind
             if phase == .recovery && item.minutes > 0 && kind == .strength {
                 blockKind = .rest
@@ -37,8 +42,11 @@ enum ATHLTHCoachProposalBridge {
             } else {
                 blockKind = .run
             }
+            // A cardio step without any duration or distance cannot be
+            // executed. Ask Coach for a better proposal instead of adding it.
+            if blockKind == .run && item.minutes == 0 { return nil }
             var block = WorkoutTemplateBlock(
-                sequence: index + 1,
+                sequence: blocks.count + 1,
                 kind: blockKind,
                 title: item.title,
                 exerciseSlug: nil,
@@ -56,12 +64,36 @@ enum ATHLTHCoachProposalBridge {
                 ? item.sets : nil
             block.restBetweenSetsSeconds = blockKind == .exercise && item.restSeconds > 0
                 ? Double(item.restSeconds) : nil
-            if activity == "walking", blockKind == .run {
+            if activity == "walking" && blockKind == .run {
                 block.cardioActivity = .walking
             }
-            return block
+            blocks.append(block)
+
+            // Run interval pauses must be real timeline steps, not discarded
+            // text. An explicitly authored recovery step takes precedence.
+            let nextIsRecovery = proposal.steps.indices.contains(index + 1) &&
+                proposal.steps[index + 1].phase == "recovery"
+            if blockKind == .run, phase == .main,
+               item.restSeconds > 0, index < proposal.steps.count - 1,
+               !nextIsRecovery {
+                var pause = WorkoutTemplateBlock(
+                    sequence: blocks.count + 1,
+                    kind: .rest,
+                    title: ATHLTHLocalization.choose(
+                        english: "Recovery", norwegian: "Pause"
+                    ),
+                    exerciseSlug: nil,
+                    distanceMeters: nil,
+                    repetitions: nil,
+                    durationSeconds: Double(item.restSeconds),
+                    targetWeightKilograms: nil,
+                    loadNote: nil,
+                    notes: nil
+                )
+                pause.phase = .recovery
+                blocks.append(pause)
+            }
         }
-        guard blocks.count == proposal.steps.count else { return nil }
         var result = PlannedSession(
             id: UUID(),
             title: String(proposal.title.prefix(110)),
