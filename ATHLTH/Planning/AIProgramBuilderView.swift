@@ -86,15 +86,20 @@ struct AIProgramBuilderView: View {
     let seed: AIProgramBuilderSeed?
     let onProgramCreated: (() -> Void)?
     let onProgramCreatedPlanID: ((UUID) -> Void)?
+    /// Coach's save icon creates a reusable plan template only; unlike
+    /// "Add", it may not activate, schedule or replace any live plan.
+    let saveAsTemplateOnly: Bool
 
     init(
         mode: AIProgramGenerationMode,
         seed: AIProgramBuilderSeed? = nil,
+        saveAsTemplateOnly: Bool = false,
         onProgramCreated: (() -> Void)? = nil,
         onProgramCreatedPlanID: ((UUID) -> Void)? = nil
     ) {
         self.mode = mode
         self.seed = seed
+        self.saveAsTemplateOnly = saveAsTemplateOnly
         self.onProgramCreated = onProgramCreated
         self.onProgramCreatedPlanID = onProgramCreatedPlanID
     }
@@ -2514,6 +2519,12 @@ struct AIProgramBuilderView: View {
 
         switch mode {
         case .generate:
+            if saveAsTemplateOnly {
+                session.saveSharedPlan(generated)
+                onProgramCreated?()
+                dismiss()
+                return
+            }
             guard session.addTrainingPlan(generated) else {
                 if let endDate = session.trainingPlanEndDate(generated),
                    let conflict = session.trainingPlanConflict(
