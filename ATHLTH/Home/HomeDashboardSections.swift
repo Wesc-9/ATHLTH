@@ -4111,17 +4111,31 @@ private struct HomeWeeklyProgressDaySheet: View {
             runs.first(where: { $0.isBuiltIn })?.plannedSession(),
             catalog.first(where: { $0.category == "hybrid" })?.plannedSession()
         ].compactMap { $0 }
-        let all = highlights + saved + catalog.map { $0.plannedSession() } +
-            runs.map { $0.plannedSession() }
+        // Convert catalog entries only until four unique suggestions are found.
+        // Previously every catalog template was materialized before truncation.
         var distinct: [PlannedSession] = []
         var names: Set<String> = []
-        for workout in all {
+        func append(_ workout: PlannedSession) {
+            guard distinct.count < 4 else { return }
             let key = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
                 .lowercased()
             if !key.isEmpty && names.insert(key).inserted {
                 distinct.append(workout)
             }
-            if distinct.count == 4 { break }
+        }
+        for workout in highlights { append(workout) }
+        for workout in saved { append(workout) }
+        if distinct.count < 4 {
+            for entry in catalog {
+                append(entry.plannedSession())
+                if distinct.count == 4 { break }
+            }
+        }
+        if distinct.count < 4 {
+            for entry in runs {
+                append(entry.plannedSession())
+                if distinct.count == 4 { break }
+            }
         }
         return distinct
     }
