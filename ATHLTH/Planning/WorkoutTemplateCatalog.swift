@@ -689,6 +689,18 @@ enum ATHLTHWorkoutSearch {
     }
 }
 
+/// Reuse the existing complete workout library when choosing a planned session.
+/// Both Home calendar and Community select an independent editable session.
+struct PlanWorkoutPickerView: View {
+    let onSelect: (PlannedSession) -> Void
+
+    var body: some View {
+        NavigationStack {
+            WorkoutTemplateLibraryView(onSelectPlanned: onSelect)
+        }
+    }
+}
+
 struct WorkoutTemplateLibraryView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
@@ -1057,7 +1069,8 @@ struct WorkoutTemplateLibraryView: View {
                 } else {
                     ForEach(filteredEntries) { entry in
                         ZStack(alignment: .topTrailing) {
-                            if let onSelectPlanned {
+                            Group {
+                                if let onSelectPlanned {
                                 Button {
                                     chooseCatalogForPlan(entry)
                                 } label: {
@@ -1071,8 +1084,8 @@ struct WorkoutTemplateLibraryView: View {
                                     workoutCard(entry)
                                 }
                                 .buttonStyle(.plain)
+                                }
                             }
-                            .buttonStyle(.plain)
                             .simultaneousGesture(
                                 TapGesture().onEnded {
                                     recents.markUsed(
@@ -1103,7 +1116,8 @@ struct WorkoutTemplateLibraryView: View {
 
                     ForEach(filteredRunningTemplates) { workout in
                         ZStack(alignment: .topTrailing) {
-                            if let onSelectPlanned {
+                            Group {
+                                if let onSelectPlanned {
                                 Button {
                                     chooseRunningForPlan(workout)
                                 } label: {
@@ -1122,8 +1136,8 @@ struct WorkoutTemplateLibraryView: View {
                                     runningWorkoutCard(workout)
                                 }
                                 .buttonStyle(.plain)
+                                }
                             }
-                            .buttonStyle(.plain)
                             .simultaneousGesture(
                                 TapGesture().onEnded {
                                     recents.markUsed(
