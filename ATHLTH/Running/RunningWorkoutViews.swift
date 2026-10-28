@@ -71,15 +71,10 @@ struct RunningWorkoutLibraryView: View {
                 }
                 : typeFiltered
 
-        let cleanQuery = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !cleanQuery.isEmpty else {
-            return favoriteFiltered
-        }
-
         return favoriteFiltered.filter {
-            $0.title.localizedCaseInsensitiveContains(cleanQuery) ||
-            $0.summary.localizedCaseInsensitiveContains(cleanQuery) ||
-            $0.type.title.localizedCaseInsensitiveContains(cleanQuery)
+            ATHLTHWorkoutSearch.matches(
+                query, texts: [$0.title, $0.summary, $0.type.title]
+            )
         }
     }
 
@@ -245,11 +240,11 @@ struct RunningWorkoutLibraryView: View {
     private func typeChip(_ title: String, selected: Bool) -> some View {
         Text(title)
             .font(.caption.weight(.semibold))
-            .foregroundStyle(selected ? .white : .primary)
+            .foregroundStyle(selected ? .white : ATHLTHPlanDesign.ink)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(
-                selected ? ATHLTHTheme.accent : Color(.secondarySystemGroupedBackground),
+                selected ? ATHLTHPlanDesign.accentInk : ATHLTHPlanDesign.selectedSurface,
                 in: Capsule()
             )
     }
@@ -259,9 +254,9 @@ struct RunningWorkoutLibraryView: View {
             HStack(alignment: .top) {
                 Image(systemName: workout.type.systemImage)
                     .font(.title2)
-                    .foregroundStyle(ATHLTHTheme.accent)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .frame(width: 44, height: 44)
-                    .background(ATHLTHTheme.accent.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
+                    .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 13))
 
                 VStack(alignment: .leading, spacing: 3) {
                     Text(workout.title)
@@ -270,7 +265,7 @@ struct RunningWorkoutLibraryView: View {
 
                     Text(workout.type.title)
                         .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.accent)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
                 }
 
                 Spacer()
@@ -328,10 +323,7 @@ struct RunningWorkoutLibraryView: View {
             .foregroundStyle(.secondary)
         }
         .padding(14)
-        .background(
-            Color(.secondarySystemGroupedBackground),
-            in: RoundedRectangle(cornerRadius: 20)
-        )
+        .athlthPlanCard(radius: 20)
     }
 }
 
