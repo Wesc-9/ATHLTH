@@ -1346,9 +1346,9 @@ struct MessageInboxView: View {
     }
 
     private var requestCount: Int {
-        requestPersonItems.count + groups.ownInvites.filter {
-            $0.status == "pending"
-        }.count
+        requestPersonItems.count + groups.ownInvites.reduce(into: 0) { count, invite in
+            if invite.status == "pending" { count += 1 }
+        }
     }
 
     private var hasVisibleClubChats: Bool {
