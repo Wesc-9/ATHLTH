@@ -125,6 +125,11 @@ struct ATHLTHNotificationCenterView: View {
                 accountID: session.profile.userID,
                 completed: RecoverySorenessStore().hasTodayCheckIn
             )
+            notifications.reconcileBodyGoalCheckIns(
+                goals: goals.goals,
+                accountID: session.profile.userID,
+                profile: ATHLTHTrainingProfile.load(userID: session.profile.userID)
+            )
             async let notificationStatus: Void =
                 notifications.refreshAuthorizationStatus()
             async let workoutImports: Bool =
@@ -2236,6 +2241,10 @@ struct ATHLTHNotificationCenterView: View {
     ) -> some View {
         if item.kind == .dailyCheckIn {
             RecoverySorenessLogView(store: RecoverySorenessStore())
+        } else if item.socialEventKind == "body_goal_checkin",
+                  let goalID = item.goalID,
+                  let goal = goals.goals.first(where: { $0.id == goalID }) {
+            ATHLTHBodyGoalCheckInView(goal: goal)
         } else if item.socialEntityType?.lowercased() == "arena_series",
            let seriesID = item.socialEntityID {
             ATHLTHArenaNotificationDestination(seriesID: seriesID)
