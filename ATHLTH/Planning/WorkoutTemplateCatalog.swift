@@ -667,6 +667,46 @@ struct WorkoutTemplateLibraryView: View {
     @State private var query = ""
     @State private var selectedCategory = "All"
     @State private var favoritesOnly = false
+    @State private var selectedMuscleFocus = "all"
+    @State private var selectedWorkoutLevel = "all"
+
+    private let strengthFocuses = [
+        "all", "chest", "back", "legs", "shoulders",
+        "arms", "glutes", "fullbody", "core", "home"
+    ]
+    private let strengthLevels = ["all", "Beginner", "Intermediate", "Advanced", "Expert"]
+
+    private func focusName(_ focus: String) -> String {
+        switch focus {
+        case "chest": return ATHLTHLocalization.choose(english: "Chest", norwegian: "Bryst")
+        case "back": return ATHLTHLocalization.choose(english: "Back", norwegian: "Rygg")
+        case "legs": return ATHLTHLocalization.choose(english: "Legs", norwegian: "Bein")
+        case "shoulders": return ATHLTHLocalization.choose(english: "Shoulders", norwegian: "Skuldre")
+        case "arms": return ATHLTHLocalization.choose(english: "Arms", norwegian: "Armer")
+        case "glutes": return ATHLTHLocalization.choose(english: "Glutes", norwegian: "Sete")
+        case "fullbody": return ATHLTHLocalization.choose(english: "Full body", norwegian: "Fullkropp")
+        case "core": return ATHLTHLocalization.choose(english: "Core", norwegian: "Kjerne")
+        case "home": return ATHLTHLocalization.choose(english: "At home", norwegian: "Hjemme")
+        default: return ATHLTHLocalization.choose(english: "All muscles", norwegian: "Alle muskelgrupper")
+        }
+    }
+
+    private func levelName(_ level: String) -> String {
+        switch level {
+        case "Beginner": return ATHLTHLocalization.choose(english: "Beginner", norwegian: "Nybegynner")
+        case "Intermediate": return ATHLTHLocalization.choose(english: "Intermediate", norwegian: "Middels")
+        case "Advanced": return ATHLTHLocalization.choose(english: "Advanced", norwegian: "Avansert")
+        case "Expert": return ATHLTHLocalization.choose(english: "Expert", norwegian: "Ekspert")
+        default: return ATHLTHLocalization.choose(english: "All levels", norwegian: "Alle nivåer")
+        }
+    }
+
+    private func levelMatches(_ entry: WorkoutTemplateCatalogEntry) -> Bool {
+        guard selectedWorkoutLevel != "all" else { return true }
+        let text = entry.difficulty.lowercased()
+        let accepted = [selectedWorkoutLevel.lowercased(), levelName(selectedWorkoutLevel).lowercased()]
+        return accepted.contains(text) || entry.tags.contains(selectedWorkoutLevel.lowercased())
+    }
 
     private var categories: [String] {
         ["All"] +
@@ -682,9 +722,9 @@ struct WorkoutTemplateLibraryView: View {
     /// Built-in running workouts share the same search, category and favorite
     /// filters as catalog workouts, without creating another library section.
     private var filteredRunningTemplates: [RunningWorkoutTemplate] {
-        guard selectedCategory == "All" || selectedCategory == "Running" else {
-            return []
-        }
+        guard (selectedCategory == "All" || selectedCategory == "Running") &&
+                selectedMuscleFocus == "all" && selectedWorkoutLevel == "all"
+        else { return [] }
 
         let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
         return builtInRunningTemplates.filter { workout in
@@ -725,9 +765,11 @@ struct WorkoutTemplateLibraryView: View {
                 entry.tags.joined(separator: " ")
                     .localizedCaseInsensitiveContains(clean)
 
+            let muscleMatches = selectedMuscleFocus == "all" ||
+                entry.tags.contains(selectedMuscleFocus)
             return categoryMatches &&
                 favoriteMatches &&
-                searchMatches
+                searchMatches && muscleMatches && levelMatches(entry)
         }
     }
 
@@ -780,6 +822,10 @@ struct WorkoutTemplateLibraryView: View {
                             category in
                             Button {
                                 selectedCategory = category
+                                if category != "Strength" {
+                                    selectedMuscleFocus = "all"
+                                    selectedWorkoutLevel = "all"
+                                }
                             } label: {
                                 filterChip(
                                     category == "Running"
@@ -795,6 +841,59 @@ struct WorkoutTemplateLibraryView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                if selectedCategory == "Strength" ||
+                    selectedMuscleFocus != "all" ||
+                    selectedWorkoutLevel != "all" {
+                    VStack(alignment: .leading, spacing: 9) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "MUSCLE GROUP", norwegian: "MUSKELGRUPPE"
+                        ))
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.1)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 7) {
+                                ForEach(strengthFocuses, id: \.self) { focus in
+                                    Button {
+                                        selectedCategory = "Strength"
+                                        selectedMuscleFocus = focus
+                                    } label: {
+                                        filterChip(
+                                            focusName(focus),
+                                            systemImage: nil,
+                                            selected: selectedMuscleFocus == focus
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        Text(ATHLTHLocalization.choose(
+                            english: "EXPERIENCE LEVEL", norwegian: "ERFARINGSNIVÅ"
+                        ))
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.1)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 7) {
+                                ForEach(strengthLevels, id: \.self) { level in
+                                    Button {
+                                        selectedCategory = "Strength"
+                                        selectedWorkoutLevel = level
+                                    } label: {
+                                        filterChip(
+                                            levelName(level),
+                                            systemImage: nil,
+                                            selected: selectedWorkoutLevel == level
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
                         }
                     }
                 }
