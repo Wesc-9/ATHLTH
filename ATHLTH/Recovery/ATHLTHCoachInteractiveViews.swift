@@ -59,53 +59,113 @@ struct ATHLTHCoachInsightDisclosure<Content: View>: View {
     }
 }
 
-struct ATHLTHCoachStarterActions: View {
-    let onPrompt: (String) -> Void
+enum ATHLTHCoachQuickAction: String, CaseIterable, Identifiable {
+    case createWorkout
+    case postponeWorkout
+    case createPlan
+    case reviewProgress
+
+    var id: String { rawValue }
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            Text(tr("What can I help you with?", "Hva kan jeg hjelpe deg med?"))
-                .font(.headline)
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-            LazyVGrid(columns: [.init(.flexible()), .init(.flexible())], spacing: 9) {
-                action(tr("Create a workout", "Lag en økt"), symbol: "dumbbell.fill",
-                       prompt: tr("Help me create a workout. Ask me for the training type, duration, equipment and level first.",
-                                  "Hjelp meg å lage en treningsøkt. Spør først om type, varighet, utstyr og nivå."))
-                action(tr("Create a plan", "Lag treningsplan"), symbol: "calendar",
-                       prompt: tr("Help me create a training plan. Ask about my goal, available days, experience and equipment.",
-                                  "Hjelp meg å lage en treningsplan. Spør om mål, treningsdager, erfaring og utstyr."))
-                action(tr("Review progress", "Analyser fremgang"), symbol: "chart.line.uptrend.xyaxis",
-                       prompt: tr("What training-history data should I share for a meaningful progress review?",
-                                  "Hvilke treningsdata trenger du tilgang til for å analysere fremgangen min?"))
-                action(tr("Ask about training", "Spør om trening"), symbol: "book.closed",
-                       prompt: tr("How can I balance strength training and running in a week?",
-                                  "Hvordan kan jeg balansere styrke og løping i løpet av en uke?"))
-            }
+    var title: String {
+        switch self {
+        case .createWorkout: return tr("Plan a workout", "Planlegg en økt")
+        case .postponeWorkout: return tr("Postpone a workout", "Utsett en økt")
+        case .createPlan: return tr("Create a plan", "Lag treningsplan")
+        case .reviewProgress: return tr("Review progress", "Analyser fremgang")
         }
-        .padding(.vertical, 6)
     }
 
-    private func action(_ title: String, symbol: String, prompt: String) -> some View {
-        Button { onPrompt(prompt) } label: {
-            VStack(alignment: .leading, spacing: 10) {
-                Image(systemName: symbol)
-                    .font(.system(size: 17))
-                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, minHeight: 76, alignment: .leading)
-            .padding(12)
-            .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 17))
+    var symbol: String {
+        switch self {
+        case .createWorkout: return "dumbbell.fill"
+        case .postponeWorkout: return "calendar.badge.clock"
+        case .createPlan: return "calendar"
+        case .reviewProgress: return "chart.line.uptrend.xyaxis"
         }
-        .buttonStyle(.plain)
+    }
+
+    var prompt: String {
+        switch self {
+        case .createWorkout:
+            return tr(
+                "Help me create a new workout. First ask about training type, duration, equipment and experience, then suggest a session I can add.",
+                "Hjelp meg å lage en ny treningsøkt. Spør først om type, varighet, utstyr og erfaring, og foreslå så en økt jeg kan legge til."
+            )
+        case .postponeWorkout:
+            return tr(
+                "Postpone my planned workout. Ask which session and new date I want, and show the changes for approval before saving.",
+                "Utsett den planlagte økten min. Spør hvilken økt og ny dato jeg ønsker, og vis endringene for godkjenning før lagring."
+            )
+        case .createPlan:
+            return tr(
+                "Help me create a training plan. Ask about my goals, training days, experience and equipment before proposing a plan.",
+                "Hjelp meg å lage en treningsplan. Spør om mål, treningsdager, erfaring og utstyr før du foreslår en plan."
+            )
+        case .reviewProgress:
+            return tr(
+                "Help me review my training progress. Ask what information you need and let me choose what data to share.",
+                "Hjelp meg å analysere treningsfremgangen min. Spør hvilke opplysninger du trenger, og la meg velge hva jeg vil dele."
+            )
+        }
+    }
+}
+
+struct ATHLTHCoachStarterActions: View {
+    let onPrompt: (String) -> Void
+    var isDisabled: Bool = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(ATHLTHLocalization.choose(
+                english: "ASK COACH", norwegian: "SPØR COACH"
+            ))
+            .font(.caption2.weight(.bold))
+            .tracking(0.8)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .padding(.horizontal, 14)
+
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 8),
+                GridItem(.flexible(), spacing: 8)
+            ], spacing: 8) {
+                ForEach(ATHLTHCoachQuickAction.allCases) { action in
+                    Button { onPrompt(action.prompt) } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: action.symbol)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(width: 18)
+                            Text(action.title)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .lineLimit(2)
+                                .minimumScaleFactor(0.83)
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.horizontal, 11)
+                        .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
+                        .background(
+                            .white.opacity(0.94),
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14)
+                                .stroke(ATHLTHPlanDesign.accentInk.opacity(0.11), lineWidth: 0.8)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDisabled)
+                    .accessibilityLabel(action.title)
+                }
+            }
+            .padding(.horizontal, 14)
+        }
+        .padding(.vertical, 3)
     }
 }
 
@@ -199,59 +259,5 @@ struct ATHLTHCoachProposalCard: View {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(ATHLTHPlanDesign.accentInk.opacity(0.18), lineWidth: 1)
         }
-    }
-}
-
-struct ATHLTHCoachHealthSourcesView: View {
-    let context: RecoveryAIContext
-
-    private func label(_ en: String, _ no: String) -> String {
-        ATHLTHLocalization.choose(english: en, norwegian: no)
-    }
-
-    private func entry(_ name: String, _ timestamp: String?, available: Bool) -> some View {
-        HStack(spacing: 9) {
-            Image(systemName: available ? "checkmark.circle" : "clock.badge.questionmark")
-                .foregroundStyle(available ? ATHLTHPlanDesign.accentInk :
-                                    ATHLTHPlanDesign.secondaryInk)
-            Text(name)
-                .font(.caption.weight(.semibold))
-            Spacer(minLength: 8)
-            if available, let timestamp,
-               let when = ISO8601DateFormatter().date(from: timestamp) {
-                Text(when.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            } else {
-                Text(label("No recent sample", "Ingen nyere måling"))
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            }
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label(label("MEASUREMENT SOURCES", "MÅLEKILDER"),
-                  systemImage: "checkmark.shield")
-                .font(.caption2.weight(.bold))
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-            entry(label("Sleep", "Søvn"),
-                  context.evidence?.sleepEndedAt,
-                  available: context.sleepSeconds != nil)
-            entry("HRV", context.evidence?.hrvSampledAt,
-                  available: context.hrvMilliseconds != nil)
-            entry(label("Resting heart rate", "Hvilepuls"),
-                  context.evidence?.restingPulseSampledAt,
-                  available: context.restingHeartRate != nil)
-            Text(label(
-                "Measurements from Apple Health. Readiness is an estimate, not a direct measurement. Missing or outdated values are excluded from Coach.",
-                "Målinger hentet via Apple Helse. Dagsform er en beregning, ikke en direkte måling. Manglende eller utdaterte verdier utelates fra Coach."
-            ))
-            .font(.caption2)
-            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-        }
-        .padding(14)
-        .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 17))
     }
 }

@@ -110,30 +110,6 @@ private func recoveryCoachMuscleName(_ value: String) -> String {
     }
 }
 
-private enum RecoveryCoachMuscleFeeling: String, CaseIterable, Identifiable {
-    case ready
-    case uncertain
-    case sore
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .ready: return recoveryAIText("Ready to train", "Føles klar")
-        case .uncertain: return recoveryAIText("A little tired", "Litt sliten")
-        case .sore: return recoveryAIText("Sore / needs rest", "Støl / trenger hvile")
-        }
-    }
-
-    var message: String {
-        switch self {
-        case .ready: return recoveryAIText("feels ready to train", "føles klar til trening")
-        case .uncertain: return recoveryAIText("feels a little tired", "føles litt sliten")
-        case .sore: return recoveryAIText("feels sore and needs more rest", "kjennes støl ut og trenger mer hvile")
-        }
-    }
-}
-
 private extension View {
     func recoveryCoachLegacyConversationPanelChrome()
         -> some View {
@@ -1059,10 +1035,6 @@ struct RecoveryCoachView: View {
     @State private var draftAutomaticHealthPermission = false
     @State private var showingCoachConsentSheet = false
     @State private var pendingShareAfterConsent = false
-    @State private var showingMuscleFeedbackSheet = false
-    @State private var feedbackMuscleName = ""
-    @State private var feedbackFeeling: RecoveryCoachMuscleFeeling = .sore
-    @State private var feedbackNote = ""
 
     private let service = RecoveryAIService()
     private let planAdaptationService = CoachPlanAdaptationService()
@@ -1082,37 +1054,17 @@ struct RecoveryCoachView: View {
                 coachConversationHero
                     .zIndex(2)
 
+                // Keep Today's Insight anchored above the conversation while
+                // chat history scrolls independently beneath it.
+                coachPinnedInsight
+                    .zIndex(2)
+
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVStack(
                             alignment: .leading,
                             spacing: 14
                         ) {
-                            // The athlete's disclosure choice persists between visits.
-                            ATHLTHCoachInsightDisclosure(
-                                userID: session.profile.userID,
-                                summary: context.recoveryScore.map {
-                                    recoveryAIText("Readiness \($0)", "Dagsform \($0)")
-                                } ?? recoveryAIText(
-                                    "No measurements yet", "Ingen målinger ennå"
-                                )
-                            ) {
-                                if context.recoveryScore != nil || !context.muscles.isEmpty {
-                                    VStack(alignment: .leading, spacing: 9) {
-                                        coachInsightCard
-                                        ATHLTHCoachHealthSourcesView(context: context)
-                                    }
-                                } else {
-                                    Text(recoveryAIText(
-                                        "No recovery measurements available. You can still ask training questions.",
-                                        "Ingen restitusjonsmålinger tilgjengelig. Du kan fortsatt stille spørsmål om trening."
-                                    ))
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                    .padding(13)
-                                }
-                            }
-
                             if let proposalActionNotice {
                                 Label(proposalActionNotice, systemImage: "checkmark.circle")
                                     .font(.caption.weight(.semibold))
@@ -1123,9 +1075,6 @@ struct RecoveryCoachView: View {
                             }
 
                             if messages.isEmpty {
-                                ATHLTHCoachStarterActions { prompt in
-                                    requestAnswer(prompt)
-                                }
                                 Text(
                                     recoveryAIText(
                                         "Ask a question to start a conversation. Coach remembers what you talk about on this device.",
@@ -1296,6 +1245,20 @@ struct RecoveryCoachView: View {
             .hidden,
             for: .tabBar
         )
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 24)
+                .onEnded { gesture in
+                    // NavigationBar is hidden for the Coach header. Restore
+                    // the familiar iOS edge-back gesture without hijacking
+                    // vertical chat scrolling or horizontal controls.
+                    guard gesture.startLocation.x <= 32,
+                          gesture.translation.width > 85,
+                          abs(gesture.translation.height) <
+                              gesture.translation.width * 0.65
+                    else { return }
+                    dismiss()
+                }
+        )
         .onAppear {
             coachPinned =
                 RecoveryCoachInboxPreferences
@@ -1383,9 +1346,6 @@ struct RecoveryCoachView: View {
         }
         .sheet(isPresented: $showingCoachConsentSheet) {
             coachConsentSheet
-        }
-        .sheet(isPresented: $showingMuscleFeedbackSheet) {
-            coachMuscleFeedbackSheet
         }
         .alert(
             recoveryAIText(
@@ -1685,6 +1645,43 @@ struct RecoveryCoachView: View {
         pendingShareAfterConsent = false
         showingCoachConsentSheet = false
         dismiss()
+    }
+
+    private var coachPinnedInsight: some View {
+        ATHLTHCoachInsightDisclosure(
+            userID: session.profile.userID,
+            summary: context.recoveryScore.map {
+                recoveryAIText("Readiness \($0)", "Dagsform \($0)")
+            } ?? recoveryAIText(
+                "No measurements yet", "Ingen målinger ennå"
+            )
+        ) {
+            if context.recoveryScore != nil || !context.muscles.isEmpty {
+                // Keep an expanded insight usable without covering the
+                // entire conversation on small iPhones.
+                ScrollView(.vertical) {
+                    coachInsightCard
+                }
+                .frame(height: 280)
+                .scrollIndicators(.hidden)
+                .accessibilityLabel(recoveryAIText(
+                    "Today's detailed insight", "Detaljer for dagens innsikt"
+                ))
+            } else {
+                Text(recoveryAIText(
+                    "No recovery measurements available. You can still ask training questions.",
+                    "Ingen restitusjonsmålinger tilgjengelig. Du kan fortsatt stille spørsmål om trening."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .padding(13)
+            }
+        }
+        .frame(maxWidth: 760)
+        .padding(.horizontal, 17)
+        .padding(.top, 7)
+        .padding(.bottom, 8)
+        .background(Color.white.opacity(0.95))
     }
 
     private var coachConversationHero:
@@ -2021,25 +2018,6 @@ struct RecoveryCoachView: View {
                     }
                 }
 
-                Button {
-                    feedbackMuscleName = coachVisibleMuscles.first?.name ?? ""
-                    feedbackFeeling = .sore
-                    feedbackNote = ""
-                    showingMuscleFeedbackSheet = true
-                } label: {
-                    Label(
-                        recoveryAIText(
-                            "Tell Coach how your muscles actually feel",
-                            "Fortell Coach hvordan musklene kjennes"
-                        ),
-                        systemImage: "slider.horizontal.3"
-                    )
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, 8)
-                }
-                .buttonStyle(.plain)
             }
 
             Text(recoveryAIText(
@@ -2051,104 +2029,6 @@ struct RecoveryCoachView: View {
             .fixedSize(horizontal: false, vertical: true)
         }
         .padding(.top, 3)
-    }
-
-    private var coachMuscleFeedbackSheet: some View {
-        NavigationStack {
-            Form {
-                Section {
-                    Picker(
-                        recoveryAIText("Muscle group", "Muskelgruppe"),
-                        selection: $feedbackMuscleName
-                    ) {
-                        ForEach(context.muscles, id: \.name) { muscle in
-                            Text(recoveryCoachMuscleName(muscle.name))
-                                .tag(muscle.name)
-                        }
-                    }
-
-                    Picker(
-                        recoveryAIText("How does it feel?", "Hvordan kjennes det?"),
-                        selection: $feedbackFeeling
-                    ) {
-                        ForEach(RecoveryCoachMuscleFeeling.allCases) { feeling in
-                            Text(feeling.title).tag(feeling)
-                        }
-                    }
-                } header: {
-                    Text(recoveryAIText("Your assessment", "Din vurdering"))
-                } footer: {
-                    Text(recoveryAIText(
-                        "The estimate in Insights will not be overwritten.",
-                        "Beregningen i Innsikt blir ikke overskrevet."
-                    ))
-                }
-
-                Section(recoveryAIText("Optional note", "Valgfri kommentar")) {
-                    TextField(
-                        recoveryAIText(
-                            "For example: legs feel heavy after yesterday",
-                            "For eksempel: tunge bein etter gårsdagen"
-                        ),
-                        text: $feedbackNote,
-                        axis: .vertical
-                    )
-                    .lineLimit(2...4)
-                }
-
-                Section {
-                    Button {
-                        prepareMuscleFeedbackQuestion()
-                    } label: {
-                        Label(
-                            recoveryAIText(
-                                "Add to question",
-                                "Legg til i spørsmål"
-                            ),
-                            systemImage: "text.bubble.fill"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                    .disabled(feedbackMuscleName.isEmpty)
-                } footer: {
-                    Text(recoveryAIText(
-                        "Review the draft in chat before you send it. If you want Coach to compare it with your health data, choose health sharing and confirm that particular question.",
-                        "Se gjennom utkastet i chatten før du sender. Vil du at Coach skal sammenligne med helsedata, må du velge deling og bekrefte akkurat det spørsmålet."
-                    ))
-                }
-            }
-            .navigationTitle(recoveryAIText("Correct muscle estimate", "Korriger muskelvurdering"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(recoveryAIText("Cancel", "Avbryt")) {
-                        showingMuscleFeedbackSheet = false
-                    }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func prepareMuscleFeedbackQuestion() {
-        guard !feedbackMuscleName.isEmpty else { return }
-        let name = recoveryCoachMuscleName(feedbackMuscleName)
-        let note = feedbackNote.trimmingCharacters(in: .whitespacesAndNewlines)
-        let correction: String
-        if ATHLTHLocalization.isNorwegian {
-            correction = "Min egen opplevelse er at \(name.lowercased()) \(feedbackFeeling.message). " +
-                (note.isEmpty ? "" : "Tilleggsinfo: \(note). ") +
-                "Kan du justere treningsrådet etter dette? Muskelprosenten er bare et usikkert estimat."
-        } else {
-            correction = "I feel that \(name.lowercased()) \(feedbackFeeling.message). " +
-                (note.isEmpty ? "" : "Additional context: \(note). ") +
-                "Please adapt your training recommendation to how I feel. Muscle recovery percentages are estimates."
-        }
-        let previous = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        question = previous.isEmpty ? correction : previous + "\n\n" + correction
-        showingMuscleFeedbackSheet = false
-        // Draft only: the normal send and explicit health-sharing
-        // confirmation remain the sole way to contact Groq.
     }
 
     private var scoreBadge:
@@ -2277,174 +2157,11 @@ struct RecoveryCoachView: View {
     private var coachComposer:
         some View {
         VStack(spacing: 8) {
-            if !quickQuestions.isEmpty && messages.isEmpty {
-                VStack(
-                    alignment: .leading,
-                    spacing: 7
-                ) {
-                    HStack {
-                        Text(
-                            recoveryAIText(
-                                "Suggested next questions",
-                                "Forslag til neste spørsmål"
-                            )
-                        )
-                        .font(
-                            .caption
-                                .weight(.semibold)
-                        )
-                        .foregroundStyle(
-                            .secondary
-                        )
-
-                        Spacer()
-
-                        Button {
-                            withAnimation(
-                                .easeInOut(
-                                    duration: 0.18
-                                )
-                            ) {
-                                quickQuestions =
-                                    contextAwareQuestions()
-                            }
-                        } label: {
-                            Image(
-                                systemName:
-                                    "arrow.clockwise"
-                            )
-                            .font(
-                                .caption
-                                    .weight(.semibold)
-                            )
-                            .foregroundStyle(
-                                .secondary
-                            )
-                            .frame(
-                                width: 28,
-                                height: 28
-                            )
-                            .contentShape(
-                                Circle()
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            recoveryAIText(
-                                "Refresh suggestions",
-                                "Oppdater forslag"
-                            )
-                        )
-                    }
-                    .padding(
-                        .horizontal
-                    )
-
-                    ScrollView(
-                        .horizontal,
-                        showsIndicators: false
-                    ) {
-                        HStack(
-                            spacing: 8
-                        ) {
-                            ForEach(
-                                quickQuestions,
-                                id: \.self
-                            ) {
-                                suggestion in
-                                Button {
-                                    requestAnswer(suggestion)
-                                } label: {
-                                    VStack(
-                                        alignment:
-                                            .leading,
-                                        spacing: 7
-                                    ) {
-                                        Image(
-                                            systemName:
-                                                quickQuestionIcon(
-                                                    for:
-                                                        suggestion
-                                                )
-                                        )
-                                        .font(
-                                            .system(
-                                                size: 12,
-                                                weight:
-                                                    .semibold
-                                            )
-                                        )
-                                        .foregroundStyle(
-                                            .indigo
-                                        )
-
-                                        Text(
-                                            suggestion
-                                        )
-                                        .font(
-                                            .caption
-                                                .weight(
-                                                    .semibold
-                                                )
-                                        )
-                                        .foregroundStyle(
-                                            ATHLTHTheme
-                                                .primaryText
-                                        )
-                                        .lineLimit(2)
-                                        .multilineTextAlignment(
-                                            .leading
-                                        )
-                                    }
-                                    .padding(11)
-                                    .frame(
-                                        width: 165,
-                                        height: 78,
-                                        alignment:
-                                            .leading
-                                    )
-                                    .background(
-                                        Color.white
-                                            .opacity(
-                                                0.72
-                                            ),
-                                        in:
-                                            RoundedRectangle(
-                                                cornerRadius:
-                                                    16,
-                                                style:
-                                                    .continuous
-                                            )
-                                    )
-                                    .overlay {
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                16,
-                                            style:
-                                                .continuous
-                                        )
-                                        .stroke(
-                                            Color.primary
-                                                .opacity(
-                                                    0.045
-                                                ),
-                                            lineWidth:
-                                                0.8
-                                        )
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(
-                                    isAsking
-                                )
-                            }
-                        }
-                        .padding(
-                            .horizontal
-                        )
-                    }
-                }
-            }
+            // Four quick actions remain visible even with a long chat history.
+            ATHLTHCoachStarterActions(
+                onPrompt: { requestAnswer($0) },
+                isDisabled: isAsking
+            )
 
             Button {
                 if !aiConsentApproved {
@@ -2495,26 +2212,6 @@ struct RecoveryCoachView: View {
 
             HStack(spacing: 9) {
                 Menu {
-                    Button {
-                        withAnimation(
-                            .easeInOut(
-                                duration: 0.18
-                            )
-                        ) {
-                            quickQuestions =
-                                contextAwareQuestions()
-                        }
-                    } label: {
-                        Label(
-                            recoveryAIText(
-                                "New suggestions",
-                                "Nye forslag"
-                            ),
-                            systemImage:
-                                "arrow.clockwise"
-                        )
-                    }
-
                     Button(
                         role: .destructive
                     ) {
@@ -3400,36 +3097,6 @@ struct RecoveryCoachView: View {
                     session.profile
                         .userID
             )
-    }
-
-    private func quickQuestionIcon(
-        for question: String
-    ) -> String {
-        let value =
-            question.lowercased()
-
-        if value.contains("sleep") ||
-            value.contains("søvn") {
-            return "moon.fill"
-        }
-
-        if value.contains("strength") ||
-            value.contains("styrke") {
-            return "dumbbell.fill"
-        }
-
-        if value.contains("run") ||
-            value.contains("løp") ||
-            value.contains("interval") {
-            return "figure.run"
-        }
-
-        if value.contains("recovery") ||
-            value.contains("restitusjon") {
-            return "heart.fill"
-        }
-
-        return "sparkles"
     }
 
     private var scoreTint:

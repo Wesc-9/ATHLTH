@@ -10,7 +10,7 @@ enum ATHLTHCoachPlanChatIntent {
             locale: Locale(identifier: "nb_NO")
         ).lowercased()
         let imperative = [
-            "flytt ", "flytte ", "endre ", "endrer ", "juster ", "justere ",
+            "flytt ", "flytte ", "utsett ", "utsette ", "endre ", "endrer ", "juster ", "justere ",
             "bytt ", "bytte ", "hopp over ", "dropp ", "fjern ",
             "move ", "reschedule ", "skip ", "adjust ", "change ", "replace ",
             "remove ", "postpone ", "shift "

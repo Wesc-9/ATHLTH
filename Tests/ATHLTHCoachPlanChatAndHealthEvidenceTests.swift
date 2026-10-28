@@ -9,6 +9,10 @@ final class ATHLTHCoachPlanChatAndHealthEvidenceTests: XCTestCase {
         XCTAssertTrue(ATHLTHCoachPlanChatIntent.isAdjustmentRequest(
             "Skip tomorrow's planned session", hasActivePlan: true))
         XCTAssertTrue(ATHLTHCoachPlanChatIntent.isAdjustmentRequest(
+            ATHLTHCoachQuickAction.postponeWorkout.prompt, hasActivePlan: true))
+        XCTAssertFalse(ATHLTHCoachPlanChatIntent.isAdjustmentRequest(
+            ATHLTHCoachQuickAction.postponeWorkout.prompt, hasActivePlan: false))
+        XCTAssertTrue(ATHLTHCoachPlanChatIntent.isAdjustmentRequest(
             "Juster treningsplanen etter siste økt", hasActivePlan: true))
         XCTAssertFalse(ATHLTHCoachPlanChatIntent.isAdjustmentRequest(
             "Lag en treningsplan for 10 km", hasActivePlan: true))
@@ -16,6 +20,13 @@ final class ATHLTHCoachPlanChatAndHealthEvidenceTests: XCTestCase {
             "Move tomorrow's workout", hasActivePlan: false))
         XCTAssertFalse(ATHLTHCoachPlanChatIntent.isAdjustmentRequest(
             "Hvorfor er pulsen høy under intervaller?", hasActivePlan: true))
+    }
+
+    func testCoachAlwaysOffersFourDifferentActions() {
+        let actions = ATHLTHCoachQuickAction.allCases
+        XCTAssertEqual(actions.count, 4)
+        XCTAssertEqual(Set(actions.map(\.id)).count, 4)
+        XCTAssertTrue(actions.allSatisfy { !$0.title.isEmpty && !$0.prompt.isEmpty })
     }
 
     func testSourceFreshnessAllowsCurrentMeasurementsAndRejectsStaleOrFuture() {
