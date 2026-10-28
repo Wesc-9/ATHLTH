@@ -30,11 +30,23 @@ struct ATHLTHBodyGoalCreationView: View {
     }
 
     private var suggestedTitle: String {
+        let current = number(baselineText)
+        let target = number(targetText)
+        let reduce = current != nil && target != nil && target! < current!
+        let increase = current != nil && target != nil && target! > current!
         switch metric {
-        case .waist: return tr("Reduce waist measurement", "Reduser midjemålet")
-        case .upperArm: return tr("Increase upper-arm measurement", "Øk overarmmålet")
-        case .weight: return tr("Reach my target weight", "Nå ønsket kroppsvekt")
-        default: return tr("My ", "Mitt mål: ") + metric.name
+        case .waist:
+            if reduce { return tr("Reduce waist measurement", "Reduser midjemålet") }
+            if increase { return tr("Increase waist measurement", "Øk midjemålet") }
+            return tr("Set a waist goal", "Sett mål for midjemålet")
+        case .upperArm:
+            if increase { return tr("Increase upper-arm measurement", "Øk overarmmålet") }
+            if reduce { return tr("Reduce upper-arm measurement", "Reduser overarmmålet") }
+            return tr("Set an upper-arm goal", "Sett mål for overarmmålet")
+        case .weight:
+            return tr("Reach my target weight", "Nå ønsket kroppsvekt")
+        default:
+            return tr("My measurement goal: ", "Mitt kroppsmål: ") + metric.name
         }
     }
 
