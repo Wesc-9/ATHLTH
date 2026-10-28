@@ -38,6 +38,11 @@ struct ATHLTHInsightsView: View {
                         selection: $selectedSection
                     )
                     .padding(.horizontal, -17)
+                    // Section transitions may animate the content below,
+                    // but must not animate the hero's measured dimensions.
+                    .transaction { transaction in
+                        transaction.animation = nil
+                    }
 
                     LazyVStack(alignment: .leading, spacing: 16) {
                         switch selectedSection {
@@ -1199,9 +1204,15 @@ private struct ATHLTHInsightsCoverHero: View {
                 Image(imageName)
                     .resizable()
                     .scaledToFill()
+                    // Keep the cover cropped to the final container bounds.
+                    // Do not interpolate its frame when Insights sections
+                    // change: that briefly stretches the artwork on screen.
                     .frame(width: geometry.size.width,
                            height: geometry.size.height)
                     .clipped()
+                    .transaction { transaction in
+                        transaction.animation = nil
+                    }
                     .accessibilityHidden(true)
 
                 // Train's bright readable cover treatment instead of the
