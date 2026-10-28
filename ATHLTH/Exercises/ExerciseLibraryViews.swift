@@ -1396,6 +1396,15 @@ struct ExerciseDetailView: View {
                     )
                 )
 
+                ATHLTHExerciseProgressView(
+                    progress: ATHLTHExerciseProgress.summary(
+                        exerciseID: currentEntry.id,
+                        name: currentEntry.canonicalName,
+                        isCustom: currentEntry.source == .custom,
+                        workouts: exerciseHistory
+                    )
+                )
+
                 if let summary = displayedSummary, !summary.isEmpty {
                     detailCard(ATHLTHLocalization.choose(
                         english: "About the exercise", norwegian: "Om øvelsen"
