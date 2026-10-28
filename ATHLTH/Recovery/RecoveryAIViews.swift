@@ -1005,6 +1005,7 @@ struct RecoveryCoachView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session:
         AppSessionStore
+    @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
 
     let context: RecoveryAIContext
     let insight: RecoveryAIInsight
@@ -1273,8 +1274,8 @@ struct RecoveryCoachView: View {
         } message: {
             Text(
                 recoveryAIText(
-                    "ATHLTH will send your question, up to 16 recent chat messages, and your current sleep, HRV, resting heart rate, activity load, muscle recovery and any check-in values to its external AI provider Groq. This approval applies to this question only. Cancel to keep health data on your device.",
-                    "ATHLTH sender spørsmålet ditt, inntil 16 tidligere chatmeldinger og opplysninger om søvn, HRV, hvilepuls, treningsbelastning, muskelrestitusjon og eventuell innsjekk til AI-leverandøren Groq. Du godkjenner bare denne sendingen. Velg Avbryt for å beholde helsedata på telefonen."
+                    "ATHLTH will send your question, up to 16 recent chat messages, your current recovery measurements and a local summary of up to eight weeks of recorded strength training to Groq. The summary can include exercise names, working weights, repetitions, estimated 1RM and progress. This approval applies to this question only. Cancel to keep these records on your device.",
+                    "ATHLTH sender spørsmålet ditt, inntil 16 tidligere chatmeldinger, restitusjonsmålingene dine og en lokal analyse av inntil åtte ukers registrert styrketrening til Groq. Analysen kan inneholde øvelsesnavn, vekt, repetisjoner, estimert 1RM og fremgang. Du godkjenner bare dette spørsmålet. Avbryt for å beholde disse dataene på telefonen."
                 )
             )
         }
@@ -2833,7 +2834,12 @@ struct RecoveryCoachView: View {
                     shareHealthAutomatically:
                         RecoveryCoachHealthSharingPreferences.canAutomaticallyShare(
                             userID: session.profile.userID
-                        )
+                        ),
+                    coachStrengthContext: shareHealthData
+                        ? ATHLTHCoachStrengthIntelligence.snapshot(
+                            from: strengthWorkout.workoutHistory
+                          )
+                        : nil
                 )
 
             messages.append(
