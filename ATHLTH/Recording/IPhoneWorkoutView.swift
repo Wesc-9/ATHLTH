@@ -217,11 +217,15 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
             let distance =
                 workout.distanceMeters /
                 splitMeters
-            let isTreadmill = workout.runEnvironment == .treadmill
-            // Phone treadmill workouts must never reuse GPS pace (including
-            // a delayed GPS callback from a previous outdoor session).
-            let paceSeconds = isTreadmill
-                ? workout.treadmillSpeedKilometersPerHour.flatMap { $0 > 0 ? 3_600 / $0 : nil }
+            let isIndoor = workout.runEnvironment == .treadmill
+            let isTreadmill = isIndoor && workout.indoorVenue != .indoorRunning
+            // Neither type of indoor running may reuse GPS pace. Indoor
+            // tracks have no belt-speed source; never imply measured pace.
+            let paceSeconds = isIndoor
+                ? (isTreadmill
+                    ? workout.treadmillSpeedKilometersPerHour.flatMap {
+                        $0 > 0 ? 3_600 / $0 : nil
+                    } : nil)
                 : workout.currentPaceSecondsPerKilometer
             let currentPace = paceSeconds.map { isMetric ? $0 : $0 * 1.609344 }
             let treadmillAveragePace = isTreadmill
@@ -301,7 +305,10 @@ private struct IPhoneWorkoutLiveMetricsPanel: View {
                         value: isTreadmill
                             ? ATHLTHLocalization.choose(
                                 english: "Belt", norwegian: "Mølle")
-                            : "GPS",
+                            : isIndoor
+                                ? ATHLTHLocalization.choose(
+                                    english: "Indoor", norwegian: "Inne")
+                                : "GPS",
                         unit: nil
                     )
                 }
@@ -1220,6 +1227,8 @@ struct IPhoneWorkoutView: View {
     @State private var showingAIConversation = false
     @State private var showingTreadmillSpeedEditor = false
     @State private var showingAddRunningWorkout = false
+    @State private var showingManualEnvironmentChoice = false
+    @State private var showingAutomaticIndoorSuggestion = false
     @State private var treadmillInclineDraft = 0.0
     @State private var treadmillInclineEditingWorkoutID:
         UUID?
@@ -1903,6 +1912,62 @@ struct IPhoneWorkoutView: View {
                     }
                 }
             }
+            .onAppear {
+                if recorder.indoorSuggestionAvailable {
+                    showingAutomaticIndoorSuggestion = true
+                }
+            }
+            .onChange(of: recorder.indoorSuggestionAvailable) { _, available in
+                if available { showingAutomaticIndoorSuggestion = true }
+            }
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Are you running indoors?",
+                    norwegian: "Trener du innendørs?"
+                ),
+                isPresented: $showingAutomaticIndoorSuggestion,
+                titleVisibility: .visible
+            ) {
+                ForEach(ATHLTHIndoorRunVenue.allCases) { venue in
+                    Button(venue.title) {
+                        _ = recorder.switchRunningEnvironmentToIndoor(venue)
+                    }
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Continue outdoors", norwegian: "Fortsett utendørs"
+                )) {
+                    recorder.dismissIndoorSuggestion()
+                }
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Less than 100 metres of reliable GPS movement in 15 minutes. Choose your running environment. Your workout continues.",
+                    norwegian: "Under 100 meter pålitelig GPS-forflytning på 15 minutter. Velg treningsmiljø – økten fortsetter."
+                ))
+            }
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Change running environment",
+                    norwegian: "Endre treningsmiljø"
+                ),
+                isPresented: $showingManualEnvironmentChoice,
+                titleVisibility: .visible
+            ) {
+                ForEach(ATHLTHIndoorRunVenue.allCases) { venue in
+                    Button(venue.title) {
+                        _ = recorder.switchRunningEnvironmentToIndoor(venue)
+                    }
+                }
+                Button(ATHLTHLocalization.choose(
+                    english: "Continue outdoors", norwegian: "Fortsett utendørs"
+                )) {
+                    recorder.dismissIndoorSuggestion()
+                }
+            } message: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Indoor running does not use GPS. Treadmill distance needs entered belt speed.",
+                    norwegian: "Innendørs løping bruker ikke GPS. Distanse på tredemølle krever oppgitt møllehastighet."
+                ))
+            }
             .sheet(isPresented: $showingLiveAudioCoach) {
                 IPhoneAudioCoachLiveSheet()
                     .environmentObject(recorder)
@@ -2226,53 +2291,42 @@ struct IPhoneWorkoutView: View {
                 Spacer()
 
                 Button {
-                    guard workout.runEnvironment ==
-                            .treadmill
-                    else {
-                        return
+                    if workout.runEnvironment == .treadmill &&
+                       workout.indoorVenue != .indoorRunning {
+                        treadmillInclineEditingWorkoutID = nil
+                        treadmillInclineDraft = workout.treadmillInclinePercent ?? 0
+                        showingTreadmillInclineEditor = true
+                    } else {
+                        showingManualEnvironmentChoice = true
                     }
-
-                    treadmillInclineEditingWorkoutID =
-                        nil
-                    treadmillInclineDraft =
-                        workout
-                            .treadmillInclinePercent ??
-                        0
-                    showingTreadmillInclineEditor =
-                        true
                 } label: {
                     HStack(spacing: 6) {
                         Image(
                             systemName:
-                                workout.runEnvironment ==
-                                .treadmill
-                                    ? "figure.run.treadmill"
+                                workout.runEnvironment == .treadmill
+                                    ? (workout.indoorVenue == .indoorRunning
+                                        ? "figure.run" : "figure.run.treadmill")
                                     : "location.fill"
                         )
 
                         Text(
-                            workout.runEnvironment ==
-                                .treadmill
-                                ? ATHLTHLocalization.format(
-                                    english:
-                                        "Treadmill · %.1f%%",
-                                    norwegian:
-                                        "Tredemølle · %.1f%%",
-                                    workout
-                                        .treadmillInclinePercent ??
-                                    0
-                                )
-                                : (
-                                    workout.points.last == nil
-                                        ? ATHLTHLocalization.choose(
-                                            english: "GPS waiting",
-                                            norwegian: "Venter på GPS"
-                                        )
-                                        : ATHLTHLocalization.choose(
-                                            english: "GPS on",
-                                            norwegian: "GPS på"
-                                        )
-                                )
+                            workout.runEnvironment == .treadmill
+                                ? (workout.indoorVenue == .indoorRunning
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Indoor running", norwegian: "Innendørs løping"
+                                    )
+                                    : ATHLTHLocalization.format(
+                                        english: "Treadmill · %.1f%%",
+                                        norwegian: "Tredemølle · %.1f%%",
+                                        workout.treadmillInclinePercent ?? 0
+                                    ))
+                                : (workout.points.last == nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "GPS waiting", norwegian: "Venter på GPS"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "GPS on", norwegian: "GPS på"
+                                    ))
                         )
                         .font(
                             .caption.weight(
@@ -2280,14 +2334,8 @@ struct IPhoneWorkoutView: View {
                             )
                         )
 
-                        if workout.runEnvironment ==
-                            .treadmill {
-                            Image(
-                                systemName:
-                                    "chevron.down"
-                            )
+                        Image(systemName: "chevron.down")
                             .font(.caption2)
-                        }
                     }
                     .foregroundStyle(
                         workout.runEnvironment == .treadmill
@@ -2334,7 +2382,8 @@ struct IPhoneWorkoutView: View {
                 }
             }
 
-            if workout.runEnvironment == .treadmill {
+            if workout.runEnvironment == .treadmill &&
+               workout.indoorVenue != .indoorRunning {
                 Button { showingTreadmillSpeedEditor = true } label: {
                     HStack(spacing: 10) {
                         Image(systemName: "speedometer")
@@ -2365,6 +2414,22 @@ struct IPhoneWorkoutView: View {
                 .buttonStyle(.plain)
             }
 
+            if workout.runEnvironment == .outdoor {
+                Button {
+                    showingManualEnvironmentChoice = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Change running environment",
+                            norwegian: "Endre treningsmiljø"
+                        ), systemImage: "location.circle"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+                .buttonStyle(.plain)
+            }
+
             Text(workout.title)
                 .font(
                     .system(
@@ -2391,10 +2456,8 @@ struct IPhoneWorkoutView: View {
                 Text(
                     workout.runEnvironment == .treadmill
                         ? ATHLTHLocalization.choose(
-                            english:
-                                "Indoor run · recorded with iPhone",
-                            norwegian:
-                                "Innendørs · registreres med iPhone"
+                            english: "Indoor run · recorded with iPhone",
+                            norwegian: "Innendørs løping · registreres med iPhone"
                         )
                         : ATHLTHLocalization.choose(
                             english:
