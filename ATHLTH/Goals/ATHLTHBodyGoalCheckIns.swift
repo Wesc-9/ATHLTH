@@ -95,8 +95,9 @@ enum ATHLTHBodyGoalCheckInPolicy {
         goal: ATHLTHGoal, profile: ATHLTHTrainingProfile,
         now: Date = Date(), calendar: Calendar = .current
     ) -> Date? {
+        // Activity check-ins remain available even without device-alert permission.
         guard let config = goal.bodyMeasurementGoal,
-              config.notificationsEnabled, goal.status == .active,
+              goal.status == .active,
               (7...30).contains(config.checkInIntervalDays),
               goal.deadline.map {
                   now <= (calendar.date(byAdding: .day, value: 1,
