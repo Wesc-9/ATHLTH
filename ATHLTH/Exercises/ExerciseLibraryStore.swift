@@ -204,8 +204,10 @@ final class ExerciseLibraryStore: ObservableObject {
     private var lastSearchResults: [ExerciseLibraryEntry] = []
 
     init() {
-        loadBundledRepDB()
+        // Prefer a valid persisted snapshot; fall back to the bundled offline catalog.
+        // This avoids decoding the same large exercise dataset twice at startup.
         loadCachedRepDB()
+        if repDBExercises.isEmpty { loadBundledRepDB() }
     }
 
     func switchAccount(_ userID: UUID?) {
