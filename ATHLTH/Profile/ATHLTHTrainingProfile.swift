@@ -49,7 +49,7 @@ struct ATHLTHTrainingProfile: Codable, Equatable {
     }
 }
 
-enum ATHLTHBodyMetric: String, Codable, CaseIterable, Identifiable {
+enum ATHLTHBodyMetric: String, Codable, CaseIterable, Identifiable, Hashable {
     case weight
     case waist
     case hips
