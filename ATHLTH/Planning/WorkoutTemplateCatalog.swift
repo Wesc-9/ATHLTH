@@ -2431,6 +2431,9 @@ struct WorkoutTemplateBuilderView: View {
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
     private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Bool)?
+    /// Used by Coach's Add flow: schedule an edited workout without
+    /// automatically saving a template in My Workouts.
+    private let onAddStandalone: ((PlannedSession) -> Bool)?
 
     init(
         initialTitle: String = "",
@@ -2447,7 +2450,8 @@ struct WorkoutTemplateBuilderView: View {
         planCopyDays: [ATHLTHPlanCopyDay] = [],
         initialCopyWeekIndex: Int = 0,
         onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)? = nil,
-        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Bool)? = nil
+        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Bool)? = nil,
+        onAddStandalone: ((PlannedSession) -> Bool)? = nil
     ) {
         _title = State(initialValue: initialTitle)
         _blocks = State(initialValue: initialBlocks)
@@ -2476,6 +2480,7 @@ struct WorkoutTemplateBuilderView: View {
             "|" + (initialRouteID?.uuidString ?? "") +
             "|" + String(initialDurationOverrideMinutes ?? -1)
         self.onSaveToPlan = onSaveToPlan
+        self.onAddStandalone = onAddStandalone
     }
 
     private struct StoredWorkoutDraft: Codable {
@@ -2527,7 +2532,9 @@ struct WorkoutTemplateBuilderView: View {
 
     // Standalone workout creation keeps its established palette. When opened
     // from the plan, use the same tokens as the first plan-creation screen.
-    private var isPlannedWorkout: Bool { onSaveToPlan != nil }
+    private var isPlannedWorkout: Bool {
+        onSaveToPlan != nil || onAddStandalone != nil
+    }
     private var studioInk: Color {
         isPlannedWorkout ? ATHLTHTrainDesign.ink
             : Color(red: 0.17, green: 0.17, blue: 0.18)
@@ -4918,7 +4925,13 @@ struct WorkoutTemplateBuilderView: View {
         guard canSave else { return }
         let workout = workoutSnapshot()
         let cleanTitle = workout.title
-        if let onSaveToPlan {
+        if let onAddStandalone {
+            guard onAddStandalone(workout) else {
+                actionNotice = tr("Cannot add this workout yet",
+                                  "Kunne ikke legge til økten ennå")
+                return
+            }
+        } else if let onSaveToPlan {
             guard onSaveToPlan(
                 cleanTitle, blocks, hasOutdoorCardio ? selectedRouteID : nil,
                 resolvedDurationMinutes, manualDurationMinutes != nil
