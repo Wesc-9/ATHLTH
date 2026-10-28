@@ -267,13 +267,14 @@ struct ATHLTHTrainingProfileView: View {
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
             Text(label)
-                .font(.system(size: 10, weight: .medium))
+                .font(.caption2.weight(.medium))
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .lineLimit(1)
+                .lineLimit(2)
                 .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, minHeight: 48)
         .padding(.vertical, 8)
+        .accessibilityElement(children: .combine)
         .background(ATHLTHPlanDesign.selectedSurface,
                     in: RoundedRectangle(cornerRadius: 13))
     }

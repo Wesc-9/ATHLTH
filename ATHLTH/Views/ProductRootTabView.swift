@@ -351,7 +351,7 @@ struct ProductRootTabView: View {
             }
         }
         .sheet(
-            item: Binding(
+            item: Binding<ATHLTHBodyGoalNotificationRoute?>(
                 get: {
                     guard let route = pushManager.pendingBodyGoalCheckIn,
                           route.accountID == session.profile.userID,
@@ -359,7 +359,7 @@ struct ProductRootTabView: View {
                     else { return nil }
                     return route
                 },
-                set: { route in
+                set: { route, _ in
                     if route == nil { pushManager.clearPendingBodyGoalCheckIn() }
                 }
             )
@@ -12181,15 +12181,27 @@ struct ATHLTHProgressView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(
                         health.hasRequestedAuthorization
-                            ? "No Apple Health progress data yet"
-                            : "Progress without Apple Health"
+                            ? ATHLTHLocalization.choose(
+                                english: "No readable Apple Health progress yet",
+                                norwegian: "Ingen lesbare helsedata ennå"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Progress without Apple Health",
+                                norwegian: "Fremgang uten Apple Health"
+                            )
                     )
                     .font(.headline)
 
                     Text(
                         health.hasRequestedAuthorization
-                            ? "Apple Health is configured, but ATHLTH has not found readable workout, steps or sleep progress for this period yet. Health-based charts stay hidden instead of showing empty cards."
-                            : "Health-based charts stay hidden until Apple Health is connected. Strength records, goals, achievements and other ATHLTH-native progress remain available."
+                            ? ATHLTHLocalization.choose(
+                                english: "Apple Health permissions have been reviewed, but no readable workouts, steps or sleep data were found for this period. This can also happen if read access was not granted. You can review access in the Health app.",
+                                norwegian: "Apple Health-tillatelsene er gjennomgått, men vi fant ingen lesbare økter, skritt eller søvndata for perioden. Dette kan også skje hvis lesetilgang ikke ble gitt. Du kan kontrollere tilgangen i Helse-appen."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Health-based charts are hidden until you review Apple Health access. Strength records, goals and ATHLTH progress remain available.",
+                                norwegian: "Helsebaserte grafer skjules til du har gjennomgått Apple Health-tilgangen. Styrkeøkter, mål og ATHLTH-fremgang er fortsatt tilgjengelig."
+                            )
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -12845,7 +12857,10 @@ struct ATHLTHProgressView: View {
 
         guard health.hasRequestedAuthorization else {
             progressSnapshot = nil
-            progressError = "Connect Apple Health to show your progress."
+            progressError = ATHLTHLocalization.choose(
+                english: "Review Apple Health access to show health-based progress.",
+                norwegian: "Gjennomgå Apple Health-tilgang for å vise helsebasert fremgang."
+            )
             return
         }
 
