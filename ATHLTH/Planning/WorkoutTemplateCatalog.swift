@@ -663,6 +663,7 @@ struct WorkoutTemplateLibraryView: View {
 
     /// Keeps legacy running templates available through the unified workout library.
     var onStartRunning: ((RunningWorkoutTemplate) -> Void)? = nil
+    var onSelectPlanned: ((PlannedSession) -> Void)? = nil
 
     @StateObject private var catalog =
         WorkoutTemplateCatalogStore()
@@ -772,6 +773,15 @@ struct WorkoutTemplateLibraryView: View {
             return categoryMatches &&
                 favoriteMatches &&
                 searchMatches && muscleMatches && levelMatches(entry)
+        }
+    }
+
+    private var filteredSavedWorkouts: [PlannedSession] {
+        guard onSelectPlanned != nil else { return [] }
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return session.savedWorkoutTemplates.filter {
+            (clean.isEmpty || $0.title.localizedCaseInsensitiveContains(clean)) &&
+            (selectedCategory == "All" || $0.kind.title == selectedCategory)
         }
     }
 
@@ -900,7 +910,26 @@ struct WorkoutTemplateLibraryView: View {
                     }
                 }
 
-                if filteredEntries.isEmpty && filteredRunningTemplates.isEmpty {
+                if onSelectPlanned != nil && !filteredSavedWorkouts.isEmpty {
+                    Text(ATHLTHLocalization.choose(english: "My workouts", norwegian: "Mine økter"))
+                        .font(.headline)
+                    ForEach(filteredSavedWorkouts) { workout in
+                        Button {
+                            onSelectPlanned?(workout)
+                        } label: {
+                            HStack {
+                                Image(systemName: workout.kind.systemImage)
+                                Text(workout.title)
+                                Spacer()
+                                Image(systemName: "plus.circle.fill")
+                            }
+                            .padding(15)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                if filteredEntries.isEmpty && filteredRunningTemplates.isEmpty && filteredSavedWorkouts.isEmpty {
                     ContentUnavailableView(
                         favoritesOnly
                             ? "No favorite workouts yet"
@@ -915,12 +944,20 @@ struct WorkoutTemplateLibraryView: View {
                 } else {
                     ForEach(filteredEntries) { entry in
                         ZStack(alignment: .topTrailing) {
-                            NavigationLink {
-                                WorkoutTemplateDetailView(
-                                    entry: entry
-                                )
-                            } label: {
-                                workoutCard(entry)
+                            if let onSelectPlanned {
+                                Button {
+                                    onSelectPlanned(entry.plannedSession())
+                                } label: {
+                                    workoutCard(entry)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                NavigationLink {
+                                    WorkoutTemplateDetailView(entry: entry)
+                                } label: {
+                                    workoutCard(entry)
+                                }
+                                .buttonStyle(.plain)
                             }
                             .buttonStyle(.plain)
                             .simultaneousGesture(
@@ -953,15 +990,25 @@ struct WorkoutTemplateLibraryView: View {
 
                     ForEach(filteredRunningTemplates) { workout in
                         ZStack(alignment: .topTrailing) {
-                            NavigationLink {
-                                RunningWorkoutDetailView(
-                                    workout: workout,
-                                    selectionTitle: nil,
-                                    onSelect: nil,
-                                    onStart: onStartRunning
-                                )
-                            } label: {
-                                runningWorkoutCard(workout)
+                            if let onSelectPlanned {
+                                Button {
+                                    onSelectPlanned(workout.plannedSession())
+                                } label: {
+                                    runningWorkoutCard(workout)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                NavigationLink {
+                                    RunningWorkoutDetailView(
+                                        workout: workout,
+                                        selectionTitle: nil,
+                                        onSelect: nil,
+                                        onStart: onStartRunning
+                                    )
+                                } label: {
+                                    runningWorkoutCard(workout)
+                                }
+                                .buttonStyle(.plain)
                             }
                             .buttonStyle(.plain)
                             .simultaneousGesture(
@@ -4730,295 +4777,3 @@ struct SavedWorkoutPickerView: View {
 
 
 
-struct PlanWorkoutPickerView: View {
-    @Environment(\.dismiss) private var dismiss
-    @EnvironmentObject private var session: AppSessionStore
-    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
-
-    @StateObject private var catalog =
-        WorkoutTemplateCatalogStore()
-    @State private var query = ""
-    @State private var selectedCategory = "all"
-
-    let onSelect: (PlannedSession) -> Void
-
-    private func categoryMatches(_ kind: WorkoutKind, category: String? = nil) -> Bool {
-        switch selectedCategory {
-        case "running": return kind == .running
-        case "strength": return kind == .strength
-        case "hybrid": return category == "hybrid"
-        case "other": return kind == .mobility || kind == .walking ||
-            (kind == .custom && category != "hybrid")
-        default: return true
-        }
-    }
-
-    private var runningWorkouts: [RunningWorkoutTemplate] {
-        guard selectedCategory == "all" || selectedCategory == "running" else { return [] }
-        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        return runningLibrary.allTemplates.filter {
-            clean.isEmpty || $0.title.localizedCaseInsensitiveContains(clean)
-                || $0.summary.localizedCaseInsensitiveContains(clean)
-                || $0.type.title.localizedCaseInsensitiveContains(clean)
-        }
-    }
-
-    private var savedWorkouts: [PlannedSession] {
-        let clean =
-            query.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        return session.savedWorkoutTemplates.filter { workout in
-            categoryMatches(workout.kind, category: workout.workoutCategory) &&
-                (clean.isEmpty || workout.title.localizedCaseInsensitiveContains(clean) ||
-                 (workout.notes ?? "").localizedCaseInsensitiveContains(clean))
-        }
-    }
-
-    private var catalogWorkouts:
-        [WorkoutTemplateCatalogEntry] {
-        let clean =
-            query.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-
-        return catalog.entries.filter { entry in
-            categoryMatches(entry.workoutKind, category: entry.category) &&
-                (clean.isEmpty ||
-                 entry.title.localizedCaseInsensitiveContains(clean) ||
-                 entry.summary.localizedCaseInsensitiveContains(clean) ||
-                 entry.tags.joined(separator: " ").localizedCaseInsensitiveContains(clean))
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    Picker(ATHLTHLocalization.choose(english: "Workout type", norwegian: "Økttype"),
-                           selection: $selectedCategory) {
-                        Text(ATHLTHLocalization.choose(english: "All", norwegian: "Alle")).tag("all")
-                        Text(ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")).tag("strength")
-                        Text(ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")).tag("running")
-                        Text(ATHLTHLocalization.choose(english: "Hybrid", norwegian: "Hybrid")).tag("hybrid")
-                        Text(ATHLTHLocalization.choose(english: "Other", norwegian: "Annet")).tag("other")
-                    }
-                    .pickerStyle(.menu)
-                }
-                if !savedWorkouts.isEmpty {
-                    Section("My Workouts") {
-                        ForEach(savedWorkouts) {
-                            workout in
-                            Button {
-                                onSelect(workout)
-                                dismiss()
-                            } label: {
-                                workoutRow(
-                                    title: workout.title,
-                                    subtitle:
-                                        savedWorkoutSubtitle(
-                                            workout
-                                        ),
-                                    icon:
-                                        workout.kind
-                                            .systemImage
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                if !runningWorkouts.isEmpty {
-                    Section(ATHLTHLocalization.choose(
-                        english: "Running workouts", norwegian: "Løpeøkter"
-                    )) {
-                        ForEach(runningWorkouts) { workout in
-                            Button {
-                                onSelect(workout.plannedSession())
-                                dismiss()
-                            } label: {
-                                workoutRow(
-                                    title: workout.title,
-                                    subtitle: workout.summary,
-                                    icon: workout.type.systemImage
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                if !catalogWorkouts.isEmpty {
-                    Section(ATHLTHLocalization.choose(
-                        english: "Complete workout library",
-                        norwegian: "Ferdige treningsøkter"
-                    )) {
-                        ForEach(catalogWorkouts) {
-                            entry in
-                            Button {
-                                onSelect(
-                                    entry
-                                        .plannedSession()
-                                )
-                                dismiss()
-                            } label: {
-                                workoutRow(
-                                    title: entry.title,
-                                    subtitle:
-                                        catalogWorkoutSubtitle(
-                                            entry
-                                        ),
-                                    icon:
-                                        entry.systemImage
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-
-                if savedWorkouts.isEmpty &&
-                    catalogWorkouts.isEmpty && runningWorkouts.isEmpty {
-                    ContentUnavailableView(
-                        "No workouts found",
-                        systemImage:
-                            "rectangle.stack",
-                        description: Text(
-                            "Try another search."
-                        )
-                    )
-                    .listRowBackground(
-                        Color.clear
-                    )
-                }
-            }
-            .navigationTitle("Choose Workout")
-            .navigationBarTitleDisplayMode(
-                .inline
-            )
-            .searchable(
-                text: $query,
-                prompt: "Search workouts"
-            )
-            .toolbar {
-                ToolbarItem(
-                    placement:
-                        .cancellationAction
-                ) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
-            .task {
-                await catalog.refresh()
-            }
-        }
-    }
-
-    private func workoutRow(
-        title: String,
-        subtitle: String,
-        icon: String
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .foregroundStyle(
-                    ATHLTHTheme.accent
-                )
-                .frame(
-                    width: 36,
-                    height: 36
-                )
-                .background(
-                    ATHLTHTheme.accentSoft,
-                    in: RoundedRectangle(
-                        cornerRadius: 11,
-                        style: .continuous
-                    )
-                )
-
-            VStack(
-                alignment: .leading,
-                spacing: 3
-            ) {
-                Text(title)
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-                    .foregroundStyle(
-                        ATHLTHTheme.primaryText
-                    )
-
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
-            }
-
-            Spacer()
-
-            Image(
-                systemName: "plus.circle.fill"
-            )
-            .foregroundStyle(
-                ATHLTHTheme.accent
-            )
-        }
-    }
-
-    private func savedWorkoutSubtitle(
-        _ workout: PlannedSession
-    ) -> String {
-        if !workout.exercises.isEmpty {
-            let count =
-                workout.exercises.count
-            return count == 1
-                ? "1 exercise · \(workout.kind.title)"
-                : "\(count) exercises · \(workout.kind.title)"
-        }
-
-        let blocks =
-            workout
-                .resolvedWorkoutBlocks
-
-        if !blocks.isEmpty {
-            let exerciseCount =
-                blocks.filter {
-                    $0.kind == .exercise
-                }.count
-
-            if exerciseCount > 0 {
-                return exerciseCount == 1
-                    ? "1 exercise · Structured workout"
-                    : "\(exerciseCount) exercises · Structured workout"
-            }
-
-            return "\(blocks.count) blocks · Structured workout"
-        }
-
-        return workout.kind.title
-    }
-
-    private func catalogWorkoutSubtitle(
-        _ entry:
-            WorkoutTemplateCatalogEntry
-    ) -> String {
-        let exerciseCount =
-            entry.blocks.filter {
-                $0.kind == .exercise
-            }.count
-
-        if exerciseCount > 0 {
-            return exerciseCount == 1
-                ? "1 exercise · \(entry.categoryTitle)"
-                : "\(exerciseCount) exercises · \(entry.categoryTitle)"
-        }
-
-        return "\(entry.blocks.count) blocks · \(entry.categoryTitle)"
-    }
-}
