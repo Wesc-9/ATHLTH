@@ -1,6 +1,64 @@
 import Foundation
 import SwiftUI
 
+/// Shared UI-only titles and hints. Never changes saved sessions or the workout engine.
+enum ATHLTHWorkoutStepCopy {
+    static func isFourByFour(_ title: String) -> Bool {
+        ATHLTHWorkoutSearch.normalized(title).contains("4x4")
+    }
+
+    static func title(for block: WorkoutTemplateBlock, workoutTitle: String, compact: Bool) -> String {
+        guard block.kind != .exercise else { return block.title }
+        let source = ATHLTHWorkoutSearch.normalized(block.title)
+        if block.kind == .run && block.resolvedPhase == .warmup &&
+            ["oppvarming", "warm up", "warmup"].contains(source) {
+            return block.cardioActivity == .walking
+                ? ATHLTHLocalization.choose(english: "Walking", norwegian: "Gange")
+                : ATHLTHLocalization.choose(english: "Jogging", norwegian: "Jogging")
+        }
+        if isFourByFour(workoutTitle) && block.resolvedPhase == .main && block.kind == .run {
+            let pieces = block.title.components(separatedBy: "·")
+            let base = ATHLTHWorkoutSearch.normalized(pieces[0])
+            if ["intervall", "interval"].contains(base), pieces.count == 2 {
+                let repetition = pieces[1].trimmingCharacters(in: .whitespaces)
+                if repetition.contains("/") {
+                    return ATHLTHLocalization.choose(
+                        english: "4x4 intervals · rep " + repetition,
+                        norwegian: "4x4 intervall · drag " + repetition
+                    )
+                }
+            }
+        }
+        if block.resolvedPhase == .recovery && (block.isActiveRecovery || isFourByFour(workoutTitle)) {
+            if compact {
+                return ATHLTHLocalization.choose(
+                    english: "Active recovery · easy jog", norwegian: "Aktiv pause · rolig jogg"
+                )
+            }
+            return ATHLTHLocalization.choose(english: "Easy jog", norwegian: "Rolig jogg")
+        }
+        return block.title
+    }
+
+    /// Coach guidance only, not a measured value or modification to the prescribed workout.
+    static func suggestedZone(for block: WorkoutTemplateBlock, workoutTitle: String) -> String? {
+        guard isFourByFour(workoutTitle), block.kind == .run,
+              block.targetHeartRateZone == nil else { return nil }
+        let zone = block.resolvedPhase == .main ? "4" : "1–2"
+        return ATHLTHLocalization.choose(
+            english: "Suggested HR zone Z", norwegian: "Anbefalt pulssone S"
+        ) + zone
+    }
+
+    static func duration(_ seconds: TimeInterval) -> String {
+        let whole = Int(seconds.rounded())
+        let minutes = whole / 60, remaining = whole % 60
+        if minutes == 0 { return "\(remaining) s" }
+        if remaining == 0 { return "\(minutes) min" }
+        return "\(minutes) min \(remaining) s"
+    }
+}
+
 /// Read-only workout presentation shared by running, strength and hybrid
 /// recipes. It uses the same light plan tokens and phase-oriented timeline as
 /// WorkoutTemplateBuilderView, without exposing editing controls by accident.
@@ -26,15 +84,7 @@ struct ATHLTHWorkoutRecipePreview: View {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 
-    private var recipeTint: Color {
-        if embeddedInDetails { return ATHLTHPlanDesign.accentInk }
-        switch category {
-        case "running": return ATHLTHTheme.vitality
-        case "hybrid": return ATHLTHTheme.accentDeep
-        case "strength": return ATHLTHTheme.accentDeep
-        default: return ATHLTHPlanDesign.ink
-        }
-    }
+    private var recipeTint: Color { ATHLTHPlanDesign.accentInk }
 
     private var categoryTitle: String {
         switch category {
@@ -196,35 +246,55 @@ struct ATHLTHWorkoutRecipePreview: View {
         }
     }
 
-    // Simple mode is a concise prescription, not the advanced step-by-step timeline.
+    // Simple: only the workout outline. Advanced holds targets, zones and editing.
     private var simpleOutline: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 11) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                HStack(alignment: .top, spacing: 11) {
-                    Image(systemName: block.resolvedPhase.symbol)
-                        .font(.subheadline)
+                if shouldShowPhaseHeader(at: index) {
+                    Label(block.resolvedPhase.title.uppercased(),
+                          systemImage: block.resolvedPhase.symbol)
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.0)
                         .foregroundStyle(recipeTint)
-                        .frame(width: 26)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(localizedTitle(block))
+                        .padding(.top, index == 0 ? 0 : 7)
+                }
+                HStack(spacing: 11) {
+                    Text("\(index + 1)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(recipeTint)
+                        .frame(width: 29, height: 29)
+                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                    thumbnail(for: block)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(localizedTitle(block, compact: true))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ATHLTHPlanDesign.ink)
-                        if let target = block.targetText, !target.isEmpty {
-                            Text(target)
+                            .fixedSize(horizontal: false, vertical: true)
+                        if let seconds = block.durationSeconds, seconds > 0 {
+                            Text(ATHLTHWorkoutStepCopy.duration(seconds))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        } else if let distance = block.distanceMeters, distance > 0 {
+                            Text(distance >= 1_000
+                                 ? String(format: "%.1f km", distance / 1_000)
+                                 : "\(Int(distance.rounded())) m")
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
                     }
                     Spacer(minLength: 0)
                 }
-                .padding(.vertical, 8)
-                if index < blocks.count - 1 {
-                    Divider().overlay(ATHLTHPlanDesign.outline)
+                .padding(13)
+                .athlthPlanCard(radius: 19, warm: block.resolvedPhase != .recovery)
+                .overlay(alignment: .leading) {
+                    if block.resolvedPhase == .recovery {
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(ATHLTHPlanDesign.accentInk.opacity(0.65))
+                            .frame(width: 4)
+                    }
                 }
             }
         }
-        .padding(15)
-        .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 19))
     }
 
     private var timeline: some View {
@@ -316,7 +386,7 @@ struct ATHLTHWorkoutRecipePreview: View {
                 thumbnail(for: block)
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(localizedTitle(block))
+                    Text(localizedTitle(block, compact: false))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                         .fixedSize(horizontal: false, vertical: true)
@@ -324,6 +394,13 @@ struct ATHLTHWorkoutRecipePreview: View {
                         Text(target)
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    if let suggested = ATHLTHWorkoutStepCopy.suggestedZone(
+                        for: block, workoutTitle: title
+                    ) {
+                        Text(suggested)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     }
                     if let pace = block.targetPaceSecondsPerKilometer,
                        pace.isFinite, pace > 0 {
@@ -395,8 +472,12 @@ struct ATHLTHWorkoutRecipePreview: View {
         }
     }
 
-    private func localizedTitle(_ block: WorkoutTemplateBlock) -> String {
-        guard block.kind == .exercise else { return block.title }
+    private func localizedTitle(_ block: WorkoutTemplateBlock, compact: Bool) -> String {
+        guard block.kind == .exercise else {
+            return ATHLTHWorkoutStepCopy.title(
+                for: block, workoutTitle: title, compact: compact
+            )
+        }
         if let match = ATHLTHExerciseReferenceResolver.resolve(
             block, in: exerciseLibrary.allExercises
         ) {
@@ -427,9 +508,6 @@ struct ATHLTHWorkoutRecipePreview: View {
         }
         if let weight = block.targetWeightKilograms, weight > 0 {
             result.append(tr("Target load: ", "Målvekt: ") + "\(weight) kg")
-        }
-        if let zone = block.targetHeartRateZone {
-            result.append(tr("Heart-rate zone Z", "Pulssone S") + "\(zone)")
         }
         if let pace = block.targetPaceSecondsPerKilometer, pace > 0 {
             let seconds = Int(pace.rounded())
