@@ -166,7 +166,8 @@ enum ATHLTHCoachWorkoutCreationIntent {
         }
         let verbs = ["lag ", "lage ", "hjelp meg a lage", "opprett ", "sett opp ",
                      "create ", "build ", "generate ", "make ", "design "]
-        let workouts = ["okt", "treningsokt", "workout", "session", "styrketrening",
+        let workouts = ["økt", "okt", "treningsøkt", "treningsokt",
+                        "workout", "session", "styrketrening",
                         "brysttrening", "løpetrening", "lopetrening"]
         return verbs.contains(where: { text.contains($0) }) &&
             workouts.contains(where: { text.contains($0) })
