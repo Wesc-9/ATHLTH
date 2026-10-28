@@ -1817,40 +1817,6 @@ struct RecoveryCoachView: View {
     private var coachInsightCard:
         some View {
         ATHLTHUnifiedCard {
-            HStack(spacing: 8) {
-                Image(
-                    systemName:
-                        "chart.bar.fill"
-                )
-                .font(
-                    .system(
-                        size: 13,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .premiumGold
-                )
-
-                Text(
-                    recoveryAIText(
-                        "TODAY'S INSIGHT",
-                        "DAGENS INNSIKT"
-                    )
-                )
-                .font(
-                    .caption
-                        .weight(.bold)
-                )
-                .tracking(1.1)
-                .foregroundStyle(
-                    .secondary
-                )
-
-                Spacer()
-            }
-
             HStack(
                 alignment: .center,
                 spacing: 14
