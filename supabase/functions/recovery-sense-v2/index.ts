@@ -50,6 +50,8 @@ type RecoveryRequest = {
   healthSharingMode?: "confirmEachQuestion" | "automatic";
   // Structured, consented strength evidence: never included without this turn's health approval.
   coachStrengthContext?: unknown;
+  // Bounded recorded running results, forwarded only on this turn's consent.
+  coachRunningContext?: unknown;
 };
 
 const json = (body: Record<string, unknown>, status = 200) =>
@@ -487,6 +489,39 @@ function normalizeCoachStrengthContext(value: unknown): StrengthCoachContext | n
   };
 }
 
+function normalizeCoachRunningContext(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  if (obj.windowDays !== 56) return null;
+  const count = (v: unknown, max: number) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? Math.min(max, Math.max(0, Math.round(n))) : 0;
+  };
+  const raw = Array.isArray(obj.recentRuns) ? obj.recentRuns.slice(0, 8) : [];
+  const recentRuns = raw.flatMap((item: unknown) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) return [];
+    const run = item as Record<string, unknown>;
+    const title = typeof run.title === "string" ? run.title.trim().slice(0, 90) : "";
+    if (!title || /[<>{}\n\r]/.test(title)) return [];
+    const pace = Number(run.averageWorkPaceSecondsPerKilometer);
+    return [{
+      title,
+      daysAgo: count(run.daysAgo, 56),
+      durationMinutes: count(run.durationMinutes, 1_000),
+      averageWorkPaceSecondsPerKilometer:
+        run.averageWorkPaceSecondsPerKilometer == null ||
+        !Number.isFinite(pace) || pace < 120 || pace > 3_600 ? null : Math.round(pace),
+      wasUserReported: run.wasUserReported === true,
+    }];
+  });
+  return {
+    windowDays: 56,
+    completedRuns: count(obj.completedRuns, 1_000),
+    runsLastSevenDays: count(obj.runsLastSevenDays, 200),
+    recentRuns,
+  };
+}
+
 function sanitizeHistory(
   input: RecoveryChatTurn[] | undefined,
 ) {
@@ -565,6 +600,10 @@ Deno.serve(async (req: Request) => {
     canShareHealth && body.mode === "ask"
       ? normalizeCoachStrengthContext(body.coachStrengthContext)
       : null;
+  const coachRunningContext =
+    canShareHealth && body.mode === "ask"
+      ? normalizeCoachRunningContext(body.coachRunningContext)
+      : null;
   const responseLanguage =
     body.language === "nb" ? "Norwegian Bokmål" : "English";
   const languageInstruction =
@@ -600,9 +639,10 @@ You are continuing an ATHLTH Coach conversation.
 - Answer the latest question directly in 2-5 short sentences.
 - If no recovery metrics were shared, say you do not have access to personal health data for this question. Never infer or invent such metrics.
 - Make the relationship to the supplied recovery data clear when relevant.
-- When coachStrengthContext is present, you are ATHLTH's evidence-first strength AND endurance coach: base strength advice on actual confirmed working sets, exercise history, trend, prescribed load vs estimated 1RM, not invented personal records. Two successful sessions may warrant reviewing a modest increase but NEVER applying changes. Plateau is a discussion prompt, not a diagnosis.
+- When coachStrengthContext is present, base strength advice on confirmed sets and exercise trends, never invented personal records. No weight changes without approval.
+- When coachRunningContext is present, use only confirmed completed runs, elapsed durations and measured pace samples, distinguishing manually reported from observed evidence. Never invent missing paces, route distances or personal bests.
 - Do not infer that missing strength metrics imply the athlete has not exercised. Explain data limitations and account for running/cycling and recovery instead of prescribing strength in isolation.
-- User consent for this question governs coachStrengthContext. When absent, do not claim access to strength history. Do not expose raw input context back verbatim unless needed for the requested recommendation.
+- User consent for this question governs coachStrengthContext and coachRunningContext. When absent, do not claim access to strength or running history. Do not expose raw input context back verbatim unless needed for the requested recommendation.
 - You can propose structured workouts and plan briefs. The app will validate and let the athlete approve every add/save action; never claim an action was performed.
 - For requests to build a specific workout, include a proposal with kind workout and 2-12 realistic ordered steps. For running, include warmup/work/cooldown and duration minutes; for strength include named exercises, sets, repetitions and rest; never invent the athlete's working weights or target pace. A step is an exercise or run segment, not prose. No medical guarantees.
 - For requests to build a training program, include a plan proposal with title, activity, duration per session, weeks and weekly frequency. The ATHLTH plan builder will flesh it out after the athlete approves. Set steps [] for plan.
@@ -616,6 +656,7 @@ You are continuing an ATHLTH Coach conversation.
         input: JSON.stringify({
           context,
           coachStrengthContext,
+          coachRunningContext,
           history,
           question,
         }),
