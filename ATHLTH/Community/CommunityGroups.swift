@@ -2239,7 +2239,13 @@ final class CommunityGroupStore: ObservableObject {
         _ announcementID: UUID,
         in groupID: UUID
     ) -> Int {
-        announcementComments(for: announcementID, in: groupID).count
+        // Counting must not allocate and sort the complete comment list.
+        (announcementCommentsByGroup[groupID] ?? []).reduce(into: 0) { count, comment in
+            if comment.contentType == "announcement" &&
+                comment.contentID == announcementID {
+                count += 1
+            }
+        }
     }
 
     func leaderboard(
