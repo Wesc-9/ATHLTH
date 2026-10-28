@@ -58,6 +58,7 @@ type RecoveryRequest = {
   coachStrengthContext?: unknown;
   // Bounded recorded running results, forwarded only on this turn's consent.
   coachRunningContext?: unknown;
+  coachTrainingContext?: unknown;
 };
 
 const json = (body: Record<string, unknown>, status = 200) =>
@@ -559,6 +560,38 @@ function normalizeCoachRunningContext(value: unknown) {
   };
 }
 
+function normalizeCoachTrainingContext(input: unknown) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return null;
+  const obj = input as Record<string, unknown>;
+  const clean = (value: unknown, limit = 100) =>
+    typeof value === "string" && !/[<>{}\\n\\r]/.test(value)
+      ? value.trim().slice(0, limit) : "";
+  const upcoming = Array.isArray(obj.upcoming) ? obj.upcoming.slice(0, 12)
+    .flatMap((entry: unknown) => {
+      if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
+      const event = entry as Record<string, unknown>;
+      const title = clean(event.title);
+      const date = clean(event.date, 40);
+      const activity = clean(event.activity, 30);
+      if (!title || !/^\\d{4}-\\d{2}-\\d{2}T/.test(date)) return [];
+      const rawDuration = Number(event.durationMinutes);
+      return [{
+        title, activity, date,
+        durationMinutes: event.durationMinutes == null ||
+          !Number.isFinite(rawDuration) ? null :
+          Math.min(480, Math.max(0, Math.round(rawDuration))),
+      }];
+    }) : [];
+  return {
+    planTitle: clean(obj.planTitle) || null,
+    planVersion: typeof obj.planVersion === "number" &&
+      Number.isFinite(obj.planVersion) ? Math.max(0, Math.round(obj.planVersion)) : null,
+    upcoming,
+    goalTitles: (Array.isArray(obj.goalTitles) ? obj.goalTitles : [])
+      .slice(0, 6).map((goal: unknown) => clean(goal)).filter(Boolean),
+  };
+}
+
 function sanitizeHistory(
   input: RecoveryChatTurn[] | undefined,
 ) {
@@ -651,6 +684,10 @@ Deno.serve(async (req: Request) => {
     canShareHealth && body.mode === "ask"
       ? normalizeCoachRunningContext(body.coachRunningContext)
       : null;
+  const coachTrainingContext =
+    canShareHealth && body.mode === "ask"
+      ? normalizeCoachTrainingContext(body.coachTrainingContext)
+      : null;
   const responseLanguage =
     body.language === "nb" ? "Norwegian Bokmål" : "English";
   const languageInstruction =
@@ -705,7 +742,8 @@ You are continuing an ATHLTH Coach conversation.
 - When coachStrengthContext is present, base strength advice on confirmed sets and exercise trends, never invented personal records. No weight changes without approval.
 - When coachRunningContext is present, use only confirmed completed runs, elapsed durations and measured pace samples, distinguishing manually reported from observed evidence. Never invent missing paces, route distances or personal bests.
 - Do not infer that missing strength metrics imply the athlete has not exercised. Explain data limitations and account for running/cycling and recovery instead of prescribing strength in isolation.
-- User consent for this question governs coachStrengthContext and coachRunningContext. When absent, do not claim access to strength or running history. Do not expose raw input context back verbatim unless needed for the requested recommendation.
+- User consent for this question governs coachStrengthContext, coachRunningContext and coachTrainingContext. When absent, do not claim access to the current training plan, goals, strength or running history. Do not expose raw input context verbatim unless the athlete requests it.
+- With coachTrainingContext, base plan-aware advice on actual upcoming sessions and recorded goal titles. Do not infer an active plan when planTitle is null, or treat a suggested exercise as already scheduled.
 - You can propose structured workouts and plan briefs. The app will validate and let the athlete approve every add/save action; never claim an action was performed.
 - For requests to build a specific workout, include a proposal with kind workout and 2-12 realistic ordered steps. For running, include warmup/work/cooldown and duration minutes; for strength include named exercises, sets, repetitions and rest; never invent the athlete's working weights or target pace. A step is an exercise or run segment, not prose. No medical guarantees.
 - For requests to build a training program, include a plan proposal with title, activity, duration per session, weeks and weekly frequency. The ATHLTH plan builder will flesh it out after the athlete approves. Set steps [] for plan.
@@ -720,6 +758,7 @@ You are continuing an ATHLTH Coach conversation.
           context,
           coachStrengthContext,
           coachRunningContext,
+          coachTrainingContext,
           history,
           question,
         }),
