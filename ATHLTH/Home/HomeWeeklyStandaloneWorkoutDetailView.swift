@@ -15,6 +15,10 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
     var onStartWorkout: ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
 
     @State private var showingInvitationLobby = false
+    @State private var showingWorkoutTextEditor = false
+    @State private var draftWorkoutTitle = ""
+    @State private var draftWorkoutNotes = ""
+    @State private var showingSaveToLibraryOptions = false
 
     private var currentWorkout: PlannedSession {
         session.standalonePlannedSessions.first {
@@ -69,6 +73,7 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
             VStack(alignment: .leading, spacing: 17) {
                 sheetHeader
                 overviewCard
+                workoutTextActions
 
                 // Full read-only programming timeline for authored workouts.
                 // The outline also supports the Simple/Advanced detail toggle.
@@ -136,6 +141,29 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .sheet(isPresented: $showingWorkoutTextEditor) {
+            workoutTextEditor
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Save to My Workouts?", norwegian: "Lagre i Mine økter?"
+            ),
+            isPresented: $showingSaveToLibraryOptions
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Save as new workout", norwegian: "Lagre som ny økt"
+            )) {
+                _ = session.saveSharedWorkout(currentWorkout)
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Your calendar copy stays independent of the saved workout.",
+                norwegian: "Kalenderkopien beholdes uavhengig av den lagrede økten."
+            ))
+        }
         .sheet(isPresented: $showingInvitationLobby) {
             PlannedWorkoutLobbyView(
                 workout: currentWorkout,
@@ -148,6 +176,93 @@ struct HomeWeeklyStandaloneWorkoutDetailView: View {
                 }
             )
             .presentationDetents([.large])
+        }
+    }
+
+    private var workoutTextActions: some View {
+        HStack(spacing: 10) {
+            Button {
+                draftWorkoutTitle = currentWorkout.title
+                draftWorkoutNotes = currentWorkout.notes ?? ""
+                showingWorkoutTextEditor = true
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(english: "Edit name and description",
+                                              norwegian: "Rediger navn og beskrivelse"),
+                    systemImage: "square.and.pencil"
+                )
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+            }
+            .buttonStyle(.plain)
+            Spacer(minLength: 0)
+            Button {
+                showingSaveToLibraryOptions = true
+            } label: {
+                Image(systemName: "square.and.arrow.down")
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 38, height: 38)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+            }
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Save workout to my workouts",
+                norwegian: "Lagre økten i Mine økter"
+            ))
+        }
+        .padding(.horizontal, 4)
+    }
+
+    private var workoutTextEditor: some View {
+        NavigationStack {
+            Form {
+                Section(ATHLTHLocalization.choose(
+                    english: "Workout name", norwegian: "Navn på treningsøkt"
+                )) {
+                    TextField(ATHLTHLocalization.choose(
+                        english: "Name", norwegian: "Navn"
+                    ), text: $draftWorkoutTitle)
+                }
+                Section(ATHLTHLocalization.choose(
+                    english: "Description", norwegian: "Beskrivelse"
+                )) {
+                    TextEditor(text: $draftWorkoutNotes)
+                        .frame(minHeight: 130)
+                }
+                Section {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Changes apply only to this calendar workout. Your saved workouts and training plans remain unchanged.",
+                        norwegian: "Endringene gjelder bare denne kalenderøkten. Lagrede økter og treningsplaner endres ikke."
+                    ))
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Edit workout", norwegian: "Rediger økt"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) {
+                        showingWorkoutTextEditor = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Save", norwegian: "Lagre"
+                    )) {
+                        var updated = currentWorkout
+                        updated.title = draftWorkoutTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                        let notes = draftWorkoutNotes.trimmingCharacters(in: .whitespacesAndNewlines)
+                        updated.notes = notes.isEmpty ? nil : notes
+                        session.updateStandalonePlannedSession(updated)
+                        showingWorkoutTextEditor = false
+                    }
+                    .disabled(draftWorkoutTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
         }
     }
 
