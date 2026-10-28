@@ -155,3 +155,20 @@ struct ATHLTHCoachWorkoutRequestSheet: View {
         .athlthPlanCard(radius: 17)
     }
 }
+
+enum ATHLTHCoachWorkoutCreationIntent {
+    static func isRequest(_ message: String) -> Bool {
+        let text = message.folding(options: [.diacriticInsensitive, .caseInsensitive],
+                                   locale: Locale(identifier: "nb_NO")).lowercased()
+        if text.contains("treningsplan") || text.contains("training plan") ||
+            text.contains("my plan") || text.contains("planen min") {
+            return false
+        }
+        let verbs = ["lag ", "lage ", "hjelp meg a lage", "opprett ", "sett opp ",
+                     "create ", "build ", "generate ", "make ", "design "]
+        let workouts = ["okt", "treningsokt", "workout", "session", "styrketrening",
+                        "brysttrening", "løpetrening", "lopetrening"]
+        return verbs.contains(where: { text.contains($0) }) &&
+            workouts.contains(where: { text.contains($0) })
+    }
+}
