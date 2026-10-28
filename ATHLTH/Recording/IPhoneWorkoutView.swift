@@ -1592,11 +1592,8 @@ struct IPhoneWorkoutView: View {
                         }
                     }
 
-                    if (
-                        workout
-                            .plannedRouteCoordinates?
-                            .count ?? 0
-                    ) >= 2 {
+                    if workout.runEnvironment == .outdoor &&
+                       (workout.plannedRouteCoordinates?.count ?? 0) >= 2 {
                         premiumWorkoutMap(
                             workout
                         )
@@ -1766,8 +1763,8 @@ struct IPhoneWorkoutView: View {
                                     .foregroundStyle(ATHLTHPlanDesign.ink)
                                 }
 
-                                if workout.runEnvironment ==
-                                    .treadmill {
+                                if workout.runEnvironment == .treadmill &&
+                                   workout.indoorVenue != .indoorRunning {
                                     if workout.treadmillSpeedKilometersPerHour != nil {
                                         Text(ATHLTHLocalization.choose(
                                             english: "Distance from entered belt speed",
@@ -1958,7 +1955,10 @@ struct IPhoneWorkoutView: View {
                     }
                 }
                 Button(ATHLTHLocalization.choose(
-                    english: "Continue outdoors", norwegian: "Fortsett utendørs"
+                    english: recorder.active?.runEnvironment == .outdoor
+                        ? "Continue outdoors" : "Cancel",
+                    norwegian: recorder.active?.runEnvironment == .outdoor
+                        ? "Fortsett utendørs" : "Avbryt"
                 )) {
                     recorder.dismissIndoorSuggestion()
                 }
