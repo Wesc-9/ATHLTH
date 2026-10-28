@@ -3759,6 +3759,7 @@ private struct ATHLTHAchievementSettingsView:
 
 private struct ATHLTHNotificationSettingsView: View {
     @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @ObservedObject private var push =
@@ -3924,6 +3925,13 @@ private struct ATHLTHNotificationSettingsView: View {
         }
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: notifications.authorizationStatus) { _, _ in
+            notifications.reconcileDailyCheckIn(
+                enabled: settings.dailyCheckInRemindersEnabled,
+                accountID: session.profile.userID,
+                completed: RecoverySorenessStore().hasTodayCheckIn
+            )
+        }
         .task {
             await notifications.refreshAuthorizationStatus()
             await notifications.reconcileSystemPreferences()
