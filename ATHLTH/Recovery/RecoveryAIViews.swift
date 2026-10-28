@@ -2432,26 +2432,26 @@ struct RecoveryCoachView: View {
                 Label(
                     shareHealthForNextQuestion
                         ? recoveryAIText(
-                            "Health data selected · confirm when sending",
-                            "Helsedata valgt · bekreft ved sending"
+                            "Health/training · confirm to share",
+                            "Helse/trening · bekreft deling"
                         )
                         : recoveryAIText(
-                            "Share health data for next question",
-                            "Del helsedata i neste spørsmål"
+                            "Health/training · not shared",
+                            "Helse/trening · ikke delt"
                         ),
                     systemImage: shareHealthForNextQuestion
                         ? "checkmark.shield.fill"
                         : "lock.shield"
                 )
-                .font(.caption.weight(.semibold))
+                .font(.caption2.weight(.semibold))
                 .foregroundStyle(
                     shareHealthForNextQuestion
-                        ? ATHLTHTheme.vitality
+                        ? ATHLTHPlanDesign.accentInk
                         : ATHLTHTheme.mutedText
                 )
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 14)
-                .padding(.vertical, 5)
+                .padding(.vertical, 3)
             }
             .buttonStyle(.plain)
             .accessibilityHint(
@@ -2460,17 +2460,6 @@ struct RecoveryCoachView: View {
                     "Vanlige spørsmål sendes til Groq uten helsedata. Aktiver og bekreft for å inkludere helsedata i ett spørsmål."
                 )
             )
-
-            Text(
-                recoveryAIText(
-                    "Your message goes to Groq. Health metrics are added only after your confirmation.",
-                    "Meldingen din sendes til Groq. Helsedata legges bare ved etter din bekreftelse."
-                )
-            )
-            .font(.system(size: 10, weight: .medium))
-            .foregroundStyle(.secondary)
-            .padding(.horizontal, 14)
-            .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 9) {
                 Menu {
