@@ -32,6 +32,8 @@ type ProgramRequest = {
   // Explicitly opted-in by the athlete, only for this request.
   injurySafetyNotes?: string | null;
   excludedMovements?: string[] | null;
+  // Explicitly consented strength signal summary from on-device Coach History.
+  coachStrengthContext?: unknown;
   goals?: GoalInput[];
   existingDays?: ExistingDay[];
 };
@@ -188,6 +190,65 @@ function clampInteger(value: unknown, low: number, high: number, fallback: numbe
   return Math.min(Math.max(Math.round(parsed), low), high);
 }
 
+
+
+type StrengthCoachContext = {
+  windowDays: number;
+  completedStrengthSessions: number;
+  strengthSessionsLastSevenDays: number;
+  completedWorkingSets: number;
+  recordedVolumeKg: number;
+  exerciseSignals: Array<{
+    exercise: string;
+    completedSessions: number;
+    mostRecentWorkingWeightKg: number | null;
+    bestEstimatedOneRepMaxKg: number | null;
+    trend: string;
+    recommendation: string;
+  }>;
+};
+
+// Explicit allowlist: no hidden symptoms, diagnoses, notes or unbounded
+// user-supplied prose can be copied from the request into the AI prompt.
+function normalizeCoachStrengthContext(value: unknown): StrengthCoachContext | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  if (!Number.isInteger(obj.windowDays) || obj.windowDays !== 56) return null;
+  const bounded = (raw: unknown, maximum: number): number => {
+    const n = Number(raw);
+    return Number.isFinite(n) ? Math.max(0, Math.min(n, maximum)) : 0;
+  };
+  const optionalWeight = (raw: unknown): number | null => {
+    if (typeof raw !== "number" || !Number.isFinite(raw) || raw <= 0) return null;
+    return Math.min(raw, 2_000);
+  };
+  const validTrends = new Set(["plateau", "improving", "insufficient_evidence"]);
+  const validAdvice = new Set(["review_small_increase", "review_plateau", "hold_and_collect_evidence"]);
+  const entries = Array.isArray(obj.exerciseSignals) ? obj.exerciseSignals.slice(0, 10) : [];
+  const exerciseSignals = entries.flatMap((raw: unknown) => {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return [];
+    const item = raw as Record<string, unknown>;
+    const exercise = typeof item.exercise === "string" ? item.exercise.trim().slice(0, 100) : "";
+    if (!exercise || /[<>{}\n\r]/.test(exercise)) return [];
+    return [{
+      exercise,
+      completedSessions: bounded(item.completedSessions, 56),
+      mostRecentWorkingWeightKg: optionalWeight(item.mostRecentWorkingWeightKg),
+      bestEstimatedOneRepMaxKg: optionalWeight(item.bestEstimatedOneRepMaxKg),
+      trend: validTrends.has(String(item.trend)) ? String(item.trend) : "insufficient_evidence",
+      recommendation: validAdvice.has(String(item.recommendation))
+        ? String(item.recommendation) : "hold_and_collect_evidence",
+    }];
+  });
+  return {
+    windowDays: 56,
+    completedStrengthSessions: bounded(obj.completedStrengthSessions, 70),
+    strengthSessionsLastSevenDays: bounded(obj.strengthSessionsLastSevenDays, 14),
+    completedWorkingSets: bounded(obj.completedWorkingSets, 2_000),
+    recordedVolumeKg: bounded(obj.recordedVolumeKg, 1_000_000),
+    exerciseSignals,
+  };
+}
 
 async function recordGroqQuota(
   response: Response,
@@ -556,6 +617,7 @@ Deno.serve(async (req: Request) => {
     // truncated safety-critical restrictions placed near the end.
     injurySafetyNotes: typeof body.injurySafetyNotes === "string"
       ? body.injurySafetyNotes.slice(0, 3_000) : null,
+    coachStrengthContext: normalizeCoachStrengthContext(body.coachStrengthContext),
     excludedMovements: Array.isArray(body.excludedMovements)
       ? body.excludedMovements
           .filter((name): name is string => typeof name === "string")
@@ -589,6 +651,9 @@ Hard rules:
 - If there is no injurySafetyNotes field, do not assume you know a diagnosis or which exercises are individually safe. Do not claim a generated workout is medically cleared.
 - Use health notes to avoid contraindicated exercises; do not diagnose, treat or promise any medical result.
 - If a goal or note suggests a medical limitation, keep recommendations general and low-risk rather than treating the condition.
+- When coachStrengthContext is present, use it only as supporting evidence from recorded training: differentiate measured working weight from an estimated 1RM, distinguish absence of history from lack of progress, and consider strength/cardio fatigue together. A plateau is a review signal, not a diagnosis.
+- Never extrapolate from an estimated 1RM to an automatic prescription or invent a personal max. Suggest incremental load review only when two separate verified completed sessions met their prescribed sets/reps/loads. Do not copy current weights into every future session. Apply conservative progression and deload weeks when indicated, always as an editable draft.
+- coachStrengthContext is absent if the athlete has not enabled Coach History. Never request or invent those records or infer injury details from training load.
 - Strength work should use exercise names, sets, reps, sensible RPE, and rest, but never invent target weights.
 - Running/walking sessions can include duration and/or distance. Only include a target pace when the provided goal genuinely supports one.
 - Every session has a blocks array (which may be empty if no precise structure is justified). Blocks describe one chronological timeline: warmup, main effort, recovery between efforts, cooldown. If prescribing intervals, include EACH effort and EACH between-effort rest; never append an extra rest after the last repeat.
