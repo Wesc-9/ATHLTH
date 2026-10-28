@@ -363,8 +363,16 @@ struct GoalsHubView: View {
 }
 
 struct GoalSummaryCard: View {
+    @EnvironmentObject private var session: AppSessionStore
     let goal: ATHLTHGoal
     let prominent: Bool
+
+    private var measuredProgress: Double {
+        goal.bodyMeasurementGoal == nil ? goal.progress :
+            ATHLTHBodyGoalCheckInPolicy.progress(
+                goal, profile: ATHLTHTrainingProfile.load(userID: session.profile.userID)
+            )
+    }
 
     private var statusLabel: String {
         switch goal.status {
@@ -417,7 +425,7 @@ struct GoalSummaryCard: View {
                     .lineLimit(1)
 
                 HStack(spacing: 6) {
-                    Text("\(Int((goal.progress * 100).rounded()))%")
+                    Text("\(Int((measuredProgress * 100).rounded()))%")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                     GeometryReader { proxy in
@@ -425,7 +433,7 @@ struct GoalSummaryCard: View {
                             Capsule().fill(ATHLTHPlanDesign.warmDivider)
                             Capsule().fill(ATHLTHPlanDesign.accent)
                                 .frame(width: proxy.size.width *
-                                       min(1, max(0, goal.progress)))
+                                       min(1, max(0, measuredProgress)))
                         }
                     }
                     .frame(height: 5)
@@ -582,7 +590,9 @@ struct GoalDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     let goalID: UUID
+    var openMeasurementCheckIn: Bool = false
 
+    @State private var showingMeasurementCheckIn = false
     @State private var showingDeleteConfirmation = false
     @State private var showingAddMilestone = false
     @State private var showingEditGoal = false
@@ -603,8 +613,13 @@ struct GoalDetailView: View {
 
                         switch selectedGoalTab {
                         case .overview:
-                            progressCard(goal)
-                            milestonesCard(goal)
+                            if goal.bodyMeasurementGoal != nil {
+                                ATHLTHBodyGoalProgressView(goal: goal)
+                                    .padding(.horizontal, 16)
+                            } else {
+                                progressCard(goal)
+                                milestonesCard(goal)
+                            }
 
                             if let why = goal.whyItMatters, !why.isEmpty {
                                 infoCard(
@@ -632,12 +647,22 @@ struct GoalDetailView: View {
 
                             actionsCard(goal)
                         case .milestones:
-                            milestonesCard(goal)
-                            trackingCard(goal)
+                            if goal.bodyMeasurementGoal != nil {
+                                ATHLTHBodyGoalProgressView(goal: goal)
+                                    .padding(.horizontal, 16)
+                            } else {
+                                milestonesCard(goal)
+                                trackingCard(goal)
+                            }
                         case .progress:
-                            progressCard(goal)
-                            goalProgressInsightCard(goal)
-                            trackingCard(goal)
+                            if goal.bodyMeasurementGoal != nil {
+                                ATHLTHBodyGoalProgressView(goal: goal)
+                                    .padding(.horizontal, 16)
+                            } else {
+                                progressCard(goal)
+                                goalProgressInsightCard(goal)
+                                trackingCard(goal)
+                            }
                         }
                     }
                     .frame(
@@ -702,6 +727,14 @@ struct GoalDetailView: View {
                         health: health,
                         strength: strength
                     )
+                }
+                .onAppear {
+                    if openMeasurementCheckIn && goal.bodyMeasurementGoal != nil {
+                        showingMeasurementCheckIn = true
+                    }
+                }
+                .sheet(isPresented: $showingMeasurementCheckIn) {
+                    ATHLTHBodyGoalCheckInView(goal: goal)
                 }
                 .sheet(isPresented: $showingAddMilestone) {
                     AddManualMilestoneView(goalID: goal.id)
@@ -1647,6 +1680,7 @@ struct GoalCreationView: View {
     @State private var targetValue = 5.0
     @State private var exerciseName = "Squat"
     @State private var showingExercisePicker = false
+    @State private var showingBodyGoalCreation = false
     @State private var activity: GoalActivityFilter = .running
     @State private var hasDeadline = false
     @State private var deadline = Calendar.current.date(byAdding: .month, value: 3, to: Date()) ?? Date()
@@ -1723,6 +1757,9 @@ struct GoalCreationView: View {
             isPresented: $showingDeadlinePicker
         ) {
             goalDeadlinePickerSheet
+        }
+        .sheet(isPresented: $showingBodyGoalCreation) {
+            ATHLTHBodyGoalCreationView()
         }
     }
 
@@ -2627,6 +2664,33 @@ struct GoalCreationView: View {
                 )
 
             case .body:
+                Button {
+                    showingBodyGoalCreation = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "ruler")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Track a body measurement",
+                                norwegian: "Sett mål for et kroppsmål"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Waist, upper arm, thigh, weight or other measurements, with check-ins.",
+                                norwegian: "Midje, overarm, lår, vekt eller andre mål – med måleinnsjekker."
+                            ))
+                            .font(.caption)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "arrow.right")
+                    }
+                    .padding(14)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 15))
+                }
+                .buttonStyle(.plain)
+
                 goalNumberField(
                     title:
                         ATHLTHLocalization.format(
