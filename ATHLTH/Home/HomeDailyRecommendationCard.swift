@@ -15,7 +15,7 @@ struct HomeDailyRecommendationCard: View {
 
     var body: some View {
         Button(action: onOpen) {
-            VStack(alignment: .leading, spacing: 9) {
+            VStack(alignment: .leading, spacing: 7) {
                 HStack(alignment: .center, spacing: 5) {
                     Image(systemName: "sparkles")
                         .font(.system(size: 12, weight: .medium))
@@ -73,8 +73,8 @@ struct HomeDailyRecommendationCard: View {
                 }
                 .foregroundStyle(ATHLTHTrainDesign.bronze)
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, minHeight: 196, alignment: .topLeading)
+            .padding(10)
+            .frame(maxWidth: .infinity, minHeight: 158, alignment: .topLeading)
             .background(ATHLTHTrainDesign.paper,
                         in: RoundedRectangle(cornerRadius: 20,
                                              style: .continuous))
