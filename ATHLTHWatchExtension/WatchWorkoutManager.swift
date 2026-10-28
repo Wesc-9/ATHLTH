@@ -3613,7 +3613,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     func end() {
-        guard isActive else { return }
+        // Ignore repeated end taps while HealthKit is finishing the same
+        // workout. Finishing and route persistence remain owned by the
+        // existing session delegate and live workout builder.
+        guard isActive, state != .ending, !finishing else { return }
         publishState(.ending)
         workoutSession?.end()
     }

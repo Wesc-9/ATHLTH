@@ -318,66 +318,11 @@ struct ProductRootTabView: View {
     }
 
     private var tabsWithNotificationSheets: some View {
-        rootTabs
-        // Render the actual challenge detail above the root tabs. The
-        // singleton retains the route if iOS delivers the tap before this
-        // view is created (cold launch).
-        .sheet(
-            item: Binding(
-                get: { pushManager.pendingChallengeNotification },
-                set: { route in
-                    if route == nil {
-                        pushManager.clearPendingChallengeNotification()
-                    }
-                }
-            )
-        ) { route in
-            NavigationStack {
-                ATHLTHChallengeNotificationDestination(route: route)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button(ATHLTHLocalization.choose(
-                                english: "Close", norwegian: "Lukk"
-                            )) {
-                                pushManager.clearPendingChallengeNotification()
-                            }
-                        }
-                    }
-            }
-        }
-        .sheet(isPresented: $showingDailyCheckInFromNotification) {
-            NavigationStack {
-                RecoverySorenessLogView(store: RecoverySorenessStore())
-            }
-        }
-        .sheet(
-            item: Binding<ATHLTHBodyGoalNotificationRoute?>(
-                get: {
-                    guard let route = pushManager.pendingBodyGoalCheckIn,
-                          route.accountID == session.profile.userID,
-                          goalStore.goals.contains(where: { $0.id == route.goalID })
-                    else { return nil }
-                    return route
-                },
-                set: { route, _ in
-                    if route == nil { pushManager.clearPendingBodyGoalCheckIn() }
-                }
-            )
-        ) { route in
-            NavigationStack {
-                GoalDetailView(goalID: route.goalID,
-                               openMeasurementCheckIn: true)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button(ATHLTHLocalization.choose(
-                                english: "Close", norwegian: "Lukk"
-                            )) {
-                                pushManager.clearPendingBodyGoalCheckIn()
-                            }
-                        }
-                    }
-            }
-        }
+        ATHLTHRootNotificationSheetHost(
+            content: rootTabs,
+            pushManager: pushManager,
+            showingDailyCheckIn: $showingDailyCheckInFromNotification
+        )
     }
 
     private var tabsWithNotifications: some View {

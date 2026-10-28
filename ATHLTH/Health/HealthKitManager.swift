@@ -273,6 +273,7 @@ final class HealthKitManager: ObservableObject {
     private let workoutImportIgnoredIDsKey = "athlth.health.workoutImport.ignoredIDs.v1"
     private var workoutImportCutoverDate = Date()
     private var workoutImportAnchor: HKQueryAnchor?
+    private var workoutImportRefreshInProgress = false
     private var pendingExternalWorkoutIDs: Set<UUID> = []
     private var importedExternalWorkoutIDs: Set<UUID> = []
     private var ignoredExternalWorkoutIDs: Set<UUID> = []
@@ -381,6 +382,10 @@ final class HealthKitManager: ObservableObject {
 
     @discardableResult
     func refreshWorkoutImportInbox() async -> Bool {
+        // Observer, foreground and manual refreshes may overlap. Keep one
+        // reader/anchor writer in flight so an older delta cannot commit
+        // after a newer import or resurface a completed inbox item.
+        guard !workoutImportRefreshInProgress else { return false }
         guard integrationEnabled,
               healthDataAvailable,
               hasRequestedAuthorization,
@@ -389,6 +394,8 @@ final class HealthKitManager: ObservableObject {
             return false
         }
 
+        workoutImportRefreshInProgress = true
+        defer { workoutImportRefreshInProgress = false }
         var acceptedWorkoutChanged = false
 
         do {
