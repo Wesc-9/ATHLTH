@@ -5,8 +5,7 @@ import Foundation
 /// while this value prevents labelling indoor tracks as treadmills.
 enum ATHLTHIndoorRunVenue: String, Codable, CaseIterable, Identifiable {
     case treadmill
-    case indoorTrack
-    case otherIndoor
+    case indoorRunning
 
     var id: String { rawValue }
 
@@ -14,10 +13,8 @@ enum ATHLTHIndoorRunVenue: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .treadmill:
             return ATHLTHLocalization.choose(english: "Treadmill", norwegian: "Tredemølle")
-        case .indoorTrack:
-            return ATHLTHLocalization.choose(english: "Indoor running track", norwegian: "Innendørs løpebane")
-        case .otherIndoor:
-            return ATHLTHLocalization.choose(english: "Other indoor training", norwegian: "Annen innendørstrening")
+        case .indoorRunning:
+            return ATHLTHLocalization.choose(english: "Indoor running", norwegian: "Innendørs løping")
         }
     }
 
@@ -28,15 +25,10 @@ enum ATHLTHIndoorRunVenue: String, Codable, CaseIterable, Identifiable {
                 english: "Enter belt speed to calculate distance",
                 norwegian: "Registrer møllehastighet for å beregne distanse"
             )
-        case .indoorTrack:
+        case .indoorRunning:
             return ATHLTHLocalization.choose(
-                english: "Keep time and steps; distance needs a separate reliable source",
-                norwegian: "Behold tid og øktdeler; distanse trenger en egen pålitelig kilde"
-            )
-        case .otherIndoor:
-            return ATHLTHLocalization.choose(
-                english: "Continue without a GPS route or invented distance",
-                norwegian: "Fortsett uten GPS-rute eller antatt distanse"
+                english: "Indoor track or running without reliable GPS distance",
+                norwegian: "Innendørsbane eller løping uten pålitelig GPS-distanse"
             )
         }
     }
@@ -44,8 +36,7 @@ enum ATHLTHIndoorRunVenue: String, Codable, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .treadmill: return "figure.run.treadmill"
-        case .indoorTrack: return "figure.run"
-        case .otherIndoor: return "figure.indoor.cycle"
+        case .indoorRunning: return "figure.run"
         }
     }
 }
