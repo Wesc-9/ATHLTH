@@ -2669,6 +2669,25 @@ struct TrainingPlanCatalogDetailView: View {
                 ))
                 .font(.caption2)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } else if let gymcoach = ATHLTHGymCoachStrengthLibrary.program(for: entry.slug) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Real GymCoach working sets, reps, RIR and rest periods. This is a repeatable source template; percentage-based loading and future progress must be reviewed and personalized before use.",
+                    norwegian: "GymCoach-malens arbeidssett, repetisjoner, RIR og pauser. Prosentbaserte vekter og videre progresjon må tilpasses og godkjennes før bruk."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                ForEach(
+                    Array(ATHLTHGymCoachStrengthLibrary.sourceWorkouts(
+                        for: gymcoach, week: week
+                    ).enumerated()),
+                    id: \.offset
+                ) { index, source in
+                    previewDetailedSessionRow(
+                        ATHLTHGymCoachStrengthLibrary.plannedSession(
+                            source, program: gymcoach, week: week
+                        ), week: week, index: index
+                    )
+                }
             } else {
                 ForEach(
                     Array(entry.sessionBlueprints
