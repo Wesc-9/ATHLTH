@@ -1006,6 +1006,7 @@ struct RecoveryCoachView: View {
     @EnvironmentObject private var session:
         AppSessionStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var goalStore: GoalStore
 
     let context: RecoveryAIContext
     let insight: RecoveryAIInsight
@@ -1043,6 +1044,7 @@ struct RecoveryCoachView: View {
     @State private var feedbackNote = ""
 
     private let service = RecoveryAIService()
+    private let planAdaptationService = CoachPlanAdaptationService()
     private let bottomAnchorID =
         "athlth-recovery-coach-bottom"
 
@@ -2943,6 +2945,16 @@ struct RecoveryCoachView: View {
         }
 
         do {
+            // An explicit command to change an existing plan uses the real
+            // plan-diff generator, not an ungrounded chat suggestion.
+            if ATHLTHCoachPlanChatIntent.isAdjustmentRequest(
+                clean, hasActivePlan: session.activePlan != nil
+            ) {
+                await respondToPlanChangeRequest(clean, sharingApproved: shareHealthData)
+                persistConversation()
+                return
+            }
+
             let reply =
                 try await service.ask(
                     clean,
@@ -2993,6 +3005,74 @@ struct RecoveryCoachView: View {
             quickQuestions =
                 contextAwareQuestions()
             persistConversation()
+        }
+    }
+
+    @MainActor
+    private func respondToPlanChangeRequest(
+        _ requestText: String, sharingApproved: Bool
+    ) async {
+        guard sharingApproved else {
+            messages.append(RecoveryCoachMessage(
+                role: .assistant,
+                text: recoveryAIText(
+                    "To suggest exact changes to your active plan, I need your approval to share its schedule with the Coach service for this request. Activate health/training sharing below and send the request again. Nothing has been changed.",
+                    "For å foreslå konkrete endringer i den aktive planen trenger jeg tillatelse til å dele planoppsettet med Coach-tjenesten for dette spørsmålet. Aktiver deling av helse/trening nedenfor og send forespørselen på nytt. Ingenting er endret."
+                )
+            ))
+            return
+        }
+        guard let plan = session.activePlan else { return }
+        let requestOwnerID = session.profile.userID
+        let linkedGoals = goalStore.goals.filter {
+            $0.linkedTrainingPlanID == plan.id
+        }
+        let details = CoachPlanAdaptationService.makeRequest(
+            plan: plan,
+            goals: linkedGoals,
+            recentTraining: [],
+            userNotes: requestText
+        )
+        do {
+            let candidate = try await planAdaptationService.generate(request: details)
+            guard session.signedIn, session.profile.userID == requestOwnerID else { return }
+            guard !candidate.changes.isEmpty else {
+                messages.append(RecoveryCoachMessage(
+                    role: .assistant,
+                    text: recoveryAIText(
+                        "I reviewed your current plan, but I couldn't produce a concrete, safe change. Please specify the workout and the new day or goal.",
+                        "Jeg har vurdert planen, men fant ikke en konkret og forsvarlig endring. Oppgi gjerne hvilken økt og ny dag eller ønsket mål."
+                    )
+                ))
+                return
+            }
+            guard session.stageCoachPlanProposal(candidate) else {
+                messages.append(RecoveryCoachMessage(
+                    role: .assistant,
+                    text: recoveryAIText(
+                        "Your plan changed while I was reviewing it. Please try again so I can use the latest version.",
+                        "Planen ble endret mens jeg gjennomgikk den. Prøv igjen, slik at jeg kan bruke siste versjon."
+                    )
+                ))
+                return
+            }
+            messages.append(RecoveryCoachMessage(
+                role: .assistant,
+                text: recoveryAIText(
+                    "Here is a proposed change to your active plan. Review each adjustment below before accepting. Your current plan remains unchanged until you approve.",
+                    "Her er et konkret forslag til endring av den aktive planen. Gjennomgå endringene nedenfor før du godkjenner. Planen er uendret inntil du bekrefter."
+                ),
+                planReviewPlanID: candidate.planID,
+                planReviewPlanVersion: candidate.planVersion
+            ))
+        } catch {
+            messages.append(RecoveryCoachMessage(
+                role: .assistant,
+                text: recoveryAIText(
+                    "I couldn't review the plan right now. No changes were made. You can try again or open Adjust Active Plan from the menu.",
+                    "Jeg fikk ikke gjennomgått planen nå. Ingen endringer ble gjort. Prøv igjen eller åpne «Juster aktiv plan» fra menyen."
+                )
+            ))
         }
     }
 
