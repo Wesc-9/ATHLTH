@@ -1754,8 +1754,15 @@ final class IPhoneWorkoutStore:
                     HKMetadataKeySyncVersion: 1,
                     HKMetadataKeyIndoorWorkout: isIndoor,
                     "ATHLTHDistanceSource": isIndoor
-                        ? (workout.treadmillSpeedKilometersPerHour != nil ? "entered_belt_speed" : "unavailable")
-                        : "gps"
+                        ? (workout.indoorVenue == .indoorRunning ? "unavailable" :
+                            (workout.treadmillSpeedKilometersPerHour != nil
+                                ? "entered_belt_speed" : "unavailable"))
+                        : "gps",
+                    "ATHLTHIndoorVenue": workout.indoorVenue?.rawValue ?? "not_specified",
+                    "ATHLTHIndoorSwitchActiveSeconds":
+                        workout.indoorSwitchActiveSeconds ?? 0,
+                    "ATHLTHGPSDistanceBeforeIndoorSwitchMeters":
+                        workout.gpsDistanceBeforeIndoorSwitchMeters ?? 0
                 ],
                 to: builder
             )
@@ -2119,6 +2126,7 @@ final class IPhoneWorkoutStore:
 
     func setTreadmillSpeedKilometersPerHour(_ speed: Double) {
         guard var workout = active, workout.runEnvironment == .treadmill,
+              workout.indoorVenue != .indoorRunning,
               speed.isFinite, (0...30).contains(speed) else { return }
         workout.setTreadmillSpeed(speed, at: Date())
         active = workout
@@ -5354,9 +5362,21 @@ final class IPhoneWorkoutStore:
     /// speed must be entered explicitly to estimate future distance.
     @discardableResult
     func switchRunningEnvironmentToIndoor(_ venue: ATHLTHIndoorRunVenue) -> Bool {
-        guard var workout = active, workout.runEnvironment == .outdoor,
-              !saving else { return false }
+        guard var workout = active, !saving else { return false }
         let now = Date()
+        if workout.runEnvironment == .treadmill {
+            guard workout.indoorVenue != venue else { return true }
+            workout.advanceTreadmillDistance(at: now)
+            workout.indoorVenue = venue
+            workout.treadmillSpeedKilometersPerHour = nil
+            workout.treadmillDistanceElapsedSeconds = workout.elapsed(at: now)
+            workout.treadmillInclinePercent = venue == .treadmill ? 0 : nil
+            active = workout
+            persistActiveCheckpoint(force: true)
+            syncLiveActivity()
+            return true
+        }
+        guard workout.runEnvironment == .outdoor else { return false }
         let originalDistance = max(0, workout.distanceMeters)
         workout.gpsDistanceBeforeIndoorSwitchMeters = originalDistance
         workout.indoorSwitchActiveSeconds = workout.elapsed(at: now)
