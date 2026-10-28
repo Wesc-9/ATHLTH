@@ -124,7 +124,15 @@ enum ATHLTHCoachProposalBridge {
             sessionsPerWeek: proposal.sessionsPerWeek,
             sessionDurationMinutes: max(20, proposal.durationMinutes),
             availableDays: days,
-            trainingFocus: .generalFitness,
+            trainingFocus: {
+                switch proposal.activity {
+                case "running": return .running
+                case "walking": return .walking
+                case "strength": return .strength
+                case "hybrid": return .hybrid
+                default: return .generalFitness
+                }
+            }(),
             gymAccess: nil,
             limitations: "",
             coachFocusNotes: proposal.summary + "\n" +
