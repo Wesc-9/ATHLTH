@@ -2753,6 +2753,15 @@ struct RecoveryCoachView: View {
                         y: 3
                     )
 
+                if let planID = message.planReviewPlanID,
+                   message.role == .assistant,
+                   messages.last(where: { $0.planReviewPlanID != nil })?.id == message.id {
+                    coachInlinePlanReview(
+                        planID: planID,
+                        version: message.planReviewPlanVersion
+                    )
+                }
+
                 if let proposal = message.proposal, message.role == .assistant {
                     ATHLTHCoachProposalCard(
                         proposal: proposal,
@@ -3005,6 +3014,95 @@ struct RecoveryCoachView: View {
             quickQuestions =
                 contextAwareQuestions()
             persistConversation()
+        }
+    }
+
+    @ViewBuilder
+    private func coachInlinePlanReview(planID: UUID, version: Int?) -> some View {
+        if let proposed = session.pendingCoachPlanProposal,
+           proposed.planID == planID, proposed.planVersion == version,
+           let latestPlan = session.trainingPlan(withID: planID),
+           proposed.isStillValid(for: latestPlan) {
+            VStack(alignment: .leading, spacing: 11) {
+                Label(
+                    recoveryAIText("PLAN CHANGE · REVIEW", "PLANENDRING · GJENNOMGANG"),
+                    systemImage: "calendar.badge.clock"
+                )
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(proposed.headline)
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                if !proposed.rationale.isEmpty {
+                    Text(proposed.rationale)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                ForEach(proposed.changes) { change in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(change.title)
+                            .font(.subheadline.weight(.semibold))
+                        Text(change.summary)
+                            .font(.caption)
+                        if !change.reason.isEmpty {
+                            Text(change.reason)
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(10)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 13))
+                }
+                HStack(spacing: 8) {
+                    Button {
+                        session.dismissCoachPlanProposal()
+                        proposalActionNotice = recoveryAIText(
+                            "Proposed changes discarded. Your plan was not changed.",
+                            "Endringsforslaget ble forkastet. Planen er ikke endret."
+                        )
+                    } label: {
+                        Text(recoveryAIText("Keep plan", "Behold planen"))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        if session.applyCoachPlanProposal(proposed) {
+                            proposalActionNotice = recoveryAIText(
+                                "Approved changes applied to your plan.",
+                                "Godkjente endringer er lagt inn i planen."
+                            )
+                        } else {
+                            proposalActionNotice = recoveryAIText(
+                                "The plan changed; nothing was applied. Generate a fresh review.",
+                                "Planen er endret; ingenting ble lagret. Be om ny gjennomgang."
+                            )
+                        }
+                    } label: {
+                        Text(recoveryAIText("Approve", "Godkjenn"))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                }
+                Text(recoveryAIText(
+                    "No change is saved before approval. Changes are checked against the current plan version.",
+                    "Ingen endringer lagres uten godkjenning. Forslaget sjekkes mot riktig planversjon."
+                ))
+                .font(.caption2)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            .padding(13)
+            .background(.white.opacity(0.98), in: RoundedRectangle(cornerRadius: 19))
+        } else {
+            Label(recoveryAIText(
+                "This plan proposal is no longer active. Request a fresh review.",
+                "Dette planforslaget er ikke lenger aktivt. Be om en ny gjennomgang."
+            ), systemImage: "clock.arrow.circlepath")
+            .font(.caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
     }
 
