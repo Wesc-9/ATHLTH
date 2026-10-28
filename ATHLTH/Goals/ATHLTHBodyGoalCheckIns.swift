@@ -77,7 +77,7 @@ enum ATHLTHBodyGoalCheckInPolicy {
     static func completedPeriod(
         goal: ATHLTHGoal, due: Date,
         profile: ATHLTHTrainingProfile,
-        calendar: Calendar = .current
+        now: Date = .now, calendar: Calendar = .current
     ) -> Bool {
         guard let config = goal.bodyMeasurementGoal,
               let prior = calendar.date(
@@ -85,7 +85,7 @@ enum ATHLTHBodyGoalCheckInPolicy {
                 to: calendar.startOfDay(for: due)
               ) else { return true }
         return profile.readings(for: config.metric).contains {
-            $0.date > prior && $0.date <= Date()
+            $0.date > prior && $0.date <= now
         }
     }
 
@@ -115,7 +115,7 @@ enum ATHLTHBodyGoalCheckInPolicy {
             if fire > now { break }
             if now.timeIntervalSince(fire) > 3 * 86_400 { continue }
             if !completedPeriod(goal: goal, due: due, profile: profile,
-                                calendar: calendar) { return due }
+                                now: now, calendar: calendar) { return due }
         }
         return nil
     }
@@ -160,7 +160,7 @@ enum ATHLTHBodyGoalReminderScheduler {
         let active = goals.flatMap { goal -> [(Date, ATHLTHGoal)] in
             dueDatesForSchedule(goal, now: now).filter {
                 !ATHLTHBodyGoalCheckInPolicy.completedPeriod(
-                    goal: goal, due: $0, profile: profile
+                    goal: goal, due: $0, profile: profile, now: now
                 )
             }.map { ($0, goal) }
         }.sorted { $0.0 < $1.0 }.prefix(40)
