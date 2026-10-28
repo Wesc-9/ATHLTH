@@ -1066,10 +1066,40 @@ struct RecoveryCoachView: View {
                             spacing: 14
                         ) {
                             // The athlete's disclosure choice persists between visits.
-                            coachInsightDisclosure
+                            ATHLTHCoachInsightDisclosure(
+                                userID: session.profile.userID,
+                                summary: context.recoveryScore.map {
+                                    recoveryAIText("Readiness \($0)", "Dagsform \($0)")
+                                } ?? recoveryAIText(
+                                    "No measurements yet", "Ingen målinger ennå"
+                                )
+                            ) {
+                                if context.recoveryScore != nil || !context.muscles.isEmpty {
+                                    coachInsightCard
+                                } else {
+                                    Text(recoveryAIText(
+                                        "No recovery measurements available. You can still ask training questions.",
+                                        "Ingen restitusjonsmålinger tilgjengelig. Du kan fortsatt stille spørsmål om trening."
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    .padding(13)
+                                }
+                            }
+
+                            if let proposalActionNotice {
+                                Label(proposalActionNotice, systemImage: "checkmark.circle")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    .padding(11)
+                                    .background(.white.opacity(0.95),
+                                                in: RoundedRectangle(cornerRadius: 13))
+                            }
 
                             if messages.isEmpty {
-                                coachStarterActions
+                                ATHLTHCoachStarterActions { prompt in
+                                    requestAnswer(prompt)
+                                }
                                 Text(
                                     recoveryAIText(
                                         "Ask a question to start a conversation. Coach remembers what you talk about on this device.",
@@ -2197,7 +2227,7 @@ struct RecoveryCoachView: View {
     private var coachComposer:
         some View {
         VStack(spacing: 8) {
-            if !quickQuestions.isEmpty {
+            if !quickQuestions.isEmpty && messages.isEmpty {
                 VStack(
                     alignment: .leading,
                     spacing: 7
@@ -2724,6 +2754,42 @@ struct RecoveryCoachView: View {
                         y: 3
                     )
 
+                if let proposal = message.proposal, message.role == .assistant {
+                    ATHLTHCoachProposalCard(
+                        proposal: proposal,
+                        onAdd: {
+                            selectedCoachProposal = proposal
+                            proposalActionNotice = nil
+                            if proposal.isWorkout {
+                                showingCoachAddConfirmation = true
+                            } else {
+                                saveCoachPlanAsTemplate = false
+                                showingCoachPlanBuilder = true
+                            }
+                        },
+                        onSave: {
+                            selectedCoachProposal = proposal
+                            proposalActionNotice = nil
+                            if proposal.isWorkout {
+                                if let workout = ATHLTHCoachProposalBridge.workout(proposal) {
+                                    _ = session.saveSharedWorkout(workout)
+                                    proposalActionNotice = recoveryAIText(
+                                        "Saved in My Workouts.", "Lagret i Mine økter."
+                                    )
+                                } else {
+                                    proposalActionNotice = recoveryAIText(
+                                        "Review the workout before saving.",
+                                        "Gjennomgå økten før lagring."
+                                    )
+                                }
+                            } else {
+                                saveCoachPlanAsTemplate = true
+                                showingCoachPlanBuilder = true
+                            }
+                        }
+                    )
+                }
+
                 Text(
                     message.createdAt
                         .formatted(
@@ -2900,8 +2966,8 @@ struct RecoveryCoachView: View {
             messages.append(
                 RecoveryCoachMessage(
                     role: .assistant,
-                    text:
-                        reply.answer
+                    text: reply.answer,
+                    proposal: reply.proposal
                 )
             )
 
