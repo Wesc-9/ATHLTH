@@ -131,6 +131,7 @@ struct AIProgramBuilderView: View {
     @State private var useProfileInterests = true
     @State private var standaloneIntake = ATHLTHAIProgramIntake()
     @State private var savedProfileInjuryNotes = ""
+    @State private var savedProfileTrainingNotes = ""
 
     private let equipmentOptions = [
         "Bodyweight / no equipment", "Dumbbells", "Kettlebells",
@@ -562,12 +563,23 @@ struct AIProgramBuilderView: View {
 
                 HStack {
                     Text(ATHLTHLocalization.choose(
-                        english: "Training profile notes (editable for this plan)",
-                        norwegian: "Notater fra treningsprofilen (kan endres her)"
+                        english: "Additional preferences for this plan (optional)",
+                        norwegian: "Ekstra ønsker for denne planen (valgfritt)"
                     ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                     Spacer()
+                    if !savedProfileTrainingNotes.isEmpty {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Use profile notes", norwegian: "Bruk profilnotater"
+                        )) {
+                            coachFocusNotes = ATHLTHCoachProfileNotesPolicy.coachContext(
+                                profileNotes: savedProfileTrainingNotes, selectedByAthlete: true
+                            )
+                            preview = nil
+                        }
+                        .font(.caption.weight(.semibold))
+                    }
                     if !coachFocusNotes.isEmpty {
                         Button(ATHLTHLocalization.choose(
                             english: "Clear", norwegian: "Fjern"
@@ -1852,12 +1864,23 @@ struct AIProgramBuilderView: View {
 
                     HStack {
                         Text(ATHLTHLocalization.choose(
-                            english: "Prefilled from Training Profile — edit freely",
-                            norwegian: "Forhåndsutfylt fra Treningsprofil – rediger fritt"
+                            english: "Optional preferences — profile notes are not shared automatically",
+                            norwegian: "Valgfrie ønsker – profilnotater deles ikke automatisk"
                         ))
                         .font(.caption2)
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         Spacer()
+                        if !savedProfileTrainingNotes.isEmpty {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Use profile notes", norwegian: "Bruk profilnotater"
+                            )) {
+                                coachFocusNotes = ATHLTHCoachProfileNotesPolicy.coachContext(
+                                    profileNotes: savedProfileTrainingNotes, selectedByAthlete: true
+                                )
+                                preview = nil
+                            }
+                            .font(.caption.weight(.semibold))
+                        }
                         if !coachFocusNotes.isEmpty {
                             Button(ATHLTHLocalization.choose(
                                 english: "Clear", norwegian: "Fjern"
@@ -2656,9 +2679,8 @@ struct AIProgramBuilderView: View {
         let savedLimitations = storedTrainingProfile.injuryAndLimitations
             .trimmingCharacters(in: .whitespacesAndNewlines)
         savedProfileInjuryNotes = String(savedLimitations.prefix(1_200))
-        if !savedTrainingNotes.isEmpty {
-            coachFocusNotes = String(savedTrainingNotes.prefix(700))
-        }
+        // Do not use private profile notes in AI-bound requests by default.
+        savedProfileTrainingNotes = String(savedTrainingNotes.prefix(700))
         if !savedLimitations.isEmpty {
             limitations = String(savedLimitations.prefix(1_200))
             if isStandaloneCoachJourney {
@@ -2684,7 +2706,9 @@ struct AIProgramBuilderView: View {
             homeEquipment = saved.homeEquipment
             otherEquipment = saved.otherEquipment
             limitations = saved.limitations
-            coachFocusNotes = saved.coachFocusNotes ?? ""
+            // Earlier Coach defaults may contain auto-imported profile notes.
+            // Require an explicit choice again before sending notes to AI.
+            coachFocusNotes = ""
             currentSessionsPerWeek = saved.currentSessionsPerWeek
             useProfileInterests = saved.useProfileInterests
             availableDays = saved.availableDays
@@ -2695,9 +2719,6 @@ struct AIProgramBuilderView: View {
         // The profile is the default source. A saved Coach intake draft can
         // still supply non-profile fields, but must not override it with
         // an unrelated, older injury statement.
-        if !savedTrainingNotes.isEmpty {
-            coachFocusNotes = String(savedTrainingNotes.prefix(700))
-        }
         if !savedLimitations.isEmpty {
             limitations = String(savedLimitations.prefix(1_200))
         }
