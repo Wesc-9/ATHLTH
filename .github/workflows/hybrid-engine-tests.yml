@@ -11,6 +11,7 @@ on:
       - release/v2.0.1
       - release/v2.0.2
       - release/v2.0.3
+      - release/v2.0.4
     paths:
       - .github/workflows/hybrid-engine-tests.yml
       - .github/testflight-trigger
