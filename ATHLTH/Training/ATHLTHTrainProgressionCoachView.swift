@@ -51,6 +51,7 @@ struct ATHLTHTrainProgressionCoachView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
                     header
+                    localStrengthEvidence
                     controlCard
                     if let plan {
                         if suggestions.isEmpty {
@@ -130,6 +131,65 @@ struct ATHLTHTrainProgressionCoachView: View {
             .font(.subheadline)
             .foregroundStyle(muted)
         }
+    }
+
+    /// Read-only local analysis: it adds context but does not bypass the
+    /// existing verified, user-approved progression proposal workflow.
+    private var localStrengthEvidence: some View {
+        let evidence = ATHLTHCoachStrengthIntelligence.snapshot(
+            from: strength.workoutHistory
+        )
+        return VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 8) {
+                Image(systemName: "chart.xyaxis.line")
+                    .foregroundStyle(champagne)
+                Text(tr("ATHLTH COACH · TRAINING EVIDENCE",
+                        "ATHLTH COACH · TRENINGSGRUNNLAG"))
+                    .font(.system(size: 10, weight: .semibold))
+                    .tracking(1.2)
+                    .foregroundStyle(champagne)
+            }
+            Text(evidence.summary)
+                .font(.subheadline)
+                .foregroundStyle(ink)
+            ForEach(Array(evidence.exerciseSignals.prefix(3)), id: \.exercise) { exercise in
+                HStack(alignment: .top, spacing: 9) {
+                    Image(systemName: exercise.trend == "improving"
+                          ? "arrow.up.right" : exercise.trend == "plateau"
+                          ? "equal" : "circle.dotted")
+                        .font(.caption.weight(.semibold))
+                        .frame(width: 20)
+                        .foregroundStyle(champagne)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.isNorwegian
+                             ? ATHLTHExerciseNameLocalization.norwegianName(for: exercise.exercise)
+                             : exercise.exercise)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                        let message = exercise.recommendation == "review_small_increase"
+                            ? tr("Targets reached twice · review a modest increase",
+                                 "Mål nådd i to økter · vurder en liten økning")
+                            : exercise.recommendation == "review_plateau"
+                            ? tr("Progress is flat · review recovery and volume",
+                                 "Utviklingen har flatet ut · vurder hvile og volum")
+                            : tr("Keep logging before adjusting",
+                                 "Fortsett å registrere før du justerer")
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(muted)
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
+            Text(tr(
+                "Local estimates based on confirmed working sets. Missing data is not evidence of inactivity. The proposals below still require your approval.",
+                "Lokale estimater fra registrerte arbeidssett. Manglende data betyr ikke manglende aktivitet. Forslagene nedenfor krever fortsatt godkjenning."
+            ))
+            .font(.caption2)
+            .foregroundStyle(muted)
+        }
+        .padding(16)
+        .coachSurface(border)
     }
 
     private var controlCard: some View {
