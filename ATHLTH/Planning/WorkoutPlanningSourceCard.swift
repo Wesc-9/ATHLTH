@@ -7,17 +7,20 @@ struct WorkoutPlanningSourceCard: View {
     let onCreateNew: () -> Void
     let onUsePlanned: () -> Void
     let onRecoveryRest: (() -> Void)?
+    let onRestDay: (() -> Void)?
 
     init(
         context: String,
         onCreateNew: @escaping () -> Void,
         onUsePlanned: @escaping () -> Void,
-        onRecoveryRest: (() -> Void)? = nil
+        onRecoveryRest: (() -> Void)? = nil,
+        onRestDay: (() -> Void)? = nil
     ) {
         self.context = context
         self.onCreateNew = onCreateNew
         self.onUsePlanned = onUsePlanned
         self.onRecoveryRest = onRecoveryRest
+        self.onRestDay = onRestDay
     }
 
     var body: some View {
@@ -77,6 +80,29 @@ struct WorkoutPlanningSourceCard: View {
 
             if let onRecoveryRest {
                 ATHLTHRecoveryRestEntryCard(action: onRecoveryRest)
+            }
+            if let onRestDay {
+                Button(action: onRestDay) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "moon.stars.fill")
+                            .foregroundStyle(ATHLTHTheme.recoveryBlue)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag"))
+                                .font(.subheadline.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Add a training-free day to your calendar.",
+                                norwegian: "Legg inn en treningsfri dag i kalenderen."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .padding(15)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                }
+                .buttonStyle(.plain)
             }
 
             HStack(alignment: .top, spacing: 10) {
@@ -333,6 +359,8 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
     }
 
     private let fixedPlanID: UUID?
+    private let allowPlanSelection: Bool
+    private let includesRestDay: Bool
     private let fixedDayID: UUID?
     private let onSaved: (() -> Void)?
     @State private var selectedPlanID: UUID?
@@ -348,9 +376,15 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
         date: Date = Date(),
         planID: UUID? = nil,
         dayID: UUID? = nil,
+        allowPlanSelection: Bool = true,
+        includesRestDay: Bool = true,
+        initialMode: Mode = .recovery,
         onSaved: (() -> Void)? = nil
     ) {
         fixedPlanID = planID
+        self.allowPlanSelection = allowPlanSelection
+        self.includesRestDay = includesRestDay
+        _mode = State(initialValue: initialMode)
         fixedDayID = dayID
         self.onSaved = onSaved
         _selectedPlanID = State(initialValue: planID)
@@ -428,7 +462,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                         .foregroundStyle(.secondary)
                     }
                     VStack(spacing: 10) {
-                        ForEach(Mode.allCases) { choice in
+                        ForEach(Mode.allCases.filter { includesRestDay || $0 != .rest }) { choice in
                             Button {
                                 mode = choice
                                 errorMessage = nil
@@ -523,7 +557,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                         ))
                         .font(.headline)
 
-                        if fixedPlanID == nil {
+                        if allowPlanSelection && fixedPlanID == nil {
                             Picker(
                                 ATHLTHLocalization.choose(
                                     english: "Add to", norwegian: "Legg til i"
@@ -546,7 +580,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                             }
                         }
 
-                        if selectedPlanID != nil {
+                        if allowPlanSelection && selectedPlanID != nil {
                             if fixedDayID == nil {
                                 Picker(
                                     ATHLTHLocalization.choose(
@@ -650,15 +684,15 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                         english: "Save", norwegian: "Lagre"
                     )) { save() }
                     .fontWeight(.semibold)
-                    .disabled(selectedPlanID != nil && selectedDay == nil)
+                    .disabled(allowPlanSelection && selectedPlanID != nil && selectedDay == nil)
                 }
             }
         }
     }
 
     private func save() {
-        let destinationDay = selectedDay
-        if selectedPlanID != nil && destinationDay == nil {
+        let destinationDay = allowPlanSelection ? selectedDay : nil
+        if allowPlanSelection && selectedPlanID != nil && destinationDay == nil {
             errorMessage = ATHLTHLocalization.choose(
                 english: "Select a day in the training plan.",
                 norwegian: "Velg en dag i treningsplanen."
@@ -727,7 +761,7 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
                 (guide.map { "wellness." + $0.id } ?? "recovery")
         )
 
-        if let selectedPlanID, let destinationDay {
+        if allowPlanSelection, let selectedPlanID, let destinationDay {
             session.addSession(planned, toDay: destinationDay.dayID, inPlan: selectedPlanID)
         } else {
             session.addStandalonePlannedSession(planned)
