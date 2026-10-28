@@ -1759,7 +1759,10 @@ struct GoalCreationView: View {
             goalDeadlinePickerSheet
         }
         .sheet(isPresented: $showingBodyGoalCreation) {
-            ATHLTHBodyGoalCreationView()
+            ATHLTHBodyGoalCreationView(onCreated: {
+                showingBodyGoalCreation = false
+                dismiss()
+            })
         }
     }
 
