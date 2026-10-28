@@ -99,6 +99,7 @@ struct ProductRootTabView: View {
     @ObservedObject private var pushManager = APNsPushManager.shared
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
@@ -121,6 +122,20 @@ struct ProductRootTabView: View {
                 session.profile.userID else { return }
         pushManager.clearPendingDailyCheckIn()
         showingDailyCheckInFromNotification = true
+    }
+
+    private func updateBodyGoalCheckInReminders() {
+        let userID = session.profile.userID
+        let profile = ATHLTHTrainingProfile.load(userID: userID)
+        let goals = goalStore.goals
+        notifications.reconcileBodyGoalCheckIns(
+            goals: goals, accountID: userID, profile: profile
+        )
+        Task {
+            await ATHLTHBodyGoalReminderScheduler.sync(
+                goals: goals, profile: profile, userID: userID
+            )
+        }
     }
 
     private func updateDailyCheckInReminder() {
@@ -290,12 +305,48 @@ struct ProductRootTabView: View {
                 RecoverySorenessLogView(store: RecoverySorenessStore())
             }
         }
+        .sheet(
+            item: Binding(
+                get: {
+                    guard let route = pushManager.pendingBodyGoalCheckIn,
+                          route.accountID == session.profile.userID,
+                          goalStore.goals.contains(where: { $0.id == route.goalID })
+                    else { return nil }
+                    return route
+                },
+                set: { route in
+                    if route == nil { pushManager.clearPendingBodyGoalCheckIn() }
+                }
+            )
+        ) { route in
+            NavigationStack {
+                GoalDetailView(goalID: route.goalID,
+                               openMeasurementCheckIn: true)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Close", norwegian: "Lukk"
+                            )) {
+                                pushManager.clearPendingBodyGoalCheckIn()
+                            }
+                        }
+                    }
+            }
+        }
         .onReceive(
             NotificationCenter.default.publisher(
                 for: .athlthRemoteNotificationTapped
             )
         ) { notification in
             let info = notification.userInfo ?? [:]
+            if let rawGoal = info["athlth_body_goal_checkin_id"] as? String,
+               let goalID = UUID(uuidString: rawGoal),
+               let rawAccount = info["athlth_body_goal_account_id"] as? String,
+               rawAccount == session.profile.userID.uuidString,
+               goalStore.goals.contains(where: { $0.id == goalID }) {
+                pushManager.captureTappedNotification(info)
+                return
+            }
             if ATHLTHDailyCheckInReminderScheduler.isCurrentAccountCheckInTap(
                 info, accountID: session.profile.userID
             ) {
@@ -327,6 +378,7 @@ struct ProductRootTabView: View {
         }
         .task {
             updateDailyCheckInReminder()
+            updateBodyGoalCheckInReminders()
             openPendingDailyCheckInIfNeeded()
             await syncApplicationIconBadge()
         }
@@ -340,9 +392,18 @@ struct ProductRootTabView: View {
         .onChange(of: settings.dailyCheckInRemindersEnabled) { _, _ in
             updateDailyCheckInReminder()
         }
+        .onChange(of: goalStore.goals) { _, _ in
+            updateBodyGoalCheckInReminders()
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .athlthTrainingDataDidChange
+        )) { _ in
+            updateBodyGoalCheckInReminders()
+        }
         .onChange(of: session.profile.userID) { _, _ in
             showingDailyCheckInFromNotification = false
             updateDailyCheckInReminder()
+            updateBodyGoalCheckInReminders()
             openPendingDailyCheckInIfNeeded()
         }
         .onChange(
@@ -361,6 +422,7 @@ struct ProductRootTabView: View {
             }
 
             updateDailyCheckInReminder()
+            updateBodyGoalCheckInReminders()
             openPendingDailyCheckInIfNeeded()
             Task {
                 await syncApplicationIconBadge()
