@@ -50,8 +50,8 @@ final class ATHLTHWorkoutSearchAndPresentationTests: XCTestCase {
         XCTAssertEqual(ATHLTHWorkoutStepCopy.suggestedZone(
             for: steps[0], workoutTitle: workoutTitle
         ), ATHLTHLocalization.choose(
-            english: "Suggested HR zone Z1–2",
-            norwegian: "Anbefalt pulssone S1–2"
+            english: "Suggested HR zone Z1–Z2",
+            norwegian: "Anbefalt pulssone S1–S2"
         ))
         XCTAssertEqual(ATHLTHWorkoutStepCopy.suggestedZone(
             for: steps[1], workoutTitle: workoutTitle
