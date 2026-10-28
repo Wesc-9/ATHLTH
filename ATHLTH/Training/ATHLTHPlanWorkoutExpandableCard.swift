@@ -75,7 +75,7 @@ enum ATHLTHPlanWorkoutCardPresentation {
     }
 
     /// Show explicit targets only; never synthesize a zero incline/pace.
-    static func facts(for block: WorkoutTemplateBlock) -> [String] {
+    static func facts(for block: WorkoutTemplateBlock, workoutTitle: String? = nil) -> [String] {
         var facts: [String] = []
         if let seconds = block.durationSeconds, seconds.isFinite, seconds > 0 {
             let whole = Int(seconds.rounded())
@@ -112,8 +112,13 @@ enum ATHLTHPlanWorkoutCardPresentation {
         }
         if let zone = block.targetHeartRateZone, (1...5).contains(zone) {
             facts.append(ATHLTHLocalization.choose(
-                english: "HR zone ", norwegian: "Pulssone "
+                english: "HR zone Z", norwegian: "Pulssone S"
             ) + "\(zone)")
+        } else if let workoutTitle,
+                  let suggestion = ATHLTHWorkoutStepCopy.suggestedZone(
+                    for: block, workoutTitle: workoutTitle
+                  ) {
+            facts.append(suggestion)
         }
         if let rpe = block.targetEffortRPE, (1...10).contains(rpe) {
             facts.append("RPE \(rpe)/10")
@@ -248,7 +253,11 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                                     Button {
                                         viewingEntireInterval = false
                                         selectedDetail = Selection(
-                                            title: entry.block.title,
+                                            title: ATHLTHWorkoutStepCopy.title(
+                                                for: entry.block,
+                                                workoutTitle: workout.title,
+                                                compact: false
+                                            ),
                                             blocks: [entry.block],
                                             groupSteps: entry.groupSteps,
                                             sourceIndex: entry.sourceIndex,
@@ -264,11 +273,15 @@ struct ATHLTHPlanWorkoutExpandableCard: View {
                                                 .foregroundStyle(bronze)
                                                 .frame(width: 22)
                                             VStack(alignment: .leading, spacing: 4) {
-                                                Text(entry.block.title)
+                                                Text(ATHLTHWorkoutStepCopy.title(
+                                                    for: entry.block,
+                                                    workoutTitle: workout.title,
+                                                    compact: false
+                                                ))
                                                     .font(.system(size: 12, weight: .semibold))
                                                     .foregroundStyle(ink)
                                                 let facts = ATHLTHPlanWorkoutCardPresentation.facts(
-                                                    for: entry.block)
+                                                    for: entry.block, workoutTitle: workout.title)
                                                 if !facts.isEmpty {
                                                     Text(facts.joined(separator: " · "))
                                                         .font(.system(size: 10))
