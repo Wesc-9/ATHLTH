@@ -641,9 +641,11 @@ private struct ATHLTHWorkoutStepEditor: View {
                                     return 3_600 / pace
                                 },
                                 set: { speed in
-                                    draft.targetPaceSecondsPerKilometer =
-                                        (speed != nil && speed!.isFinite && speed! > 0)
-                                        ? 3_600 / speed! : nil
+                                    if let speed, speed.isFinite, speed > 0 {
+                                        draft.targetPaceSecondsPerKilometer = 3_600 / speed
+                                    } else {
+                                        draft.targetPaceSecondsPerKilometer = nil
+                                    }
                                 }
                             ), format: .number.precision(.fractionLength(1)))
                             .keyboardType(.decimalPad)
