@@ -8,6 +8,12 @@ import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 type RecoveryContext = {
   recoveryScore?: number | null;
+  evidence?: {
+    capturedAt?: string | null;
+    sleepEndedAt?: string | null;
+    hrvSampledAt?: string | null;
+    restingPulseSampledAt?: string | null;
+  } | null;
   recoveryState?: string;
   recoveryDetail?: string;
   sleepSeconds?: number | null;
@@ -361,38 +367,69 @@ async function verifyPlus(
   return { ok: true, userID: user.id, groqKey };
 }
 
-function sanitizeContext(input: RecoveryContext | undefined) {
+function sanitizeContext(input: RecoveryContext | undefined, requireEvidence = false) {
   const context = input ?? {};
+  const now = Date.now();
+  const timestamp = (text: unknown): number | null => {
+    if (typeof text !== "string") return null;
+    const parsed = Date.parse(text);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const captured = timestamp(context.evidence?.capturedAt);
+  const captureValid = captured != null &&
+    now - captured >= -5 * 60_000 && now - captured <= 15 * 60_000;
+  const fresh = (text: unknown, hours: number): boolean => {
+    if (!requireEvidence) return true;
+    if (!captureValid) return false;
+    const time = timestamp(text);
+    return time != null && now - time >= -5 * 60_000 &&
+      now - time <= hours * 3_600_000;
+  };
+  const freshSleep = fresh(context.evidence?.sleepEndedAt, 48);
+  const freshHRV = fresh(context.evidence?.hrvSampledAt, 72);
+  const freshRHR = fresh(context.evidence?.restingPulseSampledAt, 72);
+  const readyHasSources = freshSleep || freshHRV || freshRHR;
 
   return {
+    sources: {
+      collectedAt: captureValid ? context.evidence?.capturedAt ?? null : null,
+      sleepEndedAt: freshSleep ? context.evidence?.sleepEndedAt ?? null : null,
+      hrvSampledAt: freshHRV ? context.evidence?.hrvSampledAt ?? null : null,
+      restingPulseSampledAt: freshRHR
+        ? context.evidence?.restingPulseSampledAt ?? null : null,
+      verified: !requireEvidence || captureValid,
+    },
     recoveryScore:
-      typeof context.recoveryScore === "number"
+      readyHasSources && typeof context.recoveryScore === "number"
         ? Math.max(0, Math.min(100, Math.round(context.recoveryScore)))
         : null,
-    recoveryState: String(context.recoveryState ?? "").slice(0, 80),
-    recoveryDetail: String(context.recoveryDetail ?? "").slice(0, 1200),
+    recoveryState: readyHasSources
+      ? String(context.recoveryState ?? "").slice(0, 80) : "Recent data unavailable",
+    recoveryDetail: readyHasSources
+      ? "Locally calculated, approximate readiness. Use only the dated sample fields and never infer missing signals."
+      : "No verified recent HealthKit readings available for a current readiness estimate.",
     sleepSeconds:
-      typeof context.sleepSeconds === "number"
+      freshSleep && typeof context.sleepSeconds === "number"
         ? Math.max(0, Math.min(context.sleepSeconds, 86400))
         : null,
     baselineSleepSeconds:
-      typeof context.baselineSleepSeconds === "number"
+      freshSleep && typeof context.baselineSleepSeconds === "number"
         ? Math.max(0, Math.min(context.baselineSleepSeconds, 86400))
         : null,
     hrvMilliseconds:
-      typeof context.hrvMilliseconds === "number"
+      freshHRV && typeof context.hrvMilliseconds === "number"
         ? Math.max(0, Math.min(context.hrvMilliseconds, 1000))
         : null,
     baselineHRVMilliseconds:
-      typeof context.baselineHRVMilliseconds === "number"
+      freshHRV && typeof context.baselineHRVMilliseconds === "number"
         ? Math.max(0, Math.min(context.baselineHRVMilliseconds, 1000))
         : null,
     restingHeartRate:
-      typeof context.restingHeartRate === "number"
+      freshRHR && typeof context.restingHeartRate === "number"
         ? Math.max(20, Math.min(context.restingHeartRate, 240))
         : null,
     baselineRestingHeartRate:
-      typeof context.baselineRestingHeartRate === "number"
+      freshRHR && typeof context.baselineRestingHeartRate === "number"
         ? Math.max(20, Math.min(context.baselineRestingHeartRate, 240))
         : null,
     yesterdayTrainingMinutes:
@@ -566,6 +603,8 @@ Important:
 - Treat the user's own report of soreness, pain or readiness as essential context. Do not override what the user feels based only on estimated recovery percentages. Adapt the proposed workout accordingly.
 - Prefer the user's own baselines over generic population norms.
 - When data is missing, say it is missing rather than guessing.
+- Every personal recovery number requires current, source-dated evidence. Never claim a timestamp or a sleep/HRV/RHR number that is not supplied in the sanitized context.
+- Do not confuse a calculated readiness score with a directly observed physiological measurement. Distinguish baselines from last-night readings and explicitly state unavailable/stale values.
 - Keep language concise, calm and useful.
 - Do not tell the user that a medical condition explains the data.
 - If the supplied data is concerning only in a general sense, recommend reducing training load or seeking appropriate professional advice if they feel unwell, without diagnosing.
@@ -602,6 +641,7 @@ Deno.serve(async (req: Request) => {
   const canShareHealth = canForwardRecoveryHealth(body.shareHealthData);
   const context = sanitizeContext(
     canShareHealth ? body.context : undefined,
+    body.mode === "ask",
   );
   const coachStrengthContext =
     canShareHealth && body.mode === "ask"
