@@ -750,6 +750,7 @@ struct ATHLTHHomeView: View {
     @State private var homeStreakDays: [Date]?
     @State private var showingGlobalSearch = false
     @State private var showingHomeTodayCalendarAll = false
+    @State private var showingHomeCalendarWorkoutPicker = false
     @State private var selectedHomeStandaloneWorkout: PlannedSession?
     @State private var selectedHomeAllStandaloneWorkout: PlannedSession?
     @State private var selectedHomeStrengthSession: PlannedSession?
@@ -1226,6 +1227,12 @@ struct ATHLTHHomeView: View {
                 .presentationDetents([.fraction(0.76), .large])
                 .presentationDragIndicator(.visible)
                 .presentationCornerRadius(28)
+            }
+            .sheet(isPresented: $showingHomeCalendarWorkoutPicker) {
+                homeCalendarWorkoutPicker
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
             }
             .sheet(isPresented: $showingHomeTodayCalendarAll) {
                 homeTodayCalendarAllSheet
@@ -2071,41 +2078,38 @@ struct ATHLTHHomeView: View {
                     alignment: .top
                 )
             } else {
-                HStack(spacing: 7) {
-                    homeCalendarQuickStartButton(
-                        title: ATHLTHLocalization.choose(
-                            english: "Run",
-                            norwegian: "Løp"
-                        ),
-                        icon: "figure.run",
-                        tint:
-                            ATHLTHTheme
-                                .vitality
-                    ) {
-                        pendingHomeQuickStartKind =
-                            .running
+                VStack(alignment: .leading, spacing: 10) {
+                    Image(systemName: "calendar")
+                        .font(.system(size: 19, weight: .light))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Nothing on the calendar today",
+                        norwegian: "Ingen aktiviteter i kalenderen"
+                    ))
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    Button {
+                        showingHomeCalendarWorkoutPicker = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Start a workout",
+                                norwegian: "Start en økt"
+                            ),
+                            systemImage: "plus"
+                        )
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 8)
+                        .background(
+                            ATHLTHTrainDesign.paleGold.opacity(0.35),
+                            in: Capsule()
+                        )
                     }
-
-                    homeCalendarQuickStartButton(
-                        title: ATHLTHLocalization.choose(
-                            english: "Strength",
-                            norwegian: "Styrke"
-                        ),
-                        icon:
-                            "dumbbell.fill",
-                        tint:
-                            ATHLTHTheme
-                                .accentDeep
-                    ) {
-                        pendingHomeQuickStartKind =
-                            .strength
-                    }
+                    .buttonStyle(.plain)
                 }
-                .frame(
-                    minHeight:
-                        homeCalendarContentMinHeight,
-                    alignment: .center
-                )
+                .frame(maxWidth: .infinity, minHeight: homeCalendarContentMinHeight)
             }
         }
         .padding(11)
@@ -2121,6 +2125,89 @@ struct ATHLTHHomeView: View {
         }
     }
 
+
+    private var homeCalendarWorkoutPicker: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 15) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "What would you like to train?",
+                        norwegian: "Hva vil du trene?"
+                    ))
+                    .font(.system(size: 22, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a category to configure your workout.",
+                        norwegian: "Velg en kategori for å tilpasse økten."
+                    ))
+                    .font(.system(size: 12))
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                        ForEach(quickStartKinds) { kind in
+                            Button {
+                                showingHomeCalendarWorkoutPicker = false
+                                pendingHomeQuickStartKind = kind
+                            } label: {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    Image(systemName: kind.systemImage)
+                                        .font(.system(size: 21, weight: .medium))
+                                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                    Text(kind.title)
+                                        .font(.system(size: 14, weight: .semibold))
+                                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                                    Spacer(minLength: 0)
+                                }
+                                .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+                                .padding(14)
+                                .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Button {
+                            showingHomeCalendarWorkoutPicker = false
+                            showingCustomQuickStart = true
+                        } label: {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Image(systemName: "plus.circle")
+                                    .font(.system(size: 21))
+                                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Other activities",
+                                    norwegian: "Andre aktiviteter"
+                                ))
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundStyle(ATHLTHTrainDesign.ink)
+                                Spacer(minLength: 0)
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 88, alignment: .leading)
+                            .padding(14)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!customQuickStartAvailable)
+                    }
+                }
+                .padding(22)
+            }
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "New workout", norwegian: "Ny treningsøkt"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Close", norwegian: "Lukk"
+                    )) {
+                        showingHomeCalendarWorkoutPicker = false
+                    }
+                }
+            }
+        }
+    }
 
     private func homeCompactCalendarRow(
         time: Date?,
