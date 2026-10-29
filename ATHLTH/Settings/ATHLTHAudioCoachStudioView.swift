@@ -179,8 +179,8 @@ struct ATHLTHAudioCoachStudioView: View {
                         in: 30...600, step: 30
                     ) {
                         Text(ATHLTHLocalization.choose(
-                            english: "About every \\(settings.audioCoachSmartSettings.motivationIntervalSeconds) sec",
-                            norwegian: "Omtrent hvert \\(settings.audioCoachSmartSettings.motivationIntervalSeconds). sekund"
+                            english: "About every \(settings.audioCoachSmartSettings.motivationIntervalSeconds) sec",
+                            norwegian: "Omtrent hvert \(settings.audioCoachSmartSettings.motivationIntervalSeconds). sekund"
                         ))
                         .font(.subheadline)
                     }
@@ -217,8 +217,8 @@ struct ATHLTHAudioCoachStudioView: View {
                         in: 90...900, step: 30
                     ) {
                         Text(ATHLTHLocalization.choose(
-                            english: "Average every \\(settings.audioCoachSmartSettings.randomIntervalSeconds / 60) min",
-                            norwegian: "I snitt hvert \\(settings.audioCoachSmartSettings.randomIntervalSeconds / 60). min"
+                            english: "Average every \(settings.audioCoachSmartSettings.randomIntervalSeconds / 60) min",
+                            norwegian: "I snitt hvert \(settings.audioCoachSmartSettings.randomIntervalSeconds / 60). min"
                         ))
                         .font(.subheadline)
                     }
