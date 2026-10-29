@@ -72,14 +72,21 @@ enum ATHLTHPlannedWorkoutType: String, CaseIterable, Codable, Hashable, Identifi
     /// Use the saved activity and category, rather than guessing from title.
     func matches(_ workout: PlannedSession) -> Bool {
         let category = workout.workoutCategory?.lowercased() ?? ""
+        // A cycling workout may be stored as .custom in the legacy shared
+        // WorkoutKind model; inspect its saved recipe rather than its title.
+        let includesCycling = workout.resolvedWorkoutBlocks.contains {
+            $0.activityTag == "cycling"
+        }
         switch self {
         case .strength: return workout.kind == .strength || category == "strength"
         case .running: return workout.kind == .running || category == "running"
         case .walking: return workout.kind == .walking || category == "walking"
-        case .cycling: return category == "cycling"
+        case .cycling: return category == "cycling" ||
+            (category.isEmpty && workout.kind == .custom && includesCycling)
         case .mobility: return workout.kind == .mobility || category == "mobility"
         case .custom:
-            return (workout.kind == .custom && category != "cycling")
+            return (workout.kind == .custom && category != "cycling" &&
+                    !(category.isEmpty && includesCycling))
                 || category == "hybrid" || category == "custom"
         }
     }
