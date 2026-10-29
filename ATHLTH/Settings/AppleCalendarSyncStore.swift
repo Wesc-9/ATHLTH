@@ -882,6 +882,7 @@ final class AppleCalendarSyncStore: ObservableObject {
             record.endsAt ??
             record.startsAt.addingTimeInterval(3_600)
         event.isAllDay = false
+        event.availability = attendance == .going ? .busy : .tentative
         event.location =
             record.meetingName
                 .trimmingCharacters(
@@ -948,6 +949,7 @@ final class AppleCalendarSyncStore: ObservableObject {
             record.endsAt ??
             record.startsAt.addingTimeInterval(3_600)
         event.isAllDay = false
+        event.availability = attendance == .going ? .busy : .tentative
         event.location =
             record.meetingName
                 .trimmingCharacters(
@@ -1017,11 +1019,12 @@ final class AppleCalendarSyncStore: ObservableObject {
             attendance: attendance
         )
         event.startDate = challenge.rules.startsAt
-        event.endDate =
-            challenge.rules.endsAt ??
-            challenge.rules.startsAt
-                .addingTimeInterval(3_600)
+        event.endDate = ATHLTHCalendarParticipationPolicy.challengeEnd(
+            start: challenge.rules.startsAt,
+            explicitEnd: challenge.rules.endsAt
+        )
         event.isAllDay = false
+        event.availability = attendance == .going ? .busy : .tentative
 
         var lines = [
             "ATHLTH · Challenge",
@@ -1060,6 +1063,36 @@ final class AppleCalendarSyncStore: ObservableObject {
         event.notes = lines.joined(separator: "\n")
     }
 
+    private func configure(
+        _ event: EKEvent,
+        challengeMeetup challenge: ATHLTHChallenge,
+        attendance: CalendarAttendanceState,
+        calendar: EKCalendar
+    ) {
+        guard let meetup = challenge.rules.meetup else { return }
+        resetManagedEvent(event)
+        event.calendar = calendar
+        event.title = titled(
+            ATHLTHLocalization.choose(
+                english: "Meetup", norwegian: "Samling"
+            ) + " · " + challenge.title,
+            attendance: attendance
+        )
+        event.startDate = meetup.scheduledAt
+        event.endDate = meetup.scheduledAt.addingTimeInterval(3_600)
+        event.isAllDay = false
+        event.availability = attendance == .going ? .busy : .tentative
+        event.location = meetup.placeName
+        event.notes = [
+            "ATHLTH · Challenge Meetup",
+            "Response: \(attendance.noteLabel)",
+            "Challenge: \(challenge.title)",
+            "",
+            "Synced from ATHLTH",
+            managedMarker(type: "challenge-meetup", id: challenge.id)
+        ].joined(separator: "\n")
+    }
+
     private func titled(
         _ base: String,
         attendance: CalendarAttendanceState
@@ -1086,37 +1119,22 @@ final class AppleCalendarSyncStore: ObservableObject {
     private func configure(
         _ event: EKEvent,
         session: PlannedSession,
-        plan: TrainingPlan,
+        plan: TrainingPlan?,
         dayDate: Date,
         calendar: EKCalendar
     ) {
         let calendarAPI = Calendar.current
 
+        resetManagedEvent(event)
         event.calendar = calendar
-        event.title = "\(plan.title): \(session.title)"
-
-        let hour: Int
-        let minute: Int
-
-        if let scheduledStart =
-                session.scheduledStart {
-            let time = calendarAPI
-                .dateComponents(
-                    [.hour, .minute],
-                    from: scheduledStart
-                )
-
-            hour = time.hour ?? defaultStartHour
-            minute = time.minute ?? defaultStartMinute
-        } else {
-            hour = defaultStartHour
-            minute = defaultStartMinute
-        }
-
-        event.startDate =
+        event.title = plan.map { "\($0.title): \(session.title)" } ??
+            session.title
+        // When moved, scheduledStart is the absolute date and time. Never
+        // replace its date with the session's old plan-day offset.
+        event.startDate = session.scheduledStart ??
             calendarAPI.date(
-                bySettingHour: hour,
-                minute: minute,
+                bySettingHour: defaultStartHour,
+                minute: defaultStartMinute,
                 second: 0,
                 of: dayDate
             ) ?? dayDate
@@ -1137,6 +1155,7 @@ final class AppleCalendarSyncStore: ObservableObject {
                 )
 
         event.isAllDay = false
+        event.availability = .busy
 
         event.notes = eventNotes(
             session: session,
@@ -1146,12 +1165,14 @@ final class AppleCalendarSyncStore: ObservableObject {
 
     private func eventNotes(
         session: PlannedSession,
-        plan: TrainingPlan
+        plan: TrainingPlan?
     ) -> String {
-        var lines = [
-            "ATHLTH · \(session.kind.title)",
-            "Plan: \(plan.title)"
-        ]
+        var lines = ["ATHLTH · \(session.kind.title)"]
+        if let plan {
+            lines.append("Plan: \(plan.title)")
+        } else {
+            lines.append("Individually planned workout")
+        }
 
         if let minutes =
                 session.durationMinutes {
@@ -1186,16 +1207,18 @@ final class AppleCalendarSyncStore: ObservableObject {
         lines.append("Synced from ATHLTH")
         lines.append(
             managedMarker(
-                type: "session",
+                type: plan == nil ? "standalone-session" : "session",
                 id: session.id
             )
         )
         lines.append(
             "[ATHLTH_SESSION:\(session.id.uuidString)]"
         )
-        lines.append(
-            "[ATHLTH_PLAN:\(plan.id.uuidString)]"
-        )
+        if let plan {
+            lines.append(
+                "[ATHLTH_PLAN:\(plan.id.uuidString)]"
+            )
+        }
 
         return lines.joined(
             separator: "\n"
@@ -1369,6 +1392,7 @@ private enum AppleCalendarSyncError:
     LocalizedError {
     case calendarAccessRequired
     case noWritableCalendarSource
+    case verificationFailed(Int)
 
     var errorDescription: String? {
         switch self {
@@ -1377,6 +1401,8 @@ private enum AppleCalendarSyncError:
 
         case .noWritableCalendarSource:
             return "ATHLTH could not find a writable Calendar account on this iPhone."
+        case .verificationFailed(let missing):
+            return "Calendar sync could not verify \(missing) ATHLTH event(s). Please check the Calendar account and retry."
         }
     }
 }
