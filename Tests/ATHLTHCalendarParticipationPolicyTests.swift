@@ -17,7 +17,7 @@ final class ATHLTHCalendarParticipationPolicyTests: XCTestCase {
 
     private func workout(start: Date?) -> PlannedSession {
         PlannedSession(
-            title: "Rolig tur", kind: .running,
+            id: UUID(), title: "Rolig tur", kind: .running,
             scheduledStart: start, durationMinutes: 45,
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
