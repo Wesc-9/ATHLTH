@@ -797,6 +797,32 @@ final class AppleCalendarSyncStore: ObservableObject {
                 if decision.isTentative { tentativeEvents += 1 }
             }
 
+            // Club challenges require an explicit joined/accepted record.
+            // Simply being a club member never confirms participation.
+            for record in snapshot.clubChallenges {
+                guard (record.status == "upcoming" ||
+                       record.status == "active" ||
+                       record.status == "live"),
+                      record.endsAt >= now,
+                      snapshot.clubChallengeParticipations.contains(where: {
+                          $0.challengeID == record.id &&
+                          $0.userID == currentUserID &&
+                          $0.status == "joined"
+                      })
+                else { continue }
+
+                let key = managedKey(type: "club-challenge", id: record.id)
+                activeKeys.insert(key)
+                let event = existingByKey[key] ??
+                    EKEvent(eventStore: eventStore)
+                configure(
+                    event, clubChallenge: record, calendar: calendar
+                )
+                try eventStore.save(
+                    event, span: .thisEvent, commit: false
+                )
+            }
+
             for challenge in snapshot.challenges {
                 let participant = challenge.participants.first {
                     $0.userID == currentUserID
@@ -1040,6 +1066,34 @@ final class AppleCalendarSyncStore: ObservableObject {
         )
 
         event.notes = lines.joined(separator: "\n")
+    }
+
+    private func configure(
+        _ event: EKEvent,
+        clubChallenge record: CommunityGroupChallengeRecord,
+        calendar: EKCalendar
+    ) {
+        resetManagedEvent(event)
+        event.calendar = calendar
+        event.title = ATHLTHLocalization.choose(
+            english: "Club challenge", norwegian: "Klubbutfordring"
+        ) + " · " + record.title
+        event.startDate = record.startsAt
+        event.endDate = ATHLTHCalendarParticipationPolicy.challengeEnd(
+            start: record.startsAt, explicitEnd: record.endsAt
+        )
+        event.isAllDay = false
+        event.availability = .busy
+        event.notes = [
+            "ATHLTH · Club Challenge",
+            "Participation: Joined",
+            "Metric: \(record.metric.rawValue)",
+            "Target: \(record.targetValue)",
+            record.summary,
+            "",
+            "Synced from ATHLTH",
+            managedMarker(type: "club-challenge", id: record.id)
+        ].joined(separator: "\n")
     }
 
     private func configure(
