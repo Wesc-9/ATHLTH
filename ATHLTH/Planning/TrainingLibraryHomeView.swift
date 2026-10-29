@@ -133,8 +133,8 @@ struct TrainingLibraryHomeView: View {
                         detail: tr("Find a complete plan", "Finn en ferdig plan"),
                         symbol: "square.stack.3d.up.fill",
                         artwork: "GoalProgress",
-                        compact: displayMode == .list,
-                        tint: gold
+                        tint: gold,
+                        compact: displayMode == .list
                     )
                 }
 
@@ -147,8 +147,8 @@ struct TrainingLibraryHomeView: View {
                                    "Styrke, løping og mer"),
                         symbol: "dumbbell.fill",
                         artwork: "StrengthQuickHero",
-                        compact: displayMode == .list,
-                        tint: lavender
+                        tint: lavender,
+                        compact: displayMode == .list
                     )
                 }
 
@@ -161,8 +161,8 @@ struct TrainingLibraryHomeView: View {
                                    "Søk på muskel og utstyr"),
                         symbol: "figure.strengthtraining.traditional",
                         artwork: "GoalStrength",
-                        compact: displayMode == .list,
-                        tint: slate
+                        tint: slate,
+                        compact: displayMode == .list
                     )
                 }
 
@@ -175,8 +175,8 @@ struct TrainingLibraryHomeView: View {
                                    "Finn en ny tur eller løperute"),
                         symbol: "map.fill",
                         artwork: "GoalAdventure",
-                        compact: displayMode == .list,
-                        tint: green
+                        tint: green,
+                        compact: displayMode == .list
                     )
                 }
             }
