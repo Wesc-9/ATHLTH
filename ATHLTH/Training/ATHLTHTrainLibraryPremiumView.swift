@@ -380,10 +380,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                     .frame(height: 470)
                     .overlay(alignment: .trailing) {
                         ATHLTHExerciseAlphabetIndex(
-                            targets: ATHLTHExerciseAlphabet.firstIDs(
-                                for: entries,
-                                name: exerciseLibrary.localizedExerciseName
-                            ),
+                            targets: exerciseLibrary.alphabetIndexTargets(for: entries),
                             onJump: { id in
                                 withAnimation(.easeOut(duration: 0.18)) {
                                     proxy.scrollTo(id, anchor: .top)
