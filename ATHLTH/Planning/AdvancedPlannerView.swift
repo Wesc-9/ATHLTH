@@ -6468,32 +6468,19 @@ struct SessionEditorView: View {
                 .presentationDetents([.large])
             }
             .sheet(isPresented: $showingSavedWorkoutPicker) {
-                NavigationStack {
-                    WorkoutTemplateLibraryView(onSelectPlanned: { workout in
+                ATHLTHPlannedWorkoutTypePickerView { workout, _ in
                     applySavedWorkout(workout)
-                    // A template supplies the structure, not the new session name.
-                    // The athlete must explicitly name any newly planned session.
+                    // A library template supplies the structure, but the
+                    // athlete still names this new independent session.
                     if existingWorkout == nil {
                         title = ""
                     }
                     discardStoredStandaloneDraft()
                     hasSelectedWorkoutSource = true
                     showingSavedWorkoutPicker = false
-                    })
-                    .navigationTitle(ATHLTHLocalization.choose(
-                        english: "Choose workout", norwegian: "Velg treningsøkt"
-                    ))
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .cancellationAction) {
-                            Button(ATHLTHLocalization.choose(
-                                english: "Cancel", norwegian: "Avbryt"
-                            )) {
-                                showingSavedWorkoutPicker = false
-                            }
-                        }
-                    }
                 }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
     }
 
