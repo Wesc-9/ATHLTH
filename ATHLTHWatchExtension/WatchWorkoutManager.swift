@@ -149,6 +149,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
+    private var customAudioCoachLastSlots: [UUID: Int] = [:]
     private var nextFuelAnnouncementSeconds: TimeInterval?
     private var structuredStepStartElapsedTime: TimeInterval = 0
     private var structuredStepStartDistanceMeters: Double = 0
@@ -4112,6 +4113,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func resetAudioCoachThresholds() {
         lastGoalEncouragementAt = nil
         let configuration = audioCoachConfiguration
+        customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: configuration.customRules ?? [],
+            distanceMeters: distanceMeters,
+            elapsedSeconds: elapsedTime
+        )
         nextFuelAnnouncementSeconds = ATHLTHFuelVoicePrompt.nextDue(
             after: elapsedTime,
             config: configuration
@@ -4211,12 +4217,40 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    private func evaluateCustomAudioCoachRules() {
+        guard !coachSpeechPaused, kind == .running || kind == .walking else {
+            return
+        }
+        let messages = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: audioCoachConfiguration.customRules ?? [],
+            distanceMeters: distanceMeters,
+            elapsedSeconds: elapsedTime,
+            paceSecondsPerKilometer: currentPaceSecondsPerKilometer,
+            heartRateBPM: hasFreshHeartRate ? heartRate : nil,
+            norwegian: coachPhrase(english: "en", norwegian: "no") == "no",
+            lastSlots: &customAudioCoachLastSlots
+        )
+        guard !messages.isEmpty else { return }
+        speak(
+            messages.joined(separator: ". "),
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: "custom:\(Int(elapsedTime)):\(Int(distanceMeters))",
+                priority: .routineCoach,
+                validFor: 10
+            )
+        )
+    }
+
     private func evaluateAudioCoach() {
         guard state == .running,
               audioCoachConfiguration.enabled
         else {
             return
         }
+
+        evaluateCustomAudioCoachRules()
 
         var shouldAnnounce = false
         var milestoneKeys: [String] = []
