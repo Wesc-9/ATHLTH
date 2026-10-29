@@ -257,9 +257,14 @@ enum ATHLTHSpokenAudioSession {
         do {
             try session.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            // Never leave music ducked forever because of one rejected call.
-            // Retry over route handoffs and Bluetooth reconnects. A new coach
-            // lease invalidates the task before it can silence active speech.
+            // When iOS rejects deactivation during a Bluetooth/Spotify route
+            // handoff, remove duckOthers first. Otherwise the music can
+            // remain quiet until the asynchronous deactivation finally works.
+            // This is only safe with no remaining speech owners.
+            try? session.setCategory(
+                .playback, mode: .default, options: [.mixWithOthers]
+            )
+            // Retry notifyOthersOnDeactivation without interrupting a new cue.
             delayedRestoreTask = Task { @MainActor in
                 let delays: [Duration] = [
                     .milliseconds(150),
