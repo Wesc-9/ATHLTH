@@ -24,12 +24,12 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
         ))
     }
 
-    func testSectionsPreserveFourDistinctDestinations() {
+    func testSectionsAvoidRepeatingHomeHealthMetrics() {
         XCTAssertEqual(
             ATHLTHInsightsSection.allCases,
-            [.overview, .health, .training, .development]
+            [.overview, .training, .development]
         )
-        XCTAssertEqual(Set(ATHLTHInsightsSection.allCases.map(\.title)).count, 4)
+        XCTAssertEqual(Set(ATHLTHInsightsSection.allCases.map(\.title)).count, 3)
     }
 
     func testWeekChartUsesRealWorkoutsAndExcludesOldHistory() {
@@ -257,7 +257,7 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
         )
     }
 
-    func testCompactFourTabNavigationFitsPhones() {
+    func testCompactThreeTabNavigationFitsPhones() {
         for width in [320.0, 375.0, 430.0] {
             let view = ATHLTHInsightsNavigation(selection: .constant(.overview))
             let controller = UIHostingController(rootView: view)
