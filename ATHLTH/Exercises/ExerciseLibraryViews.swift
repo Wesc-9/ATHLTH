@@ -46,6 +46,7 @@ struct ExerciseLibraryView: View {
     @State private var selectedBodyPart = "All"
     @State private var selectedEquipment = "All"
     @State private var favoritesOnly = false
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var showingCreateExercise = false
     @State private var showingEquipmentCamera = false
     @State private var showingCameraUnavailable = false
@@ -165,6 +166,18 @@ struct ExerciseLibraryView: View {
                 .padding(.top, 10)
                 .padding(.bottom, 4)
             }
+
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "View", norwegian: "Visning"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Spacer()
+                ATHLTHLibraryDisplayPicker(selection: $displayMode)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 7)
 
             filters
             translationAvailabilityBanner
@@ -359,7 +372,13 @@ struct ExerciseLibraryView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 10) {
+                        LazyVGrid(
+                            columns: displayMode == .grid
+                                ? [GridItem(.flexible(), spacing: 10),
+                                   GridItem(.flexible(), spacing: 10)]
+                                : [GridItem(.flexible())],
+                            spacing: 10
+                        ) {
                             ForEach(
                                 entries
                             ) { entry in
@@ -376,7 +395,11 @@ struct ExerciseLibraryView: View {
                                                 onSelect
                                         )
                                     } label: {
-                                        exerciseRow(entry)
+                                        if displayMode == .grid {
+                                            exerciseGridCard(entry)
+                                        } else {
+                                            exerciseRow(entry)
+                                        }
                                     }
                                     .buttonStyle(.plain)
                                     .simultaneousGesture(
@@ -559,7 +582,16 @@ struct ExerciseLibraryView: View {
                 resetEquipmentScan()
             }
         }
-        .onAppear(perform: refreshExerciseHistory)
+        .onAppear {
+            refreshExerciseHistory()
+            displayMode = .load(userID: session.profile.userID)
+        }
+        .onChange(of: session.profile.userID) { _, userID in
+            displayMode = .load(userID: userID)
+        }
+        .onChange(of: displayMode) { _, mode in
+            mode.save(userID: session.profile.userID)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             refreshExerciseHistory()
         }
@@ -1087,6 +1119,33 @@ struct ExerciseLibraryView: View {
                 .joined(separator: " · "),
             icon: "dumbbell.fill"
         )
+    }
+
+    /// Image-first compact card; list and grid open the same detail and
+    /// preserve the existing favorites/add controls on each exercise.
+    private func exerciseGridCard(_ entry: ExerciseLibraryEntry) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ExerciseArtwork(entry: entry, size: 90)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(library.localizedExerciseName(entry))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .lineLimit(2)
+                .multilineTextAlignment(.leading)
+            Text(entry.bodyPart.map(library.localizedBodyPartTitle)
+                ?? entry.category ?? "")
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 178, alignment: .topLeading)
+        .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+        }
     }
 
     private func exerciseRow(_ entry: ExerciseLibraryEntry) -> some View {
