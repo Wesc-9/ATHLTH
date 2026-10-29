@@ -759,32 +759,44 @@ final class AppSessionStore: ObservableObject {
         _ phoneHistory: [PhoneWorkout],
         healthWorkouts: [WorkoutSummary]
     ) {
+        // Called from the Train view's history/Health observers, including
+        // their initial emissions. Avoid disk JSON reads and repeated linear
+        // searches when there are no unlinked finished plan workouts.
+        let pending = phoneHistory.compactMap { recorded
+            -> (planID: UUID, sessionID: UUID, healthID: UUID)? in
+            guard recorded.end != nil,
+                  let planID = recorded.plannedPlanID,
+                  let sessionID = recorded.plannedSessionID,
+                  let healthID = recorded.healthID,
+                  linkedHealthWorkoutID(planID: planID, sessionID: sessionID) == nil,
+                  !isPlanSessionSkipped(planID, sessionID) else { return nil }
+            return (planID, sessionID, healthID)
+        }
+        guard !pending.isEmpty, !healthWorkouts.isEmpty else { return }
+
+        let workoutsByID = Dictionary(
+            healthWorkouts.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        guard pending.contains(where: { workoutsByID[$0.healthID] != nil })
+        else { return }
+
         let declined = AccountLocalStorage.read(
             Set<String>.self,
             name: "planAutomaticHealthRelinkDeclines",
             userID: profile.userID
         ) ?? []
-        for recorded in phoneHistory where recorded.end != nil {
-            guard let planID = recorded.plannedPlanID,
-                  let sessionID = recorded.plannedSessionID,
-                  let healthID = recorded.healthID,
-                  !declined.contains(
-                      Self.manualCompletionKey(
-                          planID: planID, sessionID: sessionID
-                      ) + "|" + healthID.uuidString
-                  ),
-                  linkedHealthWorkoutID(
-                      planID: planID, sessionID: sessionID
-                  ) == nil,
-                  !isPlanSessionSkipped(
-                      planID: planID, sessionID: sessionID
-                  ),
-                  let matching = healthWorkouts.first(where: {
-                      $0.id == healthID
-                  }) else { continue }
+        for candidate in pending {
+            guard !declined.contains(
+                Self.manualCompletionKey(
+                    planID: candidate.planID, sessionID: candidate.sessionID
+                ) + "|" + candidate.healthID.uuidString
+            ), let matching = workoutsByID[candidate.healthID] else { continue }
             // The existing linker checks activity and prevents double credit.
             _ = linkHealthWorkout(
-                matching, toPlan: planID, sessionID: sessionID
+                matching,
+                toPlan: candidate.planID,
+                sessionID: candidate.sessionID
             )
         }
     }
