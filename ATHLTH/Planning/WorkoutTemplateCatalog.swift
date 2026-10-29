@@ -934,7 +934,8 @@ struct WorkoutTemplateLibraryView: View {
         !selectedStrengthMuscles.isEmpty ||
         selectedRunningType != nil ||
         selectedRunningDuration != .any ||
-        selectedDiscoverySort != .recommended
+        selectedDiscoverySort != .recommended ||
+        (initialCategory == .strength && selectedWorkoutLevel != "all")
     }
 
     private func discoverySorted<T>(
@@ -1063,8 +1064,18 @@ struct WorkoutTemplateLibraryView: View {
     private var filteredSavedWorkouts: [PlannedSession] {
         guard onSelectPlanned != nil else { return [] }
         let clean = query
+        let originals = Dictionary(
+            catalog.entries.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let matching = session.savedWorkoutTemplates.filter { workout in
-            guard discoveryFilter.matches(workout) else { return false }
+            let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
+                workout.sharedSourceSessionID.flatMap { originals[$0] }
+            guard discoveryFilter.matches(workout, catalogEntry: source),
+                  initialCategory != .strength ||
+                    selectedWorkoutLevel == "all" ||
+                    (source.map(levelMatches) ?? false)
+            else { return false }
             let matchesCategory = selectedCategory == "All" ||
                 (ATHLTHPlannedWorkoutType(
                     rawValue: selectedCategory.lowercased()
@@ -1089,9 +1100,19 @@ struct WorkoutTemplateLibraryView: View {
                 .flatMap { $0.days }
                 .flatMap { $0.sessions }
         var seen = Set<UUID>()
+        let originals = Dictionary(
+            catalog.entries.map { ($0.id, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
         let matching = stored.filter { workout in
+            let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
+                workout.sharedSourceSessionID.flatMap { originals[$0] }
             guard seen.insert(workout.id).inserted,
-                  discoveryFilter.matches(workout) else { return false }
+                  discoveryFilter.matches(workout, catalogEntry: source),
+                  initialCategory != .strength ||
+                    selectedWorkoutLevel == "all" ||
+                    (source.map(levelMatches) ?? false)
+            else { return false }
             let matchingType = ATHLTHPlannedWorkoutType(
                 rawValue: selectedCategory.lowercased()
             )
