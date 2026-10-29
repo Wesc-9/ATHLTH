@@ -13,6 +13,53 @@ enum PlannedWorkoutReminderScheduler {
         )
     }
 
+    private static func delayedIdentifier(for id: UUID) -> String {
+        "athlth.plannedWorkout.delayedStart.\(id.uuidString)"
+    }
+
+    static func cancelDelayedStart(_ id: UUID) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: [delayedIdentifier(for: id)]
+        )
+    }
+
+    /// iOS will not start a background HealthKit workout on a local timer.
+    /// A notification invites the athlete to return if ATHLTH is suspended.
+    static func scheduleDelayedStart(
+        _ workout: PlannedSession, after seconds: TimeInterval
+    ) {
+        cancelDelayedStart(workout.id)
+        guard seconds >= 1 else { return }
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let status = await center.notificationSettings().authorizationStatus
+            var authorized = status == .authorized || status == .provisional
+                || status == .ephemeral
+            if status == .notDetermined {
+                authorized = (try? await center.requestAuthorization(
+                    options: [.alert, .sound]
+                )) ?? false
+            }
+            guard authorized else { return }
+            let notification = UNMutableNotificationContent()
+            notification.title = ATHLTHLocalization.choose(
+                english: "Ready to start your workout?",
+                norwegian: "Klar for å starte treningsøkten?"
+            )
+            notification.body = workout.title
+            notification.sound = .default
+            notification.userInfo = ["planned_workout_id": workout.id.uuidString]
+            let request = UNNotificationRequest(
+                identifier: delayedIdentifier(for: workout.id),
+                content: notification,
+                trigger: UNTimeIntervalNotificationTrigger(
+                    timeInterval: max(1, seconds), repeats: false
+                )
+            )
+            try? await center.add(request)
+        }
+    }
+
     static func sync(_ workout: PlannedSession) {
         cancel(workout.id)
         guard let date = workout.scheduledStart,

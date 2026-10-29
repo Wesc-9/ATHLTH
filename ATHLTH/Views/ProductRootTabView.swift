@@ -5298,8 +5298,15 @@ struct ATHLTHTrainView: View {
     @State private var planScrollPosition = ScrollPosition(edge: .top)
     @State private var progressScrollPosition = ScrollPosition(edge: .top)
     @State private var highlightedTrainPlanID: UUID?
+    private struct DelayedTrainPlanStart: Identifiable {
+        let id = UUID()
+        let planID: UUID
+        let workoutID: UUID
+        let startsAt: Date
+    }
     @State private var watchTransferMessage: String?
     @State private var watchTransferError: String?
+    @State private var delayedPlanStart: DelayedTrainPlanStart?
     @State private var isRecheckingWatchActivity = false
     @State private var watchActivityCheckMessage: String?
     @State private var selectedStrengthSession: PlannedSession?
@@ -5845,7 +5852,19 @@ struct ATHLTHTrainView: View {
                 handleNavigationRequest()
             }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .active { refreshTrainDayIfChanged() }
+                if phase == .active {
+                    refreshTrainDayIfChanged()
+                    resolveDelayedPlanStartIfReady()
+                }
+            }
+            .task(id: delayedPlanStart?.id) {
+                guard let launch = delayedPlanStart else { return }
+                let interval = launch.startsAt.timeIntervalSinceNow
+                if interval > 0 {
+                    try? await Task.sleep(for: .seconds(interval))
+                }
+                guard !Task.isCancelled else { return }
+                resolveDelayedPlanStartIfReady()
             }
             // iOS signals midnight, timezone and system-clock changes here.
             // A visible Train scene must not keep yesterday's workout hero.
@@ -6274,8 +6293,35 @@ struct ATHLTHTrainView: View {
             now: today
         )
 
-        ATHLTHTrainTodayPremiumView(
-            workoutCatalog: trainWorkoutCatalog,
+        VStack(alignment: .leading, spacing: 10) {
+            if let delay = delayedPlanStart {
+                HStack(spacing: 8) {
+                    Image(systemName: "clock")
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Scheduled workout start",
+                            norwegian: "Utsatt oppstart"))
+                            .font(.caption.weight(.semibold))
+                        Text(delay.startsAt, style: .time)
+                            .font(.caption2)
+                    }
+                    Spacer(minLength: 4)
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) {
+                        cancelDelayedPlanStart()
+                    }
+                    .font(.caption.weight(.semibold))
+                }
+                .padding(12)
+                .background(
+                    ATHLTHTrainDesign.paleGold.opacity(0.28),
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+            }
+
+            ATHLTHTrainTodayPremiumView(
+                workoutCatalog: trainWorkoutCatalog,
             plan: active,
             sessions: sessions,
             completedIDs: completedIDs,
@@ -6379,6 +6425,7 @@ struct ATHLTHTrainView: View {
         // Reset date-specific check-in and proposed workout state exactly
         // once when the calendar day changes; never reset the live recorder.
         .id(displayedTrainDay)
+        }
     }
 
     @ViewBuilder
@@ -7820,6 +7867,61 @@ struct ATHLTHTrainView: View {
 
     /// Sending a planned session never calls HealthKit's Watch start API.
     /// The prepared card is durable and launches only on Watch START.
+    /// A deferred start is local to the user and never creates a HealthKit
+    /// session while the phone is locked or the application is backgrounded.
+    private func scheduleTodayWorkoutStart(
+        _ selected: PlannedSession, planID: UUID, after seconds: TimeInterval
+    ) {
+        guard seconds >= 1,
+              let workout = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == selected.id }),
+              !workout.isExplicitRestDay,
+              !hasOngoingTrainWorkout,
+              !session.isPlanSessionSkipped(planID: planID, sessionID: workout.id),
+              !session.isPlanSessionCompleted(
+                  planID: planID, sessionID: workout.id,
+                  healthWorkouts: health.workouts,
+                  strengthHistory: strengthWorkout.workoutHistory)
+        else { return }
+
+        cancelDelayedPlanStart()
+        delayedPlanStart = DelayedTrainPlanStart(
+            planID: planID,
+            workoutID: workout.id,
+            startsAt: Date().addingTimeInterval(seconds)
+        )
+        PlannedWorkoutReminderScheduler.scheduleDelayedStart(
+            workout, after: seconds
+        )
+    }
+
+    private func cancelDelayedPlanStart() {
+        if let launch = delayedPlanStart {
+            PlannedWorkoutReminderScheduler.cancelDelayedStart(
+                launch.workoutID
+            )
+        }
+        delayedPlanStart = nil
+    }
+
+    private func resolveDelayedPlanStartIfReady() {
+        guard let launch = delayedPlanStart,
+              Date() >= launch.startsAt,
+              scenePhase == .active else { return }
+        cancelDelayedPlanStart()
+        guard !hasOngoingTrainWorkout,
+              let workout = session.trainingPlan(withID: launch.planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == launch.workoutID }),
+              !session.isPlanSessionSkipped(
+                planID: launch.planID, sessionID: launch.workoutID)
+        else { return }
+        openTodayPrimaryWorkout(
+            workout, planID: launch.planID, isHealthCompleted: false
+        )
+    }
+
     private func prepareTodayWorkoutForAppleWatch(
         _ selected: PlannedSession, planID: UUID
     ) {
