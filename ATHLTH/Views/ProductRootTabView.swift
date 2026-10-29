@@ -1418,6 +1418,12 @@ struct ATHLTHHomeView: View {
                     return
                 }
 
+                let homeLoadSignpost = ATHLTHPerformance.begin("HomeInitialData")
+                defer {
+                    ATHLTHPerformance.end(
+                        "HomeInitialData", id: homeLoadSignpost
+                    )
+                }
                 async let communityRefresh: Void = community.refresh()
                 async let groupRefresh: Void =
                     refreshHomeGroupCalendar()
