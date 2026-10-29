@@ -15,6 +15,44 @@ struct ATHLTHInsightsWhatIfView: View {
     @State private var runningPaceSeconds = 360
     @State private var strengthWorkingSets = 12
     @State private var customActivity = ""
+    @State private var ownQuestion = ""
+    @State private var mode: Mode = .freeText
+
+    private enum Mode: String, CaseIterable, Identifiable {
+        case freeText, guided
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .freeText: return ATHLTHLocalization.choose(
+                english: "Write freely", norwegian: "Skriv selv"
+            )
+            case .guided: return ATHLTHLocalization.choose(
+                english: "Choose workout", norwegian: "Velg økt"
+            )
+            }
+        }
+    }
+
+    private var trimmedQuestion: String {
+        ownQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var questionExamples: [String] {
+        [
+            ATHLTHLocalization.choose(
+                english: "What if I train my back now?",
+                norwegian: "Hva om jeg trener rygg nå?"
+            ),
+            ATHLTHLocalization.choose(
+                english: "What if I go for a 5 km run?",
+                norwegian: "Hva om jeg løper 5 km?"
+            ),
+            ATHLTHLocalization.choose(
+                english: "What if I take a rest day?",
+                norwegian: "Hva om jeg tar en hviledag?"
+            )
+        ]
+    }
 
     private enum Activity: String, CaseIterable, Identifiable {
         case strength, running, walking, custom
@@ -130,7 +168,8 @@ struct ATHLTHInsightsWhatIfView: View {
     }
 
     private var isValid: Bool {
-        activity != .custom ||
+        if mode == .freeText { return !trimmedQuestion.isEmpty }
+        return activity != .custom ||
             !customActivity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
@@ -162,71 +201,23 @@ struct ATHLTHInsightsWhatIfView: View {
                 }
             }
 
-            Picker(ATHLTHLocalization.choose(
-                english: "Workout type", norwegian: "Treningsform"
-            ), selection: $activity) {
-                ForEach(Activity.allCases) { item in
-                    Text(item.title).tag(item)
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "How do you want to explore?",
+                    norwegian: "Hvordan vil du undersøke?"
+                ),
+                selection: $mode
+            ) {
+                ForEach(Mode.allCases) { item in
+                    Text(item.label).tag(item)
                 }
             }
             .pickerStyle(.segmented)
 
-            VStack(alignment: .leading, spacing: 13) {
-                switch activity {
-                case .strength:
-                    strengthControls
-                case .running:
-                    runningControls
-                case .walking:
-                    durationControl
-                case .custom:
-                    TextField(
-                        ATHLTHLocalization.choose(
-                            english: "E.g. 30 minutes of cycling or yoga",
-                            norwegian: "F.eks. 30 minutter sykling eller yoga"
-                        ),
-                        text: $customActivity,
-                        axis: .vertical
-                    )
-                    .lineLimit(1...3)
-                    .textInputAutocapitalization(.sentences)
-                    .font(.subheadline)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Describe your activity",
-                        norwegian: "Beskriv aktiviteten"
-                    ))
-                    durationControl
-                }
-            }
-            .padding(14)
-            .background(
-                ATHLTHInsightsStyle.canvas,
-                in: RoundedRectangle(cornerRadius: 18)
-            )
-
-            summarySection
-
-            if activity == .strength {
-                Label(
-                    elevatedMuscleFocus
-                        ? ATHLTHLocalization.choose(
-                            english: "Your recorded training focus for this area is unusually high compared with your previous baseline. Consider how another workout fits your week, without interpreting it as injury risk.",
-                            norwegian: "Registrert treningsmengde for dette området er uvanlig høy sammenlignet med ditt tidligere nivå. Vurder hvordan en ny økt passer inn, uten å tolke dette som skaderisiko."
-                        )
-                        : recordedTargetMuscles
-                        ? ATHLTHLocalization.choose(
-                            english: "This muscle group is present in your recorded strength history. Duration alone cannot determine how much it should recover.",
-                            norwegian: "Denne muskelgruppen finnes i styrkehistorikken din. Varighet alene kan ikke avgjøre hvor mye restitusjon den trenger."
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "No reliable muscle-specific history for this selection. Coach can review the exercises, your restrictions and recovery with your permission.",
-                            norwegian: "Vi har ikke tilstrekkelig muskelspesifikk historikk for dette valget. Coach kan vurdere øvelser, begrensninger og restitusjon hvis du gir tillatelse."
-                        ),
-                    systemImage: "figure.strengthtraining.traditional"
-                )
-                .font(.caption)
-                .foregroundStyle(ATHLTHInsightsStyle.muted)
-                .fixedSize(horizontal: false, vertical: true)
+            if mode == .freeText {
+                ownQuestionSection
+            } else {
+                guidedWorkoutSection
             }
 
             Label(
@@ -246,10 +237,16 @@ struct ATHLTHInsightsWhatIfView: View {
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "sparkles")
-                    Text(ATHLTHLocalization.choose(
-                        english: "Review this workout with Coach",
-                        norwegian: "Vurder økten med Coach"
-                    ))
+                    Text(mode == .freeText
+                        ? ATHLTHLocalization.choose(
+                            english: "Ask ATHLTH Coach",
+                            norwegian: "Spør ATHLTH Coach"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Review this workout with Coach",
+                            norwegian: "Vurder økten med Coach"
+                        )
+                    )
                     Spacer()
                     Image(systemName: "arrow.right")
                 }
@@ -281,6 +278,149 @@ struct ATHLTHInsightsWhatIfView: View {
         }
         .padding(18)
         .athlthInsightsSurface()
+    }
+
+    /// Free-text questions can describe *anything* — a back workout,
+    /// 5 km, rest, cycling or a custom goal. Never invent comparison figures
+    /// from text that has not been explicitly structured by the athlete.
+    private var ownQuestionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            TextField(
+                ATHLTHLocalization.choose(
+                    english: "E.g. What if I train my back now?",
+                    norwegian: "F.eks. Hva om jeg trener rygg nå?"
+                ),
+                text: $ownQuestion,
+                axis: .vertical
+            )
+            .lineLimit(2...4)
+            .font(.subheadline)
+            .textInputAutocapitalization(.sentences)
+            .padding(13)
+            .background(.white, in: RoundedRectangle(cornerRadius: 15))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .strokeBorder(
+                        ATHLTHInsightsStyle.accent.opacity(0.24),
+                        lineWidth: 1
+                    )
+            }
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Ask your own What if question",
+                norwegian: "Skriv ditt eget Hva om-spørsmål"
+            ))
+
+            Text(ATHLTHLocalization.choose(
+                english: "Or choose an example — you can edit it before sending.",
+                norwegian: "Eller velg et eksempel – du kan redigere det før du sender."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHInsightsStyle.muted)
+
+            ForEach(questionExamples, id: \.self) { example in
+                Button {
+                    ownQuestion = example
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: "plus.circle")
+                            .foregroundStyle(ATHLTHInsightsStyle.accent)
+                        Text(example)
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHInsightsStyle.ink)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: "arrow.up.left")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHInsightsStyle.muted)
+                    }
+                    .frame(minHeight: 39)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Coach answers your question. A free-text scenario does not generate made-up workout totals.",
+                norwegian: "Coach vurderer spørsmålet ditt. Fritekst gir ingen oppdiktede beregninger av treningsmengden."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHInsightsStyle.muted)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .background(
+            ATHLTHInsightsStyle.canvas,
+            in: RoundedRectangle(cornerRadius: 18)
+        )
+    }
+
+    private var guidedWorkoutSection: some View {
+        VStack(alignment: .leading, spacing: 17) {
+                Picker(ATHLTHLocalization.choose(
+                    english: "Workout type", norwegian: "Treningsform"
+                ), selection: $activity) {
+                    ForEach(Activity.allCases) { item in
+                        Text(item.title).tag(item)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                VStack(alignment: .leading, spacing: 13) {
+                    switch activity {
+                    case .strength:
+                        strengthControls
+                    case .running:
+                        runningControls
+                    case .walking:
+                        durationControl
+                    case .custom:
+                        TextField(
+                            ATHLTHLocalization.choose(
+                                english: "E.g. 30 minutes of cycling or yoga",
+                                norwegian: "F.eks. 30 minutter sykling eller yoga"
+                            ),
+                            text: $customActivity,
+                            axis: .vertical
+                        )
+                        .lineLimit(1...3)
+                        .textInputAutocapitalization(.sentences)
+                        .font(.subheadline)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Describe your activity",
+                            norwegian: "Beskriv aktiviteten"
+                        ))
+                        durationControl
+                    }
+                }
+                .padding(14)
+                .background(
+                    ATHLTHInsightsStyle.canvas,
+                    in: RoundedRectangle(cornerRadius: 18)
+                )
+
+                summarySection
+
+                if activity == .strength {
+                    Label(
+                        elevatedMuscleFocus
+                            ? ATHLTHLocalization.choose(
+                                english: "Your recorded training focus for this area is unusually high compared with your previous baseline. Consider how another workout fits your week, without interpreting it as injury risk.",
+                                norwegian: "Registrert treningsmengde for dette området er uvanlig høy sammenlignet med ditt tidligere nivå. Vurder hvordan en ny økt passer inn, uten å tolke dette som skaderisiko."
+                            )
+                            : recordedTargetMuscles
+                            ? ATHLTHLocalization.choose(
+                                english: "This muscle group is present in your recorded strength history. Duration alone cannot determine how much it should recover.",
+                                norwegian: "Denne muskelgruppen finnes i styrkehistorikken din. Varighet alene kan ikke avgjøre hvor mye restitusjon den trenger."
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "No reliable muscle-specific history for this selection. Coach can review the exercises, your restrictions and recovery with your permission.",
+                                norwegian: "Vi har ikke tilstrekkelig muskelspesifikk historikk for dette valget. Coach kan vurdere øvelser, begrensninger og restitusjon hvis du gir tillatelse."
+                            ),
+                        systemImage: "figure.strengthtraining.traditional"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+        }
     }
 
     private var strengthControls: some View {
@@ -485,6 +625,9 @@ struct ATHLTHInsightsWhatIfView: View {
     }
 
     private var coachPrompt: String {
+        if mode == .freeText {
+            return String(trimmedQuestion.prefix(2_000))
+        }
         let request: String
         switch activity {
         case .strength:
