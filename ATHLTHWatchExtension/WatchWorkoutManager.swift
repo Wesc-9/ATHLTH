@@ -151,7 +151,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var nextTimeAnnouncementSeconds: TimeInterval?
     private var customAudioCoachLastSlots: [UUID: Int] = [:]
     private var nextFuelAnnouncementSeconds: TimeInterval?
-    private var customCoachRuleSchedule = ATHLTHAudioCoachRuleSchedule()
     private var structuredStepStartElapsedTime: TimeInterval = 0
     private var structuredStepStartDistanceMeters: Double = 0
     private var structuredWorkoutComplete = false
@@ -4106,7 +4105,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 self.evaluateWorkoutTargetAlerts()
                 self.evaluateFuelAudioCoach()
                 self.evaluateAudioCoach()
-                self.evaluateCustomAudioCoach()
                 await self.sendLiveSnapshot()
             }
         }
@@ -4115,11 +4113,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func resetAudioCoachThresholds() {
         lastGoalEncouragementAt = nil
         let configuration = audioCoachConfiguration
-        customCoachRuleSchedule.reset(
-            rules: configuration.enabled ? configuration.customRules : nil,
-            distanceMeters: distanceMeters,
-            elapsedSeconds: elapsedTime
-        )
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
             rules: configuration.customRules ?? [],
             distanceMeters: distanceMeters,
@@ -4329,46 +4322,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             )
         }
-    }
-
-    private func evaluateCustomAudioCoach() {
-        guard state == .running,
-              audioCoachConfiguration.enabled else { return }
-
-        let due = customCoachRuleSchedule.consumeDue(
-            rules: audioCoachConfiguration.customRules,
-            distanceMeters: distanceMeters,
-            elapsedSeconds: elapsedTime
-        )
-        // Advance the schedule while muted, without playing old cues later.
-        guard !coachSpeechPaused, !due.isEmpty else { return }
-
-        let norwegian = coachPhrase(english: "en", norwegian: "no") == "no"
-        let freshPace = ATHLTHCoachSensorFreshness.validPace(
-            currentPaceSecondsPerKilometer,
-            sampledAt: coachPaceSampleAt
-        ) ? currentPaceSecondsPerKilometer : nil
-        let messages = due.compactMap {
-            $0.phrase(
-                distanceMeters: distanceMeters,
-                elapsedSeconds: elapsedTime,
-                paceSecondsPerKilometer: freshPace,
-                heartRateBPM: hasFreshHeartRate ? heartRate : nil,
-                norwegian: norwegian
-            )
-        }
-        guard !messages.isEmpty else { return }
-
-        speak(
-            messages.joined(separator: ". "),
-            priority: .routineCoach,
-            event: ATHLTHCoachEvent(
-                kind: .routineMilestone,
-                key: "custom:\(Int(elapsedTime)):\(Int(distanceMeters))",
-                priority: .routineCoach,
-                validFor: 10
-            )
-        )
     }
 
     /// Sample once per 60 seconds of active step time, plus any residual
