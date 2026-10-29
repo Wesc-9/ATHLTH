@@ -254,6 +254,11 @@ struct PlannedWorkoutWatchBuilder {
         var configuration =
             workout.audioCoachConfiguration ??
             defaultConfiguration
+        // Saved workouts from older builds inherit the athlete's current
+        // motivation and landmark profile without losing workout overrides.
+        if configuration.smartPrompts == nil {
+            configuration.smartPrompts = defaultConfiguration.smartPrompts
+        }
 
         // A saved workout may override other Audio Coach preferences,
         // but fuel voice reminders follow the current athlete's opt-in.
