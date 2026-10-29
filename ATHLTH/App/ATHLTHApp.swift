@@ -1,3 +1,4 @@
+import Combine
 import CoreLocation
 import Foundation
 import SwiftUI
@@ -1385,7 +1386,14 @@ struct AppRootView: View {
                 appSession.adoptHigherWorkoutHeartRatePeak(highest)
             }
         }
-        .onChange(of: health.workouts.map(\.id)) { _, _ in
+        // Observe workout *publications* rather than rebuilding/comparing
+        // a 100-element ID array on every unrelated root view update.
+        .onReceive(
+            health.$workouts
+                .map { $0.map(\.id) }
+                .removeDuplicates()
+                .dropFirst()
+        ) { _ in
             guard appSession.signedIn else { return }
 
             Task {
