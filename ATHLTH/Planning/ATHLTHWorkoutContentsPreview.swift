@@ -43,7 +43,8 @@ struct ATHLTHWorkoutContentsPreview: View {
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
             } else {
-                ForEach(Array(visible.enumerated()), id: \.offset) { _, block in
+                ForEach(visible.indices, id: \.self) { index in
+                    let block = visible[index]
                     HStack(alignment: .top, spacing: 9) {
                         Image(systemName: block.kind.systemImage)
                             .font(.system(size: 13, weight: .semibold))
