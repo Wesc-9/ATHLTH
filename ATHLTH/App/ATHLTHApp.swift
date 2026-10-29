@@ -1596,6 +1596,7 @@ struct AppRootView: View {
                 await social.syncChallenges(challengeStore)
                 await refreshTrophiesAndNotifications()
                 await syncSocialOwnedData()
+                await syncCalendarIfAllowed()
             }
         }
         .onChange(of: communityEvents.events) { _, _ in
@@ -1646,10 +1647,12 @@ struct AppRootView: View {
             }
             scheduleHomeAssistantSnapshotSync()
         }
-        .onChange(
-            of: appSession.standalonePlannedSessions.map(\.id)
-        ) { _, _ in
+        .onChange(of: appSession.standalonePlannedSessions) { _, _ in
             scheduleHomeAssistantSnapshotSync()
+            guard appSession.signedIn else { return }
+            Task {
+                await syncCalendarIfAllowed()
+            }
         }
         .onChange(of: appSession.profile.presence) { previous, presence in
             guard appSession.signedIn else {
@@ -2103,6 +2106,7 @@ struct AppRootView: View {
 
         await calendarSync.syncIfEnabled(
             plan: plan ?? appSession.activePlan,
+            standaloneSessions: appSession.standalonePlannedSessions,
             communityEvents: communityEvents.events,
             groupEvents: communityGroups.calendarEvents,
             groupEventRSVPs:
