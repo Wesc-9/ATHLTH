@@ -2004,6 +2004,7 @@ struct PersonalHealthProfileView: View {
     @State private var heightCentimeters = 180.0
     @State private var includeMaximumHeartRate = false
     @State private var maximumHeartRateBPM = 190
+    @State private var maximumHeartRateIsEstimated = false
 
     @State private var editingField: HealthProfileField?
     @State private var refreshingAppleHealth = false
@@ -2169,7 +2170,12 @@ struct PersonalHealthProfileView: View {
                     .maximumHeartRate,
                     value:
                         includeMaximumHeartRate
-                            ? "\(maximumHeartRateBPM) bpm"
+                            ? "\(maximumHeartRateBPM) bpm" +
+                              (maximumHeartRateIsEstimated
+                                  ? ATHLTHLocalization.choose(
+                                      english: " · Est.", norwegian: " · Est."
+                                    )
+                                  : "")
                             : "Add",
                     isSet: includeMaximumHeartRate
                 )
@@ -2336,28 +2342,119 @@ struct PersonalHealthProfileView: View {
                         .padding(.vertical, 8)
 
                     case .maximumHeartRate:
-                        VStack(spacing: 18) {
-                            Text("\(maximumHeartRateBPM) bpm")
-                                .font(.system(size: 34, weight: .bold))
-                                .monospacedDigit()
-                                .frame(maxWidth: .infinity)
+                        VStack(alignment: .leading, spacing: 18) {
+                            VStack(spacing: 5) {
+                                Text("\(maximumHeartRateBPM) bpm")
+                                    .font(.system(size: 34, weight: .bold))
+                                    .monospacedDigit()
+
+                                Text(maximumHeartRateIsEstimated
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Estimated maximum heart rate",
+                                        norwegian: "Estimert makspuls"
+                                      )
+                                    : includeMaximumHeartRate
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Manually entered value",
+                                            norwegian: "Manuelt oppgitt verdi"
+                                          )
+                                        : ATHLTHLocalization.choose(
+                                            english: "Not saved yet",
+                                            norwegian: "Ikke lagret ennå"
+                                          ))
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            .frame(maxWidth: .infinity)
 
                             Stepper(
-                                "Adjust by 1 bpm",
-                                value: $maximumHeartRateBPM,
+                                ATHLTHLocalization.choose(
+                                    english: "Adjust by 1 bpm",
+                                    norwegian: "Juster med 1 slag/min"
+                                ),
+                                value: manualMaximumHeartRateBinding,
                                 in: 100...240,
                                 step: 1
                             )
 
-                            Text(
-                                "If you know your tested or measured maximum heart rate, enter it here. ATHLTH will use this value instead of an estimated max when calculating heart-rate zones."
-                            )
+                            if let estimate = maximumHeartRateEstimate {
+                                VStack(alignment: .leading, spacing: 12) {
+                                    HStack {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Don't know your max?",
+                                                norwegian: "Vet du ikke makspulsen?"
+                                            ),
+                                            systemImage: "heart.text.square"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                        Spacer()
+                                        Text("\(estimate.beatsPerMinute) bpm")
+                                            .font(.headline.monospacedDigit())
+                                    }
+
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Calculated for age \(estimate.ageYears) based on your health profile. This is a population estimate, not a measurement.",
+                                        norwegian: "Beregnet for alder \(estimate.ageYears) år ut fra helseprofilen din. Dette er et befolkningsestimat, ikke en måling."
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                    .fixedSize(horizontal: false, vertical: true)
+
+                                    Text(estimate.usesFemaleEquation
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Formula for women: 206 − 0.88 × age.",
+                                            norwegian: "Formel for kvinner: 206 − 0,88 × alder."
+                                          )
+                                        : ATHLTHLocalization.choose(
+                                            english: "General adult formula: 208 − 0.7 × age.",
+                                            norwegian: "Generell voksenformel: 208 − 0,7 × alder."
+                                          ))
+                                        .font(.caption2)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+
+                                    Button {
+                                        maximumHeartRateBPM = estimate.beatsPerMinute
+                                        maximumHeartRateIsEstimated = true
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Use estimated max heart rate",
+                                                norwegian: "Bruk estimert makspuls"
+                                            ),
+                                            systemImage: "wand.and.stars"
+                                        )
+                                        .font(.subheadline.weight(.semibold))
+                                        .frame(maxWidth: .infinity, minHeight: 42)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(ATHLTHTheme.accentDeep)
+                                }
+                                .padding(14)
+                                .background(
+                                    ATHLTHTheme.accentSoft.opacity(0.65),
+                                    in: RoundedRectangle(cornerRadius: 16)
+                                )
+                            } else {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Add your date of birth to calculate an estimate (adults 18+).",
+                                        norwegian: "Legg inn fødselsdato for å beregne et estimat (18 år eller eldre)."
+                                    ),
+                                    systemImage: "info.circle"
+                                )
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                                .fixedSize(horizontal: false, vertical: true)
+                            }
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "A measured or tested maximum heart rate is more reliable. If you adjust the number manually, it is saved as a manually entered value. ATHLTH uses the saved value for heart-rate zones.",
+                                norwegian: "En målt eller testet makspuls er mer pålitelig. Endrer du tallet manuelt, lagres det som manuelt oppgitt. ATHLTH bruker den lagrede verdien til pulssonene."
+                            ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                            .fixedSize(
-                                horizontal: false,
-                                vertical: true
-                            )
+                            .fixedSize(horizontal: false, vertical: true)
                         }
                         .padding(.vertical, 8)
                     }
@@ -2392,6 +2489,25 @@ struct PersonalHealthProfileView: View {
             }
             .presentationDetents([.medium, .large])
         }
+    }
+
+    private var maximumHeartRateEstimate: ATHLTHMaximumHeartRateEstimator.Result? {
+        guard includeDateOfBirth else { return nil }
+        return ATHLTHMaximumHeartRateEstimator.estimate(
+            dateOfBirth: dateOfBirth,
+            healthSex: includeSex ? healthSex : nil
+        )
+    }
+
+    /// Any adjustment makes the value user-specified, not automatically estimated.
+    private var manualMaximumHeartRateBinding: Binding<Int> {
+        Binding(
+            get: { maximumHeartRateBPM },
+            set: {
+                maximumHeartRateBPM = $0
+                maximumHeartRateIsEstimated = false
+            }
+        )
     }
 
     private var sourceTitle: String {
@@ -2514,6 +2630,14 @@ struct PersonalHealthProfileView: View {
     }
 
     private func persistManualDetails() {
+        // If the user chose a population estimate, refresh it when their
+        // birth date or health-sex preference changes. Never change manual HRmax.
+        if includeMaximumHeartRate,
+           maximumHeartRateIsEstimated,
+           let estimate = maximumHeartRateEstimate {
+            maximumHeartRateBPM = estimate.beatsPerMinute
+        }
+
         let manualDetails = HealthProfileBasics(
             dateOfBirth: includeDateOfBirth ? dateOfBirth : nil,
             healthSex: includeSex ? healthSex : nil,
@@ -2522,6 +2646,10 @@ struct PersonalHealthProfileView: View {
             maximumHeartRateBPM:
                 includeMaximumHeartRate
                     ? maximumHeartRateBPM
+                    : nil,
+            maximumHeartRateIsEstimated:
+                includeMaximumHeartRate
+                    ? maximumHeartRateIsEstimated
                     : nil
         )
 
@@ -2575,6 +2703,7 @@ struct PersonalHealthProfileView: View {
             includeHeight = false
         case .maximumHeartRate:
             includeMaximumHeartRate = false
+            maximumHeartRateIsEstimated = false
         }
 
         persistManualDetails()
@@ -2615,8 +2744,11 @@ struct PersonalHealthProfileView: View {
         if let value = profile.maximumHeartRateBPM {
             includeMaximumHeartRate = true
             maximumHeartRateBPM = value
+            maximumHeartRateIsEstimated =
+                profile.maximumHeartRateIsEstimated == true
         } else {
             includeMaximumHeartRate = false
+            maximumHeartRateIsEstimated = false
         }
     }
 }
