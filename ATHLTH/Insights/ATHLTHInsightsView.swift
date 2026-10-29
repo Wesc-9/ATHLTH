@@ -19,10 +19,8 @@ struct ATHLTHInsightsView: View {
     @State private var trendSnapshot: HealthProgressSnapshot?
     @State private var isLoadingTrend = false
     @State private var trendError: String?
-    @State private var scenarioSessionsPerWeek = 4
-    @State private var scenarioMinutesPerSession = 45
-    @State private var scenarioFocus: InsightsScenarioFocus = .consistency
     @State private var showingScenarioCoach = false
+    @State private var scenarioCoachPrompt = ""
     // Compute history aggregates only when the Health workout snapshot changes,
     // not every time SwiftUI recreates cards while the user scrolls.
     @State private var sessionBaselines = InsightsSessionBaselines.empty
@@ -641,93 +639,16 @@ struct ATHLTHInsightsView: View {
     }
 
     private var whatIfCard: some View {
-        insightsPaper {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(ATHLTHLocalization.choose(english: "What if?", norwegian: "Hva om?"))
-                        .font(.title3.weight(.bold))
-
-                    Text(ATHLTHLocalization.choose(english: "Model a training week before you commit to it.", norwegian: "Se hvordan en treningsuke kan påvirke belastningen før du bestemmer deg."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Image(systemName: "slider.horizontal.3")
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-            }
-
-            Picker("Scenario focus", selection: $scenarioFocus) {
-                ForEach(InsightsScenarioFocus.allCases) { focus in
-                    Text(focus.title).tag(focus)
-                }
-            }
-            .pickerStyle(.segmented)
-            .padding(.top, 12)
-
-            Stepper(
-                value: $scenarioSessionsPerWeek,
-                in: 2...7
-            ) {
-                HStack {
-                    Text(ATHLTHLocalization.choose(english: "Sessions per week", norwegian: "Økter per uke"))
-                        .font(.subheadline.weight(.semibold))
-
-                    Spacer()
-
-                    Text("\(scenarioSessionsPerWeek)")
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                }
-            }
-            .padding(.top, 12)
-
-            HStack(spacing: 10) {
-                simulatorMetric(
-                    title: ATHLTHLocalization.choose(english: "Baseline", norwegian: "Utgangspunkt"),
-                    value: "\(Int(baselineSessionMinutes.rounded())) min",
-                    subtitle: ATHLTHLocalization.choose(english: "avg. session", norwegian: "gj.sn. økt")
-                )
-
-                simulatorMetric(
-                    title: ATHLTHLocalization.choose(english: "Scenario", norwegian: "Forslag"),
-                    value: "\(Int(projectedWeeklyMinutes.rounded())) min",
-                    subtitle: ATHLTHLocalization.choose(english: "per week", norwegian: "per uke")
-                )
-            }
-            .padding(.top, 10)
-
-            Text(scenarioExplanation)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-
-            Label(
-                "Scenario only — this is not a prediction of future fitness or medical outcome.",
-                systemImage: "info.circle"
-            )
-            .font(.caption2)
-            .foregroundStyle(.secondary)
-            .padding(.top, 8)
-
-            Button {
+        ATHLTHInsightsWhatIfView(
+            baselines: sessionBaselines,
+            onAskCoach: { prompt in
+                scenarioCoachPrompt = prompt
+                showingScenarioCoach = true
+            },
+            onOpenTrain: {
                 onSelectTab(1)
-            } label: {
-                HStack {
-                    Label("Build this in Train", systemImage: "wand.and.stars")
-                    Spacer()
-                    Image(systemName: "arrow.right")
-                }
-                .font(.caption.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(height: 40)
             }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accent)
-            .padding(.top, 12)
-        }
+        )
     }
 
     private func trendMetric(
@@ -775,157 +696,6 @@ struct ATHLTHInsightsView: View {
         )
     }
 
-    private func simulatorMetric(
-        title: String,
-        value: String,
-        subtitle: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 3) {
-            Text(title)
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
-
-            Text(value)
-                .font(.title3.weight(.bold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-
-            Text(subtitle)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            ATHLTHTheme.champagneSoft.opacity(0.55),
-            in: RoundedRectangle(
-                cornerRadius: 15,
-                style: .continuous
-            )
-        )
-    }
-
-    private var pulseTitle: String {
-        switch health.recovery.state {
-        case .ready:
-            return ATHLTHLocalization.choose(english: "STRONG", norwegian: "STERK")
-        case .balanced:
-            return ATHLTHLocalization.choose(english: "BALANCED", norwegian: "BALANSERT")
-        case .takeItEasy, .recover:
-            return ATHLTHLocalization.choose(english: "RECOVER", norwegian: "RESTITUSJON")
-        case .buildingBaseline:
-            return ATHLTHLocalization.choose(english: "LEARNING", norwegian: "KARTLEGGER")
-        }
-    }
-
-    private var pulseIcon: String {
-        switch health.recovery.state {
-        case .ready:
-            return "bolt.heart.fill"
-        case .balanced:
-            return "circle.hexagongrid.fill"
-        case .takeItEasy:
-            return "gauge.with.dots.needle.33percent"
-        case .recover:
-            return "bed.double.fill"
-        case .buildingBaseline:
-            return "waveform.path.ecg"
-        }
-    }
-
-    private var pulseDetail: String {
-        switch health.recovery.state {
-        case .ready:
-            return tr("Your recovery signals support a normal training day.",
-                      "Restitusjonssignalene støtter en normal treningsdag.")
-        case .balanced:
-            return tr("Your signals are steady. Adjust the plan to how you feel.",
-                      "Signalene er stabile. Tilpass planen til hvordan du føler deg.")
-        case .takeItEasy:
-            return tr("Some signals are below your recent baseline. Keep intensity flexible.",
-                      "Noen signaler ligger under normalen din. Tilpass intensiteten.")
-        case .recover:
-            return tr("Your recent signals suggest prioritizing a lighter day.",
-                      "De siste signalene tyder på at en roligere dag kan være lurt.")
-        case .buildingBaseline:
-            return tr("ATHLTH is establishing your personal baseline from recent health data.",
-                      "ATHLTH etablerer din personlige normal ut fra helsedata.")
-        }
-    }
-
-    private var sleepValue: String {
-        guard health.sleep.totalAsleep > 0 else { return "—" }
-        return formatDuration(health.sleep.totalAsleep)
-    }
-
-    private var hrvValue: String {
-        health.heart.hrvMilliseconds.map {
-            "\(Int($0.rounded())) ms"
-        } ?? "—"
-    }
-
-    private var restingHRValue: String {
-        health.heart.restingHeartRate.map {
-            "\(Int($0.rounded())) bpm"
-        } ?? "—"
-    }
-
-    private var whatChangedItems: [InsightsChangeItem] {
-        guard let snapshot = trendSnapshot else {
-            return []
-        }
-
-        var items: [InsightsChangeItem] = []
-
-        appendChange(
-            to: &items,
-            percent: snapshot.trainingDurationChangePercent,
-            threshold: 8,
-            noun: tr("Training time", "Treningstid"),
-            icon: "clock.arrow.circlepath",
-            tint: ATHLTHTheme.accent
-        )
-
-        appendChange(
-            to: &items,
-            percent: snapshot.workoutDistanceChangePercent,
-            threshold: 8,
-            noun: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
-            icon: "point.topleft.down.to.point.bottomright.curvepath",
-            tint: .blue
-        )
-
-        appendChange(
-            to: &items,
-            percent: snapshot.workoutChangePercent,
-            threshold: 10,
-            noun: tr("Workout frequency", "Øktfrekvens"),
-            icon: "calendar.badge.clock",
-            tint: ATHLTHTheme.vitality
-        )
-
-        appendChange(
-            to: &items,
-            percent: snapshot.sleepChangePercent,
-            threshold: 5,
-            noun: tr("Average sleep", "Gjennomsnittlig søvn"),
-            icon: "moon.stars.fill",
-            tint: .purple
-        )
-
-        appendChange(
-            to: &items,
-            percent: snapshot.stepsChangePercent,
-            threshold: 10,
-            noun: ATHLTHLocalization.choose(english: "Daily steps", norwegian: "Daglige steg"),
-            icon: "figure.walk",
-            tint: .orange
-        )
-
-        return items.sorted {
-            abs($0.percent) > abs($1.percent)
-        }
-    }
-
     private func appendChange(
         to items: inout [InsightsChangeItem],
         percent: Double?,
@@ -953,43 +723,6 @@ struct ATHLTHInsightsView: View {
                 percent: percent
             )
         )
-    }
-
-    private var baselineSessionMinutes: Double {
-        let cached = scenarioFocus == .consistency
-            ? sessionBaselines.allSessionMinutes
-            : sessionBaselines.runningSessionMinutes
-
-        if let cached {
-            return max(cached, 20)
-        }
-
-        if let snapshot = trendSnapshot,
-           snapshot.workoutCount > 0 {
-            return max(
-                (snapshot.trainingDuration / 60) /
-                    Double(snapshot.workoutCount),
-                20
-            )
-        }
-
-        return 45
-    }
-
-    private var projectedWeeklyMinutes: Double {
-        baselineSessionMinutes *
-            Double(scenarioSessionsPerWeek)
-    }
-
-    private var scenarioExplanation: String {
-        switch scenarioFocus {
-        case .consistency:
-            return "At your recent average session length, \(scenarioSessionsPerWeek) sessions would represent roughly \(Int(projectedWeeklyMinutes.rounded())) training minutes per week. Use this as a planning frame, not a target you must hit."
-        case .fiveK:
-            return "This uses your recent running-session duration as the baseline. A \(scenarioSessionsPerWeek)-run week could then be shaped in Train with a mix of easy work, quality and recovery rather than making every run hard."
-        case .halfMarathon:
-            return "For a half-marathon scenario, ATHLTH can use \(scenarioSessionsPerWeek) weekly runs as the planning structure and let Train build progression around your calendar and current history."
-        }
     }
 
     @MainActor
@@ -1125,25 +858,6 @@ struct InsightsSessionBaselines: Equatable {
             runningWeeklySessions: runningCount > 0
                 ? Double(runningCount) / 4 : nil
         )
-    }
-}
-
-private enum InsightsScenarioFocus: String, CaseIterable, Identifiable {
-    case consistency
-    case fiveK
-    case halfMarathon
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .consistency:
-            return "Consistency"
-        case .fiveK:
-            return "5K"
-        case .halfMarathon:
-            return "Half"
-        }
     }
 }
 
