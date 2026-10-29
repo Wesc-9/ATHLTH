@@ -12,6 +12,9 @@ struct RunRouteBuilderView: View {
     @StateObject private var endSearch = RunRouteLocationSearchModel()
     @StateObject private var viaSearch = RunRouteLocationSearchModel()
     var initialSearchCenter: CLLocationCoordinate2D? = nil
+    /// Called only after a route is saved to the owner's route collection.
+    /// Existing builder entry points may omit the callback.
+    var onRouteSaved: (() -> Void)? = nil
     @StateObject private var searchLocation = HomeLocationStore()
     @State private var searchMapCenter: CLLocationCoordinate2D?
 
@@ -1389,6 +1392,7 @@ struct RunRouteBuilderView: View {
         )
 
         session.addImportedRoute(route)
+        onRouteSaved?()
 
         Task {
             await routeDiscovery.publish(route)

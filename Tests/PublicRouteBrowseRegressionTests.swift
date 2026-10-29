@@ -2,6 +2,19 @@ import XCTest
 @testable import ATHLTH
 
 final class PublicRouteBrowseRegressionTests: XCTestCase {
+    func testRouteLibrarySeparatesPublicAndSavedCollections() {
+        XCTAssertEqual(
+            RouteLibraryCollection.allCases,
+            [.publicRoutes, .savedRoutes]
+        )
+        XCTAssertNotEqual(
+            RouteLibraryCollection.publicRoutes.id,
+            RouteLibraryCollection.savedRoutes.id
+        )
+        XCTAssertFalse(RouteLibraryCollection.publicRoutes.title.isEmpty)
+        XCTAssertFalse(RouteLibraryCollection.savedRoutes.title.isEmpty)
+    }
+
     func testPublicFiltersOnlyOfferAllFavoritesAndMutualFriends() {
         XCTAssertEqual(
             PublicRouteBrowseFilter.allCases,

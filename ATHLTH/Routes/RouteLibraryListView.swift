@@ -6,6 +6,33 @@ enum RouteLibrarySource {
     case database, mine
 }
 
+/// The library has two explicit data sources. Public discovery must never
+/// be treated as the user's private, locally saved route collection.
+enum RouteLibraryCollection: String, CaseIterable, Identifiable {
+    case publicRoutes
+    case savedRoutes
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .publicRoutes:
+            return ATHLTHLocalization.choose(
+                english: "Public routes", norwegian: "Offentlige")
+        case .savedRoutes:
+            return ATHLTHLocalization.choose(
+                english: "My saved routes", norwegian: "Mine lagrede")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .publicRoutes: return "globe.europe.africa"
+        case .savedRoutes: return "bookmark.fill"
+        }
+    }
+}
+
 // Shared visual language with My Routes, with public-only content in Routes.
 // Friends means mutually followed route owners, never friends-only visibility.
 enum PublicRouteBrowseFilter: String, CaseIterable, Identifiable {
@@ -96,6 +123,8 @@ struct RouteLibraryListView: View {
     @StateObject private var locationStore = HomeLocationStore()
     let source: RouteLibrarySource
 
+    @State private var selectedCollection: RouteLibraryCollection = .publicRoutes
+    @State private var didSaveRouteInBuilder = false
     @State private var catalog: [RouteLibraryEntry] = []
     @State private var query = ""
     @State private var sort: RouteLibrarySort = .nearest
@@ -209,8 +238,49 @@ struct RouteLibraryListView: View {
             // component and underlying saved-route store, not a duplicate UI.
             SavedRoutesView()
         } else {
-            databaseBrowseView
+            VStack(spacing: 0) {
+                routeCollectionPicker
+                if selectedCollection == .publicRoutes {
+                    databaseBrowseView
+                } else {
+                    // The same owned-route view already used in the rest of
+                    // ATHLTH. It includes private and public saved routes,
+                    // without uploading private routes to public discovery.
+                    SavedRoutesView()
+                }
+            }
+            .background(ATHLTHPlanDesign.warmCanvas.ignoresSafeArea())
         }
+    }
+
+    private var routeCollectionPicker: some View {
+        HStack(spacing: 8) {
+            ForEach(RouteLibraryCollection.allCases) { collection in
+                let isSelected = selectedCollection == collection
+                Button {
+                    selectedCollection = collection
+                } label: {
+                    Label(collection.title, systemImage: collection.symbol)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .foregroundStyle(isSelected ? .white : ATHLTHPlanDesign.ink)
+                        .background(
+                            isSelected ? ATHLTHTheme.accentDeep
+                                : ATHLTHPlanDesign.warmSurface,
+                            in: RoundedRectangle(cornerRadius: 15)
+                        )
+                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 3)
+        .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+        .frame(maxWidth: .infinity)
     }
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -387,7 +457,27 @@ struct RouteLibraryListView: View {
             }
             Spacer(minLength: 4)
             NavigationLink {
-                RunRouteBuilderView()
+                RunRouteBuilderView(onRouteSaved: {
+                    didSaveRouteInBuilder = true
+                })
+                .onDisappear {
+                    guard didSaveRouteInBuilder else { return }
+                    didSaveRouteInBuilder = false
+                    // A newly saved private route will never appear in
+                    // public search. Reveal it in the owned-route library.
+                    // Reset any persistent restrictive filters once so the
+                    // new route is actually visible, newest first.
+                    UserDefaults.standard.set(
+                        "all", forKey: "athlth.routes.picker.visibility.v1"
+                    )
+                    UserDefaults.standard.set(
+                        0, forKey: "athlth.routes.picker.length.v1"
+                    )
+                    UserDefaults.standard.set(
+                        "newest", forKey: "athlth.routes.picker.sort.v1"
+                    )
+                    selectedCollection = .savedRoutes
+                }
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 19, weight: .medium))
