@@ -713,6 +713,7 @@ struct PlanWorkoutPickerView: View {
 }
 
 struct WorkoutTemplateLibraryView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
@@ -739,6 +740,7 @@ struct WorkoutTemplateLibraryView: View {
         ATHLTHWorkoutDiscoveryFilter.Duration = .any
     @State private var selectedDiscoverySort: DiscoverySort = .recommended
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var libraryViewWidth: CGFloat = 390
 
     private enum DiscoverySort: String, CaseIterable, Identifiable {
         case recommended, shortest, longest
@@ -1652,6 +1654,9 @@ struct WorkoutTemplateLibraryView: View {
             loadHistory()
             displayMode = .load(userID: session.profile.userID)
         }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            libraryViewWidth = width
+        }
         .onChange(of: session.profile.userID) { _, userID in
             displayMode = .load(userID: userID)
         }
@@ -1891,9 +1896,12 @@ struct WorkoutTemplateLibraryView: View {
     }
 
     private var libraryColumns: [GridItem] {
-        displayMode == .grid
-            ? [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
-            : [GridItem(.flexible())]
+        ATHLTHLibraryGridColumns.make(
+            mode: displayMode,
+            width: libraryViewWidth,
+            reservedHorizontalSpace: 36,
+            accessibilityText: dynamicTypeSize.isAccessibilitySize
+        )
     }
 
     @ViewBuilder
@@ -1943,7 +1951,7 @@ struct WorkoutTemplateLibraryView: View {
             Spacer(minLength: 0)
         }
         .padding(13)
-        .frame(maxWidth: .infinity, minHeight: 145, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 164, alignment: .topLeading)
         .background(.white, in: RoundedRectangle(cornerRadius: 18))
     }
 
@@ -2725,6 +2733,7 @@ extension WorkoutTemplateCatalogEntry {
 
 
 struct MyWorkoutTemplatesView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
@@ -2745,11 +2754,15 @@ struct MyWorkoutTemplatesView: View {
     @State private var showingRunningBuilder = false
     @State private var showingHybridBuilder = false
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var libraryViewWidth: CGFloat = 390
 
     private var libraryColumns: [GridItem] {
-        displayMode == .grid
-            ? [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
-            : [GridItem(.flexible())]
+        ATHLTHLibraryGridColumns.make(
+            mode: displayMode,
+            width: libraryViewWidth,
+            reservedHorizontalSpace: 36,
+            accessibilityText: dynamicTypeSize.isAccessibilitySize
+        )
     }
 
     var body: some View {
@@ -2924,6 +2937,9 @@ struct MyWorkoutTemplatesView: View {
         .onAppear {
             refreshHistory()
             displayMode = .load(userID: session.profile.userID)
+        }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            libraryViewWidth = width
         }
         .onChange(of: session.profile.userID) { _, id in
             displayMode = .load(userID: id)
