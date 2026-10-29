@@ -921,10 +921,13 @@ final class MirroredWorkoutAudioCoach:
     /// Bluetooth handoff. A bounded watchdog always releases our own lease.
     private func watchLocalSpeech(_ utterance: AVSpeechUtterance) {
         localSpeechWatchdog?.cancel()
-        let seconds = max(60, min(150, Double(utterance.speechString.count) / 3 + 20))
+        // Release ducking promptly if AVSpeechSynthesizer drops its finish
+        // callback during an AirPods/Bluetooth route change. The previous
+        // 60-second minimum left music quiet long after a short cue ended.
+        let seconds = max(12, min(48, Double(utterance.speechString.count) / 8 + 10))
         localSpeechWatchdog = Task { @MainActor [weak self] in
-            for _ in 0..<Int(ceil(seconds / 2)) {
-                do { try await Task.sleep(for: .seconds(2)) }
+            for _ in 0..<Int(ceil(seconds)) {
+                do { try await Task.sleep(for: .seconds(1)) }
                 catch { return }
                 guard !Task.isCancelled, let self else { return }
                 if !self.synthesizer.isSpeaking && !self.azureCoachSpeech.isBusy {
