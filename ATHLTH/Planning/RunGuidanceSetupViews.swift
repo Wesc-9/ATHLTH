@@ -94,6 +94,7 @@ struct RouteGuardianDraft {
 struct GhostQuickStartDraft {
     var enabled = false
     var targetTimeText = ""
+    var targetPaceText = ""
     var updatesEnabled = true
     private var loadedRouteID: UUID?
 
@@ -111,6 +112,7 @@ struct GhostQuickStartDraft {
         guard let route else {
             loadedRouteID = nil
             targetTimeText = ""
+            targetPaceText = ""
             enabled = false
             return
         }
@@ -133,6 +135,10 @@ struct GhostQuickStartDraft {
         targetTimeText =
             GhostTargetTimeFormatter
                 .string(seconds)
+        targetPaceText = ATHLTHGhostPaceTimeConversion.paceText(
+            duration: seconds,
+            distanceKilometers: route.distanceKilometers
+        ) ?? ""
     }
 
     @MainActor
@@ -159,6 +165,10 @@ struct GhostQuickStartDraft {
                     .string(
                         targetDuration
                     )
+            targetPaceText = ATHLTHGhostPaceTimeConversion.paceText(
+                duration: targetDuration,
+                distanceKilometers: route?.distanceKilometers
+            ) ?? ""
         }
 
         if let updates {
@@ -167,14 +177,40 @@ struct GhostQuickStartDraft {
         }
     }
 
-    var targetDuration:
-        TimeInterval? {
-        guard enabled else {
-            return nil
-        }
+    /// Editing either field recalculates the other immediately. Keep raw
+    /// text in the active field so typing "5:30" doesn't jump the cursor.
+    mutating func setTargetTimeText(
+        _ value: String,
+        distanceKilometers: Double?
+    ) {
+        targetTimeText = value
+        targetPaceText = ATHLTHGhostPaceTimeConversion.paceText(
+            duration: GhostTargetTimeFormatter.parse(value),
+            distanceKilometers: distanceKilometers
+        ) ?? ""
+    }
 
-        return GhostTargetTimeFormatter
-            .parse(targetTimeText)
+    mutating func setTargetPaceText(
+        _ value: String,
+        distanceKilometers: Double?
+    ) {
+        targetPaceText = value
+        guard let duration = ATHLTHGhostPaceTimeConversion.targetDuration(
+            paceText: value,
+            distanceKilometers: distanceKilometers
+        ) else {
+            // Never silently launch with the old time after an invalid pace.
+            targetTimeText = ""
+            return
+        }
+        targetTimeText = GhostTargetTimeFormatter.string(duration)
+    }
+
+    var targetDuration: TimeInterval? {
+        guard enabled,
+              let duration = GhostTargetTimeFormatter.parse(targetTimeText),
+              duration > 0 else { return nil }
+        return duration
     }
 }
 
@@ -654,6 +690,30 @@ struct PerWorkoutGhostView: View {
     @Binding var draft: GhostQuickStartDraft
     let route: TrainingRoute?
 
+    private var targetTimeBinding: Binding<String> {
+        Binding(
+            get: { draft.targetTimeText },
+            set: { value in
+                draft.setTargetTimeText(
+                    value,
+                    distanceKilometers: route?.distanceKilometers
+                )
+            }
+        )
+    }
+
+    private var targetPaceBinding: Binding<String> {
+        Binding(
+            get: { draft.targetPaceText },
+            set: { value in
+                draft.setTargetPaceText(
+                    value,
+                    distanceKilometers: route?.distanceKilometers
+                )
+            }
+        )
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
@@ -698,7 +758,7 @@ struct PerWorkoutGhostView: View {
                                 .font(.caption2.weight(.bold))
                                 .tracking(1.2)
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                TextField("45:00", text: $draft.targetTimeText)
+                                TextField("1:00:00", text: targetTimeBinding)
                                     .keyboardType(.numbersAndPunctuation)
                                     .font(.system(size: 27, weight: .semibold,
                                                   design: .rounded))
@@ -706,6 +766,10 @@ struct PerWorkoutGhostView: View {
                                     .monospacedDigit()
                                     .textInputAutocapitalization(.never)
                                     .autocorrectionDisabled()
+                                    .accessibilityLabel(ATHLTHLocalization.choose(
+                                        english: "Target finish time",
+                                        norwegian: "Måltid"
+                                    ))
                             }
                             Spacer()
                             Image(systemName: "stopwatch")
@@ -713,20 +777,58 @@ struct PerWorkoutGhostView: View {
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         }
 
-                        if let route, let duration = draft.targetDuration {
+                        if let route {
                             Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                            HStack {
-                                Label(ATHLTHLocalization.choose(
-                                    english: "Target pace", norwegian: "Måltempo"
-                                ), systemImage: "speedometer")
-                                .font(.subheadline)
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "TARGET PACE",
+                                        norwegian: "MÅLTEMPO"
+                                    ))
+                                    .font(.caption2.weight(.bold))
+                                    .tracking(1.2)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                        TextField("5:30", text: targetPaceBinding)
+                                            .keyboardType(.numbersAndPunctuation)
+                                            .font(.system(size: 24, weight: .semibold,
+                                                          design: .rounded))
+                                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                                            .monospacedDigit()
+                                            .textInputAutocapitalization(.never)
+                                            .autocorrectionDisabled()
+                                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                                english: "Target pace in minutes and seconds per kilometer",
+                                                norwegian: "Måltempo i minutter og sekunder per kilometer"
+                                            ))
+                                        Text("/km")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    }
+                                }
                                 Spacer()
-                                Text(GhostTargetTimeFormatter.paceText(
-                                    distanceKilometers: route.distanceKilometers,
-                                    duration: duration
+                                Image(systemName: "speedometer")
+                                    .font(.system(size: 22, weight: .medium))
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            }
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Change either value — the other updates automatically. Calculated for the selected route of",
+                                norwegian: "Endre tid eller tempo – det andre oppdateres automatisk. Beregnet for valgt rute på"
+                            ) + " " + route.distanceKilometers.formatted(
+                                .number.precision(.fractionLength(0...2))
+                            ) + " km.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                            if draft.targetDuration == nil {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Enter a valid time or pace to enable Target Ghost.",
+                                    norwegian: "Skriv inn en gyldig tid eller et tempo for å bruke Mål-Ghost."
                                 ))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                                .accessibilityAddTraits(.updatesFrequently)
                             }
                         }
                     }
