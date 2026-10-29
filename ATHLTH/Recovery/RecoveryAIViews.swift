@@ -701,6 +701,9 @@ struct RecoverySuggestedTodayCard: View {
 
 struct RecoveryCoachInboxDestinationView:
     View {
+    var initialQuestion: String? = nil
+    var submitInitialQuestion = false
+
     @EnvironmentObject private var health:
         HealthKitManager
     @EnvironmentObject private var session:
@@ -744,7 +747,11 @@ struct RecoveryCoachInboxDestinationView:
                         insight ??
                         fallbackInsight,
                     showsDoneButton:
-                        false
+                        false,
+                    initialQuestion:
+                        initialQuestion,
+                    submitInitialQuestion:
+                        submitInitialQuestion
                 )
             }
         }
@@ -1006,7 +1013,11 @@ struct RecoveryCoachView: View {
     let context: RecoveryAIContext
     let insight: RecoveryAIInsight
     var showsDoneButton: Bool = true
+    var initialQuestion: String? = nil
+    var submitInitialQuestion = false
 
+    @State private var didHandleIncomingQuestion = false
+    @State private var incomingQuestionAwaitingConsent: String?
     @State private var question = ""
     @State private var messages:
         [RecoveryCoachMessage] = []
@@ -1269,7 +1280,9 @@ struct RecoveryCoachView: View {
                     .isPinned(
                         userID: session.profile.userID
                     )
+            loadConversationIfNeeded()
             loadCoachConsent()
+            receiveIncomingQuestionIfNeeded()
         }
         .sheet(isPresented: $showingCoachWorkoutBuilder) {
             if let proposal = selectedCoachProposal,
@@ -1379,7 +1392,16 @@ struct RecoveryCoachView: View {
                 "Dette legger til en separat planlagt økt. Aktiv plan endres ikke, og økten lagres ikke automatisk i Mine økter."
             ))
         }
-        .sheet(isPresented: $showingCoachConsentSheet) {
+        .sheet(
+            isPresented: $showingCoachConsentSheet,
+            onDismiss: {
+                guard aiConsentApproved,
+                      let pending = incomingQuestionAwaitingConsent
+                else { return }
+                incomingQuestionAwaitingConsent = nil
+                requestAnswer(pending)
+            }
+        ) {
             coachConsentSheet
         }
         .alert(
@@ -1611,6 +1633,30 @@ struct RecoveryCoachView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .interactiveDismissDisabled(!aiConsentApproved)
+    }
+
+    /// Messages from the Home composer are handled only after explicit Send.
+    /// Keep the question visible during the consent flow, and never send
+    /// anything merely because a grey placeholder or suggestion is displayed.
+    @MainActor
+    private func receiveIncomingQuestionIfNeeded() {
+        guard !didHandleIncomingQuestion,
+              let incoming = initialQuestion?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+              !incoming.isEmpty
+        else { return }
+
+        didHandleIncomingQuestion = true
+        question = incoming
+        guard submitInitialQuestion else { return }
+
+        if aiConsentApproved {
+            requestAnswer(incoming)
+        } else {
+            // After consenting, the sheet's onDismiss runs the same message
+            // through the existing privacy and workout-review gates.
+            incomingQuestionAwaitingConsent = incoming
+        }
     }
 
     @MainActor
