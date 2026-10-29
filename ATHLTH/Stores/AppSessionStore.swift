@@ -508,6 +508,9 @@ final class AppSessionStore: ObservableObject {
                 heightCentimeters: basics.heightCentimeters,
                 maximumHeartRateBPM: basics.maximumHeartRateBPM,
                 maximumHeartRateIsEstimated: basics.maximumHeartRateIsEstimated,
+                maximumHeartRateUsesWorkoutPeak: basics.maximumHeartRateUsesWorkoutPeak,
+                maximumHeartRateWorkoutID: basics.maximumHeartRateWorkoutID,
+                maximumHeartRateWorkoutDate: basics.maximumHeartRateWorkoutDate,
                 personalDetailsSource: source,
                 trainingFocus: existing?.trainingFocus,
                 trainingFocusIDs: existing?.trainingFocusIDs,
@@ -518,6 +521,29 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+
+
+    /// Never downgrade a user-entered or age-estimated HRmax based on a
+    /// workout. An opted-in peak can only be raised by a validated new peak.
+    func adoptHigherWorkoutHeartRatePeak(
+        _ peak: ATHLTHWorkoutHeartRatePeak
+    ) {
+        guard var profile = onboardingProfile,
+              profile.maximumHeartRateUsesWorkoutPeak == true,
+              (100...240).contains(peak.beatsPerMinute),
+              peak.beatsPerMinute >= (profile.maximumHeartRateBPM ?? 0)
+        else { return }
+        let isNewSource = profile.maximumHeartRateWorkoutID != peak.workoutID
+        guard peak.beatsPerMinute > (profile.maximumHeartRateBPM ?? 0)
+                || (profile.maximumHeartRateWorkoutID == nil && isNewSource)
+        else { return }
+
+        profile.maximumHeartRateBPM = peak.beatsPerMinute
+        profile.maximumHeartRateIsEstimated = false
+        profile.maximumHeartRateWorkoutID = peak.workoutID
+        profile.maximumHeartRateWorkoutDate = peak.workoutDate
+        saveOnboardingProfile(profile)
+    }
 
     func mergePersonalDetailsFromAppleHealth(
         _ healthBasics: HealthProfileBasics
@@ -538,7 +564,19 @@ final class AppSessionStore: ObservableObject {
             maximumHeartRateIsEstimated:
                 existing?.maximumHeartRateBPM != nil
                     ? existing?.maximumHeartRateIsEstimated
-                    : healthBasics.maximumHeartRateIsEstimated
+                    : healthBasics.maximumHeartRateIsEstimated,
+            maximumHeartRateUsesWorkoutPeak:
+                existing?.maximumHeartRateBPM != nil
+                    ? existing?.maximumHeartRateUsesWorkoutPeak
+                    : healthBasics.maximumHeartRateUsesWorkoutPeak,
+            maximumHeartRateWorkoutID:
+                existing?.maximumHeartRateBPM != nil
+                    ? existing?.maximumHeartRateWorkoutID
+                    : healthBasics.maximumHeartRateWorkoutID,
+            maximumHeartRateWorkoutDate:
+                existing?.maximumHeartRateBPM != nil
+                    ? existing?.maximumHeartRateWorkoutDate
+                    : healthBasics.maximumHeartRateWorkoutDate
         )
 
         let usesManualFallback =
