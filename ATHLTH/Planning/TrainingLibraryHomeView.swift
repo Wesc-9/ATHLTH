@@ -16,6 +16,8 @@ struct TrainingLibraryHomeView: View {
     var onOpenPlan: ((UUID) -> Void)? = nil
     @State private var showingRecoveryRestPlanner = false
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var libraryViewWidth: CGFloat = 390
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let ink = ATHLTHPlanDesign.ink
     private let muted = ATHLTHPlanDesign.secondaryInk
@@ -25,6 +27,18 @@ struct TrainingLibraryHomeView: View {
     private let lavender = ATHLTHTheme.recoveryBlue
 
     private var layout: [GridItem] {
+        ATHLTHLibraryGridColumns.make(
+            mode: displayMode,
+            width: libraryViewWidth,
+            reservedHorizontalSpace: 0,
+            spacing: 11,
+            accessibilityText: dynamicTypeSize.isAccessibilitySize
+        )
+    }
+
+    // Keep the image-led discovery cards large enough for legible titles:
+    // unlike saved content, four top-level categories look better as 2 × 2.
+    private var categoryLayout: [GridItem] {
         displayMode == .grid
             ? [GridItem(.flexible(), spacing: 11), GridItem(.flexible(), spacing: 11)]
             : [GridItem(.flexible())]
@@ -57,6 +71,9 @@ struct TrainingLibraryHomeView: View {
         }
         .frame(maxWidth: 720, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .center)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            libraryViewWidth = width
+        }
         .buttonStyle(.plain)
         .task {
             await favorites.refresh()
@@ -124,7 +141,7 @@ struct TrainingLibraryHomeView: View {
                            "Ferdig innhold og øvelser for alle nivåer.")
             )
 
-            LazyVGrid(columns: layout, spacing: 11) {
+            LazyVGrid(columns: categoryLayout, spacing: 11) {
                 NavigationLink {
                     TrainingPlanLibraryView()
                 } label: {
@@ -1593,6 +1610,7 @@ struct TrainingPlanLibrarySheet: View {
 }
 
 struct TrainingPlanLibraryView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -1608,6 +1626,7 @@ struct TrainingPlanLibraryView: View {
     @State private var sessionsPerWeekFilter: Int?
     @State private var weeklySortAscending: Bool?
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var libraryViewWidth: CGFloat = 390
     @FocusState private var searchFocused: Bool
 
     private let ink = ATHLTHTrainDesign.ink
@@ -1796,10 +1815,12 @@ struct TrainingPlanLibraryView: View {
                         .frame(maxWidth: .infinity)
                     } else {
                         LazyVGrid(
-                            columns: displayMode == .grid
-                                ? [GridItem(.flexible(), spacing: 10),
-                                   GridItem(.flexible(), spacing: 10)]
-                                : [GridItem(.flexible())],
+                            columns: ATHLTHLibraryGridColumns.make(
+                                mode: displayMode,
+                                width: libraryViewWidth,
+                                reservedHorizontalSpace: 36,
+                                accessibilityText: dynamicTypeSize.isAccessibilitySize
+                            ),
                             spacing: 10
                         ) {
                             ForEach(listedEntries) { entry in
@@ -1826,6 +1847,9 @@ struct TrainingPlanLibraryView: View {
             ? tr("Favorite plans", "Favorittplaner")
             : tr("Plans", "Planer"))
         .navigationBarTitleDisplayMode(.inline)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            libraryViewWidth = width
+        }
         .onAppear {
             displayMode = .load(userID: session.profile.userID)
         }
@@ -2228,7 +2252,7 @@ struct TrainingPlanLibraryView: View {
                     Image(categoryArtwork(entry))
                         .resizable()
                         .scaledToFill()
-                        .frame(height: 91)
+                        .frame(height: 72)
                         .frame(maxWidth: .infinity)
                         .clipped()
                         .clipShape(RoundedRectangle(cornerRadius: 13))
