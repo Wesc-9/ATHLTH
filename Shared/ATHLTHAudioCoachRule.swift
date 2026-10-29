@@ -89,6 +89,72 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     }
 }
 
+/// Evaluates each user's distance/time rule independently. The slot journal
+/// prevents repeats when workout snapshots arrive more than once per second.
+enum ATHLTHAudioCoachRuleDelivery {
+    static func initialSlots(
+        rules: [ATHLTHAudioCoachRule],
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval
+    ) -> [UUID: Int] {
+        var result: [UUID: Int] = [:]
+        for rule in rules {
+            result[rule.id] = slot(
+                for: rule,
+                distanceMeters: distanceMeters,
+                elapsedSeconds: elapsedSeconds
+            )
+        }
+        return result
+    }
+
+    static func dueMessages(
+        rules: [ATHLTHAudioCoachRule],
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval,
+        paceSecondsPerKilometer: TimeInterval?,
+        heartRateBPM: Double?,
+        norwegian: Bool,
+        lastSlots: inout [UUID: Int]
+    ) -> [String] {
+        var messages: [String] = []
+        for rule in rules.prefix(20) {
+            let current = slot(
+                for: rule,
+                distanceMeters: distanceMeters,
+                elapsedSeconds: elapsedSeconds
+            )
+            let previous = lastSlots[rule.id] ?? 0
+            guard current > previous else { continue }
+            // Consume the crossed milestone even if a sensor value is missing.
+            // It must not be announced much later after that value recovers.
+            lastSlots[rule.id] = current
+            guard let message = rule.phrase(
+                distanceMeters: distanceMeters,
+                elapsedSeconds: elapsedSeconds,
+                paceSecondsPerKilometer: paceSecondsPerKilometer,
+                heartRateBPM: heartRateBPM,
+                norwegian: norwegian
+            ) else { continue }
+            messages.append(message)
+        }
+        return messages
+    }
+
+    private static func slot(
+        for rule: ATHLTHAudioCoachRule,
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval
+    ) -> Int {
+        let value = rule.trigger == .distance ? distanceMeters : elapsedSeconds
+        guard value.isFinite, value >= 0 else { return 0 }
+        return Int(min(
+            floor(value / Double(rule.validatedInterval)),
+            Double(Int.max / 2)
+        ))
+    }
+}
+
 struct ATHLTHAudioCoachRuleSet: Codable, Hashable, Identifiable {
     var id: UUID = UUID()
     var title: String
