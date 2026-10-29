@@ -33,6 +33,12 @@ final class AppleCalendarSyncStore: ObservableObject {
         let currentUserID: UUID?
     }
 
+    private struct SyncSummary {
+        let workouts: Int
+        let tentative: Int
+        let total: Int
+    }
+
     private enum CalendarAttendanceState {
         case going
         case maybe
@@ -612,7 +618,7 @@ final class AppleCalendarSyncStore: ObservableObject {
     private func synchronize(
         snapshot: CalendarSyncSnapshot,
         calendar: EKCalendar
-    ) throws {
+    ) throws -> SyncSummary {
         let existingEvents =
             managedEvents(in: calendar)
 
@@ -635,220 +641,184 @@ final class AppleCalendarSyncStore: ObservableObject {
         }
 
         var activeKeys = Set<String>()
+        var syncedWorkouts = 0
+        var tentativeEvents = 0
 
-        if let plan = snapshot.plan,
-           let planStart = plan.startDate {
-            let calendarAPI = Calendar.current
-            let normalizedStart =
-                calendarAPI.startOfDay(
-                    for: planStart
-                )
-
-            for week in plan.weeks {
+        if let plan = snapshot.plan {
+            for (weekIndex, week) in plan.weeks.enumerated() {
                 for day in week.days {
-                    let dayOffset =
-                        max(
-                            week.weekNumber - 1,
-                            0
-                        ) * 7 +
-                        max(
-                            day.dayIndex - 1,
-                            0
-                        )
-
-                    guard let dayDate =
-                            calendarAPI.date(
-                                byAdding: .day,
-                                value: dayOffset,
-                                to: normalizedStart
-                            )
-                    else {
-                        continue
-                    }
-
                     for session in day.sessions {
-                        let key =
-                            managedKey(
-                                type: "session",
-                                id: session.id
-                            )
+                        // A moved workout may be on a different day from its
+                        // original plan slot. Explicit scheduledStart wins.
+                        guard plan.startDate != nil ||
+                                session.scheduledStart != nil,
+                              let dayDate = ATHLTHCalendarParticipationPolicy
+                                .scheduledDate(
+                                    session: session,
+                                    planStart: plan.startDate ?? plan.createdAt,
+                                    weekNumber: weekIndex + 1,
+                                    dayIndex: day.dayIndex
+                                )
+                        else { continue }
+
+                        let key = managedKey(type: "session", id: session.id)
                         activeKeys.insert(key)
-
-                        let event =
-                            existingByKey[key] ??
-                            EKEvent(
-                                eventStore:
-                                    eventStore
-                            )
-
+                        let event = existingByKey[key] ??
+                            EKEvent(eventStore: eventStore)
                         configure(
-                            event,
-                            session: session,
-                            plan: plan,
-                            dayDate: dayDate,
-                            calendar: calendar
+                            event, session: session,
+                            plan: plan, dayDate: dayDate, calendar: calendar
                         )
-
                         try eventStore.save(
-                            event,
-                            span: .thisEvent,
-                            commit: false
+                            event, span: .thisEvent, commit: false
                         )
+                        syncedWorkouts += 1
                     }
                 }
             }
         }
 
+        // One-off workouts are scheduled without an active training plan.
+        // They must be synced, edited and removed just like plan workouts.
+        for session in snapshot.standaloneSessions {
+            guard let start = session.scheduledStart else { continue }
+            let key = managedKey(type: "standalone-session", id: session.id)
+            activeKeys.insert(key)
+            let event = existingByKey[key] ??
+                EKEvent(eventStore: eventStore)
+            configure(
+                event, session: session,
+                plan: nil, dayDate: start, calendar: calendar
+            )
+            try eventStore.save(
+                event, span: .thisEvent, commit: false
+            )
+            syncedWorkouts += 1
+        }
+
         if let currentUserID = snapshot.currentUserID {
             let now = Date()
 
-            // Public Community events only enter Calendar after the user has
-            // explicitly selected Going or Maybe.
+            // A public event must belong to the athlete. An unanswered
+            // public discovery item is not an invitation.
             for item in snapshot.communityEvents {
                 let record = item.event
-                let attendance = item.participantRows.first {
+                let participant = item.participantRows.first {
                     $0.userID == currentUserID
-                }?.attendanceStatus
-                let effectiveEnd =
-                    record.endsAt ??
-                    record.startsAt.addingTimeInterval(3_600)
-
-                guard let attendance,
-                      record.status == "upcoming",
-                      effectiveEnd >= now
-                else {
-                    continue
                 }
-
-                let key = managedKey(
-                    type: "event",
-                    id: record.id
-                )
+                guard let decision = ATHLTHCalendarParticipationPolicy.community(
+                    eventStatus: record.status,
+                    endsAt: record.endsAt ??
+                        record.startsAt.addingTimeInterval(3_600),
+                    attendance: participant?.attendanceStatus,
+                    isCreator: record.creatorID == currentUserID,
+                    now: now
+                ) else { continue }
+                let key = managedKey(type: "event", id: record.id)
                 activeKeys.insert(key)
-
-                let event =
-                    existingByKey[key] ??
-                    EKEvent(eventStore: eventStore)
-
+                let event = existingByKey[key] ?? EKEvent(eventStore: eventStore)
                 configure(
-                    event,
-                    communityEvent: item,
-                    attendance:
-                        attendance == .maybe
-                            ? .maybe
-                            : .going,
+                    event, communityEvent: item,
+                    attendance: decision.isTentative ? .maybe : .going,
                     calendar: calendar
                 )
-
-                try eventStore.save(
-                    event,
-                    span: .thisEvent,
-                    commit: false
-                )
+                try eventStore.save(event, span: .thisEvent, commit: false)
+                if decision.isTentative { tentativeEvents += 1 }
             }
 
-            // Club membership makes an upcoming Club event relevant to the
-            // user. No RSVP is shown as "No response" until they answer.
+            // Members with no response are shown as tentative, not as
+            // confirmed attendees. A declined RSVP removes the old entry.
             for record in snapshot.groupEvents {
-                let effectiveEnd =
-                    record.endsAt ??
-                    record.startsAt.addingTimeInterval(3_600)
-
-                guard (
-                    record.status == "upcoming" ||
-                    record.status == "live"
-                ),
-                effectiveEnd >= now
-                else {
-                    continue
-                }
-
-                let rsvp = snapshot.groupEventRSVPs.first {
+                let response = snapshot.groupEventRSVPs.first {
                     $0.eventID == record.id &&
                     $0.userID == currentUserID
                 }?.status
-
-                guard rsvp != "not_going" else {
-                    continue
-                }
+                guard let decision = ATHLTHCalendarParticipationPolicy.club(
+                    eventStatus: record.status,
+                    endsAt: record.endsAt ??
+                        record.startsAt.addingTimeInterval(3_600),
+                    rsvp: response,
+                    now: now
+                ) else { continue }
 
                 let attendance: CalendarAttendanceState
-                switch rsvp {
-                case "going":
+                if !decision.isTentative {
                     attendance = .going
-                case "maybe":
-                    attendance = .maybe
-                case "waitlist":
-                    attendance = .waitlist
-                default:
-                    attendance = .unanswered
+                } else {
+                    switch response {
+                    case "maybe": attendance = .maybe
+                    case "waitlist": attendance = .waitlist
+                    default: attendance = .unanswered
+                    }
                 }
 
-                let key = managedKey(
-                    type: "group-event",
-                    id: record.id
-                )
+                let key = managedKey(type: "group-event", id: record.id)
                 activeKeys.insert(key)
-
-                let event =
-                    existingByKey[key] ??
-                    EKEvent(eventStore: eventStore)
-
+                let event = existingByKey[key] ?? EKEvent(eventStore: eventStore)
                 configure(
-                    event,
-                    groupEvent: record,
-                    attendance: attendance,
-                    calendar: calendar
+                    event, groupEvent: record,
+                    attendance: attendance, calendar: calendar
                 )
-
-                try eventStore.save(
-                    event,
-                    span: .thisEvent,
-                    commit: false
-                )
+                try eventStore.save(event, span: .thisEvent, commit: false)
+                if decision.isTentative { tentativeEvents += 1 }
             }
 
-            // Only challenges where this user was actually challenged are
-            // synced. An invitation remains visible as "No response" until
-            // accepted or declined.
             for challenge in snapshot.challenges {
-                guard let participant = challenge.participants.first(
-                    where: { $0.userID == currentUserID }
-                ),
-                participant.state == .invited ||
-                    participant.state == .accepted,
-                challenge.status == .invited ||
-                    challenge.status == .upcoming ||
-                    challenge.status == .active
-                else {
-                    continue
+                let participant = challenge.participants.first {
+                    $0.userID == currentUserID
+                }
+                guard let decision = ATHLTHCalendarParticipationPolicy.challenge(
+                    status: challenge.status,
+                    participantState: participant?.state,
+                    isCreator: challenge.creatorID == currentUserID
+                ) else { continue }
+                let attendance: CalendarAttendanceState =
+                    decision.isTentative ? .unanswered : .going
+
+                // An actual meetup has its own precise scheduled time and
+                // place, separate from the challenge competition window.
+                if let meetup = challenge.rules.meetup,
+                   meetup.scheduledAt.addingTimeInterval(3_600) >= now {
+                    let key = managedKey(
+                        type: "challenge-meetup", id: challenge.id
+                    )
+                    activeKeys.insert(key)
+                    let event = existingByKey[key] ??
+                        EKEvent(eventStore: eventStore)
+                    configure(
+                        event, challengeMeetup: challenge,
+                        attendance: attendance, calendar: calendar
+                    )
+                    try eventStore.save(
+                        event, span: .thisEvent, commit: false
+                    )
+                    if decision.isTentative { tentativeEvents += 1 }
                 }
 
-                let key = managedKey(
-                    type: "challenge",
-                    id: challenge.id
-                )
+                // Avoid two duplicate events if the workout and meetup
+                // have essentially the same starting time.
+                let overlapsMeetup = challenge.rules.meetup.map {
+                    abs($0.scheduledAt.timeIntervalSince(
+                        challenge.rules.startsAt
+                    )) < 1_800
+                } ?? false
+                guard !overlapsMeetup,
+                      ATHLTHCalendarParticipationPolicy.challengeEnd(
+                        start: challenge.rules.startsAt,
+                        explicitEnd: challenge.rules.endsAt
+                      ) >= now
+                else { continue }
+
+                let key = managedKey(type: "challenge", id: challenge.id)
                 activeKeys.insert(key)
-
-                let event =
-                    existingByKey[key] ??
+                let event = existingByKey[key] ??
                     EKEvent(eventStore: eventStore)
-
                 configure(
-                    event,
-                    challenge: challenge,
-                    attendance:
-                        participant.state == .invited
-                            ? .unanswered
-                            : .going,
-                    calendar: calendar
+                    event, challenge: challenge,
+                    attendance: attendance, calendar: calendar
                 )
-
-                try eventStore.save(
-                    event,
-                    span: .thisEvent,
-                    commit: false
-                )
+                try eventStore.save(event, span: .thisEvent, commit: false)
+                if decision.isTentative { tentativeEvents += 1 }
             }
         }
 
@@ -875,6 +845,22 @@ final class AppleCalendarSyncStore: ObservableObject {
         }
 
         try eventStore.commit()
+
+        // A successful EventKit commit is necessary but doesn't prove that
+        // the expected workouts and invitations were actually written.
+        // Re-read the ATHLTH calendar before reporting a successful sync.
+        let presentKeys = Set(
+            managedEvents(in: calendar).compactMap { managedKey(from: $0) }
+        )
+        let missingCount = activeKeys.subtracting(presentKeys).count
+        guard missingCount == 0 else {
+            throw AppleCalendarSyncError.verificationFailed(missingCount)
+        }
+        return SyncSummary(
+            workouts: syncedWorkouts,
+            tentative: tentativeEvents,
+            total: activeKeys.count
+        )
     }
 
     private func configure(
