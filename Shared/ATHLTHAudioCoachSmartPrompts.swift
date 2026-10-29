@@ -99,10 +99,11 @@ struct ATHLTHAudioCoachSmartState {
             if slot > lastMotivationSlot {
                 lastMotivationSlot = slot
                 let currentPace = validatedPace(paceSecondsPerKilometer)
-                defer { priorMinutePace = currentPace }
+                let previousPace = priorMinutePace
+                priorMinutePace = currentPace
                 if elapsed - lastSpokenAt >= 35 {
                     let context: String?
-                    if let currentPace, let previous = priorMinutePace {
+                    if let currentPace, let previous = previousPace {
                         let ratio = currentPace / previous
                         if ratio < 0.94 {
                             context = norwegian
