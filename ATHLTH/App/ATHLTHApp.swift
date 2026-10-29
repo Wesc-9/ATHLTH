@@ -1615,10 +1615,15 @@ struct AppRootView: View {
         }
         .onChange(of: communityGroups.eventRSVPsByGroup) { _, _ in
             guard appSession.signedIn else { return }
-
-            Task {
-                await syncCalendarIfAllowed()
-            }
+            Task { await syncCalendarIfAllowed() }
+        }
+        .onChange(of: communityGroups.calendarChallengeParticipations) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
+        .onChange(of: communityGroups.calendarClubChallenges) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
         }
         .onChange(of: goals.goals) { _, updatedGoals in
             notifications.syncGoalEvents(from: updatedGoals)
@@ -2101,10 +2106,13 @@ struct AppRootView: View {
             communityEvents.refresh()
         async let groupCalendarRefresh: Void =
             communityGroups.refreshCalendarContent()
+        async let clubChallengeRefresh: Void =
+            communityGroups.refreshCalendarChallenges()
 
         _ = await (
             eventRefresh,
-            groupCalendarRefresh
+            groupCalendarRefresh,
+            clubChallengeRefresh
         )
 
         await calendarSync.syncIfEnabled(
@@ -2118,6 +2126,9 @@ struct AppRootView: View {
             groupEvents: communityGroups.calendarEvents,
             groupEventRSVPs:
                 communityGroups.calendarEventRSVPs,
+            clubChallenges: communityGroups.calendarClubChallenges,
+            clubChallengeParticipations:
+                communityGroups.calendarChallengeParticipations,
             challenges: challengeStore.challenges,
             currentUserID:
                 appSession.profile.userID
