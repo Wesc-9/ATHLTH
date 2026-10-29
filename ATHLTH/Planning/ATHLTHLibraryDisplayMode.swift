@@ -68,3 +68,25 @@ struct ATHLTHLibraryDisplayPicker: View {
         .accessibilityElement(children: .contain)
     }
 }
+
+
+/// Caps the library at three cards across. A small phone or enlarged text
+/// automatically falls back to fewer columns rather than squeezing titles.
+enum ATHLTHLibraryGridColumns {
+    static func make(
+        mode: ATHLTHLibraryDisplayMode,
+        width: CGFloat,
+        reservedHorizontalSpace: CGFloat = 0,
+        spacing: CGFloat = 10,
+        accessibilityText: Bool = false
+    ) -> [GridItem] {
+        guard mode == .grid else { return [GridItem(.flexible())] }
+        let usable = max(0, width - reservedHorizontalSpace)
+        let minimumCardWidth: CGFloat = accessibilityText ? 160 : 104
+        let threeFit = usable >= 3 * minimumCardWidth + 2 * spacing
+        let twoFit = usable >= 2 * minimumCardWidth + spacing
+        let count = accessibilityText ? (twoFit ? 2 : 1) :
+            (threeFit ? 3 : (twoFit ? 2 : 1))
+        return (0..<count).map { _ in GridItem(.flexible(), spacing: spacing) }
+    }
+}
