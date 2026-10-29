@@ -44,9 +44,9 @@ final class ATHLTHPlannedWorkoutTypePickerTests: XCTestCase {
             defaults: defaults
         )
         XCTAssertEqual(
-            ATHLTHPlannedWorkoutTypeUsageStore.ordered(
+            Array(ATHLTHPlannedWorkoutTypeUsageStore.ordered(
                 userID: user, defaults: defaults
-            ).prefix(2),
+            ).prefix(2)),
             [.strength, .running]
         )
         ATHLTHPlannedWorkoutTypeUsageStore.record(
