@@ -116,82 +116,18 @@ struct ExerciseLibraryView: View {
         }
     }
 
-    private static let exerciseAlphabet:
-        [String] = [
-            "A", "B", "C", "D", "E", "F",
-            "G", "H", "I", "J", "K", "L",
-            "M", "N", "O", "P", "Q", "R",
-            "S", "T", "U", "V", "W", "X",
-            "Y", "Z", "Æ", "Ø", "Å"
-        ]
-
-    private var displayedResults:
-        [ExerciseLibraryEntry] {
+    // Search now returns an alphabetized cached result. Avoid repeating
+    // an expensive localized name sort on every SwiftUI state publication.
+    private var displayedResults: [ExerciseLibraryEntry] {
         if scannerResultsActive {
             guard let scannerAnalysis else { return [] }
-            // Same native cards and Add buttons; only real validated exercise
-            // IDs selected by the equipment scanner remain in the list.
-            let regularResults = Set(results.map(\.id))
-            return scannerAnalysis
-                .matchedExercises(in: scannerCandidates)
-                .filter { regularResults.contains($0.id) }
+            let regularIDs = Set(results.map(\.id))
+            return library.alphabetized(
+                scannerAnalysis.matchedExercises(in: scannerCandidates)
+                    .filter { regularIDs.contains($0.id) }
+            )
         }
-
-        // The same A–Å ordering and right-hand alphabet index are used
-        // whether opened from the training plan, Quick Train or live Strength.
-        // Keep the scanner's ranked matching separate from ordinary search.
-        return results.sorted {
-            library.localizedExerciseName($0).localizedStandardCompare(
-                library.localizedExerciseName($1)
-            ) == .orderedAscending
-        }
-    }
-
-    private func firstExerciseIDByLetter(
-        in entries: [ExerciseLibraryEntry]
-    ) -> [String: UUID] {
-        var firstIDs: [String: UUID] = [:]
-
-        for entry in entries {
-            let letter =
-                exerciseIndexLetter(
-                    for: library.localizedExerciseName(entry)
-                )
-
-            if firstIDs[letter] == nil {
-                firstIDs[letter] = entry.id
-            }
-        }
-
-        return firstIDs
-    }
-
-    private func exerciseIndexLetter(
-        for name: String
-    ) -> String {
-        guard let first =
-                name
-                    .trimmingCharacters(
-                        in: .whitespacesAndNewlines
-                    )
-                    .first
-        else {
-            return "#"
-        }
-
-        let letter =
-            String(first)
-                .uppercased(
-                    with:
-                        Locale(
-                            identifier: "nb_NO"
-                        )
-                )
-
-        return Self.exerciseAlphabet
-            .contains(letter)
-            ? letter
-            : "#"
+        return results
     }
 
     private var selectedSectionIndex:
@@ -542,11 +478,17 @@ struct ExerciseLibraryView: View {
                     .overlay(
                         alignment: .trailing
                     ) {
-                        if !scannerResultsActive &&
-                           entries.count > 8 {
-                            exerciseAlphabetIndex(
-                                proxy: proxy,
-                                entries: entries
+                        if !entries.isEmpty {
+                            ATHLTHExerciseAlphabetIndex(
+                                targets: ATHLTHExerciseAlphabet.firstIDs(
+                                    for: entries,
+                                    name: library.localizedExerciseName
+                                ),
+                                onJump: { id in
+                                    withAnimation(.easeOut(duration: 0.18)) {
+                                        proxy.scrollTo(id, anchor: .top)
+                                    }
+                                }
                             )
                             .padding(.trailing, 4)
                         }
@@ -891,102 +833,6 @@ struct ExerciseLibraryView: View {
             .buttonStyle(.plain)
             .padding(.horizontal, 17)
         }
-    }
-
-    private func exerciseAlphabetIndex(
-        proxy: ScrollViewProxy,
-        entries: [ExerciseLibraryEntry]
-    ) -> some View {
-        let targets = firstExerciseIDByLetter(in: entries)
-
-        return VStack(spacing: 0) {
-            ForEach(
-                Self.exerciseAlphabet,
-                id: \.self
-            ) { letter in
-                let targetID =
-                    targets[letter]
-
-                Button {
-                    guard let targetID else {
-                        return
-                    }
-
-                    withAnimation(
-                        .easeOut(
-                            duration: 0.18
-                        )
-                    ) {
-                        proxy.scrollTo(
-                            targetID,
-                            anchor: .top
-                        )
-                    }
-                } label: {
-                    Text(letter)
-                        .font(
-                            .system(
-                                size: 8.5,
-                                weight:
-                                    targetID == nil
-                                        ? .medium
-                                        : .bold,
-                                design: .rounded
-                            )
-                        )
-                        .foregroundStyle(
-                            targetID == nil
-                                ? ATHLTHTheme
-                                    .mutedText
-                                    .opacity(0.24)
-                                : ATHLTHTheme
-                                    .accentDeep
-                        )
-                        .frame(
-                            width: 22,
-                            height: 14
-                        )
-                        .contentShape(
-                            Rectangle()
-                        )
-                }
-                .buttonStyle(.plain)
-                .disabled(
-                    targetID == nil
-                )
-                .accessibilityLabel(
-                    ATHLTHLocalization.format(
-                        english:
-                            "Jump to exercises beginning with %@",
-                        norwegian:
-                            "Hopp til øvelser som begynner på %@",
-                        letter
-                    )
-                )
-            }
-        }
-        .padding(.vertical, 6)
-        .background(
-            .ultraThinMaterial,
-            in: Capsule()
-        )
-        .overlay {
-            Capsule()
-                .stroke(
-                    Color.white.opacity(
-                        0.60
-                    ),
-                    lineWidth: 0.6
-                )
-        }
-        .shadow(
-            color:
-                Color.black.opacity(
-                    0.05
-                ),
-            radius: 8,
-            y: 3
-        )
     }
 
     private var filters: some View {
