@@ -769,7 +769,7 @@ final class AppSessionStore: ObservableObject {
                   let sessionID = recorded.plannedSessionID,
                   let healthID = recorded.healthID,
                   linkedHealthWorkoutID(planID: planID, sessionID: sessionID) == nil,
-                  !isPlanSessionSkipped(planID, sessionID) else { return nil }
+                  !isPlanSessionSkipped(planID: planID, sessionID: sessionID) else { return nil }
             return (planID, sessionID, healthID)
         }
         guard !pending.isEmpty, !healthWorkouts.isEmpty else { return }
