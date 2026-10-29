@@ -1,98 +1,149 @@
 import SwiftUI
 
-/// Training planning sandbox: real recent weekly minutes vs a user-controlled
-/// example. This deliberately does not estimate illness, readiness or fitness.
+/// One optional workout, chosen by the athlete — never a mandatory running
+/// goal. Estimates only future recorded minutes, never readiness or injury risk.
 struct ATHLTHInsightsWhatIfView: View {
     let baselines: InsightsSessionBaselines
+    let muscleSummary: ATHLTHInsightsMuscleSummary
     let onAskCoach: (String) -> Void
     let onOpenTrain: () -> Void
 
-    @State private var goal: Goal = .consistency
-    @State private var weeklySessions = 4
-    @State private var sessionMinutes = 45
+    @State private var activity: Activity = .strength
+    @State private var selectedMuscle: Muscle = .back
+    @State private var durationMinutes = 45
+    @State private var runningDistance = 5.0
+    @State private var runningPaceSeconds = 360
+    @State private var strengthWorkingSets = 12
+    @State private var customActivity = ""
 
-    private enum Goal: String, CaseIterable, Identifiable {
-        case consistency, fiveK, halfMarathon
+    private enum Activity: String, CaseIterable, Identifiable {
+        case strength, running, walking, custom
         var id: String { rawValue }
 
         var title: String {
             switch self {
-            case .consistency:
-                return ATHLTHLocalization.choose(
-                    english: "General", norwegian: "Generelt"
-                )
-            case .fiveK: return "5 km"
-            case .halfMarathon:
-                return ATHLTHLocalization.choose(
-                    english: "Half marathon", norwegian: "Halvmaraton"
-                )
+            case .strength: return ATHLTHLocalization.choose(
+                english: "Strength", norwegian: "Styrke")
+            case .running: return ATHLTHLocalization.choose(
+                english: "Run", norwegian: "Løp")
+            case .walking: return ATHLTHLocalization.choose(
+                english: "Walk", norwegian: "Gåtur")
+            case .custom: return ATHLTHLocalization.choose(
+                english: "Other", norwegian: "Annet")
             }
         }
+    }
 
-        var questionGoal: String {
+    private enum Muscle: String, CaseIterable, Identifiable {
+        case back, chest, legs, shoulders, arms, core, fullBody
+        var id: String { rawValue }
+
+        var title: String {
             switch self {
-            case .consistency:
-                return ATHLTHLocalization.choose(
-                    english: "a sustainable training routine",
-                    norwegian: "en gjennomførbar treningsrytme"
-                )
-            case .fiveK:
-                return ATHLTHLocalization.choose(
-                    english: "training towards 5 km",
-                    norwegian: "trening mot 5 km"
-                )
-            case .halfMarathon:
-                return ATHLTHLocalization.choose(
-                    english: "training towards a half marathon",
-                    norwegian: "trening mot halvmaraton"
-                )
+            case .back: return ATHLTHLocalization.choose(
+                english: "Back", norwegian: "Rygg")
+            case .chest: return ATHLTHLocalization.choose(
+                english: "Chest", norwegian: "Bryst")
+            case .legs: return ATHLTHLocalization.choose(
+                english: "Legs", norwegian: "Bein")
+            case .shoulders: return ATHLTHLocalization.choose(
+                english: "Shoulders", norwegian: "Skuldre")
+            case .arms: return ATHLTHLocalization.choose(
+                english: "Arms", norwegian: "Armer")
+            case .core: return ATHLTHLocalization.choose(
+                english: "Core", norwegian: "Mage/kjerne")
+            case .fullBody: return ATHLTHLocalization.choose(
+                english: "Full body", norwegian: "Helkropp")
+            }
+        }
+
+        var regions: [StrengthMuscleRegion] {
+            switch self {
+            case .back: return [.lats, .upperBack, .lowerBack]
+            case .chest: return [.chest]
+            case .legs: return [.quads, .hamstrings, .glutes, .calves]
+            case .shoulders: return [.frontDelts, .sideDelts, .rearDelts]
+            case .arms: return [.biceps, .triceps, .forearms]
+            case .core: return [.abs, .obliques]
+            case .fullBody: return []
             }
         }
     }
 
-    private var historicalWeeklyMinutes: Double? {
-        goal == .consistency
-            ? baselines.allWeeklyMinutes : baselines.runningWeeklyMinutes
+    private var proposedDurationMinutes: Int {
+        switch activity {
+        case .running:
+            return max(1, Int((runningDistance *
+                Double(runningPaceSeconds) / 60).rounded()))
+        case .strength, .walking, .custom:
+            return durationMinutes
+        }
     }
 
-    private var historicalWeeklySessions: Double? {
-        goal == .consistency
-            ? baselines.allWeeklySessions : baselines.runningWeeklySessions
+    private var weeklyMinutes: Double? {
+        switch activity {
+        case .strength: return baselines.strengthWeeklyMinutes
+        case .running: return baselines.runningWeeklyMinutes
+        case .walking: return baselines.walkingWeeklyMinutes
+        case .custom: return baselines.allWeeklyMinutes
+        }
+    }
+
+    private var weeklySessions: Double? {
+        switch activity {
+        case .strength: return baselines.strengthWeeklySessions
+        case .running: return baselines.runningWeeklySessions
+        case .walking: return baselines.walkingWeeklySessions
+        case .custom: return baselines.allWeeklySessions
+        }
     }
 
     private var comparison: ATHLTHInsightsWhatIfComparison {
         ATHLTHInsightsWhatIfComparison(
-            historicalWeeklyMinutes: historicalWeeklyMinutes,
-            historicalWeeklySessions: historicalWeeklySessions,
-            proposedSessions: weeklySessions,
-            minutesPerSession: sessionMinutes
+            historicalWeeklyMinutes: weeklyMinutes,
+            historicalWeeklySessions: weeklySessions,
+            additionalMinutes: proposedDurationMinutes
         )
+    }
+
+    private var recordedTargetMuscles: Bool {
+        guard activity == .strength,
+              muscleSummary.sessionCount > 0 else { return false }
+        if selectedMuscle == .fullBody {
+            return !muscleSummary.profile.activations.isEmpty
+        }
+        return muscleSummary.profile.activations.contains {
+            selectedMuscle.regions.contains($0.region) &&
+                $0.score.isFinite && $0.score > 0
+        }
+    }
+
+    private var isValid: Bool {
+        activity != .custom ||
+            !customActivity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 17) {
             HStack(alignment: .top, spacing: 12) {
-                Image(systemName: "slider.horizontal.3")
+                Image(systemName: "sparkles.rectangle.stack")
                     .font(.title3)
                     .foregroundStyle(ATHLTHInsightsStyle.accent)
                     .frame(width: 40, height: 40)
                     .background(
-                        ATHLTHInsightsStyle.accent.opacity(0.09),
+                        ATHLTHInsightsStyle.accent.opacity(0.10),
                         in: RoundedRectangle(cornerRadius: 13)
                     )
                     .accessibilityHidden(true)
-
                 VStack(alignment: .leading, spacing: 5) {
                     Text(ATHLTHLocalization.choose(
-                        english: "Try a training week",
-                        norwegian: "Prøv en treningsuke"
+                        english: "What if I…", norwegian: "Hva om jeg …"
                     ))
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(ATHLTHInsightsStyle.ink)
-
                     Text(ATHLTHLocalization.choose(
-                        english: "Change the number and length of sessions to see how your plan compares with your recent training.",
-                        norwegian: "Juster antall og lengde på øktene. Se forskjellen fra det du vanligvis trener."
+                        english: "Explore one workout before you decide. Nothing is added until you approve it.",
+                        norwegian: "Utforsk én økt før du bestemmer deg. Ingenting legges til uten at du godkjenner det."
                     ))
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHInsightsStyle.muted)
@@ -100,166 +151,72 @@ struct ATHLTHInsightsWhatIfView: View {
                 }
             }
 
-            Picker(
-                ATHLTHLocalization.choose(
-                    english: "Training goal", norwegian: "Treningsmål"
-                ),
-                selection: $goal
-            ) {
-                ForEach(Goal.allCases) { item in
+            Picker(ATHLTHLocalization.choose(
+                english: "Workout type", norwegian: "Treningsform"
+            ), selection: $activity) {
+                ForEach(Activity.allCases) { item in
                     Text(item.title).tag(item)
                 }
             }
             .pickerStyle(.segmented)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Choose training scenario",
-                norwegian: "Velg treningsscenario"
-            ))
 
-            VStack(spacing: 14) {
-                Stepper(value: $weeklySessions, in: 1...7, step: 1) {
-                    HStack(spacing: 8) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Sessions per week",
-                            norwegian: "Økter per uke"
-                        ))
-                        .font(.subheadline.weight(.medium))
-                        Spacer(minLength: 8)
-                        Text(weeklySessions.formatted())
-                            .font(.title3.weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(ATHLTHInsightsStyle.accent)
-                    }
+            VStack(alignment: .leading, spacing: 13) {
+                switch activity {
+                case .strength:
+                    strengthControls
+                case .running:
+                    runningControls
+                case .walking:
+                    durationControl
+                case .custom:
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "E.g. 30 minutes of cycling or yoga",
+                            norwegian: "F.eks. 30 minutter sykling eller yoga"
+                        ),
+                        text: $customActivity,
+                        axis: .vertical
+                    )
+                    .lineLimit(1...3)
+                    .textInputAutocapitalization(.sentences)
+                    .font(.subheadline)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Describe your activity",
+                        norwegian: "Beskriv aktiviteten"
+                    ))
+                    durationControl
                 }
-                .accessibilityValue(String(weeklySessions))
-
-                Divider()
-
-                Stepper(value: $sessionMinutes, in: 20...180, step: 5) {
-                    HStack(spacing: 8) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Minutes per session",
-                            norwegian: "Minutter per økt"
-                        ))
-                        .font(.subheadline.weight(.medium))
-                        Spacer(minLength: 8)
-                        Text("\(sessionMinutes) min")
-                            .font(.title3.weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(ATHLTHInsightsStyle.accent)
-                    }
-                }
-                .accessibilityValue("\(sessionMinutes) min")
             }
             .padding(14)
             .background(
                 ATHLTHInsightsStyle.canvas,
-                in: RoundedRectangle(cornerRadius: 17)
+                in: RoundedRectangle(cornerRadius: 18)
             )
 
-            if let usual = goal == .consistency
-                ? baselines.allSessionMinutes : baselines.runningSessionMinutes {
-                Button {
-                    weeklySessions = min(max(
-                        Int((historicalWeeklySessions ?? 1).rounded()), 1
-                    ), 7)
-                    sessionMinutes = min(max(
-                        Int((usual / 5).rounded()) * 5, 20
-                    ), 180)
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Start from my recent average",
-                        norwegian: "Bruk mitt nylige snitt"
-                    ), systemImage: "arrow.uturn.backward")
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(ATHLTHInsightsStyle.accent)
-                }
-                .buttonStyle(.plain)
-            }
+            summarySection
 
-            HStack(spacing: 10) {
-                metricTile(
-                    title: ATHLTHLocalization.choose(
-                        english: "Your recent week",
-                        norwegian: "Din vanlige uke"
-                    ),
-                    value: historicalWeeklyMinutes.map {
-                        "\(Int($0.rounded())) min"
-                    } ?? "—",
-                    subtitle: historicalWeeklySessions.map {
-                        String(format: "%.1f", $0) + " " +
-                            ATHLTHLocalization.choose(
-                                english: "sessions / week",
-                                norwegian: "økter / uke"
-                            )
-                    } ?? ATHLTHLocalization.choose(
-                        english: "No recent data", norwegian: "Ingen nyere data"
-                    )
-                )
-                metricTile(
-                    title: ATHLTHLocalization.choose(
-                        english: "Your test week",
-                        norwegian: "Din testuke"
-                    ),
-                    value: "\(Int(comparison.proposedWeeklyMinutes)) min",
-                    subtitle: "\(weeklySessions) " +
-                        ATHLTHLocalization.choose(
-                            english: "sessions / week",
-                            norwegian: "økter / uke"
+            if activity == .strength {
+                Label(
+                    recordedTargetMuscles
+                        ? ATHLTHLocalization.choose(
+                            english: "This muscle group is present in your recorded strength history. Duration alone cannot determine how much it should recover.",
+                            norwegian: "Denne muskelgruppen finnes i styrkehistorikken din. Varighet alene kan ikke avgjøre hvor mye restitusjon den trenger."
                         )
+                        : ATHLTHLocalization.choose(
+                            english: "No reliable muscle-specific history for this selection. Coach can review the exercises, your restrictions and recovery with your permission.",
+                            norwegian: "Vi har ikke tilstrekkelig muskelspesifikk historikk for dette valget. Coach kan vurdere øvelser, begrensninger og restitusjon hvis du gir tillatelse."
+                        ),
+                    systemImage: "figure.strengthtraining.traditional"
                 )
-            }
-
-            VStack(alignment: .leading, spacing: 7) {
-                Text(ATHLTHLocalization.choose(
-                    english: "Difference in weekly training time",
-                    norwegian: "Forskjell i ukentlig treningstid"
-                ))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHInsightsStyle.muted)
-
-                if let delta = comparison.differenceMinutes {
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
-                        Text(signedMinutes(delta))
-                            .font(.title2.weight(.semibold))
-                            .monospacedDigit()
-                            .foregroundStyle(ATHLTHInsightsStyle.ink)
-                        if let percent = comparison.changePercent {
-                            Text(signedPercent(percent))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHInsightsStyle.accent)
-                        }
-                    }
-                    Text(changeExplanation)
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHInsightsStyle.muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                } else {
-                    Text(ATHLTHLocalization.choose(
-                        english: "No recorded workouts for this category in the past 28 days. Compare once more training history is available.",
-                        norwegian: "Ingen registrerte økter for dette valget de siste 28 dagene. Sammenligningen vises når du har treningshistorikk."
-                    ))
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHInsightsStyle.muted)
-                    .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(14)
-            .background(
-                ATHLTHInsightsStyle.accent.opacity(0.07),
-                in: RoundedRectangle(cornerRadius: 17)
-            )
-
-            Text(goalExplanation)
-                .font(.subheadline)
+                .font(.caption)
                 .foregroundStyle(ATHLTHInsightsStyle.muted)
                 .fixedSize(horizontal: false, vertical: true)
+            }
 
             Label(
                 ATHLTHLocalization.choose(
-                    english: "Comparison of minutes only. The intensity, recovery and fitness effect cannot be predicted from this scenario.",
-                    norwegian: "Dette sammenligner bare minutter. Intensitet, restitusjon og effekt på formen kan ikke forutsies her."
+                    english: "Only training time is estimated. Not a prediction of recovery, injury risk, fitness, pace or future results.",
+                    norwegian: "Kun treningstid beregnes. Dette er ingen prognose for restitusjon, skaderisiko, form eller fremtidige resultater."
                 ),
                 systemImage: "info.circle"
             )
@@ -268,13 +225,14 @@ struct ATHLTHInsightsWhatIfView: View {
             .fixedSize(horizontal: false, vertical: true)
 
             Button {
+                guard isValid else { return }
                 onAskCoach(coachPrompt)
             } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "sparkles")
                     Text(ATHLTHLocalization.choose(
-                        english: "Create a plan with Coach",
-                        norwegian: "Lag en plan med Coach"
+                        english: "Review this workout with Coach",
+                        norwegian: "Vurder økten med Coach"
                     ))
                     Spacer()
                     Image(systemName: "arrow.right")
@@ -289,11 +247,16 @@ struct ATHLTHInsightsWhatIfView: View {
                 )
             }
             .buttonStyle(.plain)
+            .disabled(!isValid)
+            .opacity(isValid ? 1 : 0.5)
 
             Button(action: onOpenTrain) {
-                Label(ATHLTHLocalization.choose(
-                    english: "Open Training", norwegian: "Åpne Trening"
-                ), systemImage: "dumbbell.fill")
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Open Training", norwegian: "Åpne Trening"
+                    ),
+                    systemImage: "dumbbell.fill"
+                )
                 .font(.subheadline.weight(.medium))
                 .foregroundStyle(ATHLTHInsightsStyle.accent)
                 .frame(maxWidth: .infinity, minHeight: 44)
@@ -304,8 +267,170 @@ struct ATHLTHInsightsWhatIfView: View {
         .athlthInsightsSurface()
     }
 
-    private func metricTile(
-        title: String, value: String, subtitle: String
+    private var strengthControls: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack(spacing: 8) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Muscle focus", norwegian: "Muskelgruppe"
+                ))
+                .font(.subheadline.weight(.medium))
+                Spacer()
+                Picker(ATHLTHLocalization.choose(
+                    english: "Muscle focus", norwegian: "Muskelgruppe"
+                ), selection: $selectedMuscle) {
+                    ForEach(Muscle.allCases) { muscle in
+                        Text(muscle.title).tag(muscle)
+                    }
+                }
+                .tint(ATHLTHInsightsStyle.accent)
+            }
+
+            Divider()
+
+            Stepper(value: $strengthWorkingSets, in: 3...30, step: 3) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Planned working sets",
+                        norwegian: "Planlagte arbeidssett"
+                    ))
+                    .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Text("\(strengthWorkingSets)")
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
+                }
+            }
+            durationControl
+        }
+    }
+
+    private var runningControls: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Stepper(value: $runningDistance, in: 0.5...42.0, step: 0.5) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Distance", norwegian: "Distanse"
+                    ))
+                    .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Text("\(runningDistance.formatted(
+                        .number.precision(.fractionLength(0...1))
+                    )) km")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
+                }
+            }
+            Divider()
+            Stepper(value: $runningPaceSeconds, in: 180...900, step: 15) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Target pace", norwegian: "Måltempo"
+                    ))
+                    .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Text(paceText + " /km")
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
+                }
+            }
+            Divider()
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Estimated duration", norwegian: "Beregnet varighet"
+                ))
+                .font(.subheadline.weight(.medium))
+                Spacer()
+                Text("\(proposedDurationMinutes) min")
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
+            }
+        }
+    }
+
+    private var durationControl: some View {
+        Stepper(value: $durationMinutes, in: 15...180, step: 5) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Planned duration", norwegian: "Planlagt varighet"
+                ))
+                .font(.subheadline.weight(.medium))
+                Spacer()
+                Text("\(durationMinutes) min")
+                    .font(.subheadline.weight(.semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHInsightsStyle.accent)
+            }
+        }
+    }
+
+    private var paceText: String {
+        String(format: "%d:%02d",
+               runningPaceSeconds / 60, runningPaceSeconds % 60)
+    }
+
+    private var summarySection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text(ATHLTHLocalization.choose(
+                english: "What changes if you do this?",
+                norwegian: "Hva endres hvis du gjør dette?"
+            ))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ATHLTHInsightsStyle.ink)
+
+            HStack(spacing: 9) {
+                metric(
+                    title: ATHLTHLocalization.choose(
+                        english: "Recent weekly average",
+                        norwegian: "Nylig ukesnitt"
+                    ),
+                    value: weeklyMinutes.map {
+                        "\(Int($0.rounded())) min"
+                    } ?? "—",
+                    detail: ATHLTHLocalization.choose(
+                        english: "Past 28 days",
+                        norwegian: "Siste 28 dager"
+                    )
+                )
+                metric(
+                    title: ATHLTHLocalization.choose(
+                        english: "With this workout",
+                        norwegian: "Med denne økten"
+                    ),
+                    value: comparison.projectedWeeklyMinutes.map {
+                        "\(Int($0.rounded())) min"
+                    } ?? "+\(proposedDurationMinutes) min",
+                    detail: weeklyMinutes == nil
+                        ? ATHLTHLocalization.choose(
+                            english: "No historical comparison",
+                            norwegian: "Uten historisk sammenligning"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Hypothetical weekly total",
+                            norwegian: "Hypotetisk ukestotal"
+                        )
+                )
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "One extra \(activity.title.lowercased()) workout adds about \(proposedDurationMinutes) planned minutes. This compares the same type of activity when historical data exists.",
+                norwegian: "Én ekstra økt med \(activity.title.lowercased()) gir omtrent \(proposedDurationMinutes) planlagte minutter. Vi sammenligner med samme treningstype der det finnes historikk."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHInsightsStyle.muted)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(14)
+        .background(
+            ATHLTHInsightsStyle.accent.opacity(0.07),
+            in: RoundedRectangle(cornerRadius: 17)
+        )
+    }
+
+    private func metric(
+        title: String, value: String, detail: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
@@ -315,80 +440,50 @@ struct ATHLTHInsightsWhatIfView: View {
                 .font(.title2.weight(.semibold))
                 .monospacedDigit()
                 .foregroundStyle(ATHLTHInsightsStyle.ink)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.75)
                 .lineLimit(1)
-            Text(subtitle)
-                .font(.caption)
+            Text(detail)
+                .font(.caption2)
                 .foregroundStyle(ATHLTHInsightsStyle.muted)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .frame(maxWidth: .infinity, minHeight: 97, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
         .padding(12)
         .background(
-            ATHLTHInsightsStyle.canvas,
-            in: RoundedRectangle(cornerRadius: 16)
+            .white, in: RoundedRectangle(cornerRadius: 15)
         )
     }
 
-    private func signedMinutes(_ value: Double) -> String {
-        let rounded = Int(value.rounded())
-        let prefix = rounded > 0 ? "+" : ""
-        return "\(prefix)\(rounded) min"
-    }
-
-    private func signedPercent(_ value: Double) -> String {
-        let rounded = Int(value.rounded())
-        let prefix = rounded > 0 ? "+" : ""
-        return "(\(prefix)\(rounded) %)"
-    }
-
-    private var changeExplanation: String {
-        switch comparison.direction {
-        case .more:
-            return ATHLTHLocalization.choose(
-                english: "You are planning more training time than your recent weekly average. Review the change and build a realistic schedule.",
-                norwegian: "Du legger opp til mer treningstid enn ditt nylige ukesnitt. Vurder forskjellen og lag en realistisk plan."
-            )
-        case .less:
-            return ATHLTHLocalization.choose(
-                english: "You are planning less training time than usual. That can be intentional; decide how it fits your goals.",
-                norwegian: "Du legger opp til mindre treningstid enn vanlig. Det kan være bevisst – se det i sammenheng med målene dine."
-            )
-        case .similar:
-            return ATHLTHLocalization.choose(
-                english: "The total training time is close to your recent weekly average. Your session intensity and distribution still matter.",
-                norwegian: "Treningstiden er omtrent som ditt nylige ukesnitt. Intensitet og fordeling mellom øktene betyr fortsatt noe."
-            )
-        case .unknown:
-            return ""
-        }
-    }
-
-    private var goalExplanation: String {
-        switch goal {
-        case .consistency:
-            return ATHLTHLocalization.choose(
-                english: "All recorded workouts are included. Coach can help place training and recovery days so the week fits your routine.",
-                norwegian: "Alle registrerte økter er med. Coach kan hjelpe deg å fordele økter og hviledager gjennom uken."
-            )
-        case .fiveK:
-            return ATHLTHLocalization.choose(
-                english: "Only running sessions are compared. For 5 km, the week should balance easy runs, quality sessions and recovery.",
-                norwegian: "Bare løpeøkter sammenlignes. Mot 5 km bør uken kombinere rolig løping, kvalitetsøkter og hvile."
-            )
-        case .halfMarathon:
-            return ATHLTHLocalization.choose(
-                english: "Only running sessions are compared. A half-marathon plan needs gradual progress and enough recovery, not just more minutes.",
-                norwegian: "Bare løpeøkter sammenlignes. Halvmaraton krever gradvis utvikling og nok restitusjon – ikke bare flere minutter."
-            )
-        }
-    }
-
     private var coachPrompt: String {
-        let objective = goal.questionGoal
+        let request: String
+        switch activity {
+        case .strength:
+            request = ATHLTHLocalization.choose(
+                english: "a \(selectedMuscle.title.lowercased()) strength workout now, with about \(strengthWorkingSets) working sets over \(durationMinutes) minutes",
+                norwegian: "en \(selectedMuscle.title.lowercased())økt nå, med omtrent \(strengthWorkingSets) arbeidssett på \(durationMinutes) minutter"
+            )
+        case .running:
+            request = ATHLTHLocalization.choose(
+                english: "running \(runningDistance.formatted()) km today at \(paceText) minutes per kilometer",
+                norwegian: "å løpe \(runningDistance.formatted()) km i dag med \(paceText) min/km"
+            )
+        case .walking:
+            request = ATHLTHLocalization.choose(
+                english: "a \(durationMinutes)-minute walk today",
+                norwegian: "en gåtur på \(durationMinutes) minutter i dag"
+            )
+        case .custom:
+            request = String(customActivity.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            ).prefix(250)) + ATHLTHLocalization.choose(
+                english: ", lasting about \(durationMinutes) minutes",
+                norwegian: ", omtrent \(durationMinutes) minutter"
+            )
+        }
+
         return ATHLTHLocalization.choose(
-            english: "Help me build \(objective). I want to explore \(weeklySessions) workouts per week, around \(sessionMinutes) minutes each. Ask about my training experience, limitations, equipment and preferred starting date first. Check whether the weekly structure is realistic, propose a plan, and ask for approval before adding anything. Do not assume access to health data.",
-            norwegian: "Hjelp meg å lage \(objective). Jeg vurderer \(weeklySessions) økter i uken på omtrent \(sessionMinutes) minutter hver. Spør først om erfaring, skader eller begrensninger, utstyr og ønsket startdato. Vurder om treningsuken er realistisk, foreslå en plan og be om godkjenning før du legger til noe. Ikke anta tilgang til helsedata."
+            english: "What if I do \(request)? Help me assess how it might fit my recent training and goals. Please ask about injuries, soreness and other relevant context before recommending changes. Do not assume access to my health data. Do not change any plan or schedule anything without my approval.",
+            norwegian: "Hva om jeg gjennomfører \(request)? Hjelp meg å vurdere hvordan dette passer med treningen og målene mine. Spør om skader, stølhet og andre relevante forhold før du anbefaler endringer. Ikke anta tilgang til helsedata. Ikke endre treningsplan eller kalender uten min godkjenning."
         )
     }
 }
