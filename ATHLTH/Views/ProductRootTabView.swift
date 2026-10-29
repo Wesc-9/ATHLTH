@@ -261,7 +261,8 @@ struct ProductRootTabView: View {
                 onOpenTrain: { request in
                     trainNavigationRequest = request
                     selectedTab = 1
-                }
+                },
+                isActive: selectedTab == 0
             )
                 .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(0)
@@ -771,6 +772,9 @@ struct ATHLTHHomeView: View {
     var onOpenTrain:
         (ATHLTHTrainNavigationRequest) -> Void =
         { _ in }
+    // TabView can instantiate inactive tabs while rendering the first frame.
+    // Defer Home's network/Health loads until it is the selected tab.
+    var isActive: Bool = true
 
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
@@ -1377,7 +1381,8 @@ struct ATHLTHHomeView: View {
                     showingGettingStartedPopup = true
                 }
             }
-            .task {
+            .task(id: isActive) {
+                guard isActive else { return }
                 homeWeather.refreshIfNeeded()
 
                 // Let the Home hierarchy paint before starting refresh work.
@@ -5311,6 +5316,7 @@ struct ATHLTHTrainView: View {
 
     @State private var selectedSection: ATHLTHTrainSection = .today
     @State private var displayedTrainDay = Calendar.current.startOfDay(for: .now)
+    @State private var preparedTrainUserID: UUID?
     @State private var todayScrollPosition = ScrollPosition(edge: .top)
     @State private var planScrollPosition = ScrollPosition(edge: .top)
     @State private var progressScrollPosition = ScrollPosition(edge: .top)
@@ -5845,12 +5851,21 @@ struct ATHLTHTrainView: View {
                 .environmentObject(session)
             }
             .athlthStablePresentationBoundary()
-            .task {
-                session.refreshActivePlanForToday()
-                session.reconcilePlanLinkedPhoneWorkouts(
-                    phoneWorkout.history, healthWorkouts: health.workouts
-                )
-                await exerciseLibrary.refresh()
+            .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
+                guard isActive else { return }
+                // Retain the prepared catalog and plan state across quick
+                // Today/Plan/tab transitions. On account switch a new owner
+                // gets a full refresh rather than another owner's cache.
+                if preparedTrainUserID != session.profile.userID {
+                    preparedTrainUserID = session.profile.userID
+                    session.refreshActivePlanForToday()
+                    session.reconcilePlanLinkedPhoneWorkouts(
+                        phoneWorkout.history, healthWorkouts: health.workouts
+                    )
+                    await exerciseLibrary.refresh()
+                } else {
+                    refreshTrainDayIfChanged()
+                }
                 handleNavigationRequest()
             }
             .onReceive(phoneWorkout.$history) { history in
