@@ -507,7 +507,9 @@ final class MirroredWorkoutAudioCoach:
             latitude: snapshot.currentLatitude,
             longitude: snapshot.currentLongitude,
             horizontalAccuracy: snapshot.currentHorizontalAccuracy,
-            locationAge: Date().timeIntervalSince(snapshot.capturedAt),
+            locationAge: Date().timeIntervalSince(
+                snapshot.currentLocationSampledAt ?? .distantPast
+            ),
             norwegian: norwegian
         )
         if let positionCue {
