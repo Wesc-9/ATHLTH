@@ -103,4 +103,82 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
         )
         XCTAssertEqual(advice.destination, .training)
     }
+    func testReadyWithoutPlanRecommendsRealTimedEasyRun() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .ready,
+            hasWorkoutToday: false,
+            trainingLoadRatio: 1
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .easyRun(minutes: 25))
+        XCTAssertFalse(advice.dayDescription.isEmpty)
+        XCTAssertFalse(advice.suggestedTitle.isEmpty)
+        let workout = HomeDailyRecommendationSessionFactory.make(advice: advice)
+        XCTAssertEqual(workout?.kind, .running)
+        XCTAssertEqual(workout?.durationMinutes, 25)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.first?.durationSeconds, 1500)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.first?.cardioActivity, .running)
+    }
+
+    func testUnavailableRecoveryDoesNotClaimGoodCondition() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .unavailable,
+            hasWorkoutToday: false,
+            trainingLoadRatio: nil
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .easyWalk(minutes: 20))
+        XCTAssertTrue(
+            advice.dayDescription.localizedCaseInsensitiveContains(
+                ATHLTHLocalization.choose(
+                    english: "missing", norwegian: "mangler"
+                )
+            )
+        )
+        let workout = HomeDailyRecommendationSessionFactory.make(advice: advice)
+        XCTAssertEqual(workout?.kind, .walking)
+        XCTAssertEqual(workout?.durationMinutes, 20)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.first?.durationSeconds, 1200)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.first?.cardioActivity, .walking)
+    }
+
+    func testScheduledWorkoutIsReusedNotDuplicated() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .ready,
+            hasWorkoutToday: true,
+            trainingLoadRatio: 0.95,
+            plannedActivity: .running,
+            plannedWorkoutTitle: "4 x 4 intervaller"
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .planned)
+        XCTAssertEqual(advice.suggestedTitle, "4 x 4 intervaller")
+        XCTAssertNil(HomeDailyRecommendationSessionFactory.make(advice: advice))
+    }
+
+    func testRecoveryOverridesHardPlanWithoutModifyingIt() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .recover,
+            hasWorkoutToday: true,
+            trainingLoadRatio: 1.9,
+            plannedActivity: .running,
+            plannedWorkoutTitle: "Hard intervall"
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .easyWalk(minutes: 15))
+        XCTAssertEqual(
+            HomeDailyRecommendationSessionFactory.make(advice: advice)?
+                .durationMinutes, 15
+        )
+        XCTAssertNotEqual(advice.suggestedTitle, "Hard intervall")
+    }
+
+    func testHighLoadSuggestsConservativeWalkWhenScheduledStrengthExists() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .balanced,
+            hasWorkoutToday: true,
+            trainingLoadRatio: 1.7,
+            plannedActivity: .strength,
+            plannedWorkoutTitle: "Tung styrke"
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .easyWalk(minutes: 20))
+        XCTAssertNotNil(advice.evidence)
+    }
+
 }
