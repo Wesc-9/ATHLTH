@@ -1378,7 +1378,9 @@ struct AppRootView: View {
             guard appSession.signedIn, scenePhase == .active,
                   appSession.onboardingProfile?
                     .maximumHeartRateUsesWorkoutPeak == true else { return }
-            if let peaks = try? await health.highestRecordedWorkoutHeartRates(),
+            if let peaks = try? await health.highestRecordedWorkoutHeartRates(
+                       sampleFallbackLimit: 3
+                   ),
                let highest = peaks.first {
                 appSession.adoptHigherWorkoutHeartRatePeak(highest)
             }
@@ -1389,7 +1391,9 @@ struct AppRootView: View {
             Task {
                 if appSession.onboardingProfile?
                     .maximumHeartRateUsesWorkoutPeak == true,
-                   let peaks = try? await health.highestRecordedWorkoutHeartRates(),
+                   let peaks = try? await health.highestRecordedWorkoutHeartRates(
+                       sampleFallbackLimit: 3
+                   ),
                    let highest = peaks.first {
                     appSession.adoptHigherWorkoutHeartRatePeak(highest)
                 }
