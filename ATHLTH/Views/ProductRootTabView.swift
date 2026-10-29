@@ -5891,16 +5891,20 @@ struct ATHLTHTrainView: View {
                 // Today/Plan/tab transitions. On account switch a new owner
                 // gets a full refresh rather than another owner's cache.
                 if preparedTrainUserID != session.profile.userID {
-                    preparedTrainUserID = session.profile.userID
                     session.refreshActivePlanForToday()
                     session.reconcilePlanLinkedPhoneWorkouts(
                         phoneWorkout.history, healthWorkouts: health.workouts
                     )
+                    // Route immediately. Opening Plan or a scheduled session
+                    // must not wait for the exercise catalog's network load.
+                    handleNavigationRequest()
                     await exerciseLibrary.refresh()
+                    guard !Task.isCancelled else { return }
+                    preparedTrainUserID = session.profile.userID
                 } else {
                     refreshTrainDayIfChanged()
+                    handleNavigationRequest()
                 }
-                handleNavigationRequest()
             }
             .onReceive(phoneWorkout.$history) { history in
                 session.reconcilePlanLinkedPhoneWorkouts(
