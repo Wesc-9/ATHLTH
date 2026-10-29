@@ -745,7 +745,7 @@ struct WorkoutTemplateLibraryView: View {
         var title: String {
             switch self {
             case .recommended: return ATHLTHLocalization.choose(
-                english: "Recommended", norwegian: "Anbefalt"
+                english: "Default order", norwegian: "Standard"
             )
             case .shortest: return ATHLTHLocalization.choose(
                 english: "Shortest first", norwegian: "Kortest først"
