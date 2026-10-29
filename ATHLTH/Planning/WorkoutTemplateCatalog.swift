@@ -722,6 +722,10 @@ struct WorkoutTemplateLibraryView: View {
     var onStartRunning: ((RunningWorkoutTemplate) -> Void)? = nil
     var onSelectPlanned: ((PlannedSession) -> Void)? = nil
 
+    /// Optional category from the new premium planned-workout selector.
+    /// Other library entry points continue to start with "All".
+    var initialCategory: ATHLTHPlannedWorkoutType? = nil
+
     @StateObject private var catalog =
         WorkoutTemplateCatalogStore()
     @State private var query = ""
@@ -738,6 +742,21 @@ struct WorkoutTemplateLibraryView: View {
     @State private var catalogPersonalBlocks: [WorkoutTemplateBlock] = []
     @State private var libraryCompletions: [StructuredWorkoutCompletion] = []
     @State private var runningCompletions: [ATHLTHCompletedRunningPerformance] = []
+
+    /// Configure the library's initial category without changing its
+    /// behaviour for the Home, Community and general Library entry points.
+    init(
+        onStartRunning: ((RunningWorkoutTemplate) -> Void)? = nil,
+        onSelectPlanned: ((PlannedSession) -> Void)? = nil,
+        initialCategory: ATHLTHPlannedWorkoutType? = nil
+    ) {
+        self.onStartRunning = onStartRunning
+        self.onSelectPlanned = onSelectPlanned
+        self.initialCategory = initialCategory
+        _selectedCategory = State(
+            initialValue: initialCategory?.catalogCategory ?? "All"
+        )
+    }
 
     private func loadHistory() {
         libraryCompletions = StructuredWorkoutCompletionStore.load(
@@ -855,8 +874,10 @@ struct WorkoutTemplateLibraryView: View {
 
     private var categories: [String] {
         ["All"] +
-        Array(Set(catalog.entries.map(\.categoryTitle) + ["Running"]))
-            .sorted()
+        Array(Set(
+            catalog.entries.map(\.categoryTitle) +
+            ATHLTHPlannedWorkoutType.defaultOrder.map(\.catalogCategory)
+        )).sorted()
     }
 
     private var builtInRunningTemplates: [RunningWorkoutTemplate] {
@@ -890,7 +911,9 @@ struct WorkoutTemplateLibraryView: View {
         return catalog.entries.filter { entry in
             let categoryMatches =
                 selectedCategory == "All" ||
-                entry.categoryTitle == selectedCategory
+                entry.categoryTitle == selectedCategory ||
+                (selectedCategory == "Custom" &&
+                 ATHLTHPlannedWorkoutType.custom.matches(entry))
 
             let favoriteMatches =
                 !favoritesOnly ||
@@ -915,9 +938,15 @@ struct WorkoutTemplateLibraryView: View {
     private var filteredSavedWorkouts: [PlannedSession] {
         guard onSelectPlanned != nil else { return [] }
         let clean = query
-        return session.savedWorkoutTemplates.filter {
-            ATHLTHWorkoutSearch.matches(clean, texts: [$0.title, $0.notes ?? ""]) &&
-            (selectedCategory == "All" || $0.kind.title == selectedCategory)
+        return session.savedWorkoutTemplates.filter { workout in
+            let matchesCategory = selectedCategory == "All" ||
+                (ATHLTHPlannedWorkoutType(
+                    rawValue: selectedCategory.lowercased()
+                )?.matches(workout) ??
+                    (workout.kind.title == selectedCategory))
+            return ATHLTHWorkoutSearch.matches(
+                clean, texts: [workout.title, workout.notes ?? ""]
+            ) && matchesCategory
         }
     }
 
