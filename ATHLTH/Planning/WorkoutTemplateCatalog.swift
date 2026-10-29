@@ -605,6 +605,7 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
 
     private let client: SupabaseClient
     private var loadedRemote = false
+    private var lastRemoteRefreshAttemptAt: Date?
 
     init(client: SupabaseClient = SupabaseEnvironment.client) {
         self.client = client
@@ -616,6 +617,16 @@ final class WorkoutTemplateCatalogStore: ObservableObject {
     func refresh(force: Bool = false) async {
         if loadedRemote && !force { return }
         guard !isLoading else { return }
+
+        // The Train Today view is recreated when switching Plan/Today.
+        // If the catalog endpoint is unavailable, do not retry the same
+        // network request on every tab switch: offline entries remain ready.
+        if !force,
+           let lastRemoteRefreshAttemptAt,
+           Date().timeIntervalSince(lastRemoteRefreshAttemptAt) < 90 {
+            return
+        }
+        lastRemoteRefreshAttemptAt = Date()
 
         isLoading = true
         defer { isLoading = false }
