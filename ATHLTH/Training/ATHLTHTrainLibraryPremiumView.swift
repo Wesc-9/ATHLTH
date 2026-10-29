@@ -179,6 +179,19 @@ struct ATHLTHTrainLibraryPremiumView: View {
         }
     }
 
+    /// The whole Library uses a consistent Norwegian A–Å title order.
+    private func alphabetized<T>(
+        _ items: [T], by title: KeyPath<T, String>
+    ) -> [T] {
+        items.sorted {
+            $0[keyPath: title].compare(
+                $1[keyPath: title],
+                options: [.caseInsensitive, .numeric],
+                locale: ATHLTHExerciseAlphabet.locale
+            ) == .orderedAscending
+        }
+    }
+
     @ViewBuilder
     private var planLibrary: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -207,7 +220,10 @@ struct ATHLTHTrainLibraryPremiumView: View {
 
             if !session.trainingPlans.isEmpty {
                 sectionTitle(tr("MY PROGRAMS", "MINE TRENINGSPROGRAM"))
-                ForEach(session.trainingPlans.filter { matches($0.title, $0.summary) }) { plan in
+                ForEach(alphabetized(
+                    session.trainingPlans.filter { matches($0.title, $0.summary) },
+                    by: \.title
+                )) { plan in
                     Button {
                         if let onOpenSelectedPlan {
                             onOpenSelectedPlan(plan.id)
@@ -228,7 +244,10 @@ struct ATHLTHTrainLibraryPremiumView: View {
 
             if !session.planTemplates.isEmpty {
                 sectionTitle(tr("SAVED PLANS", "LAGREDE PLANER"))
-                ForEach(session.planTemplates.filter { matches($0.title, $0.summary) }) { plan in
+                ForEach(alphabetized(
+                    session.planTemplates.filter { matches($0.title, $0.summary) },
+                    by: \.title
+                )) { plan in
                     Button { selectedTemplate = plan } label: {
                         planRow(
                             title: plan.title,
@@ -243,9 +262,11 @@ struct ATHLTHTrainLibraryPremiumView: View {
 
             if !catalog.entries.isEmpty {
                 sectionTitle(tr("TRAINING TEMPLATES", "FERDIGE TRENINGSMALER"))
-                ForEach(catalog.entries.filter {
-                    matches($0.title, $0.summary, $0.categoryTitle)
-                }.prefix(30)) { entry in
+                ForEach(alphabetized(
+                    catalog.entries.filter {
+                        matches($0.title, $0.summary, $0.categoryTitle)
+                    }, by: \.title
+                ).prefix(30)) { entry in
                     Button { selectedCatalogPlan = entry } label: {
                         planRow(
                             title: entry.title,
@@ -270,7 +291,10 @@ struct ATHLTHTrainLibraryPremiumView: View {
                        "Økter du lagrer skal kunne brukes igjen i treningsplanen.")
                 )
             }
-            ForEach(session.savedWorkoutTemplates.filter { matches($0.title) }) { workout in
+            ForEach(alphabetized(
+                session.savedWorkoutTemplates.filter { matches($0.title) },
+                by: \.title
+            )) { workout in
                 Button { selectedWorkout = workout } label: {
                     planRow(
                         title: workout.title,
@@ -284,7 +308,10 @@ struct ATHLTHTrainLibraryPremiumView: View {
             }
             if !runningLibrary.allTemplates.isEmpty {
                 sectionTitle(tr("RUNNING WORKOUTS", "LØPEØKTER"))
-                ForEach(runningLibrary.allTemplates.filter { matches($0.title) }.prefix(30)) { workout in
+                ForEach(alphabetized(
+                    runningLibrary.allTemplates.filter { matches($0.title) },
+                    by: \.title
+                ).prefix(30)) { workout in
                     HStack(spacing: 13) {
                         Image(systemName: "figure.run")
                             .font(.system(size: 20, weight: .light))
