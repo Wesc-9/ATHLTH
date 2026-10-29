@@ -4794,6 +4794,7 @@ final class HealthKitManager: ObservableObject {
 
     private func invalidateWorkoutDerivedCaches() {
         allWorkoutsCache = nil
+        workoutPeakCache = nil
         workoutRouteCache.removeAll(
             keepingCapacity: false
         )
