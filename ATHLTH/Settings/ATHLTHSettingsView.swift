@@ -2531,7 +2531,10 @@ private struct AppleCalendarSettingsView: View {
                                     .font(.system(size: 16.5, weight: .medium))
                                     .foregroundStyle(ATHLTHTheme.primaryText)
 
-                                Text("Keep your plan, event responses and challenge invitations in Calendar.")
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Sync planned workouts and confirmed or tentative event invitations.",
+                                    norwegian: "Synkroniser planlagte økter og bekreftede eller foreløpige invitasjoner."
+                                ))
                                     .font(.caption)
                                     .foregroundStyle(ATHLTHTheme.mutedText)
                             }
@@ -2566,10 +2569,42 @@ private struct AppleCalendarSettingsView: View {
                         SettingsDivider()
 
                         statusRow(
-                            title: "Last sync",
+                            title: ATHLTHLocalization.choose(
+                                english: "Last sync", norwegian: "Sist synkronisert"
+                            ),
                             value: lastSyncText,
                             icon: "arrow.triangle.2.circlepath"
                         )
+
+                        if let total = calendarSync.lastSyncEventCount {
+                            SettingsDivider()
+                            statusRow(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Events in Calendar",
+                                    norwegian: "Hendelser i Kalender"
+                                ),
+                                value: "\(total)",
+                                icon: "checkmark.circle"
+                            )
+                            SettingsDivider()
+                            statusRow(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Planned workouts",
+                                    norwegian: "Planlagte økter"
+                                ),
+                                value: "\(calendarSync.lastSyncWorkoutCount ?? 0)",
+                                icon: "figure.run"
+                            )
+                            SettingsDivider()
+                            statusRow(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Tentative invitations",
+                                    norwegian: "Foreløpige invitasjoner"
+                                ),
+                                value: "\(calendarSync.lastSyncTentativeCount ?? 0)",
+                                icon: "envelope.badge"
+                            )
+                        }
 
                         SettingsDivider()
 
@@ -2605,7 +2640,8 @@ private struct AppleCalendarSettingsView: View {
 
                         Button {
                             Task {
-                                if calendarSync.hasFullAccess {
+                                if calendarSync.hasFullAccess &&
+                                    calendarSync.isEnabled {
                                     await syncAllCalendarContent()
                                 } else {
                                     await enableCalendarSync()
@@ -2882,6 +2918,11 @@ private struct AppleCalendarSettingsView: View {
 
         await calendarSync.sync(
             plan: session.activePlan,
+            additionalPlans: session.scheduledPlans.filter {
+                !session.isTrainingPlanPaused($0.id) &&
+                !session.isTrainingPlanDeactivated($0.id)
+            },
+            standaloneSessions: session.standalonePlannedSessions,
             communityEvents: communityEvents.events,
             groupEvents: communityGroups.calendarEvents,
             groupEventRSVPs:
@@ -2896,6 +2937,11 @@ private struct AppleCalendarSettingsView: View {
 
         await calendarSync.enable(
             plan: session.activePlan,
+            additionalPlans: session.scheduledPlans.filter {
+                !session.isTrainingPlanPaused($0.id) &&
+                !session.isTrainingPlanDeactivated($0.id)
+            },
+            standaloneSessions: session.standalonePlannedSessions,
             communityEvents: communityEvents.events,
             groupEvents: communityGroups.calendarEvents,
             groupEventRSVPs:
