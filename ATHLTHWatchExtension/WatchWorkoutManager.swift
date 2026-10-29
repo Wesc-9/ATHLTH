@@ -122,6 +122,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var coachAudioSessionIsActive = false
     private var audioCoachRestorationTask: Task<Void, Never>?
+    private var audioCoachSpeechWatchdog: Task<Void, Never>?
     private var audioCoachActivationTask:
         Task<Void, Never>?
     private var audioCoachReadyAnnouncedForWorkout = false
@@ -6521,6 +6522,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
 
         case .interruptAndDeliver:
+            audioCoachSpeechWatchdog?.cancel()
+            audioCoachSpeechWatchdog = nil
             audioCoachActivationTask?
                 .cancel()
             audioCoachActivationTask = nil
@@ -6618,6 +6621,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     self.coachEventLedger.didDeliver(event)
                 }
                 self.speechSynthesizer.speak(utterance)
+                self.watchCoachSpeechCompletion(utterance)
                 if rememberForReplay,
                    ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
                     self.coachReplayMemory.remember(
@@ -6693,6 +6697,39 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             priority: next.event.priority,
             event: next.event
         )
+    }
+
+    /// watchOS can miss AVSpeechSynthesizer's completion callback during a
+    /// Bluetooth music route handoff. Don't leave a short cue's ducking lease
+    /// active until another workout event happens to close it.
+    private func watchCoachSpeechCompletion(_ utterance: AVSpeechUtterance) {
+        audioCoachSpeechWatchdog?.cancel()
+        let duration = max(
+            20,
+            min(90, Double(utterance.speechString.count) / 5 + 15)
+        )
+        audioCoachSpeechWatchdog = Task { @MainActor [weak self] in
+            for _ in 0..<Int(ceil(duration)) {
+                do { try await Task.sleep(for: .seconds(1)) }
+                catch { return }
+                guard !Task.isCancelled, let self else { return }
+                if !self.speechSynthesizer.isSpeaking {
+                    self.audioCoachSpeechWatchdog = nil
+                    guard self.audioCoachActivationTask == nil else { return }
+                    self.guidancePriorityGate.voiceDidFinish()
+                    self.deactivateAudioCoachAudioSession()
+                    self.deliverNextQueuedCoachCue()
+                    return
+                }
+            }
+            guard !Task.isCancelled, let self,
+                  self.audioCoachActivationTask == nil else { return }
+            self.speechSynthesizer.stopSpeaking(at: .immediate)
+            self.audioCoachSpeechWatchdog = nil
+            self.guidancePriorityGate.voiceDidFinish()
+            self.deactivateAudioCoachAudioSession()
+            self.deliverNextQueuedCoachCue()
+        }
     }
 
     private func activateAudioCoachAudioSession()
@@ -6775,6 +6812,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func deactivateAudioCoachAudioSession() {
+        audioCoachSpeechWatchdog?.cancel()
+        audioCoachSpeechWatchdog = nil
         guard coachAudioSessionIsActive else { return }
         audioCoachRestorationTask?.cancel()
         audioCoachRestorationTask = nil
@@ -7753,6 +7792,8 @@ extension WatchWorkoutManager:
                 return
             }
 
+            self.audioCoachSpeechWatchdog?.cancel()
+            self.audioCoachSpeechWatchdog = nil
             self.guidancePriorityGate
                 .voiceDidFinish()
             self.deactivateAudioCoachAudioSession()
@@ -7771,6 +7812,8 @@ extension WatchWorkoutManager:
                 return
             }
 
+            self.audioCoachSpeechWatchdog?.cancel()
+            self.audioCoachSpeechWatchdog = nil
             self.guidancePriorityGate
                 .voiceDidFinish()
             self.deactivateAudioCoachAudioSession()
