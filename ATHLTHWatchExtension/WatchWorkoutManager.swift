@@ -141,6 +141,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var aiConversationVoiceTimeoutTask: Task<Void, Never>?
     @Published private(set) var lastCoachMessage: String?
     private var coachReplayMemory = ATHLTHCoachReplayMemory()
+    private var smartCoachState = ATHLTHAudioCoachSmartState()
 
     var canReplayLastCoachMessage: Bool {
         audioCoachConfiguration.enabled &&
@@ -4113,6 +4114,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func resetAudioCoachThresholds() {
         lastGoalEncouragementAt = nil
+        smartCoachState.reset()
         let configuration = audioCoachConfiguration
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
             rules: configuration.customRules ?? [],
@@ -4244,6 +4246,53 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    private func evaluateSmartAudioCoach() {
+        guard !coachSpeechPaused,
+              kind == .running || kind == .walking,
+              let settings = audioCoachConfiguration.smartPrompts
+        else { return }
+        let norwegian = coachPhrase(english: "en", norwegian: "no") == "no"
+        if usesOutdoorGPS, let location = lastAcceptedOutdoorLocation,
+           let message = smartCoachState.nextLandmark(
+               settings: settings,
+               latitude: location.coordinate.latitude,
+               longitude: location.coordinate.longitude,
+               horizontalAccuracy: location.horizontalAccuracy,
+               locationAge: Date().timeIntervalSince(location.timestamp),
+               norwegian: norwegian
+           ) {
+            speak(
+                message,
+                priority: .routineCoach,
+                event: ATHLTHCoachEvent(
+                    kind: .routineMilestone,
+                    key: "smart-place:\(Int(elapsedTime))",
+                    priority: .routineCoach,
+                    validFor: 12
+                )
+            )
+            return
+        }
+
+        if let message = smartCoachState.nextMotivation(
+            settings: settings,
+            elapsed: elapsedTime,
+            paceSecondsPerKilometer: currentPaceSecondsPerKilometer,
+            norwegian: norwegian
+        ) {
+            speak(
+                message,
+                priority: .routineCoach,
+                event: ATHLTHCoachEvent(
+                    kind: .routineMilestone,
+                    key: "smart-motivation:\(Int(elapsedTime))",
+                    priority: .routineCoach,
+                    validFor: 12
+                )
+            )
+        }
+    }
+
     private func evaluateAudioCoach() {
         guard state == .running,
               audioCoachConfiguration.enabled
@@ -4252,6 +4301,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         evaluateCustomAudioCoachRules()
+        evaluateSmartAudioCoach()
 
         var shouldAnnounce = false
         var milestoneKeys: [String] = []
@@ -7208,6 +7258,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 latestRoutePoint?.latitude,
             currentLongitude:
                 latestRoutePoint?.longitude,
+            currentHorizontalAccuracy:
+                lastAcceptedOutdoorLocation?.horizontalAccuracy,
             routeProgressPercent:
                 routeProgressPercent,
             routeComparisonID:
