@@ -31,4 +31,38 @@ final class ATHLTHLibraryDisplayModeTests: XCTestCase {
         XCTAssertEqual(ATHLTHLibraryDisplayMode.list.symbol, "list.bullet")
         XCTAssertEqual(ATHLTHLibraryDisplayMode.grid.symbol, "square.grid.2x2")
     }
+    func testGridUsesThreeColumnsOnlyWhenTheyFit() {
+        XCTAssertEqual(
+            ATHLTHLibraryGridColumns.make(
+                mode: .grid, width: 390,
+                reservedHorizontalSpace: 50
+            ).count, 3
+        )
+        XCTAssertEqual(
+            ATHLTHLibraryGridColumns.make(
+                mode: .grid, width: 355,
+                reservedHorizontalSpace: 50
+            ).count, 2
+        )
+        XCTAssertEqual(
+            ATHLTHLibraryGridColumns.make(
+                mode: .grid, width: 390,
+                reservedHorizontalSpace: 50,
+                accessibilityText: true
+            ).count, 2
+        )
+        XCTAssertEqual(
+            ATHLTHLibraryGridColumns.make(
+                mode: .grid, width: 320,
+                reservedHorizontalSpace: 50,
+                accessibilityText: true
+            ).count, 1
+        )
+        XCTAssertEqual(
+            ATHLTHLibraryGridColumns.make(
+                mode: .list, width: 1000
+            ).count, 1
+        )
+    }
+
 }
