@@ -15,6 +15,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @StateObject private var catalog = TrainingPlanLibraryStore()
     @State private var section: LibrarySection = .plans
     @State private var query = ""
+    @State private var queryInput = ""
     @State private var exerciseGroup = ""
     @State private var selectedTemplate: TrainingPlan?
     @State private var selectedCatalogPlan: TrainingPlanCatalogEntry?
@@ -71,6 +72,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                     Button {
                         section = item
                         query = ""
+                        queryInput = ""
                     } label: {
                         Text(item.label)
                             .font(.caption.weight(section == item ? .semibold : .medium))
@@ -95,13 +97,14 @@ struct ATHLTHTrainLibraryPremiumView: View {
             HStack(spacing: 10) {
                 Image(systemName: "magnifyingglass")
                     .foregroundStyle(secondary)
-                TextField(searchPrompt, text: $query)
+                TextField(searchPrompt, text: $queryInput)
                     .font(.subheadline)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                if !query.isEmpty {
+                if !queryInput.isEmpty {
                     Button {
                         query = ""
+                        queryInput = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(secondary)
@@ -132,6 +135,13 @@ struct ATHLTHTrainLibraryPremiumView: View {
         }
         .task { await catalog.refresh() }
         .task { await exerciseLibrary.refresh() }
+        .task(id: queryInput) {
+            do {
+                try await Task.sleep(for: .milliseconds(180))
+            } catch { return }
+            guard !Task.isCancelled else { return }
+            query = queryInput
+        }
         .sheet(isPresented: $showingCreatePlan) {
             ATHLTHTrainProgramComposerView { planID in
                 onPlanCreated?(planID)
