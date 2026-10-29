@@ -7,6 +7,8 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strengthWorkouts: StrengthWorkoutStore
     @State private var selectedType: ATHLTHPlannedWorkoutType?
     @State private var path: [ATHLTHPlannedWorkoutType] = []
     @State private var orderedTypes = ATHLTHPlannedWorkoutType.defaultOrder
@@ -97,7 +99,9 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
             }
             .task(id: session.profile.userID) {
                 orderedTypes = ATHLTHPlannedWorkoutTypeUsageStore.ordered(
-                    userID: session.profile.userID
+                    userID: session.profile.userID,
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strengthWorkouts.workoutHistory
                 )
             }
         }
