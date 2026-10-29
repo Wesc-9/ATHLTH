@@ -3958,7 +3958,7 @@ struct ATHLTHHomeView: View {
             }
 
             if device == .appleWatch &&
-                !watchConnection.isVerifiedForLiveLaunch {
+                !watchConnection.isReady {
                 await social.markCurrentJoinedWorkoutLaunchFailed()
                 homeWatchTransferError = ATHLTHLocalization.choose(
                     english: "Apple Watch is unavailable. Start with iPhone instead.",
@@ -5753,7 +5753,7 @@ struct ATHLTHTrainView: View {
                 CustomQuickStartSheet(
                     trainingDeviceProvider:
                         watchConnection.isReady ? .appleWatch : .none,
-                    watchConnected: watchConnection.isVerifiedForLiveLaunch,
+                    watchConnected: watchConnection.isReady,
                     initialActivity: customQuickInitialActivity
                 ) { configuration, destination in
                     let invitedFriends = social.resolvedQuickTrainPartners(
@@ -5785,7 +5785,7 @@ struct ATHLTHTrainView: View {
                             case .phoneTimer, .retrospective: usesWatch = false
                             }
                             if usesWatch &&
-                               !watchConnection.isVerifiedForLiveLaunch {
+                               !watchConnection.isReady {
                                 watchTransferError = ATHLTHLocalization.choose(
                                     english: "Connect Apple Watch before inviting friends.",
                                     norwegian: "Koble til Apple Watch før du inviterer venner."
@@ -10991,7 +10991,7 @@ struct ATHLTHTrainView: View {
     private func startCustomWorkoutOnWatch(
         _ configuration: CustomQuickWorkoutConfiguration
     ) {
-        guard watchConnection.isVerifiedForLiveLaunch else {
+        guard watchConnection.isReady else {
             watchTransferError = ATHLTHLocalization.choose(
                 english: "Apple Watch is not available. Choose iPhone timing or log the workout manually.",
                 norwegian: "Apple Watch er ikke tilgjengelig. Velg tidtaking på iPhone eller registrer økten manuelt."

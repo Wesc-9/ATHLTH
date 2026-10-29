@@ -54,6 +54,7 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
 
     private let synthesizer =
         AVSpeechSynthesizer()
+    private let audioOwner = "audio-coach-preview-\(UUID().uuidString)"
 
     private override init() {
         super.init()
@@ -72,23 +73,10 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
             at: .immediate
         )
 
-        let audioSession =
-            AVAudioSession.sharedInstance()
-        let options:
-            AVAudioSession.CategoryOptions =
-                duckOtherAudio
-                    ? [
-                        .duckOthers,
-                        .interruptSpokenAudioAndMixWithOthers
-                    ]
-                    : [.mixWithOthers]
-
-        try? audioSession.setCategory(
-            .playback,
-            mode: .spokenAudio,
-            options: options
+        try? ATHLTHSpokenAudioSession.activate(
+            duckOtherAudio: duckOtherAudio,
+            owner: audioOwner
         )
-        try? audioSession.setActive(true)
 
         let useNorwegian: Bool
         switch language {
@@ -162,13 +150,9 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
         didFinish utterance: AVSpeechUtterance
     ) {
         Task { @MainActor in
-            try? AVAudioSession
-                .sharedInstance()
-                .setActive(
-                    false,
-                    options:
-                        .notifyOthersOnDeactivation
-                )
+            ATHLTHSpokenAudioSession.deactivate(
+                owner: self.audioOwner
+            )
         }
     }
 
@@ -177,13 +161,9 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
         didCancel utterance: AVSpeechUtterance
     ) {
         Task { @MainActor in
-            try? AVAudioSession
-                .sharedInstance()
-                .setActive(
-                    false,
-                    options:
-                        .notifyOthersOnDeactivation
-                )
+            ATHLTHSpokenAudioSession.deactivate(
+                owner: self.audioOwner
+            )
         }
     }
 }

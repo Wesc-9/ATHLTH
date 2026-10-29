@@ -829,10 +829,24 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     func sendGhostRace(
         _ ghost: WatchGhostRaceTransfer
     ) {
+        // Ghost configuration is launch-critical. Queue delivery even
+        // when the Watch app is closed; live reachability is NOT required.
         sendWatchPayload(
             ghost,
-            kind: .ghostRace
+            kind: .ghostRace,
+            durable: true
         )
+        if let session,
+           session.activationState == .activated,
+           let data = try? JSONEncoder().encode(ghost) {
+            // The latest Ghost payload is also ready when the Watch app
+            // wakes in response to a HealthKit remote workout launch.
+            try? session.updateApplicationContext([
+                WatchTransferMetadataKey.kind: WatchTransferKind.ghostRace.rawValue,
+                WatchTransferMetadataKey.payload: data,
+                WatchTransferMetadataKey.sentAt: Date().timeIntervalSince1970
+            ])
+        }
     }
 
     func sendTodayWorkout(

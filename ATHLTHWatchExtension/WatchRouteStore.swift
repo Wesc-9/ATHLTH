@@ -1058,6 +1058,12 @@ extension WatchRouteStore:
         }
 
         if activated {
+            // Recover the latest queued launch configuration immediately
+            // after process activation; don't wait for a new live message.
+            let context = session.receivedApplicationContext
+            if !context.isEmpty {
+                receive(context)
+            }
             session.transferUserInfo(
                 Self.connectivityAck(
                     probeID: "watch-launch"

@@ -121,6 +121,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var appliedRunningAppendCommands = Set<UUID>()
     private let speechSynthesizer = AVSpeechSynthesizer()
     private var coachAudioSessionIsActive = false
+    private var audioCoachRestorationTask: Task<Void, Never>?
     private var audioCoachActivationTask:
         Task<Void, Never>?
     private var audioCoachReadyAnnouncedForWorkout = false
@@ -6662,6 +6663,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func activateAudioCoachAudioSession()
         async -> Bool {
+        audioCoachRestorationTask?.cancel()
+        audioCoachRestorationTask = nil
         let session =
             AVAudioSession.sharedInstance()
         let options:
@@ -6738,20 +6741,36 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func deactivateAudioCoachAudioSession() {
-        guard coachAudioSessionIsActive else {
-            return
-        }
-
+        guard coachAudioSessionIsActive else { return }
+        audioCoachRestorationTask?.cancel()
+        audioCoachRestorationTask = nil
         do {
             try AVAudioSession.sharedInstance().setActive(
-                false,
-                options: .notifyOthersOnDeactivation
-            )
+                false, options: .notifyOthersOnDeactivation)
             coachAudioSessionIsActive = false
         } catch {
-            // Do not surface this as a workout failure. The next coach cue
-            // gets another chance to establish a clean temporary session.
-            coachAudioSessionIsActive = false
+            // watchOS can temporarily refuse deactivation during AirPods /
+            // music route handoff. Keep the active flag until deactivation
+            // actually succeeds so the music never remains ducked silently.
+            // The next speech activation cancels the retry.
+            audioCoachRestorationTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                while !Task.isCancelled, self.coachAudioSessionIsActive {
+                    do { try await Task.sleep(for: .seconds(2)) }
+                    catch { return }
+                    guard !Task.isCancelled else { return }
+                    // Never deactivate the session of a newer cue.
+                    if self.speechSynthesizer.isSpeaking ||
+                       self.audioCoachActivationTask != nil { return }
+                    do {
+                        try AVAudioSession.sharedInstance().setActive(
+                            false, options: .notifyOthersOnDeactivation)
+                        self.coachAudioSessionIsActive = false
+                        self.audioCoachRestorationTask = nil
+                        return
+                    } catch { continue }
+                }
+            }
         }
     }
 
