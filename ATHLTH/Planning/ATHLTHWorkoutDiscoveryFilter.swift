@@ -63,14 +63,13 @@ struct ATHLTHWorkoutDiscoveryFilter {
             minutes: workout.durationMinutes.map(Double.init) ??
                 catalogEntry?.estimatedDurationMinutes.map(Double.init)
         ) else { return false }
-        let recipeBlocks = workout.resolvedWorkoutBlocks
         // A personal copy may carry only the source workout ID and recipe,
         // without the publisher's muscle tags. Resolve its original metadata
         // from the *same* catalog rather than guessing from a workout title.
         if !muscleGroups.isEmpty &&
             !Self.matchesMuscles(
                 tags: catalogEntry?.tags ?? [],
-                blocks: recipeBlocks,
+                blocks: workout.resolvedWorkoutBlocks,
                 chosen: muscleGroups
             ) {
             return false
@@ -81,7 +80,7 @@ struct ATHLTHWorkoutDiscoveryFilter {
             }) { return true }
             return Self.matchesRunningType(
                 runningType, tags: catalogEntry?.tags ?? [],
-                blocks: recipeBlocks
+                blocks: workout.resolvedWorkoutBlocks
             )
         }
         return true
@@ -89,7 +88,9 @@ struct ATHLTHWorkoutDiscoveryFilter {
 
     func matches(_ workout: RunningWorkoutTemplate) -> Bool {
         guard runningType == nil || workout.type == runningType else { return false }
-        return duration.matches(
+        // Estimating a running workout expands interval repeats. Do not do
+        // that calculation at all when the user has no duration filter.
+        return duration == .any || duration.matches(
             minutes: workout.estimatedDurationSeconds.map { $0 / 60 }
         )
     }
@@ -138,8 +139,23 @@ struct ATHLTHWorkoutDiscoveryFilter {
     ) -> Bool {
         let wanted = normalize(selected.rawValue)
         let labels = Set(tags.map(normalize))
+        let synonyms: [String]
+        switch selected {
+        case .easy: synonyms = ["easy", "easy run", "rolig", "base"]
+        case .recovery: synonyms = ["recovery", "recovery run", "restitusjon"]
+        case .longRun: synonyms = ["longrun", "long run", "long", "langtur"]
+        case .tempo: synonyms = ["tempo", "tempo run"]
+        case .threshold: synonyms = ["threshold", "terskel"]
+        case .intervals: synonyms = ["interval", "intervals", "intervall", "intervaller"]
+        case .fartlek: synonyms = ["fartlek"]
+        case .hills: synonyms = ["hills", "hill", "bakke", "bakkeløp"]
+        case .racePace: synonyms = ["racepace", "race pace", "konkurransefart"]
+        case .progression: synonyms = ["progression", "progressiv"]
+        case .custom: synonyms = ["custom", "egendefinert"]
+        }
         if labels.contains(wanted) ||
-            labels.contains(normalize(selected.title)) { return true }
+            labels.contains(normalize(selected.title)) ||
+            synonyms.contains(where: labels.contains) { return true }
         // Older catalog recipes may encode intervals in their structured
         // block group, even when they do not carry a running-type tag.
         if wanted.contains("interval") {
