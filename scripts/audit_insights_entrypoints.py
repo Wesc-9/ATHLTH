@@ -134,7 +134,7 @@ if "case overview, training, development" not in sections:
     fail("Insights must contain Overview, Training and Development")
 if "case overview, health, training, development" in sections:
     fail("The redundant Body & Health top-level section has returned")
-if "ATHLTHInsightsReferenceMetric" not in cards:
+if "ATHLTHInsightReferenceMetric" not in cards:
     fail("Underlying health reference metrics must remain available")
 for token in (
     "RecoveryTrendSnapshot", "ATHLTHInsightsTrainingDay",
