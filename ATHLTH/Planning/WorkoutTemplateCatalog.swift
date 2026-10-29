@@ -1156,6 +1156,7 @@ struct WorkoutTemplateLibraryView: View {
                         }
                         .buttonStyle(.plain)
 
+                        if initialCategory == nil {
                         ForEach(categories, id: \.self) {
                             category in
                             Button {
@@ -1180,12 +1181,18 @@ struct WorkoutTemplateLibraryView: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        }
                     }
                 }
 
-                if selectedCategory == "Strength" ||
+                if initialCategory != nil {
+                    activityDiscoveryFilters
+                }
+
+                if initialCategory == nil &&
+                    (selectedCategory == "Strength" ||
                     selectedMuscleFocus != "all" ||
-                    selectedWorkoutLevel != "all" {
+                    selectedWorkoutLevel != "all") {
                     VStack(alignment: .leading, spacing: 9) {
                         Text(ATHLTHLocalization.choose(
                             english: "MUSCLE GROUP", norwegian: "MUSKELGRUPPE"
@@ -1308,18 +1315,37 @@ struct WorkoutTemplateLibraryView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                if filteredEntries.isEmpty && filteredRunningTemplates.isEmpty && filteredSavedWorkouts.isEmpty && filteredScheduledWorkouts.isEmpty {
-                    ContentUnavailableView(
-                        favoritesOnly
-                            ? "No favorite workouts yet"
-                            : "No workouts found",
-                        systemImage: "rectangle.stack",
-                        description: Text(
-                            catalog.errorMessage ??
-                            "Try another search or category."
+                if filteredEntries.isEmpty && filteredRunningTemplates.isEmpty &&
+                   filteredSavedWorkouts.isEmpty && filteredScheduledWorkouts.isEmpty {
+                    VStack(spacing: 14) {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english: "No matching workouts",
+                                norwegian: "Ingen økter passer filtrene"
+                            ),
+                            systemImage: "line.3.horizontal.decrease.circle",
+                            description: Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Try a different muscle group, run type or duration.",
+                                    norwegian: "Prøv en annen muskelgruppe, økttype eller varighet."
+                                )
+                            )
                         )
-                    )
-                    .padding(.top, 32)
+                        if hasDiscoveryFilters {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Clear filters", norwegian: "Nullstill filtre"
+                            )) {
+                                selectedStrengthMuscles = []
+                                selectedRunningType = nil
+                                selectedRunningDuration = .any
+                                selectedWorkoutLevel = "all"
+                                selectedDiscoverySort = .recommended
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(ATHLTHTheme.accentDeep)
+                        }
+                    }
+                    .padding(.top, 25)
                 } else {
                     ForEach(filteredEntries) { entry in
                         ZStack(alignment: .topTrailing) {
@@ -1573,6 +1599,205 @@ struct WorkoutTemplateLibraryView: View {
                 favoriteRefresh
             )
         }
+    }
+
+    @ViewBuilder
+    private var activityDiscoveryFilters: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "FIND THE RIGHT WORKOUT",
+                        norwegian: "FINN RIKTIG ØKT"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Text(initialCategory == .strength
+                        ? ATHLTHLocalization.choose(
+                            english: "Which muscles?", norwegian: "Hvilke muskelgrupper?"
+                        )
+                        : initialCategory == .running
+                            ? ATHLTHLocalization.choose(
+                                english: "What kind of run?", norwegian: "Hva slags løpeøkt?"
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "Narrow your search", norwegian: "Finn økten du ønsker"
+                              ))
+                    .font(.title3.bold())
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
+                Spacer(minLength: 5)
+                if hasDiscoveryFilters {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Clear filters", norwegian: "Nullstill"
+                    )) {
+                        selectedStrengthMuscles = []
+                        selectedRunningType = nil
+                        selectedRunningDuration = .any
+                        selectedWorkoutLevel = "all"
+                        selectedDiscoverySort = .recommended
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+            }
+
+            if initialCategory == .strength {
+                Text(ATHLTHLocalization.choose(
+                    english: "Select one or more muscle groups. Workouts containing those groups appear below.",
+                    norwegian: "Trykk på én eller flere muskelgrupper. Økter med disse musklene vises nedenfor."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 104), spacing: 9)],
+                    spacing: 9
+                ) {
+                    ForEach(strengthMuscleChoices, id: \.self) { muscle in
+                        let selected = selectedStrengthMuscles.contains(muscle)
+                        Button {
+                            if selected {
+                                selectedStrengthMuscles.remove(muscle)
+                            } else {
+                                selectedStrengthMuscles.insert(muscle)
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName:
+                                    selected ? "checkmark.circle.fill" : "circle"
+                                )
+                                .font(.system(size: 13, weight: .semibold))
+                                Text(focusName(muscle))
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.78)
+                                Spacer(minLength: 0)
+                            }
+                            .foregroundStyle(
+                                selected ? .white : ATHLTHPlanDesign.ink
+                            )
+                            .padding(.horizontal, 10)
+                            .frame(maxWidth: .infinity, minHeight: 42)
+                            .background(
+                                selected ? ATHLTHTheme.accentDeep : .white,
+                                in: RoundedRectangle(cornerRadius: 13)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 13)
+                                    .strokeBorder(
+                                        selected ? ATHLTHTheme.accentDeep :
+                                            ATHLTHTheme.accentSoft,
+                                        lineWidth: 1
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selected ? [.isSelected] : [])
+                    }
+                }
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Experience", norwegian: "Erfaringsnivå"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        ForEach(strengthLevels, id: \.self) { level in
+                            Button {
+                                selectedWorkoutLevel = level
+                            } label: {
+                                filterChip(
+                                    levelName(level),
+                                    systemImage: nil,
+                                    selected: selectedWorkoutLevel == level
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            if initialCategory == .running {
+                Text(ATHLTHLocalization.choose(
+                    english: "Workout type", norwegian: "Økttype"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        Button { selectedRunningType = nil } label: {
+                            filterChip(
+                                ATHLTHLocalization.choose(
+                                    english: "All", norwegian: "Alle"
+                                ),
+                                systemImage: "figure.run",
+                                selected: selectedRunningType == nil
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        ForEach(RunningWorkoutType.allCases) { type in
+                            Button { selectedRunningType = type } label: {
+                                filterChip(
+                                    type.title, systemImage: nil,
+                                    selected: selectedRunningType == type
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Duration", norwegian: "Varighet"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        ForEach(ATHLTHWorkoutDiscoveryFilter.Duration.allCases) {
+                            duration in
+                            Button {
+                                selectedRunningDuration = duration
+                            } label: {
+                                filterChip(
+                                    duration.title, systemImage: nil,
+                                    selected: selectedRunningDuration == duration
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+            }
+
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Sort workouts", norwegian: "Sorter økter"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                Spacer()
+                Picker(ATHLTHLocalization.choose(
+                    english: "Sort", norwegian: "Sorter"
+                ), selection: $selectedDiscoverySort) {
+                    ForEach(DiscoverySort.allCases) { sort in
+                        Text(sort.title).tag(sort)
+                    }
+                }
+                .tint(ATHLTHPlanDesign.accentInk)
+            }
+        }
+        .padding(15)
+        .background(
+            ATHLTHTheme.accentSoft.opacity(0.3),
+            in: RoundedRectangle(cornerRadius: 21)
+        )
     }
 
     private func workoutCard(
