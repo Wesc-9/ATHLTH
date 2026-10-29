@@ -304,7 +304,9 @@ enum ATHLTHPersonalInsightEngine {
         guard diverged else { return nil }
         return .init(
             kind: .everydayMovement,
-            sampleCount: 28,
+            // Progress aggregates do not expose the number of sampled days.
+            // Report this as a period comparison, never 28 paired samples.
+            sampleCount: 0,
             evidence: [
                 evidence("Daglige steg", "Daily steps",
                          (steps > 0 ? "+" : "") + number(steps) + " %"),
