@@ -33,14 +33,13 @@ extension View {
 /// Insights uses the same editorial navigation and colors as Train.
 /// The sections filter presentation only; none change health or workout data.
 enum ATHLTHInsightsSection: String, CaseIterable, Identifiable {
-    case overview, health, training, development
+    case overview, training, development
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .overview: return ATHLTHLocalization.choose(english: "Overview", norwegian: "Oversikt")
-        case .health: return ATHLTHLocalization.choose(english: "Body & health", norwegian: "Kropp & helse")
         case .training: return ATHLTHLocalization.choose(english: "Training", norwegian: "Trening")
         case .development: return ATHLTHLocalization.choose(english: "Trends", norwegian: "Utvikling")
         }
@@ -48,7 +47,7 @@ enum ATHLTHInsightsSection: String, CaseIterable, Identifiable {
 }
 
 /// The same translucent segmented selector used by Train Today,
-/// compressed slightly to fit four Insights destinations on iPhone.
+/// sized for three clear destinations on iPhone.
 struct ATHLTHInsightsNavigation: View {
     @Binding var selection: ATHLTHInsightsSection
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
