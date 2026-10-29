@@ -16,7 +16,6 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @State private var section: LibrarySection = .plans
     @State private var query = ""
     @State private var exerciseGroup = ""
-    @State private var exerciseVisibleCount = 65
     @State private var selectedTemplate: TrainingPlan?
     @State private var selectedCatalogPlan: TrainingPlanCatalogEntry?
     @State private var selectedWorkout: PlannedSession?
@@ -72,7 +71,6 @@ struct ATHLTHTrainLibraryPremiumView: View {
                     Button {
                         section = item
                         query = ""
-                        exerciseVisibleCount = 65
                     } label: {
                         Text(item.label)
                             .font(.caption.weight(section == item ? .semibold : .medium))
@@ -309,9 +307,23 @@ struct ATHLTHTrainLibraryPremiumView: View {
         }
     }
 
+    /// Train and the full Exercise Library now use the same cached search and
+    /// localized A–Å order. The prior full-array filter + 65-row pagination
+    /// made distant letters inaccessible without repeated "show more" taps.
     private var exerciseLibraryContent: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            sectionTitle(tr("EXERCISE INDEX", "ØVELSESBIBLIOTEK"))
+        let entries = exerciseLibrary.search(
+            query: query,
+            bodyPart: exerciseGroup.isEmpty ? nil : exerciseGroup
+        )
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                sectionTitle(tr("EXERCISE INDEX", "ØVELSESBIBLIOTEK"))
+                Spacer()
+                Text("\(entries.count)")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(secondary)
+            }
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -322,64 +334,65 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 }
             }
 
-            let filteredExercises = exerciseLibrary.selectableExercises.filter { item in
-                let nameMatch = matches(item.name, item.canonicalName,
-                                        item.bodyPart ?? "", item.category ?? "")
-                let muscleMatch = exerciseGroup.isEmpty
-                    || item.bodyPart?.localizedCaseInsensitiveContains(exerciseGroup) == true
-                    || item.category?.localizedCaseInsensitiveContains(exerciseGroup) == true
-                return nameMatch && muscleMatch
-            }
-
-            if filteredExercises.isEmpty {
+            if entries.isEmpty {
                 emptySection(
                     tr("No matching exercises", "Fant ingen øvelser"),
                     tr("Try a different name or muscle group.",
                        "Prøv et annet navn eller en muskelgruppe.")
                 )
-            }
-
-            ForEach(filteredExercises.prefix(exerciseVisibleCount)) { entry in
-                Button { selectedExercise = entry } label: {
-                    HStack(spacing: 11) {
-                        Image(systemName: "dumbbell")
-                            .font(.system(size: 17, weight: .light))
-                            .foregroundStyle(champagne)
-                            .frame(width: 36, height: 36)
-                            .background(paper, in: RoundedRectangle(cornerRadius: 11))
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(entry.name)
-                                .font(.subheadline.weight(.medium))
-                                .lineLimit(2)
-                                .multilineTextAlignment(.leading)
-                            Text(entry.bodyPart.map {
-                                exerciseLibrary.localizedBodyPartTitle($0)
-                            } ?? entry.category ?? tr("Exercise", "Øvelse"))
-                            .font(.caption)
-                            .foregroundStyle(secondary)
+            } else {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(spacing: 9) {
+                            ForEach(entries) { entry in
+                                Button { selectedExercise = entry } label: {
+                                    HStack(spacing: 11) {
+                                        ExerciseArtwork(entry: entry, size: 43)
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(exerciseLibrary.localizedExerciseName(entry))
+                                                .font(.subheadline.weight(.medium))
+                                                .lineLimit(2)
+                                                .multilineTextAlignment(.leading)
+                                            Text(entry.bodyPart.map {
+                                                exerciseLibrary.localizedBodyPartTitle($0)
+                                            } ?? entry.category ?? tr("Exercise", "Øvelse"))
+                                                .font(.caption)
+                                                .foregroundStyle(secondary)
+                                        }
+                                        Spacer(minLength: 2)
+                                        Image(systemName: "chevron.right")
+                                            .font(.caption2)
+                                            .foregroundStyle(secondary)
+                                    }
+                                    .padding(10)
+                                    .librarySurface(line: line)
+                                }
+                                .buttonStyle(.plain)
+                                .id(entry.id)
+                            }
                         }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.caption2)
-                            .foregroundStyle(secondary)
+                        .padding(.leading, 2)
+                        .padding(.trailing, 33)
+                        .padding(.vertical, 6)
                     }
-                    .padding(12)
-                    .librarySurface(line: line)
+                    .scrollIndicators(.hidden)
+                    .scrollDismissesKeyboard(.interactively)
+                    .frame(height: 470)
+                    .overlay(alignment: .trailing) {
+                        ATHLTHExerciseAlphabetIndex(
+                            targets: ATHLTHExerciseAlphabet.firstIDs(
+                                for: entries,
+                                name: exerciseLibrary.localizedExerciseName
+                            ),
+                            onJump: { id in
+                                withAnimation(.easeOut(duration: 0.18)) {
+                                    proxy.scrollTo(id, anchor: .top)
+                                }
+                            }
+                        )
+                        .padding(.trailing, 3)
+                    }
                 }
-                .buttonStyle(.plain)
-            }
-
-            if filteredExercises.count > exerciseVisibleCount {
-                Button {
-                    exerciseVisibleCount = min(filteredExercises.count, exerciseVisibleCount + 65)
-                } label: {
-                    Text(tr("Show more exercises", "Vis flere øvelser"))
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(12)
-                        .background(paper, in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
             }
 
             if !exerciseLibrary.repDBExercises.isEmpty {
