@@ -7260,6 +7260,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 latestRoutePoint?.longitude,
             currentHorizontalAccuracy:
                 lastAcceptedOutdoorLocation?.horizontalAccuracy,
+            currentLocationSampledAt:
+                lastAcceptedOutdoorLocation?.timestamp,
             routeProgressPercent:
                 routeProgressPercent,
             routeComparisonID:
