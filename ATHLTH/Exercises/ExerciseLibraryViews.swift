@@ -42,6 +42,7 @@ struct ExerciseLibraryView: View {
     let onSelect: ((ExerciseLibraryEntry) -> Void)?
 
     @State private var query = ""
+    @State private var queryInput = ""
     @State private var selectedBodyPart = "All"
     @State private var selectedEquipment = "All"
     @State private var favoritesOnly = false
@@ -345,6 +346,8 @@ struct ExerciseLibraryView: View {
                                 selectedBodyPart = "All"
                                 selectedEquipment = "All"
                                 query = ""
+                    queryInput = ""
+                            queryInput = ""
                             }
                             .font(.subheadline.weight(.semibold))
                             .tint(ATHLTHPlanDesign.accent)
@@ -561,6 +564,14 @@ struct ExerciseLibraryView: View {
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             refreshExerciseHistory()
         }
+        // Debounce typing so long catalog scans do not run for each key.
+        .task(id: queryInput) {
+            do {
+                try await Task.sleep(for: .milliseconds(180))
+            } catch { return }
+            guard !Task.isCancelled else { return }
+            query = queryInput
+        }
         .task {
             recents.refresh()
             async let exerciseRefresh: Void = library.refresh()
@@ -763,6 +774,7 @@ struct ExerciseLibraryView: View {
 
         // Prevent older search filters from silently hiding matched exercises.
         query = ""
+        queryInput = ""
         selectedBodyPart = "All"
         selectedEquipment = "All"
         favoritesOnly = false
@@ -843,14 +855,15 @@ struct ExerciseLibraryView: View {
                         english: "Search exercise, muscle or equipment",
                         norwegian: "Søk øvelse på norsk eller engelsk"
                     ),
-                    text: $query
+                    text: $queryInput
                 )
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
 
-                if !query.isEmpty {
+                if !queryInput.isEmpty {
                     Button {
                         query = ""
+                    queryInput = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
