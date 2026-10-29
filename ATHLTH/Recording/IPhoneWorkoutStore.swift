@@ -357,6 +357,7 @@ final class IPhoneWorkoutStore:
     private var coachCueQueue = ATHLTHCoachCueQueue()
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
+    private var customAudioCoachLastSlots: [UUID: Int] = [:]
     private var nextFuelAnnouncementSeconds: TimeInterval?
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
@@ -900,6 +901,11 @@ final class IPhoneWorkoutStore:
             nextFuelAnnouncementSeconds = ATHLTHFuelVoicePrompt.nextDue(
                 after: workout.elapsed(at: now),
                 config: configuration
+            )
+            customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+                rules: configuration.customRules ?? [],
+                distanceMeters: workout.distanceMeters,
+                elapsedSeconds: workout.elapsed(at: now)
             )
         } else {
             resetCoachThresholds(configuration: nil)
@@ -2673,6 +2679,11 @@ final class IPhoneWorkoutStore:
             WatchAudioCoachConfiguration?
     ) {
         lastGoalEncouragementAt = nil
+        customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: configuration?.customRules ?? [],
+            distanceMeters: active?.distanceMeters ?? 0,
+            elapsedSeconds: active?.elapsed(at: Date()) ?? 0
+        )
         guard let configuration,
               configuration.enabled
         else {
@@ -4179,6 +4190,7 @@ final class IPhoneWorkoutStore:
         }
 
         announceFuelIfDue(workout, configuration: configuration)
+        evaluateCustomAudioCoachRules(workout, configuration: configuration)
 
         var shouldAnnounce = false
         var milestoneKeys: [String] = []
@@ -4373,6 +4385,43 @@ final class IPhoneWorkoutStore:
             event: ATHLTHCoachEvent(
                 kind: .routineMilestone,
                 key: milestoneKeys.joined(separator: "-"),
+                priority: .routineCoach,
+                validFor: 10
+            )
+        )
+    }
+
+    private func evaluateCustomAudioCoachRules(
+        _ workout: PhoneWorkout,
+        configuration: WatchAudioCoachConfiguration
+    ) {
+        let elapsed = workout.elapsed(at: Date())
+        let freshPace = ATHLTHCoachSensorFreshness.validPace(
+            workout.currentPaceSecondsPerKilometer,
+            sampledAt: coachPaceSampleAt
+        ) ? workout.currentPaceSecondsPerKilometer : nil
+        let norwegian = localizedCoachPhrase(
+            english: "en",
+            norwegian: "no",
+            configuration: configuration
+        ) == "no"
+        let messages = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: configuration.customRules ?? [],
+            distanceMeters: workout.distanceMeters,
+            elapsedSeconds: elapsed,
+            paceSecondsPerKilometer: freshPace,
+            heartRateBPM: nil,
+            norwegian: norwegian,
+            lastSlots: &customAudioCoachLastSlots
+        )
+        guard !messages.isEmpty else { return }
+        speak(
+            messages.joined(separator: ". "),
+            configuration: configuration,
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: "custom:\(Int(elapsed)):\(Int(workout.distanceMeters))",
                 priority: .routineCoach,
                 validFor: 10
             )
