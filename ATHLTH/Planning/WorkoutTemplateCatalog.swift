@@ -1064,10 +1064,16 @@ struct WorkoutTemplateLibraryView: View {
     private var filteredSavedWorkouts: [PlannedSession] {
         guard onSelectPlanned != nil else { return [] }
         let clean = query
-        let originals = Dictionary(
-            catalog.entries.map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        // Most library visits have no specialised filter. Only build the
+        // publisher metadata index when a muscle/level/type filter needs it.
+        let needMetadata = !selectedStrengthMuscles.isEmpty ||
+            selectedRunningType != nil ||
+            (initialCategory == .strength && selectedWorkoutLevel != "all")
+        let originals: [UUID: WorkoutTemplateCatalogEntry] = needMetadata
+            ? Dictionary(
+                catalog.entries.map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first }
+            ) : [:]
         let matching = session.savedWorkoutTemplates.filter { workout in
             let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
                 workout.sharedSourceSessionID.flatMap { originals[$0] }
@@ -1100,10 +1106,16 @@ struct WorkoutTemplateLibraryView: View {
                 .flatMap { $0.days }
                 .flatMap { $0.sessions }
         var seen = Set<UUID>()
-        let originals = Dictionary(
-            catalog.entries.map { ($0.id, $0) },
-            uniquingKeysWith: { first, _ in first }
-        )
+        // Most library visits have no specialised filter. Only build the
+        // publisher metadata index when a muscle/level/type filter needs it.
+        let needMetadata = !selectedStrengthMuscles.isEmpty ||
+            selectedRunningType != nil ||
+            (initialCategory == .strength && selectedWorkoutLevel != "all")
+        let originals: [UUID: WorkoutTemplateCatalogEntry] = needMetadata
+            ? Dictionary(
+                catalog.entries.map { ($0.id, $0) },
+                uniquingKeysWith: { first, _ in first }
+            ) : [:]
         let matching = stored.filter { workout in
             let source = workout.workoutTemplateID.flatMap { originals[$0] } ??
                 workout.sharedSourceSessionID.flatMap { originals[$0] }
@@ -1136,10 +1148,33 @@ struct WorkoutTemplateLibraryView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 LibraryPremiumIntro(
-                    eyebrow: "WORKOUT LIBRARY",
-                    title: "Complete workouts",
-                    subtitle:
-                        "A workout is the session you actually perform. It can combine running, exercises, rest, routes and targets in one structure.",
+                    eyebrow: initialCategory != nil
+                        ? "ATHLTH · PLAN" : "WORKOUT LIBRARY",
+                    title: initialCategory == .strength
+                        ? ATHLTHLocalization.choose(
+                            english: "Strength workouts", norwegian: "Styrkeøkter"
+                          )
+                        : initialCategory == .running
+                            ? ATHLTHLocalization.choose(
+                                english: "Running workouts", norwegian: "Løpeøkter"
+                              )
+                            : initialCategory?.title ?? "Complete workouts",
+                    subtitle: initialCategory == .strength
+                        ? ATHLTHLocalization.choose(
+                            english: "Choose muscle groups and preview the actual exercises before planning.",
+                            norwegian: "Velg muskelgrupper og se øvelsene før du planlegger."
+                          )
+                        : initialCategory == .running
+                            ? ATHLTHLocalization.choose(
+                                english: "Find intervals, easy runs or long runs. Filter and inspect each part.",
+                                norwegian: "Finn intervaller, rolige turer eller langtur. Filtrer og se alle øktdelene."
+                              )
+                            : initialCategory != nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "Explore and adapt an existing workout.",
+                                    norwegian: "Finn og tilpass en eksisterende økt."
+                                  )
+                                : "A workout is the session you actually perform. It can combine running, exercises, rest, routes and targets in one structure.",
                     icon: "rectangle.stack.fill",
                     accent: ATHLTHPlanDesign.accentInk
                 ) {
@@ -1480,7 +1515,9 @@ struct WorkoutTemplateLibraryView: View {
                 accent: ATHLTHPlanDesign.accent.opacity(0.16)
             )
         )
-        .navigationTitle(ATHLTHLocalization.choose(english: "Workouts", norwegian: "Treningsøkter"))
+        .navigationTitle(initialCategory?.title ?? ATHLTHLocalization.choose(
+            english: "Workouts", norwegian: "Treningsøkter"
+        ))
         .navigationBarTitleDisplayMode(.inline)
         .searchable(
             text: $query,
