@@ -30,6 +30,8 @@ final class AppleCalendarSyncStore: ObservableObject {
         let communityEvents: [CommunityEventItem]
         let groupEvents: [CommunityGroupEventRecord]
         let groupEventRSVPs: [CommunityGroupEventRSVPRecord]
+        let clubChallenges: [CommunityGroupChallengeRecord]
+        let clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord]
         let challenges: [ATHLTHChallenge]
         let currentUserID: UUID?
     }
@@ -212,6 +214,8 @@ final class AppleCalendarSyncStore: ObservableObject {
         communityEvents: [CommunityEventItem] = [],
         groupEvents: [CommunityGroupEventRecord] = [],
         groupEventRSVPs: [CommunityGroupEventRSVPRecord] = [],
+        clubChallenges: [CommunityGroupChallengeRecord] = [],
+        clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge] = [],
         currentUserID: UUID? = nil
     ) async {
@@ -238,6 +242,8 @@ final class AppleCalendarSyncStore: ObservableObject {
                 communityEvents: communityEvents,
                 groupEvents: groupEvents,
                 groupEventRSVPs: groupEventRSVPs,
+                clubChallenges: clubChallenges,
+                clubChallengeParticipations: clubChallengeParticipations,
                 challenges: challenges,
                 currentUserID: currentUserID
             )
@@ -373,6 +379,8 @@ final class AppleCalendarSyncStore: ObservableObject {
         communityEvents: [CommunityEventItem] = [],
         groupEvents: [CommunityGroupEventRecord] = [],
         groupEventRSVPs: [CommunityGroupEventRSVPRecord] = [],
+        clubChallenges: [CommunityGroupChallengeRecord] = [],
+        clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge] = [],
         currentUserID: UUID? = nil
     ) async {
@@ -395,6 +403,8 @@ final class AppleCalendarSyncStore: ObservableObject {
             communityEvents: communityEvents,
             groupEvents: groupEvents,
             groupEventRSVPs: groupEventRSVPs,
+            clubChallenges: clubChallenges,
+            clubChallengeParticipations: clubChallengeParticipations,
             challenges: challenges,
             currentUserID: currentUserID
         )
@@ -407,6 +417,8 @@ final class AppleCalendarSyncStore: ObservableObject {
         communityEvents: [CommunityEventItem] = [],
         groupEvents: [CommunityGroupEventRecord] = [],
         groupEventRSVPs: [CommunityGroupEventRSVPRecord] = [],
+        clubChallenges: [CommunityGroupChallengeRecord] = [],
+        clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge] = [],
         currentUserID: UUID? = nil
     ) async {
@@ -417,6 +429,8 @@ final class AppleCalendarSyncStore: ObservableObject {
             communityEvents: communityEvents,
             groupEvents: groupEvents,
             groupEventRSVPs: groupEventRSVPs,
+            clubChallenges: clubChallenges,
+            clubChallengeParticipations: clubChallengeParticipations,
             challenges: challenges,
             currentUserID: currentUserID
         )
@@ -462,6 +476,10 @@ final class AppleCalendarSyncStore: ObservableObject {
                     pendingSnapshot.groupEvents,
                 groupEventRSVPs:
                     pendingSnapshot.groupEventRSVPs,
+                clubChallenges:
+                    pendingSnapshot.clubChallenges,
+                clubChallengeParticipations:
+                    pendingSnapshot.clubChallengeParticipations,
                 challenges:
                     pendingSnapshot.challenges,
                 currentUserID:
