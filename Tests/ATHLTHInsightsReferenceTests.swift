@@ -39,9 +39,9 @@ final class ATHLTHInsightsReferenceTests: XCTestCase {
                        load.walkingMinutes + load.otherMinutes, load.acuteMinutes)
     }
 
-    func testFourReferenceSectionsAreAvailable() {
+    func testThreeInsightsSectionsPreserveUnderlyingHealthMetrics() {
         XCTAssertEqual(ATHLTHInsightsSection.allCases,
-                       [.overview, .health, .training, .development])
+                       [.overview, .training, .development])
         XCTAssertEqual(ATHLTHInsightReferenceMetric.allCases.count, 4)
     }
 }
