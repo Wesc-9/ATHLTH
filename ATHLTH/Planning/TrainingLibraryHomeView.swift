@@ -15,6 +15,7 @@ struct TrainingLibraryHomeView: View {
     let onStartRunning: (RunningWorkoutTemplate) -> Void
     var onOpenPlan: ((UUID) -> Void)? = nil
     @State private var showingRecoveryRestPlanner = false
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
 
     private let ink = ATHLTHPlanDesign.ink
     private let muted = ATHLTHPlanDesign.secondaryInk
@@ -24,12 +25,22 @@ struct TrainingLibraryHomeView: View {
     private let lavender = ATHLTHTheme.recoveryBlue
 
     private var layout: [GridItem] {
-        [GridItem(.flexible(), spacing: 11), GridItem(.flexible(), spacing: 11)]
+        displayMode == .grid
+            ? [GridItem(.flexible(), spacing: 11), GridItem(.flexible(), spacing: 11)]
+            : [GridItem(.flexible())]
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 25) {
             introduction
+
+            HStack {
+                Text(tr("View", "Visning"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(muted)
+                Spacer()
+                ATHLTHLibraryDisplayPicker(selection: $displayMode)
+            }
 
             exploreSection
 
@@ -49,6 +60,15 @@ struct TrainingLibraryHomeView: View {
         .buttonStyle(.plain)
         .task {
             await favorites.refresh()
+        }
+        .onAppear {
+            displayMode = .load(userID: session.profile.userID)
+        }
+        .onChange(of: session.profile.userID) { _, userID in
+            displayMode = .load(userID: userID)
+        }
+        .onChange(of: displayMode) { _, mode in
+            mode.save(userID: session.profile.userID)
         }
         .sheet(isPresented: $showingRecoveryRestPlanner) {
             ATHLTHRecoveryRestPlanningSheet()
@@ -113,6 +133,7 @@ struct TrainingLibraryHomeView: View {
                         detail: tr("Find a complete plan", "Finn en ferdig plan"),
                         symbol: "square.stack.3d.up.fill",
                         artwork: "GoalProgress",
+                        compact: displayMode == .list,
                         tint: gold
                     )
                 }
@@ -126,6 +147,7 @@ struct TrainingLibraryHomeView: View {
                                    "Styrke, løping og mer"),
                         symbol: "dumbbell.fill",
                         artwork: "StrengthQuickHero",
+                        compact: displayMode == .list,
                         tint: lavender
                     )
                 }
@@ -139,6 +161,7 @@ struct TrainingLibraryHomeView: View {
                                    "Søk på muskel og utstyr"),
                         symbol: "figure.strengthtraining.traditional",
                         artwork: "GoalStrength",
+                        compact: displayMode == .list,
                         tint: slate
                     )
                 }
@@ -152,6 +175,7 @@ struct TrainingLibraryHomeView: View {
                                    "Finn en ny tur eller løperute"),
                         symbol: "map.fill",
                         artwork: "GoalAdventure",
+                        compact: displayMode == .list,
                         tint: green
                     )
                 }
@@ -167,7 +191,11 @@ struct TrainingLibraryHomeView: View {
                 detail: tr("Everything you have created and saved.",
                            "Alt du har opprettet og lagret.")
             )
-            VStack(spacing: 0) {
+            LazyVGrid(
+                columns: displayMode == .grid
+                    ? layout : [GridItem(.flexible())],
+                spacing: displayMode == .grid ? 11 : 0
+            ) {
                 NavigationLink {
                     MyTrainingPlansLibraryView(onOpenPlan: onOpenPlan)
                 } label: {
@@ -176,10 +204,11 @@ struct TrainingLibraryHomeView: View {
                         detail: tr("Created and scheduled", "Opprettede og planlagte"),
                         symbol: "calendar",
                         tint: gold,
-                        count: session.trainingPlans.count
+                        count: session.trainingPlans.count,
+                        grid: displayMode == .grid
                     )
                 }
-                libraryDivider
+                if displayMode == .list { libraryDivider }
                 NavigationLink {
                     LibrarySavedWorkoutsHubView(
                         onStartRunning: onStartRunning
@@ -192,10 +221,11 @@ struct TrainingLibraryHomeView: View {
                         symbol: "bookmark",
                         tint: slate,
                         count: session.savedWorkoutTemplates.count
-                            + runningLibrary.customTemplates.count
+                            + runningLibrary.customTemplates.count,
+                        grid: displayMode == .grid
                     )
                 }
-                libraryDivider
+                if displayMode == .list { libraryDivider }
                 NavigationLink {
                     ExerciseLibraryView(source: .mine)
                 } label: {
@@ -204,10 +234,11 @@ struct TrainingLibraryHomeView: View {
                         detail: tr("Custom movements", "Egne øvelser"),
                         symbol: "dumbbell",
                         tint: lavender,
-                        count: exerciseLibrary.customExercises.count
+                        count: exerciseLibrary.customExercises.count,
+                        grid: displayMode == .grid
                     )
                 }
-                libraryDivider
+                if displayMode == .list { libraryDivider }
                 NavigationLink {
                     RouteLibraryListView(source: .mine)
                 } label: {
@@ -216,10 +247,11 @@ struct TrainingLibraryHomeView: View {
                         detail: tr("Saved and created routes", "Lagrede og opprettede ruter"),
                         symbol: "map",
                         tint: green,
-                        count: session.savedRoutes.count
+                        count: session.savedRoutes.count,
+                        grid: displayMode == .grid
                     )
                 }
-                libraryDivider
+                if displayMode == .list { libraryDivider }
                 NavigationLink {
                     LibraryFavoritesView(onStartRunning: onStartRunning)
                 } label: {
@@ -229,11 +261,12 @@ struct TrainingLibraryHomeView: View {
                                    "Dine favoritter på ett sted"),
                         symbol: "star",
                         tint: gold,
-                        count: favorites.favorites.count
+                        count: favorites.favorites.count,
+                        grid: displayMode == .grid
                     )
                 }
             }
-            .background(.white.opacity(0.92),
+            .background(displayMode == .list ? .white.opacity(0.92) : .clear,
                         in: RoundedRectangle(cornerRadius: 22))
             .overlay {
                 RoundedRectangle(cornerRadius: 22)
@@ -357,6 +390,7 @@ private struct LibraryHubCategoryTile: View {
     let symbol: String
     let artwork: String
     let tint: Color
+    var compact: Bool = false
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -396,7 +430,7 @@ private struct LibraryHubCategoryTile: View {
             }
             .padding(13)
         }
-        .frame(height: 160)
+        .frame(height: compact ? 91 : 160)
         .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
@@ -414,6 +448,7 @@ private struct LibraryHubCollectionRow: View {
     let symbol: String
     let tint: Color
     let count: Int?
+    var grid: Bool = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -443,7 +478,10 @@ private struct LibraryHubCollectionRow: View {
                 .foregroundStyle(Color.gray.opacity(0.68))
         }
         .padding(.horizontal, 14)
-        .frame(minHeight: 67)
+        .frame(maxWidth: .infinity, minHeight: grid ? 120 : 67,
+               alignment: grid ? .topLeading : .center)
+        .background(grid ? Color.white.opacity(0.96) : .clear,
+                    in: RoundedRectangle(cornerRadius: 18))
         .contentShape(Rectangle())
         .accessibilityElement(children: .combine)
     }
