@@ -1788,13 +1788,22 @@ final class AppSessionStore: ObservableObject {
             plans.removeAll { $0.id == resolvedActive.id }
         }
 
-        activePlan = resolvedActive
-        scheduledPlans = plans.sorted {
+        // Only publish genuine plan changes. This method runs on Train
+        // entry/foreground; assigning identical @Published values needlessly
+        // invalidates Home, Train, Insights and every plan subscriber.
+        // The active plan also schedules a full account-content save in didSet.
+        if activePlan != resolvedActive {
+            activePlan = resolvedActive
+        }
+        let resolvedScheduled = plans.sorted {
             let lhs = $0.startDate ?? $0.createdAt
             let rhs = $1.startDate ?? $1.createdAt
             return lhs < rhs
         }
-        persistScheduledPlans()
+        if scheduledPlans != resolvedScheduled {
+            scheduledPlans = resolvedScheduled
+            persistScheduledPlans()
+        }
     }
 
     func deleteTrainingPlan(
