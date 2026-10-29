@@ -384,7 +384,17 @@ struct ATHLTHTrainLibraryPremiumView: View {
                             ForEach(entries) { entry in
                                 Button { selectedExercise = entry } label: {
                                     HStack(spacing: 11) {
-                                        ExerciseArtwork(entry: entry, size: 43)
+                                        // Keep Train's large index lightweight:
+                                        // full photographic media loads only in
+                                        // the dedicated exercise detail screen.
+                                        Image(systemName: "dumbbell")
+                                            .font(.system(size: 17, weight: .light))
+                                            .foregroundStyle(champagne)
+                                            .frame(width: 43, height: 43)
+                                            .background(
+                                                paper,
+                                                in: RoundedRectangle(cornerRadius: 11)
+                                            )
                                         VStack(alignment: .leading, spacing: 4) {
                                             Text(exerciseLibrary.localizedExerciseName(entry))
                                                 .font(.subheadline.weight(.medium))
