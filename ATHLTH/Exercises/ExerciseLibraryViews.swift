@@ -904,6 +904,43 @@ struct ExerciseLibraryView: View {
                 y: 5
             )
 
+            // One swipeable horizontal line, matching the muscle chips in
+            // Train's plan library. Every muscle is visible as a direct tap
+            // rather than hiding the choices inside a dropdown menu.
+            ScrollViewReader { proxy in
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 8) {
+                        muscleGroupChip(
+                            ATHLTHLocalization.choose(
+                                english: "All", norwegian: "Alle"
+                            ),
+                            value: "All"
+                        )
+                        .id("All")
+
+                        ForEach(library.bodyParts, id: \.self) { part in
+                            muscleGroupChip(
+                                library.localizedBodyPartTitle(part),
+                                value: part
+                            )
+                            .id(part)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+                .onAppear {
+                    proxy.scrollTo(selectedBodyPart, anchor: .center)
+                }
+                .onChange(of: selectedBodyPart) { _, value in
+                    withAnimation(.easeOut(duration: 0.18)) {
+                        proxy.scrollTo(value, anchor: .center)
+                    }
+                }
+            }
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Muscle groups", norwegian: "Muskelgrupper"
+            ))
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     if onSelect == nil {
@@ -936,36 +973,6 @@ struct ExerciseLibraryView: View {
                         )
                     }
                     .buttonStyle(.plain)
-                    }
-
-                    Menu {
-                        Button(
-                            ATHLTHLocalization.choose(
-                                english: "All",
-                                norwegian: "Alle"
-                            )
-                        ) { selectedBodyPart = "All" }
-                        ForEach(library.bodyParts, id: \.self) { part in
-                            Button(
-                                library.localizedBodyPartTitle(
-                                    part
-                                )
-                            ) {
-                                selectedBodyPart = part
-                            }
-                        }
-                    } label: {
-                        filterChip(
-                            selectedBodyPart == "All"
-                                ? ATHLTHLocalization.choose(
-                                    english: "Muscle group",
-                                    norwegian: "Muskelgruppe"
-                                )
-                                : library.localizedBodyPartTitle(
-                                    selectedBodyPart
-                                ),
-                            active: selectedBodyPart != "All"
-                        )
                     }
 
                     Menu {
@@ -1018,6 +1025,34 @@ struct ExerciseLibraryView: View {
         .padding(.horizontal)
         .padding(.top, 8)
         .padding(.bottom, 6)
+    }
+
+    private func muscleGroupChip(_ title: String, value: String) -> some View {
+        let selected = selectedBodyPart == value
+        return Button {
+            selectedBodyPart = value
+        } label: {
+            Text(title)
+                .font(.caption.weight(selected ? .semibold : .medium))
+                .foregroundStyle(
+                    selected ? Color.white : ATHLTHPlanDesign.ink
+                )
+                .lineLimit(1)
+                .padding(.horizontal, 13)
+                .frame(height: 34)
+                .background(
+                    selected ? ATHLTHPlanDesign.ink : Color.white,
+                    in: Capsule()
+                )
+                .overlay {
+                    Capsule().strokeBorder(
+                        ATHLTHPlanDesign.outline,
+                        lineWidth: selected ? 0 : 0.8
+                    )
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
     private func filterChip(_ text: String, active: Bool) -> some View {
