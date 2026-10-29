@@ -480,10 +480,7 @@ struct ExerciseLibraryView: View {
                     ) {
                         if !entries.isEmpty {
                             ATHLTHExerciseAlphabetIndex(
-                                targets: ATHLTHExerciseAlphabet.firstIDs(
-                                    for: entries,
-                                    name: library.localizedExerciseName
-                                ),
+                                targets: library.alphabetIndexTargets(for: entries),
                                 onJump: { id in
                                     withAnimation(.easeOut(duration: 0.18)) {
                                         proxy.scrollTo(id, anchor: .top)
