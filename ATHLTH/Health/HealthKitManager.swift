@@ -207,6 +207,11 @@ final class HealthKitManager: ObservableObject {
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
     private var workoutPeakCache:
         (records: [ATHLTHWorkoutHeartRatePeak], generatedAt: Date)?
+    // Background auto-updates scan only a few uncached sample histories.
+    // Keep this cache separate from exhaustive user-initiated HRmax searches.
+    private var workoutPeakLightCache:
+        (records: [ATHLTHWorkoutHeartRatePeak], generatedAt: Date)?
+    private var workoutPeakLightScanInProgress = false
     // Home's light recent-workout refresh must not launch simultaneous
     // HealthKit queries or repeat a full health assessment on every render.
     private var lastHomeWorkoutRefreshAt: Date?
@@ -1577,7 +1582,8 @@ final class HealthKitManager: ObservableObject {
     /// workouts with the established sample-based fallback.
     func highestRecordedWorkoutHeartRates(
         limit: Int = 5,
-        forceRefresh: Bool = false
+        forceRefresh: Bool = false,
+        sampleFallbackLimit: Int = 100
     ) async throws -> [ATHLTHWorkoutHeartRatePeak] {
         guard integrationEnabled,
               healthDataAvailable,
@@ -1587,10 +1593,31 @@ final class HealthKitManager: ObservableObject {
                 forIdentifier: .heartRate
               ) else { return [] }
 
+        // A foreground refresh must not wait for up to 100 sequential
+        // HKSampleQuery fallbacks. The full profile picker still uses the
+        // exhaustive historical search, including older imported workouts.
+        let fallbackLimit = min(max(sampleFallbackLimit, 0), 100)
         if !forceRefresh,
            let cache = workoutPeakCache,
            Date().timeIntervalSince(cache.generatedAt) < 600 {
             return Array(cache.records.prefix(max(1, limit)))
+        }
+        if fallbackLimit < 100 {
+            if !forceRefresh,
+               let light = workoutPeakLightCache,
+               Date().timeIntervalSince(light.generatedAt) < 600 {
+                return Array(light.records.prefix(max(1, limit)))
+            }
+            // Two foreground observers may ask for the same results together.
+            // The first owner will apply the result; the second avoids
+            // duplicating HealthKit work.
+            guard !workoutPeakLightScanInProgress else { return [] }
+            workoutPeakLightScanInProgress = true
+        }
+        defer {
+            if fallbackLimit < 100 {
+                workoutPeakLightScanInProgress = false
+            }
         }
 
         let workouts = try await fetchAllWorkoutsCached(
@@ -1613,7 +1640,7 @@ final class HealthKitManager: ObservableObject {
                 peak = ATHLTHWorkoutHeartRatePeakPolicy.validPeak(
                     cachedPeak
                 )
-            } else if fallbackChecks < 100 {
+            } else if fallbackChecks < fallbackLimit {
                 fallbackChecks += 1
                 let sampleStats = try? await fetchHeartRateStats(
                     for: workout
@@ -1639,7 +1666,11 @@ final class HealthKitManager: ObservableObject {
                 ? $0.workoutDate > $1.workoutDate
                 : $0.beatsPerMinute > $1.beatsPerMinute
         }
-        workoutPeakCache = (records, Date())
+        if fallbackLimit == 100 {
+            workoutPeakCache = (records, Date())
+        } else {
+            workoutPeakLightCache = (records, Date())
+        }
         return Array(records.prefix(max(1, limit)))
     }
 
@@ -4795,6 +4826,7 @@ final class HealthKitManager: ObservableObject {
     private func invalidateWorkoutDerivedCaches() {
         allWorkoutsCache = nil
         workoutPeakCache = nil
+        workoutPeakLightCache = nil
         workoutRouteCache.removeAll(
             keepingCapacity: false
         )
