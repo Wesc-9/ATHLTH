@@ -1068,10 +1068,18 @@ struct ATHLTHInsightsView: View {
 struct InsightsSessionBaselines: Equatable {
     let allSessionMinutes: Double?
     let runningSessionMinutes: Double?
+    let allWeeklyMinutes: Double?
+    let runningWeeklyMinutes: Double?
+    let allWeeklySessions: Double?
+    let runningWeeklySessions: Double?
 
     static let empty = InsightsSessionBaselines(
         allSessionMinutes: nil,
-        runningSessionMinutes: nil
+        runningSessionMinutes: nil,
+        allWeeklyMinutes: nil,
+        runningWeeklyMinutes: nil,
+        allWeeklySessions: nil,
+        runningWeeklySessions: nil
     )
 
     static func calculate(
@@ -1104,11 +1112,18 @@ struct InsightsSessionBaselines: Equatable {
             }
         }
 
+        // Four complete weeks of history, not the current calendar week.
+        // Keep unavailable history nil: never invent a 45-minute baseline.
         return InsightsSessionBaselines(
             allSessionMinutes: allCount > 0
                 ? allTotal / Double(allCount) : nil,
             runningSessionMinutes: runningCount > 0
-                ? runningTotal / Double(runningCount) : nil
+                ? runningTotal / Double(runningCount) : nil,
+            allWeeklyMinutes: allCount > 0 ? allTotal / 4 : nil,
+            runningWeeklyMinutes: runningCount > 0 ? runningTotal / 4 : nil,
+            allWeeklySessions: allCount > 0 ? Double(allCount) / 4 : nil,
+            runningWeeklySessions: runningCount > 0
+                ? Double(runningCount) / 4 : nil
         )
     }
 }
