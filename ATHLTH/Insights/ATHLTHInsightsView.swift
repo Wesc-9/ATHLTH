@@ -859,8 +859,7 @@ struct InsightsSessionBaselines: Equatable {
             if workout.activity == .running {
                 runningCount += 1
                 runningTotal += minutes
-            } else if workout.activity == .traditionalStrengthTraining ||
-                        workout.activity == .functionalStrengthTraining {
+            } else if workout.activity == .strength {
                 strengthCount += 1
                 strengthTotal += minutes
             } else if workout.activity == .walking {
