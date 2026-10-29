@@ -529,6 +529,15 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachSavedRuleSets: [ATHLTHAudioCoachRuleSet] {
         didSet { persist() }
     }
+    @Published var audioCoachSmartSettings: ATHLTHAudioCoachSmartSettings {
+        didSet { persist() }
+    }
+    @Published var audioCoachProfiles: [ATHLTHAudioCoachProfile] {
+        didSet { persist() }
+    }
+    @Published var activeAudioCoachProfileID: UUID? {
+        didSet { persist() }
+    }
     @Published var audioCoachAnnounceDistance: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceElapsedTime: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceAveragePace: Bool { didSet { persist() } }
@@ -865,6 +874,19 @@ final class AppSettingsStore: ObservableObject {
                 .flatMap { try? JSONDecoder().decode(
                     [ATHLTHAudioCoachRuleSet].self, from: $0) }
         ) ?? []
+        audioCoachSmartSettings = defaults.data(
+            forKey: "settings.audioCoach.smartPrompts.v1"
+        ).flatMap { try? JSONDecoder().decode(
+            ATHLTHAudioCoachSmartSettings.self, from: $0
+        ) } ?? ATHLTHAudioCoachSmartSettings()
+        audioCoachProfiles = defaults.data(
+            forKey: "settings.audioCoach.profiles.v1"
+        ).flatMap { try? JSONDecoder().decode(
+            [ATHLTHAudioCoachProfile].self, from: $0
+        ) } ?? []
+        activeAudioCoachProfileID = defaults.string(
+            forKey: "settings.audioCoach.activeProfileID.v1"
+        ).flatMap(UUID.init(uuidString:))
         audioCoachAnnounceDistance =
             defaults.object(
                 forKey: "settings.audioCoach.announceDistance"
@@ -1187,6 +1209,18 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.audioCoach.savedRuleSets.v1"
         )
         defaults.set(
+            try? JSONEncoder().encode(audioCoachSmartSettings),
+            forKey: "settings.audioCoach.smartPrompts.v1"
+        )
+        defaults.set(
+            try? JSONEncoder().encode(audioCoachProfiles),
+            forKey: "settings.audioCoach.profiles.v1"
+        )
+        defaults.set(
+            activeAudioCoachProfileID?.uuidString,
+            forKey: "settings.audioCoach.activeProfileID.v1"
+        )
+        defaults.set(
             audioCoachAnnounceDistance,
             forKey: "settings.audioCoach.announceDistance"
         )
@@ -1456,6 +1490,7 @@ final class AppSettingsStore: ObservableObject {
                     : nil,
             customRules: audioCoachCustomRules.isEmpty ? nil
                 : Array(audioCoachCustomRules.prefix(20)),
+            smartPrompts: audioCoachSmartSettings,
             announceDistance: audioCoachAnnounceDistance,
             announceElapsedTime: audioCoachAnnounceElapsedTime,
             announceAveragePace: audioCoachAnnounceAveragePace,
@@ -1516,6 +1551,62 @@ final class AppSettingsStore: ObservableObject {
         )
 
         return applyingFuelVoice(to: configuration)
+    }
+
+    /// A profile captures a reusable full set of coach preferences. It does not
+    /// overwrite the older saved announcement lists.
+    func saveAudioCoachProfile(named rawName: String) {
+        let name = String(rawName.trimmingCharacters(
+            in: .whitespacesAndNewlines
+        ).prefix(60))
+        guard !name.isEmpty, audioCoachProfiles.count < 30 else { return }
+        let profile = ATHLTHAudioCoachProfile(
+            name: name, configuration: audioCoachConfiguration(enabled: true)
+        )
+        audioCoachProfiles.append(profile)
+        activeAudioCoachProfileID = profile.id
+    }
+
+    func applyAudioCoachProfile(_ profile: ATHLTHAudioCoachProfile) {
+        let config = profile.configuration
+        audioCoachCustomRules = config.customRules ?? []
+        audioCoachSmartSettings = config.smartPrompts ?? ATHLTHAudioCoachSmartSettings()
+        audioCoachDistanceTriggerEnabled = config.distanceIntervalMeters != nil
+        if let distance = config.distanceIntervalMeters {
+            audioCoachDistanceIntervalKilometers = distance / 1_000
+        }
+        audioCoachTimeTriggerEnabled = config.timeIntervalSeconds != nil
+        if let seconds = config.timeIntervalSeconds {
+            audioCoachTimeIntervalSeconds = Int(seconds)
+            audioCoachTimeIntervalMinutes = max(1, Int((seconds / 60).rounded()))
+        }
+        audioCoachAnnounceDistance = config.announceDistance
+        audioCoachAnnounceElapsedTime = config.announceElapsedTime
+        audioCoachAnnounceAveragePace = config.announceAveragePace
+        audioCoachAnnounceClockTime = config.announceClockTime
+        audioCoachAnnounceHeartRate = config.announceHeartRate
+        audioCoachAnnounceRemainingRouteDistance =
+            config.announceRemainingRouteDistance
+        audioCoachAnnounceEstimatedRemainingRouteTime =
+            config.announceEstimatedRemainingRouteTime
+        audioCoachAnnounceCurrentWorkoutStep =
+            config.announceCurrentWorkoutStep
+        audioCoachAnnounceRemainingStepTime =
+            config.announceRemainingStepTime
+        audioCoachAnnounceRemainingStepDistance =
+            config.announceRemainingStepDistance
+        audioCoachDuckOtherAudio = config.shouldDuckOtherAudio
+        guidanceQuietPeriodSeconds = Int(config.resolvedGuidanceQuietPeriodSeconds)
+        audioCoachLanguage = config.language
+        audioCoachVoiceIdentifier = config.voiceIdentifier
+        audioCoachSpeechRate = Double(config.resolvedSpeechRate)
+        audioCoachSpeechVolume = Double(config.resolvedSpeechVolume)
+        audioCoachSpeechStyle = config.speechStyle ?? .balanced
+        audioCoachAnnounceWorkoutStart = config.shouldAnnounceWorkoutStart
+        audioCoachAnnouncePauseResume = config.shouldAnnouncePauseResume
+        audioCoachAnnounceWorkoutComplete = config.shouldAnnounceWorkoutComplete
+        audioCoachEnabledByDefault = true
+        activeAudioCoachProfileID = profile.id
     }
 
     /// Append the current signed-in athlete's voice plan to any approved
