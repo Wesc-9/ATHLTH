@@ -6367,14 +6367,6 @@ struct ATHLTHTrainView: View {
                     isHealthCompleted: healthCompleted
                 )
             },
-            onSendWorkoutToWatch: { workout in
-                guard let active else { return }
-                prepareTodayWorkoutForAppleWatch(workout, planID: active.id)
-            },
-            onDelayWorkout: { workout, seconds in
-                guard let active else { return }
-                scheduleTodayWorkoutStart(workout, planID: active.id, after: seconds)
-            },
             onWorkoutDetails: { workout, healthCompleted in
                 guard let active else { return }
                 selectedPlanWorkout = PlannedWorkoutSelection(
@@ -6382,6 +6374,14 @@ struct ATHLTHTrainView: View {
                     workout: workout,
                     isHealthCompleted: healthCompleted
                 )
+            },
+            onSendWorkoutToWatch: { workout in
+                guard let active else { return }
+                prepareTodayWorkoutForAppleWatch(workout, planID: active.id)
+            },
+            onDelayWorkout: { workout, seconds in
+                guard let active else { return }
+                scheduleTodayWorkoutStart(workout, planID: active.id, after: seconds)
             },
             onAcceptAlternative: { planned, suggestion in
                 guard !hasOngoingTrainWorkout,
