@@ -10257,9 +10257,12 @@ struct SessionEditorView: View {
     }
 
     private func persistSession(_ workout: PlannedSession) {
-        if let selectedScratchWorkoutType {
+        if selectedScratchWorkoutType != nil {
+            // Count the activity that was actually saved. A scratch running
+            // workout may have become a hybrid or cycling session in the
+            // shared timeline builder.
             ATHLTHPlannedWorkoutTypeUsageStore.record(
-                selectedScratchWorkoutType,
+                ATHLTHPlannedWorkoutType.from(workout),
                 userID: session.profile.userID
             )
         }
