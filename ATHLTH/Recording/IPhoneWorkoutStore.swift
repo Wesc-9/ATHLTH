@@ -351,6 +351,7 @@ final class IPhoneWorkoutStore:
         AVSpeechSynthesizer()
     private let azureCoachSpeech = ATHLTHAzureWorkoutSpeech()
     private let audioOwner = "phone-workout-\(UUID().uuidString)"
+    private var localSpeechWatchdog: Task<Void, Never>?
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
     private var coachEventLedger = ATHLTHCoachEventLedger()
@@ -4534,6 +4535,7 @@ final class IPhoneWorkoutStore:
                     owner: self.audioOwner
                 )
                 self.speechSynthesizer.speak(utterance)
+                self.watchLocalCoachSpeech(utterance)
             },
             onFinished: { [weak self] in
                 guard let self else { return }
@@ -4547,6 +4549,7 @@ final class IPhoneWorkoutStore:
                 owner: audioOwner
             )
             speechSynthesizer.speak(utterance)
+            watchLocalCoachSpeech(utterance)
         }
         if rememberForReplay,
            ATHLTHCoachReplayMemory.mayRemember(priority: priority) {
@@ -4568,7 +4571,40 @@ final class IPhoneWorkoutStore:
         )
     }
 
+    /// Some AirPods/Spotify handoffs lose AVSpeechSynthesizer's completion.
+    /// Poll the synthesizer and release ducking promptly when it falls idle.
+    private func watchLocalCoachSpeech(_ utterance: AVSpeechUtterance) {
+        localSpeechWatchdog?.cancel()
+        let maximumSeconds = max(
+            10, min(45, Double(utterance.speechString.count) / 8 + 10)
+        )
+        localSpeechWatchdog = Task { @MainActor [weak self] in
+            for _ in 0..<Int(ceil(maximumSeconds)) {
+                do { try await Task.sleep(for: .seconds(1)) }
+                catch { return }
+                guard let self, !Task.isCancelled else { return }
+                if !self.speechSynthesizer.isSpeaking &&
+                    !self.azureCoachSpeech.isBusy {
+                    self.localSpeechWatchdog = nil
+                    ATHLTHSpokenAudioSession.deactivate(owner: self.audioOwner)
+                    self.guidancePriorityGate.voiceDidFinish()
+                    self.deliverNextQueuedCoachCue()
+                    return
+                }
+            }
+            guard let self, !Task.isCancelled,
+                  !self.azureCoachSpeech.isBusy else { return }
+            self.speechSynthesizer.stopSpeaking(at: .immediate)
+            self.localSpeechWatchdog = nil
+            ATHLTHSpokenAudioSession.deactivate(owner: self.audioOwner)
+            self.guidancePriorityGate.voiceDidFinish()
+            self.deliverNextQueuedCoachCue()
+        }
+    }
+
     private func deactivateCoachAudioSession() {
+        localSpeechWatchdog?.cancel()
+        localSpeechWatchdog = nil
         azureCoachSpeech.stop()
         speechSynthesizer.stopSpeaking(
             at: .immediate
@@ -4593,6 +4629,8 @@ final class IPhoneWorkoutStore:
             }
 
             self.guidancePriorityGate.voiceDidFinish()
+            self.localSpeechWatchdog?.cancel()
+            self.localSpeechWatchdog = nil
 
             ATHLTHSpokenAudioSession
                 .deactivate(owner: audioOwner)
@@ -4615,6 +4653,8 @@ final class IPhoneWorkoutStore:
             }
 
             self.guidancePriorityGate.voiceDidFinish()
+            self.localSpeechWatchdog?.cancel()
+            self.localSpeechWatchdog = nil
 
             ATHLTHSpokenAudioSession
                 .deactivate(owner: audioOwner)
