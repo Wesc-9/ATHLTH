@@ -833,6 +833,10 @@ struct AppRootView: View {
     }
 
     private func runLifecycleStartupTask() async {
+        let startupSignpost = ATHLTHPerformance.begin("LifecycleStartup")
+        defer {
+            ATHLTHPerformance.end("LifecycleStartup", id: startupSignpost)
+        }
         // Compatibility preview is a CI-only rendering surface. Do not
         // compete with the first frame by starting auth, StoreKit or
         // backend work that the preview neither needs nor can use.
