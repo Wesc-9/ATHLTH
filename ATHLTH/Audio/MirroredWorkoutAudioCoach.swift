@@ -44,6 +44,7 @@ final class MirroredWorkoutAudioCoach:
         TimeInterval?
     private var nextFuelSeconds: TimeInterval?
     private var customAudioCoachLastSlots: [UUID: Int] = [:]
+    private var smartCoachState = ATHLTHAudioCoachSmartState()
     private var lastState:
         WatchWorkoutMirrorState?
     private var lastStepIndex: Int?
@@ -79,6 +80,7 @@ final class MirroredWorkoutAudioCoach:
         announcedStart = false
         finished = false
         workoutStartedAt = nil
+        smartCoachState.reset()
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
             rules: configuration.customRules ?? [],
             distanceMeters: 0,
@@ -199,6 +201,7 @@ final class MirroredWorkoutAudioCoach:
             announceIntervalProgressIfDue(snapshot)
             announceFuelIfNeeded(snapshot)
             announceCustomAudioCoachRules(snapshot)
+            announceSmartCoachIfNeeded(snapshot)
             announceRoutineIfNeeded(snapshot)
         }
 
@@ -306,6 +309,7 @@ final class MirroredWorkoutAudioCoach:
         nextTimeSeconds = nil
         nextFuelSeconds = nil
         customAudioCoachLastSlots = [:]
+        smartCoachState.reset()
         lastState = nil
         lastStepIndex = nil
         announcedStart = false
@@ -488,6 +492,57 @@ final class MirroredWorkoutAudioCoach:
                 validFor: 10
             )
         )
+    }
+
+    private func announceSmartCoachIfNeeded(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) {
+        guard snapshot.kind == .running || snapshot.kind == .walking,
+              let settings = configuration.smartPrompts
+        else { return }
+
+        let norwegian = phrase(english: "en", norwegian: "no") == "no"
+        let positionCue = smartCoachState.nextLandmark(
+            settings: settings,
+            latitude: snapshot.currentLatitude,
+            longitude: snapshot.currentLongitude,
+            horizontalAccuracy: snapshot.currentHorizontalAccuracy,
+            locationAge: Date().timeIntervalSince(snapshot.capturedAt),
+            norwegian: norwegian
+        )
+        if let positionCue {
+            speak(
+                positionCue,
+                priority: .routineCoach,
+                event: ATHLTHCoachEvent(
+                    kind: .routineMilestone,
+                    key: "smart-place:\(Int(snapshot.elapsedTime))",
+                    priority: .routineCoach,
+                    createdAt: snapshot.capturedAt,
+                    validFor: 10
+                )
+            )
+            return
+        }
+
+        if let message = smartCoachState.nextMotivation(
+            settings: settings,
+            elapsed: snapshot.elapsedTime,
+            paceSecondsPerKilometer: resolvedPace(snapshot),
+            norwegian: norwegian
+        ) {
+            speak(
+                message,
+                priority: .routineCoach,
+                event: ATHLTHCoachEvent(
+                    kind: .routineMilestone,
+                    key: "smart-motivation:\(Int(snapshot.elapsedTime))",
+                    priority: .routineCoach,
+                    createdAt: snapshot.capturedAt,
+                    validFor: 12
+                )
+            )
+        }
     }
 
     private func announceRoutineIfNeeded(
