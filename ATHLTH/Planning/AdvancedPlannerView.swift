@@ -5491,6 +5491,7 @@ struct SessionEditorView: View {
     @State private var showingSavedWorkoutPicker = false
     @State private var pickingScratchWorkout = false
     @State private var selectedScratchWorkoutType: ATHLTHPlannedWorkoutType?
+    @State private var scratchTimelineDraftID = UUID()
     @State private var showingUnifiedWorkoutComposer = false
     @State private var showingRecoveryRestPlanner = false
     @State private var showingRestDayPlanner = false
@@ -6242,6 +6243,7 @@ struct SessionEditorView: View {
     ) {
         discardStoredStandaloneDraft()
         selectedScratchWorkoutType = type
+        scratchTimelineDraftID = UUID()
         hasSelectedWorkoutSource = true
         title = ""
         notes = ""
@@ -6584,7 +6586,7 @@ struct SessionEditorView: View {
                         plannedExercises.isEmpty &&
                         selectedRunningWorkouts.isEmpty
                         ? scratchQuickAdd : nil,
-                    draftContext: "session-scratch.\(session.profile.userID.uuidString).\(selectedScratchWorkoutType?.rawValue ?? "custom")",
+                    draftContext: "session-scratch.\(session.profile.userID.uuidString).\(scratchTimelineDraftID.uuidString)",
                     plannedDate: scheduledTime,
                     onAddStandalone: { updated in
                         applyScratchTimeline(updated)
