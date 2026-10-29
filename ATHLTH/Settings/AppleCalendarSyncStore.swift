@@ -766,11 +766,16 @@ final class AppleCalendarSyncStore: ObservableObject {
                 let key = managedKey(type: "group-event", id: record.id)
                 activeKeys.insert(key)
                 let event = existingByKey[key] ?? EKEvent(eventStore: eventStore)
+                let wasRecurring = event.recurrenceRules?.isEmpty == false
                 configure(
                     event, groupEvent: record,
                     attendance: attendance, calendar: calendar
                 )
-                try eventStore.save(event, span: .thisEvent, commit: false)
+                try eventStore.save(
+                    event,
+                    span: wasRecurring ? .futureEvents : .thisEvent,
+                    commit: false
+                )
                 if decision.isTentative { tentativeEvents += 1 }
             }
 
@@ -842,7 +847,8 @@ final class AppleCalendarSyncStore: ObservableObject {
 
             try eventStore.remove(
                 event,
-                span: .thisEvent,
+                span: event.recurrenceRules?.isEmpty == false
+                    ? .futureEvents : .thisEvent,
                 commit: false
             )
         }
@@ -850,7 +856,8 @@ final class AppleCalendarSyncStore: ObservableObject {
         for duplicate in duplicateEvents {
             try eventStore.remove(
                 duplicate,
-                span: .thisEvent,
+                span: duplicate.recurrenceRules?.isEmpty == false
+                    ? .futureEvents : .thisEvent,
                 commit: false
             )
         }
@@ -1266,18 +1273,18 @@ final class AppleCalendarSyncStore: ObservableObject {
                 calendars: [calendar]
             )
 
-        return eventStore
-            .events(
-                matching: predicate
-            )
+        // EventKit expands recurring series into multiple occurrences.
+        // Treat a series as one owned event: otherwise every subsequent
+        // sync interprets its occurrences as duplicates and deletes them.
+        var seenCalendarItemIDs = Set<String>()
+        return eventStore.events(matching: predicate)
             .filter {
                 let notes = $0.notes ?? ""
-                return notes.contains(
-                    "[ATHLTH_MANAGED:"
-                ) ||
-                notes.contains(
-                    "[ATHLTH_SESSION:"
-                )
+                return notes.contains("[ATHLTH_MANAGED:") ||
+                    notes.contains("[ATHLTH_SESSION:")
+            }
+            .filter {
+                seenCalendarItemIDs.insert($0.calendarItemIdentifier).inserted
             }
     }
 
