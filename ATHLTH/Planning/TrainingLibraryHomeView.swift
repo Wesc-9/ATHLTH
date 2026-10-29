@@ -1607,6 +1607,7 @@ struct TrainingPlanLibraryView: View {
     @State private var selectedMuscle: ExerciseMuscleGroup?
     @State private var sessionsPerWeekFilter: Int?
     @State private var weeklySortAscending: Bool?
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @FocusState private var searchFocused: Bool
 
     private let ink = ATHLTHTrainDesign.ink
@@ -1770,6 +1771,13 @@ struct TrainingPlanLibraryView: View {
 
                     resultsHeader
                         .id("all-training-plans")
+                    HStack {
+                        Text(tr("View", "Visning"))
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(muted)
+                        Spacer()
+                        ATHLTHLibraryDisplayPicker(selection: $displayMode)
+                    }
 
                     if filteredEntries.isEmpty {
                         ContentUnavailableView(
@@ -1787,8 +1795,20 @@ struct TrainingPlanLibraryView: View {
                         .padding(.top, 20)
                         .frame(maxWidth: .infinity)
                     } else {
-                        ForEach(listedEntries) { entry in
-                            planListItem(entry)
+                        LazyVGrid(
+                            columns: displayMode == .grid
+                                ? [GridItem(.flexible(), spacing: 10),
+                                   GridItem(.flexible(), spacing: 10)]
+                                : [GridItem(.flexible())],
+                            spacing: 10
+                        ) {
+                            ForEach(listedEntries) { entry in
+                                if displayMode == .grid {
+                                    planGridItem(entry)
+                                } else {
+                                    planListItem(entry)
+                                }
+                            }
                         }
                     }
                 }
@@ -1806,6 +1826,15 @@ struct TrainingPlanLibraryView: View {
             ? tr("Favorite plans", "Favorittplaner")
             : tr("Plans", "Planer"))
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            displayMode = .load(userID: session.profile.userID)
+        }
+        .onChange(of: session.profile.userID) { _, userID in
+            displayMode = .load(userID: userID)
+        }
+        .onChange(of: displayMode) { _, value in
+            value.save(userID: session.profile.userID)
+        }
         .task {
             async let plans: Void = catalog.refresh()
             async let saved: Void = favorites.refresh()
@@ -2186,6 +2215,48 @@ struct TrainingPlanLibraryView: View {
             .background(.white.opacity(0.88), in: Capsule())
         }
         .accessibilityLabel(tr("Plan filters and sorting", "Filtre og sortering av planer"))
+    }
+
+    private func planGridItem(_ entry: TrainingPlanCatalogEntry) -> some View {
+        ZStack(alignment: .topTrailing) {
+            NavigationLink {
+                TrainingPlanCatalogDetailView(
+                    entry: entry, onPlanCreated: onPlanCreated
+                )
+            } label: {
+                VStack(alignment: .leading, spacing: 8) {
+                    Image(categoryArtwork(entry))
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 91)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                    Text(entry.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                    Text(tr("\(entry.durationWeeks) weeks", "\(entry.durationWeeks) uker"))
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                    Spacer(minLength: 0)
+                }
+                .padding(11)
+                .frame(maxWidth: .infinity, minHeight: 195, alignment: .topLeading)
+                .background(.white, in: RoundedRectangle(cornerRadius: 19))
+            }
+            .buttonStyle(.plain)
+
+            LibraryFavoriteButton(
+                kind: .plan,
+                itemID: entry.id.uuidString,
+                title: entry.title,
+                subtitle: "\(entry.durationWeeks) weeks · \(entry.level)",
+                icon: "calendar.badge.clock"
+            )
+            .padding(6)
+        }
     }
 
     private func planListItem(_ entry: TrainingPlanCatalogEntry) -> some View {
