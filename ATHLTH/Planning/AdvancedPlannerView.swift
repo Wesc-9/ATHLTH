@@ -5943,7 +5943,9 @@ struct SessionEditorView: View {
                             norwegian: "Legg til i aktiv plan"
                         ) + " · " + plan.title, isOn: $saveToActivePlan)
                         .tint(ATHLTHTheme.accentDeep)
-                        .disabled(activePlanDestination == nil)
+                        // Keep the toggle operable if a previously valid
+                        // date becomes invalid, so the user can opt out.
+                        .disabled(activePlanDestination == nil && !saveToActivePlan)
 
                         if activePlanDestination == nil {
                             Text(ATHLTHLocalization.choose(
