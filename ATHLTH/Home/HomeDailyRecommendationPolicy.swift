@@ -15,7 +15,31 @@ enum HomeDailyRecommendationPolicy {
         case running, strength, other
     }
 
+    enum SuggestedWorkout: Equatable {
+        case planned
+        case easyWalk(minutes: Int)
+        case easyRun(minutes: Int)
+
+        var kind: WorkoutKind? {
+            switch self {
+            case .planned: return nil
+            case .easyWalk: return .walking
+            case .easyRun: return .running
+            }
+        }
+        var durationMinutes: Int? {
+            switch self {
+            case .planned: return nil
+            case .easyWalk(let minutes), .easyRun(let minutes): return minutes
+            }
+        }
+    }
+
     struct Advice {
+        let dayDescription: String
+        let suggestedWorkout: SuggestedWorkout
+        let suggestedTitle: String
+        let suggestedDetail: String
         let title: String
         let detail: String
         let source: String
@@ -26,7 +50,15 @@ enum HomeDailyRecommendationPolicy {
 
         init(title: String, detail: String, source: String,
              symbol: String, destination: Destination,
-             evidence: String? = nil) {
+             evidence: String? = nil,
+             dayDescription: String = "",
+             suggestedWorkout: SuggestedWorkout = .easyWalk(minutes: 20),
+             suggestedTitle: String = "",
+             suggestedDetail: String = "") {
+            self.dayDescription = dayDescription
+            self.suggestedWorkout = suggestedWorkout
+            self.suggestedTitle = suggestedTitle
+            self.suggestedDetail = suggestedDetail
             self.title = title
             self.detail = detail
             self.source = source
@@ -40,7 +72,8 @@ enum HomeDailyRecommendationPolicy {
         readiness: Readiness,
         hasWorkoutToday: Bool,
         trainingLoadRatio: Double?,
-        plannedActivity: PlannedActivity? = nil
+        plannedActivity: PlannedActivity? = nil,
+        plannedWorkoutTitle: String? = nil
     ) -> Advice {
         func tr(_ en: String, _ no: String) -> String {
             ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -56,6 +89,108 @@ enum HomeDailyRecommendationPolicy {
             return tr(
                 "Training minutes \(change >= 0 ? "+" : "")\(change)% vs 4-week average",
                 "Treningsminutter \(change >= 0 ? "+" : "")\(change) % mot 4-ukers snitt"
+            )
+        }
+
+        let recoveryPriority = readiness == .recover ||
+            readiness == .takeItEasy || (ratio ?? 0) >= 1.5
+
+        // Conservative recovery suggestions take precedence over a hard
+        // scheduled session. The existing plan remains unchanged.
+        let suggestedWorkout: SuggestedWorkout
+        if recoveryPriority {
+            suggestedWorkout = .easyWalk(
+                minutes: readiness == .recover ? 15 : 20
+            )
+        } else if hasWorkoutToday, plannedWorkoutTitle != nil {
+            suggestedWorkout = .planned
+        } else if readiness == .ready {
+            suggestedWorkout = .easyRun(minutes: 25)
+        } else {
+            suggestedWorkout = .easyWalk(minutes: 20)
+        }
+
+        let dayDescription: String = {
+            if readiness == .recover {
+                return tr(
+                    "Recovery indicators suggest a quieter day. Listen to your body and rest if needed.",
+                    "Restitusjonsmålingene tyder på at en roligere dag kan passe. Kjenn etter og hvil ved behov."
+                )
+            }
+            if readiness == .takeItEasy {
+                return tr(
+                    "Readiness is lower than usual. Prioritize an easy session and check how you feel.",
+                    "Dagsformen ser lavere ut enn vanlig. Prioriter en lett økt og kjenn etter."
+                )
+            }
+            if (ratio ?? 0) >= 1.5 {
+                return tr(
+                    "Your recent training minutes are above your usual level. A lighter day can help balance the load.",
+                    "Du har trent mer enn ditt vanlige nivå i det siste. En roligere dag kan balansere belastningen."
+                )
+            }
+            switch readiness {
+            case .ready:
+                return tr(
+                    "Available recovery measurements look positive today. Check how your body feels during the warm-up.",
+                    "Tilgjengelige restitusjonsmålinger ser gode ut i dag. Kjenn etter hvordan kroppen føles under oppvarmingen."
+                )
+            case .balanced:
+                return tr(
+                    "Recovery measurements look balanced. Moderate activity may fit well today.",
+                    "Restitusjonsmålingene ser balanserte ut. Moderat aktivitet kan passe fint i dag."
+                )
+            case .unavailable:
+                return tr(
+                    "Reliable recovery data is missing today. Start gently and adjust to how you feel.",
+                    "Vi mangler sikre restitusjonsdata i dag. Start rolig og tilpass etter hvordan du føler deg."
+                )
+            case .recover, .takeItEasy:
+                return tr("Take it easy today.", "Ta det rolig i dag.")
+            }
+        }()
+
+        let suggestedTitle: String
+        let suggestedDetail: String
+        switch suggestedWorkout {
+        case .planned:
+            suggestedTitle = plannedWorkoutTitle ?? tr(
+                "Planned workout", "Planlagt økt"
+            )
+            suggestedDetail = tr(
+                "Open this session and start it with the usual workout engine.",
+                "Åpne denne økten og start med den vanlige øktmotoren."
+            )
+        case .easyWalk(let minutes):
+            suggestedTitle = tr(
+                "Easy walk · \(minutes) min", "Rolig gåtur · \(minutes) min"
+            )
+            suggestedDetail = tr(
+                "Relaxed walking at a comfortable pace.",
+                "Rolig gange i et behagelig tempo."
+            )
+        case .easyRun(let minutes):
+            suggestedTitle = tr(
+                "Easy run · \(minutes) min", "Rolig løpetur · \(minutes) min"
+            )
+            suggestedDetail = tr(
+                "Comfortable pace without hard intervals.",
+                "Behagelig tempo uten harde intervaller."
+            )
+        }
+
+        func makeAdvice(
+            title: String, detail: String, source: String,
+            symbol: String, destination: Destination,
+            evidence: String? = nil
+        ) -> Advice {
+            Advice(
+                title: title, detail: detail, source: source,
+                symbol: symbol, destination: destination, evidence: evidence,
+                dayDescription: dayDescription,
+                suggestedWorkout: suggestedWorkout,
+                suggestedTitle: suggestedTitle,
+                suggestedDetail: suggestedDetail
             )
         }
 
@@ -91,7 +226,7 @@ enum HomeDailyRecommendationPolicy {
 
         // Low readiness takes priority over a seemingly normal training load.
         if readiness == .recover || readiness == .takeItEasy {
-            return Advice(
+            return makeAdvice(
                 title: lighterSessionTitle(),
                 detail: lighterSessionDetail(),
                 source: tr("Based on readiness", "Basert på dagsform"),
@@ -102,7 +237,7 @@ enum HomeDailyRecommendationPolicy {
         }
 
         if let ratio, ratio >= 1.5 {
-            return Advice(
+            return makeAdvice(
                 title: lighterSessionTitle(),
                 detail: lighterSessionDetail(),
                 source: tr("Based on recent training", "Basert på treningsbelastning"),
@@ -114,10 +249,10 @@ enum HomeDailyRecommendationPolicy {
 
         switch readiness {
         case .ready:
-            return Advice(
+            return makeAdvice(
                 title: hasWorkoutToday
                     ? tr("Your planned session fits", "Dagens økt kan passe")
-                    : tr("Good day for activity", "Fin dag for aktivitet"),
+                    : tr("Ready for movement", "Klar for bevegelse"),
                 detail: hasWorkoutToday
                     ? tr("Start as planned. Check how you feel during the warm-up.",
                          "Start som planlagt. Kjenn etter under oppvarmingen.")
@@ -128,7 +263,7 @@ enum HomeDailyRecommendationPolicy {
                 destination: .training
             )
         case .balanced:
-            return Advice(
+            return makeAdvice(
                 title: hasWorkoutToday
                     ? tr("Keep today's intensity steady", "Hold jevn intensitet")
                     : tr("Build a steady habit", "Bygg en jevn vane"),
@@ -142,7 +277,7 @@ enum HomeDailyRecommendationPolicy {
                 destination: .training
             )
         case .unavailable:
-            return Advice(
+            return makeAdvice(
                 title: hasWorkoutToday
                     ? tr("Start with a gentle warm-up", "Start med rolig oppvarming")
                     : tr("Try a short walk", "Prøv en kort gåtur"),
@@ -159,7 +294,7 @@ enum HomeDailyRecommendationPolicy {
             )
         case .recover, .takeItEasy:
             // Already handled above.
-            return Advice(
+            return makeAdvice(
                 title: lighterSessionTitle(),
                 detail: lighterSessionDetail(),
                 source: tr("Based on readiness", "Basert på dagsform"),
