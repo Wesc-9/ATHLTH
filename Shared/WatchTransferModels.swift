@@ -1526,6 +1526,7 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var currentLongitude: Double? = nil
     // Accuracy is required before any GPS landmark announcement.
     var currentHorizontalAccuracy: Double? = nil
+    var currentLocationSampledAt: Date? = nil
     var routeProgressPercent: Double? = nil
 
     // Stable route identity lets Live Ghost compare progress along the same
