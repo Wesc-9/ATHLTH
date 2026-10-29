@@ -1635,17 +1635,22 @@ struct AppRootView: View {
             }
             scheduleHomeAssistantSnapshotSync()
         }
-        .onChange(of: appSession.activePlan) { _, plan in
-            guard appSession.signedIn else {
-                return
-            }
-
-            Task {
-                await syncCalendarIfAllowed(
-                    plan: plan
-                )
-            }
+        .onChange(of: appSession.activePlan) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
             scheduleHomeAssistantSnapshotSync()
+        }
+        .onChange(of: appSession.scheduledPlans) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
+        .onChange(of: appSession.pausedTrainingPlanIDs) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
+        .onChange(of: appSession.deactivatedTrainingPlanIDs) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
         }
         .onChange(of: appSession.standalonePlannedSessions) { _, _ in
             scheduleHomeAssistantSnapshotSync()
@@ -2085,9 +2090,7 @@ struct AppRootView: View {
     }
 
 
-    private func syncCalendarIfAllowed(
-        plan: TrainingPlan? = nil
-    ) async {
+    private func syncCalendarIfAllowed() async {
         guard appSession.subscriptionAccess.hasPaidAccess,
               calendarSync.isEnabled
         else {
@@ -2105,7 +2108,11 @@ struct AppRootView: View {
         )
 
         await calendarSync.syncIfEnabled(
-            plan: plan ?? appSession.activePlan,
+            plan: appSession.activePlan,
+            additionalPlans: appSession.scheduledPlans.filter {
+                !appSession.isTrainingPlanPaused($0.id) &&
+                !appSession.isTrainingPlanDeactivated($0.id)
+            },
             standaloneSessions: appSession.standalonePlannedSessions,
             communityEvents: communityEvents.events,
             groupEvents: communityGroups.calendarEvents,
