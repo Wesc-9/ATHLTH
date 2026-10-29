@@ -736,6 +736,33 @@ struct WorkoutTemplateLibraryView: View {
     @AppStorage("athlth.workoutPreview.advanced.v1") private var advancedMode = false
     @State private var pendingCatalogAddition: WorkoutTemplateCatalogEntry?
     @State private var pendingRunningAddition: RunningWorkoutTemplate?
+    @State private var previewedWorkoutSource: SelectedWorkoutSource?
+
+    /// All workout categories use the same recipe preview and editor.
+    private enum SelectedWorkoutSource: Identifiable {
+        case scheduled(PlannedSession)
+        case saved(PlannedSession)
+        case catalog(WorkoutTemplateCatalogEntry)
+        case running(RunningWorkoutTemplate)
+
+        var id: String {
+            switch self {
+            case .scheduled(let value): return "scheduled-\(value.id.uuidString)"
+            case .saved(let value): return "saved-\(value.id.uuidString)"
+            case .catalog(let value): return "catalog-\(value.id.uuidString)"
+            case .running(let value): return "running-\(value.id.uuidString)"
+            }
+        }
+
+        var workout: PlannedSession {
+            switch self {
+            case .scheduled(let value), .saved(let value): return value
+            case .catalog(let value): return value.plannedSession()
+            case .running(let value): return value.plannedSession()
+            }
+        }
+    }
+
     @State private var showingPersonalizationQuestion = false
     @State private var showingCatalogPersonalization = false
     @State private var showingRunningPersonalization = false
@@ -806,6 +833,20 @@ struct WorkoutTemplateLibraryView: View {
         } else {
             addCatalogToPlan(entry, blocks:
                 ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks))
+        }
+    }
+
+    /// Keep target personalization and the common editor exactly as before:
+    /// the preview is only a reading/confirmation step.
+    private func confirmPreview(_ source: SelectedWorkoutSource) {
+        previewedWorkoutSource = nil
+        switch source {
+        case .scheduled(let workout), .saved(let workout):
+            onSelectPlanned?(workout)
+        case .catalog(let entry):
+            chooseCatalogForPlan(entry)
+        case .running(let workout):
+            chooseRunningForPlan(workout)
         }
     }
 
@@ -1111,9 +1152,14 @@ struct WorkoutTemplateLibraryView: View {
                     .font(.headline)
                     ForEach(filteredScheduledWorkouts.prefix(50)) { workout in
                         Button {
-                            onSelectPlanned?(workout)
+                            if initialCategory != nil {
+                                previewedWorkoutSource = .scheduled(workout)
+                            } else {
+                                onSelectPlanned?(workout)
+                            }
                         } label: {
-                            HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack(spacing: 12) {
                                 Image(systemName: workout.kind.systemImage)
                                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                     .frame(width: 36, height: 36)
@@ -1130,6 +1176,10 @@ struct WorkoutTemplateLibraryView: View {
                                 Image(systemName: "chevron.right")
                                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             }
+                                if initialCategory != nil {
+                                    ATHLTHWorkoutContentsPreview(workout: workout)
+                                }
+                            }
                             .padding(14)
                             .background(.white,
                                         in: RoundedRectangle(cornerRadius: 17))
@@ -1143,13 +1193,22 @@ struct WorkoutTemplateLibraryView: View {
                         .font(.headline)
                     ForEach(filteredSavedWorkouts) { workout in
                         Button {
-                            onSelectPlanned?(workout)
+                            if initialCategory != nil {
+                                previewedWorkoutSource = .saved(workout)
+                            } else {
+                                onSelectPlanned?(workout)
+                            }
                         } label: {
-                            HStack {
-                                Image(systemName: workout.kind.systemImage)
-                                Text(workout.title)
-                                Spacer()
-                                Image(systemName: "plus.circle.fill")
+                            VStack(alignment: .leading, spacing: 10) {
+                                HStack {
+                                    Image(systemName: workout.kind.systemImage)
+                                    Text(workout.title)
+                                    Spacer()
+                                    Image(systemName: "plus.circle.fill")
+                                }
+                                if initialCategory != nil {
+                                    ATHLTHWorkoutContentsPreview(workout: workout)
+                                }
                             }
                             .padding(15)
                             .background(.white, in: RoundedRectangle(cornerRadius: 16))
@@ -1175,7 +1234,11 @@ struct WorkoutTemplateLibraryView: View {
                             Group {
                                 if let onSelectPlanned {
                                 Button {
-                                    chooseCatalogForPlan(entry)
+                                    if initialCategory != nil {
+                                        previewedWorkoutSource = .catalog(entry)
+                                    } else {
+                                        chooseCatalogForPlan(entry)
+                                    }
                                 } label: {
                                     workoutCard(entry)
                                 }
@@ -1222,7 +1285,11 @@ struct WorkoutTemplateLibraryView: View {
                             Group {
                                 if let onSelectPlanned {
                                 Button {
-                                    chooseRunningForPlan(workout)
+                                    if initialCategory != nil {
+                                        previewedWorkoutSource = .running(workout)
+                                    } else {
+                                        chooseRunningForPlan(workout)
+                                    }
                                 } label: {
                                     runningWorkoutCard(workout)
                                 }
@@ -1280,6 +1347,13 @@ struct WorkoutTemplateLibraryView: View {
             text: $query,
             prompt: ATHLTHLocalization.choose(english: "Search workouts", norwegian: "Søk etter treningsøkter")
         )
+        .sheet(item: $previewedWorkoutSource) { source in
+            ATHLTHWorkoutSelectionPreviewSheet(workout: source.workout) {
+                confirmPreview(source)
+            }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
+        }
         .confirmationDialog(
             ATHLTHLocalization.choose(
                 english: "Set personal workout targets now?",
@@ -1462,6 +1536,13 @@ struct WorkoutTemplateLibraryView: View {
                 )
                 .padding(.top, 2)
 
+                if initialCategory != nil {
+                    ATHLTHWorkoutContentsPreview(
+                        workout: entry.plannedSession()
+                    )
+                    .padding(.top, 7)
+                }
+
                 if let last = ATHLTHLibraryWorkoutHistory.catalogOriginal(
                     id: entry.id, completions: libraryCompletions
                 ) {
@@ -1532,6 +1613,13 @@ struct WorkoutTemplateLibraryView: View {
                 .font(.caption2.weight(.medium))
                 .foregroundStyle(ATHLTHTheme.mutedText)
                 .padding(.top, 2)
+
+                if initialCategory != nil {
+                    ATHLTHWorkoutContentsPreview(
+                        workout: workout.plannedSession()
+                    )
+                    .padding(.top, 7)
+                }
 
                 if let last = ATHLTHLibraryWorkoutHistory.running(
                     id: workout.id, records: runningCompletions
