@@ -55,6 +55,7 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
     private let synthesizer =
         AVSpeechSynthesizer()
     private let audioOwner = "audio-coach-preview-\(UUID().uuidString)"
+    private var restorationWatchdog: Task<Void, Never>?
 
     private override init() {
         super.init()
@@ -69,6 +70,8 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
         duckOtherAudio: Bool,
         speechStyle: ATHLTHCoachSpeechStyle
     ) {
+        restorationWatchdog?.cancel()
+        restorationWatchdog = nil
         synthesizer.stopSpeaking(
             at: .immediate
         )
@@ -143,6 +146,14 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
                 )
             )
         synthesizer.speak(utterance)
+        restorationWatchdog = Task { @MainActor [weak self] in
+            let seconds = max(12, min(40, Double(preview.count) / 8 + 10))
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled, let self else { return }
+            self.synthesizer.stopSpeaking(at: .immediate)
+            ATHLTHSpokenAudioSession.deactivate(owner: self.audioOwner)
+            self.restorationWatchdog = nil
+        }
     }
 
     nonisolated func speechSynthesizer(
@@ -150,6 +161,9 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
         didFinish utterance: AVSpeechUtterance
     ) {
         Task { @MainActor in
+            guard !self.synthesizer.isSpeaking else { return }
+            self.restorationWatchdog?.cancel()
+            self.restorationWatchdog = nil
             ATHLTHSpokenAudioSession.deactivate(
                 owner: self.audioOwner
             )
@@ -161,6 +175,9 @@ private final class ATHLTHAudioCoachPreviewSpeaker:
         didCancel utterance: AVSpeechUtterance
     ) {
         Task { @MainActor in
+            guard !self.synthesizer.isSpeaking else { return }
+            self.restorationWatchdog?.cancel()
+            self.restorationWatchdog = nil
             ATHLTHSpokenAudioSession.deactivate(
                 owner: self.audioOwner
             )
