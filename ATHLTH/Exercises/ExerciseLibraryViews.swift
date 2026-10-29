@@ -346,8 +346,7 @@ struct ExerciseLibraryView: View {
                                 selectedBodyPart = "All"
                                 selectedEquipment = "All"
                                 query = ""
-                    queryInput = ""
-                            queryInput = ""
+                                queryInput = ""
                             }
                             .font(.subheadline.weight(.semibold))
                             .tint(ATHLTHPlanDesign.accent)
@@ -863,7 +862,7 @@ struct ExerciseLibraryView: View {
                 if !queryInput.isEmpty {
                     Button {
                         query = ""
-                    queryInput = ""
+                        queryInput = ""
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
