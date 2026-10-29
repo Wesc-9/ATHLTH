@@ -22,7 +22,7 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
 
     func testNorwegianAlphabetIncludesAllTwentyNineLetters() {
         XCTAssertEqual(ATHLTHExerciseAlphabet.letters.count, 29)
-        XCTAssertEqual(ATHLTHExerciseAlphabet.letters.suffix(3), ["Æ", "Ø", "Å"])
+        XCTAssertEqual(Array(ATHLTHExerciseAlphabet.letters.suffix(3)), ["Æ", "Ø", "Å"])
         XCTAssertEqual(ATHLTHExerciseAlphabet.letter(for: " åsen "), "Å")
         XCTAssertEqual(ATHLTHExerciseAlphabet.letter(for: "Ærlig"), "Æ")
         XCTAssertEqual(ATHLTHExerciseAlphabet.letter(for: "øvelse"), "Ø")
