@@ -205,6 +205,8 @@ final class HealthKitManager: ObservableObject {
     private var backgroundRefreshTask: Task<Void, Never>?
     private var backgroundRefreshNeedsFull = false
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
+    private var workoutPeakCache:
+        (records: [ATHLTHWorkoutHeartRatePeak], generatedAt: Date)?
     // Home's light recent-workout refresh must not launch simultaneous
     // HealthKit queries or repeat a full health assessment on every render.
     private var lastHomeWorkoutRefreshAt: Date?
@@ -1540,6 +1542,7 @@ final class HealthKitManager: ObservableObject {
                 // History's separate all-workouts cache must never return
                 // yesterday's state after Home observed a new Health workout.
                 allWorkoutsCache = nil
+                workoutPeakCache = nil
                 invalidateWorkoutDerivedCaches()
             }
 
@@ -1564,6 +1567,80 @@ final class HealthKitManager: ObservableObject {
         return fetched
             .map(WorkoutSummary.init)
             .sorted { $0.startDate > $1.startDate }
+    }
+
+    /// Scan the athlete's HealthKit workout library for the highest
+    /// recorded workout heart rate. The peak is not a measured HRmax and
+    /// never changes training zones without the user's explicit opt-in.
+    /// Existing HKWorkout statistics are read without per-workout queries;
+    /// for older imports missing those statistics, try up to 100 recent
+    /// workouts with the established sample-based fallback.
+    func highestRecordedWorkoutHeartRates(
+        limit: Int = 5,
+        forceRefresh: Bool = false
+    ) async throws -> [ATHLTHWorkoutHeartRatePeak] {
+        guard integrationEnabled,
+              healthDataAvailable,
+              hasRequestedAuthorization,
+              !shouldDeferAutomaticHealthWork,
+              let heartRateType = HKObjectType.quantityType(
+                forIdentifier: .heartRate
+              ) else { return [] }
+
+        if !forceRefresh,
+           let cache = workoutPeakCache,
+           Date().timeIntervalSince(cache.generatedAt) < 600 {
+            return Array(cache.records.prefix(max(1, limit)))
+        }
+
+        let workouts = try await fetchAllWorkoutsCached(
+            forceRefresh: forceRefresh
+        )
+        let unit = HKUnit.count().unitDivided(by: .minute())
+        var records: [ATHLTHWorkoutHeartRatePeak] = []
+        var fallbackChecks = 0
+
+        for workout in workouts {
+            try Task.checkCancellation()
+            guard workout.duration >= 60 else { continue }
+
+            let cachedPeak = workout.statistics(for: heartRateType)
+                .flatMap { Self.safeDoubleValue(
+                    $0.maximumQuantity(), unit: unit
+                ) }
+            let peak: Int?
+            if let cachedPeak {
+                peak = ATHLTHWorkoutHeartRatePeakPolicy.validPeak(
+                    cachedPeak
+                )
+            } else if fallbackChecks < 100 {
+                fallbackChecks += 1
+                let sampleStats = try? await fetchHeartRateStats(
+                    for: workout
+                )
+                peak = sampleStats?.1.flatMap {
+                    ATHLTHWorkoutHeartRatePeakPolicy.validPeak($0)
+                }
+            } else {
+                peak = nil
+            }
+
+            guard let peak else { continue }
+            records.append(ATHLTHWorkoutHeartRatePeak(
+                beatsPerMinute: peak,
+                workoutID: workout.uuid,
+                workoutDate: workout.startDate,
+                workoutTitle: WorkoutSummary(workout: workout).activity.rawValue
+            ))
+        }
+
+        records.sort {
+            $0.beatsPerMinute == $1.beatsPerMinute
+                ? $0.workoutDate > $1.workoutDate
+                : $0.beatsPerMinute > $1.beatsPerMinute
+        }
+        workoutPeakCache = (records, Date())
+        return Array(records.prefix(max(1, limit)))
     }
 
     func activeWorkoutDays(
