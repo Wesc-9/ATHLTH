@@ -160,3 +160,53 @@ struct ATHLTHAudioCoachRuleSet: Codable, Hashable, Identifiable {
     var title: String
     var rules: [ATHLTHAudioCoachRule]
 }
+/// Workout-local rule cadence. Each rule advances independently, so adding a
+/// 30-second time cue never changes a kilometre-based pace cue. Late time slots
+/// are skipped rather than spoken in a burst after a pause or reconnect.
+struct ATHLTHAudioCoachRuleSchedule {
+    private var nextByRuleID: [UUID: Double] = [:]
+
+    mutating func reset(
+        rules: [ATHLTHAudioCoachRule]?,
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval
+    ) {
+        nextByRuleID.removeAll(keepingCapacity: true)
+        for rule in (rules ?? []).prefix(20) {
+            let current = rule.trigger == .distance
+                ? distanceMeters : elapsedSeconds
+            guard current.isFinite else { continue }
+            let step = Double(rule.validatedInterval)
+            nextByRuleID[rule.id] =
+                (floor(max(current, 0) / step) + 1) * step
+        }
+    }
+
+    mutating func consumeDue(
+        rules: [ATHLTHAudioCoachRule]?,
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval
+    ) -> [ATHLTHAudioCoachRule] {
+        var due: [ATHLTHAudioCoachRule] = []
+        for rule in (rules ?? []).prefix(20) {
+            let current = rule.trigger == .distance
+                ? distanceMeters : elapsedSeconds
+            guard current.isFinite, current >= 0 else { continue }
+            let step = Double(rule.validatedInterval)
+            guard let next = nextByRuleID[rule.id] else {
+                // A new rule added during an ongoing session starts at its
+                // next full interval, not with an old catch-up announcement.
+                nextByRuleID[rule.id] =
+                    (floor(current / step) + 1) * step
+                continue
+            }
+            guard current >= next else { continue }
+            nextByRuleID[rule.id] = (floor(current / step) + 1) * step
+            if rule.trigger == .time && current - next > 2.5 {
+                continue
+            }
+            due.append(rule)
+        }
+        return due
+    }
+}
