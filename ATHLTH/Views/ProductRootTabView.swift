@@ -116,6 +116,7 @@ struct ProductRootTabView: View {
     @State private var trainNavigationRequest:
         ATHLTHTrainNavigationRequest?
     @State private var showingDailyCheckInFromNotification = false
+    @State private var deferredTabReminderTask: Task<Void, Never>?
 
     private func openPendingDailyCheckInIfNeeded() {
         guard pushManager.pendingDailyCheckInAccountID ==
@@ -335,9 +336,22 @@ struct ProductRootTabView: View {
         .onChange(of: pushManager.pendingDailyCheckInAccountID) { _, _ in
             openPendingDailyCheckInIfNeeded()
         }
-        .onChange(of: selectedTab) { _, _ in
-            // Completing a check-in on Insights clears its Home reminder.
-            updateDailyCheckInReminder()
+        .onChange(of: selectedTab) { previous, next in
+            // Never reschedule notifications synchronously on a tab tap.
+            // Finish the tab's first animation frame before doing the
+            // account-local read + notification reconciliation. Only leaving
+            // Insights or returning Home needs this refresh.
+            deferredTabReminderTask?.cancel()
+            guard previous == 2 || next == 0 else { return }
+            deferredTabReminderTask = Task { @MainActor in
+                do {
+                    try await Task.sleep(for: .milliseconds(180))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                updateDailyCheckInReminder()
+            }
         }
         .onChange(of: settings.dailyCheckInRemindersEnabled) { _, _ in
             updateDailyCheckInReminder()
