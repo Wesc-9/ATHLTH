@@ -1015,6 +1015,7 @@ struct PostWorkoutReviewView: View {
     @State private var replayContext: WorkoutAIInsightContext?
     @State private var completionWaitingSeconds: TimeInterval?
     @State private var completionRoute: [CLLocation] = []
+    @State private var completionMeasuredPulse: [ATHLTHRunningHeartRatePoint] = []
     @State private var isAdvancedReview = false
     @State private var showingKilometerDetails = false
     @State private var showingTrainingPartners = false
@@ -1250,6 +1251,8 @@ struct PostWorkoutReviewView: View {
                     loadReplayContext()
                 async let routeLoad: Void =
                     loadCompletionRoute()
+                async let pulseLoad: Void =
+                    loadCompletionPulse()
                 async let mediaLoad: Void =
                     social.refreshWorkoutMedia()
 
@@ -1257,6 +1260,7 @@ struct PostWorkoutReviewView: View {
                     reviewLoad,
                     replayLoad,
                     routeLoad,
+                    pulseLoad,
                     mediaLoad
                 )
             }
@@ -1272,35 +1276,44 @@ struct PostWorkoutReviewView: View {
         }
     }
 
-    /// Prefer genuine GPS kilometer markers outdoors. On a treadmill use
-    /// recorded Watch/iPhone minute distance, never the planned target speed.
+    /// Prefer genuine GPS kilometre markers outdoors. On a treadmill use
+    /// recorded Watch/iPhone minute distance, never planned target speed.
     private var reviewedKilometerSplits: [ATHLTHRunningResultInsights.KilometerSplit] {
         let routeSplits = ATHLTHRunningResultInsights.kilometerSplits(
             from: completionRoute, reportedDistanceMeters: workout.distanceMeters)
         if !routeSplits.isEmpty { return routeSplits }
+        return ATHLTHRunningResultInsights.kilometerSplits(
+            from: reviewedRunningMinutes,
+            reportedDistanceMeters: workout.distanceMeters
+        )
+    }
 
+    private var reviewedRunningMinutes: [ATHLTHRecordedRunningMinute] {
         let history = ATHLTHRunningPerformanceHistory.load(
-            userID: session.profile.userID)
+            userID: session.profile.userID
+        )
         let recorded = ATHLTHRunningPerformanceHistory.match(
             workoutID: workout.id,
             endDate: workout.endDate,
             duration: workout.duration,
             candidates: history
         )
-        let phoneMinutes: [ATHLTHRecordedRunningMinute]? = {
-            guard let phone = phoneWorkout.lastCompletedWorkout,
-                  phone.id == workout.id || phone.healthID == workout.id
-            else { return nil }
-            return phone.recordedRunningMinutes
-        }()
-        return ATHLTHRunningResultInsights.kilometerSplits(
-            from: recorded?.minutes ?? phoneMinutes ?? [],
-            reportedDistanceMeters: workout.distanceMeters
-        )
+        if let minutes = recorded?.minutes, !minutes.isEmpty { return minutes }
+        guard let phone = phoneWorkout.lastCompletedWorkout,
+              phone.id == workout.id || phone.healthID == workout.id
+        else { return [] }
+        return phone.recordedRunningMinutes ?? []
     }
 
     private var kilometerSplitsDisclosure: some View {
         let splits = reviewedKilometerSplits
+        let measuredByKilometer = ATHLTHRunningKilometerPulseAnalysis.results(
+            for: splits,
+            measuredPulse: completionMeasuredPulse,
+            recordedMinutes: reviewedRunningMinutes,
+            athleteMaximumBPM:
+                session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
+        )
         return VStack(spacing: 0) {
             Button {
                 withAnimation(.easeInOut(duration: 0.24)) {
@@ -1342,17 +1355,20 @@ struct PostWorkoutReviewView: View {
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .padding(16)
                 } else {
-                    HStack {
-                        Text("KM").frame(maxWidth: .infinity, alignment: .leading)
+                    HStack(spacing: 6) {
+                        Text("KM").frame(width: 26, alignment: .leading)
                         Text(ATHLTHLocalization.choose(
                             english: "Pace", norwegian: "Tempo"))
-                            .frame(maxWidth: .infinity)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         Text(ATHLTHLocalization.choose(
-                            english: "Speed", norwegian: "Fart"))
-                            .frame(maxWidth: .infinity)
+                            english: "Pulse", norwegian: "Puls"))
+                            .frame(width: 58, alignment: .trailing)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Zone", norwegian: "Sone"))
+                            .frame(width: 37, alignment: .trailing)
                         Text(ATHLTHLocalization.choose(
                             english: "Time", norwegian: "Tid"))
-                            .frame(maxWidth: .infinity, alignment: .trailing)
+                            .frame(width: 43, alignment: .trailing)
                     }
                     .font(.system(size: 10, weight: .bold))
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -1360,22 +1376,31 @@ struct PostWorkoutReviewView: View {
                     .padding(.top, 12)
                     ForEach(splits) { split in
                         let seconds = Int(split.durationSeconds.rounded())
-                        HStack(spacing: 5) {
+                        let pulse = measuredByKilometer[split.kilometer]
+                        HStack(spacing: 6) {
                             Text("\(split.kilometer)")
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .frame(width: 26, alignment: .leading)
                             Text(String(format: "%d:%02d/km",
                                         seconds / 60, seconds % 60))
-                                .frame(maxWidth: .infinity)
-                            Text(String(format: "%.1f km/t",
-                                        3_600 / split.durationSeconds))
-                                .frame(maxWidth: .infinity)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            Text(pulse.map { "\($0.averageBPM)" } ?? "—")
+                                .frame(width: 58, alignment: .trailing)
+                            Text(pulse?.observedZone.map { "Z\($0)" } ?? "—")
+                                .foregroundStyle(
+                                    pulse?.observedZone == nil
+                                        ? ATHLTHPlanDesign.secondaryInk
+                                        : ATHLTHPlanDesign.accentInk
+                                )
+                                .frame(width: 37, alignment: .trailing)
                             Text(String(format: "%d:%02d",
                                         seconds / 60, seconds % 60))
-                                .frame(maxWidth: .infinity, alignment: .trailing)
+                                .frame(width: 43, alignment: .trailing)
                         }
                         .font(.system(size: 11, weight: .semibold, design: .rounded))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                         .monospacedDigit()
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
                         .padding(.horizontal, 15)
                         .padding(.vertical, 10)
                         if split.id != splits.last?.id {
@@ -1383,8 +1408,8 @@ struct PostWorkoutReviewView: View {
                         }
                     }
                     Text(ATHLTHLocalization.choose(
-                        english: "Measured completed kilometres only; no planned targets.",
-                        norwegian: "Kun fullførte, målte kilometere. Ingen planlagte mål."
+                        english: "Only completed kilometres. Pulse is measured within each kilometre (bpm); zones use your profile maximum. — means no usable measurement or zone.",
+                        norwegian: "Kun fullførte kilometer. Puls er målt per kilometer (bpm), og soner bruker makspuls fra profilen. — betyr manglende måling eller sone."
                     ))
                     .font(.caption2)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -4320,6 +4345,18 @@ struct PostWorkoutReviewView: View {
             for: workout,
             maximumHeartRateBPM:
                 session.onboardingProfile?.maximumHeartRateBPM
+        )
+    }
+
+    @MainActor
+    private func loadCompletionPulse() async {
+        guard workout.activity == .running || workout.activity == .walking
+        else {
+            completionMeasuredPulse = []
+            return
+        }
+        completionMeasuredPulse = await health.runningHeartRateTimeline(
+            for: workout.id
         )
     }
 
