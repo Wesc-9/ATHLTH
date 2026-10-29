@@ -118,6 +118,17 @@ struct ATHLTHInsightsWhatIfView: View {
         }
     }
 
+    private var elevatedMuscleFocus: Bool {
+        guard activity == .strength,
+              selectedMuscle != .fullBody,
+              muscleSummary.sessionCount >= 3
+        else { return false }
+        return ATHLTHInsightsMuscleRanking.all(muscleSummary).contains {
+            selectedMuscle.regions.contains($0.region) &&
+                $0.needsLoadBalanceAttention
+        }
+    }
+
     private var isValid: Bool {
         activity != .custom ||
             !customActivity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -197,7 +208,12 @@ struct ATHLTHInsightsWhatIfView: View {
 
             if activity == .strength {
                 Label(
-                    recordedTargetMuscles
+                    elevatedMuscleFocus
+                        ? ATHLTHLocalization.choose(
+                            english: "Your recorded training focus for this area is unusually high compared with your previous baseline. Consider how another workout fits your week, without interpreting it as injury risk.",
+                            norwegian: "Registrert treningsmengde for dette området er uvanlig høy sammenlignet med ditt tidligere nivå. Vurder hvordan en ny økt passer inn, uten å tolke dette som skaderisiko."
+                        )
+                        : recordedTargetMuscles
                         ? ATHLTHLocalization.choose(
                             english: "This muscle group is present in your recorded strength history. Duration alone cannot determine how much it should recover.",
                             norwegian: "Denne muskelgruppen finnes i styrkehistorikken din. Varighet alene kan ikke avgjøre hvor mye restitusjon den trenger."
@@ -414,10 +430,7 @@ struct ATHLTHInsightsWhatIfView: View {
                 )
             }
 
-            Text(ATHLTHLocalization.choose(
-                english: "One extra \(activity.title.lowercased()) workout adds about \(proposedDurationMinutes) planned minutes. This compares the same type of activity when historical data exists.",
-                norwegian: "Én ekstra økt med \(activity.title.lowercased()) gir omtrent \(proposedDurationMinutes) planlagte minutter. Vi sammenligner med samme treningstype der det finnes historikk."
-            ))
+            Text(comparisonExplanation)
             .font(.caption)
             .foregroundStyle(ATHLTHInsightsStyle.muted)
             .fixedSize(horizontal: false, vertical: true)
@@ -426,6 +439,19 @@ struct ATHLTHInsightsWhatIfView: View {
         .background(
             ATHLTHInsightsStyle.accent.opacity(0.07),
             in: RoundedRectangle(cornerRadius: 17)
+        )
+    }
+
+    private var comparisonExplanation: String {
+        if activity == .custom {
+            return ATHLTHLocalization.choose(
+                english: "This adds about \(proposedDurationMinutes) planned minutes. Since you entered a custom activity, the reference uses all recorded training, not the specific activity.",
+                norwegian: "Dette legger til omtrent \(proposedDurationMinutes) planlagte minutter. For egendefinert aktivitet bruker vi alle registrerte økter som sammenligningsgrunnlag."
+            )
+        }
+        return ATHLTHLocalization.choose(
+            english: "An additional \(activity.title.lowercased()) session adds about \(proposedDurationMinutes) planned minutes. The reference is the same workout category.",
+            norwegian: "Én ekstra økt med \(activity.title.lowercased()) gir omtrent \(proposedDurationMinutes) planlagte minutter. Sammenligningen gjelder samme treningstype."
         )
     }
 
