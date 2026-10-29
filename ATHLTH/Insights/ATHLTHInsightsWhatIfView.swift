@@ -221,10 +221,15 @@ struct ATHLTHInsightsWhatIfView: View {
             }
 
             Label(
-                ATHLTHLocalization.choose(
-                    english: "Only training time is estimated. Not a prediction of recovery, injury risk, fitness, pace or future results.",
-                    norwegian: "Kun treningstid beregnes. Dette er ingen prognose for restitusjon, skaderisiko, form eller fremtidige resultater."
-                ),
+                mode == .freeText
+                    ? ATHLTHLocalization.choose(
+                        english: "The question is sent to Coach as written. No training session is created automatically.",
+                        norwegian: "Spørsmålet sendes til Coach slik du skrev det. Ingen treningsøkt opprettes automatisk."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Only training time is estimated. Not a prediction of recovery, injury risk, fitness, pace or future results.",
+                        norwegian: "Kun treningstid beregnes. Dette er ingen prognose for restitusjon, skaderisiko, form eller fremtidige resultater."
+                    ),
                 systemImage: "info.circle"
             )
             .font(.caption)
@@ -354,72 +359,72 @@ struct ATHLTHInsightsWhatIfView: View {
 
     private var guidedWorkoutSection: some View {
         VStack(alignment: .leading, spacing: 17) {
-                Picker(ATHLTHLocalization.choose(
-                    english: "Workout type", norwegian: "Treningsform"
-                ), selection: $activity) {
-                    ForEach(Activity.allCases) { item in
-                        Text(item.title).tag(item)
-                    }
+            Picker(ATHLTHLocalization.choose(
+                english: "Workout type", norwegian: "Treningsform"
+            ), selection: $activity) {
+                ForEach(Activity.allCases) { item in
+                    Text(item.title).tag(item)
                 }
-                .pickerStyle(.segmented)
+            }
+            .pickerStyle(.segmented)
 
-                VStack(alignment: .leading, spacing: 13) {
-                    switch activity {
-                    case .strength:
-                        strengthControls
-                    case .running:
-                        runningControls
-                    case .walking:
-                        durationControl
-                    case .custom:
-                        TextField(
-                            ATHLTHLocalization.choose(
-                                english: "E.g. 30 minutes of cycling or yoga",
-                                norwegian: "F.eks. 30 minutter sykling eller yoga"
-                            ),
-                            text: $customActivity,
-                            axis: .vertical
-                        )
-                        .lineLimit(1...3)
-                        .textInputAutocapitalization(.sentences)
-                        .font(.subheadline)
-                        .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Describe your activity",
-                            norwegian: "Beskriv aktiviteten"
-                        ))
-                        durationControl
-                    }
-                }
-                .padding(14)
-                .background(
-                    ATHLTHInsightsStyle.canvas,
-                    in: RoundedRectangle(cornerRadius: 18)
-                )
-
-                summarySection
-
-                if activity == .strength {
-                    Label(
-                        elevatedMuscleFocus
-                            ? ATHLTHLocalization.choose(
-                                english: "Your recorded training focus for this area is unusually high compared with your previous baseline. Consider how another workout fits your week, without interpreting it as injury risk.",
-                                norwegian: "Registrert treningsmengde for dette området er uvanlig høy sammenlignet med ditt tidligere nivå. Vurder hvordan en ny økt passer inn, uten å tolke dette som skaderisiko."
-                            )
-                            : recordedTargetMuscles
-                            ? ATHLTHLocalization.choose(
-                                english: "This muscle group is present in your recorded strength history. Duration alone cannot determine how much it should recover.",
-                                norwegian: "Denne muskelgruppen finnes i styrkehistorikken din. Varighet alene kan ikke avgjøre hvor mye restitusjon den trenger."
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "No reliable muscle-specific history for this selection. Coach can review the exercises, your restrictions and recovery with your permission.",
-                                norwegian: "Vi har ikke tilstrekkelig muskelspesifikk historikk for dette valget. Coach kan vurdere øvelser, begrensninger og restitusjon hvis du gir tillatelse."
-                            ),
-                        systemImage: "figure.strengthtraining.traditional"
+            VStack(alignment: .leading, spacing: 13) {
+                switch activity {
+                case .strength:
+                    strengthControls
+                case .running:
+                    runningControls
+                case .walking:
+                    durationControl
+                case .custom:
+                    TextField(
+                        ATHLTHLocalization.choose(
+                            english: "E.g. 30 minutes of cycling or yoga",
+                            norwegian: "F.eks. 30 minutter sykling eller yoga"
+                        ),
+                        text: $customActivity,
+                        axis: .vertical
                     )
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHInsightsStyle.muted)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(1...3)
+                    .textInputAutocapitalization(.sentences)
+                    .font(.subheadline)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Describe your activity",
+                        norwegian: "Beskriv aktiviteten"
+                    ))
+                    durationControl
                 }
+            }
+            .padding(14)
+            .background(
+                ATHLTHInsightsStyle.canvas,
+                in: RoundedRectangle(cornerRadius: 18)
+            )
+
+            summarySection
+
+            if activity == .strength {
+                Label(
+                    elevatedMuscleFocus
+                        ? ATHLTHLocalization.choose(
+                            english: "Your recorded training focus for this area is unusually high compared with your previous baseline. Consider how another workout fits your week, without interpreting it as injury risk.",
+                            norwegian: "Registrert treningsmengde for dette området er uvanlig høy sammenlignet med ditt tidligere nivå. Vurder hvordan en ny økt passer inn, uten å tolke dette som skaderisiko."
+                        )
+                        : recordedTargetMuscles
+                        ? ATHLTHLocalization.choose(
+                            english: "This muscle group is present in your recorded strength history. Duration alone cannot determine how much it should recover.",
+                            norwegian: "Denne muskelgruppen finnes i styrkehistorikken din. Varighet alene kan ikke avgjøre hvor mye restitusjon den trenger."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "No reliable muscle-specific history for this selection. Coach can review the exercises, your restrictions and recovery with your permission.",
+                            norwegian: "Vi har ikke tilstrekkelig muskelspesifikk historikk for dette valget. Coach kan vurdere øvelser, begrensninger og restitusjon hvis du gir tillatelse."
+                        ),
+                    systemImage: "figure.strengthtraining.traditional"
+                )
+                .font(.caption)
+                .foregroundStyle(ATHLTHInsightsStyle.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
     }
 
