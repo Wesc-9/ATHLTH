@@ -98,7 +98,7 @@ if ".ignoresSafeArea(.container, edges: .top)" not in insights:
 if "ATHLTHCoverSafeArea.statusBarTop" not in insights:
     fail("Insights cover must keep tab controls below status bar")
 if "selection: $selectedSection" not in insights:
-    fail("Insights hero must own the four-option segmented navigation")
+    fail("Insights hero must own the three-option segmented navigation")
 
 # Audit the active editorial layout, rather than requiring all of the
 # previous redundant charts. Each tab must have a distinct purpose.
@@ -108,19 +108,19 @@ for token in (
     "readinessOverviewCard",
     "signalPerspectiveCard",
     "ATHLTHInsightsDailyCheckInCard(",
-    "ATHLTHInsightsReferenceSignalCard(",
     "ATHLTHInsightsMuscleCard(summary: muscleSummary)",
     "trainingRhythmCard",
     "ATHLTHInsightsReferenceDistributionCard(",
     "whatChangedCard",
     "whatIfCard",
+    "ATHLTHInsightsWhatIfView(",
     "recoveryTrendSnapshot(days: 7)",
     "ATHLTHReadinessExplanationSheet(",
 ):
     if token not in insights:
         fail(f"Required Insights element or data route is missing: {token}")
-# Guard against duplicate cards across tabs: a repeated trend can be seen
-# in details, but the four top-level summaries must not copy one another.
+# Guard against duplicate cards across tabs: health measurements remain
+# available through readiness details rather than a redundant fourth section.
 development = between(insights,
     "private var developmentSection: some View {", "@MainActor")
 if "ATHLTHInsightsReferenceSignalCard(" in development:
@@ -130,9 +130,12 @@ training = between(insights,
     "private var developmentSection: some View {")
 if training.find("ATHLTHInsightsMuscleCard(") > training.find("trainingRhythmCard"):
     fail("Muscle balance must be the first training insight")
-for case in ("case overview, health, training, development",):
-    if case not in sections:
-        fail("Reference's four sections were removed or changed")
+if "case overview, training, development" not in sections:
+    fail("Insights must contain Overview, Training and Development")
+if "case overview, health, training, development" in sections:
+    fail("The redundant Body & Health top-level section has returned")
+if "ATHLTHInsightsReferenceMetric" not in cards:
+    fail("Underlying health reference metrics must remain available")
 for token in (
     "RecoveryTrendSnapshot", "ATHLTHInsightsTrainingDay",
     "RecoveryTrainingLoadSummary", "RecoverySorenessStore",
@@ -148,4 +151,4 @@ if "regionTints: atlasTints" not in sections or "ForEach(allMuscles)" not in sec
 if "ATHLTHInsightsMuscleRanking.all(summary)" not in sections:
     fail("All-muscle 100% reference ranking missing")
 print("PASS: obsolete Recovery screen removed; readiness opens a local factor explanation.")
-print("PASS: nonrepetitive editorial cards consume recorded Health, workout and check-in data.")
+print("PASS: three editorial sections preserve readiness, training and trends without a duplicate health tab.")
