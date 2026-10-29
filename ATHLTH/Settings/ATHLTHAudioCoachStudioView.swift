@@ -430,7 +430,7 @@ struct ATHLTHAudioCoachStudioView: View {
         Task { @MainActor in
             var request = MKLocalSearch.Request()
             request.naturalLanguageQuery = query
-            request.resultTypes = .pointOfInterest
+            request.resultTypes = [.pointOfInterest, .address]
             do {
                 let response = try await MKLocalSearch(request: request).start()
                 foundPlaces = response.mapItems.prefix(6).compactMap { item in
