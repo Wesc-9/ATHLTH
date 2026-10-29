@@ -1,6 +1,225 @@
 import Foundation
 
 struct PlannedWorkoutWatchBuilder {
+    static func strengthSnapshot(
+        _ workout: PlannedSession
+    ) -> WatchStrengthSessionSnapshot? {
+        guard workout.kind == .strength,
+              !workout.exercises.isEmpty
+        else {
+            return nil
+        }
+
+        let queue =
+            workout.exercises
+                .enumerated()
+                .map {
+                    index,
+                    planned in
+
+                    let setTargets =
+                        planned
+                            .resolvedSetTargets
+                    let setCount =
+                        setTargets.count
+                    let plans =
+                        Array(
+                            setTargets.enumerated()
+                        )
+                        .map {
+                            index,
+                            target in
+
+                            WatchStrengthSetPlan(
+                                setNumber:
+                                    index + 1,
+                                reps:
+                                    planned
+                                        .resolvedTargetKind ==
+                                        .reps
+                                        ? target.reps
+                                        : nil,
+                                durationSeconds:
+                                    planned
+                                        .resolvedTargetKind ==
+                                        .time
+                                        ? target
+                                            .durationSeconds
+                                        : nil,
+                                weightKilograms:
+                                    planned
+                                        .resolvedLoadKind ==
+                                        .weightKilograms
+                                        ? target
+                                            .weightKilograms
+                                        : nil,
+                                resistanceLevel:
+                                    planned
+                                        .resolvedLoadKind ==
+                                        .resistanceLevel
+                                        ? target
+                                            .resistanceLevel
+                                        : nil,
+                                restSeconds:
+                                    target
+                                        .restSeconds,
+                                targetRPE:
+                                    target
+                                        .targetRPE,
+                                targetRIR:
+                                    target
+                                        .targetRIR,
+                                isWarmUp:
+                                    target
+                                        .isWarmUp
+                            )
+                        }
+
+                    return WatchStrengthExerciseSummary(
+                        index: index,
+                        name:
+                            planned
+                                .embeddedExercise
+                                .name,
+                        primaryMuscles:
+                            planned
+                                .embeddedExercise
+                                .primaryMuscles,
+                        setCount:
+                            setCount,
+                        instructions:
+                            planned
+                                .embeddedExercise
+                                .instructions,
+                        secondaryMuscles:
+                            planned
+                                .embeddedExercise
+                                .secondaryMuscles,
+                        equipment:
+                            planned
+                                .embeddedExercise
+                                .equipment,
+                        setPlans:
+                            plans
+                    )
+                }
+
+        guard let first =
+                queue.first,
+              let firstPlan =
+                first.setPlans?.first
+        else {
+            return nil
+        }
+
+        return WatchStrengthSessionSnapshot(
+            workoutID:
+                workout.id,
+            title:
+                workout.title,
+            exerciseIndex: 0,
+            exerciseCount:
+                queue.count,
+            exerciseName:
+                first.name,
+            primaryMuscles:
+                first.primaryMuscles,
+            setIndex: 0,
+            setCount:
+                first.setCount,
+            setNumber: 1,
+            completedSets: 0,
+            totalSets:
+                queue.reduce(0) {
+                    $0 + $1.setCount
+                },
+            draftReps:
+                firstPlan.reps ?? 8,
+            draftWeightKilograms:
+                firstPlan
+                    .weightKilograms ??
+                20,
+            draftRestSeconds:
+                firstPlan.restSeconds ??
+                90,
+            draftDurationSeconds:
+                firstPlan
+                    .durationSeconds,
+            draftResistanceLevel:
+                firstPlan
+                    .resistanceLevel,
+            targetKindRaw:
+                firstPlan
+                    .durationSeconds != nil
+                    ? "time"
+                    : "reps",
+            loadKindRaw:
+                firstPlan
+                    .resistanceLevel != nil
+                    ? "resistanceLevel"
+                    : "weightKilograms",
+            isResting: false,
+            restEndsAt: nil,
+            currentExerciseComplete:
+                false,
+            hasNextExercise:
+                queue.count > 1,
+            allExercisesComplete:
+                false,
+            updatedAt: Date(),
+            inputMode:
+                .appleWatch,
+            draftRPE:
+                plannedDefaultRPE(
+                    workout
+                ),
+            draftRIR:
+                plannedDefaultRIR(
+                    workout
+                ),
+            isWarmUp:
+                firstPlan.isWarmUp,
+            effortMetricRaw:
+                "rpe",
+            exerciseQueue:
+                queue,
+            startedAt: nil,
+            plannedSessionID:
+                workout.id,
+            allowsLiveExerciseBuilding:
+                false
+        )
+    }
+
+    private static func plannedDefaultRPE(
+        _ workout: PlannedSession
+    ) -> Double? {
+        workout.exercises
+            .first?
+            .resolvedSetTargets
+            .first?
+            .targetRPE ??
+        workout.exercises
+            .first?
+            .targetRPE ??
+        8
+    }
+
+    private static func plannedDefaultRIR(
+        _ workout: PlannedSession
+    ) -> Double? {
+        workout.exercises
+            .first?
+            .resolvedSetTargets
+            .first?
+            .targetRIR ??
+        workout.exercises
+            .first?
+            .targetRIR ??
+        2
+    }
+
+
     static func watchKind(
         for kind: WorkoutKind
     ) -> WatchWorkoutKind? {

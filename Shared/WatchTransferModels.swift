@@ -1113,6 +1113,8 @@ struct WatchPreparedWorkoutTransfer: Codable, Hashable {
     var indoor: Bool? = nil
     // Optional for backwards-compatible decoding of transfers from older builds.
     var startMode: WatchWorkoutStartMode? = nil
+    // Optional and backwards-compatible: full planned strength prescription.
+    var strengthWorkout: WatchStrengthSessionSnapshot? = nil
     var updatedAt: Date
 }
 

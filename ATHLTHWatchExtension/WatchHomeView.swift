@@ -461,7 +461,13 @@ struct WatchHomeView: View {
             ) {
                 HStack {
                     Label(
-                        "TODAY",
+                        workout.scheduledStart.map {
+                            Calendar.current.isDateInToday($0)
+                        } ?? true
+                        ? ATHLTHLocalization.choose(
+                            english: "TODAY", norwegian: "I DAG")
+                        : ATHLTHLocalization.choose(
+                            english: "UPCOMING", norwegian: "KOMMENDE"),
                         systemImage:
                             "calendar.badge.clock"
                     )
@@ -483,7 +489,8 @@ struct WatchHomeView: View {
                                 .scheduledStart {
                         Text(
                             start.formatted(
-                                date: .omitted,
+                                date: Calendar.current.isDateInToday(start)
+                                    ? .omitted : .abbreviated,
                                 time: .shortened
                             )
                         )

@@ -300,6 +300,9 @@ final class WatchRouteStore: NSObject, ObservableObject {
         manager.configureAudioCoach(workout.audioCoach ?? .disabled)
         manager.configureGhostRace(workout.ghostRace)
 
+        if workout.kind == .strength, let strength = workout.strengthWorkout {
+            manager.configureStrengthSession(strength)
+        }
         if let running = workout.runningWorkout {
             manager.configureRunningWorkout(running)
         } else if workout.kind == .running || workout.kind == .walking {
