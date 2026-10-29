@@ -787,6 +787,28 @@ final class ExerciseLibraryStore: ObservableObject {
         }
     }
 
+    /// Letter lookup reuses the same localized sort keys as search. The
+    /// alphabet rail can redraw without translating thousands of names again.
+    func alphabetIndexTargets(
+        for entries: [ExerciseLibraryEntry]
+    ) -> [String: UUID] {
+        var result: [String: UUID] = [:]
+        for entry in entries {
+            let name: String
+            if let cached = cachedAlphabetSortKeys[entry.id] {
+                name = cached
+            } else {
+                name = localizedExerciseName(entry)
+                cachedAlphabetSortKeys[entry.id] = name
+            }
+            let letter = ATHLTHExerciseAlphabet.letter(for: name)
+            if result[letter] == nil {
+                result[letter] = entry.id
+            }
+        }
+        return result
+    }
+
     func search(
         query: String,
         bodyPart: String? = nil,
