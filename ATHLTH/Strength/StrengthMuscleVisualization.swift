@@ -283,7 +283,8 @@ enum StrengthMuscleProfileBuilder {
         workout: StrengthWorkoutLog,
         library:
             @autoclosure () ->
-                [ExerciseLibraryEntry]
+                [ExerciseLibraryEntry],
+        completedWorkingSetsOnly: Bool = false
     ) -> StrengthMuscleSessionSummary {
         let performed =
             performedExercises(
@@ -388,26 +389,26 @@ enum StrengthMuscleProfileBuilder {
                 )
 
             let meaningfulSets =
-                log.sets.filter {
+                completedWorkingSetsOnly
+                ? log.sets.filter(\.countsTowardTrainingLoad)
+                : log.sets.filter {
                     $0.isCompleted ||
                     $0.resolvedCompletedReps != nil ||
                     $0.completedWeightKilograms != nil ||
                     $0.completedResistanceLevel != nil ||
                     $0.resolvedCompletedDistanceMeters != nil
                 }
+            // The Insights activity estimate counts only finished working
+            // sets, not planned, skipped, warm-up or hybrid transition sets.
+            if completedWorkingSetsOnly && meaningfulSets.isEmpty {
+                continue
+            }
 
             let setCount: Int
-            if workout.trackingMode ==
-                .advanced {
-                setCount =
-                    meaningfulSets.count
+            if completedWorkingSetsOnly || workout.trackingMode == .advanced {
+                setCount = meaningfulSets.count
             } else {
-                setCount =
-                    max(
-                        meaningfulSets.count,
-                        log.sets.count,
-                        1
-                    )
+                setCount = max(meaningfulSets.count, log.sets.count, 1)
             }
 
             let workload =

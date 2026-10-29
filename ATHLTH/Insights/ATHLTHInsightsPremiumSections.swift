@@ -191,7 +191,11 @@ struct ATHLTHInsightsMuscleSummary {
 
         for workout in usable {
             let profile = StrengthMuscleProfileBuilder
-                .make(workout: workout, library: []).profile
+                .make(
+                    workout: workout,
+                    library: [],
+                    completedWorkingSetsOnly: true
+                ).profile
             samples.append((date: workout.startedAt, profile: profile))
             guard workout.startedAt >= recentCutoff else { continue }
             recentCount += 1
