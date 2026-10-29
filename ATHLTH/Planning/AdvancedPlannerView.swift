@@ -5221,8 +5221,12 @@ private enum SessionEditorMode: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .basic: return "Basic"
-        case .advanced: return "Advanced"
+        case .basic: return ATHLTHLocalization.choose(
+            english: "Simple", norwegian: "Enkel"
+        )
+        case .advanced: return ATHLTHLocalization.choose(
+            english: "Advanced", norwegian: "Avansert"
+        )
         }
     }
 }
@@ -5878,13 +5882,35 @@ struct SessionEditorView: View {
                         )
                     )
 
-                    Picker(ATHLTHLocalization.choose(english: "Type", norwegian: "Type"), selection: $kind) {
-                        ForEach(WorkoutKind.allCases) { kind in
+                    if let selectedScratchWorkoutType {
+                        HStack(spacing: 12) {
                             Label(
-                                kind.title,
-                                systemImage: kind.systemImage
+                                selectedScratchWorkoutType.title,
+                                systemImage: selectedScratchWorkoutType.symbol
                             )
-                            .tag(kind)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Spacer()
+                            Text(ATHLTHLocalization.choose(
+                                english: "Starting activity",
+                                norwegian: "Startaktivitet"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Text(ATHLTHLocalization.choose(
+                            english: "The timeline can mix several activities. The saved type follows the workout's actual contents.",
+                            norwegian: "Du kan kombinere flere aktiviteter i tidslinjen. Lagret økttype følger innholdet du legger til."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    } else {
+                        Picker(ATHLTHLocalization.choose(
+                            english: "Type", norwegian: "Type"
+                        ), selection: $kind) {
+                            ForEach(WorkoutKind.allCases) { kind in
+                                Label(kind.title, systemImage: kind.systemImage)
+                                    .tag(kind)
+                            }
                         }
                     }
 
@@ -6231,26 +6257,11 @@ struct SessionEditorView: View {
         selectedRouteID = nil
         runEnvironment = .outdoor
         workoutCategory = type.rawValue
-        switch type {
-        case .strength: kind = .strength
-        case .running: kind = .running
-        case .walking: kind = .walking
-        case .cycling: kind = .custom
-        case .mobility: kind = .mobility
-        case .custom: kind = .custom
-        }
+        kind = type.scratchWorkoutKind
     }
 
     private var scratchQuickAdd: String? {
-        guard let selectedScratchWorkoutType else { return nil }
-        switch selectedScratchWorkoutType {
-        case .strength: return "exercise"
-        case .running: return "running"
-        case .walking: return "walking"
-        case .cycling: return "cycling"
-        case .mobility: return "stretching"
-        case .custom: return nil
-        }
+        selectedScratchWorkoutType?.scratchQuickAdd
     }
 
     /// The timeline builder returns the same PlannedSession recipe the editor
@@ -6590,6 +6601,7 @@ struct SessionEditorView: View {
                         onCreateNew: { type in
                             prepareBlankWorkout(for: type)
                             showingSavedWorkoutPicker = false
+                            pickingScratchWorkout = false
                         },
                         onSelect: { _, _ in }
                     )
