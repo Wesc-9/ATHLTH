@@ -523,6 +523,12 @@ final class AppSettingsStore: ObservableObject {
     @Published var audioCoachTimeIntervalMinutes: Int { didSet { persist() } }
     /// Precise custom cadence (seconds). Old installs migrate from minutes.
     @Published var audioCoachTimeIntervalSeconds: Int { didSet { persist() } }
+    @Published var audioCoachCustomRules: [ATHLTHAudioCoachRule] {
+        didSet { persist() }
+    }
+    @Published var audioCoachSavedRuleSets: [ATHLTHAudioCoachRuleSet] {
+        didSet { persist() }
+    }
     @Published var audioCoachAnnounceDistance: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceElapsedTime: Bool { didSet { persist() } }
     @Published var audioCoachAnnounceAveragePace: Bool { didSet { persist() } }
@@ -849,6 +855,16 @@ final class AppSettingsStore: ObservableObject {
             ((defaults.object(forKey: "settings.audioCoach.timeIntervalMinutes") as? Int ?? 10) * 60),
             15
         ), 7_200)
+        audioCoachCustomRules = (
+            defaults.data(forKey: "settings.audioCoach.customRules.v1")
+                .flatMap { try? JSONDecoder().decode(
+                    [ATHLTHAudioCoachRule].self, from: $0) }
+        ) ?? []
+        audioCoachSavedRuleSets = (
+            defaults.data(forKey: "settings.audioCoach.savedRuleSets.v1")
+                .flatMap { try? JSONDecoder().decode(
+                    [ATHLTHAudioCoachRuleSet].self, from: $0) }
+        ) ?? []
         audioCoachAnnounceDistance =
             defaults.object(
                 forKey: "settings.audioCoach.announceDistance"
@@ -1163,6 +1179,14 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.audioCoach.timeIntervalSeconds"
         )
         defaults.set(
+            try? JSONEncoder().encode(audioCoachCustomRules),
+            forKey: "settings.audioCoach.customRules.v1"
+        )
+        defaults.set(
+            try? JSONEncoder().encode(audioCoachSavedRuleSets),
+            forKey: "settings.audioCoach.savedRuleSets.v1"
+        )
+        defaults.set(
             audioCoachAnnounceDistance,
             forKey: "settings.audioCoach.announceDistance"
         )
@@ -1423,13 +1447,15 @@ final class AppSettingsStore: ObservableObject {
             enabled: enabled,
             language: audioCoachLanguage,
             distanceIntervalMeters:
-                audioCoachDistanceTriggerEnabled
+                audioCoachCustomRules.isEmpty && audioCoachDistanceTriggerEnabled
                     ? audioCoachDistanceIntervalKilometers * 1_000
                     : nil,
             timeIntervalSeconds:
-                audioCoachTimeTriggerEnabled
+                audioCoachCustomRules.isEmpty && audioCoachTimeTriggerEnabled
                     ? Double(min(max(audioCoachTimeIntervalSeconds, 15), 7_200))
                     : nil,
+            customRules: audioCoachCustomRules.isEmpty ? nil
+                : Array(audioCoachCustomRules.prefix(20)),
             announceDistance: audioCoachAnnounceDistance,
             announceElapsedTime: audioCoachAnnounceElapsedTime,
             announceAveragePace: audioCoachAnnounceAveragePace,

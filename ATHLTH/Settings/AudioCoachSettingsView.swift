@@ -175,6 +175,12 @@ struct ATHLTHAudioCoachSettingsView: View {
     @State private var showingCustomTimeInterval = false
     @State private var customTimeMinutes = 5
     @State private var customTimeSeconds = 0
+    @State private var customRuleTrigger: ATHLTHAudioCoachRule.Trigger = .distance
+    @State private var customRuleMetric: ATHLTHAudioCoachRule.Metric = .pace
+    @State private var customRuleDistanceMeters = 1_000
+    @State private var customRuleSeconds = 30
+    @State private var customRuleSetName = ""
+
 
     var body: some View {
         ZStack {
@@ -186,6 +192,7 @@ struct ATHLTHAudioCoachSettingsView: View {
                     experienceSection
                     speakingToneQuickSection
                     voiceSection
+                    customCoachRulesSection
                     advancedOptionsToggle
                     if showAdvancedSettings {
                         triggerSection
@@ -669,6 +676,183 @@ struct ATHLTHAudioCoachSettingsView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    /// Independent speaking rules: each row owns its own cadence and metric.
+    /// Saving a named combination never removes the active draft.
+    private var customCoachRulesSection: some View {
+        premiumSection(ATHLTHLocalization.choose(
+            english: "My Audio Coaches", norwegian: "Mine Audio Coaches"
+        )) {
+            premiumCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Build your announcements",
+                        norwegian: "Bygg dine egne beskjeder"
+                    ))
+                    .font(.headline)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Add independent rules and reuse a saved list.",
+                        norwegian: "Legg til flere regler og hent en lagret liste senere."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                    Picker(ATHLTHLocalization.choose(
+                        english: "Trigger", norwegian: "Utløser"
+                    ), selection: $customRuleTrigger) {
+                        ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
+                            Text(trigger.title).tag(trigger)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
+                    HStack {
+                        Picker(ATHLTHLocalization.choose(
+                            english: "Announce", norwegian: "Si"
+                        ), selection: $customRuleMetric) {
+                            ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
+                                Text(metric.title).tag(metric)
+                            }
+                        }
+                        .labelsHidden()
+                        Spacer(minLength: 4)
+                    }
+
+                    if customRuleTrigger == .distance {
+                        Stepper(
+                            value: $customRuleDistanceMeters,
+                            in: 100...42_000,
+                            step: 100
+                        ) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Every \(customRuleDistanceMeters) m",
+                                norwegian: "Hver \(customRuleDistanceMeters) m"
+                            ))
+                        }
+                    } else {
+                        Stepper(
+                            value: $customRuleSeconds, in: 15...7_200, step: 15
+                        ) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Every \(customRuleSeconds) sec",
+                                norwegian: "Hvert \(customRuleSeconds). sekund"
+                            ))
+                        }
+                    }
+
+                    Button {
+                        let interval = customRuleTrigger == .distance
+                            ? customRuleDistanceMeters : customRuleSeconds
+                        settings.audioCoachCustomRules.append(
+                            ATHLTHAudioCoachRule(
+                                trigger: customRuleTrigger,
+                                metric: customRuleMetric,
+                                interval: interval
+                            )
+                        )
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Add rule", norwegian: "Legg til"
+                        ), systemImage: "plus")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    .disabled(settings.audioCoachCustomRules.count >= 20)
+
+                    ForEach(settings.audioCoachCustomRules) { rule in
+                        HStack(alignment: .center) {
+                            Image(systemName: rule.trigger == .distance
+                                ? "point.bottomleft.forward.to.point.topright.scurvepath"
+                                : "clock")
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(rule.metric.title).font(.subheadline.weight(.semibold))
+                                Text(rule.trigger == .distance
+                                    ? "\(rule.validatedInterval) m"
+                                    : "\(rule.validatedInterval) sek")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer()
+                            Button(role: .destructive) {
+                                settings.audioCoachCustomRules.removeAll {
+                                    $0.id == rule.id
+                                }
+                            } label: {
+                                Image(systemName: "trash")
+                                    .frame(width: 44, height: 44)
+                            }
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Remove rule", norwegian: "Fjern regel"
+                            ))
+                        }
+                    }
+
+                    if !settings.audioCoachCustomRules.isEmpty {
+                        TextField(ATHLTHLocalization.choose(
+                            english: "Name this list", norwegian: "Navn på listen"
+                        ), text: $customRuleSetName)
+                        .textInputAutocapitalization(.sentences)
+                        Button {
+                            let title = customRuleSetName.trimmingCharacters(
+                                in: .whitespacesAndNewlines)
+                            guard !title.isEmpty else { return }
+                            settings.audioCoachSavedRuleSets.append(
+                                ATHLTHAudioCoachRuleSet(
+                                    title: title,
+                                    rules: settings.audioCoachCustomRules
+                                )
+                            )
+                            customRuleSetName = ""
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Save list", norwegian: "Lagre liste"
+                            ), systemImage: "square.and.arrow.down")
+                        }
+                        .disabled(customRuleSetName.trimmingCharacters(
+                            in: .whitespacesAndNewlines).isEmpty)
+                    }
+
+                    if !settings.audioCoachSavedRuleSets.isEmpty {
+                        Menu {
+                            ForEach(settings.audioCoachSavedRuleSets) { saved in
+                                Button(saved.title) {
+                                    settings.audioCoachCustomRules = saved.rules
+                                }
+                            }
+                        } label: {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Load a saved list", norwegian: "Hent lagret liste"
+                            ), systemImage: "folder")
+                                .frame(maxWidth: .infinity, minHeight: 44)
+                        }
+                        ForEach(settings.audioCoachSavedRuleSets) { saved in
+                            HStack {
+                                Text(saved.title).font(.subheadline)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text("\(saved.rules.count)")
+                                    .foregroundStyle(ATHLTHTheme.mutedText)
+                                Button(role: .destructive) {
+                                    settings.audioCoachSavedRuleSets.removeAll {
+                                        $0.id == saved.id
+                                    }
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .frame(width: 44, height: 44)
+                                }
+                                .accessibilityLabel(ATHLTHLocalization.choose(
+                                    english: "Delete saved list",
+                                    norwegian: "Slett lagret liste"))
+                            }
+                        }
+                    }
+                }
+                .padding(16)
+            }
+        }
     }
 
     private var triggerSection: some View {

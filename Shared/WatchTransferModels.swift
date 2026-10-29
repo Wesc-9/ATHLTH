@@ -353,6 +353,9 @@ struct WatchAudioCoachConfiguration: Codable, Hashable {
     var language: WatchAudioCoachLanguage
     var distanceIntervalMeters: Double?
     var timeIntervalSeconds: TimeInterval?
+    // An optional ruleset keeps previously persisted and Watch transfers
+    // backwards compatible. Each metric has its own cadence.
+    var customRules: [ATHLTHAudioCoachRule]? = nil
 
     var announceDistance: Bool
     var announceElapsedTime: Bool
