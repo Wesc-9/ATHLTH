@@ -206,12 +206,13 @@ struct ATHLTHAudioCoachSettingsView: View {
                 VStack(spacing: 0) {
                     // ATHLTH+ applies to premium voices and workout features,
                     // not to discovering local voices or editing preferences.
+                    studioEntrySection
                     experienceSection
                     speakingToneQuickSection
                     voiceSection
-                    customCoachRulesSection
                     advancedOptionsToggle
                     if showAdvancedSettings {
+                        customCoachRulesSection
                         triggerSection
                         updateSection
                         eventSection
@@ -369,6 +370,60 @@ struct ATHLTHAudioCoachSettingsView: View {
             )
         }
         .ignoresSafeArea()
+    }
+
+    private var studioEntrySection: some View {
+        premiumSection(ATHLTHLocalization.choose(
+            english: "My Audio Coach", norwegian: "Min Audio Coach"
+        )) {
+            NavigationLink {
+                ATHLTHAudioCoachStudioView()
+            } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "waveform.badge.mic")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .frame(width: 52, height: 52)
+                        .background(ATHLTHTheme.accentSoft,
+                                    in: RoundedRectangle(cornerRadius: 17))
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Personal Coach Studio",
+                            norwegian: "Personlig Coach Studio"
+                        ))
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Motivation, places and saved profiles",
+                            norwegian: "Motivasjon, steder og lagrede profiler"
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                        Text("\(settings.audioCoachProfiles.count) " +
+                             ATHLTHLocalization.choose(
+                                 english: "saved profiles",
+                                 norwegian: "lagrede profiler"
+                             ))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                }
+                .padding(20)
+                .frame(maxWidth: .infinity, minHeight: 106)
+                .background(
+                    LinearGradient(
+                        colors: [ATHLTHTheme.card, ATHLTHTheme.accentSoft],
+                        startPoint: .leading, endPoint: .trailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 26)
+                )
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private var selectedExperience: ATHLTHCoachExperiencePreset? {
