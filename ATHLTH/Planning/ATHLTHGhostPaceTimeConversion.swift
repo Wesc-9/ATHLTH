@@ -16,7 +16,7 @@ enum ATHLTHGhostPaceTimeConversion {
         guard fields.count == 2,
               let minutes = Int(fields[0]),
               let seconds = Int(fields[1]),
-              minutes >= 0, (0..<60).contains(seconds)
+              (0...60).contains(minutes), (0..<60).contains(seconds)
         else { return nil }
 
         let pace = TimeInterval(minutes * 60 + seconds)
