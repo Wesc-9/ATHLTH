@@ -32,6 +32,7 @@ struct ExerciseLibraryView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
     @State private var nameTranslationConfig: TranslationSession.Configuration?
     @State private var languageStatus: LanguageAvailability.Status = .unsupported
@@ -47,6 +48,7 @@ struct ExerciseLibraryView: View {
     @State private var selectedEquipment = "All"
     @State private var favoritesOnly = false
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var libraryViewWidth: CGFloat = 390
     @State private var showingCreateExercise = false
     @State private var showingEquipmentCamera = false
     @State private var showingCameraUnavailable = false
@@ -373,10 +375,12 @@ struct ExerciseLibraryView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVGrid(
-                            columns: displayMode == .grid
-                                ? [GridItem(.flexible(), spacing: 10),
-                                   GridItem(.flexible(), spacing: 10)]
-                                : [GridItem(.flexible())],
+                            columns: ATHLTHLibraryGridColumns.make(
+                                mode: displayMode,
+                                width: libraryViewWidth,
+                                reservedHorizontalSpace: 50,
+                                accessibilityText: dynamicTypeSize.isAccessibilitySize
+                            ),
                             spacing: 10
                         ) {
                             ForEach(
@@ -585,6 +589,9 @@ struct ExerciseLibraryView: View {
         .onAppear {
             refreshExerciseHistory()
             displayMode = .load(userID: session.profile.userID)
+        }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            libraryViewWidth = width
         }
         .onChange(of: session.profile.userID) { _, userID in
             displayMode = .load(userID: userID)
@@ -1125,7 +1132,7 @@ struct ExerciseLibraryView: View {
     /// preserve the existing favorites/add controls on each exercise.
     private func exerciseGridCard(_ entry: ExerciseLibraryEntry) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            ExerciseArtwork(entry: entry, size: 90)
+            ExerciseArtwork(entry: entry, size: 64)
                 .frame(maxWidth: .infinity, alignment: .leading)
             Text(library.localizedExerciseName(entry))
                 .font(.subheadline.weight(.semibold))
@@ -1140,7 +1147,7 @@ struct ExerciseLibraryView: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 178, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 161, alignment: .topLeading)
         .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 20))
         .overlay {
             RoundedRectangle(cornerRadius: 20)
