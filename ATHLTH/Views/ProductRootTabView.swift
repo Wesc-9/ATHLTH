@@ -6304,6 +6304,14 @@ struct ATHLTHTrainView: View {
                     isHealthCompleted: healthCompleted
                 )
             },
+            onSendWorkoutToWatch: { workout in
+                guard let active else { return }
+                prepareTodayWorkoutForAppleWatch(workout, planID: active.id)
+            },
+            onDelayWorkout: { workout, seconds in
+                guard let active else { return }
+                scheduleTodayWorkoutStart(workout, planID: active.id, after: seconds)
+            },
             onWorkoutDetails: { workout, healthCompleted in
                 guard let active else { return }
                 selectedPlanWorkout = PlannedWorkoutSelection(
@@ -7808,6 +7816,88 @@ struct ATHLTHTrainView: View {
             }
         }
         return origin
+    }
+
+    /// Sending a planned session never calls HealthKit's Watch start API.
+    /// The prepared card is durable and launches only on Watch START.
+    private func prepareTodayWorkoutForAppleWatch(
+        _ selected: PlannedSession, planID: UUID
+    ) {
+        guard watchConnection.isReady,
+              let workout = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == selected.id }),
+              !workout.isExplicitRestDay,
+              !session.isPlanSessionSkipped(
+                planID: planID, sessionID: workout.id),
+              !session.isPlanSessionCompleted(
+                planID: planID, sessionID: workout.id,
+                healthWorkouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory),
+              let watchKind = PlannedWorkoutWatchBuilder.watchKind(
+                for: workout.kind)
+        else {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "This workout cannot be sent to Apple Watch now.",
+                norwegian: "Denne økten kan ikke sendes til Apple Watch nå."
+            )
+            return
+        }
+
+        let indoor = workout.kind == .running
+            && RunEnvironment.forPlannedSession(workout) == .treadmill
+        let route = indoor ? nil : PlannedWorkoutWatchBuilder.route(
+            for: workout, routes: session.savedRoutes)
+        if workout.routeID != nil && route == nil && !indoor {
+            watchTransferError = ATHLTHLocalization.choose(
+                english: "The planned route is missing.",
+                norwegian: "Den planlagte ruten mangler."
+            )
+            return
+        }
+        if let route {
+            do {
+                try watchConnection.sendRoute(route)
+            } catch {
+                watchTransferError = error.localizedDescription
+                return
+            }
+        }
+
+        let running: WatchRunningWorkoutTransfer? =
+            watchKind == .running || watchKind == .walking
+            ? PlannedWorkoutWatchBuilder.runningTransfer(
+                from: workout,
+                routeAlerts: settings.routeAlertConfiguration,
+                autoPauseEnabled: workout.autoPauseEnabled
+                    ?? settings.autoPauseOutdoorWorkouts)
+            : nil
+        watchConnection.sendPreparedWorkout(
+            WatchPreparedWorkoutTransfer(
+                id: UUID(),
+                title: workout.title,
+                summary: workout.durationMinutes.map { "\($0) min" }
+                    ?? workout.kind.title,
+                kind: watchKind,
+                routeID: route?.id,
+                runningWorkout: running,
+                audioCoach: PlannedWorkoutWatchBuilder.audioCoachConfiguration(
+                    for: workout,
+                    selectedRoute: route,
+                    defaultConfiguration: settings.audioCoachConfiguration(
+                        enabled: settings.audioCoachEnabledByDefault)),
+                indoor: indoor,
+                startMode: .onWatch,
+                strengthWorkout: watchKind == .strength
+                    ? PlannedWorkoutWatchBuilder.strengthSnapshot(workout)
+                    : nil,
+                updatedAt: Date()
+            )
+        )
+        watchTransferMessage = ATHLTHLocalization.choose(
+            english: "Sent to Apple Watch. Tap the ready card there to start.",
+            norwegian: "Sendt til Apple Watch. Trykk på kortet der når du vil starte."
+        )
     }
 
     private func openTodayPrimaryWorkout(

@@ -32,6 +32,9 @@ struct ATHLTHTrainTodayPremiumView: View {
     let onOpenLibrary: () -> Void
     let onStartWorkout: (PlannedSession, Bool) -> Void
     let onWorkoutDetails: (PlannedSession, Bool) -> Void
+    /// Long-press actions are handled by the owning validated launch flow.
+    let onSendWorkoutToWatch: (PlannedSession) -> Void
+    let onDelayWorkout: (PlannedSession, TimeInterval) -> Void
     /// Changes only the selected unfinished workout after explicit approval.
     let onAcceptAlternative: (
         PlannedSession, ATHLTHDailyWorkoutAlternativeAdvisor.Suggestion
@@ -43,6 +46,8 @@ struct ATHLTHTrainTodayPremiumView: View {
     @State private var reportedSoreness: Int?
     @State private var reportedMuscles: [String: RecoverySorenessLevel] = [:]
     @State private var pendingSwap: PendingSwap?
+    @State private var customDelayWorkout: PlannedSession?
+    @State private var customDelayMinutes = 2
 
     private struct PendingSwap {
         let workout: PlannedSession
@@ -139,6 +144,39 @@ struct ATHLTHTrainTodayPremiumView: View {
                 UserDefaults.standard.dictionary(forKey: quickActivityStorageKey)
                     as? [String: Int] ?? [:]
             temporarilyFeaturedGoalID = nil
+        }
+        .sheet(item: $customDelayWorkout) { workout in
+            NavigationStack {
+                Form {
+                    Section {
+                        Stepper(value: $customDelayMinutes, in: 1...120) {
+                            Text(tr("Start in \(customDelayMinutes) minutes",
+                                    "Start om \(customDelayMinutes) minutter"))
+                        }
+                    } footer: {
+                        Text(tr(
+                            "The iPhone opens the workout start flow when the timer ends in the foreground. If locked, a reminder can be shown instead.",
+                            "iPhone åpner oppstarten når nedtellingen er ferdig og appen er aktiv. Er telefonen låst, kan du få en påminnelse i stedet."
+                        ))
+                    }
+                }
+                .navigationTitle(tr("Delayed start", "Utsatt oppstart"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(tr("Cancel", "Avbryt")) {
+                            customDelayWorkout = nil
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(tr("Set start", "Velg oppstart")) {
+                            onDelayWorkout(workout, TimeInterval(customDelayMinutes * 60))
+                            customDelayWorkout = nil
+                        }
+                    }
+                }
+            }
+            .presentationDetents([.medium])
         }
         .onReceive(NotificationCenter.default.publisher(
             for: Notification.Name("athlth.dailyCheckInDidUpdate")
@@ -624,9 +662,46 @@ struct ATHLTHTrainTodayPremiumView: View {
             }
             .buttonStyle(.plain)
             .accessibilityHint(tr(
-                "Use the existing iPhone or Apple Watch workout setup",
-                "Bruker eksisterende oppsett for iPhone eller Apple Watch"
+                "Tap to open the workout start flow, or hold for more start options.",
+                "Trykk for å åpne oppstarten, eller hold inne for flere startvalg."
             ))
+            .contextMenu {
+                if !finished && !hasActiveWorkout {
+                    Button {
+                        onStartWorkout(workout, healthCompletedIDs.contains(workout.id))
+                    } label: {
+                        Label(tr("Start now", "Start nå"), systemImage: "play.fill")
+                    }
+                    Menu {
+                        ForEach([30, 60, 300, 600], id: \.self) { seconds in
+                            Button {
+                                onDelayWorkout(workout, TimeInterval(seconds))
+                            } label: {
+                                Text(seconds < 60 ? tr("30 seconds", "30 sekunder")
+                                    : tr("\(seconds / 60) minutes",
+                                         "\(seconds / 60) minutter"))
+                            }
+                        }
+                        Button {
+                            customDelayMinutes = 2
+                            customDelayWorkout = workout
+                        } label: {
+                            Label(tr("Choose duration…", "Velg tid …"),
+                                  systemImage: "clock")
+                        }
+                    } label: {
+                        Label(tr("Start later", "Start om X tid"), systemImage: "clock")
+                    }
+                    if [.running, .walking, .strength].contains(workout.kind) {
+                        Button {
+                            onSendWorkoutToWatch(workout)
+                        } label: {
+                            Label(tr("Send to Apple Watch", "Send til Apple Watch"),
+                                  systemImage: "applewatch")
+                        }
+                    }
+                }
+            }
         }
         .frame(minHeight: 188, alignment: .topLeading)
     }
