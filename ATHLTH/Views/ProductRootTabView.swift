@@ -815,6 +815,8 @@ struct ATHLTHHomeView: View {
     @State private var homeCalendarPendingKind: WorkoutKind?
     @State private var homeCalendarPendingCustom = false
     @State private var selectedHomeStandaloneWorkout: PlannedSession?
+    @State private var selectedHomeRecommendedWorkout: PlannedSession?
+    @State private var homeRecommendedPlanID: UUID?
     @State private var selectedHomeAllStandaloneWorkout: PlannedSession?
     @State private var selectedHomeStrengthSession: PlannedSession?
     @State private var selectedHomeStructuredWorkout: PlannedSession?
@@ -1324,6 +1326,25 @@ struct ATHLTHHomeView: View {
                     // remains available for a downward swipe back to Home.
                     .presentationContentInteraction(.scrolls)
                     .presentationCornerRadius(30)
+            }
+            .sheet(item: $selectedHomeRecommendedWorkout) { workout in
+                HomeDailyRecommendedWorkoutSheet(
+                    workout: workout,
+                    isPlanWorkout: homeRecommendedPlanID != nil,
+                    canStartWithWatch: watchConnection.isReady,
+                    onOpenPlannedWorkout: {
+                        startHomeDailyRecommendedWorkout(workout, device: .appleWatch)
+                    },
+                    onStartOnPhone: {
+                        startHomeDailyRecommendedWorkout(workout, device: .iPhone)
+                    },
+                    onStartOnWatch: {
+                        startHomeDailyRecommendedWorkout(workout, device: .appleWatch)
+                    }
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(28)
             }
             // Independent sessions share the calendar but not a plan ID.
             .sheet(item: $selectedHomeStandaloneWorkout) { workout in
@@ -1968,9 +1989,23 @@ struct ATHLTHHomeView: View {
     // former Home goal shortcut without deleting any saved goals.
     private let homeCalendarContentMinHeight: CGFloat = 70
 
+    /// Prefer the actual uncompleted workout in the plan, then a standalone
+    /// scheduled session. Rest days are never executable recommendations.
+    private var homeRecommendedScheduledWorkout:
+        (planID: UUID?, workout: PlannedSession)? {
+        if let selection = homeTodayPlanWorkout {
+            return (selection.planID, selection.workout)
+        }
+        if let workout = HomeTodayCalendarSchedule.workouts(
+            plan: nil, standalone: session.standalonePlannedSessions
+        ).first(where: { !$0.isExplicitRestDay }) {
+            return (nil, workout)
+        }
+        return nil
+    }
+
     private var homeDailyRecommendation: HomeDailyRecommendationPolicy.Advice {
         let readiness: HomeDailyRecommendationPolicy.Readiness
-        // An unavailable score is not evidence of good or poor recovery.
         if health.recovery.score == nil {
             readiness = .unavailable
         } else {
@@ -1982,41 +2017,86 @@ struct ATHLTHHomeView: View {
             case .buildingBaseline: readiness = .unavailable
             }
         }
-
-        let hasWorkoutToday = !HomeTodayCalendarSchedule.workouts(
-            plan: session.activePlan,
-            standalone: session.standalonePlannedSessions
-        ).isEmpty
-
-        let first = HomeTodayCalendarSchedule.workouts(
-            plan: session.activePlan,
-            standalone: session.standalonePlannedSessions
-        ).first
-        let plannedActivity: HomeDailyRecommendationPolicy.PlannedActivity? =
-            first.map { workout -> HomeDailyRecommendationPolicy.PlannedActivity in
-                switch workout.kind {
+        let scheduled = homeRecommendedScheduledWorkout
+        let activity: HomeDailyRecommendationPolicy.PlannedActivity? =
+            scheduled.map {
+                switch $0.workout.kind {
                 case .running: return .running
                 case .strength: return .strength
                 default: return .other
                 }
             }
-
         return HomeDailyRecommendationPolicy.recommendation(
             readiness: readiness,
-            hasWorkoutToday: hasWorkoutToday,
+            hasWorkoutToday: scheduled != nil,
             trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio,
-            plannedActivity: plannedActivity
+            plannedActivity: activity,
+            plannedWorkoutTitle: scheduled?.workout.title
         )
     }
 
     private func openHomeDailyRecommendation(
         _ advice: HomeDailyRecommendationPolicy.Advice
     ) {
-        switch advice.destination {
-        case .insights:
-            onSelectTab(2)
-        case .training:
-            onOpenTrain(.today)
+        if advice.suggestedWorkout == .planned {
+            guard let scheduled = homeRecommendedScheduledWorkout else {
+                onOpenTrain(.today)
+                return
+            }
+            homeRecommendedPlanID = scheduled.planID
+            selectedHomeRecommendedWorkout = scheduled.workout
+        } else if let suggested =
+                    HomeDailyRecommendationSessionFactory.make(advice: advice) {
+            homeRecommendedPlanID = nil
+            selectedHomeRecommendedWorkout = suggested
+        }
+    }
+
+    private func startHomeDailyRecommendedWorkout(
+        _ workout: PlannedSession, device: WorkoutCaptureDevice
+    ) {
+        selectedHomeRecommendedWorkout = nil
+        let planID = homeRecommendedPlanID
+        Task { @MainActor in
+            // Avoid presenting a recorder while the sheet dismissal animates.
+            try? await Task.sleep(for: .milliseconds(330))
+            if let planID {
+                // A plan workout uses its existing detail, start options and
+                // completion linkage. Never launch an unlinked copy.
+                onOpenTrain(.workout(planID: planID, workoutID: workout.id))
+                return
+            }
+            if session.standalonePlannedSessions.contains(where: {
+                $0.id == workout.id
+            }) {
+                startHomeStandaloneWorkout(workout, device: device)
+                return
+            }
+
+            guard !homeDirectStartInProgress,
+                  phoneWorkout.active == nil,
+                  strengthWorkout.activeWorkout == nil,
+                  !watchConnection.hasActiveWatchWorkout,
+                  !ATHLTHWatchWorkoutRuntime.isMirroredWorkoutActive
+            else {
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "Finish your current workout first.",
+                    norwegian: "Avslutt økten som pågår først."
+                )
+                return
+            }
+            if device == .appleWatch {
+                guard watchConnection.isReady else {
+                    homeWatchTransferError = ATHLTHLocalization.choose(
+                        english: "Apple Watch is unavailable. Start with iPhone instead.",
+                        norwegian: "Apple Watch er ikke tilgjengelig. Start med iPhone i stedet."
+                    )
+                    return
+                }
+                startHomePlannedWorkoutOnWatch(workout)
+            } else {
+                startHomeStandalonePhoneEndurance(workout)
+            }
         }
     }
 
