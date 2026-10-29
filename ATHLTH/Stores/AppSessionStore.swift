@@ -507,6 +507,7 @@ final class AppSessionStore: ObservableObject {
                 weightKilograms: basics.weightKilograms,
                 heightCentimeters: basics.heightCentimeters,
                 maximumHeartRateBPM: basics.maximumHeartRateBPM,
+                maximumHeartRateIsEstimated: basics.maximumHeartRateIsEstimated,
                 personalDetailsSource: source,
                 trainingFocus: existing?.trainingFocus,
                 trainingFocusIDs: existing?.trainingFocusIDs,
@@ -533,7 +534,11 @@ final class AppSessionStore: ObservableObject {
                 healthBasics.heightCentimeters ?? existing?.heightCentimeters,
             maximumHeartRateBPM:
                 existing?.maximumHeartRateBPM ??
-                healthBasics.maximumHeartRateBPM
+                healthBasics.maximumHeartRateBPM,
+            maximumHeartRateIsEstimated:
+                existing?.maximumHeartRateBPM != nil
+                    ? existing?.maximumHeartRateIsEstimated
+                    : healthBasics.maximumHeartRateIsEstimated
         )
 
         let usesManualFallback =
