@@ -20,7 +20,9 @@ struct ATHLTHInsightsView: View {
     @State private var isLoadingTrend = false
     @State private var trendError: String?
     @State private var scenarioSessionsPerWeek = 4
+    @State private var scenarioMinutesPerSession = 45
     @State private var scenarioFocus: InsightsScenarioFocus = .consistency
+    @State private var showingScenarioCoach = false
     // Compute history aggregates only when the Health workout snapshot changes,
     // not every time SwiftUI recreates cards while the user scrolls.
     @State private var sessionBaselines = InsightsSessionBaselines.empty
@@ -48,8 +50,6 @@ struct ATHLTHInsightsView: View {
                         switch selectedSection {
                         case .overview:
                             overviewSection
-                        case .health:
-                            healthSection
                         case .training:
                             trainingSection
                         case .development:
@@ -70,6 +70,12 @@ struct ATHLTHInsightsView: View {
             .ignoresSafeArea(.container, edges: .top)
             .background(ATHLTHInsightsStyle.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(isPresented: $showingScenarioCoach) {
+                RecoveryCoachInboxDestinationView(
+                    initialQuestion: scenarioCoachPrompt,
+                    submitInitialQuestion: true
+                )
+            }
             .sheet(isPresented: $showingCheckIn) {
                 RecoverySorenessLogView(store: checkInStore)
             }
@@ -114,7 +120,6 @@ struct ATHLTHInsightsView: View {
     private var insightsHeroImage: String {
         switch selectedSection {
         case .overview: return "ProgressHero"
-        case .health: return "RecoveryHero"
         case .training: return "GoalMountain"
         case .development: return "GoalProgress"
         }
@@ -125,7 +130,6 @@ struct ATHLTHInsightsView: View {
         case .overview:
             return tr("Understand your body. Train smarter.",
                       "Forstå kroppen din. Tren smartere.")
-        case .health: return tr("Body & health", "Kropp & helse")
         case .training: return tr("Training", "Trening")
         case .development: return tr("Progress over time", "Utvikling over tid")
         }
@@ -135,36 +139,6 @@ struct ATHLTHInsightsView: View {
         Group {
             readinessOverviewCard
             signalPerspectiveCard
-        }
-    }
-    private var healthSection: some View {
-        Group {
-            healthSignalIntroCard
-            ATHLTHInsightsReferenceSignalCard(
-                metric: .sleep, snapshot: recoverySnapshot
-            ) { selectedSection = .development }
-            ATHLTHInsightsReferenceSignalCard(
-                metric: .hrv, snapshot: recoverySnapshot
-            ) { selectedSection = .development }
-            DisclosureGroup {
-                VStack(spacing: 14) {
-                    ATHLTHInsightsReferenceSignalCard(
-                        metric: .restingHeartRate, snapshot: recoverySnapshot
-                    ) { selectedSection = .development }
-                    ATHLTHInsightsReferenceSignalCard(
-                        metric: .respiratory, snapshot: recoverySnapshot
-                    ) { selectedSection = .development }
-                }
-                .padding(.top, 10)
-            } label: {
-                Label(tr("More body signals", "Flere kroppssignaler"),
-                      systemImage: "waveform.path.ecg")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHInsightsStyle.ink)
-            }
-            .tint(ATHLTHInsightsStyle.accent)
-            .padding(17)
-            .athlthInsightsSurface()
         }
     }
     private var trainingSection: some View {
@@ -185,24 +159,6 @@ struct ATHLTHInsightsView: View {
             }
             whatIfCard
         }
-    }
-
-    private var healthSignalIntroCard: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Label(tr("See the pattern, not just a number", "Se mønsteret, ikke bare tallet"),
-                  systemImage: "waveform.path.ecg")
-                .font(.system(size: 18, weight: .semibold, design: .serif))
-                .foregroundStyle(ATHLTHInsightsStyle.ink)
-            Text(tr(
-                "Sleep and HRV show your recent seven-day trends. Expand the other measurements only when you want to explore further.",
-                "Søvn og HRV viser utviklingen de siste sju dagene. Utvid øvrige målinger når du vil gå dypere."
-            ))
-            .font(.subheadline)
-            .foregroundStyle(ATHLTHInsightsStyle.muted)
-            .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(17)
-        .athlthInsightsSurface()
     }
 
     private var signalPerspectiveCard: some View {
