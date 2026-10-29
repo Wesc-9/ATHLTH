@@ -1,44 +1,31 @@
 import Foundation
 
-/// Transparent planning arithmetic. A training-minute comparison is never
-/// presented as a prediction of readiness, fitness gains or injury risk.
+/// Adds one hypothetical session to a recent *weekly average*. This is
+/// arithmetic about logged minutes, not a recovery or performance forecast.
 struct ATHLTHInsightsWhatIfComparison: Equatable {
     let historicalWeeklyMinutes: Double?
     let historicalWeeklySessions: Double?
-    let proposedSessions: Int
-    let minutesPerSession: Int
+    let additionalMinutes: Int
 
-    var proposedWeeklyMinutes: Double {
-        Double(max(proposedSessions, 0) * max(minutesPerSession, 0))
+    var projectedWeeklyMinutes: Double? {
+        guard let baseline = historicalWeeklyMinutes,
+              baseline.isFinite, baseline >= 0
+        else { return nil }
+        return baseline + Double(max(additionalMinutes, 0))
     }
 
-    var hasHistory: Bool {
-        historicalWeeklyMinutes != nil && historicalWeeklySessions != nil
+    var projectedWeeklySessions: Double? {
+        guard let historicalWeeklySessions,
+              historicalWeeklySessions.isFinite,
+              historicalWeeklySessions >= 0
+        else { return nil }
+        return historicalWeeklySessions + 1
     }
 
-    var differenceMinutes: Double? {
-        guard let historicalWeeklyMinutes else { return nil }
-        return proposedWeeklyMinutes - historicalWeeklyMinutes
-    }
-
-    var changePercent: Double? {
+    var increasePercent: Double? {
         guard let historicalWeeklyMinutes, historicalWeeklyMinutes > 0 else {
             return nil
         }
-        return (proposedWeeklyMinutes - historicalWeeklyMinutes) /
-            historicalWeeklyMinutes * 100
-    }
-
-    /// Meaningfully different means at least a quarter hour per week;
-    /// anything smaller than that is a near match, not a fitness claim.
-    var direction: Direction {
-        guard let differenceMinutes else { return .unknown }
-        if differenceMinutes >= 15 { return .more }
-        if differenceMinutes <= -15 { return .less }
-        return .similar
-    }
-
-    enum Direction: Equatable {
-        case unknown, more, less, similar
+        return Double(max(additionalMinutes, 0)) / historicalWeeklyMinutes * 100
     }
 }
