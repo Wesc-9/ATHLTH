@@ -55,12 +55,22 @@ struct ATHLTHWorkoutDiscoveryFilter {
         return true
     }
 
-    func matches(_ workout: PlannedSession) -> Bool {
-        guard duration.matches(minutes: workout.durationMinutes.map(Double.init))
-        else { return false }
+    func matches(
+        _ workout: PlannedSession,
+        catalogEntry: WorkoutTemplateCatalogEntry? = nil
+    ) -> Bool {
+        guard duration.matches(
+            minutes: workout.durationMinutes.map(Double.init) ??
+                catalogEntry?.estimatedDurationMinutes.map(Double.init)
+        ) else { return false }
+        let recipeBlocks = workout.resolvedWorkoutBlocks
+        // A personal copy may carry only the source workout ID and recipe,
+        // without the publisher's muscle tags. Resolve its original metadata
+        // from the *same* catalog rather than guessing from a workout title.
         if !muscleGroups.isEmpty &&
             !Self.matchesMuscles(
-                tags: [], blocks: workout.resolvedWorkoutBlocks,
+                tags: catalogEntry?.tags ?? [],
+                blocks: recipeBlocks,
                 chosen: muscleGroups
             ) {
             return false
@@ -70,8 +80,8 @@ struct ATHLTHWorkoutDiscoveryFilter {
                 $0.type == runningType
             }) { return true }
             return Self.matchesRunningType(
-                runningType, tags: [],
-                blocks: workout.resolvedWorkoutBlocks
+                runningType, tags: catalogEntry?.tags ?? [],
+                blocks: recipeBlocks
             )
         }
         return true
