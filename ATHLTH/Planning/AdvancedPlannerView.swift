@@ -5250,6 +5250,7 @@ private struct SessionEditorStoredDraft: Codable {
     let selectedPartnerID: UUID?
     let physicalMeetup: Bool?
     let scheduledTimeEnabled: Bool
+    let saveToActivePlan: Bool?
     let editorModeRaw: String
     let targetPaceEnabled: Bool
     let heartRateTargetEnabled: Bool
@@ -5529,6 +5530,7 @@ struct SessionEditorView: View {
 
     @State private var scheduledTimeEnabled = false
     @State private var scheduledTime = Date()
+    @State private var saveToActivePlan = false
 
     @State private var editorMode: SessionEditorMode =
         UserDefaults.standard.bool(forKey: "athlth.planWorkspace.advancedMode")
@@ -5933,6 +5935,26 @@ struct SessionEditorView: View {
                         )
                     }
 
+                    if isStandalone,
+                       selectedScratchWorkoutType != nil,
+                       let plan = session.activePlan {
+                        Toggle(ATHLTHLocalization.choose(
+                            english: "Add to active plan",
+                            norwegian: "Legg til i aktiv plan"
+                        ) + " · " + plan.title, isOn: $saveToActivePlan)
+                        .tint(ATHLTHTheme.accentDeep)
+                        .disabled(activePlanDestination == nil)
+
+                        if activePlanDestination == nil {
+                            Text(ATHLTHLocalization.choose(
+                                english: "This date is outside the active plan or is a rest day. Choose another date, or save the workout as an extra session.",
+                                norwegian: "Datoen er utenfor den aktive planen eller er en hviledag. Velg en annen dato, eller lagre som ekstra økt."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+
                     HStack {
                         Label(ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"), systemImage: "clock")
                             .foregroundStyle(
@@ -6258,6 +6280,7 @@ struct SessionEditorView: View {
         selectedRunningWorkouts = []
         selectedRouteID = nil
         runEnvironment = .outdoor
+        saveToActivePlan = false
         workoutCategory = type.rawValue
         kind = type.scratchWorkoutKind
     }
@@ -9251,7 +9274,31 @@ struct SessionEditorView: View {
     }
 
     private var canAdd: Bool {
-        !resolvedWorkoutTitle.isEmpty
+        !resolvedWorkoutTitle.isEmpty &&
+            (!saveToActivePlan || activePlanDestination != nil)
+    }
+
+    /// Only offer the active-plan destination when the chosen calendar date
+    /// maps to a real non-rest day. Never silently mutate a rest day or
+    /// attach a new workout outside the active plan's scheduled range.
+    private var activePlanDestination: (planID: UUID, dayID: UUID)? {
+        guard let plan = session.activePlan,
+              let startDate = plan.startDate else { return nil }
+        let calendar = Calendar.current
+        let offset = calendar.dateComponents(
+            [.day], from: calendar.startOfDay(for: startDate),
+            to: calendar.startOfDay(for: scheduledTime)
+        ).day ?? -1
+        guard offset >= 0, offset < plan.weeks.count * 7,
+              let week = plan.weeks.first(where: {
+                  $0.weekNumber == (offset / 7) + 1
+              }),
+              let day = week.days.first(where: {
+                  $0.dayIndex == (offset % 7) + 1
+              }),
+              !day.sessions.contains(where: { $0.isExplicitRestDay })
+        else { return nil }
+        return (plan.id, day.id)
     }
 
     private func addExercise(_ exercise: Exercise) {
@@ -10215,7 +10262,14 @@ struct SessionEditorView: View {
             )
         }
         if isStandalone {
-            session.addStandalonePlannedSession(workout)
+            if saveToActivePlan, let destination = activePlanDestination {
+                session.addSession(
+                    workout, toDay: destination.dayID,
+                    inPlan: destination.planID
+                )
+            } else {
+                session.addStandalonePlannedSession(workout)
+            }
         } else if existingWorkout != nil, let planID {
             session.updateSession(workout, inPlan: planID)
         } else if let dayID {
@@ -10262,6 +10316,7 @@ struct SessionEditorView: View {
             selectedPartnerID: selectedPartnerID,
             physicalMeetup: physicalMeetup,
             scheduledTimeEnabled: scheduledTimeEnabled,
+            saveToActivePlan: saveToActivePlan,
             editorModeRaw: editorMode.rawValue,
             targetPaceEnabled: targetPaceEnabled,
             heartRateTargetEnabled: heartRateTargetEnabled,
@@ -10293,6 +10348,7 @@ struct SessionEditorView: View {
         meetingPoint = draft.workout.meetingPoint
         reminderMinutesBefore = draft.workout.reminderMinutesBefore ?? 0
         scheduledTimeEnabled = draft.scheduledTimeEnabled
+        saveToActivePlan = draft.saveToActivePlan ?? false
         selectedPartnerID = directPartnerID ?? draft.selectedPartnerID
         // Legacy draft modes are normalized to in-person invitations.
         physicalMeetup = true
