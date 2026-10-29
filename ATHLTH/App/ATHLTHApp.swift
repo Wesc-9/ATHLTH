@@ -1367,10 +1367,28 @@ struct AppRootView: View {
         ) { _ in
             handleRemoteNotificationReceived()
         }
+        // An explicitly chosen workout-peak source follows new higher
+        // measurements. It never changes a manually entered or age-estimated
+        // maximum. Re-check on foreground and when the user opts in.
+        .task(id: "\(appSession.signedIn)-\(scenePhase == .active)-\(appSession.onboardingProfile?.maximumHeartRateUsesWorkoutPeak == true)") {
+            guard appSession.signedIn, scenePhase == .active,
+                  appSession.onboardingProfile?
+                    .maximumHeartRateUsesWorkoutPeak == true else { return }
+            if let peaks = try? await health.highestRecordedWorkoutHeartRates(),
+               let highest = peaks.first {
+                appSession.adoptHigherWorkoutHeartRatePeak(highest)
+            }
+        }
         .onChange(of: health.workouts.map(\.id)) { _, _ in
             guard appSession.signedIn else { return }
 
             Task {
+                if appSession.onboardingProfile?
+                    .maximumHeartRateUsesWorkoutPeak == true,
+                   let peaks = try? await health.highestRecordedWorkoutHeartRates(),
+                   let highest = peaks.first {
+                    appSession.adoptHigherWorkoutHeartRatePeak(highest)
+                }
                 await officialWeeklyChallenges.syncCompletionState(
                     workouts: health.workouts
                 )
