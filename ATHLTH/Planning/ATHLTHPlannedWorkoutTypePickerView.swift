@@ -1,9 +1,25 @@
 import SwiftUI
 
-/// Shown after "Bruk planlagt økt". Uses the existing unified workout
-/// library/editor; it is a navigation choice, not another workout engine.
+/// A single grid of images for both entry routes, so the design and
+/// per-account adaptive order cannot drift between planned and scratch.
+enum ATHLTHWorkoutTypePickerPurpose {
+    case useExisting, createFromScratch
+}
+
 struct ATHLTHPlannedWorkoutTypePickerView: View {
+    let purpose: ATHLTHWorkoutTypePickerPurpose
+    let onCreateNew: ((ATHLTHPlannedWorkoutType) -> Void)?
     let onSelect: (PlannedSession, ATHLTHPlannedWorkoutType) -> Void
+
+    init(
+        purpose: ATHLTHWorkoutTypePickerPurpose = .useExisting,
+        onCreateNew: ((ATHLTHPlannedWorkoutType) -> Void)? = nil,
+        onSelect: @escaping (PlannedSession, ATHLTHPlannedWorkoutType) -> Void
+    ) {
+        self.purpose = purpose
+        self.onCreateNew = onCreateNew
+        self.onSelect = onSelect
+    }
 
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
@@ -42,8 +58,12 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
                         .foregroundStyle(ink)
 
                         Text(ATHLTHLocalization.choose(
-                            english: "Choose an activity to find and adapt an existing workout.",
-                            norwegian: "Velg aktivitet for å hente og tilpasse en planlagt økt."
+                            english: purpose == .createFromScratch
+                                ? "Choose an activity and build your own workout in the shared editor."
+                                : "Choose an activity to find and adapt an existing workout.",
+                            norwegian: purpose == .createFromScratch
+                                ? "Velg aktivitet og bygg din egen økt i den felles øktbyggeren."
+                                : "Velg aktivitet for å hente og tilpasse en planlagt økt."
                         ))
                         .font(.subheadline)
                         .foregroundStyle(muted)
@@ -62,8 +82,12 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
                             .font(.title3)
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                         Text(ATHLTHLocalization.choose(
-                            english: "Tip: You can change exercises, structure and details in the next step.",
-                            norwegian: "Tips: Du kan endre øvelser, struktur og detaljer i neste steg."
+                            english: purpose == .createFromScratch
+                                ? "Start with a blank workout. Add exercises, intervals and rests using the same editor for every activity."
+                                : "Tip: You can change exercises, structure and details in the next step.",
+                            norwegian: purpose == .createFromScratch
+                                ? "Start med en tom økt. Legg til øvelser, intervaller og pauser i samme øktbygger."
+                                : "Tips: Du kan endre øvelser, struktur og detaljer i neste steg."
                         ))
                         .font(.caption)
                         .foregroundStyle(muted)
@@ -133,7 +157,12 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
             Spacer(minLength: 4)
 
             Button {
-                if let selectedType { path.append(selectedType) }
+                guard let selectedType else { return }
+                if purpose == .createFromScratch {
+                    onCreateNew?(selectedType)
+                } else {
+                    path.append(selectedType)
+                }
             } label: {
                 Text(ATHLTHLocalization.choose(
                     english: "Next", norwegian: "Neste"
