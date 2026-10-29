@@ -55,6 +55,33 @@ final class InsightsSessionBaselinesTests: XCTestCase {
         XCTAssertNil(expired.runningSessionMinutes)
     }
 
+    func testRunningStrengthAndWalkingHaveSeparateWeeklyAverages() {
+        let workouts = [
+            summary(.running, daysAgo: 1, minutes: 50),
+            summary(.traditionalStrengthTraining, daysAgo: 2, minutes: 45),
+            summary(.functionalStrengthTraining, daysAgo: 3, minutes: 35),
+            summary(.walking, daysAgo: 4, minutes: 40)
+        ]
+        let result = InsightsSessionBaselines.calculate(
+            workouts: workouts, at: now
+        )
+        XCTAssertEqual(result.runningWeeklyMinutes ?? 0, 12.5, accuracy: 0.001)
+        XCTAssertEqual(result.strengthWeeklyMinutes ?? 0, 20, accuracy: 0.001)
+        XCTAssertEqual(result.walkingWeeklyMinutes ?? 0, 10, accuracy: 0.001)
+        XCTAssertEqual(result.strengthWeeklySessions ?? 0, 0.5, accuracy: 0.001)
+        XCTAssertEqual(result.allWeeklyMinutes ?? 0, 42.5, accuracy: 0.001)
+    }
+
+    func testMissingActivityHistoryIsNotReplacedWithInventedBaseline() {
+        let onlyWalking = summary(.walking, daysAgo: 1, minutes: 40)
+        let result = InsightsSessionBaselines.calculate(
+            workouts: [onlyWalking], at: now
+        )
+        XCTAssertNil(result.runningWeeklyMinutes)
+        XCTAssertNil(result.strengthWeeklyMinutes)
+        XCTAssertEqual(result.walkingWeeklyMinutes ?? 0, 10, accuracy: 0.001)
+    }
+
     func testNonRunningWorkoutDoesNotBecomeRunningBaseline() {
         let strength = summary(
             .functionalStrengthTraining, daysAgo: 2, minutes: 50
