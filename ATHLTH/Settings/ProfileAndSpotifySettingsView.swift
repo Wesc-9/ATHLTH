@@ -2005,6 +2005,12 @@ struct PersonalHealthProfileView: View {
     @State private var includeMaximumHeartRate = false
     @State private var maximumHeartRateBPM = 190
     @State private var maximumHeartRateIsEstimated = false
+    @State private var maximumHeartRateUsesWorkoutPeak = false
+    @State private var maximumHeartRateWorkoutID: UUID?
+    @State private var maximumHeartRateWorkoutDate: Date?
+    @State private var workoutHeartRatePeaks: [ATHLTHWorkoutHeartRatePeak] = []
+    @State private var loadingWorkoutHeartRatePeaks = false
+    @State private var workoutHeartRatePeakError: String?
 
     @State private var editingField: HealthProfileField?
     @State private var refreshingAppleHealth = false
@@ -2171,11 +2177,15 @@ struct PersonalHealthProfileView: View {
                     value:
                         includeMaximumHeartRate
                             ? "\(maximumHeartRateBPM) bpm" +
-                              (maximumHeartRateIsEstimated
+                              (maximumHeartRateUsesWorkoutPeak
                                   ? ATHLTHLocalization.choose(
-                                      english: " · Est.", norwegian: " · Est."
+                                      english: " · Workout", norwegian: " · Økt"
                                     )
-                                  : "")
+                                  : maximumHeartRateIsEstimated
+                                    ? ATHLTHLocalization.choose(
+                                        english: " · Est.", norwegian: " · Est."
+                                      )
+                                    : "")
                             : "Add",
                     isSet: includeMaximumHeartRate
                 )
@@ -2348,11 +2358,16 @@ struct PersonalHealthProfileView: View {
                                     .font(.system(size: 34, weight: .bold))
                                     .monospacedDigit()
 
-                                Text(maximumHeartRateIsEstimated
+                                Text(maximumHeartRateUsesWorkoutPeak
                                     ? ATHLTHLocalization.choose(
-                                        english: "Estimated maximum heart rate",
-                                        norwegian: "Estimert makspuls"
+                                        english: "Highest recorded workout pulse",
+                                        norwegian: "Høyeste registrerte treningspuls"
                                       )
+                                    : maximumHeartRateIsEstimated
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Estimated maximum heart rate",
+                                            norwegian: "Estimert makspuls"
+                                          )
                                     : includeMaximumHeartRate
                                         ? ATHLTHLocalization.choose(
                                             english: "Manually entered value",
@@ -2416,6 +2431,9 @@ struct PersonalHealthProfileView: View {
                                     Button {
                                         maximumHeartRateBPM = estimate.beatsPerMinute
                                         maximumHeartRateIsEstimated = true
+                                        maximumHeartRateUsesWorkoutPeak = false
+                                        maximumHeartRateWorkoutID = nil
+                                        maximumHeartRateWorkoutDate = nil
                                     } label: {
                                         Label(
                                             ATHLTHLocalization.choose(
@@ -2448,9 +2466,11 @@ struct PersonalHealthProfileView: View {
                                 .fixedSize(horizontal: false, vertical: true)
                             }
 
+                            workoutHeartRatePeakSection
+
                             Text(ATHLTHLocalization.choose(
-                                english: "A measured or tested maximum heart rate is more reliable. If you adjust the number manually, it is saved as a manually entered value. ATHLTH uses the saved value for heart-rate zones.",
-                                norwegian: "En målt eller testet makspuls er mer pålitelig. Endrer du tallet manuelt, lagres det som manuelt oppgitt. ATHLTH bruker den lagrede verdien til pulssonene."
+                                english: "A tested maximum heart rate is more reliable. Workout peaks may contain sensor errors. Manual changes override the selected source. ATHLTH uses the saved value for heart-rate zones.",
+                                norwegian: "En testet makspuls er mer pålitelig. Treningspulser kan inneholde sensorfeil. Manuelle endringer overstyrer valgt kilde. ATHLTH bruker den lagrede verdien til pulssonene."
                             ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -2488,6 +2508,140 @@ struct PersonalHealthProfileView: View {
                 }
             }
             .presentationDetents([.medium, .large])
+            .task {
+                guard field == .maximumHeartRate else { return }
+                await refreshWorkoutHeartRatePeaks()
+            }
+        }
+    }
+
+    private var workoutHeartRatePeakSection: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "From recorded workouts",
+                        norwegian: "Fra registrerte treningsøkter"
+                    ),
+                    systemImage: "waveform.path.ecg"
+                )
+                .font(.subheadline.weight(.semibold))
+                Spacer()
+                if loadingWorkoutHeartRatePeaks {
+                    ProgressView().tint(ATHLTHTheme.accentDeep)
+                } else {
+                    Button {
+                        Task { await refreshWorkoutHeartRatePeaks(force: true) }
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Refresh workout heart rates",
+                        norwegian: "Oppdater treningspuls"
+                    ))
+                    .disabled(!health.hasRequestedAuthorization)
+                }
+            }
+
+            if let best = workoutHeartRatePeaks.first {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("\(best.beatsPerMinute) bpm")
+                        .font(.title2.weight(.bold))
+                        .monospacedDigit()
+                    Spacer()
+                    Text(best.workoutDate, format: .dateTime.day().month().year())
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                Text(best.workoutTitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+
+                Button {
+                    maximumHeartRateBPM = best.beatsPerMinute
+                    maximumHeartRateIsEstimated = false
+                    maximumHeartRateUsesWorkoutPeak = true
+                    maximumHeartRateWorkoutID = best.workoutID
+                    maximumHeartRateWorkoutDate = best.workoutDate
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Use highest workout pulse · Auto-update",
+                            norwegian: "Bruk høyeste treningspuls · Oppdater automatisk"
+                        ),
+                        systemImage: "checkmark.circle"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 42)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+
+                if workoutHeartRatePeaks.count > 1 {
+                    ForEach(workoutHeartRatePeaks.dropFirst().prefix(3)) { peak in
+                        HStack(spacing: 6) {
+                            Text("\(peak.beatsPerMinute) bpm")
+                                .monospacedDigit()
+                            Spacer()
+                            Text(peak.workoutDate, format: .dateTime.day().month().year())
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        .font(.caption)
+                    }
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "A higher peak from a future Apple Health workout will update your selected training maximum. Existing manually entered or estimated values are never replaced automatically.",
+                    norwegian: "En høyere puls i en senere Apple Health-økt vil oppdatere valgt treningsmakspuls. Manuelle og estimerte verdier endres aldri automatisk."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+            } else {
+                Text(workoutHeartRatePeakError ?? ATHLTHLocalization.choose(
+                    english: loadingWorkoutHeartRatePeaks
+                        ? "Checking Apple Health workouts…"
+                        : "No workout heart-rate measurements found. Connect Apple Health and try again.",
+                    norwegian: loadingWorkoutHeartRatePeaks
+                        ? "Sjekker treningsøkter i Apple Health …"
+                        : "Fant ingen pulsmålinger fra treningsøkter. Koble til Apple Health og prøv igjen."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(14)
+        .background(
+            ATHLTHTheme.accentSoft.opacity(0.45),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+    }
+
+    private func refreshWorkoutHeartRatePeaks(force: Bool = false) async {
+        guard !loadingWorkoutHeartRatePeaks else { return }
+        loadingWorkoutHeartRatePeaks = true
+        workoutHeartRatePeakError = nil
+        defer { loadingWorkoutHeartRatePeaks = false }
+        do {
+            workoutHeartRatePeaks = try await health
+                .highestRecordedWorkoutHeartRates(forceRefresh: force)
+            // A previously opted-in workout HRmax is automatically raised,
+            // never replaced with a lower peak or a manual override.
+            if let best = workoutHeartRatePeaks.first {
+                session.adoptHigherWorkoutHeartRatePeak(best)
+                if maximumHeartRateUsesWorkoutPeak,
+                   best.beatsPerMinute > maximumHeartRateBPM {
+                    maximumHeartRateBPM = best.beatsPerMinute
+                    maximumHeartRateWorkoutID = best.workoutID
+                    maximumHeartRateWorkoutDate = best.workoutDate
+                }
+            }
+        } catch {
+            workoutHeartRatePeakError = ATHLTHLocalization.choose(
+                english: "Couldn't read workout heart rates. Check Health access and retry.",
+                norwegian: "Kunne ikke lese treningspuls. Sjekk Helse-tilgang og prøv igjen."
+            )
         }
     }
 
@@ -2506,6 +2660,9 @@ struct PersonalHealthProfileView: View {
             set: {
                 maximumHeartRateBPM = $0
                 maximumHeartRateIsEstimated = false
+                maximumHeartRateUsesWorkoutPeak = false
+                maximumHeartRateWorkoutID = nil
+                maximumHeartRateWorkoutDate = nil
             }
         )
     }
@@ -2650,6 +2807,18 @@ struct PersonalHealthProfileView: View {
             maximumHeartRateIsEstimated:
                 includeMaximumHeartRate
                     ? maximumHeartRateIsEstimated
+                    : nil,
+            maximumHeartRateUsesWorkoutPeak:
+                includeMaximumHeartRate
+                    ? maximumHeartRateUsesWorkoutPeak
+                    : nil,
+            maximumHeartRateWorkoutID:
+                includeMaximumHeartRate && maximumHeartRateUsesWorkoutPeak
+                    ? maximumHeartRateWorkoutID
+                    : nil,
+            maximumHeartRateWorkoutDate:
+                includeMaximumHeartRate && maximumHeartRateUsesWorkoutPeak
+                    ? maximumHeartRateWorkoutDate
                     : nil
         )
 
@@ -2704,6 +2873,9 @@ struct PersonalHealthProfileView: View {
         case .maximumHeartRate:
             includeMaximumHeartRate = false
             maximumHeartRateIsEstimated = false
+            maximumHeartRateUsesWorkoutPeak = false
+            maximumHeartRateWorkoutID = nil
+            maximumHeartRateWorkoutDate = nil
         }
 
         persistManualDetails()
@@ -2746,9 +2918,16 @@ struct PersonalHealthProfileView: View {
             maximumHeartRateBPM = value
             maximumHeartRateIsEstimated =
                 profile.maximumHeartRateIsEstimated == true
+            maximumHeartRateUsesWorkoutPeak =
+                profile.maximumHeartRateUsesWorkoutPeak == true
+            maximumHeartRateWorkoutID = profile.maximumHeartRateWorkoutID
+            maximumHeartRateWorkoutDate = profile.maximumHeartRateWorkoutDate
         } else {
             includeMaximumHeartRate = false
             maximumHeartRateIsEstimated = false
+            maximumHeartRateUsesWorkoutPeak = false
+            maximumHeartRateWorkoutID = nil
+            maximumHeartRateWorkoutDate = nil
         }
     }
 }
