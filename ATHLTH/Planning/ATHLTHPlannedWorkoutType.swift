@@ -146,17 +146,57 @@ enum ATHLTHPlannedWorkoutTypeUsageStore {
 
     static func ordered(
         userID: UUID,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = .standard,
+        healthWorkouts: [WorkoutSummary] = [],
+        strengthHistory: [StrengthWorkoutLog] = []
     ) -> [ATHLTHPlannedWorkoutType] {
         let values = load(userID: userID, defaults: defaults)
+
+        // A user's real workout history matters more than opening a tile.
+        // Read the already cached workout histories; do not launch HealthKit
+        // queries or count each second of live training as a new workout.
+        var historical: [ATHLTHPlannedWorkoutType: ATHLTHPlannedWorkoutTypeUsage] = [:]
+        for workout in healthWorkouts {
+            let type: ATHLTHPlannedWorkoutType
+            switch workout.activity {
+            case .running: type = .running
+            case .walking, .hiking: type = .walking
+            case .cycling: type = .cycling
+            case .strength, .coreTraining: type = .strength
+            case .yoga: type = .mobility
+            default: type = .custom
+            }
+            var entry = historical[type] ?? ATHLTHPlannedWorkoutTypeUsage()
+            entry.count += 1
+            entry.lastUsedAt = max(entry.lastUsedAt ?? .distantPast,
+                                   workout.startDate)
+            historical[type] = entry
+        }
+
+        // Strength performed only in ATHLTH (no Health permission) must
+        // still influence the order. Avoid double-counting when HealthKit
+        // has already supplied strength history for this account.
+        if historical[.strength] == nil {
+            let finished = strengthHistory.filter(\.isFinished)
+            historical[.strength] = ATHLTHPlannedWorkoutTypeUsage(
+                count: finished.count,
+                lastUsedAt: finished.map(\.startedAt).max()
+            )
+        }
+
         return ATHLTHPlannedWorkoutType.defaultOrder.sorted { lhs, rhs in
             let left = values[lhs.rawValue] ?? ATHLTHPlannedWorkoutTypeUsage()
             let right = values[rhs.rawValue] ?? ATHLTHPlannedWorkoutTypeUsage()
-            if left.count != right.count { return left.count > right.count }
-            if left.lastUsedAt != right.lastUsedAt {
-                return (left.lastUsedAt ?? .distantPast) >
-                    (right.lastUsedAt ?? .distantPast)
-            }
+            let leftHistory = historical[lhs] ?? ATHLTHPlannedWorkoutTypeUsage()
+            let rightHistory = historical[rhs] ?? ATHLTHPlannedWorkoutTypeUsage()
+            let leftCount = left.count + leftHistory.count
+            let rightCount = right.count + rightHistory.count
+            if leftCount != rightCount { return leftCount > rightCount }
+            let leftRecent = max(left.lastUsedAt ?? .distantPast,
+                                 leftHistory.lastUsedAt ?? .distantPast)
+            let rightRecent = max(right.lastUsedAt ?? .distantPast,
+                                  rightHistory.lastUsedAt ?? .distantPast)
+            if leftRecent != rightRecent { return leftRecent > rightRecent }
             let order = ATHLTHPlannedWorkoutType.defaultOrder
             return order.firstIndex(of: lhs)! < order.firstIndex(of: rhs)!
         }
