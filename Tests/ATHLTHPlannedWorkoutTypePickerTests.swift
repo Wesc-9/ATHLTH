@@ -113,4 +113,33 @@ final class ATHLTHPlannedWorkoutTypePickerTests: XCTestCase {
         XCTAssertFalse(ATHLTHPlannedWorkoutType.custom.matches(cycling))
         XCTAssertEqual(ATHLTHPlannedWorkoutType.from(cycling), .cycling)
     }
+    func testScratchStarterTypesReuseTheSingleSessionEngine() {
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.strength.scratchWorkoutKind, .strength)
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.running.scratchWorkoutKind, .running)
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.walking.scratchWorkoutKind, .walking)
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.cycling.scratchWorkoutKind, .custom)
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.mobility.scratchWorkoutKind, .mobility)
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.custom.scratchWorkoutKind, .custom)
+
+        // Cycling is represented by workoutCategory = "cycling"; it must not
+        // be silently confused with the generic custom activity.
+        var cycling = PlannedSession(
+            id: UUID(), title: "Sykling", kind: ATHLTHPlannedWorkoutType.cycling.scratchWorkoutKind,
+            scheduledStart: nil, durationMinutes: nil,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        cycling.workoutCategory = ATHLTHPlannedWorkoutType.cycling.rawValue
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.from(cycling), .cycling)
+    }
+
+    func testScratchQuickAddsUseExistingTimelineActions() {
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.strength.scratchQuickAdd, "exercise")
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.running.scratchQuickAdd, "running")
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.walking.scratchQuickAdd, "walking")
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.cycling.scratchQuickAdd, "cycling")
+        XCTAssertEqual(ATHLTHPlannedWorkoutType.mobility.scratchQuickAdd, "stretching")
+        XCTAssertNil(ATHLTHPlannedWorkoutType.custom.scratchQuickAdd)
+    }
+
 }
