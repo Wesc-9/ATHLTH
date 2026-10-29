@@ -2869,12 +2869,14 @@ struct TrainTogetherPostCreateView:
             )
         }
         .sheet(isPresented: $showingPlannedWorkoutPicker) {
-            PlanWorkoutPickerView { workout in
+            ATHLTHPlannedWorkoutTypePickerView { workout, _ in
                 selectedSourceID = workout.id
                 workoutToEdit = workout
                 showingPlannedWorkoutPicker = false
                 showingSharedWorkoutEditor = true
             }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
         .sheet(
             isPresented:
