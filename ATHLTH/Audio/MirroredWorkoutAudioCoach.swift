@@ -43,6 +43,7 @@ final class MirroredWorkoutAudioCoach:
     private var nextTimeSeconds:
         TimeInterval?
     private var nextFuelSeconds: TimeInterval?
+    private var customAudioCoachLastSlots: [UUID: Int] = [:]
     private var lastState:
         WatchWorkoutMirrorState?
     private var lastStepIndex: Int?
@@ -78,6 +79,11 @@ final class MirroredWorkoutAudioCoach:
         announcedStart = false
         finished = false
         workoutStartedAt = nil
+        customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: configuration.customRules ?? [],
+            distanceMeters: 0,
+            elapsedSeconds: 0
+        )
         nextFuelSeconds = ATHLTHFuelVoicePrompt.nextDue(
             after: 0,
             config: configuration
@@ -192,6 +198,7 @@ final class MirroredWorkoutAudioCoach:
             announceStepIfNeeded(snapshot)
             announceIntervalProgressIfDue(snapshot)
             announceFuelIfNeeded(snapshot)
+            announceCustomAudioCoachRules(snapshot)
             announceRoutineIfNeeded(snapshot)
         }
 
@@ -237,6 +244,11 @@ final class MirroredWorkoutAudioCoach:
             nextTimeSeconds =
                 (floor(snapshot.elapsedTime / interval) + 1) * interval
         }
+        customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: configuration.customRules ?? [],
+            distanceMeters: snapshot.distanceMeters,
+            elapsedSeconds: snapshot.elapsedTime
+        )
         nextFuelSeconds = ATHLTHFuelVoicePrompt.nextDue(
             after: snapshot.elapsedTime,
             config: configuration
@@ -293,6 +305,7 @@ final class MirroredWorkoutAudioCoach:
         nextDistanceMeters = nil
         nextTimeSeconds = nil
         nextFuelSeconds = nil
+        customAudioCoachLastSlots = [:]
         lastState = nil
         lastStepIndex = nil
         announcedStart = false
@@ -444,6 +457,35 @@ final class MirroredWorkoutAudioCoach:
                 priority: .routineCoach,
                 createdAt: snapshot.capturedAt,
                 validFor: 12
+            )
+        )
+    }
+
+    private func announceCustomAudioCoachRules(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) {
+        let messages = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: configuration.customRules ?? [],
+            distanceMeters: snapshot.distanceMeters,
+            elapsedSeconds: snapshot.elapsedTime,
+            paceSecondsPerKilometer: resolvedPace(snapshot),
+            heartRateBPM: ATHLTHCoachSensorFreshness.validHeartRate(
+                snapshot.heartRate,
+                sampledAt: snapshot.coachHeartRateSampleAt
+            ) ? snapshot.heartRate : nil,
+            norwegian: phrase(english: "en", norwegian: "no") == "no",
+            lastSlots: &customAudioCoachLastSlots
+        )
+        guard !messages.isEmpty else { return }
+        speak(
+            messages.joined(separator: ". "),
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: "custom:\(Int(snapshot.elapsedTime)):\(Int(snapshot.distanceMeters))",
+                priority: .routineCoach,
+                createdAt: snapshot.capturedAt,
+                validFor: 10
             )
         )
     }
