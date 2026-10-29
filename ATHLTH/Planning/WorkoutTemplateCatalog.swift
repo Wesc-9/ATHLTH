@@ -950,7 +950,7 @@ struct WorkoutTemplateLibraryView: View {
             guard let b else { return true }
             if a == b { return lhs.offset < rhs.offset }
             return selectedDiscoverySort == .shortest ? a < b : a > b
-        }.map(\.element)
+        }.map { $0.element }
     }
 
     private func focusName(_ focus: String) -> String {
@@ -1831,6 +1831,14 @@ struct WorkoutTemplateLibraryView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                }
+                if selectedRunningDuration != .any {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Only workouts with a recorded duration can match a time filter.",
+                        norwegian: "Kun økter med registrert varighet kan vises med tidsfilter."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
                 }
             }
 
