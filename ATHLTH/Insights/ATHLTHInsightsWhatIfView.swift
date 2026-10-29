@@ -330,9 +330,7 @@ struct ATHLTHInsightsWhatIfView: View {
                     ))
                     .font(.subheadline.weight(.medium))
                     Spacer()
-                    Text("\(runningDistance.formatted(
-                        .number.precision(.fractionLength(0...1))
-                    )) km")
+                    Text(distanceText + " km")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHInsightsStyle.accent)
                 }
@@ -380,6 +378,12 @@ struct ATHLTHInsightsWhatIfView: View {
                     .foregroundStyle(ATHLTHInsightsStyle.accent)
             }
         }
+    }
+
+    private var distanceText: String {
+        runningDistance.formatted(
+            .number.precision(.fractionLength(0...1))
+        )
     }
 
     private var paceText: String {
