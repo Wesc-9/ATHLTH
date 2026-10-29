@@ -106,7 +106,9 @@ for token in (
     "ATHLTHInsightsNavigation(",
     "ATHLTHInsightsCoverHero(",
     "readinessOverviewCard",
-    "signalPerspectiveCard",
+    "personalInsightsHighlights",
+    "personalInsightsLibrary",
+    "ATHLTHPersonalInsightsView(",
     "ATHLTHInsightsDailyCheckInCard(",
     "ATHLTHInsightsMuscleCard(summary: muscleSummary)",
     "trainingRhythmCard",
@@ -114,7 +116,7 @@ for token in (
     "whatChangedCard",
     "whatIfCard",
     "ATHLTHInsightsWhatIfView(",
-    "recoveryTrendSnapshot(days: 7)",
+    "recoveryTrendSnapshot(days: 28)",
     "ATHLTHReadinessExplanationSheet(",
 ):
     if token not in insights:
