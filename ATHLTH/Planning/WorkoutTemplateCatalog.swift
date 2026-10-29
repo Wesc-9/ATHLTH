@@ -733,6 +733,29 @@ struct WorkoutTemplateLibraryView: View {
     @State private var favoritesOnly = false
     @State private var selectedMuscleFocus = "all"
     @State private var selectedWorkoutLevel = "all"
+    @State private var selectedStrengthMuscles: Set<String> = []
+    @State private var selectedRunningType: RunningWorkoutType?
+    @State private var selectedRunningDuration:
+        ATHLTHWorkoutDiscoveryFilter.Duration = .any
+    @State private var selectedDiscoverySort: DiscoverySort = .recommended
+
+    private enum DiscoverySort: String, CaseIterable, Identifiable {
+        case recommended, shortest, longest
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .recommended: return ATHLTHLocalization.choose(
+                english: "Recommended", norwegian: "Anbefalt"
+            )
+            case .shortest: return ATHLTHLocalization.choose(
+                english: "Shortest first", norwegian: "Kortest først"
+            )
+            case .longest: return ATHLTHLocalization.choose(
+                english: "Longest first", norwegian: "Lengst først"
+            )
+            }
+        }
+    }
     @AppStorage("athlth.workoutPreview.advanced.v1") private var advancedMode = false
     @State private var pendingCatalogAddition: WorkoutTemplateCatalogEntry?
     @State private var pendingRunningAddition: RunningWorkoutTemplate?
@@ -888,6 +911,47 @@ struct WorkoutTemplateLibraryView: View {
     ]
     private let strengthLevels = ["all", "Beginner", "Intermediate", "Advanced", "Expert"]
 
+    /// These are anatomical filters, not an additional strength library.
+    /// The matching rules use published tags and embedded exercise muscles.
+    private let strengthMuscleChoices = [
+        "chest", "back", "shoulders", "arms", "legs", "glutes",
+        "core", "fullbody", "biceps", "triceps", "quads",
+        "hamstrings", "calves"
+    ]
+
+    private var discoveryFilter: ATHLTHWorkoutDiscoveryFilter {
+        ATHLTHWorkoutDiscoveryFilter(
+            muscleGroups: initialCategory == .strength
+                ? selectedStrengthMuscles : [],
+            runningType: initialCategory == .running
+                ? selectedRunningType : nil,
+            duration: initialCategory == .running
+                ? selectedRunningDuration : .any
+        )
+    }
+
+    private var hasDiscoveryFilters: Bool {
+        !selectedStrengthMuscles.isEmpty ||
+        selectedRunningType != nil ||
+        selectedRunningDuration != .any ||
+        selectedDiscoverySort != .recommended
+    }
+
+    private func discoverySorted<T>(
+        _ items: [T], durationMinutes: (T) -> Double?
+    ) -> [T] {
+        guard initialCategory != nil,
+              selectedDiscoverySort != .recommended else { return items }
+        return items.enumerated().sorted { lhs, rhs in
+            let a = durationMinutes(lhs.element)
+            let b = durationMinutes(rhs.element)
+            guard let a else { return false }
+            guard let b else { return true }
+            if a == b { return lhs.offset < rhs.offset }
+            return selectedDiscoverySort == .shortest ? a < b : a > b
+        }.map(\.element)
+    }
+
     private func focusName(_ focus: String) -> String {
         switch focus {
         case "chest": return ATHLTHLocalization.choose(english: "Chest", norwegian: "Bryst")
@@ -899,6 +963,11 @@ struct WorkoutTemplateLibraryView: View {
         case "fullbody": return ATHLTHLocalization.choose(english: "Full body", norwegian: "Fullkropp")
         case "core": return ATHLTHLocalization.choose(english: "Core", norwegian: "Kjerne")
         case "home": return ATHLTHLocalization.choose(english: "At home", norwegian: "Hjemme")
+        case "biceps": return "Biceps"
+        case "triceps": return "Triceps"
+        case "quads": return ATHLTHLocalization.choose(english: "Quads", norwegian: "Forside lår")
+        case "hamstrings": return ATHLTHLocalization.choose(english: "Hamstrings", norwegian: "Bakside lår")
+        case "calves": return ATHLTHLocalization.choose(english: "Calves", norwegian: "Legger")
         default: return ATHLTHLocalization.choose(english: "All muscles", norwegian: "Alle muskelgrupper")
         }
     }
@@ -941,7 +1010,8 @@ struct WorkoutTemplateLibraryView: View {
         else { return [] }
 
         let clean = query
-        return builtInRunningTemplates.filter { workout in
+        let matching = builtInRunningTemplates.filter { workout in
+            guard discoveryFilter.matches(workout) else { return false }
             let favoriteMatches =
                 !favoritesOnly ||
                 favorites.isFavorite(.workout, itemID: workout.id.uuidString)
@@ -950,13 +1020,17 @@ struct WorkoutTemplateLibraryView: View {
             )
             return favoriteMatches && searchMatches
         }
+        return discoverySorted(matching) {
+            $0.estimatedDurationSeconds.map { $0 / 60 }
+        }
     }
 
     private var filteredEntries:
         [WorkoutTemplateCatalogEntry] {
         let clean = query
 
-        return catalog.entries.filter { entry in
+        let matching = catalog.entries.filter { entry in
+            guard discoveryFilter.matches(entry) else { return false }
             let categoryMatches =
                 selectedCategory == "All" ||
                 entry.categoryTitle == selectedCategory ||
@@ -981,12 +1055,16 @@ struct WorkoutTemplateLibraryView: View {
                 favoriteMatches &&
                 searchMatches && muscleMatches && levelMatches(entry)
         }
+        return discoverySorted(matching) {
+            $0.estimatedDurationMinutes.map(Double.init)
+        }
     }
 
     private var filteredSavedWorkouts: [PlannedSession] {
         guard onSelectPlanned != nil else { return [] }
         let clean = query
-        return session.savedWorkoutTemplates.filter { workout in
+        let matching = session.savedWorkoutTemplates.filter { workout in
+            guard discoveryFilter.matches(workout) else { return false }
             let matchesCategory = selectedCategory == "All" ||
                 (ATHLTHPlannedWorkoutType(
                     rawValue: selectedCategory.lowercased()
@@ -995,6 +1073,9 @@ struct WorkoutTemplateLibraryView: View {
             return ATHLTHWorkoutSearch.matches(
                 clean, texts: [workout.title, workout.notes ?? ""]
             ) && matchesCategory
+        }
+        return discoverySorted(matching) {
+            $0.durationMinutes.map(Double.init)
         }
     }
 
@@ -1008,8 +1089,9 @@ struct WorkoutTemplateLibraryView: View {
                 .flatMap { $0.days }
                 .flatMap { $0.sessions }
         var seen = Set<UUID>()
-        return stored.filter { workout in
-            guard seen.insert(workout.id).inserted else { return false }
+        let matching = stored.filter { workout in
+            guard seen.insert(workout.id).inserted,
+                  discoveryFilter.matches(workout) else { return false }
             let matchingType = ATHLTHPlannedWorkoutType(
                 rawValue: selectedCategory.lowercased()
             )
@@ -1023,6 +1105,9 @@ struct WorkoutTemplateLibraryView: View {
         .sorted {
             ($0.scheduledStart ?? .distantPast) >
             ($1.scheduledStart ?? .distantPast)
+        }
+        return discoverySorted(matching) {
+            $0.durationMinutes.map(Double.init)
         }
     }
 
