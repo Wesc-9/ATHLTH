@@ -486,6 +486,8 @@ struct AppRootView: View {
     @State private var relayedWorkoutLaunchGuardUntil = Date.distantPast
     @State private var lastTrainingPresenceSyncAt = Date.distantPast
     @State private var lastTrainingPresenceState: Bool?
+    @State private var lastPresencePhoneWorkoutActive: Bool?
+    @State private var lastPresenceStrengthWorkoutActive: Bool?
     @State private var lastHomeAssistantLiveWorkoutSyncAt = Date.distantPast
     @State private var lastHomeAssistantStrengthSyncAt = Date.distantPast
     @State private var lastHomeAssistantSnapshotSyncAt = Date.distantPast
@@ -1333,13 +1335,24 @@ struct AppRootView: View {
             lifecycleSessionContent
         .onReceive(phoneWorkout.$active) { workout in
             handlePhoneWorkoutLiveUpdate(workout)
-            Task { await syncActualTrainingPresence() }
+            // The live workout publishes frequently; training presence only
+            // changes when recording starts or ends. The 70-second loop below
+            // maintains the session's existing remote heartbeat.
+            let active = workout != nil
+            if lastPresencePhoneWorkoutActive != active {
+                lastPresencePhoneWorkoutActive = active
+                Task { await syncActualTrainingPresence() }
+            }
         }
         .onReceive(strengthWorkout.$activeWorkout) { workout in
             handleStrengthWorkoutLiveUpdate(workout)
-            Task { await syncActualTrainingPresence() }
+            let active = workout != nil
+            if lastPresenceStrengthWorkoutActive != active {
+                lastPresenceStrengthWorkoutActive = active
+                Task { await syncActualTrainingPresence() }
+            }
         }
-        .onReceive(workoutMirroring.$snapshot) { _ in
+        .onChange(of: workoutMirroring.hasActiveMirroredWorkout) { _, _ in
             Task { await syncActualTrainingPresence() }
         }
         .task(id: appSession.signedIn && scenePhase == .active) {
