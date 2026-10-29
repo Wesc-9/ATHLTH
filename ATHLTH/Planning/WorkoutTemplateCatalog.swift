@@ -950,6 +950,34 @@ struct WorkoutTemplateLibraryView: View {
         }
     }
 
+    /// The original picker only exposed saved templates. "Bruk planlagt
+    /// økt" also needs actual sessions from the calendar and active plans.
+    private var filteredScheduledWorkouts: [PlannedSession] {
+        guard onSelectPlanned != nil else { return [] }
+        let clean = query
+        let stored = session.standalonePlannedSessions +
+            session.trainingPlans.flatMap { $0.weeks }
+                .flatMap { $0.days }
+                .flatMap { $0.sessions }
+        var seen = Set<UUID>()
+        return stored.filter { workout in
+            guard seen.insert(workout.id).inserted else { return false }
+            let matchingType = ATHLTHPlannedWorkoutType(
+                rawValue: selectedCategory.lowercased()
+            )
+            return (selectedCategory == "All" ||
+                    (matchingType?.matches(workout) ??
+                     (workout.kind.title == selectedCategory))) &&
+                ATHLTHWorkoutSearch.matches(
+                    clean, texts: [workout.title, workout.notes ?? ""]
+                )
+        }
+        .sorted {
+            ($0.scheduledStart ?? .distantPast) >
+            ($1.scheduledStart ?? .distantPast)
+        }
+    }
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
@@ -1075,6 +1103,41 @@ struct WorkoutTemplateLibraryView: View {
                     }
                 }
 
+                if onSelectPlanned != nil && !filteredScheduledWorkouts.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "From your plans",
+                        norwegian: "Fra dine planer"
+                    ))
+                    .font(.headline)
+                    ForEach(filteredScheduledWorkouts.prefix(50)) { workout in
+                        Button {
+                            onSelectPlanned?(workout)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: workout.kind.systemImage)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                    .frame(width: 36, height: 36)
+                                    .background(ATHLTHTheme.accentSoft, in: Circle())
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(workout.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                    Text(workout.kind.title)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            }
+                            .padding(14)
+                            .background(.white,
+                                        in: RoundedRectangle(cornerRadius: 17))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
                 if onSelectPlanned != nil && !filteredSavedWorkouts.isEmpty {
                     Text(ATHLTHLocalization.choose(english: "My workouts", norwegian: "Mine økter"))
                         .font(.headline)
@@ -1094,7 +1157,7 @@ struct WorkoutTemplateLibraryView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                if filteredEntries.isEmpty && filteredRunningTemplates.isEmpty && filteredSavedWorkouts.isEmpty {
+                if filteredEntries.isEmpty && filteredRunningTemplates.isEmpty && filteredSavedWorkouts.isEmpty && filteredScheduledWorkouts.isEmpty {
                     ContentUnavailableView(
                         favoritesOnly
                             ? "No favorite workouts yet"
