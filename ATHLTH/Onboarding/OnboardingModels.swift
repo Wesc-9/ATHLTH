@@ -39,6 +39,11 @@ struct HealthProfileBasics: Codable, Hashable {
     /// True only when the user explicitly saved an estimated HRmax.
     /// Nil/false retains the legacy interpretation of a manually entered value.
     var maximumHeartRateIsEstimated: Bool? = nil
+    /// Opt-in: reuse the highest valid pulse recorded during Apple Health
+    /// workouts, including new workouts when their data becomes available.
+    var maximumHeartRateUsesWorkoutPeak: Bool? = nil
+    var maximumHeartRateWorkoutID: UUID? = nil
+    var maximumHeartRateWorkoutDate: Date? = nil
 
     static let empty = HealthProfileBasics(
         dateOfBirth: nil,
@@ -463,6 +468,9 @@ struct OnboardingProfileData: Codable, Hashable {
     var heightCentimeters: Double?
     var maximumHeartRateBPM: Int? = nil
     var maximumHeartRateIsEstimated: Bool? = nil
+    var maximumHeartRateUsesWorkoutPeak: Bool? = nil
+    var maximumHeartRateWorkoutID: UUID? = nil
+    var maximumHeartRateWorkoutDate: Date? = nil
     var personalDetailsSource: PersonalDetailsSource
     var trainingFocus: TrainingFocus? = nil
     // Optional to decode profiles stored by earlier app versions.
@@ -479,7 +487,10 @@ struct OnboardingProfileData: Codable, Hashable {
             weightKilograms: weightKilograms,
             heightCentimeters: heightCentimeters,
             maximumHeartRateBPM: maximumHeartRateBPM,
-            maximumHeartRateIsEstimated: maximumHeartRateIsEstimated
+            maximumHeartRateIsEstimated: maximumHeartRateIsEstimated,
+            maximumHeartRateUsesWorkoutPeak: maximumHeartRateUsesWorkoutPeak,
+            maximumHeartRateWorkoutID: maximumHeartRateWorkoutID,
+            maximumHeartRateWorkoutDate: maximumHeartRateWorkoutDate
         )
     }
 }
