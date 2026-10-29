@@ -201,7 +201,25 @@ struct ATHLTHAudioCoachSmartState {
             "Dette er en god investering i formen din.",
             "Finn et tempo som passer deg, og nyt turen.",
             "Ett steg nærmere den formen du ønsker deg.",
-            "Hold kursen. Du gjør jobben."
+            "Hold kursen. Du gjør jobben.",
+            "Ta noen dype pust og kjenn at kroppen jobber.",
+            "Sett pris på fremgangen, også de små stegene.",
+            "Du er sterkere enn du var da du startet.",
+            "Stødig rytme, godt fokus.",
+            "Små fremskritt er også fremskritt.",
+            "Du er i bevegelse, og det er det som teller.",
+            "Nå handler det bare om neste lille etappe.",
+            "Hold hodet høyt og blikket frem.",
+            "Det er lov å justere tempoet. Behold kontrollen.",
+            "Du har allerede gjort det viktigste: Du startet.",
+            "Gi deg selv kreditt for jobben du legger ned.",
+            "Kjenn på flyten og bruk den.",
+            "En kilometer om gangen.",
+            "Du finner styrken i jevn innsats.",
+            "Ta et øyeblikk og finn pusten igjen.",
+            "Fortsett med ditt tempo. Det er din økt.",
+            "Du klarer mer enn du tror.",
+            "Veldig bra fokus. Fortsett."
         ]
         let builtInEN = [
             "Nice work! Focus on the next step.",
@@ -225,14 +243,41 @@ struct ATHLTHAudioCoachSmartState {
             "You're investing in your fitness today.",
             "Find a pace that suits you and enjoy the run.",
             "One step closer to your fitness goals.",
-            "Stay the course. You're doing the work."
+            "Stay the course. You're doing the work.",
+            "Take a deep breath and feel your body working.",
+            "Appreciate every bit of progress.",
+            "You're stronger than when you started.",
+            "Steady rhythm, clear focus.",
+            "Small improvements are still improvements.",
+            "You're moving, and that's what matters.",
+            "Just think about the next short stretch.",
+            "Keep your head up and eyes forward.",
+            "It's okay to adjust your pace. Stay in control.",
+            "You've already done the hardest part: starting.",
+            "Give yourself credit for showing up.",
+            "Find your flow and go with it.",
+            "One kilometer at a time.",
+            "Your strength grows through steady effort.",
+            "Take a moment to settle your breathing.",
+            "Keep your own pace. This is your run.",
+            "You can do more than you think.",
+            "Great focus. Keep it going."
         ]
         let custom = settings.customEncouragements.prefix(40)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        let options = (norwegian ? builtInNO : builtInEN) + custom
+        let builtIn = norwegian ? builtInNO : builtInEN
+        let options = builtIn + custom
         let eligible = options.indices.filter { !recentPhraseIndices.contains($0) }
-        let picked = (eligible.isEmpty ? Array(options.indices) : eligible)
+        let available = eligible.isEmpty ? Array(options.indices) : eligible
+        let customChoices = available.filter { $0 >= builtIn.count }
+        let builtInChoices = available.filter { $0 < builtIn.count }
+        // User-authored phrases should be heard, not drowned out by the
+        // much larger built-in bank. Alternate pools at random when possible.
+        let chosenPool = !customChoices.isEmpty &&
+            (builtInChoices.isEmpty || Bool.random())
+            ? customChoices : builtInChoices
+        let picked = (chosenPool.isEmpty ? available : chosenPool)
             .randomElement() ?? 0
         recentPhraseIndices.append(picked)
         if recentPhraseIndices.count > 9 { recentPhraseIndices.removeFirst() }
