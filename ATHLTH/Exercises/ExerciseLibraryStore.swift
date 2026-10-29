@@ -200,6 +200,9 @@ final class ExerciseLibraryStore: ObservableObject {
         let equipment: String?
     }
     private var cachedSearchText: [UUID: String] = [:]
+    // Alphabet keys are resolved once per catalog/translation revision,
+    // rather than inside SwiftUI body on every unrelated state update.
+    private var cachedAlphabetSortKeys: [UUID: String] = [:]
     private var lastSearchRequest: SearchRequest?
     private var lastSearchTranslationRevision = -1
     private var lastSearchResults: [ExerciseLibraryEntry] = []
@@ -695,6 +698,7 @@ final class ExerciseLibraryStore: ObservableObject {
         cachedBodyParts = nil
         cachedEquipmentOptions = nil
         cachedSearchText = [:]
+        cachedAlphabetSortKeys = [:]
         lastSearchRequest = nil
         lastSearchTranslationRevision = -1
         lastSearchResults = []
@@ -758,6 +762,31 @@ final class ExerciseLibraryStore: ObservableObject {
         return resolved
     }
 
+    /// Stable, Norwegian-localized alphabetical ordering for *all* exercise
+    /// surfaces, including results filtered by source, muscle or equipment.
+    /// Sorting in the store prevents every view render from re-sorting
+    /// thousands of translated names. Never change source IDs or saved data.
+    func alphabetized(
+        _ entries: [ExerciseLibraryEntry]
+    ) -> [ExerciseLibraryEntry] {
+        guard entries.count > 1 else { return entries }
+        let locale = ATHLTHExerciseAlphabet.locale
+        for entry in entries where cachedAlphabetSortKeys[entry.id] == nil {
+            cachedAlphabetSortKeys[entry.id] = localizedExerciseName(entry)
+        }
+        return entries.sorted { lhs, rhs in
+            let left = cachedAlphabetSortKeys[lhs.id] ?? lhs.name
+            let right = cachedAlphabetSortKeys[rhs.id] ?? rhs.name
+            let comparison = left.compare(
+                right,
+                options: [.caseInsensitive, .numeric],
+                locale: locale
+            )
+            if comparison != .orderedSame { return comparison == .orderedAscending }
+            return lhs.id.uuidString < rhs.id.uuidString
+        }
+    }
+
     func search(
         query: String,
         bodyPart: String? = nil,
@@ -771,6 +800,9 @@ final class ExerciseLibraryStore: ObservableObject {
 
         let request = SearchRequest(query: cleanQuery, bodyPart: bodyPart, equipment: equipment)
         let translationRevision = NorwegianExerciseAutoTranslation.shared.revision
+        if lastSearchTranslationRevision != translationRevision {
+            cachedAlphabetSortKeys = [:]
+        }
         if lastSearchRequest == request &&
            lastSearchTranslationRevision == translationRevision {
             return lastSearchResults
@@ -850,8 +882,9 @@ final class ExerciseLibraryStore: ObservableObject {
         }
         lastSearchRequest = request
         lastSearchTranslationRevision = translationRevision
-        lastSearchResults = matches
-        return matches
+        let ordered = alphabetized(matches)
+        lastSearchResults = ordered
+        return ordered
     }
 
     func createCustomExercise(
