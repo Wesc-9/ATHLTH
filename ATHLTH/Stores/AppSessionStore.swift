@@ -1773,6 +1773,10 @@ final class AppSessionStore: ObservableObject {
     func refreshActivePlanForToday(
         referenceDate: Date = Date()
     ) {
+        let performanceID = ATHLTHPerformance.begin("RefreshActiveTrainingPlan")
+        defer {
+            ATHLTHPerformance.end("RefreshActiveTrainingPlan", id: performanceID)
+        }
         var plans = trainingPlans.map(normalizedTrainingPlan)
         let activeCandidates = plans.filter {
             !pausedTrainingPlanIDs.contains($0.id) &&
