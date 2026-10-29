@@ -198,7 +198,6 @@ struct ATHLTHTrainLibraryPremiumView: View {
         }
     }
 
-    @ViewBuilder
     private var libraryColumns: [GridItem] {
         displayMode == .grid
             ? [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
