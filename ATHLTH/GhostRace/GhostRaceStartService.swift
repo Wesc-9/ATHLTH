@@ -559,6 +559,17 @@ enum GhostRaceStartService {
                     ghostUpdates:
                         ghostAudio
                 )
+                guard phoneWorkout.active != nil else {
+                    throw NSError(
+                        domain: "ATHLTH.GhostRace",
+                        code: 24,
+                        userInfo: [NSLocalizedDescriptionKey:
+                            ATHLTHLocalization.choose(
+                                english: "Ghost Race could not start recording on iPhone. Check location access and try again.",
+                                norwegian: "Ghost Race fikk ikke startet registreringen på iPhone. Kontroller stedstilgang og prøv igjen."
+                            )]
+                    )
+                }
                 phoneWorkout
                     .configureGhostOpponentName(
                         opponentName
@@ -625,8 +636,7 @@ enum GhostRaceStartService {
                 )
             }
 
-            watchConnection.sendGhostRace(
-                WatchGhostRaceTransfer(
+            let ghostTransfer = WatchGhostRaceTransfer(
                     title: reference.title,
                     referenceDuration:
                         reference
@@ -640,7 +650,7 @@ enum GhostRaceStartService {
                     opponentName:
                         opponentName
                 )
-            )
+            watchConnection.sendGhostRace(ghostTransfer)
 
             let runningTransfer =
                 WatchRunningWorkoutTransfer(
@@ -669,6 +679,11 @@ enum GhostRaceStartService {
                     .running
                 )
 
+            // A HealthKit remote launch can start before queued WCSession data
+            // reaches Watch. Refresh the fixed Ghost after startup as well,
+            // otherwise the workout may run with no opponent.
+            watchConnection.sendWorkoutRouteSelection(raceRoute.id)
+            watchConnection.sendGhostRace(ghostTransfer)
             watchConnection
                 .sendAudioCoachConfiguration(
                     standardAudioCoach
