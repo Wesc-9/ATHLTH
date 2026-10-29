@@ -5485,6 +5485,9 @@ struct SessionEditorView: View {
     @State private var workoutBlocks: [WorkoutTemplateBlock] = []
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
+    @State private var pickingScratchWorkout = false
+    @State private var selectedScratchWorkoutType: ATHLTHPlannedWorkoutType?
+    @State private var showingUnifiedWorkoutComposer = false
     @State private var showingRecoveryRestPlanner = false
     @State private var showingRestDayPlanner = false
     @State private var selectedPartnerID: UUID?
@@ -6177,12 +6180,11 @@ struct SessionEditorView: View {
                 norwegian: "Den samme øktmotoren brukes for egen planlegging og Train Together."
             ),
             onCreateNew: {
-                // A fresh workout must not silently inherit old draft values.
-                discardStoredStandaloneDraft()
-                hasSelectedWorkoutSource = true
-                title = ""
+                pickingScratchWorkout = true
+                showingSavedWorkoutPicker = true
             },
             onUsePlanned: {
+                pickingScratchWorkout = false
                 showingSavedWorkoutPicker = true
             },
             onResumeDraft: hasStoredStandaloneDraft
@@ -6204,6 +6206,70 @@ struct SessionEditorView: View {
         )
     }
 
+
+    /// "Fra bunnen av" starts with an actual blank shared session. Activity
+    /// choice only controls initial defaults; no canned workout is copied.
+    /// Keep the chosen date/time as the athlete may have selected it before
+    /// opening this sheet.
+    private func prepareBlankWorkout(
+        for type: ATHLTHPlannedWorkoutType
+    ) {
+        discardStoredStandaloneDraft()
+        selectedScratchWorkoutType = type
+        hasSelectedWorkoutSource = true
+        title = ""
+        notes = ""
+        durationMinutes = 0
+        strengthDurationAdjustmentMinutes = 0
+        distanceKilometers = 0
+        distanceWasAdjustedManually = false
+        durationWasAdjustedManually = false
+        workoutTemplateID = nil
+        workoutBlocks = []
+        plannedExercises = []
+        selectedRunningWorkouts = []
+        selectedRouteID = nil
+        runEnvironment = .outdoor
+        workoutCategory = type.rawValue
+        switch type {
+        case .strength: kind = .strength
+        case .running: kind = .running
+        case .walking: kind = .walking
+        case .cycling: kind = .custom
+        case .mobility: kind = .mobility
+        case .custom: kind = .custom
+        }
+    }
+
+    private var scratchQuickAdd: String? {
+        guard let selectedScratchWorkoutType else { return nil }
+        switch selectedScratchWorkoutType {
+        case .strength: return "exercise"
+        case .running: return "running"
+        case .walking: return "walking"
+        case .cycling: return "cycling"
+        case .mobility: return "stretching"
+        case .custom: return nil
+        }
+    }
+
+    /// The timeline builder returns the same PlannedSession recipe the editor
+    /// already saves and transfers to the Watch. It does not schedule the
+    /// session itself: the athlete confirms date and time in this editor.
+    private func applyScratchTimeline(_ updated: PlannedSession) {
+        workoutBlocks = updated.resolvedWorkoutBlocks
+        workoutTemplateID = nil
+        plannedExercises = []
+        selectedRunningWorkouts = []
+        kind = updated.kind
+        workoutCategory = updated.workoutCategory
+        selectedRouteID = updated.routeID
+        title = updated.title
+        if let minutes = updated.durationMinutes {
+            durationMinutes = minutes
+            durationWasAdjustedManually = false
+        }
+    }
 
     // Keep the potentially large dynamic list outside the parent Form's
     // result builder. This also avoids Swift compiler type-check timeouts
@@ -6328,6 +6394,37 @@ struct SessionEditorView: View {
 
             workoutSourcesSection
 
+            if selectedScratchWorkoutType != nil {
+                Section {
+                    Button {
+                        showingUnifiedWorkoutComposer = true
+                    } label: {
+                        Label(
+                            workoutBlocks.isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english: "Add exercises and phases",
+                                    norwegian: "Legg til øvelser og øktdeler"
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "Edit workout timeline",
+                                    norwegian: "Rediger økttidslinje"
+                                  ),
+                            systemImage: "list.bullet.rectangle.portrait"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 48)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHTheme.accentDeep)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Uses the same timeline builder for strength, intervals, walking, cycling, mobility and mixed sessions.",
+                        norwegian: "Samme tidslinjebygger brukes til styrke, intervaller, gåing, sykling, mobilitet og kombinasjonsøkter."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .listRowBackground(ATHLTHPlanDesign.surface)
+            }
 
             if onPreparedWorkout == nil && !prioritizePartnerPlanning {
                 partnerPlanningSection
@@ -6467,20 +6564,51 @@ struct SessionEditorView: View {
                 }
                 .presentationDetents([.large])
             }
-            .sheet(isPresented: $showingSavedWorkoutPicker) {
-                ATHLTHPlannedWorkoutTypePickerView { workout, _ in
-                    applySavedWorkout(workout)
-                    // A library template supplies the structure, but the
-                    // athlete still names this new independent session.
-                    if existingWorkout == nil {
-                        title = ""
+            .sheet(isPresented: $showingUnifiedWorkoutComposer) {
+                WorkoutTemplateBuilderView(
+                    initialTitle: title,
+                    initialBlocks: workoutPlanningPreviewBlocks,
+                    initialRouteID: selectedRouteID,
+                    initialQuickAdd: workoutBlocks.isEmpty &&
+                        plannedExercises.isEmpty &&
+                        selectedRunningWorkouts.isEmpty
+                        ? scratchQuickAdd : nil,
+                    draftContext: "session-scratch.\(session.profile.userID.uuidString).\(selectedScratchWorkoutType?.rawValue ?? "custom")",
+                    plannedDate: scheduledTime,
+                    onAddStandalone: { updated in
+                        applyScratchTimeline(updated)
+                        return true
                     }
-                    discardStoredStandaloneDraft()
-                    hasSelectedWorkoutSource = true
-                    showingSavedWorkoutPicker = false
-                }
+                )
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingSavedWorkoutPicker) {
+                if pickingScratchWorkout {
+                    ATHLTHPlannedWorkoutTypePickerView(
+                        purpose: .createFromScratch,
+                        onCreateNew: { type in
+                            prepareBlankWorkout(for: type)
+                            showingSavedWorkoutPicker = false
+                        },
+                        onSelect: { _, _ in }
+                    )
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                } else {
+                    ATHLTHPlannedWorkoutTypePickerView { workout, _ in
+                        applySavedWorkout(workout)
+                        // A library template supplies the structure, but the
+                        // athlete still names this new independent session.
+                        if existingWorkout == nil { title = "" }
+                        selectedScratchWorkoutType = nil
+                        discardStoredStandaloneDraft()
+                        hasSelectedWorkoutSource = true
+                        showingSavedWorkoutPicker = false
+                    }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                }
             }
     }
 
@@ -10066,6 +10194,12 @@ struct SessionEditorView: View {
     }
 
     private func persistSession(_ workout: PlannedSession) {
+        if let selectedScratchWorkoutType {
+            ATHLTHPlannedWorkoutTypeUsageStore.record(
+                selectedScratchWorkoutType,
+                userID: session.profile.userID
+            )
+        }
         if isStandalone {
             session.addStandalonePlannedSession(workout)
         } else if existingWorkout != nil, let planID {
