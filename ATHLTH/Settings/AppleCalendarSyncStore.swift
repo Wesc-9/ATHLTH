@@ -10,9 +10,9 @@ final class AppleCalendarSyncStore: ObservableObject {
     @Published private(set) var isSyncing = false
     @Published private(set) var calendarIdentifier: String?
     @Published private(set) var lastSyncedAt: Date?
-    @Published private(set) var lastSyncWorkoutCount: Int?
-    @Published private(set) var lastSyncTentativeCount: Int?
-    @Published private(set) var lastSyncEventCount: Int?
+    @Published private(set) var lastSyncWorkoutCount: Int? = nil
+    @Published private(set) var lastSyncTentativeCount: Int? = nil
+    @Published private(set) var lastSyncEventCount: Int? = nil
     @Published private(set) var defaultStartHour: Int
     @Published private(set) var defaultStartMinute: Int
     @Published var errorMessage: String?
@@ -25,6 +25,7 @@ final class AppleCalendarSyncStore: ObservableObject {
 
     private struct CalendarSyncSnapshot {
         let plan: TrainingPlan?
+        let additionalPlans: [TrainingPlan]
         let standaloneSessions: [PlannedSession]
         let communityEvents: [CommunityEventItem]
         let groupEvents: [CommunityGroupEventRecord]
@@ -206,6 +207,7 @@ final class AppleCalendarSyncStore: ObservableObject {
 
     func enable(
         plan: TrainingPlan?,
+        additionalPlans: [TrainingPlan] = [],
         standaloneSessions: [PlannedSession] = [],
         communityEvents: [CommunityEventItem] = [],
         groupEvents: [CommunityGroupEventRecord] = [],
@@ -231,6 +233,7 @@ final class AppleCalendarSyncStore: ObservableObject {
 
             await sync(
                 plan: plan,
+                additionalPlans: additionalPlans,
                 standaloneSessions: standaloneSessions,
                 communityEvents: communityEvents,
                 groupEvents: groupEvents,
@@ -365,6 +368,7 @@ final class AppleCalendarSyncStore: ObservableObject {
 
     func syncIfEnabled(
         plan: TrainingPlan?,
+        additionalPlans: [TrainingPlan] = [],
         standaloneSessions: [PlannedSession] = [],
         communityEvents: [CommunityEventItem] = [],
         groupEvents: [CommunityGroupEventRecord] = [],
@@ -386,6 +390,7 @@ final class AppleCalendarSyncStore: ObservableObject {
 
         await sync(
             plan: plan,
+            additionalPlans: additionalPlans,
             standaloneSessions: standaloneSessions,
             communityEvents: communityEvents,
             groupEvents: groupEvents,
@@ -397,6 +402,7 @@ final class AppleCalendarSyncStore: ObservableObject {
 
     func sync(
         plan: TrainingPlan?,
+        additionalPlans: [TrainingPlan] = [],
         standaloneSessions: [PlannedSession] = [],
         communityEvents: [CommunityEventItem] = [],
         groupEvents: [CommunityGroupEventRecord] = [],
@@ -406,6 +412,7 @@ final class AppleCalendarSyncStore: ObservableObject {
     ) async {
         let snapshot = CalendarSyncSnapshot(
             plan: plan,
+            additionalPlans: additionalPlans,
             standaloneSessions: standaloneSessions,
             communityEvents: communityEvents,
             groupEvents: groupEvents,
@@ -447,6 +454,7 @@ final class AppleCalendarSyncStore: ObservableObject {
             self.pendingSnapshot = nil
             await sync(
                 plan: pendingSnapshot.plan,
+                additionalPlans: pendingSnapshot.additionalPlans,
                 standaloneSessions: pendingSnapshot.standaloneSessions,
                 communityEvents:
                     pendingSnapshot.communityEvents,
@@ -644,7 +652,10 @@ final class AppleCalendarSyncStore: ObservableObject {
         var syncedWorkouts = 0
         var tentativeEvents = 0
 
-        if let plan = snapshot.plan {
+        var syncedPlanIDs = Set<UUID>()
+        let plans = (snapshot.plan.map { [$0] } ?? []) +
+            snapshot.additionalPlans
+        for plan in plans where syncedPlanIDs.insert(plan.id).inserted {
             for (weekIndex, week) in plan.weeks.enumerated() {
                 for day in week.days {
                     for session in day.sessions {
