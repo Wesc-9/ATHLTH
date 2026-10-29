@@ -85,11 +85,11 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
         let ranked = ATHLTHInsightsMuscleRanking.extremes(summary)
         XCTAssertEqual(ranked.most.map(\.region), [.quads])
         XCTAssertTrue(ranked.least.isEmpty)
-        XCTAssertEqual(ranked.most.first?.percentage, 100)
+        XCTAssertEqual(ranked.most.first?.percentage, 33)
     }
 
     @MainActor
-    func testAllLoggedMusclesAreRankedAndHighestIs100Percent() {
+    func testAllLoggedMusclesUseAnAbsoluteWeeklyReference() {
         let profile = StrengthMuscleProfile(activations: [
             .init(region: .quads, score: 8),
             .init(region: .hamstrings, score: 7.5),
@@ -104,9 +104,8 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
         XCTAssertEqual(all.map(\.region), [
             .quads, .hamstrings, .glutes, .outerHip, .upperBack, .calves
         ])
-        XCTAssertEqual(all.map(\.percentage), [100, 94, 85, 38, 13, 6])
-        XCTAssertEqual(all.filter(\.needsLoadBalanceAttention).map(\.region),
-                       [.quads, .hamstrings, .glutes])
+        XCTAssertEqual(all.map(\.percentage), [67, 63, 57, 25, 8, 4])
+        XCTAssertTrue(all.allSatisfy { !$0.needsLoadBalanceAttention })
         let extremes = ATHLTHInsightsMuscleRanking.extremes(summary)
         XCTAssertEqual(extremes.most.map(\.region), [.quads, .hamstrings])
         XCTAssertEqual(extremes.least.map(\.region), [.calves, .upperBack])
@@ -143,7 +142,7 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
         ])
         let ranking = ATHLTHInsightsMuscleRanking.all(
             ATHLTHInsightsMuscleSummary(profile: profile, sessionCount: 18))
-        XCTAssertEqual(ranking.first?.percentage, 100)
+        XCTAssertEqual(ranking.first?.percentage, 83)
         XCTAssertFalse(ranking.contains(where: \.needsLoadBalanceAttention))
     }
 
@@ -157,8 +156,105 @@ final class ATHLTHInsightsPremiumTests: XCTestCase {
         let all = ATHLTHInsightsMuscleRanking.all(
             ATHLTHInsightsMuscleSummary(profile: profile, sessionCount: 9))
         XCTAssertEqual(all.map(\.region), [.chest])
-        XCTAssertEqual(all.first?.percentage, 100)
+        XCTAssertEqual(all.first?.percentage, 33)
         XCTAssertFalse(all.first?.needsLoadBalanceAttention ?? true)
+    }
+
+    @MainActor
+    func testSmallStrengthDoseIsNotAutomaticallyOneHundredPercent() {
+        let oneSession = ATHLTHInsightsMuscleSummary(
+            profile: StrengthMuscleProfile(activations: [
+                .init(region: .quads, score: 3)
+            ]), sessionCount: 1
+        )
+        let result = ATHLTHInsightsMuscleRanking.all(oneSession)
+        XCTAssertEqual(result.first?.percentage, 25)
+        XCTAssertFalse(result.first?.needsLoadBalanceAttention ?? true)
+    }
+
+    @MainActor
+    func testOlderStrengthWorkContributesLessThanRecentWork() {
+        func profile(_ score: Double) -> StrengthMuscleProfile {
+            StrengthMuscleProfile(activations: [
+                .init(region: .quads, score: score)
+            ])
+        }
+        let fresh = ATHLTHInsightsMuscleSummary.estimateActivity(
+            samples: [(date: now.addingTimeInterval(-86_400), profile: profile(4))],
+            at: now
+        )
+        let old = ATHLTHInsightsMuscleSummary.estimateActivity(
+            samples: [(date: now.addingTimeInterval(-21 * 86_400),
+                       profile: profile(4))],
+            at: now
+        )
+        XCTAssertGreaterThan(
+            fresh.weeklyLoad[.quads] ?? 0, old.weeklyLoad[.quads] ?? 0
+        )
+        XCTAssertLessThan(
+            fresh.weeklyLoad[.quads] ?? 0, 12
+        )
+    }
+
+    @MainActor
+    func testLongTermHistoryRaisesTheReferenceForHighlyTrainedMuscles() {
+        let profile = StrengthMuscleProfile(activations: [
+            .init(region: .quads, score: 30)
+        ])
+        let samples: [(date: Date, profile: StrengthMuscleProfile)] =
+            [35, 42, 49, 56].map {
+                (date: now.addingTimeInterval(-Double($0) * 86_400),
+                 profile: profile)
+            }
+        let estimate = ATHLTHInsightsMuscleSummary.estimateActivity(
+            samples: samples, at: now
+        )
+        XCTAssertTrue(estimate.reliableBaselineRegions.contains(.quads))
+        XCTAssertEqual(estimate.previousWeeklyLoad[.quads] ?? 0, 10, accuracy: 0.01)
+
+        let baseline = ATHLTHInsightsMuscleSummary(
+            profile: StrengthMuscleProfile(activations: [
+                .init(region: .quads, score: 10)
+            ]),
+            sessionCount: 4,
+            weeklyLoad: [.quads: 10],
+            previousWeeklyLoad: [:],
+            reliableBaselineRegions: []
+        )
+        let personalized = ATHLTHInsightsMuscleSummary(
+            profile: baseline.profile,
+            sessionCount: 4,
+            weeklyLoad: [.quads: 10],
+            previousWeeklyLoad: [.quads: 20],
+            reliableBaselineRegions: [.quads]
+        )
+        XCTAssertLessThan(
+            ATHLTHInsightsMuscleRanking.all(personalized)[0].percentage,
+            ATHLTHInsightsMuscleRanking.all(baseline)[0].percentage
+        )
+    }
+
+    @MainActor
+    func testRedFlagRequiresHistoricalEvidenceOfMeaningfulIncrease() {
+        let profile = StrengthMuscleProfile(activations: [
+            .init(region: .quads, score: 30)
+        ])
+        let withoutBaseline = ATHLTHInsightsMuscleSummary(
+            profile: profile, sessionCount: 6, weeklyLoad: [.quads: 30]
+        )
+        XCTAssertFalse(
+            ATHLTHInsightsMuscleRanking.all(withoutBaseline)[0].needsLoadBalanceAttention
+        )
+
+        let withBaseline = ATHLTHInsightsMuscleSummary(
+            profile: profile, sessionCount: 6,
+            weeklyLoad: [.quads: 30],
+            previousWeeklyLoad: [.quads: 15],
+            reliableBaselineRegions: [.quads]
+        )
+        XCTAssertTrue(
+            ATHLTHInsightsMuscleRanking.all(withBaseline)[0].needsLoadBalanceAttention
+        )
     }
 
     func testCompactFourTabNavigationFitsPhones() {

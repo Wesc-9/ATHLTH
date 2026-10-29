@@ -100,52 +100,129 @@ struct ATHLTHInsightsNavigation: View {
     }
 }
 
-/// Aggregates completed, logged ATHLTH strength sessions once per history
-/// publication. Never infers muscle training from unrelated Health workouts.
+/// Completed, muscle-attributed strength training is the only source of this
+/// activity estimate. It is not a clinical assessment of muscle fatigue.
 struct ATHLTHInsightsMuscleSummary {
     let profile: StrengthMuscleProfile
     let sessionCount: Int
+    /// Time-weighted equivalent weekly muscle sets, over the last 28 days.
+    var weeklyLoad: [StrengthMuscleRegion: Double] = [:]
+    /// The preceding twelve weeks provide a personal reference when present.
+    var previousWeeklyLoad: [StrengthMuscleRegion: Double] = [:]
+    var reliableBaselineRegions: Set<StrengthMuscleRegion> = []
 
     static let empty = ATHLTHInsightsMuscleSummary(profile: .empty, sessionCount: 0)
 
-    static func make(from history: [StrengthWorkoutLog], at now: Date = Date()) -> Self {
-        let cutoff = now.addingTimeInterval(-28 * 86_400)
-        let sessions = history.filter {
-            $0.isFinished && $0.startedAt >= cutoff && $0.startedAt <= now
-        }
-        guard !sessions.isEmpty else { return .empty }
+    struct ActivityEstimate {
+        let weeklyLoad: [StrengthMuscleRegion: Double]
+        let previousWeeklyLoad: [StrengthMuscleRegion: Double]
+        let reliableBaselineRegions: Set<StrengthMuscleRegion>
+    }
 
+    /// Half-life affects the age of the logged training, NOT tissue recovery.
+    /// The denominator converts an exponentially weighted 28-day sum back
+    /// into weekly-equivalent sets, rather than forcing the peak to 100%.
+    static func estimateActivity(
+        samples: [(date: Date, profile: StrengthMuscleProfile)],
+        at now: Date
+    ) -> ActivityEstimate {
+        let recentDays = 28.0
+        let previousDays = 84.0
+        let halfLifeDays = 10.0
+        let dailyDecay = log(2.0) / halfLifeDays
+        let weeklyNormalization = (1 - exp(-dailyDecay * recentDays))
+            / (dailyDecay * 7.0)
+
+        var weighted: [StrengthMuscleRegion: Double] = [:]
+        var previousTotal: [StrengthMuscleRegion: Double] = [:]
+        var previousWeeks: [StrengthMuscleRegion: Set<Date>] = [:]
+        var previousExposureCount: [StrengthMuscleRegion: Int] = [:]
+        let calendar = Calendar.current
+
+        for sample in samples {
+            let ageDays = now.timeIntervalSince(sample.date) / 86_400
+            guard ageDays >= 0, ageDays < recentDays + previousDays else {
+                continue
+            }
+            for activation in sample.profile.activations {
+                guard activation.score.isFinite, activation.score > 0 else {
+                    continue
+                }
+                if ageDays < recentDays {
+                    weighted[activation.region, default: 0] +=
+                        activation.score * exp(-dailyDecay * ageDays)
+                } else {
+                    previousTotal[activation.region, default: 0] += activation.score
+                    previousExposureCount[activation.region, default: 0] += 1
+                    let weekStart = calendar.dateInterval(
+                        of: .weekOfYear, for: sample.date
+                    )?.start ?? calendar.startOfDay(for: sample.date)
+                    previousWeeks[activation.region, default: []].insert(weekStart)
+                }
+            }
+        }
+
+        let reference = previousTotal.mapValues { $0 / (previousDays / 7.0) }
+        let reliable = Set(reference.keys.filter { region in
+            (previousExposureCount[region] ?? 0) >= 3 &&
+                (previousWeeks[region]?.count ?? 0) >= 3
+        })
+        return ActivityEstimate(
+            weeklyLoad: weighted.mapValues { $0 / weeklyNormalization },
+            previousWeeklyLoad: reference,
+            reliableBaselineRegions: reliable
+        )
+    }
+
+    static func make(from history: [StrengthWorkoutLog], at now: Date = Date()) -> Self {
+        let recentCutoff = now.addingTimeInterval(-28 * 86_400)
+        let historyCutoff = now.addingTimeInterval(-112 * 86_400)
+        // Incomplete, future and zero-working-set logs must not inflate the map.
+        let usable = history.filter {
+            $0.isFinished && $0.totalWorkingSets > 0 &&
+                $0.startedAt >= historyCutoff && $0.startedAt <= now
+        }
+
+        var samples: [(date: Date, profile: StrengthMuscleProfile)] = []
         var values: [StrengthMuscleRegion: Double] = [:]
         var primary: Set<StrengthMuscleRegion> = []
         var secondary: Set<StrengthMuscleRegion> = []
+        var recentCount = 0
 
-        for workout in sessions {
-            // Modern workout snapshots contain muscle metadata. Missing
-            // legacy metadata is not invented from exercise names.
-            let summary = StrengthMuscleProfileBuilder.make(workout: workout, library: [])
-            for activation in summary.profile.activations {
+        for workout in usable {
+            let profile = StrengthMuscleProfileBuilder
+                .make(workout: workout, library: []).profile
+            samples.append((date: workout.startedAt, profile: profile))
+            guard workout.startedAt >= recentCutoff else { continue }
+            recentCount += 1
+            for activation in profile.activations
+                where activation.score.isFinite && activation.score > 0 {
                 values[activation.region, default: 0] += activation.score
             }
-            primary.formUnion(summary.profile.primaryRegions)
-            secondary.formUnion(summary.profile.secondaryRegions)
+            primary.formUnion(profile.primaryRegions)
+            secondary.formUnion(profile.secondaryRegions)
         }
 
-        let activations = values.map {
-            StrengthMuscleActivation(region: $0.key, score: $0.value)
-        }
+        guard recentCount > 0 else { return .empty }
+        let activity = estimateActivity(samples: samples, at: now)
         return ATHLTHInsightsMuscleSummary(
             profile: StrengthMuscleProfile(
-                activations: activations,
+                activations: values.map {
+                    StrengthMuscleActivation(region: $0.key, score: $0.value)
+                },
                 primaryRegions: primary,
                 secondaryRegions: secondary
             ),
-            sessionCount: sessions.count
+            sessionCount: recentCount,
+            weeklyLoad: activity.weeklyLoad,
+            previousWeeklyLoad: activity.previousWeeklyLoad,
+            reliableBaselineRegions: activity.reliableBaselineRegions
         )
     }
 }
 
-/// Relative recorded muscle activation during the last 28 days.
-/// The busiest logged region is 100%, never an injury or recovery estimate.
+/// Percentage of a training-activity reference, NOT percent muscle exhaustion.
+/// A conservative minimum reference protects sparse histories from exaggeration.
 struct ATHLTHInsightsMuscleFocus: Identifiable {
     let region: StrengthMuscleRegion
     let percentage: Int
@@ -155,39 +232,45 @@ struct ATHLTHInsightsMuscleFocus: Identifiable {
 }
 
 enum ATHLTHInsightsMuscleRanking {
+    /// Heuristic reference: 12 effective working sets per week per muscle.
+    /// Personal history can increase this reference, but never make it tiny.
+    private static let minimumWeeklyReference = 12.0
+
     static func all(_ summary: ATHLTHInsightsMuscleSummary) -> [ATHLTHInsightsMuscleFocus] {
-        let ordered = summary.profile.activations
-            .filter { $0.score.isFinite && $0.score > 0 }
-            .sorted {
-                if $0.score == $1.score {
-                    return $0.region.rawValue < $1.region.rawValue
-                }
-                return $0.score > $1.score
-            }
-        guard let peak = ordered.first?.score, peak > 0 else { return [] }
-        // Highlight a truly disproportionate concentration, not simply a
-        // near-peak muscle: if every region is equally used, none is red.
-        // At least three logged regions and sessions are needed to compare.
-        // Relative use alone is NEVER evidence of injury or overtraining.
-        let hasComparison = ordered.count >= 3 && summary.sessionCount >= 3
-        let middle = ordered.count / 2
-        let median = ordered.count.isMultiple(of: 2)
-            ? (ordered[middle - 1].score + ordered[middle].score) / 2
-            : ordered[middle].score
-        return ordered.map { item in
-            let share = min(max(item.score / peak, 0), 1)
+        summary.profile.activations.compactMap { item in
+            guard item.score.isFinite && item.score > 0 else { return nil }
+            let weekly = summary.weeklyLoad[item.region] ?? item.score
+            guard weekly.isFinite, weekly > 0 else { return nil }
+            let baseline = summary.reliableBaselineRegions.contains(item.region)
+                ? (summary.previousWeeklyLoad[item.region] ?? 0) : 0
+            let target = max(minimumWeeklyReference, baseline * 1.25)
+            let fraction = min(max(weekly / target, 0), 1)
+            // 100% is earned only at a meaningful dose, not awarded to the
+            // largest logged muscle just because it is ranked first.
+            let percentage = Int((fraction * 100).rounded())
+            let unusuallyElevated = summary.reliableBaselineRegions.contains(item.region)
+                && summary.sessionCount >= 3 && baseline >= 3
+                && weekly >= minimumWeeklyReference
+                && weekly >= baseline * 1.5
+                && percentage >= 85
+
             return ATHLTHInsightsMuscleFocus(
                 region: item.region,
-                percentage: Int((share * 100).rounded()),
-                score: item.score,
-                needsLoadBalanceAttention: hasComparison
-                    && share >= 0.85 && item.score >= median * 1.20
+                percentage: percentage,
+                score: weekly,
+                needsLoadBalanceAttention: unusuallyElevated
             )
+        }.sorted {
+            if $0.percentage != $1.percentage {
+                return $0.percentage > $1.percentage
+            }
+            if $0.score != $1.score { return $0.score > $1.score }
+            return $0.region.rawValue < $1.region.rawValue
         }
     }
 
     static func extremes(_ summary: ATHLTHInsightsMuscleSummary)
-        -> (most: [ATHLTHInsightsMuscleFocus], least: [ATHLTHInsightsMuscleFocus]) {
+    -> (most: [ATHLTHInsightsMuscleFocus], least: [ATHLTHInsightsMuscleFocus]) {
         let sorted = all(summary)
         let high = Array(sorted.prefix(2))
         let highRegions = Set(high.map(\.region))
@@ -331,8 +414,8 @@ struct ATHLTHInsightsMuscleCard: View {
                             in: RoundedRectangle(cornerRadius: 15))
 
                 Text(ATHLTHLocalization.choose(
-                    english: "Compared with the highest logged muscle activation (100%) across \(summary.sessionCount) strength sessions. Red means relatively concentrated training, NOT injury, fatigue or overtraining. Unrecorded regions stay neutral.",
-                    norwegian: "Sammenlignet med mest registrert muskelaktivering (100 %) fra \(summary.sessionCount) styrkeøkter. Rødt viser relativt høy treningskonsentrasjon, IKKE skade, utmattelse eller overtrening. Uregistrerte muskler er nøytrale."
+                    english: "Estimated training activity from \(summary.sessionCount) strength sessions in 28 days. Older sessions count less. Compared with your prior training when available, otherwise a conservative reference. 100% is not muscle exhaustion. Red is not a diagnosis. Unlogged areas stay neutral.",
+                    norwegian: "Anslått treningsmengde fra \(summary.sessionCount) styrkeøkter på 28 dager. Eldre økter teller mindre. Sammenlignes med din historikk når mulig, ellers et nøkternt referansenivå. 100 % betyr ikke utmattet muskel. Rødt er ingen diagnose. Uregistrerte muskler er nøytrale."
                 ))
                 .font(.caption2)
                 .foregroundStyle(ATHLTHInsightsStyle.muted)
