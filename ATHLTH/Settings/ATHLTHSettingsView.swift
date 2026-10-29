@@ -2906,10 +2906,13 @@ private struct AppleCalendarSettingsView: View {
             communityEvents.refresh()
         async let groupRefresh: Void =
             communityGroups.refreshCalendarContent()
+        async let challengeRefresh: Void =
+            communityGroups.refreshCalendarChallenges()
 
         _ = await (
             eventRefresh,
-            groupRefresh
+            groupRefresh,
+            challengeRefresh
         )
     }
 
@@ -2927,6 +2930,9 @@ private struct AppleCalendarSettingsView: View {
             groupEvents: communityGroups.calendarEvents,
             groupEventRSVPs:
                 communityGroups.calendarEventRSVPs,
+            clubChallenges: communityGroups.calendarClubChallenges,
+            clubChallengeParticipations:
+                communityGroups.calendarChallengeParticipations,
             challenges: challenges.challenges,
             currentUserID: session.profile.userID
         )
@@ -2946,6 +2952,9 @@ private struct AppleCalendarSettingsView: View {
             groupEvents: communityGroups.calendarEvents,
             groupEventRSVPs:
                 communityGroups.calendarEventRSVPs,
+            clubChallenges: communityGroups.calendarClubChallenges,
+            clubChallengeParticipations:
+                communityGroups.calendarChallengeParticipations,
             challenges: challenges.challenges,
             currentUserID: session.profile.userID
         )
