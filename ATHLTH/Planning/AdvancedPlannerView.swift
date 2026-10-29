@@ -9836,7 +9836,10 @@ struct SessionEditorView: View {
         allowInviteeExercises = workout.allowInviteeExercises == true
         reminderMinutesBefore = workout.reminderMinutesBefore ?? 0
 
-        if let scheduled = workout.scheduledStart {
+        // Copy the structure from an existing workout, not its calendar
+        // placement. A new "Planlegg ekstra økt" keeps the date the athlete
+        // selected before opening the source picker.
+        if !isStandalone, let scheduled = workout.scheduledStart {
             scheduledTimeEnabled = true
             scheduledTime = scheduled
         }
