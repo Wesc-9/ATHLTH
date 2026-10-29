@@ -737,6 +737,7 @@ struct WorkoutTemplateLibraryView: View {
     @State private var pendingCatalogAddition: WorkoutTemplateCatalogEntry?
     @State private var pendingRunningAddition: RunningWorkoutTemplate?
     @State private var previewedWorkoutSource: SelectedWorkoutSource?
+    @State private var workoutSourceAfterPreviewDismiss: SelectedWorkoutSource?
 
     /// All workout categories use the same recipe preview and editor.
     private enum SelectedWorkoutSource: Identifiable {
@@ -839,7 +840,13 @@ struct WorkoutTemplateLibraryView: View {
     /// Keep target personalization and the common editor exactly as before:
     /// the preview is only a reading/confirmation step.
     private func confirmPreview(_ source: SelectedWorkoutSource) {
+        // Dismiss the detail sheet *before* opening target personalization
+        // or returning to the editor. Presenting both at once can lose taps.
+        workoutSourceAfterPreviewDismiss = source
         previewedWorkoutSource = nil
+    }
+
+    private func completeConfirmedPreview(_ source: SelectedWorkoutSource) {
         switch source {
         case .scheduled(let workout), .saved(let workout):
             onSelectPlanned?(workout)
@@ -1347,7 +1354,12 @@ struct WorkoutTemplateLibraryView: View {
             text: $query,
             prompt: ATHLTHLocalization.choose(english: "Search workouts", norwegian: "Søk etter treningsøkter")
         )
-        .sheet(item: $previewedWorkoutSource) { source in
+        .sheet(item: $previewedWorkoutSource, onDismiss: {
+            if let source = workoutSourceAfterPreviewDismiss {
+                workoutSourceAfterPreviewDismiss = nil
+                completeConfirmedPreview(source)
+            }
+        }) { source in
             ATHLTHWorkoutSelectionPreviewSheet(workout: source.workout) {
                 confirmPreview(source)
             }
