@@ -17,6 +17,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @State private var query = ""
     @State private var queryInput = ""
     @State private var exerciseGroup = ""
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var selectedTemplate: TrainingPlan?
     @State private var selectedCatalogPlan: TrainingPlanCatalogEntry?
     @State private var selectedWorkout: PlannedSession?
@@ -54,9 +55,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                         .foregroundStyle(ink)
                 }
                 Spacer()
-                Image(systemName: "books.vertical")
-                    .font(.system(size: 20, weight: .light))
-                    .foregroundStyle(champagne)
+                ATHLTHLibraryDisplayPicker(selection: $displayMode)
             }
 
             Text(tr(
@@ -129,9 +128,16 @@ struct ATHLTHTrainLibraryPremiumView: View {
         .foregroundStyle(ink)
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear {
+            displayMode = .load(userID: session.profile.userID)
             if startWithWorkouts {
                 section = .workouts
             }
+        }
+        .onChange(of: session.profile.userID) { _, id in
+            displayMode = .load(userID: id)
+        }
+        .onChange(of: displayMode) { _, value in
+            value.save(userID: session.profile.userID)
         }
         .task { await catalog.refresh() }
         .task { await exerciseLibrary.refresh() }
@@ -193,6 +199,38 @@ struct ATHLTHTrainLibraryPremiumView: View {
     }
 
     @ViewBuilder
+    private var libraryColumns: [GridItem] {
+        displayMode == .grid
+            ? [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+            : [GridItem(.flexible())]
+    }
+
+    @ViewBuilder
+    private func libraryCard(title: String, detail: String, icon: String) -> some View {
+        if displayMode == .grid {
+            VStack(alignment: .leading, spacing: 8) {
+                Image(systemName: icon)
+                    .font(.system(size: 19, weight: .light))
+                    .foregroundStyle(champagne)
+                    .frame(width: 40, height: 40)
+                    .background(paper, in: RoundedRectangle(cornerRadius: 11))
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(2)
+                Text(detail)
+                    .font(.caption)
+                    .foregroundStyle(secondary)
+                    .lineLimit(3)
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, minHeight: 131, alignment: .topLeading)
+            .padding(13)
+            .librarySurface(line: line)
+        } else {
+            planRow(title: title, detail: detail, icon: icon)
+        }
+    }
+
     private var planLibrary: some View {
         VStack(alignment: .leading, spacing: 16) {
             Button { showingCreatePlan = true } label: {
@@ -220,6 +258,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
 
             if !session.trainingPlans.isEmpty {
                 sectionTitle(tr("MY PROGRAMS", "MINE TRENINGSPROGRAM"))
+                LazyVGrid(columns: libraryColumns, spacing: 10) {
                 ForEach(alphabetized(
                     session.trainingPlans.filter { matches($0.title, $0.summary) },
                     by: \.title
@@ -231,7 +270,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                             onOpenPlan()
                         }
                     } label: {
-                        planRow(
+                        libraryCard(
                             title: plan.title,
                             detail: tr("\(plan.weeks.count) weeks · Scheduled",
                                        "\(plan.weeks.count) uker · Planlagt"),
@@ -240,16 +279,18 @@ struct ATHLTHTrainLibraryPremiumView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                }
             }
 
             if !session.planTemplates.isEmpty {
                 sectionTitle(tr("SAVED PLANS", "LAGREDE PLANER"))
+                LazyVGrid(columns: libraryColumns, spacing: 10) {
                 ForEach(alphabetized(
                     session.planTemplates.filter { matches($0.title, $0.summary) },
                     by: \.title
                 )) { plan in
                     Button { selectedTemplate = plan } label: {
-                        planRow(
+                        libraryCard(
                             title: plan.title,
                             detail: tr("\(plan.weeks.count) weeks · Reusable",
                                        "\(plan.weeks.count) uker · Klar for gjenbruk"),
@@ -258,17 +299,19 @@ struct ATHLTHTrainLibraryPremiumView: View {
                     }
                     .buttonStyle(.plain)
                 }
+                }
             }
 
             if !catalog.entries.isEmpty {
                 sectionTitle(tr("TRAINING TEMPLATES", "FERDIGE TRENINGSMALER"))
+                LazyVGrid(columns: libraryColumns, spacing: 10) {
                 ForEach(alphabetized(
                     catalog.entries.filter {
                         matches($0.title, $0.summary, $0.categoryTitle)
                     }, by: \.title
                 ).prefix(30)) { entry in
                     Button { selectedCatalogPlan = entry } label: {
-                        planRow(
+                        libraryCard(
                             title: entry.title,
                             detail: "\(entry.durationWeeks) " + tr("weeks", "uker")
                                 + " · \(entry.sessionsPerWeek) " + tr("sessions/week", "økter/uke"),
@@ -276,6 +319,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                }
                 }
             }
         }
@@ -291,12 +335,13 @@ struct ATHLTHTrainLibraryPremiumView: View {
                        "Økter du lagrer skal kunne brukes igjen i treningsplanen.")
                 )
             }
+            LazyVGrid(columns: libraryColumns, spacing: 10) {
             ForEach(alphabetized(
                 session.savedWorkoutTemplates.filter { matches($0.title) },
                 by: \.title
             )) { workout in
                 Button { selectedWorkout = workout } label: {
-                    planRow(
+                    libraryCard(
                         title: workout.title,
                         detail: workout.kind.title + workout.durationMinutes.map {
                             " · \($0) min"
@@ -306,8 +351,10 @@ struct ATHLTHTrainLibraryPremiumView: View {
                 }
                 .buttonStyle(.plain)
             }
+            }
             if !runningLibrary.allTemplates.isEmpty {
                 sectionTitle(tr("RUNNING WORKOUTS", "LØPEØKTER"))
+                LazyVGrid(columns: libraryColumns, spacing: 10) {
                 ForEach(alphabetized(
                     runningLibrary.allTemplates.filter { matches($0.title) },
                     by: \.title
@@ -330,6 +377,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                     }
                     .padding(14)
                     .librarySurface(line: line)
+                }
                 }
             }
             Button(action: onOpenPlan) {
@@ -380,37 +428,46 @@ struct ATHLTHTrainLibraryPremiumView: View {
             } else {
                 ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(spacing: 9) {
+                        LazyVGrid(columns: libraryColumns, spacing: 9) {
                             ForEach(entries) { entry in
                                 Button { selectedExercise = entry } label: {
-                                    HStack(spacing: 11) {
-                                        // Keep Train's large index lightweight:
-                                        // full photographic media loads only in
-                                        // the dedicated exercise detail screen.
-                                        Image(systemName: "dumbbell")
-                                            .font(.system(size: 17, weight: .light))
-                                            .foregroundStyle(champagne)
-                                            .frame(width: 43, height: 43)
-                                            .background(
-                                                paper,
-                                                in: RoundedRectangle(cornerRadius: 11)
-                                            )
-                                        VStack(alignment: .leading, spacing: 4) {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack(spacing: 10) {
+                                            Image(systemName: "dumbbell")
+                                                .font(.system(size: 17, weight: .light))
+                                                .foregroundStyle(champagne)
+                                                .frame(width: 43, height: 43)
+                                                .background(
+                                                    paper, in: RoundedRectangle(cornerRadius: 11)
+                                                )
+                                            if displayMode == .list {
+                                                Text(exerciseLibrary.localizedExerciseName(entry))
+                                                    .font(.subheadline.weight(.medium))
+                                                    .lineLimit(2)
+                                                Spacer(minLength: 0)
+                                                Image(systemName: "chevron.right")
+                                                    .font(.caption2)
+                                                    .foregroundStyle(secondary)
+                                            }
+                                        }
+                                        if displayMode == .grid {
                                             Text(exerciseLibrary.localizedExerciseName(entry))
                                                 .font(.subheadline.weight(.medium))
                                                 .lineLimit(2)
-                                                .multilineTextAlignment(.leading)
-                                            Text(entry.bodyPart.map {
-                                                exerciseLibrary.localizedBodyPartTitle($0)
-                                            } ?? entry.category ?? tr("Exercise", "Øvelse"))
-                                                .font(.caption)
-                                                .foregroundStyle(secondary)
                                         }
-                                        Spacer(minLength: 2)
-                                        Image(systemName: "chevron.right")
-                                            .font(.caption2)
+                                        Text(entry.bodyPart.map {
+                                            exerciseLibrary.localizedBodyPartTitle($0)
+                                        } ?? entry.category ?? tr("Exercise", "Øvelse"))
+                                            .font(.caption)
                                             .foregroundStyle(secondary)
+                                            .lineLimit(2)
+                                        if displayMode == .grid { Spacer(minLength: 0) }
                                     }
+                                    .frame(
+                                        maxWidth: .infinity,
+                                        minHeight: displayMode == .grid ? 132 : 57,
+                                        alignment: .topLeading
+                                    )
                                     .padding(10)
                                     .librarySurface(line: line)
                                 }
