@@ -2744,10 +2744,26 @@ struct MyWorkoutTemplatesView: View {
 
     @State private var showingRunningBuilder = false
     @State private var showingHybridBuilder = false
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+
+    private var libraryColumns: [GridItem] {
+        displayMode == .grid
+            ? [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+            : [GridItem(.flexible())]
+    }
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "View", norwegian: "Visning"
+                    ))
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Spacer()
+                    ATHLTHLibraryDisplayPicker(selection: $displayMode)
+                }
                 HStack(spacing: 10) {
                     Button {
                         showingRunningBuilder = true
@@ -2775,6 +2791,7 @@ struct MyWorkoutTemplatesView: View {
                     ))
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(ATHLTHTheme.mutedText)
+                    LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(runningLibrary.customTemplates) { workout in
                         NavigationLink {
                             RunningWorkoutDetailView(
@@ -2808,6 +2825,7 @@ struct MyWorkoutTemplatesView: View {
                             .athlthPlanCard(radius: 18)
                         }
                         .buttonStyle(.plain)
+                    }
                     }
                 }
 
@@ -2881,10 +2899,10 @@ struct MyWorkoutTemplatesView: View {
                     )
                     .padding(.top, 60)
                 } else {
-                    ForEach(
-                        session.savedWorkoutTemplates
-                    ) { workout in
-                        savedWorkoutCard(workout)
+                    LazyVGrid(columns: libraryColumns, spacing: 10) {
+                        ForEach(session.savedWorkoutTemplates) { workout in
+                            savedWorkoutCard(workout)
+                        }
                     }
                 }
             }
@@ -2903,7 +2921,16 @@ struct MyWorkoutTemplatesView: View {
         .sheet(isPresented: $showingHybridBuilder) {
             WorkoutTemplateBuilderView()
         }
-        .onAppear(perform: refreshHistory)
+        .onAppear {
+            refreshHistory()
+            displayMode = .load(userID: session.profile.userID)
+        }
+        .onChange(of: session.profile.userID) { _, id in
+            displayMode = .load(userID: id)
+        }
+        .onChange(of: displayMode) { _, mode in
+            mode.save(userID: session.profile.userID)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             refreshHistory()
         }
@@ -2934,6 +2961,7 @@ struct MyWorkoutTemplatesView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(workout.title)
                         .font(.headline)
+                        .lineLimit(displayMode == .grid ? 2 : 3)
 
                     Text(savedWorkoutSubtitle(workout))
                         .font(.caption)
@@ -2966,7 +2994,7 @@ struct MyWorkoutTemplatesView: View {
                 .buttonStyle(.plain)
             }
 
-            if workout.isStructuredWorkout {
+            if workout.isStructuredWorkout && displayMode == .list {
                 HStack(spacing: 7) {
                     ForEach(
                         workout.resolvedWorkoutBlocks
