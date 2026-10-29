@@ -69,6 +69,32 @@ enum ATHLTHPlannedWorkoutType: String, CaseIterable, Codable, Hashable, Identifi
 
     var catalogCategory: String { rawValue.capitalized }
 
+    /// The shared PlannedSession model uses a category to distinguish cycling
+    /// from generic custom sessions. No duplicate cycling workout engine.
+    var scratchWorkoutKind: WorkoutKind {
+        switch self {
+        case .strength: return .strength
+        case .running: return .running
+        case .walking: return .walking
+        case .cycling: return .custom
+        case .mobility: return .mobility
+        case .custom: return .custom
+        }
+    }
+
+    /// An optional first editable block in the existing timeline composer.
+    /// A scratch workout contains no saved program or preselected loads.
+    var scratchQuickAdd: String? {
+        switch self {
+        case .strength: return "exercise"
+        case .running: return "running"
+        case .walking: return "walking"
+        case .cycling: return "cycling"
+        case .mobility: return "stretching"
+        case .custom: return nil
+        }
+    }
+
     /// Use the saved activity and category, rather than guessing from title.
     func matches(_ workout: PlannedSession) -> Bool {
         let category = workout.workoutCategory?.lowercased() ?? ""
