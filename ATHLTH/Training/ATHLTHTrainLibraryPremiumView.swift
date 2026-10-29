@@ -6,6 +6,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let onOpenPlan: () -> Void
     var onOpenSelectedPlan: ((UUID) -> Void)? = nil
@@ -18,6 +19,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
     @State private var queryInput = ""
     @State private var exerciseGroup = ""
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
+    @State private var libraryViewWidth: CGFloat = 390
     @State private var selectedTemplate: TrainingPlan?
     @State private var selectedCatalogPlan: TrainingPlanCatalogEntry?
     @State private var selectedWorkout: PlannedSession?
@@ -127,6 +129,9 @@ struct ATHLTHTrainLibraryPremiumView: View {
         }
         .foregroundStyle(ink)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
+            libraryViewWidth = width
+        }
         .onAppear {
             displayMode = .load(userID: session.profile.userID)
             if startWithWorkouts {
@@ -199,9 +204,12 @@ struct ATHLTHTrainLibraryPremiumView: View {
     }
 
     private var libraryColumns: [GridItem] {
-        displayMode == .grid
-            ? [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
-            : [GridItem(.flexible())]
+        ATHLTHLibraryGridColumns.make(
+            mode: displayMode,
+            width: libraryViewWidth,
+            reservedHorizontalSpace: 35,
+            accessibilityText: dynamicTypeSize.isAccessibilitySize
+        )
     }
 
     @ViewBuilder
@@ -222,7 +230,7 @@ struct ATHLTHTrainLibraryPremiumView: View {
                     .lineLimit(3)
                 Spacer(minLength: 0)
             }
-            .frame(maxWidth: .infinity, minHeight: 131, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 148, alignment: .topLeading)
             .padding(13)
             .librarySurface(line: line)
         } else {
