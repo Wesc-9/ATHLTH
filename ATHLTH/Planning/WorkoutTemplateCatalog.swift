@@ -738,6 +738,7 @@ struct WorkoutTemplateLibraryView: View {
     @State private var selectedRunningDuration:
         ATHLTHWorkoutDiscoveryFilter.Duration = .any
     @State private var selectedDiscoverySort: DiscoverySort = .recommended
+    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
 
     private enum DiscoverySort: String, CaseIterable, Identifiable {
         case recommended, shortest, longest
@@ -1196,6 +1197,14 @@ struct WorkoutTemplateLibraryView: View {
                     }
                 }
 
+                HStack {
+                    Text(ATHLTHLocalization.choose(english: "View", norwegian: "Visning"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Spacer()
+                    ATHLTHLibraryDisplayPicker(selection: $displayMode)
+                }
+
                 ScrollView(
                     .horizontal,
                     showsIndicators: false
@@ -1305,6 +1314,7 @@ struct WorkoutTemplateLibraryView: View {
                         norwegian: "Fra dine planer"
                     ))
                     .font(.headline)
+                    LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(filteredScheduledWorkouts.prefix(50)) { workout in
                         Button {
                             if initialCategory != nil {
@@ -1331,7 +1341,7 @@ struct WorkoutTemplateLibraryView: View {
                                 Image(systemName: "chevron.right")
                                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             }
-                                if initialCategory != nil {
+                                if initialCategory != nil && displayMode == .list {
                                     ATHLTHWorkoutContentsPreview(workout: workout)
                                 }
                             }
@@ -1341,11 +1351,13 @@ struct WorkoutTemplateLibraryView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    }
                 }
 
                 if onSelectPlanned != nil && !filteredSavedWorkouts.isEmpty {
                     Text(ATHLTHLocalization.choose(english: "My workouts", norwegian: "Mine økter"))
                         .font(.headline)
+                    LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(filteredSavedWorkouts) { workout in
                         Button {
                             if initialCategory != nil {
@@ -1361,7 +1373,7 @@ struct WorkoutTemplateLibraryView: View {
                                     Spacer()
                                     Image(systemName: "plus.circle.fill")
                                 }
-                                if initialCategory != nil {
+                                if initialCategory != nil && displayMode == .list {
                                     ATHLTHWorkoutContentsPreview(workout: workout)
                                 }
                             }
@@ -1369,6 +1381,7 @@ struct WorkoutTemplateLibraryView: View {
                             .background(.white, in: RoundedRectangle(cornerRadius: 16))
                         }
                         .buttonStyle(.plain)
+                    }
                     }
                 }
                 if filteredEntries.isEmpty && filteredRunningTemplates.isEmpty &&
@@ -1403,6 +1416,7 @@ struct WorkoutTemplateLibraryView: View {
                     }
                     .padding(.top, 25)
                 } else {
+                    LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(filteredEntries) { entry in
                         ZStack(alignment: .topTrailing) {
                             Group {
@@ -1414,14 +1428,14 @@ struct WorkoutTemplateLibraryView: View {
                                         chooseCatalogForPlan(entry)
                                     }
                                 } label: {
-                                    workoutCard(entry)
+                                    catalogTile(entry)
                                 }
                                 .buttonStyle(.plain)
                             } else {
                                 NavigationLink {
                                     WorkoutTemplateDetailView(entry: entry)
                                 } label: {
-                                    workoutCard(entry)
+                                    catalogTile(entry)
                                 }
                                 .buttonStyle(.plain)
                                 }
@@ -1465,7 +1479,7 @@ struct WorkoutTemplateLibraryView: View {
                                         chooseRunningForPlan(workout)
                                     }
                                 } label: {
-                                    runningWorkoutCard(workout)
+                                    runningTile(workout)
                                 }
                                 .buttonStyle(.plain)
                             } else {
@@ -1477,7 +1491,7 @@ struct WorkoutTemplateLibraryView: View {
                                         onStart: onStartRunning
                                     )
                                 } label: {
-                                    runningWorkoutCard(workout)
+                                    runningTile(workout)
                                 }
                                 .buttonStyle(.plain)
                                 }
@@ -1503,6 +1517,7 @@ struct WorkoutTemplateLibraryView: View {
                             )
                             .padding(12)
                         }
+                    }
                     }
                 }
             }
@@ -1633,7 +1648,16 @@ struct WorkoutTemplateLibraryView: View {
                 }
             }
         }
-        .onAppear(perform: loadHistory)
+        .onAppear {
+            loadHistory()
+            displayMode = .load(userID: session.profile.userID)
+        }
+        .onChange(of: session.profile.userID) { _, userID in
+            displayMode = .load(userID: userID)
+        }
+        .onChange(of: displayMode) { _, mode in
+            mode.save(userID: session.profile.userID)
+        }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             loadHistory()
         }
@@ -1864,6 +1888,63 @@ struct WorkoutTemplateLibraryView: View {
             ATHLTHTheme.accentSoft.opacity(0.3),
             in: RoundedRectangle(cornerRadius: 21)
         )
+    }
+
+    private var libraryColumns: [GridItem] {
+        displayMode == .grid
+            ? [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)]
+            : [GridItem(.flexible())]
+    }
+
+    @ViewBuilder
+    private func catalogTile(_ entry: WorkoutTemplateCatalogEntry) -> some View {
+        if displayMode == .grid {
+            workoutGridCard(
+                title: entry.title,
+                subtitle: entry.categoryTitle,
+                symbol: entry.systemImage
+            )
+        } else {
+            workoutCard(entry)
+        }
+    }
+
+    @ViewBuilder
+    private func runningTile(_ workout: RunningWorkoutTemplate) -> some View {
+        if displayMode == .grid {
+            workoutGridCard(
+                title: workout.title,
+                subtitle: workout.type.title,
+                symbol: workout.type.systemImage
+            )
+        } else {
+            runningWorkoutCard(workout)
+        }
+    }
+
+    private func workoutGridCard(
+        title: String, subtitle: String, symbol: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .light))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 44, height: 44)
+                .background(ATHLTHTheme.accentSoft,
+                            in: RoundedRectangle(cornerRadius: 13))
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .lineLimit(2)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .lineLimit(2)
+            Spacer(minLength: 0)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, minHeight: 145, alignment: .topLeading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 18))
     }
 
     private func workoutCard(
