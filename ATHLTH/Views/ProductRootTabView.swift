@@ -3685,7 +3685,24 @@ struct ATHLTHHomeView: View {
             return
         }
 
-        let workouts = session.plannedSessions(on: Date(), in: plan)
+        let today = session.plannedSessions(on: Date(), in: plan)
+            .filter { !$0.isExplicitRestDay
+                && PlannedWorkoutWatchBuilder.watchKind(for: $0.kind) != nil }
+        let workouts: [PlannedSession] = {
+            if !today.isEmpty { return today }
+            // On rest days show the next planned workout on Watch home,
+            // without changing the athlete's actual weekly plan.
+            for offset in 1...7 {
+                guard let date = Calendar.current.date(
+                    byAdding: .day, value: offset, to: Date()
+                ) else { continue }
+                let next = session.plannedSessions(on: date, in: plan)
+                    .filter { !$0.isExplicitRestDay
+                        && PlannedWorkoutWatchBuilder.watchKind(for: $0.kind) != nil }
+                if !next.isEmpty { return next }
+            }
+            return []
+        }()
         var transfers: [WatchTodayWorkoutTransfer] = []
         for workout in workouts {
             guard let watchKind = PlannedWorkoutWatchBuilder.watchKind(

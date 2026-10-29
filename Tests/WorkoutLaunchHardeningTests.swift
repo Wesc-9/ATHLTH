@@ -2,6 +2,36 @@ import XCTest
 @testable import ATHLTH
 
 final class WorkoutLaunchHardeningTests: XCTestCase {
+    func testPreparedWatchWorkoutRemainsManualAfterCoding() throws {
+        let prepared = WatchPreparedWorkoutTransfer(
+            id: UUID(), title: "Strength", summary: "5 exercises",
+            kind: .strength, routeID: nil,
+            runningWorkout: nil, audioCoach: nil,
+            indoor: false, startMode: .onWatch, updatedAt: Date()
+        )
+        let restored = try JSONDecoder().decode(
+            WatchPreparedWorkoutTransfer.self,
+            from: JSONEncoder().encode(prepared))
+        XCTAssertEqual(restored.startMode, .onWatch)
+        XCTAssertEqual(restored.kind, .strength)
+        XCTAssertNil(restored.strengthWorkout)
+    }
+
+    func testWatchTodaySnapshotRetainsFutureSession() {
+        let workout = WatchTodayWorkoutTransfer(
+            planID: UUID(), workoutID: UUID(), title: "Interval",
+            summary: "45 min", kind: .running,
+            scheduledStart: Date().addingTimeInterval(2 * 86_400),
+            durationMinutes: 45, distanceKilometers: nil, routeID: nil,
+            runningWorkout: nil, audioCoach: nil, updatedAt: Date()
+        )
+        let snapshot = WatchTodaySnapshot(
+            workout: workout, updatedAt: Date(), workouts: [workout])
+        XCTAssertEqual(snapshot.scheduledWorkouts.first?.workoutID,
+                       workout.workoutID)
+    }
+
+
     func testFreeStrengthDraftDefaultsAreNotAnExercisePrescription() {
         var snapshot = WatchStrengthSessionSnapshot(
             workoutID: UUID(), title: "Strength", exerciseIndex: 0,

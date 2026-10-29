@@ -197,11 +197,17 @@ final class WatchRouteStore: NSObject, ObservableObject {
     private func loadTodayWorkouts() {
         guard let data = UserDefaults.standard.data(forKey: todayWorkoutsDefaultsKey),
               let snapshot = try? JSONDecoder().decode(WatchTodaySnapshot.self, from: data),
-              Calendar.current.isDateInToday(snapshot.updatedAt) else {
+              Date().timeIntervalSince(snapshot.updatedAt) < 8 * 86_400 else {
             todayWorkouts = todayWorkout.map { [$0] } ?? []
             return
         }
-        todayWorkouts = snapshot.scheduledWorkouts
+        let startOfToday = Calendar.current.startOfDay(for: Date())
+        todayWorkouts = snapshot.scheduledWorkouts.filter { workout in
+            guard let start = workout.scheduledStart else {
+                return Calendar.current.isDateInToday(snapshot.updatedAt)
+            }
+            return start >= startOfToday
+        }
     }
 
     private func storeTodayWorkouts(_ workouts: [WatchTodayWorkoutTransfer]) {
