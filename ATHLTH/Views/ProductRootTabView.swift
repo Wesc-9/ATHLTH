@@ -793,6 +793,8 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var ghostRace: GhostRaceStore
 
     @State private var homeStreakDays: [Date]?
+    @State private var lastHomeInitialLoadAt: Date?
+    @State private var homeInitialLoadAccountID: UUID?
     @State private var showingGlobalSearch = false
     @State private var showingHomeTodayCalendarAll = false
     @State private var showingHomeCalendarWorkoutPicker = false
@@ -1381,7 +1383,7 @@ struct ATHLTHHomeView: View {
                     showingGettingStartedPopup = true
                 }
             }
-            .task(id: isActive) {
+            .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
                 homeWeather.refreshIfNeeded()
 
@@ -1389,7 +1391,16 @@ struct ATHLTHHomeView: View {
                 // The compatibility preview is intentionally data-static so
                 // smoke tests measure rendering rather than backend latency.
                 await Task.yield()
-                guard !session.previewModeEnabled else {
+                guard !session.previewModeEnabled, !Task.isCancelled else {
+                    return
+                }
+
+                // Switching rapidly between tabs should not relaunch every
+                // Home network, HealthKit, and streak query. Refreshable and
+                // store notifications still update explicit/new data.
+                if homeInitialLoadAccountID == session.profile.userID,
+                   let lastHomeInitialLoadAt,
+                   Date().timeIntervalSince(lastHomeInitialLoadAt) < 90 {
                     return
                 }
 
@@ -1433,6 +1444,9 @@ struct ATHLTHHomeView: View {
                     groupRefresh,
                     activityRefresh
                 )
+                guard !Task.isCancelled else { return }
+                homeInitialLoadAccountID = session.profile.userID
+                lastHomeInitialLoadAt = Date()
             }
             .onChange(of: strengthWorkout.workoutHistory.count) {
                 syncHomeTodayWorkoutToWatch()
