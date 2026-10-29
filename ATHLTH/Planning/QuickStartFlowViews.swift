@@ -2295,6 +2295,7 @@ struct RunQuickStartSheet: View {
                     isAdvancedSetup &&
                     guidanceRoute != nil &&
                     ghostDraft.enabled &&
+                    ghostDraft.targetDuration != nil &&
                     ghostDraft.updatesEnabled
                         ? settings
                             .ghostRaceAudioConfiguration
