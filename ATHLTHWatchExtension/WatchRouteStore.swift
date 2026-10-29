@@ -788,8 +788,10 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 .syncWorkoutActivityStateToPhone()
         } else if activated {
             companionLinked = false
+            // WCSession reachability is false when the companion iPhone
+            // app sleeps. That does not make Watch workouts unavailable.
             connectionText =
-                "iPhone not reachable"
+                "Watch ready · iPhone in background"
             spotifyPlaybackState =
                 .unavailable
         }
