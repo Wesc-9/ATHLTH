@@ -110,6 +110,11 @@ struct ATHLTHInsightsView: View {
             .onReceive(strength.$workoutHistory) { history in
                 muscleSummary = ATHLTHInsightsMuscleSummary.make(from: history)
             }
+            .onReceive(NotificationCenter.default.publisher(
+                for: Notification.Name("athlth.dailyCheckInDidUpdate")
+            )) { _ in
+                checkInStore.reloadFromStorage()
+            }
         }
     }
 
@@ -136,7 +141,7 @@ struct ATHLTHInsightsView: View {
     private var overviewSection: some View {
         Group {
             readinessOverviewCard
-            signalPerspectiveCard
+            personalInsightsHighlights
         }
     }
     private var trainingSection: some View {
@@ -152,6 +157,7 @@ struct ATHLTHInsightsView: View {
     private var developmentSection: some View {
         Group {
             whatChangedCard
+            personalInsightsLibrary
             ATHLTHInsightsDailyCheckInCard(store: checkInStore) {
                 showingCheckIn = true
             }
@@ -159,50 +165,38 @@ struct ATHLTHInsightsView: View {
         }
     }
 
-    private var signalPerspectiveCard: some View {
-        let recent = recoverySnapshot.days.suffix(7)
-        let hrv = recent.compactMap(\.hrvMilliseconds)
-        let sleep = recent.compactMap { $0.sleepDuration.map { $0 / 3600 } }
-        let number: String
-        let description: String
-        if hrv.count >= 3, let latest = hrv.last {
-            let previous = hrv.dropLast().reduce(0, +) / Double(hrv.count - 1)
-            number = String(format: "%+.0f %%", previous > 0 ?
-                            (latest - previous) / previous * 100 : 0)
-            description = tr(
-                "Latest measured HRV compared with earlier days. Day-to-day variation is not a diagnosis.",
-                "Siste målte HRV sammenlignet med tidligere dager. Daglige variasjoner er ikke en diagnose."
-            )
-        } else if sleep.count >= 3, let latest = sleep.last {
-            let previous = sleep.dropLast().reduce(0, +) / Double(sleep.count - 1)
-            number = String(format: "%+.0f min", (latest - previous) * 60)
-            description = tr(
-                "Last recorded sleep compared with preceding measured nights.",
-                "Siste registrerte søvn sammenlignet med tidligere målte netter."
-            )
-        } else {
-            number = "—"
-            description = tr(
-                "Your own comparison appears after several measured days in Apple Health.",
-                "Din personlige sammenligning vises etter flere dager med målinger i Apple Health."
-            )
-        }
-        return VStack(alignment: .leading, spacing: 10) {
-            Label(tr("Your latest signal", "Ditt siste signal"),
-                  systemImage: "waveform.path.ecg")
-                .font(.system(size: 19, weight: .semibold, design: .serif))
-                .foregroundStyle(ATHLTHInsightsStyle.ink)
-            Text(number)
-                .font(.system(size: 34, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(ATHLTHInsightsStyle.accent)
-            Text(description)
-                .font(.subheadline)
-                .foregroundStyle(ATHLTHInsightsStyle.muted)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(17)
-        .athlthInsightsSurface()
+    /// All observations are compared locally. No health data is sent to
+    /// external services simply by browsing Insights.
+    private var personalFindings: [ATHLTHPersonalInsight] {
+        ATHLTHPersonalInsightEngine.findings(
+            days: recoverySnapshot.days,
+            checkIns: checkInStore.entries,
+            stepsChangePercent: trendSnapshot?.stepsChangePercent,
+            trainingChangePercent: trendSnapshot?.trainingDurationChangePercent,
+            averageDailySteps: trendSnapshot?.averageDailySteps
+        )
+    }
+
+    private var personalInsightsHighlights: some View {
+        ATHLTHPersonalInsightsView(
+            findings: personalFindings,
+            maxVisible: 2,
+            onShowAll: {
+                selectedSection = .development
+            },
+            onCheckIn: {
+                showingCheckIn = true
+            }
+        )
+    }
+
+    private var personalInsightsLibrary: some View {
+        ATHLTHPersonalInsightsView(
+            findings: personalFindings,
+            onCheckIn: {
+                showingCheckIn = true
+            }
+        )
     }
 
     private var trainingRhythmCard: some View {
@@ -272,7 +266,9 @@ struct ATHLTHInsightsView: View {
             recoverySnapshot = .empty
             return
         }
-        recoverySnapshot = await health.recoveryTrendSnapshot(days: 7)
+        // Need enough paired days for meaningful personal comparisons.
+        // HealthKit caches each time range to avoid unnecessary repeat work.
+        recoverySnapshot = await health.recoveryTrendSnapshot(days: 28)
     }
 
     private var dailyRecommendationCard: some View {
