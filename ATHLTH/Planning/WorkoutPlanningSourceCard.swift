@@ -6,6 +6,7 @@ struct WorkoutPlanningSourceCard: View {
     let context: String
     let onCreateNew: () -> Void
     let onUsePlanned: () -> Void
+    let onResumeDraft: (() -> Void)?
     let onRecoveryRest: (() -> Void)?
     let onRestDay: (() -> Void)?
 
@@ -13,12 +14,14 @@ struct WorkoutPlanningSourceCard: View {
         context: String,
         onCreateNew: @escaping () -> Void,
         onUsePlanned: @escaping () -> Void,
+        onResumeDraft: (() -> Void)? = nil,
         onRecoveryRest: (() -> Void)? = nil,
         onRestDay: (() -> Void)? = nil
     ) {
         self.context = context
         self.onCreateNew = onCreateNew
         self.onUsePlanned = onUsePlanned
+        self.onResumeDraft = onResumeDraft
         self.onRecoveryRest = onRecoveryRest
         self.onRestDay = onRestDay
     }
@@ -45,6 +48,38 @@ struct WorkoutPlanningSourceCard: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(.bottom, 1)
+
+            if let onResumeDraft {
+                Button(action: onResumeDraft) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "arrow.counterclockwise.circle.fill")
+                            .font(.title3)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Continue saved draft",
+                                norwegian: "Fortsett lagret utkast"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Pick up where you left off.",
+                                norwegian: "Fortsett der du avsluttet sist."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        }
+                        Spacer(minLength: 4)
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, minHeight: 56)
+                    .background(ATHLTHTheme.surfaceStone.opacity(0.7),
+                                in: RoundedRectangle(cornerRadius: 18))
+                }
+                .buttonStyle(.plain)
+            }
 
             HStack(alignment: .top, spacing: 12) {
                 sourceTile(

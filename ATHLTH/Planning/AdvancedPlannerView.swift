@@ -5469,6 +5469,7 @@ struct SessionEditorView: View {
     let preserveSourceID: Bool
 
     @State private var hasSelectedWorkoutSource = false
+    @State private var hasStoredStandaloneDraft = false
     @State private var prioritizePartnerPlanning = false
     @State private var title = ""
     @State private var kind: WorkoutKind = .strength
@@ -6176,12 +6177,24 @@ struct SessionEditorView: View {
                 norwegian: "Den samme øktmotoren brukes for egen planlegging og Train Together."
             ),
             onCreateNew: {
+                // A fresh workout must not silently inherit old draft values.
+                discardStoredStandaloneDraft()
                 hasSelectedWorkoutSource = true
                 title = ""
             },
             onUsePlanned: {
                 showingSavedWorkoutPicker = true
             },
+            onResumeDraft: hasStoredStandaloneDraft
+                ? {
+                    // Resume only after an explicit choice, preserving all
+                    // details previously stored in the workout draft.
+                    draftRestored = false
+                    restoreDraftIfNeeded()
+                    hasSelectedWorkoutSource = true
+                    hasStoredStandaloneDraft = false
+                }
+                : nil,
             onRecoveryRest: onPreparedWorkout == nil
                 ? { showingRecoveryRestPlanner = true }
                 : nil,
@@ -6463,6 +6476,7 @@ struct SessionEditorView: View {
                     if existingWorkout == nil {
                         title = ""
                     }
+                    discardStoredStandaloneDraft()
                     hasSelectedWorkoutSource = true
                     showingSavedWorkoutPicker = false
                     })
@@ -6605,18 +6619,36 @@ struct SessionEditorView: View {
                 let existingDraft = UserDefaults.standard.data(
                     forKey: draftStorageKey
                 ) != nil
-                restoreDraftIfNeeded()
-                if isStandalone && existingWorkout == nil {
-                    if !hasSelectedWorkoutSource {
-                        if !existingDraft, let initialSourceWorkout {
-                            applySavedWorkout(initialSourceWorkout)
-                            if !preserveSourceID { title = "" }
-                        }
-                        hasSelectedWorkoutSource = existingDraft ||
-                            initialSourceWorkout != nil
+                if SessionEditorEntryRouting.requiresSourceChoice(
+                    isStandalone: isStandalone,
+                    hasExistingWorkout: existingWorkout != nil,
+                    hasInitialSource: initialSourceWorkout != nil,
+                    isPreparedWorkout: onPreparedWorkout != nil,
+                    hasDirectPartner: directPartnerID != nil,
+                    hasSavedDraft: existingDraft
+                ) {
+                    // Never auto-resume a saved draft just because it exists.
+                    // Initialise only once: a returning sheet must not reset
+                    // the athlete's already selected workout source.
+                    if !draftRestored {
+                        hasStoredStandaloneDraft = existingDraft
+                        draftRestored = true
+                        hasSelectedWorkoutSource = false
                     }
                 } else {
-                    hasSelectedWorkoutSource = true
+                    restoreDraftIfNeeded()
+                    if isStandalone && existingWorkout == nil {
+                        if !hasSelectedWorkoutSource {
+                            if !existingDraft, let initialSourceWorkout {
+                                applySavedWorkout(initialSourceWorkout)
+                                if !preserveSourceID { title = "" }
+                            }
+                            hasSelectedWorkoutSource = existingDraft ||
+                                initialSourceWorkout != nil
+                        }
+                    } else {
+                        hasSelectedWorkoutSource = true
+                    }
                 }
                 if social.trainingPartners.isEmpty {
                     Task { await social.refresh() }
@@ -10074,6 +10106,13 @@ struct SessionEditorView: View {
             context = "day.\(planID?.uuidString ?? "active").\(dayID?.uuidString ?? "unknown")"
         }
         return "athlth.sessionEditor.draft.v1.\(session.profile.userID.uuidString).\(context)"
+    }
+
+    private func discardStoredStandaloneDraft() {
+        guard isStandalone, existingWorkout == nil,
+              onPreparedWorkout == nil else { return }
+        UserDefaults.standard.removeObject(forKey: draftStorageKey)
+        hasStoredStandaloneDraft = false
     }
 
     private func persistDraft() {

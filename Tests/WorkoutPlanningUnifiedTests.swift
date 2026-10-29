@@ -18,6 +18,46 @@ final class WorkoutPlanningUnifiedTests: XCTestCase {
         )
     }
 
+    func testManualStandaloneAlwaysOffersSourceSelectionWithAndWithoutDraft() {
+        for hasDraft in [false, true] {
+            XCTAssertTrue(SessionEditorEntryRouting.requiresSourceChoice(
+                isStandalone: true,
+                hasExistingWorkout: false,
+                hasInitialSource: false,
+                isPreparedWorkout: false,
+                hasDirectPartner: false,
+                hasSavedDraft: hasDraft
+            ))
+        }
+    }
+
+    func testExistingAndPartnerWorkoutsPreserveDirectEditingRoutes() {
+        XCTAssertFalse(SessionEditorEntryRouting.requiresSourceChoice(
+            isStandalone: false,
+            hasExistingWorkout: true,
+            hasInitialSource: false,
+            isPreparedWorkout: false,
+            hasDirectPartner: false,
+            hasSavedDraft: true
+        ))
+        XCTAssertFalse(SessionEditorEntryRouting.requiresSourceChoice(
+            isStandalone: true,
+            hasExistingWorkout: false,
+            hasInitialSource: true,
+            isPreparedWorkout: false,
+            hasDirectPartner: false,
+            hasSavedDraft: true
+        ))
+        XCTAssertFalse(SessionEditorEntryRouting.requiresSourceChoice(
+            isStandalone: true,
+            hasExistingWorkout: false,
+            hasInitialSource: false,
+            isPreparedWorkout: false,
+            hasDirectPartner: true,
+            hasSavedDraft: true
+        ))
+    }
+
     func testPrivateWorkoutProposalDoesNotMutateOriginal() throws {
         let original = makeWorkout()
         var modified = original
