@@ -154,6 +154,14 @@ struct ATHLTHAudioCoachStudioView: View {
         }
     }
 
+    private var randomCadenceTitle: String {
+        let seconds = settings.audioCoachSmartSettings.randomIntervalSeconds
+        let minutes = seconds / 60
+        let remainder = seconds % 60
+        return remainder == 0 ? "\(minutes) min"
+            : "\(minutes) min \(remainder) sek"
+    }
+
     private var motivationCard: some View {
         studioCard(
             title: ATHLTHLocalization.choose(
@@ -217,8 +225,8 @@ struct ATHLTHAudioCoachStudioView: View {
                         in: 90...900, step: 30
                     ) {
                         Text(ATHLTHLocalization.choose(
-                            english: "Average every \(settings.audioCoachSmartSettings.randomIntervalSeconds / 60) min",
-                            norwegian: "I snitt hvert \(settings.audioCoachSmartSettings.randomIntervalSeconds / 60). min"
+                            english: "Average every \(randomCadenceTitle)",
+                            norwegian: "I snitt hvert \(randomCadenceTitle)"
                         ))
                         .font(.subheadline)
                     }
