@@ -207,7 +207,7 @@ struct WatchHomeView: View {
                             norwegian: "iPhone tilkoblet"
                         )
                         : ATHLTHLocalization.choose(
-                            english: "Watch can record independently",
+                            english: "Watch ready for standalone workouts",
                             norwegian: "Klokken kan registrere økter alene"
                         )
                 )
@@ -844,7 +844,7 @@ struct WatchHomeView: View {
                     routeStore
                         .companionLinked
                     ? "iphone.radiowaves.left.and.right"
-                    : "iphone.slash"
+                    : "applewatch"
             )
             .font(
                 .system(size: 10)
@@ -858,7 +858,7 @@ struct WatchHomeView: View {
                     )
                 } else {
                     Text(
-                        "Watch can record independently"
+                        "Watch ready for standalone workouts"
                     )
                 }
             }
