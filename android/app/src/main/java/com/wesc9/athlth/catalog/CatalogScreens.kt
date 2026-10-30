@@ -58,6 +58,8 @@ fun TrainingCatalogScreen() {
     LaunchedEffect(account) { refresh() }
 
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        com.wesc9.athlth.ui.PremiumHero("TrainHero.jpg", "Din trening")
+        com.wesc9.athlth.training.WorkoutTimerPreview()
         Text("TRAIN", style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.SemiBold)
         Text("Tren smartere, med samme ATHLTH-bibliotek som på iPhone.",
