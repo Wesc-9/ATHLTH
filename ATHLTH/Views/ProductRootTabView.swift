@@ -5257,10 +5257,13 @@ private struct HomeHeroUtilityButtons: View {
         ATHLTHNotificationStore
     @EnvironmentObject private var messaging:
         MessagingStore
+    @Environment(\.accessibilityReduceMotion)
+    private var reduceMotion
 
     let weather: HomeWeatherSnapshot?
     let challengeInviteUnreadCount: Int
     let pendingWorkoutImportCount: Int
+    @Binding var expanded: Bool
     let onSearch: () -> Void
 
     private var inboxUnreadCount: Int {
@@ -5276,67 +5279,167 @@ private struct HomeHeroUtilityButtons: View {
 
     var body: some View {
         HStack(spacing: 0) {
+            Button(action: toggleExpanded) {
+                ZStack(alignment: .topTrailing) {
+                    Image(systemName: expanded
+                          ? "chevron.right" : "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.94))
+                        .frame(width: 29, height: 29)
+                        .background(Color.black.opacity(0.22), in: Circle())
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
+                                    Color.white.opacity(0.22),
+                                    lineWidth: 0.6
+                                )
+                                .allowsHitTesting(false)
+                        }
+
+                    // Surface pending updates even in the compact state.
+                    if !expanded &&
+                        (inboxUnreadCount > 0 || notificationCount > 0) {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 7, height: 7)
+                            .offset(x: 1, y: -1)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .frame(width: 42, height: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: expanded
+                    ? "Hide Home shortcuts" : "Show Home shortcuts",
+                norwegian: expanded
+                    ? "Skjul snarveier på Hjem"
+                    : "Vis snarveier på Hjem"
+            ))
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Tap or drag the arrow horizontally.",
+                norwegian: "Trykk eller dra pilen vannrett."
+            ))
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 18, coordinateSpace: .local)
+                    .onEnded { value in
+                        finishHandleDrag(value.translation)
+                    }
+            )
+
+            weatherBadge
+
+            if expanded {
+                heroButton(
+                    icon: "magnifyingglass",
+                    action: onSearch
+                )
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Search ATHLTH",
+                    norwegian: "Søk i ATHLTH"
+                ))
+
+                NavigationLink {
+                    MessageInboxDestinationView()
+                } label: {
+                    badgeButton(
+                        icon: inboxUnreadCount > 0
+                            ? "tray.full.fill" : "tray",
+                        count: inboxUnreadCount
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: inboxUnreadCount > 0
+                        ? "Inbox, \(inboxUnreadCount) unread"
+                        : "Inbox",
+                    norwegian: inboxUnreadCount > 0
+                        ? "Innboks, \(inboxUnreadCount) uleste"
+                        : "Innboks"
+                ))
+
+                NavigationLink {
+                    ATHLTHNotificationCenterView()
+                } label: {
+                    badgeButton(
+                        icon: notificationCount > 0
+                            ? "bell.fill" : "bell",
+                        count: notificationCount
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: notificationCount > 0
+                        ? "Notifications, \(notificationCount) pending"
+                        : "Notifications",
+                    norwegian: notificationCount > 0
+                        ? "Varsler, \(notificationCount) nye"
+                        : "Varsler"
+                ))
+            }
+        }
+    }
+
+    private var weatherBadge: some View {
+        HStack(spacing: 4) {
             if let weather, weather.temperatureCelsius.isFinite {
-                HStack(spacing: 4) {
-                    Image(systemName: weather.symbolName)
-                        .symbolRenderingMode(.hierarchical)
-                        .font(.system(size: 13, weight: .medium))
-                    Text("\(Int(weather.temperatureCelsius.rounded()))°")
-                        .font(.system(size: 13, weight: .semibold, design: .rounded))
-                }
-                .foregroundStyle(.white)
-                .frame(width: 67, height: 36)
-                .background(Color.black.opacity(0.15), in: Capsule())
-                .overlay {
-                    Capsule().strokeBorder(.white.opacity(0.24), lineWidth: 0.7)
-                }
-                .accessibilityLabel(
-                    "\(Int(weather.temperatureCelsius.rounded())) grader" +
-                    (weather.locationName.map { ", \($0)" } ?? "")
-                )
+                Image(systemName: weather.symbolName)
+                    .symbolRenderingMode(.hierarchical)
+                    .font(.system(size: 13, weight: .medium))
+                Text("\(Int(weather.temperatureCelsius.rounded()))°")
+                    .font(.system(size: 13, weight: .semibold,
+                                  design: .rounded))
+            } else {
+                Image(systemName: "cloud.sun")
+                    .font(.system(size: 13, weight: .medium))
+                Text("—")
+                    .font(.system(size: 13, weight: .semibold,
+                                  design: .rounded))
             }
-
-            heroButton(
-                icon: "magnifyingglass",
-                action: onSearch
-            )
-            .accessibilityLabel("Search ATHLTH")
-
-            NavigationLink {
-                MessageInboxDestinationView()
-            } label: {
-                badgeButton(
-                    icon:
-                        inboxUnreadCount > 0
-                            ? "tray.full.fill"
-                            : "tray",
-                    count: inboxUnreadCount
+        }
+        .foregroundStyle(.white.opacity(0.94))
+        .frame(width: 67, height: 36)
+        .background(Color.black.opacity(0.20), in: Capsule())
+        .overlay {
+            Capsule()
+                .strokeBorder(
+                    Color.white.opacity(0.19),
+                    lineWidth: 0.6
                 )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                inboxUnreadCount > 0
-                    ? "Inbox, \(inboxUnreadCount) unread"
-                    : "Inbox"
-            )
+                .allowsHitTesting(false)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(weatherAccessibilityLabel)
+    }
 
-            NavigationLink {
-                ATHLTHNotificationCenterView()
-            } label: {
-                badgeButton(
-                    icon:
-                        notificationCount > 0
-                            ? "bell.fill"
-                            : "bell",
-                    count: notificationCount
-                )
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                notificationCount > 0
-                    ? "Notifications, \(notificationCount) pending"
-                    : "Notifications"
+    private var weatherAccessibilityLabel: String {
+        guard let weather, weather.temperatureCelsius.isFinite else {
+            return ATHLTHLocalization.choose(
+                english: "Weather not available",
+                norwegian: "Værdata ikke tilgjengelig"
             )
+        }
+        return "\(Int(weather.temperatureCelsius.rounded()))°" +
+            (weather.locationName.map { ", \($0)" } ?? "")
+    }
+
+    private func toggleExpanded() {
+        setExpanded(!expanded)
+    }
+
+    private func finishHandleDrag(_ translation: CGSize) {
+        let shouldExpand = ATHLTHHomeToolbarDragPolicy.expanded(
+            currentlyExpanded: expanded,
+            translation: translation
+        )
+        guard shouldExpand != expanded else { return }
+        setExpanded(shouldExpand)
+    }
+
+    private func setExpanded(_ value: Bool) {
+        withAnimation(reduceMotion ? nil : .smooth(duration: 0.26)) {
+            expanded = value
         }
     }
 
@@ -5349,9 +5452,9 @@ private struct HomeHeroUtilityButtons: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)
-                .background(Color.black.opacity(0.18), in: Circle())
+                .background(Color.black.opacity(0.16), in: Circle())
                 .overlay {
-                    Circle().strokeBorder(.white.opacity(0.24), lineWidth: 0.7)
+                    Circle().strokeBorder(.white.opacity(0.20), lineWidth: 0.6)
                 }
                 .frame(width: 42, height: 44)
                 .contentShape(Rectangle())
@@ -5368,9 +5471,9 @@ private struct HomeHeroUtilityButtons: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 34, height: 34)
-                .background(Color.black.opacity(0.18), in: Circle())
+                .background(Color.black.opacity(0.16), in: Circle())
                 .overlay {
-                    Circle().strokeBorder(.white.opacity(0.24), lineWidth: 0.7)
+                    Circle().strokeBorder(.white.opacity(0.20), lineWidth: 0.6)
                 }
                 .frame(width: 42, height: 44)
                 .contentShape(Rectangle())
