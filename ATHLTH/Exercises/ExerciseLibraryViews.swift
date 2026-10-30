@@ -967,6 +967,10 @@ struct ExerciseLibraryView: View {
                     }
                     .padding(.vertical, 2)
                 }
+                // A horizontal ScrollView has a flexible vertical ideal size.
+                // Bound its height so the search and equipment controls
+                // cannot be separated by unused space on tall iPhones.
+                .frame(height: dynamicTypeSize.isAccessibilitySize ? 62 : 48)
                 .onAppear {
                     proxy.scrollTo(selectedBodyPart, anchor: .center)
                 }
@@ -1002,7 +1006,7 @@ struct ExerciseLibraryView: View {
                                 : Color.primary
                         )
                         .padding(.horizontal, 11)
-                        .padding(.vertical, 7)
+                        .frame(minHeight: 44)
                         .background(
                             favoritesOnly
                                 ? ATHLTHTheme.accent
@@ -1057,9 +1061,12 @@ struct ExerciseLibraryView: View {
                             selectedEquipment = "All"
                         }
                         .font(.caption.weight(.semibold))
+                        .frame(minHeight: 44)
                     }
                 }
             }
+            // Keep the second horizontal filter strip compact as well.
+            .frame(height: dynamicTypeSize.isAccessibilitySize ? 62 : 44)
         }
         .padding(.horizontal)
         .padding(.top, 8)
@@ -1078,7 +1085,7 @@ struct ExerciseLibraryView: View {
                 )
                 .lineLimit(1)
                 .padding(.horizontal, 13)
-                .frame(height: 34)
+                .frame(minHeight: 44)
                 .background(
                     selected ? ATHLTHPlanDesign.ink : Color.white,
                     in: Capsule()
@@ -1103,7 +1110,7 @@ struct ExerciseLibraryView: View {
         .font(.caption.weight(.semibold))
         .foregroundStyle(active ? .white : .primary)
         .padding(.horizontal, 11)
-        .padding(.vertical, 7)
+        .frame(minHeight: 44)
         .background(
             active
                 ? ATHLTHTheme.accent
