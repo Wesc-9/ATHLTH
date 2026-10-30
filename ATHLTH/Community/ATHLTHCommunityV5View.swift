@@ -430,6 +430,7 @@ struct ATHLTHCommunityV5View: View {
                 }
                 .buttonStyle(.plain)
             }
+            clubsDirectory
             membersStrip
             if let invite = pendingClubInvitation {
                 invitationBanner(invite)
@@ -476,6 +477,7 @@ struct ATHLTHCommunityV5View: View {
                 }
                 .buttonStyle(.plain)
             }
+            upcomingEventsDirectory
         }
     }
 
@@ -485,6 +487,164 @@ struct ATHLTHCommunityV5View: View {
         HStack(alignment: .top, spacing: 10) {
             content()
         }
+    }
+
+
+    // MARK: - Clubs and events use the same reference cards, not V5 lists
+
+    private var clubsDirectory: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Explore clubs", norwegian: "Utforsk klubber"
+                    ),
+                    systemImage: "person.3.fill"
+                )
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+                Spacer()
+                Button {
+                    showSearch = true
+                } label: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Search", norwegian: "Søk"
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(CommunityReferenceStyle.gold)
+                }
+                .buttonStyle(.plain)
+            }
+
+            let suggested = matchingPublicClubs.prefix(8)
+            if suggested.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "No other clubs are available right now. Try searching.",
+                    norwegian: "Ingen andre klubber er tilgjengelige nå. Prøv å søke."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .padding(.vertical, 11)
+            } else {
+                ForEach(Array(suggested)) { club in
+                    NavigationLink {
+                        CommunityGroupDetailView(group: club)
+                    } label: {
+                        HStack(spacing: 11) {
+                            ATHLTHArtworkImage(
+                                reference: club.imageURL ?? club.headerImageURL,
+                                fallbackAssetName: "CommunityHero",
+                                maxPixelSize: 600
+                            )
+                            .athlthBoundedFill()
+                            .frame(width: 46, height: 46)
+                            .clipShape(Circle())
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(club.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(CommunityReferenceStyle.ink)
+                                    .lineLimit(1)
+                                Text(club.locationName.isEmpty
+                                    ? club.summary : club.locationName)
+                                    .font(.caption)
+                                    .foregroundStyle(CommunityReferenceStyle.muted)
+                                    .lineLimit(1)
+                            }
+                            Spacer(minLength: 3)
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(CommunityReferenceStyle.gold)
+                        }
+                        .padding(.vertical, 4)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if club.id != suggested.last?.id {
+                        Rectangle()
+                            .fill(CommunityReferenceStyle.edge.opacity(0.6))
+                            .frame(height: 0.6)
+                    }
+                }
+            }
+        }
+        .padding(15)
+        .communityReferenceCard()
+    }
+
+    private var upcomingEventsDirectory: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Upcoming club gatherings",
+                    norwegian: "Kommende klubbsamlinger"
+                ),
+                systemImage: "calendar"
+            )
+            .font(.system(size: 15, weight: .semibold))
+            .foregroundStyle(CommunityReferenceStyle.ink)
+
+            let laterEvents = groups.calendarEvents
+                .filter {
+                    $0.startsAt >= Date() &&
+                    $0.status != "cancelled" &&
+                    $0.id != upcomingGathering?.id
+                }
+                .prefix(6)
+
+            if laterEvents.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "No additional club gatherings scheduled.",
+                    norwegian: "Ingen flere klubbsamlinger er planlagt."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .padding(.vertical, 9)
+            } else {
+                ForEach(Array(laterEvents)) { event in
+                    if let club = groups.group(for: event.groupID) {
+                        NavigationLink {
+                            CommunityGroupEventDetailView(
+                                group: club, event: event
+                            )
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "calendar")
+                                    .foregroundStyle(CommunityReferenceStyle.gold)
+                                    .frame(width: 32, height: 32)
+                                    .background(
+                                        CommunityReferenceStyle.cream,
+                                        in: RoundedRectangle(cornerRadius: 10)
+                                    )
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(event.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(CommunityReferenceStyle.ink)
+                                        .lineLimit(1)
+                                    Text(event.startsAt.formatted(
+                                        .dateTime.weekday(.abbreviated)
+                                            .day().month(.abbreviated)
+                                            .hour().minute()
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(CommunityReferenceStyle.muted)
+                                    .lineLimit(1)
+                                }
+                                Spacer(minLength: 3)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(CommunityReferenceStyle.gold)
+                            }
+                            .padding(.vertical, 5)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(15)
+        .communityReferenceCard()
     }
 
     // MARK: - 2 x 2 editorial cards
