@@ -1567,7 +1567,7 @@ struct AppRootView: View {
         )
     }
 
-    private var lifecycleSocialContent: AnyView {
+    private var lifecycleSocialCalendarContent: AnyView {
         AnyView(
             lifecycleCompletionContent
         .onChange(of: settings.language) { _, _ in
@@ -1657,6 +1657,12 @@ struct AppRootView: View {
             guard appSession.signedIn else { return }
             Task { await syncCalendarIfAllowed() }
         }
+        )
+    }
+
+    private var lifecycleSocialPresenceContent: AnyView {
+        AnyView(
+            lifecycleSocialCalendarContent
         .onChange(of: appSession.standalonePlannedSessions) { _, _ in
             scheduleHomeAssistantSnapshotSync()
             guard appSession.signedIn else { return }
@@ -1708,6 +1714,12 @@ struct AppRootView: View {
                 )
             }
         }
+        )
+    }
+
+    private var lifecycleSocialContent: AnyView {
+        AnyView(
+            lifecycleSocialPresenceContent
         .onChange(of: settings.workoutRemindersEnabled) { _, _ in
             Task { await syncPushPreferences() }
         }
