@@ -68,6 +68,7 @@ struct ATHLTHCommunityV5View: View {
     @StateObject private var weather = HomeWeatherStore()
     @State private var tab: ATHLTHCommunityMainTab = .overview
     @State private var showSearch = false
+    @State private var showCreateClub = false
     @State private var query = ""
     @State private var joinMessage: String?
     @State private var respondingToInvite: UUID?
@@ -176,6 +177,9 @@ struct ATHLTHCommunityV5View: View {
             .ignoresSafeArea(.container, edges: .top)
             .background(CommunityReferenceStyle.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .sheet(isPresented: $showCreateClub) {
+                CommunityGroupCreateView()
+            }
             .task {
                 weather.refreshIfNeeded()
                 await refreshContent(force: false)
@@ -1132,6 +1136,18 @@ struct ATHLTHCommunityV5View: View {
             .autocorrectionDisabled()
             .padding(12)
             .background(CommunityReferenceStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
+
+            Button {
+                showCreateClub = true
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Create a club", norwegian: "Opprett klubb"
+                ), systemImage: "plus.circle")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(CommunityReferenceStyle.gold)
+                .frame(minHeight: 40)
+            }
+            .buttonStyle(.plain)
 
             if query.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 {
                 ForEach(Array(social.discoverResults.prefix(3))) { person in
