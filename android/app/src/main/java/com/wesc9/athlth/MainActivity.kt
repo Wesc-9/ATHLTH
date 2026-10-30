@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
 }
 
 private enum class Tab(val title: String) {
-    HOME("Hjem"), TRAIN("Trening"), PROFILE("Profil")
+    HOME("Hjem"), TRAIN("Trening"), COMMUNITY("Fellesskap"), PROFILE("Profil")
 }
 
 @Composable
@@ -135,7 +135,9 @@ private fun ATHLTHApp() {
                     style = MaterialTheme.typography.labelMedium, color = Gold)
 
                 when (tab) {
-                    Tab.HOME -> HomeScreen(
+                    Tab.HOME -> {
+                    com.wesc9.athlth.ui.PremiumHero("HomeHero.jpg", "Din fremgang, samlet")
+                    HomeScreen(
                         availability = health.availability(),
                         permissions = permissions,
                         overview = overview,
@@ -166,7 +168,9 @@ private fun ATHLTHApp() {
                             }
                         }
                     )
+                    }
                     Tab.TRAIN -> TrainScreen()
+                    Tab.COMMUNITY -> com.wesc9.athlth.community.CommunityScreen()
                     Tab.PROFILE -> ProfileScreen()
                 }
             }
@@ -253,6 +257,7 @@ private fun ProfileScreen() {
         }
     }
 
+    com.wesc9.athlth.ui.PremiumHero("ProfileHero.jpg", "Din profil")
     TitleAndSubtitle("ATHLTH-konto", "Samme konto som på iPhone.")
     ATHLTHCard {
         if (signedIn != null) {

@@ -2,6 +2,7 @@ package com.wesc9.athlth.auth
 
 import com.wesc9.athlth.BuildConfig
 import io.github.jan.supabase.auth.Auth
+import io.github.jan.supabase.postgrest.Postgrest
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.createSupabaseClient
@@ -14,6 +15,7 @@ object ATHLTHAuth {
     val client by lazy {
         createSupabaseClient(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_PUBLISHABLE_KEY) {
             install(Auth)
+            install(Postgrest)
         }
     }
 
