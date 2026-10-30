@@ -915,7 +915,13 @@ struct ATHLTHCommunityV5View: View {
             }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
-                    Button { showCreate = true } label: {
+                    NavigationLink {
+                        if let club = myClub, groups.canManage(club) {
+                            CommunityGroupInviteMemberView(group: club)
+                        } else {
+                            SocialHubView(initialTab: .feed)
+                        }
+                    } label: {
                         VStack(spacing: 5) {
                             Image(systemName: "plus")
                                 .font(.system(size: 18, weight: .light))
