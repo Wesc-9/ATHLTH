@@ -120,7 +120,7 @@ class ATHLTHHealthConnect(private val context: Context) {
                 )
                 result.records.forEach { record ->
                     record.samples.forEach { sample ->
-                        if (latestTime == null || sample.time > latestTime) {
+                        if (latestTime?.let { sample.time > it } ?: true) {
                             latestTime = sample.time
                             latestBpm = sample.beatsPerMinute
                         }
