@@ -1084,7 +1084,9 @@ struct ATHLTHCommunityV5View: View {
                         if let club = myClub, groups.canManage(club) {
                             CommunityGroupInviteMemberView(group: club)
                         } else {
-                            SocialHubView(initialTab: .feed)
+                            // Non-admins can find people; only club managers
+                            // may send membership invitations.
+                            SocialHubView(initialTab: .discover)
                         }
                     } label: {
                         VStack(spacing: 5) {
