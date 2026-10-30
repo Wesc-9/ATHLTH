@@ -1613,7 +1613,6 @@ struct TrainingPlanLibraryView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var favorites: LibraryFavoritesStore
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var onPlanCreated: (() -> Void)? = nil
     /// Dedicated Favorites view only. Not exposed as a catalog list filter.
