@@ -70,7 +70,6 @@ struct ATHLTHCommunityV5View: View {
     @State private var showSearch = false
     @State private var showCreateClub = false
     @State private var query = ""
-    @State private var joinMessage: String?
     @State private var respondingToInvite: UUID?
     @State private var inviteError: String?
 
@@ -104,6 +103,7 @@ struct ATHLTHCommunityV5View: View {
         groups.calendarEvents
             .filter {
                 $0.status != "cancelled" &&
+                $0.status != "draft" &&
                 $0.startsAt >= Date() &&
                 groups.joinedGroupIDs.contains($0.groupID)
             }
@@ -145,14 +145,6 @@ struct ATHLTHCommunityV5View: View {
                         if showSearch {
                             searchBar
                         }
-                        if let joinMessage {
-                            Text(joinMessage)
-                                .font(.caption)
-                                .foregroundStyle(CommunityReferenceStyle.darkGold)
-                                .padding(11)
-                                .communityReferenceCard()
-                        }
-
                         switch tab {
                         case .overview:
                             overview
@@ -188,7 +180,7 @@ struct ATHLTHCommunityV5View: View {
                 weather.refreshIfNeeded(force: true)
                 await refreshContent(force: true)
             }
-            .task(id: query) {
+            .task(id: showSearch ? query : "") {
                 let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard showSearch && term.count >= 2 else {
                     groups.clearSearch()
@@ -361,7 +353,6 @@ struct ATHLTHCommunityV5View: View {
                 Button {
                     withAnimation(.easeInOut(duration: 0.23)) {
                         tab = option
-                        joinMessage = nil
                     }
                 } label: {
                     Text(option.title)
@@ -589,6 +580,7 @@ struct ATHLTHCommunityV5View: View {
                 .filter {
                     $0.startsAt >= Date() &&
                     $0.status != "cancelled" &&
+                    $0.status != "draft" &&
                     $0.id != upcomingGathering?.id
                 }
                 .prefix(6)
