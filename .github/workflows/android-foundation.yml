@@ -26,7 +26,8 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: android-actions/setup-android@v3
+      # GitHub ubuntu runners already ship Android command-line tools.
+      # Avoid setup-android@v3: its legacy 'tools' package install fails.
       - name: Install compile SDK
         run: sdkmanager --install "platforms;android-36" "build-tools;36.0.0"
       - uses: gradle/actions/setup-gradle@v4
