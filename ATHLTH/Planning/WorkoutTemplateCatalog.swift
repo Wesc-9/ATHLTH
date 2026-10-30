@@ -922,6 +922,20 @@ struct WorkoutTemplateLibraryView: View {
         "hamstrings", "calves"
     ]
 
+    private func toggleStrengthMuscle(_ muscle: String) {
+        if selectedStrengthMuscles.contains(muscle) {
+            selectedStrengthMuscles.remove(muscle)
+        } else {
+            selectedStrengthMuscles.insert(muscle)
+        }
+    }
+
+    private func clearStrengthFilters() {
+        selectedStrengthMuscles.removeAll()
+        selectedWorkoutLevel = "all"
+        selectedDiscoverySort = .recommended
+    }
+
     private var discoveryFilter: ATHLTHWorkoutDiscoveryFilter {
         ATHLTHWorkoutDiscoveryFilter(
             muscleGroups: initialCategory == .strength
@@ -1223,6 +1237,42 @@ struct WorkoutTemplateLibraryView: View {
                         }
                         .buttonStyle(.plain)
 
+                        if initialCategory == .strength {
+                            // One compact, horizontally scrolling tab row beside
+                            // Favorites instead of the old multi-row muscle grid.
+                            Button {
+                                selectedStrengthMuscles.removeAll()
+                            } label: {
+                                filterChip(
+                                    ATHLTHLocalization.choose(
+                                        english: "All", norwegian: "Alle"
+                                    ),
+                                    systemImage: nil,
+                                    selected: selectedStrengthMuscles.isEmpty
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .frame(minHeight: 44)
+
+                            ForEach(strengthMuscleChoices, id: \.self) { muscle in
+                                let selected = selectedStrengthMuscles.contains(muscle)
+                                Button {
+                                    toggleStrengthMuscle(muscle)
+                                } label: {
+                                    filterChip(
+                                        focusName(muscle),
+                                        systemImage: selected ? "checkmark" : nil,
+                                        selected: selected
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .frame(minHeight: 44)
+                                .accessibilityAddTraits(
+                                    selected ? [.isSelected] : []
+                                )
+                            }
+                        }
+
                         if initialCategory == nil {
                         ForEach(categories, id: \.self) {
                             category in
@@ -1252,7 +1302,9 @@ struct WorkoutTemplateLibraryView: View {
                     }
                 }
 
-                if initialCategory != nil {
+                if initialCategory == .strength {
+                    strengthRefinementBar
+                } else if initialCategory != nil {
                     activityDiscoveryFilters
                 }
 
@@ -1688,6 +1740,70 @@ struct WorkoutTemplateLibraryView: View {
         }
     }
 
+    /// Extra strength filters stay on one small toolbar; muscle selection
+    /// belongs to the horizontal Favorites/tab row above the results.
+    private var strengthRefinementBar: some View {
+        HStack(spacing: 8) {
+            Menu {
+                ForEach(strengthLevels, id: \.self) { level in
+                    Button {
+                        selectedWorkoutLevel = level
+                    } label: {
+                        if selectedWorkoutLevel == level {
+                            Label(levelName(level), systemImage: "checkmark")
+                        } else {
+                            Text(levelName(level))
+                        }
+                    }
+                }
+            } label: {
+                Label(
+                    selectedWorkoutLevel == "all"
+                        ? ATHLTHLocalization.choose(
+                            english: "Experience", norwegian: "Erfaringsnivå"
+                          )
+                        : levelName(selectedWorkoutLevel),
+                    systemImage: "slider.horizontal.3"
+                )
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .background(.white.opacity(0.86), in: Capsule())
+            }
+
+            Spacer(minLength: 0)
+
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Sort workouts", norwegian: "Sorter økter"
+                ),
+                selection: $selectedDiscoverySort
+            ) {
+                ForEach(DiscoverySort.allCases) { sort in
+                    Text(sort.title).tag(sort)
+                }
+            }
+            .tint(ATHLTHPlanDesign.accentInk)
+
+            if hasDiscoveryFilters {
+                Button {
+                    clearStrengthFilters()
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Clear filters", norwegian: "Nullstill filtre"
+                ))
+            }
+        }
+    }
+
     @ViewBuilder
     private var activityDiscoveryFilters: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -1728,85 +1844,6 @@ struct WorkoutTemplateLibraryView: View {
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                }
-            }
-
-            if initialCategory == .strength {
-                Text(ATHLTHLocalization.choose(
-                    english: "Select one or more muscle groups. Workouts containing those groups appear below.",
-                    norwegian: "Trykk på én eller flere muskelgrupper. Økter med disse musklene vises nedenfor."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .fixedSize(horizontal: false, vertical: true)
-
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 104), spacing: 9)],
-                    spacing: 9
-                ) {
-                    ForEach(strengthMuscleChoices, id: \.self) { muscle in
-                        let selected = selectedStrengthMuscles.contains(muscle)
-                        Button {
-                            if selected {
-                                selectedStrengthMuscles.remove(muscle)
-                            } else {
-                                selectedStrengthMuscles.insert(muscle)
-                            }
-                        } label: {
-                            HStack(spacing: 6) {
-                                Image(systemName:
-                                    selected ? "checkmark.circle.fill" : "circle"
-                                )
-                                .font(.system(size: 13, weight: .semibold))
-                                Text(focusName(muscle))
-                                    .font(.caption.weight(.semibold))
-                                    .lineLimit(1)
-                                    .minimumScaleFactor(0.78)
-                                Spacer(minLength: 0)
-                            }
-                            .foregroundStyle(
-                                selected ? .white : ATHLTHPlanDesign.ink
-                            )
-                            .padding(.horizontal, 10)
-                            .frame(maxWidth: .infinity, minHeight: 42)
-                            .background(
-                                selected ? ATHLTHTheme.accentDeep : .white,
-                                in: RoundedRectangle(cornerRadius: 13)
-                            )
-                            .overlay {
-                                RoundedRectangle(cornerRadius: 13)
-                                    .strokeBorder(
-                                        selected ? ATHLTHTheme.accentDeep :
-                                            ATHLTHTheme.accentSoft,
-                                        lineWidth: 1
-                                    )
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(selected ? [.isSelected] : [])
-                    }
-                }
-
-                Text(ATHLTHLocalization.choose(
-                    english: "Experience", norwegian: "Erfaringsnivå"
-                ))
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 7) {
-                        ForEach(strengthLevels, id: \.self) { level in
-                            Button {
-                                selectedWorkoutLevel = level
-                            } label: {
-                                filterChip(
-                                    levelName(level),
-                                    systemImage: nil,
-                                    selected: selectedWorkoutLevel == level
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
                 }
             }
 
