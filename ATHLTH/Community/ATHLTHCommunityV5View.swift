@@ -68,6 +68,7 @@ struct ATHLTHCommunityV5View: View {
     @StateObject private var weather = HomeWeatherStore()
     @State private var tab: ATHLTHCommunityMainTab = .overview
     @State private var showSearch = false
+    @FocusState private var searchFocused: Bool
     @State private var showCreateClub = false
     @State private var query = ""
     @State private var respondingToInvite: UUID?
@@ -169,6 +170,9 @@ struct ATHLTHCommunityV5View: View {
             .ignoresSafeArea(.container, edges: .top)
             .background(CommunityReferenceStyle.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
+            .onChange(of: showSearch) { _, visible in
+                searchFocused = visible
+            }
             .sheet(isPresented: $showCreateClub) {
                 CommunityGroupCreateView()
             }
@@ -1286,6 +1290,7 @@ struct ATHLTHCommunityV5View: View {
             ), text: $query)
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
+            .focused($searchFocused)
             .padding(12)
             .background(CommunityReferenceStyle.canvas, in: RoundedRectangle(cornerRadius: 12))
 
