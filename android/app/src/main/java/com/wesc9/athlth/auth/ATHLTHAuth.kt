@@ -11,13 +11,15 @@ import io.github.jan.supabase.createSupabaseClient
  * Publishable client keys are public; RLS enforces per-user database access.
  */
 object ATHLTHAuth {
-    private val client by lazy {
+    val client by lazy {
         createSupabaseClient(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_PUBLISHABLE_KEY) {
             install(Auth)
         }
     }
 
     val sessionStatus get() = client.auth.sessionStatus
+
+    fun userId(): String? = client.auth.currentUserOrNull()?.id
 
     fun signedInEmail(): String? = client.auth.currentUserOrNull()?.email
 

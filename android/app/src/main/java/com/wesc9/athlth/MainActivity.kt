@@ -234,16 +234,7 @@ private fun HomeScreen(
 
 @Composable
 private fun TrainScreen() {
-    TitleAndSubtitle("Train", "Klar for felles treningsmotor")
-    ATHLTHCard {
-        Text("Treningsplaner kommer i neste utviklingsfase",
-            fontWeight = FontWeight.SemiBold)
-        Text(
-            "Felles modell for oppvarming, intervaller, pauser, styrke og nedtrapping er lagt til. " +
-                "Selve øktbyggeren og live-opptaket er ikke tilgjengelig i denne første Android-utgaven.",
-            color = Muted
-        )
-    }
+    com.wesc9.athlth.catalog.TrainingCatalogScreen()
 }
 
 @Composable
@@ -319,6 +310,7 @@ private fun ProfileScreen() {
         }
         if (error != null) Text(error ?: "", color = Color(0xFFAA3B2C))
     }
+    com.wesc9.athlth.catalog.ProfileCloudPanel(signedIn)
 }
 
 @Composable
