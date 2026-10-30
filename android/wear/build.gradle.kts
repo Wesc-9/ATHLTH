@@ -22,5 +22,6 @@ android {
 
 dependencies {
     implementation("androidx.health:health-services-client:1.1.0")
+    implementation("com.google.guava:guava:33.4.8-android")
     implementation("androidx.core:core-ktx:1.16.0")
 }

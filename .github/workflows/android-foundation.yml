@@ -41,3 +41,14 @@ jobs:
           gradle-version: "8.13"
       - name: Compile and run unit tests
         run: gradle -p android :app:assembleDebug :app:testDebugUnitTest :wear:assembleDebug --stacktrace
+
+      - name: Attach Android phone and Wear OS test APKs
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-android-debug
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/wear/build/outputs/apk/debug/wear-debug.apk
+          if-no-files-found: error
+          retention-days: 7
