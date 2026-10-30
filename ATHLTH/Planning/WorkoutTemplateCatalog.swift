@@ -1250,9 +1250,9 @@ struct WorkoutTemplateLibraryView: View {
                                     systemImage: nil,
                                     selected: selectedStrengthMuscles.isEmpty
                                 )
+                                .frame(minHeight: 44)
                             }
                             .buttonStyle(.plain)
-                            .frame(minHeight: 44)
 
                             ForEach(strengthMuscleChoices, id: \.self) { muscle in
                                 let selected = selectedStrengthMuscles.contains(muscle)
@@ -1264,9 +1264,9 @@ struct WorkoutTemplateLibraryView: View {
                                         systemImage: selected ? "checkmark" : nil,
                                         selected: selected
                                     )
+                                    .frame(minHeight: 44)
                                 }
                                 .buttonStyle(.plain)
-                                .frame(minHeight: 44)
                                 .accessibilityAddTraits(
                                     selected ? [.isSelected] : []
                                 )
