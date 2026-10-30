@@ -796,6 +796,8 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @Environment(\.dynamicTypeSize) private var homeDynamicTypeSize
+    @SceneStorage("homeHeroUtilityToolbarExpanded.v1")
+    private var homeHeroToolbarExpanded = true
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var community: CommunityEventStore
@@ -885,8 +887,8 @@ struct ATHLTHHomeView: View {
                         }
                     )
 
-                    // Four equally sized 44pt hit areas in one restrained
-                    // frosted capsule. Keeps all destinations and counters.
+                    // Weather and its visible handle remain accessible when
+                    // the other shortcuts retract into this lighter glass rail.
                     HStack(spacing: 0) {
                         HomeHeroUtilityButtons(
                             weather: homeWeather.snapshot,
@@ -897,33 +899,40 @@ struct ATHLTHHomeView: View {
                                 }.count,
                             pendingWorkoutImportCount:
                                 health.pendingWorkoutImportCount,
+                            expanded: $homeHeroToolbarExpanded,
                             onSearch: {
                                 showingGlobalSearch = true
                             }
                         )
 
-                        NavigationLink {
-                            ATHLTHProfileView()
-                        } label: {
-                            homeProfileShortcut
-                                .frame(width: 52, height: 52)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            ATHLTHLocalization.choose(
-                                english: "Profile", norwegian: "Profil"
+                        if homeHeroToolbarExpanded {
+                            NavigationLink {
+                                ATHLTHProfileView()
+                            } label: {
+                                homeProfileShortcut
+                                    .frame(width: 52, height: 52)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(
+                                ATHLTHLocalization.choose(
+                                    english: "Profile", norwegian: "Profil"
+                                )
                             )
-                        )
+                            .transition(.opacity)
+                        }
                     }
                     .padding(.horizontal, 5)
-                    .background(Color.black.opacity(0.08), in: Capsule())
                     .background(.ultraThinMaterial, in: Capsule())
                     .overlay {
                         Capsule()
-                            .strokeBorder(Color.white.opacity(0.38), lineWidth: 0.8)
+                            .strokeBorder(
+                                Color.white.opacity(0.25),
+                                lineWidth: 0.7
+                            )
+                            .allowsHitTesting(false)
                     }
-                    .shadow(color: .black.opacity(0.10), radius: 9, y: 4)
+                    .shadow(color: .black.opacity(0.055), radius: 7, y: 3)
                     .padding(.top, 60)
                     .padding(.trailing, 16)
                 }
