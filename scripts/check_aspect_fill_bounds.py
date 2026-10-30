@@ -29,13 +29,13 @@ REQUIRED = {
         r"\.frame\(width:\s*viewport\.size\.width,\s*height:\s*(?:196|workoutHeroHeight)\)",
         r"\.containerRelativeFrame\(\.horizontal\)",
     ),
-    # Community V5 replaces and deletes the former V4 screen. The large
-    # photographic hero must be constrained by its GeometryReader viewport;
-    # club images use the existing bounded-fill helper.
+    # The reference screenshot replaces V5 with a single full-bleed cover
+    # and 2x2 cards. Guard both the bounded hero and club/event artwork,
+    # rather than requiring retired V5 card methods.
     "ATHLTH/Community/ATHLTHCommunityV5View.swift": (
-        r"private var clubHero: some View.*?GeometryReader\s*\{\s*size\s+in.*?\.scaledToFill\(\)\s*\.frame\(width:\s*size\.size\.width,\s*height:\s*size\.size\.height\)",
-        r"private func joinedClubCard.*?\.athlthBoundedFill\(\)",
-        r"private func recommendedClubRow.*?\.athlthBoundedFill\(\)",
+        r"private var cover: some View.*?GeometryReader\s*\{\s*geo\s+in.*?\.scaledToFill\(\)\s*\.frame\(width:\s*geo\.size\.width,\s*height:\s*geo\.size\.height\)",
+        r"private func clubSummary.*?\.athlthBoundedFill\(\)",
+        r"private var nextGatheringCard.*?\.athlthBoundedFill\(\)",
     ),
     "ATHLTH/Social/SocialViews.swift": (
         r"Image\(\"CommunityHero\"\)\s*\.resizable\(\)\s*\.scaledToFill\(\)\s*\.athlthBoundedFill\(\)",
