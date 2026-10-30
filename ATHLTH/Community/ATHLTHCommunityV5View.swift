@@ -308,8 +308,8 @@ struct ATHLTHCommunityV5View: View {
                 ATHLTHProfileView()
             } label: {
                 CommunityShowcaseAvatar(
-                    url: URL(string: session.profile.avatarURL ?? ""),
-                    fallback: session.profile.displayName ?? "ATHLTH",
+                    url: session.profile.avatarURL,
+                    fallback: session.profile.displayName,
                     size: 37
                 )
                 .overlay {
@@ -406,8 +406,9 @@ struct ATHLTHCommunityV5View: View {
         VStack(spacing: 12) {
             twoColumns {
                 joinedClubCard
-                NavigationLink {
-                    CommunityGroupDiscoveryView()
+                Button {
+                    tab = .clubs
+                    showSearch = true
                 } label: {
                     basicLinkCard(
                         title: ATHLTHLocalization.choose(
@@ -519,8 +520,9 @@ struct ATHLTHCommunityV5View: View {
                 .foregroundStyle(CommunityReferenceStyle.ink)
                 .fixedSize(horizontal: false, vertical: true)
                 Spacer(minLength: 0)
-                NavigationLink {
-                    CommunityGroupDiscoveryView()
+                Button {
+                    tab = .clubs
+                    showSearch = true
                 } label: {
                     creamButton(ATHLTHLocalization.choose(
                         english: "Find a club", norwegian: "Finn klubb"
@@ -694,7 +696,7 @@ struct ATHLTHCommunityV5View: View {
             ), icon: "star.fill")
             if let challenge = weekly.activeChallenge {
                 NavigationLink {
-                    OfficialWeeklyChallengeDetailView(challenge: challenge)
+                    OfficialWeeklyChallengeDetailView(challengeID: challenge.id)
                 } label: {
                     VStack(alignment: .leading, spacing: 7) {
                         HStack(spacing: 8) {
@@ -720,7 +722,7 @@ struct ATHLTHCommunityV5View: View {
                 .buttonStyle(.plain)
                 Spacer(minLength: 0)
                 NavigationLink {
-                    OfficialWeeklyChallengeDetailView(challenge: challenge)
+                    OfficialWeeklyChallengeDetailView(challengeID: challenge.id)
                 } label: {
                     creamButton(ATHLTHLocalization.choose(
                         english: "View challenge", norwegian: "Se utfordring"
