@@ -693,6 +693,128 @@ struct ATHLTHInsightsView: View {
         )
     }
 
+    private var pulseTitle: String {
+        switch health.recovery.state {
+        case .ready:
+            return ATHLTHLocalization.choose(english: "STRONG", norwegian: "STERK")
+        case .balanced:
+            return ATHLTHLocalization.choose(english: "BALANCED", norwegian: "BALANSERT")
+        case .takeItEasy, .recover:
+            return ATHLTHLocalization.choose(english: "RECOVER", norwegian: "RESTITUSJON")
+        case .buildingBaseline:
+            return ATHLTHLocalization.choose(english: "LEARNING", norwegian: "KARTLEGGER")
+        }
+    }
+
+    private var pulseIcon: String {
+        switch health.recovery.state {
+        case .ready:
+            return "bolt.heart.fill"
+        case .balanced:
+            return "circle.hexagongrid.fill"
+        case .takeItEasy:
+            return "gauge.with.dots.needle.33percent"
+        case .recover:
+            return "bed.double.fill"
+        case .buildingBaseline:
+            return "waveform.path.ecg"
+        }
+    }
+
+    private var pulseDetail: String {
+        switch health.recovery.state {
+        case .ready:
+            return tr("Your recovery signals support a normal training day.",
+                      "Restitusjonssignalene støtter en normal treningsdag.")
+        case .balanced:
+            return tr("Your signals are steady. Adjust the plan to how you feel.",
+                      "Signalene er stabile. Tilpass planen til hvordan du føler deg.")
+        case .takeItEasy:
+            return tr("Some signals are below your recent baseline. Keep intensity flexible.",
+                      "Noen signaler ligger under normalen din. Tilpass intensiteten.")
+        case .recover:
+            return tr("Your recent signals suggest prioritizing a lighter day.",
+                      "De siste signalene tyder på at en roligere dag kan være lurt.")
+        case .buildingBaseline:
+            return tr("ATHLTH is establishing your personal baseline from recent health data.",
+                      "ATHLTH etablerer din personlige normal ut fra helsedata.")
+        }
+    }
+
+    private var sleepValue: String {
+        guard health.sleep.totalAsleep > 0 else { return "—" }
+        return formatDuration(health.sleep.totalAsleep)
+    }
+
+    private var hrvValue: String {
+        health.heart.hrvMilliseconds.map {
+            "\(Int($0.rounded())) ms"
+        } ?? "—"
+    }
+
+    private var restingHRValue: String {
+        health.heart.restingHeartRate.map {
+            "\(Int($0.rounded())) bpm"
+        } ?? "—"
+    }
+
+    private var whatChangedItems: [InsightsChangeItem] {
+        guard let snapshot = trendSnapshot else {
+            return []
+        }
+
+        var items: [InsightsChangeItem] = []
+
+        appendChange(
+            to: &items,
+            percent: snapshot.trainingDurationChangePercent,
+            threshold: 8,
+            noun: tr("Training time", "Treningstid"),
+            icon: "clock.arrow.circlepath",
+            tint: ATHLTHTheme.accent
+        )
+
+        appendChange(
+            to: &items,
+            percent: snapshot.workoutDistanceChangePercent,
+            threshold: 8,
+            noun: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
+            icon: "point.topleft.down.to.point.bottomright.curvepath",
+            tint: .blue
+        )
+
+        appendChange(
+            to: &items,
+            percent: snapshot.workoutChangePercent,
+            threshold: 10,
+            noun: tr("Workout frequency", "Øktfrekvens"),
+            icon: "calendar.badge.clock",
+            tint: ATHLTHTheme.vitality
+        )
+
+        appendChange(
+            to: &items,
+            percent: snapshot.sleepChangePercent,
+            threshold: 5,
+            noun: tr("Average sleep", "Gjennomsnittlig søvn"),
+            icon: "moon.stars.fill",
+            tint: .purple
+        )
+
+        appendChange(
+            to: &items,
+            percent: snapshot.stepsChangePercent,
+            threshold: 10,
+            noun: ATHLTHLocalization.choose(english: "Daily steps", norwegian: "Daglige steg"),
+            icon: "figure.walk",
+            tint: .orange
+        )
+
+        return items.sorted {
+            abs($0.percent) > abs($1.percent)
+        }
+    }
+
     private func appendChange(
         to items: inout [InsightsChangeItem],
         percent: Double?,
