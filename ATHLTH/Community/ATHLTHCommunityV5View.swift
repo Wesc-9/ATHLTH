@@ -909,7 +909,7 @@ struct ATHLTHCommunityV5View: View {
                 .foregroundStyle(CommunityReferenceStyle.ink)
                 Spacer()
                 NavigationLink {
-                    SocialHubView(initialTab: .feed)
+                    ATHLTHCommunityActiveMembersDirectoryView()
                 } label: {
                     Text(ATHLTHLocalization.choose(
                         english: "See all", norwegian: "Se alle"
@@ -1207,5 +1207,91 @@ struct ATHLTHCommunityV5View: View {
             ? social.refresh(challengeStore: challenges)
             : social.refreshIfStale(challengeStore: challenges)
         _ = await (a, b, c, d, e, f)
+    }
+}
+
+
+/// A privacy-respecting directory for the screenshot's "Active members" row.
+/// Online status is *never* inferred from group membership or last activity.
+private struct ATHLTHCommunityActiveMembersDirectoryView: View {
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
+
+    private var activeFriends: [SocialProfileCard] {
+        social.mutualFollows.filter {
+            realtime.isTrainingNow($0.userID) ||
+            realtime.isOnline($0.userID)
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Active members", norwegian: "Aktive medlemmer"
+                ))
+                .font(.system(size: 31, weight: .regular, design: .serif))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Only mutual followers who have chosen to share their status appear here.",
+                    norwegian: "Her vises bare gjensidige følgere som har valgt å dele statusen sin."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+
+                if activeFriends.isEmpty {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "No active members are sharing their status now.",
+                            norwegian: "Ingen aktive medlemmer deler status akkurat nå."
+                        ),
+                        systemImage: "person.3"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(CommunityReferenceStyle.muted)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(20)
+                    .communityReferenceCard()
+                } else {
+                    ForEach(activeFriends) { member in
+                        NavigationLink {
+                            FriendProfileView(userID: member.userID)
+                        } label: {
+                            HStack(spacing: 13) {
+                                ATHLTHSocialStatusAvatar(
+                                    profile: member, size: 43
+                                )
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(member.resolvedName)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(CommunityReferenceStyle.ink)
+                                    if !member.usernameLabel.isEmpty {
+                                        Text(member.usernameLabel)
+                                            .font(.caption)
+                                            .foregroundStyle(CommunityReferenceStyle.muted)
+                                    }
+                                }
+                                Spacer(minLength: 2)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(CommunityReferenceStyle.gold)
+                            }
+                            .padding(14)
+                            .communityReferenceCard()
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(17)
+            .frame(maxWidth: 760)
+            .frame(maxWidth: .infinity)
+        }
+        .background(CommunityReferenceStyle.canvas.ignoresSafeArea())
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Members", norwegian: "Medlemmer"
+        ))
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
