@@ -22,87 +22,103 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
     }
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkouts: StrengthWorkoutStore
-    @State private var selectedType: ATHLTHPlannedWorkoutType?
     @State private var path: [ATHLTHPlannedWorkoutType] = []
     @State private var orderedTypes = ATHLTHPlannedWorkoutType.defaultOrder
 
-    private let columns = [
-        GridItem(.flexible(minimum: 125), spacing: 12),
-        GridItem(.flexible(minimum: 125), spacing: 12)
-    ]
     private let ink = Color(red: 0.075, green: 0.10, blue: 0.17)
     private let muted = Color(red: 0.47, green: 0.50, blue: 0.58)
     private let canvas = Color(red: 0.988, green: 0.984, blue: 0.973)
 
     var body: some View {
         NavigationStack(path: $path) {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    header
+            GeometryReader { viewport in
+                // Six categories fit in three rows on a regular iPhone.
+                // Short windows and larger accessibility text can still scroll.
+                let compact = viewport.size.width < 620 || viewport.size.height < 660
+                let columns = Array(
+                    repeating: GridItem(.flexible(minimum: 110), spacing: compact ? 10 : 12),
+                    count: compact ? 2 : 3
+                )
+                let tileHeight = cardHeight(
+                    availableHeight: viewport.size.height,
+                    compact: compact
+                )
 
-                    VStack(alignment: .leading, spacing: 9) {
-                        Text("ATHLTH · PLAN")
-                            .font(.system(size: 11, weight: .bold))
-                            .tracking(3.0)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: compact ? 12 : 20) {
+                        header(compact: compact)
 
-                        Text(ATHLTHLocalization.choose(
-                            english: "What would you like to plan?",
-                            norwegian: "Hva vil du planlegge?"
-                        ))
-                        .font(.system(size: 30, weight: .bold, design: .rounded))
-                        .minimumScaleFactor(0.85)
-                        .foregroundStyle(ink)
+                        VStack(alignment: .leading, spacing: compact ? 5 : 9) {
+                            Text("ATHLTH · PLAN")
+                                .font(.system(size: 11, weight: .bold))
+                                .tracking(3.0)
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
 
-                        Text(ATHLTHLocalization.choose(
-                            english: purpose == .createFromScratch
-                                ? "Choose an activity and build your own workout in the shared editor."
-                                : "Choose an activity to find and adapt an existing workout.",
-                            norwegian: purpose == .createFromScratch
-                                ? "Velg aktivitet og bygg din egen økt i den felles øktbyggeren."
-                                : "Velg aktivitet for å hente og tilpasse en planlagt økt."
-                        ))
-                        .font(.subheadline)
-                        .foregroundStyle(muted)
-                        .fixedSize(horizontal: false, vertical: true)
-                    }
-                    .padding(.horizontal, 3)
+                            Text(ATHLTHLocalization.choose(
+                                english: "What would you like to plan?",
+                                norwegian: "Hva vil du planlegge?"
+                            ))
+                            .font(typeSize.isAccessibilitySize
+                                  ? .title2.bold()
+                                  : .system(size: compact ? 25 : 30, weight: .bold, design: .rounded))
+                            .minimumScaleFactor(0.85)
+                            .foregroundStyle(ink)
 
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(orderedTypes) { type in
-                            activityTile(type)
+                            Text(ATHLTHLocalization.choose(
+                                english: purpose == .createFromScratch
+                                    ? "Choose an activity and build your own workout in the shared editor."
+                                    : "Choose an activity to find and adapt an existing workout.",
+                                norwegian: purpose == .createFromScratch
+                                    ? "Velg aktivitet og bygg din egen økt i den felles øktbyggeren."
+                                    : "Velg aktivitet for å hente og tilpasse en planlagt økt."
+                            ))
+                            .font(compact ? .footnote : .subheadline)
+                            .foregroundStyle(muted)
+                            .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.horizontal, 3)
+
+                        LazyVGrid(columns: columns, spacing: compact ? 10 : 12) {
+                            ForEach(orderedTypes) { type in
+                                activityTile(type, height: tileHeight, compact: compact)
+                            }
+                        }
+
+                        // The tip is supplementary. Keep the six workout
+                        // choices visible first on the smaller phone sheet.
+                        if !compact {
+                            HStack(alignment: .center, spacing: 12) {
+                                Image(systemName: "lightbulb")
+                                    .font(.title3)
+                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                Text(ATHLTHLocalization.choose(
+                                    english: purpose == .createFromScratch
+                                        ? "Start with a blank workout. Add exercises, intervals and rests using the same editor for every activity."
+                                        : "Tip: You can change exercises, structure and details in the next step.",
+                                    norwegian: purpose == .createFromScratch
+                                        ? "Start med en tom økt. Legg til øvelser, intervaller og pauser i samme øktbygger."
+                                        : "Tips: Du kan endre øvelser, struktur og detaljer i neste steg."
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(muted)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(16)
+                            .background(canvas, in: RoundedRectangle(cornerRadius: 18))
                         }
                     }
-
-                    HStack(alignment: .center, spacing: 12) {
-                        Image(systemName: "lightbulb")
-                            .font(.title3)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                        Text(ATHLTHLocalization.choose(
-                            english: purpose == .createFromScratch
-                                ? "Start with a blank workout. Add exercises, intervals and rests using the same editor for every activity."
-                                : "Tip: You can change exercises, structure and details in the next step.",
-                            norwegian: purpose == .createFromScratch
-                                ? "Start med en tom økt. Legg til øvelser, intervaller og pauser i samme øktbygger."
-                                : "Tips: Du kan endre øvelser, struktur og detaljer i neste steg."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(muted)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(16)
-                    .background(canvas, in: RoundedRectangle(cornerRadius: 18))
+                    .padding(.horizontal, compact ? 16 : 20)
+                    .padding(.top, compact ? 8 : 18)
+                    .padding(.bottom, compact ? 12 : 34)
+                    .frame(maxWidth: 740)
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 18)
-                .padding(.bottom, 34)
-                .frame(maxWidth: 740)
-                .frame(maxWidth: .infinity)
+                .scrollIndicators(.hidden)
             }
-            .scrollIndicators(.hidden)
             .background(canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: ATHLTHPlannedWorkoutType.self) { type in
@@ -132,7 +148,16 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
         .tint(ATHLTHTheme.accentDeep)
     }
 
-    private var header: some View {
+    private func cardHeight(availableHeight: CGFloat, compact: Bool) -> CGFloat {
+        if typeSize.isAccessibilitySize { return compact ? 226 : 250 }
+        if compact {
+            // Reserve space for sheet navigation, title and grid gutters.
+            return min(178, max(146, (availableHeight - 224) / 3))
+        }
+        return min(250, max(180, (availableHeight - 290) / 2))
+    }
+
+    private func header(compact: Bool) -> some View {
         HStack(spacing: 8) {
             Button {
                 dismiss()
@@ -155,31 +180,28 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
             .minimumScaleFactor(0.85)
 
             Spacer(minLength: 4)
-
-            Button {
-                guard let selectedType else { return }
-                if purpose == .createFromScratch {
-                    onCreateNew?(selectedType)
-                } else {
-                    path.append(selectedType)
-                }
-            } label: {
-                Text(ATHLTHLocalization.choose(
-                    english: "Next", norwegian: "Neste"
-                ))
-                .frame(minWidth: 73, minHeight: 40)
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-            .disabled(selectedType == nil)
+            Color.clear
+                .frame(width: 90, height: 1)
+                .accessibilityHidden(true)
         }
-        .padding(.bottom, 32)
+        .padding(.bottom, compact ? 4 : 18)
     }
 
-    private func activityTile(_ type: ATHLTHPlannedWorkoutType) -> some View {
-        let isSelected = selectedType == type
-        return Button {
-            selectedType = type
+    private func openWorkoutType(_ type: ATHLTHPlannedWorkoutType) {
+        if purpose == .createFromScratch {
+            onCreateNew?(type)
+        } else if path.isEmpty {
+            path.append(type)
+        }
+    }
+
+    private func activityTile(
+        _ type: ATHLTHPlannedWorkoutType,
+        height: CGFloat,
+        compact: Bool
+    ) -> some View {
+        Button {
+            openWorkoutType(type)
         } label: {
             GeometryReader { geometry in
                 ZStack(alignment: .topLeading) {
@@ -191,6 +213,7 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
                             height: geometry.size.height
                         )
                         .clipped()
+                        .accessibilityHidden(true)
 
                     LinearGradient(
                         stops: [
@@ -206,37 +229,50 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
 
                     VStack(alignment: .leading, spacing: 0) {
                         Image(systemName: type.symbol)
-                            .font(.system(size: 20, weight: .medium))
+                            .font(.system(size: compact ? 16 : 20, weight: .medium))
                             .foregroundStyle(ink)
-                            .frame(width: 48, height: 48)
+                            .frame(
+                                width: compact ? 34 : 48,
+                                height: compact ? 34 : 48
+                            )
                             .background(iconColor(type), in: Circle())
 
                         Text(type.title)
-                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .font(typeSize.isAccessibilitySize
+                                  ? .headline
+                                  : .system(
+                                      size: compact ? 17 : 20,
+                                      weight: .bold,
+                                      design: .rounded
+                                  ))
                             .foregroundStyle(ink)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                            .padding(.top, 18)
+                            .padding(.top, compact ? 6 : 18)
 
                         Text(type.description)
-                            .font(.system(size: 12))
+                            .font(typeSize.isAccessibilitySize
+                                  ? .subheadline
+                                  : .system(size: compact ? 11 : 12))
                             .foregroundStyle(muted)
                             .multilineTextAlignment(.leading)
-                            .lineLimit(3)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .padding(.top, 6)
+                            .lineLimit(typeSize.isAccessibilitySize ? 4 : (compact ? 2 : 3))
+                            .padding(.top, compact ? 2 : 6)
 
-                        Spacer(minLength: 8)
+                        Spacer(minLength: compact ? 2 : 8)
 
-                        Image(systemName: isSelected
-                              ? "checkmark"
-                              : "arrow.right")
-                            .font(.system(size: 19, weight: .semibold))
+                        Image(systemName: "arrow.right")
+                            .font(.system(
+                                size: compact ? 16 : 19, weight: .semibold
+                            ))
                             .foregroundStyle(ink)
-                            .frame(width: 48, height: 48)
+                            .frame(
+                                width: compact ? 34 : 48,
+                                height: compact ? 34 : 48
+                            )
                             .background(.white.opacity(0.96), in: Circle())
                     }
-                    .padding(15)
+                    .padding(compact ? 10 : 15)
                     .frame(
                         width: geometry.size.width,
                         height: geometry.size.height,
@@ -247,23 +283,23 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
                     width: geometry.size.width,
                     height: geometry.size.height
                 )
-                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .clipShape(RoundedRectangle(cornerRadius: compact ? 18 : 22))
                 .overlay {
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(
-                            isSelected
-                                ? ATHLTHTheme.accentDeep
-                                : Color.white.opacity(0.85),
-                            lineWidth: isSelected ? 2.4 : 1
-                        )
+                    RoundedRectangle(cornerRadius: compact ? 18 : 22)
+                        .strokeBorder(Color.white.opacity(0.85), lineWidth: 1)
                 }
             }
-            .frame(height: 300)
-            .contentShape(RoundedRectangle(cornerRadius: 22))
+            .frame(height: height)
+            .contentShape(RoundedRectangle(cornerRadius: compact ? 18 : 22))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("\(type.title). \(type.description)")
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: purpose == .createFromScratch
+                ? "Open workout editor" : "Browse workouts",
+            norwegian: purpose == .createFromScratch
+                ? "Åpner øktbyggeren" : "Åpner øktbiblioteket"
+        ))
     }
 
     private func iconColor(_ type: ATHLTHPlannedWorkoutType) -> Color {
