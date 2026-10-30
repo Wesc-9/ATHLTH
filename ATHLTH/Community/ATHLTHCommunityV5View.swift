@@ -60,6 +60,7 @@ struct ATHLTHCommunityV5View: View {
     @EnvironmentObject private var weekly: OfficialWeeklyChallengeStore
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
@@ -73,6 +74,15 @@ struct ATHLTHCommunityV5View: View {
     @State private var joiningGroupIDs: Set<UUID> = []
     @State private var respondingToInvite: UUID?
     @State private var inviteError: String?
+
+    // Only mutual followers may expose online/training presence, and only
+    // when they have opted in. Do not infer status from their membership.
+    private var activeMembers: [SocialProfileCard] {
+        social.mutualFollows.filter {
+            realtime.isOnline($0.userID) ||
+            realtime.isTrainingNow($0.userID)
+        }
+    }
 
     private var myClub: CommunityGroupRecord? {
         groups.joinedGroups.sorted {
@@ -937,15 +947,13 @@ struct ATHLTHCommunityV5View: View {
                     }
                     .buttonStyle(.plain)
 
-                    ForEach(Array(social.mutualFollows.prefix(12))) { friend in
+                    ForEach(Array(activeMembers.prefix(12))) { friend in
                         NavigationLink {
                             FriendProfileView(userID: friend.userID)
                         } label: {
                             VStack(spacing: 5) {
-                                CommunityShowcaseAvatar(
-                                    url: friend.avatarURL.flatMap(URL.init(string:)),
-                                    fallback: friend.resolvedName,
-                                    size: 43
+                                ATHLTHSocialStatusAvatar(
+                                    profile: friend, size: 39
                                 )
                                 Text(friend.resolvedName.components(separatedBy: " ").first ?? friend.resolvedName)
                                     .font(.system(size: 9))
@@ -957,10 +965,10 @@ struct ATHLTHCommunityV5View: View {
                         .buttonStyle(.plain)
                     }
 
-                    if social.mutualFollows.isEmpty {
+                    if activeMembers.isEmpty {
                         Text(ATHLTHLocalization.choose(
-                            english: "Your training friends will appear here.",
-                            norwegian: "Treningsvennene dine vises her."
+                            english: "No friends sharing active status right now.",
+                            norwegian: "Ingen venner deler aktiv status akkurat nå."
                         ))
                         .font(.caption)
                         .foregroundStyle(CommunityReferenceStyle.muted)
