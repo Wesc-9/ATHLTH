@@ -17,6 +17,8 @@ object ATHLTHAuth {
         }
     }
 
+    val sessionStatus get() = client.auth.sessionStatus
+
     fun signedInEmail(): String? = client.auth.currentUserOrNull()?.email
 
     suspend fun signIn(email: String, password: String) {
