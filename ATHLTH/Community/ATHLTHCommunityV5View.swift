@@ -68,10 +68,8 @@ struct ATHLTHCommunityV5View: View {
     @StateObject private var weather = HomeWeatherStore()
     @State private var tab: ATHLTHCommunityMainTab = .overview
     @State private var showSearch = false
-    @State private var showCreate = false
     @State private var query = ""
     @State private var joinMessage: String?
-    @State private var joiningGroupIDs: Set<UUID> = []
     @State private var respondingToInvite: UUID?
     @State private var inviteError: String?
 
@@ -178,9 +176,6 @@ struct ATHLTHCommunityV5View: View {
             .ignoresSafeArea(.container, edges: .top)
             .background(CommunityReferenceStyle.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
-            .sheet(isPresented: $showCreate) {
-                ATHLTHCommunityCreateHubView()
-            }
             .task {
                 weather.refreshIfNeeded()
                 await refreshContent(force: false)
