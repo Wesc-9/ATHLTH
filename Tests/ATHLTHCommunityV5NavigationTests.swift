@@ -1,14 +1,14 @@
 import XCTest
 @testable import ATHLTH
 
-/// Ensures the 2026 Community shell remains exactly three tabs and does not
-/// revive the previous fourth-page shortcut menu.
+/// The approved 2026 reference has four tabs in one redesigned shell.
+/// This must not return to the previous three-tab Community V5 dashboard.
 final class ATHLTHCommunityV5NavigationTests: XCTestCase {
-    func testCommunityHasExactlyThreeRootDestinations() {
+    func testCommunityHasFourReferenceDestinations() {
         XCTAssertEqual(ATHLTHCommunityMainTab.allCases,
-                       [.overview, .arena, .clubs])
+                       [.overview, .clubs, .arena, .events])
         XCTAssertEqual(
-            Set(ATHLTHCommunityMainTab.allCases.map(\.id)).count, 3)
+            Set(ATHLTHCommunityMainTab.allCases.map(\.id)).count, 4)
     }
 
     func testCommunityTabLabelsAreNotBlank() {
