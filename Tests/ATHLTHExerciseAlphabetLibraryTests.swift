@@ -10,7 +10,8 @@ final class ATHLTHExerciseAlphabetLibraryTests: XCTestCase {
             id: id, origin: .custom, ownerID: UUID(),
             name: title, instructions: ["Move with control."],
             primaryMuscles: ["Back"], secondaryMuscles: [],
-            equipment: ["Bodyweight"], imageURL: nil
+            equipment: ["Bodyweight"], imageURL: nil,
+            isVisibleOutsideOwnerLibrary: false
         )
         return ExerciseLibraryEntry(
             id: id, exercise: exercise, source: .custom,
