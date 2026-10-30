@@ -26,6 +26,7 @@ on:
       - release/v2.0.1
       - release/v2.0.3
       - release/v2.0.4
+      - release/v2.0.5
     paths:
       - ATHLTH/**/*.swift
       - ATHLTH/Assets.xcassets/**
