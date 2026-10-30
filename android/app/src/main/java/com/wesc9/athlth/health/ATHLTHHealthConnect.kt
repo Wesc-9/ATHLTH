@@ -81,23 +81,55 @@ class ATHLTHHealthConnect(private val context: Context) {
         // Imported records are displayed only; ATHLTH does NOT automatically
         // store/re-upload them or create extra ATHLTH workouts.
         val sessions = if (granted.contains(HealthPermission.getReadPermission(ExerciseSessionRecord::class))) {
-            hc.readRecords(
-                ReadRecordsRequest(
-                    recordType = ExerciseSessionRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(now.minus(7, ChronoUnit.DAYS), now),
-                    pageSize = 100
+            var page: String? = null
+            val seen = mutableSetOf<String>()
+            var pageCount = 0
+            do {
+                val result = hc.readRecords(
+                    ReadRecordsRequest(
+                        recordType = ExerciseSessionRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(now.minus(7, ChronoUnit.DAYS), now),
+                        pageSize = 100,
+                        pageToken = page
+                    )
                 )
-            ).records.size
+                // Multiple sources may provide an identical exercise session.
+                result.records.forEach { item ->
+                    seen += "${item.startTime}|${item.endTime}|${item.exerciseType}"
+                }
+                page = result.pageToken
+                pageCount++
+            } while (page != null && pageCount < 100)
+            // A partial page walk must not be shown as a definitive 7-day count.
+            if (page == null) seen.size else null
         } else null
 
         val heartRate = if (granted.contains(HealthPermission.getReadPermission(HeartRateRecord::class))) {
-            hc.readRecords(
-                ReadRecordsRequest(
-                    recordType = HeartRateRecord::class,
-                    timeRangeFilter = TimeRangeFilter.between(now.minus(24, ChronoUnit.HOURS), now),
-                    pageSize = 100
+            var page: String? = null
+            var latestTime: Instant? = null
+            var latestBpm: Long? = null
+            var pageCount = 0
+            do {
+                val result = hc.readRecords(
+                    ReadRecordsRequest(
+                        recordType = HeartRateRecord::class,
+                        timeRangeFilter = TimeRangeFilter.between(now.minus(24, ChronoUnit.HOURS), now),
+                        pageSize = 100,
+                        pageToken = page
+                    )
                 )
-            ).records.flatMap { it.samples }.maxByOrNull { it.time }?.beatsPerMinute
+                result.records.forEach { record ->
+                    record.samples.forEach { sample ->
+                        if (latestTime == null || sample.time > latestTime) {
+                            latestTime = sample.time
+                            latestBpm = sample.beatsPerMinute
+                        }
+                    }
+                }
+                page = result.pageToken
+                pageCount++
+            } while (page != null && pageCount < 100)
+            if (page == null) latestBpm else null
         } else null
 
         val sleep = if (granted.contains(HealthPermission.getReadPermission(SleepSessionRecord::class))) {
