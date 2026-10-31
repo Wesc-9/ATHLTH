@@ -659,6 +659,15 @@ enum WorkoutLaunchCoordinator {
         plannedPlanID: UUID? = nil,
         plannedSessionID: UUID? = nil
     ) async throws {
+        // Validate the shared timeline before handing a workout to iPad,
+        // HealthKit, Apple Watch or the iPhone recording store.
+        if let advanced = configuration.advancedWorkout,
+           let issue = ATHLTHQuickRunTimelineAdapter.validationError(for: advanced) {
+            throw NSError(
+                domain: "ATHLTH.QuickRunTimeline", code: 1,
+                userInfo: [NSLocalizedDescriptionKey: issue]
+            )
+        }
         if ATHLTHDeviceRole.isIPad {
             let envelope =
                 WorkoutDeviceRelayEnvelope(
@@ -716,9 +725,9 @@ enum WorkoutLaunchCoordinator {
                 return route
             }
 
-            guard
-                let workout = configuration.workout,
-                let routeID = workout.routeID
+            guard let routeID =
+                    configuration.advancedWorkout?.routeID ??
+                    configuration.workout?.routeID
             else {
                 return nil
             }
@@ -783,7 +792,14 @@ enum WorkoutLaunchCoordinator {
         }()
 
         let structuredWorkout =
-            configuration.workout.map {
+            configuration.advancedWorkout.flatMap {
+                ATHLTHQuickRunTimelineAdapter.transfer(
+                    from: $0,
+                    title: configuration.title,
+                    routeAlerts: configuration.routeAlerts,
+                    autoPauseEnabled: configuration.autoPauseEnabled
+                )
+            } ?? configuration.workout.map {
                 PlannedWorkoutWatchBuilder
                     .runningTransfer(
                         from: $0,
@@ -946,6 +962,12 @@ enum WorkoutLaunchCoordinator {
         }
 
         let preparedSummary: String = {
+            if let advanced = configuration.advancedWorkout {
+                return advanced.durationMinutes.map { "\($0) min" } ??
+                    ATHLTHLocalization.choose(
+                        english: "Structured run", norwegian: "Strukturert løpeøkt"
+                    )
+            }
             if let workout =
                     configuration.workout {
                 return workout.summary
