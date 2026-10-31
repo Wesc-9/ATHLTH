@@ -3591,7 +3591,17 @@ struct WorkoutTemplateBuilderView: View {
                 blockPickerSheet
             }
             .sheet(isPresented: $showingSavedWorkoutPicker) {
-                savedWorkoutPickerSheet
+                if isPlannedWorkout {
+                    WorkoutTemplateLibraryView(
+                        onSelectPlanned: { workout in
+                            appendSavedWorkout(workout)
+                            showingSavedWorkoutPicker = false
+                        },
+                        initialCategory: initialActivity
+                    )
+                } else {
+                    savedWorkoutPickerSheet
+                }
             }
             .sheet(isPresented: $showingStudioRoutePicker) {
                 SavedRoutesView(
@@ -3869,6 +3879,7 @@ struct WorkoutTemplateBuilderView: View {
             blocks: $blocks,
             visiblePhases: $studioVisiblePhases,
             selectedPhase: $selectedPhase,
+            advanced: studioAdvanced,
             onAddRun: { phase in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
@@ -3936,10 +3947,27 @@ struct WorkoutTemplateBuilderView: View {
 
     private func useRoute(_ route: TrainingRoute, in phase: WorkoutPhaseKind) {
         selectedPhase = phase
-        studioVisiblePhases.insert(phase)
+        let previousRoute = session.savedRoutes.first { $0.id == selectedRouteID }
+        let existingRouteBlockIndex = previousRoute.flatMap { previous in
+            blocks.firstIndex(where: {
+                $0.title == previous.title && $0.kind == .run
+            })
+        }
+        // A route can be the entire workout with no mandatory phase header.
+        // If the user has already added parts, the route joins the chosen part.
+        let directRoute = blocks.isEmpty && studioVisiblePhases.isEmpty
+            && phase == .main
         selectedRouteID = route.id
-        // A selected route is itself a run step; a phase wrapper is optional.
-        // Do not add an extra route-only panel or preset warm-up.
+        if !directRoute { studioVisiblePhases.insert(phase) }
+        if let existingRouteBlockIndex {
+            blocks[existingRouteBlockIndex].title = route.title
+            blocks[existingRouteBlockIndex].distanceMeters =
+                route.distanceKilometers * 1_000
+            blocks[existingRouteBlockIndex].phase = phase
+            blocks[existingRouteBlockIndex].durationSeconds = nil
+            resequence()
+            return
+        }
         var routeRun = WorkoutTemplateBlock(
             sequence: 0, kind: .run, title: route.title,
             exerciseSlug: nil,
@@ -5270,18 +5298,23 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func appendSavedWorkout(_ workout: PlannedSession) {
-        let source = workout.workoutBlocks ?? []
+        let source = workout.resolvedWorkoutBlocks
         guard !source.isEmpty else { return }
         var newGroups: [UUID: UUID] = [:]
-        for original in source {
+        let insertAt = ATHLTHWorkoutPhasePlacement.insertionIndex(
+            for: selectedPhase, in: blocks
+        )
+        let copied = source.map { original -> WorkoutTemplateBlock in
             var copy = original
             copy.editorDragID = UUID()
+            copy.phase = selectedPhase
             if let id = original.groupID {
                 if newGroups[id] == nil { newGroups[id] = UUID() }
                 copy.groupID = newGroups[id]
             }
-            blocks.append(copy)
+            return copy
         }
+        blocks.insert(contentsOf: copied, at: insertAt)
         resequence()
     }
 
