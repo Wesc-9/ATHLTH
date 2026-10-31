@@ -1164,6 +1164,8 @@ struct WorkoutTemplateLibraryView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
+                // Run library filters are enough context; keep hero cards elsewhere.
+                if initialCategory != .running {
                 LibraryPremiumIntro(
                     eyebrow: initialCategory != nil
                         ? "ATHLTH · PLAN" : "WORKOUT LIBRARY",
@@ -1213,14 +1215,35 @@ struct WorkoutTemplateLibraryView: View {
                     }
                 }
 
-                HStack {
+                }
+
+                HStack(spacing: 9) {
                     Text(ATHLTHLocalization.choose(english: "View", norwegian: "Visning"))
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    Spacer()
+                    if initialCategory == .running {
+                        Button {
+                            favoritesOnly.toggle()
+                        } label: {
+                            filterChip(
+                                ATHLTHLocalization.choose(
+                                    english: "Favorites", norwegian: "Favoritter"
+                                ),
+                                systemImage: "star.fill",
+                                selected: favoritesOnly
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(
+                            favoritesOnly ? [.isSelected] : []
+                        )
+                    }
+                    Spacer(minLength: 4)
                     ATHLTHLibraryDisplayPicker(selection: $displayMode)
                 }
+                .frame(minHeight: 44)
 
+                if initialCategory != .running {
                 ScrollView(
                     .horizontal,
                     showsIndicators: false
@@ -1230,7 +1253,9 @@ struct WorkoutTemplateLibraryView: View {
                             favoritesOnly.toggle()
                         } label: {
                             filterChip(
-                                "Favorites",
+                                ATHLTHLocalization.choose(
+                                    english: "Favorites", norwegian: "Favoritter"
+                                ),
                                 systemImage: "star.fill",
                                 selected: favoritesOnly
                             )
@@ -1300,6 +1325,8 @@ struct WorkoutTemplateLibraryView: View {
                         }
                         }
                     }
+                }
+
                 }
 
                 if initialCategory == .strength {
@@ -1875,7 +1902,11 @@ struct WorkoutTemplateLibraryView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    .padding(.trailing, 15)
                 }
+                // Extend the actual scroll viewport to the filter card edge.
+                // The final chip retains an inset so it is never cut in half.
+                .padding(.trailing, -15)
 
                 Text(ATHLTHLocalization.choose(
                     english: "Duration", norwegian: "Varighet"
@@ -1897,7 +1928,9 @@ struct WorkoutTemplateLibraryView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    .padding(.trailing, 15)
                 }
+                .padding(.trailing, -15)
                 if selectedRunningDuration != .any {
                     Text(ATHLTHLocalization.choose(
                         english: "Only workouts with a recorded duration can match a time filter.",
