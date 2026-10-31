@@ -3880,10 +3880,22 @@ struct WorkoutTemplateBuilderView: View {
             visiblePhases: $studioVisiblePhases,
             selectedPhase: $selectedPhase,
             advanced: studioAdvanced,
+            activity: initialActivity,
             onAddRun: { phase in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
-                addRunBlock()
+                switch initialActivity {
+                case .strength:
+                    openExercisePicker()
+                case .walking:
+                    addRunBlock(activity: .walking)
+                case .cycling:
+                    addCyclingBlock()
+                case .mobility:
+                    addWellnessBlock(.stretching)
+                default:
+                    addRunBlock()
+                }
             },
             onAddIntervals: { phase in
                 selectedPhase = phase
@@ -3939,7 +3951,16 @@ struct WorkoutTemplateBuilderView: View {
                 guard let index = blocks.firstIndex(where: {
                     $0.editorDragID == id
                 }) else { return }
+                let groupID = blocks[index].groupID
                 blocks.remove(at: index)
+                if let groupID,
+                   blocks.filter({ $0.groupID == groupID }).count < 2 {
+                    for i in blocks.indices where blocks[i].groupID == groupID {
+                        blocks[i].groupID = nil
+                        blocks[i].groupKind = nil
+                        blocks[i].groupRounds = nil
+                    }
+                }
                 resequence()
             }
         )
