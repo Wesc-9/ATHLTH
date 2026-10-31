@@ -3172,6 +3172,8 @@ struct WorkoutTemplateBuilderView: View {
     @State private var studioBasicRunMode: RunQuickStartMode = .free
     @State private var studioBasicRunEnvironment: RunEnvironment = .outdoor
     @State private var studioBasicDate = Date()
+    @State private var studioBasicOwnedBlockIDs: Set<UUID> = []
+    @State private var studioBasicWorkoutTitle: String?
     @State private var showingCopyPicker = false
     @State private var pendingExerciseChoice: WorkoutBlockGroupKind?
     @State private var pendingSavedWorkoutPicker = false
@@ -3244,6 +3246,16 @@ struct WorkoutTemplateBuilderView: View {
         self.initialActivity = initialActivity
         self.onScheduledTimeChanged = onScheduledTimeChanged
         _studioAdvanced = State(initialValue: initialActivity == nil)
+        _studioBasicRunMode = State(initialValue:
+            initialRouteID != nil ? .route :
+            initialBlocks.count > 1 ? .structured : .free
+        )
+        let firstRun = initialBlocks.first { $0.kind == .run }
+        _studioBasicRunEnvironment = State(initialValue:
+            firstRun?.isIndoor == true
+                ? (firstRun?.treadmillInclinePercent != nil ? .treadmill : .indoor)
+                : .outdoor
+        )
         _studioBasicDate = State(initialValue: plannedDate ?? Date())
         self.planCopyDays = planCopyDays
         self.onCopyToPlan = onCopyToPlan
@@ -3563,6 +3575,7 @@ struct WorkoutTemplateBuilderView: View {
                                 selectedRouteTitle: session.savedRoutes.first {
                                     $0.id == selectedRouteID
                                 }?.title,
+                                selectedWorkoutTitle: studioBasicWorkoutTitle,
                                 onChooseRoute: {
                                     studioRoutePhase = .main
                                     showingStudioRoutePicker = true
@@ -3641,30 +3654,22 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
             .onChange(of: studioBasicRunMode) { _, mode in
-                guard isPlannedWorkout, initialActivity == .running else { return }
-                if mode != .free {
-                    // Remove only the anonymous basic free-run placeholder.
-                    // Never delete user-added exercises or imported workouts.
-                    blocks.removeAll {
-                        $0.kind == .run &&
-                        $0.title == RunQuickStartMode.free.title &&
-                        $0.distanceMeters == 1_000 &&
-                        $0.durationSeconds == nil &&
-                        $0.groupID == nil
-                    }
-                    resequence()
-                } else if blocks.isEmpty {
-                    selectedPhase = .main
-                    addRunBlock(activity: .running)
-                    blocks[blocks.count - 1].isIndoor =
-                        studioBasicRunEnvironment != .outdoor
+                guard isPlannedWorkout, !studioAdvanced,
+                      initialActivity == .running else { return }
+                removeBasicOwnedBlocks()
+                if mode != .route { selectedRouteID = nil }
+                if mode != .structured { studioBasicWorkoutTitle = nil }
+                if mode == .free { seedBasicFreeRun() }
+            }
+            .onChange(of: studioAdvanced) { _, advanced in
+                if !advanced && initialActivity == .running {
+                    seedBasicFreeRun()
                 }
             }
             .onAppear {
                 if isPlannedWorkout && !studioAdvanced &&
-                    initialActivity == .running && blocks.isEmpty {
-                    selectedPhase = .main
-                    addRunBlock(activity: .running)
+                    initialActivity == .running {
+                    seedBasicFreeRun()
                 }
             }
             .sheet(isPresented: $showingBlockPicker, onDismiss: {
@@ -3687,6 +3692,9 @@ struct WorkoutTemplateBuilderView: View {
                     WorkoutTemplateLibraryView(
                         onSelectPlanned: { workout in
                             appendSavedWorkout(workout)
+                            if !studioAdvanced && initialActivity == .running {
+                                studioBasicWorkoutTitle = workout.title
+                            }
                             showingSavedWorkoutPicker = false
                         },
                         initialCategory: initialActivity
@@ -4063,8 +4071,30 @@ struct WorkoutTemplateBuilderView: View {
         )
     }
 
+    private func removeBasicOwnedBlocks() {
+        guard !studioBasicOwnedBlockIDs.isEmpty else { return }
+        blocks.removeAll { studioBasicOwnedBlockIDs.contains($0.editorDragID) }
+        studioBasicOwnedBlockIDs.removeAll()
+        resequence()
+    }
+
+    private func seedBasicFreeRun() {
+        guard isPlannedWorkout, initialActivity == .running,
+              studioBasicRunMode == .free, blocks.isEmpty else { return }
+        selectedPhase = .main
+        addRunBlock(activity: .running)
+        guard let lastIndex = blocks.indices.last else { return }
+        blocks[lastIndex].isIndoor = studioBasicRunEnvironment != .outdoor
+        blocks[lastIndex].treadmillInclinePercent =
+            studioBasicRunEnvironment == .treadmill ? 0 : nil
+        studioBasicOwnedBlockIDs.insert(blocks[lastIndex].editorDragID)
+    }
+
     private func useRoute(_ route: TrainingRoute, in phase: WorkoutPhaseKind) {
         selectedPhase = phase
+        if isPlannedWorkout && !studioAdvanced && initialActivity == .running {
+            removeBasicOwnedBlocks()
+        }
         let previousRoute = session.savedRoutes.first { $0.id == selectedRouteID }
         let existingRouteBlockIndex = previousRoute.flatMap { previous in
             blocks.firstIndex(where: {
@@ -4097,6 +4127,10 @@ struct WorkoutTemplateBuilderView: View {
         routeRun.cardioActivity = initialActivity == .walking ? .walking : .running
         routeRun.isIndoor = false
         insertBlock(routeRun, toGroup: nil)
+        if isPlannedWorkout && !studioAdvanced &&
+            initialActivity == .running, let added = blocks.last {
+            studioBasicOwnedBlockIDs.insert(added.editorDragID)
+        }
     }
 
     private func moveStudioBlock(
@@ -5418,6 +5452,9 @@ struct WorkoutTemplateBuilderView: View {
     private func appendSavedWorkout(_ workout: PlannedSession) {
         let source = workout.resolvedWorkoutBlocks
         guard !source.isEmpty else { return }
+        if isPlannedWorkout && !studioAdvanced && initialActivity == .running {
+            removeBasicOwnedBlocks()
+        }
         var newGroups: [UUID: UUID] = [:]
         let insertAt = ATHLTHWorkoutPhasePlacement.insertionIndex(
             for: selectedPhase, in: blocks
@@ -5433,6 +5470,9 @@ struct WorkoutTemplateBuilderView: View {
             return copy
         }
         blocks.insert(contentsOf: copied, at: insertAt)
+        if isPlannedWorkout && !studioAdvanced && initialActivity == .running {
+            studioBasicOwnedBlockIDs.formUnion(copied.map(\.editorDragID))
+        }
         resequence()
     }
 
