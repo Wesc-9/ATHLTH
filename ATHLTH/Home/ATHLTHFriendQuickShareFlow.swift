@@ -19,7 +19,7 @@ enum ATHLTHFriendQuickShareKind: String, Identifiable {
     var title: String {
         switch self {
         case .plan:
-            ATHLTHLocalization.choose(english: "Share a plan", norwegian: "Del plan")
+            ATHLTHLocalization.choose(english: "Send plan", norwegian: "Send plan")
         case .workout:
             ATHLTHLocalization.choose(english: "Send workout", norwegian: "Send treningsøkt")
         case .route:
