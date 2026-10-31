@@ -1480,6 +1480,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             return
         }
 
+        // A completed Watch result can arrive while AppRoot's view
+        // observers are not mounted. Terminate only that Watch session's
+        // ActivityKit card and matching widget snapshot immediately.
+        ATHLTHSurfaceCoordinator.completedWatchWorkoutDidArrive(result)
+
         // Release the start guard as soon as the completed result arrives,
         // independently of sign-in, Health import or summary dismissal.
         let activity = WatchWorkoutActivityState.afterCompletion(
