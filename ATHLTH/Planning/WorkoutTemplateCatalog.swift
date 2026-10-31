@@ -3728,6 +3728,13 @@ struct WorkoutTemplateBuilderView: View {
                                 blockDetails(index)
                             }
                             .padding(18)
+                            .onAppear {
+                                let original = blocks[index]
+                                let adapted = ATHLTHRunningLibraryExerciseAdapter.adapt(original)
+                                if original.kind != adapted.kind {
+                                    blocks[index] = adapted
+                                }
+                            }
                         }
                     }
                     .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
@@ -5602,6 +5609,11 @@ struct WorkoutTemplateBuilderView: View {
             entry.exercise.isVisibleOutsideOwnerLibrary
             ? ATHLTHExerciseReferenceResolver.shareableSnapshot(entry.exercise)
             : nil
+        // A library item named Running is cardio, not a strength set.
+        // Keep its original exercise reference, but use the existing run engine.
+        if groupID == nil {
+            block = ATHLTHRunningLibraryExerciseAdapter.adapt(block)
+        }
         insertBlock(block, toGroup: groupID)
     }
 
