@@ -618,7 +618,8 @@ final class IPhoneWorkoutStore:
         pendingAutoPauseEnabled =
             autoPauseEnabled
 
-        if environment == .treadmill {
+        if environment != .outdoor {
+            // Indoor running and treadmill do not require location permission.
             beginIfAuthorized()
         } else if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
