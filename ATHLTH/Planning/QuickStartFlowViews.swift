@@ -1246,8 +1246,6 @@ struct RunQuickStartSheet: View {
     @State private var quickDisplayDate = Date()
     @State private var pendingStartDate: Date?
     @State private var pendingStartDevice: WorkoutCaptureDevice?
-    @State private var customDelayMinutes = 2
-    @State private var showingCustomDelay = false
     @State private var delayedStartTask: Task<Void, Never>?
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var routeLocationProbe =
@@ -1337,11 +1335,29 @@ struct RunQuickStartSheet: View {
                     }
 
                     if mode == .route || mode == .structured {
-                        selectionCard
+                        if isAdvancedSetup {
+                            selectionCard
+                        } else {
+                            basicSelectedContent
+                        }
                     }
 
                     if mode == .route, selectedRoute != nil {
-                        ATHLTHRouteWarmupCard(configuration: $routeWarmup)
+                        if isAdvancedSetup {
+                            ATHLTHRouteWarmupCard(configuration: $routeWarmup)
+                        } else {
+                            DisclosureGroup {
+                                ATHLTHRouteWarmupCard(configuration: $routeWarmup)
+                            } label: {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Optional warm-up",
+                                    norwegian: "Valgfri oppvarming"
+                                ), systemImage: "timer")
+                                .font(.subheadline.weight(.medium))
+                                .frame(minHeight: 44)
+                            }
+                            .tint(ATHLTHTrainDesign.bronze)
+                        }
                     }
 
                     if isAdvancedSetup {
@@ -1674,40 +1690,6 @@ struct RunQuickStartSheet: View {
         )
     }
 
-    private var runWatchTimingOptions: some View {
-        ATHLTHPlanSurface(density: .compact) {
-            DisclosureGroup {
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english: "When should the watch begin?",
-                        norwegian: "Når skal klokken starte?"
-                    ),
-                    selection: $watchStartMode
-                ) {
-                    ForEach(WatchWorkoutStartMode.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
-
-                Text(watchStartMode.detail)
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-            } label: {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Apple Watch start timing",
-                        norwegian: "Starttid på Apple Watch"
-                    ),
-                    systemImage: "applewatch"
-                )
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-            }
-            .tint(ATHLTHPlanDesign.accent)
-        }
-    }
-
     private var runEnvironmentCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(ATHLTHLocalization.choose(
@@ -1788,6 +1770,41 @@ struct RunQuickStartSheet: View {
                 .opacity(unavailable ? 0.48 : 1)
             }
         }
+    }
+
+    private var basicSelectedContent: some View {
+        HStack(spacing: 10) {
+            Image(systemName: mode == .route ? "map" : "list.bullet.rectangle")
+                .foregroundStyle(ATHLTHTrainDesign.bronze)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(mode == .route
+                    ? selectedRoute?.title ?? ATHLTHLocalization.choose(
+                        english: "Choose route", norwegian: "Velg rute"
+                      )
+                    : selectedWorkout?.title ?? ATHLTHLocalization.choose(
+                        english: "Choose workout", norwegian: "Velg treningsøkt"
+                      ))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+                .lineLimit(1)
+                if mode == .route, let selectedRoute {
+                    Text(String(format: "%.1f km", selectedRoute.distanceKilometers))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer(minLength: 0)
+            Button(ATHLTHLocalization.choose(
+                english: "Change", norwegian: "Endre"
+            )) {
+                if mode == .route { showingRoutes = true }
+                else { showingRunningLibrary = true }
+            }
+            .buttonStyle(.bordered)
+            .tint(ATHLTHTrainDesign.bronze)
+        }
+        .padding(12)
+        .athlthTrainPaper()
     }
 
     @ViewBuilder
