@@ -327,7 +327,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                             english: "Strength exercise", norwegian: "Styrkeøvelse"
                         )
                         : ATHLTHLocalization.choose(
-                            english: "Run / activity", norwegian: "Løp / aktivitet"
+                            english: "Running exercise", norwegian: "Løpeøvelse"
                         ),
                     systemImage: activity == .strength ? "dumbbell" : "figure.run"
                 )

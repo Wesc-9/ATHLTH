@@ -3184,8 +3184,6 @@ struct WorkoutTemplateBuilderView: View {
     @State private var savedToMyWorkouts = false
     @State private var savedTemplateID: UUID?
     @State private var actionNotice: String?
-    @AppStorage("athlth.workoutBuilder.durationInput.v1")
-    private var durationInputMode = "clock"
     private let draftContext: String
     private let sourceTemplateID: UUID?
     private let initialQuickAdd: String?
@@ -4844,108 +4842,9 @@ struct WorkoutTemplateBuilderView: View {
         }
         switch block.kind {
             case .run:
-                Picker(tr("Activity", "Aktivitet"), selection: Binding(
-                    get: { blocks[index].cardioActivity ?? .running },
-                    set: { activity in
-                        let oldActivity = blocks[index].cardioActivity ?? .running
-                        blocks[index].cardioActivity = activity
-                        if blocks[index].title == oldActivity.title ||
-                            blocks[index].title == "Løping" ||
-                            blocks[index].title == "Running" ||
-                            blocks[index].title == "Gåing" ||
-                            blocks[index].title == "Walking" ||
-                            blocks[index].title == "Løpeintervall" ||
-                            blocks[index].title == "Run interval" ||
-                            blocks[index].title == "Gåintervall" ||
-                            blocks[index].title == "Walking interval" {
-                            let isInterval = blocks[index].groupKind == .intervals
-                            blocks[index].title = isInterval
-                                ? (activity == .walking
-                                    ? tr("Walking interval", "Gåintervall")
-                                    : tr("Run interval", "Løpeintervall"))
-                                : (activity == .walking
-                                    ? tr("Walking", "Gåing")
-                                    : tr("Running", "Løping"))
-                        }
-                    }
-                )) {
-                    Text(tr("Run", "Løp")).tag(WorkoutCardioActivity.running)
-                    Text(tr("Walk", "Gå")).tag(WorkoutCardioActivity.walking)
-                }
-                .pickerStyle(.segmented)
-                TextField(ATHLTHLocalization.choose(english: "Activity (jogging, strides, drills)",
-                                                       norwegian: "Aktivitet (jogg, stigningsløp, drill)"),
-                          text: Binding(
-                            get: { ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]) },
-                            set: { blocks[index].title = $0 }
-                          ))
-                    .font(.subheadline)
-                Picker(ATHLTHLocalization.choose(english: "Goal", norwegian: "Mål"),
-                       selection: Binding<Bool>(
-                          get: { blocks[index].durationSeconds != nil },
-                          set: { timed in
-                              blocks[index].durationSeconds = timed ? 600 : nil
-                              blocks[index].distanceMeters = timed ? nil : 1_000
-                          })) {
-                    Text(ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse")).tag(false)
-                    Text(ATHLTHLocalization.choose(english: "Time", norwegian: "Tid")).tag(true)
-                }
-                .pickerStyle(.segmented)
-                if blocks[index].durationSeconds != nil {
-                    durationEntryEditor(index)
-                } else {
-                    Stepper(value: distanceBinding(index), in: 1...100000, step: 1) {
-                        Text("\(Int(blocks[index].distanceMeters ?? 1000)) m")
-                    }
-                }
-                Toggle(tr("Outdoor activity", "Utendørs"), isOn: Binding(
-                    get: { blocks[index].isIndoor != true },
-                    set: { outdoor in
-                        blocks[index].isIndoor = !outdoor
-                        if outdoor { blocks[index].treadmillInclinePercent = nil }
-                    }
-                ))
-                .tint(studioAccent)
-                if blocks[index].isIndoor != true {
-                    if !isPlannedWorkout { routeSection }
-                } else {
-                    Toggle(
-                        tr("Treadmill incline target", "Målstigning på tredemølle"),
-                        isOn: Binding(
-                            get: { blocks[index].treadmillInclinePercent != nil },
-                            set: { blocks[index].treadmillInclinePercent = $0 ? 0 : nil }
-                        )
-                    )
-                    .tint(studioAccent)
-                    if blocks[index].treadmillInclinePercent != nil {
-                        Stepper(
-                            value: Binding(
-                                get: { blocks[index].treadmillInclinePercent ?? 0 },
-                                set: { blocks[index].treadmillInclinePercent = $0 }
-                            ),
-                            in: 0...20, step: 0.5
-                        ) {
-                            Text(String(
-                                format: "%.1f %% stigning",
-                                blocks[index].treadmillInclinePercent ?? 0
-                            ))
-                            .font(.subheadline.weight(.medium))
-                        }
-                    }
-                }
-                Toggle(ATHLTHLocalization.choose(english: "Target pace", norwegian: "Måltempo"),
-                       isOn: Binding(
-                          get: { blocks[index].targetPaceSecondsPerKilometer != nil },
-                          set: { blocks[index].targetPaceSecondsPerKilometer = $0 ? 330 : nil }
-                       ))
-                if blocks[index].targetPaceSecondsPerKilometer != nil {
-                    Stepper(value: Binding(
-                              get: { blocks[index].targetPaceSecondsPerKilometer ?? 330 },
-                              set: { blocks[index].targetPaceSecondsPerKilometer = $0 }),
-                            in: 60...3600, step: 1) {
-                        let pace = Int(blocks[index].targetPaceSecondsPerKilometer ?? 330)
-                        Text(String(format: "%d:%02d/km", pace / 60, pace % 60))
-                    }
+                ATHLTHPlannedRunStepEditor(block: $blocks[index])
+                if !isPlannedWorkout && blocks[index].isIndoor != true {
+                    routeSection
                 }
             case .exercise:
                 Toggle(
@@ -5029,54 +4928,7 @@ struct WorkoutTemplateBuilderView: View {
             }
 
             if block.kind != .rest {
-                Divider().padding(.vertical, 3)
-
-                Text(tr("PLANNED INTENSITY", "PLANLAGT INTENSITET"))
-                    .font(.system(size: 10, weight: .semibold))
-                    .tracking(1.1)
-                    .foregroundStyle(studioAccent)
-
-                Picker(
-                    tr("Heart rate zone", "Pulssone"),
-                    selection: Binding<Int>(
-                        get: { blocks[index].targetHeartRateZone ?? 0 },
-                        set: { selected in
-                            blocks[index].targetHeartRateZone =
-                                (1...5).contains(selected) ? selected : nil
-                            // A manual choice replaces the imported intensity
-                            // label; never keep contradictory HR ranges.
-                            blocks[index].sourceIntensityZoneLabel = nil
-                            blocks[index].targetHeartRatePercentMin = nil
-                            blocks[index].targetHeartRatePercentMax = nil
-                        }
-                    )
-                ) {
-                    Text(tr("No target", "Ingen")).tag(0)
-                    ForEach(1...5, id: \.self) { zone in
-                        Text("\(zone)").tag(zone)
-                    }
-                }
-
-                Picker(
-                    tr("Perceived effort", "Opplevd anstrengelse"),
-                    selection: Binding<Int>(
-                        get: { blocks[index].targetEffortRPE ?? 0 },
-                        set: { blocks[index].targetEffortRPE =
-                            (1...10).contains($0) ? $0 : nil }
-                    )
-                ) {
-                    Text(tr("No target", "Ingen")).tag(0)
-                    ForEach(1...10, id: \.self) { effort in
-                        Text("RPE \(effort)/10").tag(effort)
-                    }
-                }
-
-                Text(tr(
-                    "These are planned targets, not measured heart rate or effort.",
-                    "Dette er planlagte mål, ikke målt puls eller anstrengelse."
-                ))
-                .font(.caption2)
-                .foregroundStyle(studioInk.opacity(0.6))
+                ATHLTHPlannedIntensityEditor(block: $blocks[index])
             }
     }
 
@@ -5907,109 +5759,8 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     // Presentation preference only; the workout model always stores seconds.
-    @ViewBuilder
     private func durationEntryEditor(_ index: Int) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 8) {
-                Text(tr("Duration", "Varighet"))
-                    .font(.caption.weight(.semibold))
-                Spacer()
-                Menu {
-                    Button(tr("Minutes", "Minutter")) { durationInputMode = "minutes" }
-                    Button(tr("Minutes : seconds", "Minutter : sekunder")) {
-                        durationInputMode = "clock"
-                    }
-                    Button(tr("Seconds", "Sekunder")) { durationInputMode = "seconds" }
-                } label: {
-                    HStack(spacing: 5) {
-                        Text(durationInputMode == "minutes"
-                             ? tr("Minutes", "Minutter")
-                             : durationInputMode == "seconds"
-                             ? tr("Seconds", "Sekunder")
-                             : tr("Min : sec", "Min : sek"))
-                        Image(systemName: "chevron.down")
-                    }
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(studioAccent)
-                }
-            }
-            HStack(spacing: 7) {
-                if durationInputMode == "seconds" {
-                    TextField(tr("Seconds", "Sekunder"),
-                              value: totalSecondsBinding(index),
-                              format: .number)
-                        .keyboardType(.numberPad)
-                        .frame(width: 82)
-                    Text(tr("sec", "sek"))
-                        .foregroundStyle(studioInk.opacity(0.60))
-                } else {
-                    TextField(tr("Minutes", "Minutter"),
-                              value: minutesComponentBinding(index),
-                              format: .number)
-                        .keyboardType(.numberPad)
-                        .frame(width: 62)
-                    if durationInputMode == "clock" {
-                        Text(":")
-                        TextField(tr("Seconds", "Sekunder"),
-                                  value: secondsComponentBinding(index),
-                                  format: .number)
-                            .keyboardType(.numberPad)
-                            .frame(width: 56)
-                        Text(tr("min : sec", "min : sek"))
-                            .font(.caption)
-                            .foregroundStyle(studioInk.opacity(0.60))
-                    } else {
-                        Text(tr("min", "min"))
-                            .foregroundStyle(studioInk.opacity(0.60))
-                        let remainder = Int((blocks[index].durationSeconds ?? 0).rounded()) % 60
-                        if remainder > 0 {
-                            Text("+ \(remainder) " + tr("sec", "sek"))
-                                .font(.caption)
-                                .foregroundStyle(studioInk.opacity(0.60))
-                        }
-                    }
-                }
-                Spacer(minLength: 0)
-            }
-            .font(.system(size: 20, weight: .medium, design: .rounded))
-            .textFieldStyle(.roundedBorder)
-            Text(tr("Stored precisely in seconds, regardless of display choice.",
-                    "Tiden lagres nøyaktig i sekunder uansett visning."))
-                .font(.caption2)
-                .foregroundStyle(studioInk.opacity(0.55))
-        }
-        .padding(.vertical, 3)
-    }
-
-    private func totalSecondsBinding(_ index: Int) -> Binding<Int> {
-        Binding(
-            get: { Int((blocks[index].durationSeconds ?? 60).rounded()) },
-            set: { blocks[index].durationSeconds = Double(min(max($0, 1), 21600)) }
-        )
-    }
-
-    private func minutesComponentBinding(_ index: Int) -> Binding<Int> {
-        Binding(
-            get: { Int((blocks[index].durationSeconds ?? 60).rounded()) / 60 },
-            set: { minutes in
-                let remaining = Int((blocks[index].durationSeconds ?? 60).rounded()) % 60
-                blocks[index].durationSeconds = Double(
-                    min(max(minutes, 0) * 60 + remaining, 21600)
-                )
-            }
-        )
-    }
-
-    private func secondsComponentBinding(_ index: Int) -> Binding<Int> {
-        Binding(
-            get: { Int((blocks[index].durationSeconds ?? 60).rounded()) % 60 },
-            set: { seconds in
-                let minutes = Int((blocks[index].durationSeconds ?? 60).rounded()) / 60
-                blocks[index].durationSeconds = Double(
-                    min(minutes * 60 + min(max(seconds, 0), 59), 21600)
-                )
-            }
-        )
+        ATHLTHPlannedDurationEditor(durationSeconds: $blocks[index].durationSeconds)
     }
 
     private func distanceBinding(_ index: Int) -> Binding<Double> {
