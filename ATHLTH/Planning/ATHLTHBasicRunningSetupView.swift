@@ -157,7 +157,7 @@ struct ATHLTHBasicRunningSetupView: View {
                 .font(.system(size: 17, weight: .semibold, design: .serif))
                 .foregroundStyle(ink)
             HStack(spacing: 8) {
-                ForEach(items, id: \.id) { item in
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
                     let selected = item.id == selection
                     Button { onSelect(item.id) } label: {
                         VStack(spacing: 5) {
