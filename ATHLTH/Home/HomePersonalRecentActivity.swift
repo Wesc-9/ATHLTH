@@ -547,6 +547,8 @@ struct HomeActiveFriendsStrip: View {
     @State private var selectedFriendID: UUID?
     @State private var destination: FriendQuickDestination?
     @State private var challengeFriend: SocialProfileCard?
+    @State private var trainTogetherFriend: SocialProfileCard?
+    @State private var shareRequest: ATHLTHFriendQuickShareRequest?
 
     private enum FriendQuickDestination: Hashable {
         case message(SocialProfileCard)
@@ -556,6 +558,8 @@ struct HomeActiveFriendsStrip: View {
     private enum FriendQuickAction {
         case message(SocialProfileCard)
         case challenge(SocialProfileCard)
+        case trainTogether(SocialProfileCard)
+        case share(SocialProfileCard, ATHLTHFriendQuickShareKind)
         case profile(UUID)
     }
 
@@ -574,6 +578,12 @@ struct HomeActiveFriendsStrip: View {
                 destination = .message(friend)
             case .challenge(let friend):
                 challengeFriend = friend
+            case .trainTogether(let friend):
+                trainTogetherFriend = friend
+            case .share(let friend, let kind):
+                shareRequest = ATHLTHFriendQuickShareRequest(
+                    friend: friend, kind: kind
+                )
             case .profile(let userID):
                 destination = .profile(userID)
             }
@@ -732,6 +742,12 @@ struct HomeActiveFriendsStrip: View {
                                     },
                                     onProfile: {
                                         openAction(.profile(friend.userID))
+                                    },
+                                    onTrainTogether: {
+                                        openAction(.trainTogether(friend))
+                                    },
+                                    onShare: { kind in
+                                        openAction(.share(friend, kind))
                                     }
                                 )
                                 .presentationCompactAdaptation(.popover)
@@ -769,6 +785,18 @@ struct HomeActiveFriendsStrip: View {
     }
             .sheet(item: $challengeFriend) { friend in
                 ChallengeCreationView(preselectedFriends: [friend])
+            }
+            .sheet(item: $trainTogetherFriend) { friend in
+                // Reuse Plan's real invitation editor. Its send action
+                // creates a version-2 workout invite with the partner fixed.
+                SessionEditorView(
+                    standaloneDate: Date(),
+                    partnerID: friend.userID,
+                    physicalMeetup: true
+                )
+            }
+            .sheet(item: $shareRequest) { request in
+                ATHLTHFriendQuickShareFlow(request: request)
             }
         } else if social.isRefreshing {
             HStack(spacing: 8) {
