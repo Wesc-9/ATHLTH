@@ -241,6 +241,12 @@ struct ATHLTHCoachRouteGeneratorView: View {
                 }
             }
             .task { locationStore.start() }
+            .onChange(of: brief) { _, _ in
+                // Never allow a route generated for stale preferences to be
+                // confirmed after the athlete changes the request.
+                suggestions = []
+                selectedID = nil
+            }
         }
     }
 
@@ -294,6 +300,10 @@ struct ATHLTHCoachRouteGeneratorView: View {
                 let results = try await ATHLTHCoachRouteGenerator.generate(
                     brief: selectedBrief, location: location
                 )
+                guard brief == selectedBrief else {
+                    isGenerating = false
+                    return
+                }
                 suggestions = results
                 selectedID = results.first?.id
                 if let first = results.first { updateMap(for: first) }
