@@ -1569,7 +1569,8 @@ struct MirroredWorkoutLiveView: View {
                     )
                 } label: {
                     Label(
-                        snapshot.runningAwaitingMainStart == true
+                        (snapshot.runningAwaitingMainStart == true ||
+                         snapshot.runningRouteWarmup == true)
                             ? ATHLTHLocalization.choose(
                                 english: "Start main section", norwegian: "Start hoveddel"
                               )
