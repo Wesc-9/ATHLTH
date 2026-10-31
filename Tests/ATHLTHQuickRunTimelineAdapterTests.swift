@@ -60,6 +60,19 @@ final class ATHLTHQuickRunTimelineAdapterTests: XCTestCase {
         XCTAssertEqual(transfer?.steps.filter { $0.phase == "recovery" }.count, 3)
     }
 
+    func testTimedStepsKeepAutomaticProgressionWhenAnotherStepIsOpen() {
+        let timed = block("Timed run", phase: .main, seconds: 300)
+        var open = block("Open run", phase: .main, seconds: 300)
+        open.durationSeconds = nil
+        let transfer = ATHLTHQuickRunTimelineAdapter.transfer(
+            from: workout([timed, open]), title: "Free finale",
+            routeAlerts: .standard, autoPauseEnabled: true
+        )
+        XCTAssertEqual(transfer?.steps[0].measure, .time)
+        XCTAssertEqual(transfer?.steps[1].measure, .open)
+        XCTAssertEqual(transfer?.autoAdvanceTimedSteps, true)
+    }
+
     func testStrengthOrMixedWorkoutIsRejected() {
         let run = block("Run", phase: .main, seconds: 600)
         let strength = block("Strength", kind: .exercise, phase: .main, seconds: 60)
