@@ -3554,8 +3554,10 @@ struct WorkoutTemplateBuilderView: View {
                             onDateChanged: onScheduledTimeChanged
                         )
                         plannedStudio
-                        if studioAdvanced {
-                            workoutActions
+                        if let actionNotice {
+                            Label(actionNotice, systemImage: "info.circle")
+                                .font(.caption)
+                                .foregroundStyle(studioAccent)
                         }
                     } else {
                         if let plannedDate {
@@ -3907,10 +3909,14 @@ struct WorkoutTemplateBuilderView: View {
             onAddIntervals: { phase in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
+                let existingGroups = Set(blocks.compactMap(\.groupID))
                 createIntervals()
-                // Convert grouped repetitions immediately into editable
-                // effort/recovery rows, with no unwanted final pause.
-                if let id = blocks.last(where: { $0.groupKind == .intervals })?.groupID,
+                // Only individualize the NEW interval group. A warm-up
+                // insert must never unexpectedly rewrite a later group.
+                if let id = blocks.first(where: {
+                    $0.groupKind == .intervals &&
+                    $0.groupID.map { !existingGroups.contains($0) } == true
+                })?.groupID,
                    let individual = ATHLTHIntervalGroupEditing.individualSteps(
                     in: blocks, groupID: id
                    ) {
