@@ -740,6 +740,14 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
             }
         }
 
+        if latestSnapshot.state == .ending ||
+            latestSnapshot.state == .completed ||
+            latestSnapshot.state == .failed {
+            // ActivityKit must be notified by the session owner even when
+            // AppRootView is suspended and its onChange observer is absent.
+            ATHLTHSurfaceCoordinator.syncLiveActivity(with: latestSnapshot)
+        }
+
         if latestSnapshot.state == .completed ||
             latestSnapshot.state == .failed {
             mirroredSession = nil
@@ -763,6 +771,9 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         current.state = .completed
         current.capturedAt = activity.updatedAt
         snapshot = current
+        // The Watch's explicit inactive state is authoritative. Close the
+        // matching Live Activity even if HealthKit result import is delayed.
+        ATHLTHSurfaceCoordinator.syncLiveActivity(with: current)
         mirroredSession = nil
         isPresentationRequested = false
         liveViewIsVisible = false
@@ -826,6 +837,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         }
 
         self.snapshot = snapshot
+        ATHLTHSurfaceCoordinator.syncLiveActivity(with: snapshot)
         mirroredSession = nil
         connectionText =
             ATHLTHLocalization.choose(
@@ -919,6 +931,10 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
             }
 
             self.snapshot = snapshot
+            if newState == .ending ||
+                newState == .completed || newState == .failed {
+                ATHLTHSurfaceCoordinator.syncLiveActivity(with: snapshot)
+            }
 
             if self.iPhoneAudioCoachAttached {
                 if !self.aiConversationActive &&
