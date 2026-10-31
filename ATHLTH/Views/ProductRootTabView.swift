@@ -2297,7 +2297,10 @@ struct ATHLTHHomeView: View {
                     alignment: .top
                 )
             } else {
-                VStack(alignment: .leading, spacing: 10) {
+                // Center the empty calendar state within the space below
+                // the header. Keep its call to action a little lower, without
+                // changing the height shared with the recommendation card.
+                VStack(alignment: .center, spacing: 8) {
                     Image(systemName: "calendar")
                         .font(.system(size: 19, weight: .light))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
@@ -2307,6 +2310,7 @@ struct ATHLTHHomeView: View {
                     ))
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .multilineTextAlignment(.center)
                     Button {
                         showingHomeCalendarWorkoutPicker = true
                     } label: {
@@ -2320,15 +2324,21 @@ struct ATHLTHHomeView: View {
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
                         .padding(.horizontal, 11)
-                        .padding(.vertical, 8)
+                        .frame(minHeight: 44)
                         .background(
                             ATHLTHTrainDesign.paleGold.opacity(0.35),
                             in: Capsule()
                         )
                     }
                     .buttonStyle(.plain)
+                    .padding(.top, 8)
                 }
-                .frame(maxWidth: .infinity, minHeight: homeCalendarContentMinHeight)
+                .frame(
+                    maxWidth: .infinity,
+                    minHeight: homeCalendarContentMinHeight,
+                    maxHeight: .infinity,
+                    alignment: .center
+                )
             }
         }
         .padding(11)
