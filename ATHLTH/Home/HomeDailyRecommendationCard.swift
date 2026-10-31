@@ -6,9 +6,11 @@ import SwiftUI
 struct HomeDailyRecommendationCard: View {
     let advice: HomeDailyRecommendationPolicy.Advice
     let onStartRecommendedWorkout: () -> Void
+    /// Dense presentation in Home's two-column row; accessibility remains naturally sized.
+    var compact: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: compact ? 6 : 10) {
             HStack(spacing: 6) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 12, weight: .medium))
@@ -17,7 +19,7 @@ struct HomeDailyRecommendationCard: View {
                     english: "Today's recommendation",
                     norwegian: "Dagens anbefaling"
                 ))
-                .font(.system(size: 12, weight: .bold))
+                .font(.system(size: compact ? 11 : 12, weight: .bold))
                 .foregroundStyle(ATHLTHTrainDesign.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
@@ -25,19 +27,21 @@ struct HomeDailyRecommendationCard: View {
             }
 
             Text(advice.dayDescription)
-                .font(.system(size: 11.5))
+                .font(.system(size: compact ? 10 : 11.5))
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(compact ? 4 : nil)
+                .fixedSize(horizontal: false, vertical: !compact)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if let evidence = advice.evidence {
                 Text(evidence)
-                    .font(.system(size: 9.5, weight: .medium))
+                    .font(.system(size: compact ? 8.5 : 9.5, weight: .medium))
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .lineLimit(compact ? 2 : nil)
+                    .fixedSize(horizontal: false, vertical: !compact)
             }
 
-            Spacer(minLength: 4)
+            Spacer(minLength: compact ? 0 : 4)
 
             Rectangle()
                 .fill(ATHLTHTrainDesign.rule.opacity(0.45))
@@ -46,7 +50,7 @@ struct HomeDailyRecommendationCard: View {
             Text(ATHLTHLocalization.choose(
                 english: "RECOMMENDED WORKOUT", norwegian: "ANBEFALT ØKT"
             ))
-            .font(.system(size: 9, weight: .bold))
+            .font(.system(size: compact ? 8.5 : 9, weight: .bold))
             .tracking(0.8)
             .foregroundStyle(ATHLTHTrainDesign.bronze)
 
@@ -56,9 +60,9 @@ struct HomeDailyRecommendationCard: View {
                           ? "figure.walk" :
                           advice.suggestedWorkout.kind == .running
                           ? "figure.run" : "play.circle.fill")
-                        .font(.system(size: 15, weight: .semibold))
+                        .font(.system(size: compact ? 14 : 15, weight: .semibold))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
-                        .frame(width: 29, height: 29)
+                        .frame(width: compact ? 27 : 29, height: compact ? 27 : 29)
                         .background(
                             ATHLTHTrainDesign.paleGold.opacity(0.45),
                             in: RoundedRectangle(cornerRadius: 9)
@@ -66,13 +70,15 @@ struct HomeDailyRecommendationCard: View {
 
                     VStack(alignment: .leading, spacing: 3) {
                         Text(advice.suggestedTitle)
-                            .font(.system(size: 12, weight: .semibold))
+                            .font(.system(size: compact ? 11 : 12, weight: .semibold))
                             .foregroundStyle(ATHLTHTrainDesign.ink)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(compact ? 2 : nil)
+                            .fixedSize(horizontal: false, vertical: !compact)
                         Text(advice.suggestedDetail)
-                            .font(.system(size: 10))
+                            .font(.system(size: compact ? 9 : 10))
                             .foregroundStyle(ATHLTHTrainDesign.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                            .lineLimit(compact ? 2 : nil)
+                            .fixedSize(horizontal: false, vertical: !compact)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -80,7 +86,7 @@ struct HomeDailyRecommendationCard: View {
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
                 }
-                .frame(maxWidth: .infinity, minHeight: 43)
+                .frame(maxWidth: .infinity, minHeight: compact ? 37 : 43)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -90,8 +96,13 @@ struct HomeDailyRecommendationCard: View {
                 norwegian: "Åpner oppstart av akkurat denne økten."
             ))
         }
-        .padding(11)
-        .frame(maxWidth: .infinity, minHeight: 180, alignment: .topLeading)
+        .padding(compact ? 9 : 11)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: compact ? 0 : 180,
+            maxHeight: compact ? .infinity : nil,
+            alignment: .topLeading
+        )
         .background(
             ATHLTHTrainDesign.paper,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
