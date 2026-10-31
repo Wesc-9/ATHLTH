@@ -3981,8 +3981,11 @@ final class IPhoneWorkoutStore:
 
         workout.structuredStepIndex =
             nextIndex
+        // For route warm-up, the runner's manual tap IS the start-main
+        // action. Keep the old two-step confirmation for library workouts.
         workout.awaitingMainStart = step.phase == "warmup" &&
-            plan.autoStartMainAfterWarmup != true
+            plan.autoStartMainAfterWarmup != true &&
+            !(forceManualAdvance && plan.deferRouteUntilMain == true)
         if step.phase == "warmup",
            plan.deferRouteUntilMain == true {
             workout.routeLegDistanceOffsetMeters = workout.distanceMeters
