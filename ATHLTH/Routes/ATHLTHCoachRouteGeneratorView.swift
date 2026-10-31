@@ -171,7 +171,7 @@ struct ATHLTHCoachRouteGeneratorView: View {
 
                 if !suggestions.isEmpty {
                     Section(tr("Coach's route suggestions", "Ruteforslag fra coach")) {
-                        ForEach(Array(suggestions.enumerated()), id: \.element.id) { index, item in
+                        ForEach(suggestions) { item in
                             Button {
                                 selectedID = item.id
                                 updateMap(for: item)
@@ -181,9 +181,9 @@ struct ATHLTHCoachRouteGeneratorView: View {
                                           ? "checkmark.circle.fill" : "circle")
                                         .foregroundStyle(ATHLTHTrainDesign.bronze)
                                     VStack(alignment: .leading, spacing: 4) {
-                                        Text(index == 0
+                                        Text(item.id == suggestions.first?.id
                                              ? tr("Best distance match", "Nærmest ønsket distanse")
-                                             : tr("Alternative", "Alternativ") + " \(index + 1)")
+                                             : tr("Alternative", "Alternativ") + " \(item.variation)")
                                             .font(.subheadline.weight(.semibold))
                                         Text(String(format: "%.1f km · ca. %.0f min",
                                                     item.distanceMeters / 1000,
