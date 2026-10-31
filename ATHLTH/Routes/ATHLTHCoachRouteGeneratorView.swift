@@ -12,7 +12,15 @@ struct ATHLTHCoachRouteGeneratorView: View {
 
     var onRouteSaved: ((TrainingRoute) -> Void)? = nil
 
-    @State private var brief = ATHLTHCoachRouteBrief()
+    @State private var brief: ATHLTHCoachRouteBrief
+
+    init(
+        initialBrief: ATHLTHCoachRouteBrief = ATHLTHCoachRouteBrief(),
+        onRouteSaved: ((TrainingRoute) -> Void)? = nil
+    ) {
+        self.onRouteSaved = onRouteSaved
+        _brief = State(initialValue: initialBrief)
+    }
     @State private var suggestions: [ATHLTHCoachRouteSuggestion] = []
     @State private var selectedID: UUID?
     @State private var mapPosition: MapCameraPosition = .automatic
