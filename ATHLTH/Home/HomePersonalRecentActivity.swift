@@ -823,10 +823,10 @@ struct HomeActiveFriendsStrip: View {
     }
 }
 
+/// An anchored, compact friend card; secondary actions launch existing
+/// invitation and messaging flows rather than expanding this popover.
 private struct HomeFriendQuickActionsPopover: View {
     @EnvironmentObject private var social: SocialStore
-    @AppStorage("athlth.home.showFriendPublicWorkouts")
-    private var showFriendWorkouts = true
 
     let friend: SocialProfileCard
     let isTraining: Bool
@@ -834,211 +834,150 @@ private struct HomeFriendQuickActionsPopover: View {
     let onMessage: () -> Void
     let onChallenge: () -> Void
     let onProfile: () -> Void
+    let onTrainTogether: () -> Void
+    let onShare: (ATHLTHFriendQuickShareKind) -> Void
 
-    @State private var loadedPublicWorkouts: [SocialFeedItem] = []
+    @State private var friendProfile: SocialFriendProfile?
+    @State private var followOverview: SocialFollowOverview?
 
-    private var publicWorkouts: [SocialFeedItem] {
-        guard showFriendWorkouts else { return [] }
-        // Only server-authorized, explicitly public workouts. Never infer
-        // workout history from training presence, device logs or private data.
-        let recent = (loadedPublicWorkouts + social.feed).filter {
-            $0.activity.actorID == friend.userID &&
-            $0.activity.kind == "workout" &&
-            $0.activity.visibility == "public"
-        }
-        var seen = Set<UUID>()
-        return Array(recent.sorted {
-            $0.activity.createdAt > $1.activity.createdAt
-        }.filter {
-            seen.insert($0.id).inserted
-        }.prefix(2))
-    }
-
-    private func loadPublicWorkouts() async {
-        guard showFriendWorkouts else {
-            loadedPublicWorkouts = []
-            return
-        }
-        guard let profile = await social.loadFriendProfile(friend.userID),
-              !Task.isCancelled, showFriendWorkouts else {
-            return
-        }
-        loadedPublicWorkouts = profile.recentActivities.filter {
-            $0.activity.actorID == friend.userID &&
-            $0.activity.kind == "workout" &&
-            $0.activity.visibility == "public"
-        }
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
     private var status: String {
-        if isTraining {
-            return ATHLTHLocalization.choose(
-                english: "Training now", norwegian: "Trener nå"
-            )
-        }
-        if isOnline {
-            return ATHLTHLocalization.choose(
-                english: "Online", norwegian: "Pålogget"
-            )
-        }
-        return ATHLTHLocalization.choose(
-            english: "Friend", norwegian: "Venn"
-        )
+        if isTraining { return tr("Training now", "Trener nå") }
+        if isOnline { return tr("Online", "Pålogget") }
+        return tr("Friend", "Venn")
     }
 
     private var statusColor: Color {
         if isTraining { return Color.orange }
         if isOnline { return Color.green }
-        return ATHLTHTheme.mutedText
+        return ATHLTHTheme.premiumGold
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            HStack(spacing: 10) {
-                ATHLTHSocialStatusAvatar(profile: friend, size: 42)
-                    .frame(width: 50, height: 50)
+            Button(action: onProfile) {
+                HStack(alignment: .center, spacing: 12) {
+                    ATHLTHSocialStatusAvatar(profile: friend, size: 52)
+                        .frame(width: 59, height: 59)
 
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(friend.resolvedName)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(friend.resolvedName)
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .lineLimit(2)
+                            .multilineTextAlignment(.leading)
 
-                    HStack(spacing: 5) {
-                        Circle()
-                            .fill(statusColor)
-                            .frame(width: 6, height: 6)
-                        Text(status)
-                            .font(.system(size: 11))
-                            .foregroundStyle(ATHLTHTheme.mutedText)
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(statusColor)
+                                .frame(width: 7, height: 7)
+                            Text(status)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            if !friend.usernameLabel.isEmpty {
+                                Text("· " + friend.usernameLabel)
+                                    .font(.caption2)
+                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    .lineLimit(1)
+                            }
+                        }
                     }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
-                Spacer(minLength: 0)
-            }
-
-            Rectangle()
-                .fill(Color.black.opacity(0.07))
-                .frame(height: 0.5)
-
-            HStack(spacing: 4) {
-                actionButton(
-                    ATHLTHLocalization.choose(
-                        english: "Message", norwegian: "Melding"
-                    ),
-                    icon: "bubble.left",
-                    action: onMessage
-                )
-                actionButton(
-                    ATHLTHLocalization.choose(
-                        english: "Challenge", norwegian: "Utfordre"
-                    ),
-                    icon: "trophy",
-                    action: onChallenge
-                )
-                actionButton(
-                    ATHLTHLocalization.choose(
-                        english: "Profile", norwegian: "Profil"
-                    ),
-                    icon: "person.crop.circle",
-                    action: onProfile
-                )
-            }
-
-            if showFriendWorkouts && !publicWorkouts.isEmpty {
-                Rectangle()
-                    .fill(Color.black.opacity(0.07))
-                    .frame(height: 0.5)
-
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Recent shared workouts",
-                        norwegian: "Siste delte økter"
-                    ))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-
-                    ForEach(publicWorkouts) { item in
-                        sharedWorkoutRow(item)
-                    }
-                }
-            }
-
-            Button {
-                showFriendWorkouts.toggle()
-            } label: {
-                HStack(spacing: 5) {
-                    Image(systemName: showFriendWorkouts
-                        ? "eye.slash" : "eye")
-                    Text(showFriendWorkouts
-                        ? ATHLTHLocalization.choose(
-                            english: "Hide workout previews",
-                            norwegian: "Skjul økter"
-                          )
-                        : ATHLTHLocalization.choose(
-                            english: "Show shared workouts",
-                            norwegian: "Vis delte økter"
-                          ))
-                }
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .frame(maxWidth: .infinity, alignment: .trailing)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(tr("Open profile for \(friend.resolvedName)",
+                                   "Åpne profilen til \(friend.resolvedName)"))
+
+            HStack(spacing: 0) {
+                statistic(
+                    friendProfile?.performance?.totalWorkoutCount,
+                    title: tr("Workouts", "Økter")
+                )
+                thinVerticalDivider
+                statistic(
+                    followOverview?.followerCount,
+                    title: tr("Followers", "Følgere")
+                )
+                thinVerticalDivider
+                statistic(
+                    followOverview?.followingCount,
+                    title: tr("Following", "Følger")
+                )
+            }
+            .padding(.vertical, 2)
+
+            HStack(spacing: 7) {
+                primaryAction(tr("Message", "Melding"),
+                              icon: "bubble.left", action: onMessage)
+                primaryAction(tr("Challenge", "Utfordre"),
+                              icon: "trophy", action: onChallenge)
+                primaryAction(tr("Train together", "Tren sammen"),
+                              icon: "person.2.wave.2", action: onTrainTogether)
+            }
+
+            Rectangle()
+                .fill(ATHLTHTheme.premiumGold.opacity(0.15))
+                .frame(height: 1)
+                .accessibilityHidden(true)
+
+            HStack(alignment: .top, spacing: 5) {
+                secondaryAction(.plan, icon: "calendar")
+                secondaryAction(.workout, icon: "figure.run")
+                secondaryAction(.route, icon: "point.topleft.down.to.point.bottomright.curvepath")
+                secondaryAction(.exercise, icon: "dumbbell")
+            }
         }
         .padding(14)
-        .frame(width: 278)
-        .background(Color.white)
-        .presentationBackground(.white)
-        .task(id: showFriendWorkouts) {
-            await loadPublicWorkouts()
+        .frame(width: 336)
+        .background(
+            ATHLTHPlanDesign.canvas,
+            in: RoundedRectangle(cornerRadius: 25, style: .continuous)
+        )
+        .presentationBackground(ATHLTHPlanDesign.canvas)
+        .task(id: friend.userID) {
+            // Only statistics allowed by the recipient's privacy settings
+            // are shown. A missing value stays a dash, never a fake count.
+            async let profile = social.loadFriendProfile(friend.userID)
+            async let overview = social.loadFollowOverview(for: friend.userID)
+            let loadedProfile = await profile
+            let loadedOverview = await overview
+            guard !Task.isCancelled else { return }
+            friendProfile = loadedProfile
+            followOverview = loadedOverview
         }
     }
 
-    private func sharedWorkoutRow(_ item: SocialFeedItem) -> some View {
-        let activity = HomeFollowingWorkoutPresentation.activity(for: item)
-        let duration = HomeRecentCardFormat.number(
-            item, key: "duration_seconds"
-        )
-        let distance = HomeRecentCardFormat.number(
-            item, key: "distance_meters"
-        )
-        let showDistance = distance != nil &&
-            (activity == .running || activity == .walking || activity == .hiking)
-        return HStack(spacing: 8) {
-            Image(systemName: activity.icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.accentDeep)
-                .frame(width: 27, height: 27)
-                .background(ATHLTHTheme.accentSoft, in: Circle())
+    private var thinVerticalDivider: some View {
+        Rectangle()
+            .fill(ATHLTHTheme.premiumGold.opacity(0.14))
+            .frame(width: 1, height: 32)
+            .accessibilityHidden(true)
+    }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(HomeRecentCardFormat.activity(activity))
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(1)
-
-                HStack(spacing: 5) {
-                    Text(HomeRecentCardFormat.date(item.activity.createdAt))
-                    if showDistance {
-                        Text("· " + HomeRecentCardFormat.distance(distance))
-                    }
-                    if let duration {
-                        Text("· " + HomeRecentCardFormat.duration(duration))
-                    }
-                }
-                .font(.system(size: 9.5))
-                .foregroundStyle(ATHLTHTheme.mutedText)
+    private func statistic(_ count: Int?, title: String) -> some View {
+        VStack(spacing: 4) {
+            Text(count?.formatted() ?? "—")
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .monospacedDigit()
+            Text(title)
+                .font(.system(size: 10))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 .lineLimit(1)
-                .minimumScaleFactor(0.78)
-            }
-            Spacer(minLength: 0)
         }
-        .frame(minHeight: 33)
+        .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
     }
 
-    private func actionButton(
+    private func primaryAction(
         _ title: String,
         icon: String,
         action: @escaping () -> Void
@@ -1046,20 +985,57 @@ private struct HomeFriendQuickActionsPopover: View {
         Button(action: action) {
             VStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 18, weight: .medium))
+                    .font(.system(size: 19, weight: .regular))
                     .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(height: 21)
+                    .frame(width: 38, height: 37)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 12)
+                    )
                 Text(title)
                     .font(.system(size: 10.5, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.85)
             }
-            .frame(maxWidth: .infinity, minHeight: 54)
+            .frame(maxWidth: .infinity, minHeight: 79)
+            .background(
+                Color.white.opacity(0.78),
+                in: RoundedRectangle(cornerRadius: 17)
+            )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
+    }
+
+    private func secondaryAction(
+        _ kind: ATHLTHFriendQuickShareKind,
+        icon: String
+    ) -> some View {
+        Button { onShare(kind) } label: {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(height: 23)
+                Text(kind.title)
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+                    .minimumScaleFactor(0.85)
+            }
+            .frame(maxWidth: .infinity, minHeight: 62)
+            .background(
+                Color.white.opacity(0.53),
+                in: RoundedRectangle(cornerRadius: 13)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(kind.title)
     }
 }
 
