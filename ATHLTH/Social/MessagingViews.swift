@@ -7248,9 +7248,20 @@ struct MessageSharePicker: View {
     @EnvironmentObject private var settings: AppSettingsStore
 
     let onSelect: (MessageShareDraft) -> Void
+    let allowedKinds: [MessageShareKind]
 
-    @State private var selectedKind: MessageShareKind = .workout
+    @State private var selectedKind: MessageShareKind
     @State private var shareError: String?
+
+    init(
+        allowedKinds: [MessageShareKind] = MessageShareKind.allCases,
+        onSelect: @escaping (MessageShareDraft) -> Void
+    ) {
+        self.allowedKinds = allowedKinds.isEmpty
+            ? MessageShareKind.allCases : allowedKinds
+        self.onSelect = onSelect
+        _selectedKind = State(initialValue: self.allowedKinds[0])
+    }
 
     var body: some View {
         NavigationStack {
@@ -7284,8 +7295,7 @@ struct MessageSharePicker: View {
                         ) {
                             HStack(spacing: 8) {
                                 ForEach(
-                                    MessageShareKind
-                                        .allCases
+                                    allowedKinds
                                 ) { kind in
                                     Button {
                                         selectedKind =
