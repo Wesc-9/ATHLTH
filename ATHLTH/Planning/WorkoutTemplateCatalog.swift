@@ -732,6 +732,7 @@ struct WorkoutTemplateLibraryView: View {
     @State private var query = ""
     @State private var selectedCategory = "All"
     @State private var favoritesOnly = false
+    @State private var expandedWorkoutCardID: String?
     @State private var selectedMuscleFocus = "all"
     @State private var selectedWorkoutLevel = "all"
     @State private var selectedStrengthMuscles: Set<String> = []
@@ -921,6 +922,14 @@ struct WorkoutTemplateLibraryView: View {
         "core", "fullbody", "biceps", "triceps", "quads",
         "hamstrings", "calves"
     ]
+
+    private func toggleWorkoutCard(_ identifier: String) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            expandedWorkoutCardID = ATHLTHWorkoutLibraryExpansion.toggled(
+                current: expandedWorkoutCardID, selecting: identifier
+            )
+        }
+    }
 
     private func toggleStrengthMuscle(_ muscle: String) {
         if selectedStrengthMuscles.contains(muscle) {
@@ -1397,40 +1406,51 @@ struct WorkoutTemplateLibraryView: View {
                     .font(.headline)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(filteredScheduledWorkouts.prefix(50)) { workout in
-                        Button {
-                            if initialCategory != nil {
-                                previewedWorkoutSource = .scheduled(workout)
-                            } else {
-                                onSelectPlanned?(workout)
-                            }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack(spacing: 12) {
-                                Image(systemName: workout.kind.systemImage)
-                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                                    .frame(width: 36, height: 36)
-                                    .background(ATHLTHTheme.accentSoft, in: Circle())
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(workout.title)
-                                        .font(.subheadline.weight(.semibold))
-                                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                                    Text(workout.kind.title)
-                                        .font(.caption)
-                                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        if initialCategory != nil && displayMode == .list {
+                            ATHLTHWorkoutLibraryExpandableCard(
+                                workout: workout,
+                                expanded: expandedWorkoutCardID == "scheduled-\(workout.id.uuidString)",
+                                onToggle: {
+                                    toggleWorkoutCard("scheduled-\(workout.id.uuidString)")
+                                },
+                                onUse: {
+                                    previewedWorkoutSource = .scheduled(workout)
                                 }
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                            ) {
+                                EmptyView()
                             }
-                                if initialCategory != nil && displayMode == .list {
-                                    ATHLTHWorkoutContentsPreview(workout: workout)
+                        } else {
+                            Button {
+                                if initialCategory != nil {
+                                    previewedWorkoutSource = .scheduled(workout)
+                                } else {
+                                    onSelectPlanned?(workout)
                                 }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    HStack(spacing: 12) {
+                                        Image(systemName: workout.kind.systemImage)
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                            .frame(width: 36, height: 36)
+                                            .background(ATHLTHTheme.accentSoft, in: Circle())
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(workout.title)
+                                                .font(.subheadline.weight(.semibold))
+                                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                            Text(workout.kind.title)
+                                                .font(.caption)
+                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                        }
+                                        Spacer()
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                    }
+                                }
+                                .padding(14)
+                                .background(.white, in: RoundedRectangle(cornerRadius: 17))
                             }
-                            .padding(14)
-                            .background(.white,
-                                        in: RoundedRectangle(cornerRadius: 17))
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                     }
                 }
@@ -1440,28 +1460,40 @@ struct WorkoutTemplateLibraryView: View {
                         .font(.headline)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(filteredSavedWorkouts) { workout in
-                        Button {
-                            if initialCategory != nil {
-                                previewedWorkoutSource = .saved(workout)
-                            } else {
-                                onSelectPlanned?(workout)
+                        if initialCategory != nil && displayMode == .list {
+                            ATHLTHWorkoutLibraryExpandableCard(
+                                workout: workout,
+                                expanded: expandedWorkoutCardID == "saved-\(workout.id.uuidString)",
+                                onToggle: {
+                                    toggleWorkoutCard("saved-\(workout.id.uuidString)")
+                                },
+                                onUse: {
+                                    previewedWorkoutSource = .saved(workout)
+                                }
+                            ) {
+                                EmptyView()
                             }
-                        } label: {
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack {
+                        } else {
+                            Button {
+                                if initialCategory != nil {
+                                    previewedWorkoutSource = .saved(workout)
+                                } else {
+                                    onSelectPlanned?(workout)
+                                }
+                            } label: {
+                                HStack(spacing: 10) {
                                     Image(systemName: workout.kind.systemImage)
                                     Text(workout.title)
+                                        .font(.subheadline.weight(.semibold))
                                     Spacer()
                                     Image(systemName: "plus.circle.fill")
                                 }
-                                if initialCategory != nil && displayMode == .list {
-                                    ATHLTHWorkoutContentsPreview(workout: workout)
-                                }
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                                .padding(15)
+                                .background(.white, in: RoundedRectangle(cornerRadius: 16))
                             }
-                            .padding(15)
-                            .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                     }
                 }
@@ -1499,6 +1531,38 @@ struct WorkoutTemplateLibraryView: View {
                 } else {
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(filteredEntries) { entry in
+                        if initialCategory != nil && displayMode == .list,
+                           onSelectPlanned != nil {
+                            ATHLTHWorkoutLibraryExpandableCard(
+                                workout: entry.plannedSession(),
+                                subtitle: entry.summary,
+                                expanded: expandedWorkoutCardID == "catalog-\(entry.id.uuidString)",
+                                onToggle: {
+                                    toggleWorkoutCard("catalog-\(entry.id.uuidString)")
+                                    recents.markUsed(
+                                        .workout, itemID: entry.id.uuidString,
+                                        title: entry.title, subtitle: entry.categoryTitle,
+                                        icon: entry.systemImage
+                                    )
+                                },
+                                onUse: {
+                                    previewedWorkoutSource = .catalog(entry)
+                                    recents.markUsed(
+                                        .workout, itemID: entry.id.uuidString,
+                                        title: entry.title, subtitle: entry.categoryTitle,
+                                        icon: entry.systemImage
+                                    )
+                                }
+                            ) {
+                                LibraryFavoriteButton(
+                                    kind: .workout,
+                                    itemID: entry.id.uuidString,
+                                    title: entry.title,
+                                    subtitle: entry.categoryTitle,
+                                    icon: entry.systemImage
+                                )
+                            }
+                        } else {
                         ZStack(alignment: .topTrailing) {
                             Group {
                                 if let onSelectPlanned {
@@ -1547,9 +1611,42 @@ struct WorkoutTemplateLibraryView: View {
                             )
                             .padding(12)
                         }
+                        }
                     }
 
                     ForEach(filteredRunningTemplates) { workout in
+                        if initialCategory != nil && displayMode == .list,
+                           onSelectPlanned != nil {
+                            ATHLTHWorkoutLibraryExpandableCard(
+                                workout: workout.plannedSession(),
+                                subtitle: workout.summary,
+                                expanded: expandedWorkoutCardID == "running-\(workout.id.uuidString)",
+                                onToggle: {
+                                    toggleWorkoutCard("running-\(workout.id.uuidString)")
+                                    recents.markUsed(
+                                        .workout, itemID: workout.id.uuidString,
+                                        title: workout.title, subtitle: workout.type.title,
+                                        icon: workout.type.systemImage
+                                    )
+                                },
+                                onUse: {
+                                    previewedWorkoutSource = .running(workout)
+                                    recents.markUsed(
+                                        .workout, itemID: workout.id.uuidString,
+                                        title: workout.title, subtitle: workout.type.title,
+                                        icon: workout.type.systemImage
+                                    )
+                                }
+                            ) {
+                                LibraryFavoriteButton(
+                                    kind: .workout,
+                                    itemID: workout.id.uuidString,
+                                    title: workout.title,
+                                    subtitle: workout.type.title,
+                                    icon: workout.type.systemImage
+                                )
+                            }
+                        } else {
                         ZStack(alignment: .topTrailing) {
                             Group {
                                 if let onSelectPlanned {
@@ -1597,6 +1694,7 @@ struct WorkoutTemplateLibraryView: View {
                                 icon: workout.type.systemImage
                             )
                             .padding(12)
+                        }
                         }
                     }
                     }
