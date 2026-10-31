@@ -6409,6 +6409,43 @@ struct SessionEditorView: View {
                 .listRowBackground(SwiftUI.Color.clear)
                 .listRowInsets(EdgeInsets(top: 14, leading: 14,
                                           bottom: 14, trailing: 14))
+            } else if isStandalone && selectedScratchWorkoutType != nil {
+                // The old parallel Form, run builder and route picker have
+                // been replaced by the shared studio. Keep only a small
+                // scheduling confirmation when the studio returns.
+                Section {
+                    HStack {
+                        Label(
+                            title.isEmpty
+                                ? selectedScratchWorkoutType?.title ?? "Økt"
+                                : title,
+                            systemImage: selectedScratchWorkoutType?.symbol
+                                ?? "figure.run"
+                        )
+                        .font(.headline)
+                        Spacer()
+                        Text("\(workoutBlocks.count) deløkter")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    DatePicker(
+                        ATHLTHLocalization.choose(
+                            english: "Date and time", norwegian: "Dato og tid"
+                        ), selection: $scheduledTime,
+                        displayedComponents: [.date, .hourAndMinute]
+                    )
+                    Button {
+                        showingUnifiedWorkoutComposer = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Edit workout",
+                                norwegian: "Rediger økten"
+                            ), systemImage: "slider.horizontal.3"
+                        )
+                    }
+                }
+                .listRowBackground(ATHLTHPlanDesign.surface)
             } else {
             // Entry from the "Train together" card puts partner selection
             // first while retaining the exact same workout editor.
@@ -6608,6 +6645,8 @@ struct SessionEditorView: View {
                     initialTitle: title,
                     initialBlocks: workoutPlanningPreviewBlocks,
                     initialRouteID: selectedRouteID,
+                    initialActivity: selectedScratchWorkoutType,
+                    onScheduledTimeChanged: { scheduledTime = $0 },
                     initialQuickAdd: workoutBlocks.isEmpty &&
                         plannedExercises.isEmpty &&
                         selectedRunningWorkouts.isEmpty
