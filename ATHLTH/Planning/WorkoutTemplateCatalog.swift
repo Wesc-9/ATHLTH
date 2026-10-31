@@ -3642,7 +3642,18 @@ struct WorkoutTemplateBuilderView: View {
             }
             .onChange(of: studioBasicRunMode) { _, mode in
                 guard isPlannedWorkout, initialActivity == .running else { return }
-                if mode == .free && blocks.isEmpty {
+                if mode != .free {
+                    // Remove only the anonymous basic free-run placeholder.
+                    // Never delete user-added exercises or imported workouts.
+                    blocks.removeAll {
+                        $0.kind == .run &&
+                        $0.title == RunQuickStartMode.free.title &&
+                        $0.distanceMeters == 1_000 &&
+                        $0.durationSeconds == nil &&
+                        $0.groupID == nil
+                    }
+                    resequence()
+                } else if blocks.isEmpty {
                     selectedPhase = .main
                     addRunBlock(activity: .running)
                     blocks[blocks.count - 1].isIndoor =
@@ -5800,7 +5811,15 @@ struct WorkoutTemplateBuilderView: View {
             notes: nil
         )
         workout.workoutBlocks = blocks
-        workout.workoutCategory = category
+        if isPlannedWorkout, initialActivity == .running, !studioAdvanced {
+            switch studioBasicRunEnvironment {
+            case .outdoor: workout.workoutCategory = "running"
+            case .indoor: workout.workoutCategory = "indoor"
+            case .treadmill: workout.workoutCategory = "treadmill"
+            }
+        } else {
+            workout.workoutCategory = category
+        }
         return workout
     }
 
