@@ -1034,6 +1034,9 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     var sourceWorkoutID: UUID? = nil
     var routeAlerts: WatchRouteAlertConfiguration? = nil
     var targetAlerts: WatchWorkoutTargetAlertConfiguration? = nil
+    /// Athlete's configured or age-estimated HRmax for per-step Z1–Z5
+    /// target speech. Optional to preserve previously saved Watch transfers.
+    var heartRateZoneMaximumBPM: Double? = nil
     // Non-nil means this is an indoor treadmill run, including a valid 0%.
     // Optional keeps transfers from older builds decodable.
     var treadmillInclinePercent: Double? = nil
