@@ -421,8 +421,13 @@ struct RunQuickStartConfiguration {
     var watchStartMode: WatchWorkoutStartMode = .immediate
     var routeWarmup: ATHLTHRouteWarmupConfiguration = .disabled
     var customWorkoutTitle: String? = nil
+    /// Shared Plan timeline from the Advanced Quick Train composer.
+    var advancedWorkout: PlannedSession? = nil
 
     var title: String {
+        if mode == .structured, let advancedWorkout {
+            return advancedWorkout.title
+        }
         if let customWorkoutTitle,
            !customWorkoutTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return customWorkoutTitle.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -460,7 +465,7 @@ extension RunQuickStartConfiguration {
             }
 
             guard let routeID =
-                    workout?.routeID
+                    advancedWorkout?.routeID ?? workout?.routeID
             else {
                 return nil
             }
@@ -484,9 +489,17 @@ extension RunQuickStartConfiguration {
             exercises: [],
             notes: nil
         )
-        snapshot.runningWorkout = workout
-        snapshot.runningWorkouts =
-            workout.map { [$0] }
+        // Preserve the same source recipe when Quick Run is relayed
+        // through iPad or shared with training partners.
+        if let advancedWorkout {
+            snapshot.workoutBlocks = advancedWorkout.resolvedWorkoutBlocks
+            snapshot.workoutCategory = advancedWorkout.workoutCategory
+            snapshot.durationMinutes = advancedWorkout.durationMinutes
+            snapshot.routeID = advancedWorkout.routeID
+        } else {
+            snapshot.runningWorkout = workout
+            snapshot.runningWorkouts = workout.map { [$0] }
+        }
         snapshot.audioCoachConfiguration =
             audioCoach
         snapshot.autoPauseEnabled =
@@ -1236,6 +1249,7 @@ struct RunQuickStartSheet: View {
     @State private var routeWarmup = ATHLTHRouteWarmupConfiguration.disabled
     @State private var selectedRoute: TrainingRoute?
     @State private var selectedWorkout: RunningWorkoutTemplate?
+    @State private var advancedWorkout: PlannedSession?
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var socialMode:
         SocialWorkoutParticipationMode =
@@ -1466,16 +1480,48 @@ struct RunQuickStartSheet: View {
                     RunningWorkoutLibraryView(
                         selectionTitle: "Choose Workout"
                     ) { workout in
+                        advancedWorkout = nil
                         selectedWorkout = workout
                         showingRunningLibrary = false
                     }
                 }
             }
             .sheet(isPresented: $showingDetailedWorkoutBuilder) {
-                ATHLTHTrainIntervalComposerView(initial: selectedWorkout) { workout in
-                    selectedWorkout = workout
-                    mode = .structured
-                }
+                // Exactly the same advanced studio and ordered timeline as
+                // Plan -> From Scratch -> Running, not the legacy interval
+                // composer and not a second workout execution engine.
+                WorkoutTemplateBuilderView(
+                    initialTitle: advancedWorkout?.title ??
+                        selectedWorkout?.title ?? quickWorkoutName,
+                    initialBlocks: advancedWorkout?.resolvedWorkoutBlocks ??
+                        selectedWorkout.map {
+                            ATHLTHQuickRunTimelineAdapter.editorBlocks(from: $0)
+                        } ?? [],
+                    initialRouteID: advancedWorkout?.routeID ??
+                        selectedWorkout?.routeID,
+                    draftContext: "quick-run-advanced",
+                    initialActivity: .running,
+                    initialStudioAdvanced: true,
+                    onAddStandalone: { workout in
+                        if let issue = ATHLTHQuickRunTimelineAdapter.validationError(
+                            for: workout
+                        ) {
+                            launchFailure = issue
+                            return false
+                        }
+                        advancedWorkout = workout
+                        selectedWorkout = nil
+                        quickWorkoutName = workout.title
+                        environment = ATHLTHQuickRunTimelineAdapter.environment(
+                            for: workout
+                        )
+                        launchFailure = nil
+                        mode = .structured
+                        return true
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $showingSpotifyPicker) {
                 SpotifyPlaylistPickerView(
@@ -1783,7 +1829,8 @@ struct RunQuickStartSheet: View {
                     ? selectedRoute?.title ?? ATHLTHLocalization.choose(
                         english: "Choose route", norwegian: "Velg rute"
                       )
-                    : selectedWorkout?.title ?? ATHLTHLocalization.choose(
+                    : advancedWorkout?.title ??
+                      selectedWorkout?.title ?? ATHLTHLocalization.choose(
                         english: "Choose workout", norwegian: "Velg treningsøkt"
                       ))
                 .font(.subheadline.weight(.semibold))
@@ -2156,12 +2203,19 @@ struct RunQuickStartSheet: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text(
-                            selectedWorkout?.title ??
+                            advancedWorkout?.title ??
+                                selectedWorkout?.title ??
                                 "Choose a running workout"
                         )
                         .font(.headline)
 
                         Text(
+                            advancedWorkout.map {
+                                ATHLTHLocalization.choose(
+                                    english: "\($0.resolvedWorkoutBlocks.count) planned phases",
+                                    norwegian: "\($0.resolvedWorkoutBlocks.count) planlagte øktdeler"
+                                )
+                            } ??
                             selectedWorkout?.summary ??
                                 "\(runningLibrary.allTemplates.count) structured workouts available"
                         )
@@ -2176,7 +2230,7 @@ struct RunQuickStartSheet: View {
                         showingRunningLibrary = true
                     } label: {
                         Text(
-                            selectedWorkout == nil
+                            selectedWorkout == nil && advancedWorkout == nil
                                 ? "Choose"
                                 : "Change"
                         )
@@ -2191,9 +2245,9 @@ struct RunQuickStartSheet: View {
                 } label: {
                     Label(
                         ATHLTHLocalization.choose(
-                            english: selectedWorkout == nil
+                            english: selectedWorkout == nil && advancedWorkout == nil
                                 ? "Build detailed session" : "Customize every phase",
-                            norwegian: selectedWorkout == nil
+                            norwegian: selectedWorkout == nil && advancedWorkout == nil
                                 ? "Bygg detaljert økt" : "Tilpass hver enkelt del"
                         ),
                         systemImage: "slider.horizontal.3"
@@ -2204,7 +2258,11 @@ struct RunQuickStartSheet: View {
                 .buttonStyle(.plain)
                 .padding(.top, 9)
 
-                if let workout = selectedWorkout {
+                if let advancedWorkout {
+                    ATHLTHRunQuickStartPlanPreview(
+                        workout: nil, plannedSession: advancedWorkout
+                    )
+                } else if let workout = selectedWorkout {
                     ATHLTHRunQuickStartPlanPreview(
                         workout: workout, plannedSession: nil
                     )
@@ -2334,7 +2392,7 @@ struct RunQuickStartSheet: View {
         case .route:
             return selectedRoute != nil
         case .structured:
-            return selectedWorkout != nil
+            return advancedWorkout != nil || selectedWorkout != nil
         }
     }
 
@@ -2360,6 +2418,10 @@ struct RunQuickStartSheet: View {
         }
 
         launchFailure = nil
+        let runEnvironment = mode == .structured
+            ? advancedWorkout.map { ATHLTHQuickRunTimelineAdapter.environment(for: $0) }
+                ?? environment
+            : environment
         var configuration = RunQuickStartConfiguration(
                 mode: mode,
                 route:
@@ -2372,10 +2434,12 @@ struct RunQuickStartSheet: View {
                         : nil,
                 captureDevice:
                     captureDevice,
-                environment: environment,
+                environment: runEnvironment,
                 treadmillInclinePercent:
-                    environment == .treadmill
-                        ? 0
+                    runEnvironment == .treadmill
+                        ? advancedWorkout?.resolvedWorkoutBlocks
+                            .first(where: { $0.kind == .run })?
+                            .treadmillInclinePercent ?? 0
                         : nil,
                 audioCoach:
                     isAdvancedSetup
@@ -2423,8 +2487,10 @@ struct RunQuickStartSheet: View {
                     socialMode,
                 gearIDs: selectedGearIDs,
                 watchStartMode: watchStartMode,
-                customWorkoutTitle: quickWorkoutName
+                customWorkoutTitle: mode == .structured &&
+                    advancedWorkout != nil ? nil : quickWorkoutName
             )
+        configuration.advancedWorkout = mode == .structured ? advancedWorkout : nil
         configuration.routeWarmup = mode == .route ? routeWarmup : .disabled
         launchInProgress = true
         Task { @MainActor in
@@ -2828,7 +2894,7 @@ struct RunQuickStartSheet: View {
 
         guard mode == .structured,
               let routeID =
-                selectedWorkout?.routeID
+                advancedWorkout?.routeID ?? selectedWorkout?.routeID
         else {
             return nil
         }
