@@ -3,6 +3,20 @@ import Foundation
 /// Executes the same chronological WorkoutTemplateBlock timeline built in
 /// Plan -> From Scratch without creating a separate running editor or recorder.
 enum ATHLTHQuickRunTimelineAdapter {
+    /// A library run is projected only to seed the shared studio; its
+    /// source template is never mutated unless the user saves a new one.
+    static func editorBlocks(from template: RunningWorkoutTemplate) -> [WorkoutTemplateBlock] {
+        var source = PlannedSession(
+            id: UUID(), title: template.title, kind: .running,
+            scheduledStart: nil, durationMinutes: nil,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: template.routeID, exercises: [], notes: nil
+        )
+        source.runningWorkout = template
+        source.runningWorkouts = [template]
+        return ATHLTHUnifiedWorkout.editorBlocks(from: source)
+    }
+
     static func validationError(for workout: PlannedSession) -> String? {
         let blocks = workout.resolvedWorkoutBlocks
         let runs = blocks.filter { $0.kind == .run }
