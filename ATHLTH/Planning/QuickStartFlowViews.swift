@@ -1537,6 +1537,7 @@ struct RunQuickStartSheet: View {
                 routeLocationProbe.refresh()
             }
             .onDisappear {
+                cancelPendingQuickRun()
                 guard captureDevice == .iPhone,
                       phoneWorkout.active != nil,
                       !phoneWorkout.isUserMinimized
@@ -1568,6 +1569,9 @@ struct RunQuickStartSheet: View {
                     route: guidanceRoute,
                     settings: settings
                 )
+            }
+            .onChange(of: scenePhase) { _, _ in
+                firePendingQuickRun()
             }
             .onChange(of: environment) { _, newValue in
                 if newValue != .outdoor,
@@ -2210,43 +2214,89 @@ struct RunQuickStartSheet: View {
     }
 
     private var runStickyStartBar: some View {
-        VStack(alignment: .leading, spacing: 9) {
+        VStack(alignment: .leading, spacing: 7) {
             if let launchFailure {
                 ATHLTHQuickWatchLaunchNotice(message: launchFailure) {
                     self.launchFailure = nil
                 }
-                .padding(.horizontal, 15)
+                .padding(.horizontal, 12)
             }
             if launchInProgress {
                 ProgressView(ATHLTHLocalization.choose(
-                    english: "Starting workout…",
-                    norwegian: "Starter treningsøkten…"
+                    english: "Starting workout…", norwegian: "Starter treningsøkten…"
                 ))
                 .font(.caption)
-                .padding(.horizontal, 18)
+                .padding(.horizontal, 12)
             }
-            ATHLTHQuickStartDeviceLaunchBar(
-            watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
-            onIPhone: {
-                captureDevice = .iPhone
-                submitQuickRun(captureDevice: .iPhone)
-            },
-            onAppleWatch: {
-                captureDevice = .appleWatch
-                submitQuickRun(captureDevice: .appleWatch)
-            },
-            preferAppleWatch: watchConnected && !ATHLTHDeviceRole.isIPad,
-            supportingText: ATHLTHDeviceRole.isIPad
-                ? ATHLTHLocalization.choose(
-                    english: "Sent through your signed-in iPhone.",
-                    norwegian: "Sendes via din innloggede iPhone."
-                )
-                : nil,
-            canStart: canSubmitQuickRun(captureDevice: .iPhone)
-        )
-            .allowsHitTesting(!launchInProgress)
-            .opacity(launchInProgress ? 0.65 : 1)
+            ATHLTHQuickRunStartFooter(
+                watchAvailable: watchConnected || ATHLTHDeviceRole.isIPad,
+                canStart: canSubmitQuickRun(captureDevice: .iPhone),
+                starting: launchInProgress,
+                scheduledDate: pendingStartDate,
+                onIPhoneNow: {
+                    cancelPendingQuickRun()
+                    captureDevice = .iPhone
+                    watchStartMode = .immediate
+                    submitQuickRun(captureDevice: .iPhone)
+                },
+                onWatchNow: {
+                    cancelPendingQuickRun()
+                    captureDevice = .appleWatch
+                    watchStartMode = .immediate
+                    submitQuickRun(captureDevice: .appleWatch)
+                },
+                onWatchCountDown: {
+                    cancelPendingQuickRun()
+                    captureDevice = .appleWatch
+                    watchStartMode = .afterThirtySeconds
+                    submitQuickRun(captureDevice: .appleWatch)
+                },
+                onWatchManual: {
+                    cancelPendingQuickRun()
+                    captureDevice = .appleWatch
+                    watchStartMode = .onWatch
+                    submitQuickRun(captureDevice: .appleWatch)
+                },
+                onDelay: { device, seconds in
+                    scheduleQuickRun(device: device, after: seconds)
+                },
+                onCancelDelay: cancelPendingQuickRun
+            )
         }
+    }
+
+    private func cancelPendingQuickRun() {
+        delayedStartTask?.cancel()
+        delayedStartTask = nil
+        pendingStartDate = nil
+        pendingStartDevice = nil
+    }
+
+    private func scheduleQuickRun(
+        device: WorkoutCaptureDevice, after seconds: Int
+    ) {
+        guard seconds > 0, canSubmitQuickRun(captureDevice: device) else {
+            return
+        }
+        cancelPendingQuickRun()
+        pendingStartDevice = device
+        pendingStartDate = Date().addingTimeInterval(TimeInterval(seconds))
+        delayedStartTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(seconds))
+            guard !Task.isCancelled, scenePhase == .active else { return }
+            firePendingQuickRun()
+        }
+    }
+
+    private func firePendingQuickRun() {
+        guard !launchInProgress, let date = pendingStartDate,
+              date <= Date(), let device = pendingStartDevice,
+              scenePhase == .active else { return }
+        cancelPendingQuickRun()
+        captureDevice = device
+        watchStartMode = .immediate
+        quickDisplayDate = Date()
+        submitQuickRun(captureDevice: device)
     }
 
     private func canSubmitQuickRun(
