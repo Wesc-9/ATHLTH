@@ -15,9 +15,6 @@ struct TrainingLibraryHomeView: View {
     let onStartRunning: (RunningWorkoutTemplate) -> Void
     var onOpenPlan: ((UUID) -> Void)? = nil
     @State private var showingRecoveryRestPlanner = false
-    @State private var displayMode: ATHLTHLibraryDisplayMode = .list
-    @State private var libraryViewWidth: CGFloat = 390
-    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     private let ink = ATHLTHPlanDesign.ink
     private let muted = ATHLTHPlanDesign.secondaryInk
@@ -26,35 +23,16 @@ struct TrainingLibraryHomeView: View {
     private let green = ATHLTHTheme.vitality
     private let lavender = ATHLTHTheme.recoveryBlue
 
-    private var layout: [GridItem] {
-        ATHLTHLibraryGridColumns.make(
-            mode: displayMode,
-            width: libraryViewWidth,
-            reservedHorizontalSpace: 0,
-            spacing: 11,
-            accessibilityText: dynamicTypeSize.isAccessibilitySize
-        )
-    }
-
-    // Keep the image-led discovery cards large enough for legible titles:
-    // unlike saved content, four top-level categories look better as 2 × 2.
-    private var categoryLayout: [GridItem] {
-        displayMode == .grid
-            ? [GridItem(.flexible(), spacing: 11), GridItem(.flexible(), spacing: 11)]
-            : [GridItem(.flexible())]
-    }
+    // The Library hub always presents two columns. Nested libraries still
+    // honor their own display settings and user-specific choices.
+    private let categoryLayout: [GridItem] = [
+        GridItem(.flexible(), spacing: 11),
+        GridItem(.flexible(), spacing: 11)
+    ]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 25) {
             introduction
-
-            HStack {
-                Text(tr("View", "Visning"))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(muted)
-                Spacer()
-                ATHLTHLibraryDisplayPicker(selection: $displayMode)
-            }
 
             exploreSection
 
@@ -71,21 +49,9 @@ struct TrainingLibraryHomeView: View {
         }
         .frame(maxWidth: 720, alignment: .leading)
         .frame(maxWidth: .infinity, alignment: .center)
-        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
-            libraryViewWidth = width
-        }
         .buttonStyle(.plain)
         .task {
             await favorites.refresh()
-        }
-        .onAppear {
-            displayMode = .load(userID: session.profile.userID)
-        }
-        .onChange(of: session.profile.userID) { _, userID in
-            displayMode = .load(userID: userID)
-        }
-        .onChange(of: displayMode) { _, mode in
-            mode.save(userID: session.profile.userID)
         }
         .sheet(isPresented: $showingRecoveryRestPlanner) {
             ATHLTHRecoveryRestPlanningSheet()
@@ -151,7 +117,6 @@ struct TrainingLibraryHomeView: View {
                         symbol: "square.stack.3d.up.fill",
                         artwork: "GoalProgress",
                         tint: gold,
-                        compact: displayMode == .list
                     )
                 }
 
@@ -165,7 +130,6 @@ struct TrainingLibraryHomeView: View {
                         symbol: "dumbbell.fill",
                         artwork: "StrengthQuickHero",
                         tint: lavender,
-                        compact: displayMode == .list
                     )
                 }
 
@@ -179,7 +143,6 @@ struct TrainingLibraryHomeView: View {
                         symbol: "figure.strengthtraining.traditional",
                         artwork: "GoalStrength",
                         tint: slate,
-                        compact: displayMode == .list
                     )
                 }
 
@@ -193,7 +156,6 @@ struct TrainingLibraryHomeView: View {
                         symbol: "map.fill",
                         artwork: "GoalAdventure",
                         tint: green,
-                        compact: displayMode == .list
                     )
                 }
             }
@@ -208,11 +170,7 @@ struct TrainingLibraryHomeView: View {
                 detail: tr("Everything you have created and saved.",
                            "Alt du har opprettet og lagret.")
             )
-            LazyVGrid(
-                columns: displayMode == .grid
-                    ? layout : [GridItem(.flexible())],
-                spacing: displayMode == .grid ? 11 : 0
-            ) {
+            LazyVGrid(columns: categoryLayout, spacing: 11) {
                 NavigationLink {
                     MyTrainingPlansLibraryView(onOpenPlan: onOpenPlan)
                 } label: {
@@ -222,10 +180,9 @@ struct TrainingLibraryHomeView: View {
                         symbol: "calendar",
                         tint: gold,
                         count: session.trainingPlans.count,
-                        grid: displayMode == .grid
+                        grid: true
                     )
                 }
-                if displayMode == .list { libraryDivider }
                 NavigationLink {
                     LibrarySavedWorkoutsHubView(
                         onStartRunning: onStartRunning
@@ -239,10 +196,9 @@ struct TrainingLibraryHomeView: View {
                         tint: slate,
                         count: session.savedWorkoutTemplates.count
                             + runningLibrary.customTemplates.count,
-                        grid: displayMode == .grid
+                        grid: true
                     )
                 }
-                if displayMode == .list { libraryDivider }
                 NavigationLink {
                     ExerciseLibraryView(source: .mine)
                 } label: {
@@ -252,10 +208,9 @@ struct TrainingLibraryHomeView: View {
                         symbol: "dumbbell",
                         tint: lavender,
                         count: exerciseLibrary.customExercises.count,
-                        grid: displayMode == .grid
+                        grid: true
                     )
                 }
-                if displayMode == .list { libraryDivider }
                 NavigationLink {
                     RouteLibraryListView(source: .mine)
                 } label: {
@@ -265,10 +220,9 @@ struct TrainingLibraryHomeView: View {
                         symbol: "map",
                         tint: green,
                         count: session.savedRoutes.count,
-                        grid: displayMode == .grid
+                        grid: true
                     )
                 }
-                if displayMode == .list { libraryDivider }
                 NavigationLink {
                     LibraryFavoritesView(onStartRunning: onStartRunning)
                 } label: {
@@ -279,15 +233,9 @@ struct TrainingLibraryHomeView: View {
                         symbol: "star",
                         tint: gold,
                         count: favorites.favorites.count,
-                        grid: displayMode == .grid
+                        grid: true
                     )
                 }
-            }
-            .background(displayMode == .list ? .white.opacity(0.92) : .clear,
-                        in: RoundedRectangle(cornerRadius: 22))
-            .overlay {
-                RoundedRectangle(cornerRadius: 22)
-                    .strokeBorder(Color.black.opacity(0.035), lineWidth: 1)
             }
         }
     }
@@ -314,13 +262,6 @@ struct TrainingLibraryHomeView: View {
         .padding(15)
         .background(gold.opacity(0.065),
                     in: RoundedRectangle(cornerRadius: 17))
-    }
-
-    private var libraryDivider: some View {
-        Rectangle()
-            .fill(Color.black.opacity(0.055))
-            .frame(height: 0.5)
-            .padding(.leading, 67)
     }
 
     private func sectionHeading(
@@ -459,7 +400,7 @@ private struct LibraryHubCategoryTile: View {
     }
 }
 
-private struct LibraryHubCollectionRow: View {
+struct LibraryHubCollectionRow: View {
     let title: String
     let detail: String
     let symbol: String
@@ -467,40 +408,89 @@ private struct LibraryHubCollectionRow: View {
     let count: Int?
     var grid: Bool = false
 
+    private let titleColor = Color(red: 0.17, green: 0.17, blue: 0.18)
+    private let detailColor = Color(red: 0.47, green: 0.46, blue: 0.45)
+
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: symbol)
-                .font(.system(size: 17, weight: .medium))
-                .foregroundStyle(tint)
-                .frame(width: 38, height: 38)
-                .background(tint.opacity(0.10),
-                            in: RoundedRectangle(cornerRadius: 12))
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(Color(red: 0.17, green: 0.17, blue: 0.18))
-                Text(detail)
-                    .font(.caption)
-                    .foregroundStyle(Color(red: 0.47, green: 0.46, blue: 0.45))
-                    .lineLimit(2)
+        Group {
+            if grid {
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack(alignment: .center, spacing: 6) {
+                        symbolIcon
+                        Spacer(minLength: 4)
+                        if let count, count > 0 {
+                            Text("\(count)")
+                                .font(.caption.monospacedDigit().weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                    }
+
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(titleColor)
+                        .lineLimit(2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                    HStack(alignment: .bottom, spacing: 5) {
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(detailColor)
+                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.medium))
+                            .foregroundStyle(Color.gray.opacity(0.68))
+                            .accessibilityHidden(true)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, minHeight: 158,
+                       alignment: .topLeading)
+                .background(Color.white.opacity(0.96),
+                            in: RoundedRectangle(cornerRadius: 18))
+            } else {
+                HStack(spacing: 12) {
+                    symbolIcon
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(titleColor)
+                        Text(detail)
+                            .font(.caption)
+                            .foregroundStyle(detailColor)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 2)
+                    if let count, count > 0 {
+                        Text("\(count)")
+                            .font(.caption.monospacedDigit().weight(.medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(Color.gray.opacity(0.68))
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 14)
+                .frame(maxWidth: .infinity, minHeight: 67)
             }
-            Spacer(minLength: 2)
-            if let count, count > 0 {
-                Text("\(count)")
-                    .font(.caption.monospacedDigit().weight(.medium))
-                    .foregroundStyle(.secondary)
-            }
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.gray.opacity(0.68))
         }
-        .padding(.horizontal, 14)
-        .frame(maxWidth: .infinity, minHeight: grid ? 120 : 67,
-               alignment: grid ? .topLeading : .center)
-        .background(grid ? Color.white.opacity(0.96) : .clear,
-                    in: RoundedRectangle(cornerRadius: 18))
-        .contentShape(Rectangle())
+        .contentShape(RoundedRectangle(cornerRadius: grid ? 18 : 12))
         .accessibilityElement(children: .combine)
+    }
+
+    private var symbolIcon: some View {
+        Image(systemName: symbol)
+            .font(.system(size: 17, weight: .medium))
+            .foregroundStyle(tint)
+            .frame(width: 38, height: 38)
+            .background(tint.opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 12))
+            .accessibilityHidden(true)
     }
 }
 
