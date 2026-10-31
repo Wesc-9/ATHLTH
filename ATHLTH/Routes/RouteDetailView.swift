@@ -29,7 +29,6 @@ struct RouteDetailView: View {
     @State private var draftTitle = ""
     @State private var watchMessage: String?
     @State private var watchError: String?
-    @State private var startingRoute = false
     @State private var startingGhostAttemptID: UUID?
     @State private var showingTargetGhost = false
     @State private var publicTrailMetadata: PublicTrailRecord?
@@ -1505,45 +1504,22 @@ struct RouteDetailView: View {
                     )
                 }
 
-                if isPublicTrail {
-                    Button {
-                        routeToStart = currentRoute
-                    } label: {
-                        Label(
-                            "Start Route",
-                            systemImage: "play.fill"
-                        )
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accent)
-                    .controlSize(.large)
-                } else if settings.trainingDeviceProvider ==
-                    .appleWatch {
-                    Button {
-                        Task {
-                            await startRouteOnWatch()
-                        }
-                    } label: {
-                        if startingRoute {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                        } else {
-                            Label(
-                                "Start Route",
-                                systemImage: "play.fill"
-                            )
-                            .frame(maxWidth: .infinity)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accent)
-                    .controlSize(.large)
-                    .disabled(
-                        startingRoute ||
-                        !watchConnection.isReady
+                Button {
+                    routeToStart = currentRoute
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Start Route",
+                            norwegian: "Start rute"
+                        ),
+                        systemImage: "play.fill"
                     )
+                    .frame(maxWidth: .infinity)
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accent)
+                .controlSize(.large)
+                .disabled(phoneWorkout.active != nil)
 
                 if let challengeRoute = isOwner
                     ? Optional(currentRoute)
@@ -2077,38 +2053,6 @@ struct RouteDetailView: View {
                     captureDevice,
                 settings: settings
             )
-        } catch {
-            watchError = error.localizedDescription
-        }
-    }
-
-    private func startRouteOnWatch() async {
-        guard watchConnection.isReady else {
-            watchError = "Apple Watch is not ready."
-            return
-        }
-
-        startingRoute = true
-        defer { startingRoute = false }
-
-        do {
-            try watchConnection.sendRoute(currentRoute)
-            watchConnection.sendWorkoutRouteSelection(
-                currentRoute.id
-            )
-            try await watchConnection.startWorkoutOnWatch(
-                .running
-            )
-            watchConnection.sendRunningWorkout(
-                WatchRunningWorkoutTransfer(
-                    title: currentRoute.title,
-                    steps: [],
-                    routeAlerts:
-                        settings.routeAlertConfiguration
-                )
-            )
-            watchMessage =
-                "\(currentRoute.title) started on Apple Watch."
         } catch {
             watchError = error.localizedDescription
         }
