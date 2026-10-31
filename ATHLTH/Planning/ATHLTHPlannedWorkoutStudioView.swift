@@ -10,6 +10,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     @Binding var selectedPhase: WorkoutPhaseKind
 
     let advanced: Bool
+    let activity: ATHLTHPlannedWorkoutType?
     let onAddRun: (WorkoutPhaseKind) -> Void
     let onAddIntervals: (WorkoutPhaseKind) -> Void
     let onAddExercise: (WorkoutPhaseKind) -> Void
@@ -376,9 +377,16 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             Button {
                 onAddRun(phase)
             } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Run / activity", norwegian: "Løp / aktivitet"
-                ), systemImage: "figure.run")
+                Label(
+                    activity == .strength
+                        ? ATHLTHLocalization.choose(
+                            english: "Strength exercise", norwegian: "Styrkeøvelse"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Run / activity", norwegian: "Løp / aktivitet"
+                        ),
+                    systemImage: activity == .strength ? "dumbbell" : "figure.run"
+                )
             }
             Button {
                 onAddExercise(phase)
