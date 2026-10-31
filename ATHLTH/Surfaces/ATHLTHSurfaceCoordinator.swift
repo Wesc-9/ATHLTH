@@ -177,6 +177,29 @@ enum ATHLTHSurfaceCoordinator {
         lastWidgetReloadAt = Date()
     }
 
+    /// WatchConnectivity can deliver a durable workout result independently
+    /// of the mirrored HealthKit session and without an active tab view.
+    /// Close the matching lock-screen activity at receipt time.
+    static func completedWatchWorkoutDidArrive(
+        _ result: WatchWorkoutResult
+    ) {
+        syncLiveActivity(
+            with: WatchWorkoutLiveSnapshot(
+                kind: result.kind,
+                state: .completed,
+                startedAt: result.startedAt,
+                capturedAt: result.endedAt,
+                elapsedTime: result.duration,
+                heartRate: result.averageHeartRate ?? 0,
+                activeCalories: result.activeCalories,
+                distanceMeters: result.distanceMeters,
+                averageHeartRate: result.averageHeartRate,
+                maxHeartRate: result.maxHeartRate,
+                routePointCount: result.routePointCount
+            )
+        )
+    }
+
     static func clearAccountSurfaces() {
         accountSurfacesEnabled = false
         accountGeneration &+= 1
