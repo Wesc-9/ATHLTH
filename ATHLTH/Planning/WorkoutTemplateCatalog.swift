@@ -3653,20 +3653,13 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
             .onChange(of: studioBasicRunMode) { _, mode in
-                guard isPlannedWorkout, initialActivity == .running else { return }
-                if mode != .free {
-                    // A new scratch workout starts empty. Never inject a
-                    // hidden main set, 1 km target or warm-up on mode change.
-                    if selectedRouteID == nil {
-                        blocks.removeAll {
-                            $0.kind == .run && $0.groupID == nil &&
-                            $0.distanceMeters == 1_000 &&
-                            $0.durationSeconds == nil &&
-                            ($0.title == "Løping" || $0.title == "Running")
-                        }
-                        resequence()
-                    }
-                }
+                guard isPlannedWorkout, !studioAdvanced,
+                      initialActivity == .running else { return }
+                // Only content added by the previous Basic selection is
+                // cleared; pre-existing edited exercise rows are preserved.
+                removeBasicOwnedBlocks()
+                if mode != .route { selectedRouteID = nil }
+                if mode != .structured { studioBasicWorkoutTitle = nil }
             }
             .sheet(isPresented: $showingBlockPicker, onDismiss: {
                 if pendingStandaloneExercise {
@@ -4072,18 +4065,6 @@ struct WorkoutTemplateBuilderView: View {
         blocks.removeAll { studioBasicOwnedBlockIDs.contains($0.editorDragID) }
         studioBasicOwnedBlockIDs.removeAll()
         resequence()
-    }
-
-    private func seedBasicFreeRun() {
-        guard isPlannedWorkout, initialActivity == .running,
-              studioBasicRunMode == .free, blocks.isEmpty else { return }
-        selectedPhase = .main
-        addRunBlock(activity: .running)
-        guard let lastIndex = blocks.indices.last else { return }
-        blocks[lastIndex].isIndoor = studioBasicRunEnvironment != .outdoor
-        blocks[lastIndex].treadmillInclinePercent =
-            studioBasicRunEnvironment == .treadmill ? 0 : nil
-        studioBasicOwnedBlockIDs.insert(blocks[lastIndex].editorDragID)
     }
 
     private func useRoute(_ route: TrainingRoute, in phase: WorkoutPhaseKind) {
