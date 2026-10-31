@@ -229,6 +229,7 @@ struct WatchRunIntervalFocusPage: View {
                         (step.phase == "warmup" &&
                          workoutPlan.autoStartMainAfterWarmup != true) ||
                         step.phase == "cooldown" ||
+                        step.measure == .open ||
                         workoutPlan.autoAdvanceTimedSteps == false),
                        workout.state == .running {
                         Button {
