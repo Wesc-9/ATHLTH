@@ -588,9 +588,21 @@ struct AppRootView: View {
                 payload.workout
                     .resolvedRunningWorkouts
                     .first
+            let hasTimeline = !payload.workout.resolvedWorkoutBlocks.isEmpty
+            if hasTimeline,
+               let issue = ATHLTHQuickRunTimelineAdapter.validationError(
+                    for: payload.workout
+               ) {
+                throw NSError(
+                    domain: "ATHLTH.DeviceRelayTimeline", code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: issue]
+                )
+            }
+            let advancedWorkout: PlannedSession? =
+                hasTimeline ? payload.workout : nil
 
             let mode: RunQuickStartMode
-            if runningWorkout != nil {
+            if runningWorkout != nil || advancedWorkout != nil {
                 mode = .structured
             } else if payload.route != nil {
                 mode = .route
@@ -598,7 +610,7 @@ struct AppRootView: View {
                 mode = .free
             }
 
-            let configuration =
+            var configuration =
                 RunQuickStartConfiguration(
                     mode: mode,
                     route: payload.route,
@@ -640,6 +652,7 @@ struct AppRootView: View {
                     gearIDs:
                         Set(envelope.gearIDs)
                 )
+            configuration.advancedWorkout = advancedWorkout
 
             try await WorkoutLaunchCoordinator
                 .startRunQuick(
