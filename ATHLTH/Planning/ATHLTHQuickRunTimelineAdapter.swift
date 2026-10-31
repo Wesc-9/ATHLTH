@@ -112,11 +112,9 @@ enum ATHLTHQuickRunTimelineAdapter {
             routeAlerts: routeAlerts,
             autoPauseEnabled: autoPauseEnabled
         )
-        // Open-ended main phases cannot complete from a timer/GPS threshold.
-        // Allow manual Next instead of leaving the athlete stuck in a step.
-        result.autoAdvanceTimedSteps = !steps.contains {
-            $0.phase == "work" && $0.measure == .open
-        }
+        // Timed steps advance normally. The shared running engine exposes
+        // manual Next independently for every open-ended step.
+        result.autoAdvanceTimedSteps = true
         // An open warm-up must always expose the manual transition button.
         result.autoStartMainAfterWarmup = !steps.contains {
             $0.phase == "warmup" && $0.measure == .open
