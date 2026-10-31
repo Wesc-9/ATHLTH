@@ -1043,6 +1043,9 @@ struct WatchRunningWorkoutTransfer: Codable, Hashable {
     /// Automatic timed-step progression is the existing default for old plans.
     var autoAdvanceTimedSteps: Bool? = nil
     var autoStartMainAfterWarmup: Bool? = nil
+    /// Route progress and navigation begin only after an optional warm-up.
+    /// Nil is the legacy behavior: guidance starts with the workout.
+    var deferRouteUntilMain: Bool? = nil
     var intervalCoachCueEverySeconds: TimeInterval? = nil
     var intervalCoachCountdownSeconds: TimeInterval? = nil
 }
