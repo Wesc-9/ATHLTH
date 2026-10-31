@@ -406,6 +406,7 @@ struct RunQuickStartConfiguration {
         SocialWorkoutParticipationMode
     let gearIDs: Set<UUID>
     var watchStartMode: WatchWorkoutStartMode = .immediate
+    var routeWarmup: ATHLTHRouteWarmupConfiguration = .disabled
 
     var title: String {
         switch mode {
@@ -1214,6 +1215,7 @@ struct RunQuickStartSheet: View {
     @State private var launchFailure: String?
 
     @State private var mode: RunQuickStartMode
+    @State private var routeWarmup = ATHLTHRouteWarmupConfiguration.disabled
     @State private var selectedRoute: TrainingRoute?
     @State private var selectedWorkout: RunningWorkoutTemplate?
     @State private var selectedFriendIDs: Set<UUID> = []
@@ -1303,6 +1305,10 @@ struct RunQuickStartSheet: View {
                     }
 
                     selectionCard
+
+                    if mode == .route, selectedRoute != nil {
+                        ATHLTHRouteWarmupCard(configuration: $routeWarmup)
+                    }
 
                     quickRunGuidanceCard
 
@@ -2262,7 +2268,7 @@ struct RunQuickStartSheet: View {
         }
 
         launchFailure = nil
-        let configuration = RunQuickStartConfiguration(
+        var configuration = RunQuickStartConfiguration(
                 mode: mode,
                 route:
                     mode == .route
@@ -2326,6 +2332,7 @@ struct RunQuickStartSheet: View {
                 gearIDs: selectedGearIDs,
                 watchStartMode: watchStartMode
             )
+        configuration.routeWarmup = mode == .route ? routeWarmup : .disabled
         launchInProgress = true
         Task { @MainActor in
             let failure = await onStart(configuration)
