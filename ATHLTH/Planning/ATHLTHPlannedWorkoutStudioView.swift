@@ -11,6 +11,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     let advanced: Bool
     let activity: ATHLTHPlannedWorkoutType?
+    let hasSelectedRoute: Bool
     let onAddRun: (WorkoutPhaseKind) -> Void
     let onAddIntervals: (WorkoutPhaseKind) -> Void
     let onAddExercise: (WorkoutPhaseKind) -> Void
@@ -46,8 +47,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     }
 
     private var routeAsWholeWorkout: WorkoutTemplateBlock? {
-        guard visiblePhases.isEmpty, blocks.count == 1,
-              blocks[0].kind == .run,
+        guard hasSelectedRoute, visiblePhases.isEmpty,
+              blocks.count == 1, blocks[0].kind == .run,
               blocks[0].distanceMeters != nil else { return nil }
         return blocks[0]
     }
