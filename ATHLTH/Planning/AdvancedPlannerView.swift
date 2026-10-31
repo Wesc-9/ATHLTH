@@ -5490,7 +5490,8 @@ struct SessionEditorView: View {
     @State private var workoutBlocks: [WorkoutTemplateBlock] = []
     @State private var workoutCategory: String?
     @State private var showingSavedWorkoutPicker = false
-    @State private var pickingScratchWorkout = false
+    @State private var showingScratchTypePicker = false
+    @State private var openScratchComposerAfterPickerDismiss = false
     @State private var selectedScratchWorkoutType: ATHLTHPlannedWorkoutType?
     @State private var scratchTimelineDraftID = UUID()
     @State private var showingUnifiedWorkoutComposer = false
@@ -6231,11 +6232,11 @@ struct SessionEditorView: View {
                 norwegian: "Den samme øktmotoren brukes for egen planlegging og Train Together."
             ),
             onCreateNew: {
-                pickingScratchWorkout = true
-                showingSavedWorkoutPicker = true
+                // A scratch workout has its own entry route. Never reuse
+                // the saved-workout sheet, which opens the catalog.
+                showingScratchTypePicker = true
             },
             onUsePlanned: {
-                pickingScratchWorkout = false
                 showingSavedWorkoutPicker = true
             },
             onResumeDraft: hasStoredStandaloneDraft
@@ -6621,33 +6622,44 @@ struct SessionEditorView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
             }
-            .sheet(isPresented: $showingSavedWorkoutPicker) {
-                if pickingScratchWorkout {
-                    ATHLTHPlannedWorkoutTypePickerView(
-                        purpose: .createFromScratch,
-                        onCreateNew: { type in
-                            prepareBlankWorkout(for: type)
-                            showingSavedWorkoutPicker = false
-                            pickingScratchWorkout = false
-                        },
-                        onSelect: { _, _ in }
-                    )
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                } else {
-                    ATHLTHPlannedWorkoutTypePickerView { workout, _ in
-                        applySavedWorkout(workout)
-                        // A library template supplies the structure, but the
-                        // athlete still names this new independent session.
-                        if existingWorkout == nil { title = "" }
-                        selectedScratchWorkoutType = nil
-                        discardStoredStandaloneDraft()
-                        hasSelectedWorkoutSource = true
-                        showingSavedWorkoutPicker = false
-                    }
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
+            // Keep the scratch and catalog sheets independent so a
+            // transient state change cannot replace the scratch type
+            // picker with the catalog while dismissing it.
+            .sheet(
+                isPresented: $showingScratchTypePicker,
+                onDismiss: {
+                    guard openScratchComposerAfterPickerDismiss else { return }
+                    openScratchComposerAfterPickerDismiss = false
+                    // Open the unified timeline only after the type picker
+                    // has fully closed: no overlapping sheet presentations.
+                    showingUnifiedWorkoutComposer = true
                 }
+            ) {
+                ATHLTHPlannedWorkoutTypePickerView(
+                    purpose: .createFromScratch,
+                    onCreateNew: { type in
+                        prepareBlankWorkout(for: type)
+                        openScratchComposerAfterPickerDismiss = true
+                        showingScratchTypePicker = false
+                    },
+                    onSelect: { _, _ in }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showingSavedWorkoutPicker) {
+                ATHLTHPlannedWorkoutTypePickerView { workout, _ in
+                    applySavedWorkout(workout)
+                    // A library template supplies the structure, but the
+                    // athlete still names this new independent session.
+                    if existingWorkout == nil { title = "" }
+                    selectedScratchWorkoutType = nil
+                    discardStoredStandaloneDraft()
+                    hasSelectedWorkoutSource = true
+                    showingSavedWorkoutPicker = false
+                }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
     }
 
