@@ -3406,10 +3406,9 @@ struct WorkoutTemplateBuilderView: View {
         // A distance-based outdoor route is a complete planned workout,
         // even without an estimated finishing time.
         let basicFreeRun = isPlannedWorkout && !studioAdvanced &&
-            initialActivity == .running &&
-            studioBasicRunMode == .free &&
-            blocks.contains { $0.kind == .run }
-        return (hasRunning || hasStrength || hasCycling || hasTimedWellness) &&
+            initialActivity == .running && studioBasicRunMode == .free
+        return (hasRunning || hasStrength || hasCycling ||
+                hasTimedWellness || basicFreeRun) &&
             !hasIncompleteSuperset &&
             (!isPlannedWorkout || resolvedDurationMinutes != nil ||
              routeDistanceGoal || basicFreeRun)
@@ -3654,22 +3653,19 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
             .onChange(of: studioBasicRunMode) { _, mode in
-                guard isPlannedWorkout, !studioAdvanced,
-                      initialActivity == .running else { return }
-                removeBasicOwnedBlocks()
-                if mode != .route { selectedRouteID = nil }
-                if mode != .structured { studioBasicWorkoutTitle = nil }
-                if mode == .free { seedBasicFreeRun() }
-            }
-            .onChange(of: studioAdvanced) { _, advanced in
-                if !advanced && initialActivity == .running {
-                    seedBasicFreeRun()
-                }
-            }
-            .onAppear {
-                if isPlannedWorkout && !studioAdvanced &&
-                    initialActivity == .running {
-                    seedBasicFreeRun()
+                guard isPlannedWorkout, initialActivity == .running else { return }
+                if mode != .free {
+                    // A new scratch workout starts empty. Never inject a
+                    // hidden main set, 1 km target or warm-up on mode change.
+                    if selectedRouteID == nil {
+                        blocks.removeAll {
+                            $0.kind == .run && $0.groupID == nil &&
+                            $0.distanceMeters == 1_000 &&
+                            $0.durationSeconds == nil &&
+                            ($0.title == "Løping" || $0.title == "Running")
+                        }
+                        resequence()
+                    }
                 }
             }
             .sheet(isPresented: $showingBlockPicker, onDismiss: {
@@ -5822,6 +5818,15 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
+    private var basicFreeRunningKind: WorkoutKind {
+        if isPlannedWorkout && !studioAdvanced &&
+           initialActivity == .running && studioBasicRunMode == .free &&
+           blocks.isEmpty {
+            return .running
+        }
+        return resolvedWorkoutKind
+    }
+
     private func workoutSnapshot() -> PlannedSession {
         let requestedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let suggestedBasicTitle: String = {
@@ -5841,7 +5846,7 @@ struct WorkoutTemplateBuilderView: View {
         var workout = PlannedSession(
             id: UUID(),
             title: cleanTitle,
-            kind: resolvedWorkoutKind,
+            kind: basicFreeRunningKind,
             scheduledStart: nil,
             durationMinutes: resolvedDurationMinutes,
             targetDistanceKilometers: nil,
