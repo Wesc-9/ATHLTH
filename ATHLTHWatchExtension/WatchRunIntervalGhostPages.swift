@@ -235,11 +235,15 @@ struct WatchRunIntervalFocusPage: View {
                             workout.advanceStructuredRunningWorkoutManually()
                         } label: {
                             Label(ATHLTHLocalization.choose(
-                                english: workout.awaitingMainStart
+                                english: (workout.awaitingMainStart ||
+                                    (step.phase == "warmup" &&
+                                     workoutPlan.deferRouteUntilMain == true))
                                     ? "Start main section" : step.phase == "warmup"
                                     ? "End warm-up" : step.phase == "cooldown"
                                     ? "End cool-down" : "Next phase",
-                                norwegian: workout.awaitingMainStart
+                                norwegian: (workout.awaitingMainStart ||
+                                    (step.phase == "warmup" &&
+                                     workoutPlan.deferRouteUntilMain == true))
                                     ? "Start hoveddel" : step.phase == "warmup"
                                     ? "Avslutt oppvarming" : step.phase == "cooldown"
                                     ? "Avslutt nedjogging" : "Neste del"
