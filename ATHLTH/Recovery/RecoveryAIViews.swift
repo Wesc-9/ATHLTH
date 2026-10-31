@@ -1031,6 +1031,8 @@ struct RecoveryCoachView: View {
     @State private var proposalActionNotice: String?
     @State private var selectedCoachProposal: RecoveryCoachProposal?
     @State private var showingCoachWorkoutBuilder = false
+    @State private var showingCoachRouteGenerator = false
+    @State private var coachRouteBrief = ATHLTHCoachRouteBrief()
     @State private var showingCoachPlanBuilder = false
     @State private var activeQuickWizard: ATHLTHCoachQuickAction?
     @State private var pendingWizardPrompt: String?
@@ -1283,6 +1285,9 @@ struct RecoveryCoachView: View {
             loadConversationIfNeeded()
             loadCoachConsent()
             receiveIncomingQuestionIfNeeded()
+        }
+        .sheet(isPresented: $showingCoachRouteGenerator) {
+            ATHLTHCoachRouteGeneratorView(initialBrief: coachRouteBrief)
         }
         .sheet(isPresented: $showingCoachWorkoutBuilder) {
             if let proposal = selectedCoachProposal,
@@ -2245,6 +2250,29 @@ struct RecoveryCoachView: View {
             )
 
             Button {
+                coachRouteBrief = ATHLTHCoachRouteBrief()
+                showingCoachRouteGenerator = true
+            } label: {
+                Label(
+                    recoveryAIText(
+                        "Create a running route with Coach",
+                        "Lag en løperute med Coach"
+                    ),
+                    systemImage: "point.topleft.down.to.point.bottomright.curvepath"
+                )
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(maxWidth: .infinity, minHeight: 38)
+                .background(
+                    ATHLTHPlanDesign.selectedSurface,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(isAsking)
+            .padding(.horizontal, 14)
+
+            Button {
                 if !aiConsentApproved {
                     pendingShareAfterConsent = false
                     draftHealthPermission = false
@@ -2710,6 +2738,16 @@ struct RecoveryCoachView: View {
     ) {
         let clean = rawQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !clean.isEmpty, !isAsking else { return }
+
+        if ATHLTHCoachRouteIntent.isRequest(clean) {
+            // Route requests are executed locally by MapKit only after
+            // the athlete reviews the options. No hallucinated geometry
+            // or automatic location disclosure to the AI conversation.
+            coachRouteBrief = ATHLTHCoachRouteIntent.initialBrief(from: clean)
+            showingCoachRouteGenerator = true
+            question = ""
+            return
+        }
 
         if !reviewedWorkout &&
            ATHLTHCoachWorkoutCreationIntent.isRequest(clean) {
