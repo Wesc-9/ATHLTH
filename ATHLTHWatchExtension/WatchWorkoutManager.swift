@@ -4604,7 +4604,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         targetWasOutside = false
 
         let mustStartMainManually = finishedStep?.phase == "warmup" &&
-            workout.autoStartMainAfterWarmup != true
+            workout.autoStartMainAfterWarmup != true &&
+            !(manually && workout.deferRouteUntilMain == true)
         if finishedStep?.phase == "warmup",
            workout.deferRouteUntilMain == true {
             routeLegDistanceOffsetMeters = distanceMeters
