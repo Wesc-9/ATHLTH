@@ -9,12 +9,21 @@ enum ATHLTHHeartRateZoneCoachTarget {
         stepZone: Int?,
         maximumBPM: Double?
     ) -> WatchWorkoutTargetAlertConfiguration? {
-        guard let stepZone,
-              let interval = ATHLTHHeartRateZones.range(
-                for: stepZone,
-                maximumBPM: maximumBPM
-              ) else {
-            return configured
+        guard let stepZone else { return configured }
+        guard let interval = ATHLTHHeartRateZones.range(
+            for: stepZone,
+            maximumBPM: maximumBPM
+        ) else {
+            // A stale workout-wide zone must never be described as the
+            // current interval's goal when HRmax is not available.
+            var fallback = configured
+            if fallback?.heartRateZone != stepZone {
+                fallback?.heartRateEnabled = false
+                fallback?.heartRateZone = nil
+                fallback?.heartRateMinimumBPM = nil
+                fallback?.heartRateMaximumBPM = nil
+            }
+            return fallback
         }
 
         var result = configured ?? WatchWorkoutTargetAlertConfiguration(
@@ -46,10 +55,10 @@ enum ATHLTHHeartRateZoneCoachTarget {
                 : ("Heart rate above target", "Pulsen er over målområdet")
         }
         return below
-            ? ("Heart rate below zone \(zone). Increase the effort slightly.",
-               "Pulsen er under sone \(zone). Øk intensiteten litt.")
-            : ("Heart rate above zone \(zone). Ease off slightly.",
-               "Pulsen er over sone \(zone). Senk intensiteten litt.")
+            ? ("Heart rate below zone Z\(zone). Increase the effort slightly.",
+               "Pulsen er under pulssone S\(zone). Øk intensiteten litt.")
+            : ("Heart rate above zone Z\(zone). Ease off slightly.",
+               "Pulsen er over pulssone S\(zone). Senk intensiteten litt.")
     }
 
     static func backInTargetPhrase(
@@ -58,8 +67,8 @@ enum ATHLTHHeartRateZoneCoachTarget {
         guard let zone, (1...5).contains(zone) else {
             return ("Back in target", "Tilbake i målområdet")
         }
-        return ("Back in heart-rate zone \(zone)",
-                "Tilbake i pulssone \(zone)")
+        return ("Back in heart-rate zone Z\(zone)",
+                "Tilbake i pulssone S\(zone)")
     }
 
     static func spokenDelivery(
