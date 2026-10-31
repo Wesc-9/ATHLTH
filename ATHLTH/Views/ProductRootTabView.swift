@@ -887,8 +887,8 @@ struct ATHLTHHomeView: View {
                         }
                     )
 
-                    // Weather and its visible handle remain accessible when
-                    // the other shortcuts retract into this lighter glass rail.
+                    // Keep the compact rail as handle + profile avatar.
+                    // Weather and the remaining shortcuts appear when expanded.
                     HStack(spacing: 0) {
                         HomeHeroUtilityButtons(
                             weather: homeWeather.snapshot,
@@ -905,22 +905,21 @@ struct ATHLTHHomeView: View {
                             }
                         )
 
-                        if homeHeroToolbarExpanded {
-                            NavigationLink {
-                                ATHLTHProfileView()
-                            } label: {
-                                homeProfileShortcut
-                                    .frame(width: 52, height: 52)
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(
-                                ATHLTHLocalization.choose(
-                                    english: "Profile", norwegian: "Profil"
-                                )
-                            )
-                            .transition(.opacity)
+                        // The profile avatar remains visible and tappable in
+                        // both expanded and collapsed Home toolbar states.
+                        NavigationLink {
+                            ATHLTHProfileView()
+                        } label: {
+                            homeProfileShortcut
+                                .frame(width: 52, height: 52)
+                                .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Profile", norwegian: "Profil"
+                            )
+                        )
                     }
                     .padding(.horizontal, 5)
                     .background(.ultraThinMaterial, in: Capsule())
@@ -5328,9 +5327,9 @@ private struct HomeHeroUtilityButtons: View {
                     }
             )
 
-            weatherBadge
-
             if expanded {
+                weatherBadge
+
                 heroButton(
                     icon: "magnifyingglass",
                     action: onSearch
