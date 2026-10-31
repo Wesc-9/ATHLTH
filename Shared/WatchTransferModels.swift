@@ -1568,6 +1568,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningStepTargetPaceSecondsPerKilometer: Double? = nil
     var runningManualAdvanceRequired: Bool? = nil
     var runningAwaitingMainStart: Bool? = nil
+    /// This warm-up needs just one manual tap to start the saved route.
+    var runningRouteWarmup: Bool? = nil
     var runningStepElapsedSeconds: TimeInterval? = nil
     var runningIntervalCoachCueEverySeconds: TimeInterval? = nil
     var runningIntervalCoachCountdownSeconds: TimeInterval? = nil
