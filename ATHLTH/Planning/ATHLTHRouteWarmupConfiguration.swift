@@ -54,6 +54,7 @@ struct ATHLTHRouteWarmupConfiguration: Codable, Hashable {
         )
         transfer.autoAdvanceTimedSteps = true
         transfer.autoStartMainAfterWarmup = startsMainAutomatically
+        transfer.deferRouteUntilMain = true
         return transfer
     }
 }
