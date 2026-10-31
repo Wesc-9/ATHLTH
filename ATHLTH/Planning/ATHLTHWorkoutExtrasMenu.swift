@@ -3,6 +3,7 @@ import SwiftUI
 /// Lightweight entry points into the existing ATHLTH workout integrations.
 /// Actions are presented separately from the workout-save action.
 struct ATHLTHWorkoutExtrasMenu: View {
+    let onGear: () -> Void
     let onPlanWithFriend: () -> Void
     let onSpotify: () -> Void
     let onHeartRateAndPace: () -> Void
@@ -17,6 +18,9 @@ struct ATHLTHWorkoutExtrasMenu: View {
 
     var body: some View {
         Menu {
+            Button(action: onGear) {
+                Label(tr("Gear", "Utstyr"), systemImage: "shoeprints.fill")
+            }
             Button(action: onPlanWithFriend) {
                 Label(tr("Plan with a friend", "Planlegg med en venn"),
                       systemImage: "person.2")

@@ -3263,6 +3263,7 @@ struct ATHLTHPlanCopyDay: Identifiable, Hashable {
 }
 
 private enum ATHLTHWorkoutExtraDestination: String, Identifiable {
+    case gear
     case planWithFriend
     case spotify
     case heartRateAndPace
@@ -3307,6 +3308,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingStudioRouteBuilder = false
     @State private var showingStudioStepEditor = false
     @State private var selectedWorkoutExtra: ATHLTHWorkoutExtraDestination?
+    @State private var selectedWorkoutGearIDs: Set<UUID> = []
     @State private var studioEditedStepID: UUID?
     @State private var studioRoutePhase: WorkoutPhaseKind = .main
     @State private var studioVisiblePhases: Set<WorkoutPhaseKind> = []
@@ -3422,6 +3424,7 @@ struct WorkoutTemplateBuilderView: View {
         let blocks: [WorkoutTemplateBlock]
         let routeID: UUID?
         let manualMinutes: Int?
+        let gearIDs: [UUID]?
         let pendingCopyDayIDs: [Int]?
         let updatedAt: Date
     }
@@ -3438,6 +3441,7 @@ struct WorkoutTemplateBuilderView: View {
         title = stored.title
         blocks = stored.blocks
         selectedRouteID = stored.routeID
+        selectedWorkoutGearIDs = Set(stored.gearIDs ?? [])
         manualDurationMinutes = stored.manualMinutes
         durationInputText = (stored.manualMinutes ??
             ATHLTHWorkoutDurationEstimator.minutes(for: stored.blocks)).map(String.init) ?? ""
@@ -3456,6 +3460,7 @@ struct WorkoutTemplateBuilderView: View {
             blocks: blocks,
             routeID: selectedRouteID,
             manualMinutes: manualDurationMinutes,
+            gearIDs: Array(selectedWorkoutGearIDs),
             pendingCopyDayIDs: Array(pendingCopyDayIDs).sorted(),
             updatedAt: Date()
         )
@@ -3654,6 +3659,7 @@ struct WorkoutTemplateBuilderView: View {
 
     private var workoutExtrasMenu: some View {
         ATHLTHWorkoutExtrasMenu(
+            onGear: { selectedWorkoutExtra = .gear },
             onPlanWithFriend: {
                 persistWorkoutDraft()
                 selectedWorkoutExtra = .planWithFriend
@@ -3892,6 +3898,26 @@ struct WorkoutTemplateBuilderView: View {
             }
             .sheet(item: $selectedWorkoutExtra) { destination in
                 switch destination {
+                case .gear:
+                    NavigationStack {
+                        ScrollView {
+                            WorkoutGearSelectionCard(
+                                selectedGearIDs: $selectedWorkoutGearIDs,
+                                activity: initialActivity == .walking ? .walking : .running
+                            )
+                            .padding(16)
+                        }
+                        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+                        .navigationTitle(tr("Workout gear", "Utstyr for økten"))
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(tr("Done", "Ferdig")) {
+                                    selectedWorkoutExtra = nil
+                                }
+                            }
+                        }
+                    }
                 case .planWithFriend:
                     NavigationStack {
                         TrainTogetherPostCreateView(
@@ -4080,6 +4106,7 @@ struct WorkoutTemplateBuilderView: View {
                 persistWorkoutDraft()
             }
             .onChange(of: selectedRouteID) { _, _ in persistWorkoutDraft() }
+            .onChange(of: selectedWorkoutGearIDs) { _, _ in persistWorkoutDraft() }
             .onChange(of: manualDurationMinutes) { _, _ in
                 persistWorkoutDraft()
             }
@@ -5921,6 +5948,9 @@ struct WorkoutTemplateBuilderView: View {
             notes: nil
         )
         workout.workoutBlocks = blocks
+        if !selectedWorkoutGearIDs.isEmpty {
+            workout.gearIDs = Array(selectedWorkoutGearIDs)
+        }
         if isPlannedWorkout, initialActivity == .running, !studioAdvanced {
             switch studioBasicRunEnvironment {
             case .outdoor: workout.workoutCategory = "running"
