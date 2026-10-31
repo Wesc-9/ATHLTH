@@ -837,11 +837,11 @@ private struct HomeFriendQuickActionsPopover: View {
     let onTrainTogether: () -> Void
     let onShare: (ATHLTHFriendQuickShareKind) -> Void
 
-    @State private var friendProfile: SocialFriendProfile?
+    @State private var performance: SocialPerformanceStats?
     @State private var followOverview: SocialFollowOverview?
 
-    private func tr(_ en: String, _ no: String) -> String {
-        ATHLTHLocalization.choose(english: en, norwegian: no)
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 
     private var status: String {
@@ -851,38 +851,39 @@ private struct HomeFriendQuickActionsPopover: View {
     }
 
     private var statusColor: Color {
-        if isTraining { return Color.orange }
-        if isOnline { return Color.green }
+        if isTraining { return .orange }
+        if isOnline { return .green }
         return ATHLTHTheme.premiumGold
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(spacing: 12) {
+            // Name AND portrait lead directly to the athlete's real profile.
             Button(action: onProfile) {
-                HStack(alignment: .center, spacing: 12) {
-                    ATHLTHSocialStatusAvatar(profile: friend, size: 52)
-                        .frame(width: 59, height: 59)
+                HStack(spacing: 10) {
+                    ATHLTHSocialStatusAvatar(profile: friend, size: 48)
+                        .frame(width: 52, height: 52)
 
                     VStack(alignment: .leading, spacing: 5) {
                         Text(friend.resolvedName)
-                            .font(.system(size: 15, weight: .semibold))
+                            .font(.system(size: 14, weight: .semibold))
                             .foregroundStyle(ATHLTHPlanDesign.ink)
-                            .lineLimit(2)
+                            .fixedSize(horizontal: false, vertical: true)
                             .multilineTextAlignment(.leading)
-
-                        HStack(spacing: 6) {
+                            .lineLimit(2)
+                        HStack(spacing: 5) {
                             Circle()
                                 .fill(statusColor)
-                                .frame(width: 7, height: 7)
+                                .frame(width: 6, height: 6)
                             Text(status)
-                                .font(.caption)
+                                .font(.system(size: 11))
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                            if !friend.usernameLabel.isEmpty {
-                                Text("· " + friend.usernameLabel)
-                                    .font(.caption2)
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                                    .lineLimit(1)
-                            }
+                        }
+                        if !friend.usernameLabel.isEmpty {
+                            Text(friend.usernameLabel)
+                                .font(.caption2)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                .lineLimit(1)
                         }
                     }
                     Spacer(minLength: 0)
@@ -893,91 +894,101 @@ private struct HomeFriendQuickActionsPopover: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(tr("Open profile for \(friend.resolvedName)",
-                                   "Åpne profilen til \(friend.resolvedName)"))
+            .accessibilityLabel(
+                tr("Open profile for", "Åpne profilen til") + " " + friend.resolvedName
+            )
 
-            HStack(spacing: 0) {
-                statistic(
-                    friendProfile?.performance?.totalWorkoutCount,
-                    title: tr("Workouts", "Økter")
-                )
-                thinVerticalDivider
-                statistic(
-                    followOverview?.followerCount,
-                    title: tr("Followers", "Følgere")
-                )
-                thinVerticalDivider
-                statistic(
-                    followOverview?.followingCount,
-                    title: tr("Following", "Følger")
-                )
-            }
-            .padding(.vertical, 2)
-
-            HStack(spacing: 7) {
-                primaryAction(tr("Message", "Melding"),
-                              icon: "bubble.left", action: onMessage)
-                primaryAction(tr("Challenge", "Utfordre"),
-                              icon: "trophy", action: onChallenge)
-                primaryAction(tr("Train together", "Tren sammen"),
-                              icon: "person.2.wave.2", action: onTrainTogether)
+            if performance != nil || followOverview != nil {
+                HStack(spacing: 0) {
+                    stat(
+                        performance.map { $0.totalWorkoutCount.formatted() } ?? "—",
+                        title: tr("Workouts", "Økter")
+                    )
+                    statDivider
+                    stat(
+                        followOverview.map { $0.followerCount.formatted() } ?? "—",
+                        title: tr("Followers", "Følgere")
+                    )
+                    statDivider
+                    stat(
+                        followOverview.map { $0.followingCount.formatted() } ?? "—",
+                        title: tr("Following", "Følger")
+                    )
+                }
+                .padding(.vertical, 3)
             }
 
             Rectangle()
-                .fill(ATHLTHTheme.premiumGold.opacity(0.15))
-                .frame(height: 1)
-                .accessibilityHidden(true)
+                .fill(ATHLTHPlanDesign.accentInk.opacity(0.12))
+                .frame(height: 0.5)
 
-            HStack(alignment: .top, spacing: 5) {
-                secondaryAction(.plan, icon: "calendar")
-                secondaryAction(.workout, icon: "figure.run")
-                secondaryAction(.route, icon: "point.topleft.down.to.point.bottomright.curvepath")
-                secondaryAction(.exercise, icon: "dumbbell")
+            HStack(spacing: 8) {
+                mainAction(tr("Message", "Melding"),
+                           icon: "bubble.left", action: onMessage)
+                mainAction(tr("Challenge", "Utfordre"),
+                           icon: "trophy", action: onChallenge)
+                mainAction(tr("Train Together", "Tren sammen"),
+                           icon: "figure.run", action: onTrainTogether)
+            }
+
+            Rectangle()
+                .fill(ATHLTHPlanDesign.accentInk.opacity(0.12))
+                .frame(height: 0.5)
+
+            HStack(spacing: 6) {
+                shareAction(tr("Share plan", "Del plan"),
+                            icon: "calendar") { onShare(.plan) }
+                shareAction(tr("Send workout", "Send treningsøkt"),
+                            icon: "dumbbell") { onShare(.workout) }
+                shareAction(tr("Send route", "Send rute"),
+                            icon: "point.topleft.down.to.point.bottomright.curvepath") {
+                    onShare(.route)
+                }
+                shareAction(tr("Send exercise", "Send øvelse"),
+                            icon: "figure.strengthtraining.traditional") {
+                    onShare(.exercise)
+                }
             }
         }
         .padding(14)
-        .frame(width: 336)
+        .frame(width: 328)
         .background(
-            ATHLTHPlanDesign.canvas,
+            Color(red: 0.995, green: 0.99, blue: 0.978),
             in: RoundedRectangle(cornerRadius: 25, style: .continuous)
         )
-        .presentationBackground(ATHLTHPlanDesign.canvas)
+        .presentationBackground(.clear)
         .task(id: friend.userID) {
-            // Only statistics allowed by the recipient's privacy settings
-            // are shown. A missing value stays a dash, never a fake count.
-            async let profile = social.loadFriendProfile(friend.userID)
-            async let overview = social.loadFollowOverview(for: friend.userID)
-            let loadedProfile = await profile
-            let loadedOverview = await overview
+            async let loadedProfile = social.loadFriendProfile(friend.userID)
+            async let loadedFollows = social.loadFollowOverview(for: friend.userID)
+            let loaded = await loadedProfile
+            let follows = await loadedFollows
             guard !Task.isCancelled else { return }
-            friendProfile = loadedProfile
-            followOverview = loadedOverview
+            performance = loaded?.performance
+            followOverview = follows
         }
     }
 
-    private var thinVerticalDivider: some View {
+    private var statDivider: some View {
         Rectangle()
-            .fill(ATHLTHTheme.premiumGold.opacity(0.14))
-            .frame(width: 1, height: 32)
-            .accessibilityHidden(true)
+            .fill(ATHLTHPlanDesign.accentInk.opacity(0.14))
+            .frame(width: 0.5, height: 28)
     }
 
-    private func statistic(_ count: Int?, title: String) -> some View {
-        VStack(spacing: 4) {
-            Text(count?.formatted() ?? "—")
-                .font(.system(size: 17, weight: .semibold, design: .rounded))
+    private func stat(_ value: String, title: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.system(size: 14, weight: .semibold, design: .rounded))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
-                .monospacedDigit()
+                .lineLimit(1)
             Text(title)
                 .font(.system(size: 10))
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .lineLimit(1)
         }
         .frame(maxWidth: .infinity)
         .accessibilityElement(children: .combine)
     }
 
-    private func primaryAction(
+    private func mainAction(
         _ title: String,
         icon: String,
         action: @escaping () -> Void
@@ -985,57 +996,53 @@ private struct HomeFriendQuickActionsPopover: View {
         Button(action: action) {
             VStack(spacing: 7) {
                 Image(systemName: icon)
-                    .font(.system(size: 19, weight: .regular))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 38, height: 37)
+                    .font(.system(size: 17, weight: .regular))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(width: 33, height: 33)
                     .background(
                         ATHLTHPlanDesign.selectedSurface,
-                        in: RoundedRectangle(cornerRadius: 12)
+                        in: RoundedRectangle(cornerRadius: 11)
                     )
                 Text(title)
                     .font(.system(size: 10.5, weight: .medium))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                     .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                    .minimumScaleFactor(0.85)
+                    .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity, minHeight: 79)
-            .background(
-                Color.white.opacity(0.78),
-                in: RoundedRectangle(cornerRadius: 17)
-            )
+            .frame(maxWidth: .infinity, minHeight: 69)
+            .background(.white, in: RoundedRectangle(cornerRadius: 15))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
     }
 
-    private func secondaryAction(
-        _ kind: ATHLTHFriendQuickShareKind,
-        icon: String
+    private func shareAction(
+        _ title: String,
+        icon: String,
+        action: @escaping () -> Void
     ) -> some View {
-        Button { onShare(kind) } label: {
+        Button(action: action) {
             VStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(height: 23)
-                Text(kind.title)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.system(size: 15))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                Text(title)
+                    .font(.system(size: 9.5, weight: .medium))
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .minimumScaleFactor(0.85)
             }
-            .frame(maxWidth: .infinity, minHeight: 62)
+            .frame(maxWidth: .infinity, minHeight: 63)
             .background(
-                Color.white.opacity(0.53),
+                ATHLTHPlanDesign.selectedSurface.opacity(0.75),
                 in: RoundedRectangle(cornerRadius: 13)
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(kind.title)
+        .accessibilityLabel(title)
     }
 }
 
