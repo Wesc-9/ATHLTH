@@ -1105,11 +1105,15 @@ private struct IPhoneStructuredStepCard: View {
                                                 recorder.advanceStructuredStepManually()
                                             } label: {
                                                 Text(ATHLTHLocalization.choose(
-                                                    english: workout.awaitingMainStart == true
+                                                    english: workout.awaitingMainStart == true ||
+                                                        (step.phase == "warmup" &&
+                                                         workout.structuredRunningWorkout?.deferRouteUntilMain == true)
                                                         ? "Start main section" : step.phase == "warmup"
                                                         ? "End warm-up" : step.phase == "cooldown"
                                                         ? "End cool-down" : "Next phase",
-                                                    norwegian: workout.awaitingMainStart == true
+                                                    norwegian: workout.awaitingMainStart == true ||
+                                                        (step.phase == "warmup" &&
+                                                         workout.structuredRunningWorkout?.deferRouteUntilMain == true)
                                                         ? "Start hoveddel" : step.phase == "warmup"
                                                         ? "Avslutt oppvarming" : step.phase == "cooldown"
                                                         ? "Avslutt nedjogging" : "Neste del"
