@@ -1518,7 +1518,14 @@ struct RunQuickStartSheet: View {
                         launchFailure = nil
                         mode = .structured
                         return true
-                    }
+                    },
+                    onValidateSave: {
+                        ATHLTHQuickRunTimelineAdapter.validationError(for: $0)
+                    },
+                    saveButtonTitle: ATHLTHLocalization.choose(
+                        english: "Use in Quick Train",
+                        norwegian: "Bruk i Quick Train"
+                    )
                 )
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
