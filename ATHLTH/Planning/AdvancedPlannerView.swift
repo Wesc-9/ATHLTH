@@ -6645,14 +6645,14 @@ struct SessionEditorView: View {
                     initialTitle: title,
                     initialBlocks: workoutPlanningPreviewBlocks,
                     initialRouteID: selectedRouteID,
-                    initialActivity: selectedScratchWorkoutType,
-                    onScheduledTimeChanged: { scheduledTime = $0 },
                     initialQuickAdd: workoutBlocks.isEmpty &&
                         plannedExercises.isEmpty &&
                         selectedRunningWorkouts.isEmpty
                         ? scratchQuickAdd : nil,
                     draftContext: "session-scratch.\(session.profile.userID.uuidString).\(scratchTimelineDraftID.uuidString)",
                     plannedDate: scheduledTime,
+                    initialActivity: selectedScratchWorkoutType,
+                    onScheduledTimeChanged: { scheduledTime = $0 },
                     onAddStandalone: { updated in
                         applyScratchTimeline(updated)
                         return true
