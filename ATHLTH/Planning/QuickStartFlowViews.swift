@@ -343,10 +343,12 @@ enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
         guard let workout, workout.kind == .running else { return .outdoor }
         if workout.workoutCategory == "treadmill" { return .treadmill }
         if workout.workoutCategory == "indoor" { return .indoor }
+        // Legacy planned workouts with an indoor block but no explicit
+        // category were previously treadmill workouts: preserve their mode.
         if workout.resolvedWorkoutBlocks.contains(where: {
             $0.kind == .run && $0.isIndoor == true
         }) {
-            return .indoor
+            return .treadmill
         }
         return .outdoor
     }
