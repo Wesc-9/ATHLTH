@@ -800,7 +800,15 @@ enum WorkoutLaunchCoordinator {
                     routeAlerts: configuration.routeAlerts,
                     autoPauseEnabled: configuration.autoPauseEnabled
                 )
-            }
+            } ?? (
+                configuration.mode == .route
+                    ? configuration.routeWarmup.runningTransfer(
+                        title: configuration.title,
+                        routeAlerts: configuration.routeAlerts,
+                        autoPauseEnabled: configuration.autoPauseEnabled
+                    )
+                    : nil
+            )
 
         if configuration.captureDevice == .iPhone {
             workoutMirroring?
