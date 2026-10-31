@@ -3309,6 +3309,9 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingStudioStepEditor = false
     @State private var selectedWorkoutExtra: ATHLTHWorkoutExtraDestination?
     @State private var selectedWorkoutGearIDs: Set<UUID> = []
+    @State private var gearSelectionTouched = false
+    @State private var selectedSpotifyPlaylist: SpotifyPlaylistReference?
+    @State private var spotifyAutoplayOnStart: Bool?
     @State private var studioEditedStepID: UUID?
     @State private var studioRoutePhase: WorkoutPhaseKind = .main
     @State private var studioVisiblePhases: Set<WorkoutPhaseKind> = []
@@ -3337,11 +3340,11 @@ struct WorkoutTemplateBuilderView: View {
     private let initialActivity: ATHLTHPlannedWorkoutType?
     private let onScheduledTimeChanged: ((Date) -> Void)?
     private let planCopyDays: [ATHLTHPlanCopyDay]
-    private let onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)?
+    private let onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int], ATHLTHWorkoutPlannerExtras) -> Bool)?
     private let initialDraftSignature: String
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
-    private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Bool)?
+    private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool, ATHLTHWorkoutPlannerExtras) -> Bool)?
     /// Used by Coach's Add flow: schedule an edited workout without
     /// automatically saving a template in My Workouts.
     private let onAddStandalone: ((PlannedSession) -> Bool)?
@@ -3362,11 +3365,12 @@ struct WorkoutTemplateBuilderView: View {
         plannedDate: Date? = nil,
         initialActivity: ATHLTHPlannedWorkoutType? = nil,
         initialStudioAdvanced: Bool? = nil,
+        initialExtras: ATHLTHWorkoutPlannerExtras = .init(),
         onScheduledTimeChanged: ((Date) -> Void)? = nil,
         planCopyDays: [ATHLTHPlanCopyDay] = [],
         initialCopyWeekIndex: Int = 0,
-        onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)? = nil,
-        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Bool)? = nil,
+        onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int], ATHLTHWorkoutPlannerExtras) -> Bool)? = nil,
+        onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool, ATHLTHWorkoutPlannerExtras) -> Bool)? = nil,
         onAddStandalone: ((PlannedSession) -> Bool)? = nil,
         onValidateSave: ((PlannedSession) -> String?)? = nil,
         saveButtonTitle: String? = nil
@@ -3381,6 +3385,10 @@ struct WorkoutTemplateBuilderView: View {
                 : initialBlocks.first?.resolvedPhase ?? .warmup)
         )
         _selectedRouteID = State(initialValue: initialRouteID)
+        _selectedWorkoutGearIDs = State(initialValue: Set(initialExtras.gearIDs ?? []))
+        _gearSelectionTouched = State(initialValue: initialExtras.gearIDs != nil)
+        _selectedSpotifyPlaylist = State(initialValue: initialExtras.spotifyPlaylist)
+        _spotifyAutoplayOnStart = State(initialValue: initialExtras.spotifyAutoplayOnStart)
         _manualDurationMinutes = State(initialValue: initialDurationOverrideMinutes)
         _durationInputText = State(initialValue: (initialDurationOverrideMinutes ??
             ATHLTHWorkoutDurationEstimator.minutes(for: initialBlocks)).map(String.init) ?? "")
@@ -3425,6 +3433,8 @@ struct WorkoutTemplateBuilderView: View {
         let routeID: UUID?
         let manualMinutes: Int?
         let gearIDs: [UUID]?
+        let spotifyPlaylist: SpotifyPlaylistReference?
+        let spotifyAutoplayOnStart: Bool?
         let pendingCopyDayIDs: [Int]?
         let updatedAt: Date
     }
@@ -3442,6 +3452,9 @@ struct WorkoutTemplateBuilderView: View {
         blocks = stored.blocks
         selectedRouteID = stored.routeID
         selectedWorkoutGearIDs = Set(stored.gearIDs ?? [])
+        gearSelectionTouched = stored.gearIDs != nil
+        selectedSpotifyPlaylist = stored.spotifyPlaylist
+        spotifyAutoplayOnStart = stored.spotifyAutoplayOnStart
         manualDurationMinutes = stored.manualMinutes
         durationInputText = (stored.manualMinutes ??
             ATHLTHWorkoutDurationEstimator.minutes(for: stored.blocks)).map(String.init) ?? ""
@@ -3460,7 +3473,9 @@ struct WorkoutTemplateBuilderView: View {
             blocks: blocks,
             routeID: selectedRouteID,
             manualMinutes: manualDurationMinutes,
-            gearIDs: Array(selectedWorkoutGearIDs),
+            gearIDs: gearSelectionTouched ? Array(selectedWorkoutGearIDs) : nil,
+            spotifyPlaylist: selectedSpotifyPlaylist,
+            spotifyAutoplayOnStart: spotifyAutoplayOnStart,
             pendingCopyDayIDs: Array(pendingCopyDayIDs).sorted(),
             updatedAt: Date()
         )
@@ -3925,18 +3940,10 @@ struct WorkoutTemplateBuilderView: View {
                         )
                     }
                 case .spotify:
-                    NavigationStack {
-                        SpotifySettingsView()
-                            .navigationTitle("Spotify")
-                            .navigationBarTitleDisplayMode(.inline)
-                            .toolbar {
-                                ToolbarItem(placement: .cancellationAction) {
-                                    Button(tr("Done", "Ferdig")) {
-                                        selectedWorkoutExtra = nil
-                                    }
-                                }
-                            }
-                    }
+                    ATHLTHWorkoutSpotifyOptionsSheet(
+                        playlist: $selectedSpotifyPlaylist,
+                        autoplay: $spotifyAutoplayOnStart
+                    )
                 case .heartRateAndPace:
                     ATHLTHWorkoutTargetsQuickSheet(blocks: $blocks)
                 case .audioCoach:
@@ -4106,7 +4113,13 @@ struct WorkoutTemplateBuilderView: View {
                 persistWorkoutDraft()
             }
             .onChange(of: selectedRouteID) { _, _ in persistWorkoutDraft() }
-            .onChange(of: selectedWorkoutGearIDs) { _, _ in persistWorkoutDraft() }
+            .onChange(of: selectedWorkoutGearIDs) { _, _ in
+                if draftActive { gearSelectionTouched = true }
+                persistWorkoutDraft()
+            }
+            .onChange(of: gearSelectionTouched) { _, _ in persistWorkoutDraft() }
+            .onChange(of: selectedSpotifyPlaylist) { _, _ in persistWorkoutDraft() }
+            .onChange(of: spotifyAutoplayOnStart) { _, _ in persistWorkoutDraft() }
             .onChange(of: manualDurationMinutes) { _, _ in
                 persistWorkoutDraft()
             }
@@ -5948,9 +5961,11 @@ struct WorkoutTemplateBuilderView: View {
             notes: nil
         )
         workout.workoutBlocks = blocks
-        if !selectedWorkoutGearIDs.isEmpty {
+        if gearSelectionTouched {
             workout.gearIDs = Array(selectedWorkoutGearIDs)
         }
+        workout.spotifyPlaylist = selectedSpotifyPlaylist
+        workout.spotifyAutoplayOnStart = spotifyAutoplayOnStart
         if isPlannedWorkout, initialActivity == .running, !studioAdvanced {
             switch studioBasicRunEnvironment {
             case .outdoor: workout.workoutCategory = "running"
@@ -5971,6 +5986,11 @@ struct WorkoutTemplateBuilderView: View {
             return
         }
         let cleanTitle = workout.title
+        let extras = ATHLTHWorkoutPlannerExtras(
+            gearIDs: workout.gearIDs,
+            spotifyPlaylist: workout.spotifyPlaylist,
+            spotifyAutoplayOnStart: workout.spotifyAutoplayOnStart
+        )
         if let onAddStandalone {
             guard onAddStandalone(workout) else {
                 actionNotice = tr("Cannot add this workout yet",
@@ -5980,7 +6000,7 @@ struct WorkoutTemplateBuilderView: View {
         } else if let onSaveToPlan {
             guard onSaveToPlan(
                 cleanTitle, blocks, hasOutdoorCardio ? selectedRouteID : nil,
-                resolvedDurationMinutes, manualDurationMinutes != nil
+                resolvedDurationMinutes, manualDurationMinutes != nil, extras
             ) else {
                 actionNotice = tr("Cannot save this workout yet",
                                   "Kunne ikke lagre økten ennå")
@@ -5989,7 +6009,7 @@ struct WorkoutTemplateBuilderView: View {
             if !pendingCopyDayIDs.isEmpty, let onCopyToPlan {
                 guard onCopyToPlan(
                     cleanTitle, blocks, hasOutdoorCardio ? selectedRouteID : nil,
-                    resolvedDurationMinutes, Array(pendingCopyDayIDs).sorted()
+                    resolvedDurationMinutes, Array(pendingCopyDayIDs).sorted(), extras
                 ) else {
                     actionNotice = tr("Workout saved; check copy destinations",
                                       "Økten er lagret. Kontroller kopieringsdagene.")

@@ -851,14 +851,22 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     initialFocusedExecutionStepIndex: initialFocusedExecutionStepIndex,
                     initialDurationOverrideMinutes: durationWasEditedManually
                         ? draft.durationMinutes : nil,
+                    initialExtras: ATHLTHWorkoutPlannerExtras(
+                        gearIDs: draft.gearIDs,
+                        spotifyPlaylist: draft.spotifyPlaylist,
+                        spotifyAutoplayOnStart: draft.spotifyAutoplayOnStart
+                    ),
                     draftContext: "plan-\(planID.uuidString)-day-\(dayID.uuidString)-workout-\(existingWorkout?.id.uuidString ?? "new")",
-                    onSaveToPlan: { title, blocks, routeID, knownMinutes, wasManual in
+                    onSaveToPlan: { title, blocks, routeID, knownMinutes, wasManual, extras in
                         var nextDraft = draft
                         ATHLTHUnifiedWorkout.apply(
                             blocks: blocks, title: title, routeID: routeID,
                             estimatedMinutes: knownMinutes,
                             to: &nextDraft
                         )
+                        nextDraft.gearIDs = extras.gearIDs
+                        nextDraft.spotifyPlaylist = extras.spotifyPlaylist
+                        nextDraft.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
                         draft = nextDraft
                         durationWasEditedManually = wasManual
                         return true

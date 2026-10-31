@@ -768,28 +768,37 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 initialBlocks: quickStudioOption.map { quickDaySeed($0) } ??
                     (addingExtraWorkout ? [] : (selectedWorkoutForEditor(day: selection.id)?.blocks ?? [])),
                 initialRouteID: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeID,
+                initialExtras: ATHLTHWorkoutPlannerExtras(
+                    gearIDs: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.gearIDs,
+                    spotifyPlaylist: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.spotifyPlaylist,
+                    spotifyAutoplayOnStart: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.spotifyAutoplayOnStart
+                ),
                 draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
                 plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
                 planCopyDays: planCopyDayOptions(
                     excluding: selection.id, sourceWeekIndex: selectedPlanWeekIndex
                 ),
                 initialCopyWeekIndex: selectedPlanWeekIndex,
-                onCopyToPlan: { name, blocks, routeID, minutes, keys in
+                onCopyToPlan: { name, blocks, routeID, minutes, keys, extras in
                     copyComposedWorkout(
                         name: name, blocks: blocks, routeID: routeID,
                         duration: minutes, targets: keys,
+                        extras: extras,
                         sourceDay: selection.id, sourceWeek: selectedPlanWeekIndex
                     )
                 },
-                onSaveToPlan: { name, blocks, routeID, minutes, _ in
+                onSaveToPlan: { name, blocks, routeID, minutes, _, extras in
                     guard let minutes, (1...240).contains(minutes) else { return false }
-                    let proposed = ATHLTHPlanStructuredWorkoutBlueprint(
+                    var proposed = ATHLTHPlanStructuredWorkoutBlueprint(
                         title: name,
                         kind: workoutKind(for: blocks),
                         durationMinutes: minutes,
                         routeID: routeID,
                         blocks: blocks
                     )
+                    proposed.gearIDs = extras.gearIDs
+                    proposed.spotifyPlaylist = extras.spotifyPlaylist
+                    proposed.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
                     guard proposed.isValid else { return false }
                     updateWeekDay(selection.id) { edit in
                         edit.isRestDay = false
@@ -3681,18 +3690,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         routeID: UUID?,
         duration: Int?,
         targets: [Int],
+        extras: ATHLTHWorkoutPlannerExtras,
         sourceDay: Int,
         sourceWeek: Int
     ) -> Bool {
         guard !targets.isEmpty,
               let duration, (1...240).contains(duration) else { return false }
-        let proposed = ATHLTHPlanStructuredWorkoutBlueprint(
+        var proposed = ATHLTHPlanStructuredWorkoutBlueprint(
             title: name,
             kind: workoutKind(for: blocks),
             durationMinutes: duration,
             routeID: routeID,
             blocks: blocks
         )
+        proposed.gearIDs = extras.gearIDs
+        proposed.spotifyPlaylist = extras.spotifyPlaylist
+        proposed.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
         guard proposed.isValid else { return false }
         let sourceKey = weekDayKey(sourceDay, weekIndex: sourceWeek)
         guard targets.allSatisfy({

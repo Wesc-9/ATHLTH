@@ -9,6 +9,9 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
     var durationMinutes: Int
     var routeID: UUID?
     var blocks: [WorkoutTemplateBlock]
+    var gearIDs: [UUID]? = nil
+    var spotifyPlaylist: SpotifyPlaylistReference? = nil
+    var spotifyAutoplayOnStart: Bool? = nil
     /// Minutes since local midnight; nil means no fixed start time.
     var startMinuteOfDay: Int? = nil
 
@@ -83,6 +86,9 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
         workout.exercises = []
         workout.workoutBlocks = blocks
         workout.workoutCategory = category
+        workout.gearIDs = gearIDs
+        workout.spotifyPlaylist = spotifyPlaylist
+        workout.spotifyAutoplayOnStart = spotifyAutoplayOnStart
         workout.runningWorkout = nil
         workout.runningWorkouts = nil
         return workout
