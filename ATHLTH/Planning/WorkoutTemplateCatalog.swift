@@ -3203,6 +3203,8 @@ struct WorkoutTemplateBuilderView: View {
     /// Used by Coach's Add flow: schedule an edited workout without
     /// automatically saving a template in My Workouts.
     private let onAddStandalone: ((PlannedSession) -> Bool)?
+    private let onValidateSave: ((PlannedSession) -> String?)?
+    private let saveButtonTitle: String?
 
     init(
         initialTitle: String = "",
@@ -3223,7 +3225,9 @@ struct WorkoutTemplateBuilderView: View {
         initialCopyWeekIndex: Int = 0,
         onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int]) -> Bool)? = nil,
         onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool) -> Bool)? = nil,
-        onAddStandalone: ((PlannedSession) -> Bool)? = nil
+        onAddStandalone: ((PlannedSession) -> Bool)? = nil,
+        onValidateSave: ((PlannedSession) -> String?)? = nil,
+        saveButtonTitle: String? = nil
     ) {
         _title = State(initialValue: initialTitle)
         _blocks = State(initialValue: initialBlocks)
@@ -3268,6 +3272,8 @@ struct WorkoutTemplateBuilderView: View {
             "|" + String(initialDurationOverrideMinutes ?? -1)
         self.onSaveToPlan = onSaveToPlan
         self.onAddStandalone = onAddStandalone
+        self.onValidateSave = onValidateSave
+        self.saveButtonTitle = saveButtonTitle
     }
 
     private struct StoredWorkoutDraft: Codable {
@@ -5524,9 +5530,9 @@ struct WorkoutTemplateBuilderView: View {
             Button {
                 saveWorkout()
             } label: {
-                Label(isPlannedWorkout
+                Label(saveButtonTitle ?? (isPlannedWorkout
                     ? tr("Save and continue", "Lagre og gå videre")
-                    : tr("Save workout", "Lagre treningsøkt"),
+                    : tr("Save workout", "Lagre treningsøkt")),
                       systemImage: "checkmark.circle.fill")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.white)
@@ -5854,6 +5860,10 @@ struct WorkoutTemplateBuilderView: View {
     private func saveWorkout() {
         guard canSave else { return }
         let workout = workoutSnapshot()
+        if let issue = onValidateSave?(workout) {
+            actionNotice = issue
+            return
+        }
         let cleanTitle = workout.title
         if let onAddStandalone {
             guard onAddStandalone(workout) else {
