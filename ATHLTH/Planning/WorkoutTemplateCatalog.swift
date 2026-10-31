@@ -3890,6 +3890,7 @@ struct WorkoutTemplateBuilderView: View {
             selectedPhase: $selectedPhase,
             advanced: studioAdvanced,
             activity: initialActivity,
+            hasSelectedRoute: selectedRouteID != nil,
             onAddRun: { phase in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
