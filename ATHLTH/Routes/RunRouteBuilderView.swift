@@ -37,6 +37,7 @@ struct RunRouteBuilderView: View {
     @State private var isCalculating = false
     @State private var errorMessage: String?
     @State private var savedMessage: String?
+    @State private var showingCoachRouteGenerator = false
 
     private var selectedAlternative: RunRouteAlternative? {
         guard let outbound = alternatives.first(where: { $0.id == selectedAlternativeID })
@@ -67,6 +68,37 @@ struct RunRouteBuilderView: View {
         ScrollView {
             VStack(spacing: 16) {
                 hero
+                Button {
+                    showingCoachRouteGenerator = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Let Coach suggest a route",
+                                norwegian: "La Coach foreslå en rute"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Choose distance, time, terrain and start location",
+                                norwegian: "Velg distanse, tid, terreng og startsted"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 17)
+                    )
+                }
+                .buttonStyle(.plain)
                 routeNameCard
                 // Put the live summary where it is useful while editing points.
                 if selectedAlternative != nil {
@@ -128,6 +160,11 @@ struct RunRouteBuilderView: View {
         )
         .navigationTitle("Create Running Route")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $showingCoachRouteGenerator) {
+            ATHLTHCoachRouteGeneratorView(onRouteSaved: { _ in
+                onRouteSaved?()
+            })
+        }
         .alert("ATHLTH", isPresented: Binding(
             get: { errorMessage != nil || savedMessage != nil },
             set: { presented in
