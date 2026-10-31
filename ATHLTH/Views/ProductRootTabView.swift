@@ -2089,6 +2089,11 @@ struct ATHLTHHomeView: View {
         }
     }
 
+    // On regular text sizes these two cards form one visual row. Their
+    // backgrounds must end at the same baseline instead of relying on
+    // different content-driven minimum heights.
+    private let homeTodayTwinCardHeight: CGFloat = 174
+
     private var homeDailyRecommendationAndCalendarRow: some View {
         let advice = homeDailyRecommendation
 
@@ -2104,14 +2109,20 @@ struct ATHLTHHomeView: View {
                 // Do not let an intrinsic ideal width collapse this into two
                 // full-width cards. Each tile receives exactly half of Home.
                 HStack(alignment: .top, spacing: 10) {
-                    HomeDailyRecommendationCard(advice: advice) {
-                        openHomeDailyRecommendation(advice)
-                    }
+                    HomeDailyRecommendationCard(
+                        advice: advice,
+                        onStartRecommendedWorkout: {
+                            openHomeDailyRecommendation(advice)
+                        },
+                        compact: true
+                    )
                     .frame(maxWidth: .infinity)
+                    .frame(height: homeTodayTwinCardHeight)
                     .layoutPriority(1)
 
                     homeTodayCalendarCard
                         .frame(maxWidth: .infinity)
+                        .frame(height: homeTodayTwinCardHeight)
                         .layoutPriority(1)
                 }
                 .frame(maxWidth: .infinity, alignment: .top)
@@ -2321,7 +2332,12 @@ struct ATHLTHHomeView: View {
             }
         }
         .padding(11)
-        .frame(maxWidth: .infinity, minHeight: 158, alignment: .topLeading)
+        .frame(
+            maxWidth: .infinity,
+            minHeight: 158,
+            maxHeight: .infinity,
+            alignment: .topLeading
+        )
         .background(
             ATHLTHTrainDesign.paper,
             in: RoundedRectangle(cornerRadius: 20, style: .continuous)
