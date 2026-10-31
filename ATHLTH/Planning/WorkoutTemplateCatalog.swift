@@ -3393,10 +3393,14 @@ struct WorkoutTemplateBuilderView: View {
                 $0.isIndoor != true }
         // A distance-based outdoor route is a complete planned workout,
         // even without an estimated finishing time.
+        let basicFreeRun = isPlannedWorkout && !studioAdvanced &&
+            initialActivity == .running &&
+            studioBasicRunMode == .free &&
+            blocks.contains { $0.kind == .run }
         return (hasRunning || hasStrength || hasCycling || hasTimedWellness) &&
             !hasIncompleteSuperset &&
             (!isPlannedWorkout || resolvedDurationMinutes != nil ||
-             routeDistanceGoal)
+             routeDistanceGoal || basicFreeRun)
     }
 
     private var hasIncompleteSuperset: Bool {
@@ -5769,7 +5773,19 @@ struct WorkoutTemplateBuilderView: View {
 
     private func workoutSnapshot() -> PlannedSession {
         let requestedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanTitle = requestedTitle.isEmpty ? categoryTitle : requestedTitle
+        let suggestedBasicTitle: String = {
+            guard isPlannedWorkout && !studioAdvanced,
+                  initialActivity == .running else { return categoryTitle }
+            switch studioBasicRunMode {
+            case .free: return RunQuickStartMode.free.title
+            case .route:
+                return session.savedRoutes.first { $0.id == selectedRouteID }?.title
+                    ?? RunQuickStartMode.route.title
+            case .structured:
+                return blocks.first?.title ?? RunQuickStartMode.structured.title
+            }
+        }()
+        let cleanTitle = requestedTitle.isEmpty ? suggestedBasicTitle : requestedTitle
 
         var workout = PlannedSession(
             id: UUID(),
