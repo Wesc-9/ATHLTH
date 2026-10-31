@@ -3217,6 +3217,7 @@ struct WorkoutTemplateBuilderView: View {
         sourceTemplateID: UUID? = nil,
         plannedDate: Date? = nil,
         initialActivity: ATHLTHPlannedWorkoutType? = nil,
+        initialStudioAdvanced: Bool? = nil,
         onScheduledTimeChanged: ((Date) -> Void)? = nil,
         planCopyDays: [ATHLTHPlanCopyDay] = [],
         initialCopyWeekIndex: Int = 0,
@@ -3245,7 +3246,8 @@ struct WorkoutTemplateBuilderView: View {
         self.plannedDate = plannedDate
         self.initialActivity = initialActivity
         self.onScheduledTimeChanged = onScheduledTimeChanged
-        _studioAdvanced = State(initialValue: initialActivity == nil)
+        _studioAdvanced = State(initialValue:
+            initialStudioAdvanced ?? (initialActivity == nil))
         _studioBasicRunMode = State(initialValue:
             initialRouteID != nil ? .route :
             initialBlocks.count > 1 ? .structured : .free
