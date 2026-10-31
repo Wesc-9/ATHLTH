@@ -43,6 +43,13 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             ? .main : block.resolvedPhase
     }
 
+    private var routeAsWholeWorkout: WorkoutTemplateBlock? {
+        guard visiblePhases.isEmpty, blocks.count == 1,
+              blocks[0].kind == .run,
+              blocks[0].distanceMeters != nil else { return nil }
+        return blocks[0]
+    }
+
     private func entries(in phase: WorkoutPhaseKind) -> [WorkoutTemplateBlock] {
         blocks.filter { presentationPhase(for: $0) == phase }
     }
@@ -65,7 +72,22 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 addSectionMenu
             }
 
-            if phases.isEmpty {
+            if let routeBlock = routeAsWholeWorkout {
+                VStack(alignment: .leading, spacing: 9) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Route as complete workout",
+                            norwegian: "Rute som hele økten"
+                        ), systemImage: "map"
+                    )
+                    .font(.headline)
+                    .foregroundStyle(ink)
+                    stepRow(routeBlock, position: 1, phase: .main)
+                    addContentMenu(.main)
+                }
+                .padding(12)
+                .athlthPlanCard(radius: 19)
+            } else if phases.isEmpty {
                 VStack(spacing: 13) {
                     Image(systemName: "square.stack.3d.up")
                         .font(.system(size: 25))
@@ -107,8 +129,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 .athlthPlanCard(radius: 22)
             }
 
-            ForEach(phases) { phase in
-                phaseCard(phase)
+            if routeAsWholeWorkout == nil {
+                ForEach(phases) { phase in
+                    phaseCard(phase)
+                }
             }
         }
         .animation(.easeInOut(duration: 0.18), value: visiblePhases)
