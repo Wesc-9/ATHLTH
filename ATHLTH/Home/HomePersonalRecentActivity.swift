@@ -936,7 +936,7 @@ private struct HomeFriendQuickActionsPopover: View {
                 .frame(height: 0.5)
 
             HStack(spacing: 6) {
-                shareAction(tr("Share plan", "Del plan"),
+                shareAction(tr("Send plan", "Send plan"),
                             icon: "calendar") { onShare(.plan) }
                 shareAction(tr("Send workout", "Send treningsøkt"),
                             icon: "dumbbell") { onShare(.workout) }
