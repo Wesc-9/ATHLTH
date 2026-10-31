@@ -1242,6 +1242,14 @@ struct RunQuickStartSheet: View {
     @State private var captureDevice: WorkoutCaptureDevice
     @State private var watchStartMode: WatchWorkoutStartMode = .immediate
     @State private var environment: RunEnvironment = .outdoor
+    @State private var quickWorkoutName = ""
+    @State private var quickDisplayDate = Date()
+    @State private var pendingStartDate: Date?
+    @State private var pendingStartDevice: WorkoutCaptureDevice?
+    @State private var customDelayMinutes = 2
+    @State private var showingCustomDelay = false
+    @State private var delayedStartTask: Task<Void, Never>?
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var routeLocationProbe =
         QuickStartRouteLocationProbe()
 
@@ -1303,49 +1311,48 @@ struct RunQuickStartSheet: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 16) {
-                    introCard
+                VStack(spacing: isAdvancedSetup ? 16 : 12) {
+                    if isAdvancedSetup {
+                        introCard
+                        modeCard
+                        runEnvironmentCard
+                    } else {
+                        ATHLTHRunBasicSetupView(
+                            workoutName: $quickWorkoutName,
+                            mode: $mode,
+                            environment: $environment,
+                            date: $quickDisplayDate,
+                            selectedRouteTitle: selectedRoute?.title,
+                            selectedWorkoutTitle: selectedWorkout?.title,
+                            onChooseRoute: { showingRoutes = true },
+                            onChooseWorkout: { showingRunningLibrary = true }
+                        )
+                    }
+
                     if let plannedSession {
                         PlannedQuickStartContextCard(workout: plannedSession)
                         ATHLTHRunQuickStartPlanPreview(
                             workout: nil, plannedSession: plannedSession
                         )
                     }
-                    modeCard
-                    runEnvironmentCard
 
-                    // Recording device is chosen by one of the two actual
-                    // start buttons. Keep optional Watch timing here.
-                    if watchConnected || ATHLTHDeviceRole.isIPad {
-                        runWatchTimingOptions
+                    if mode == .route || mode == .structured {
+                        selectionCard
                     }
-
-                    selectionCard
 
                     if mode == .route, selectedRoute != nil {
                         ATHLTHRouteWarmupCard(configuration: $routeWarmup)
                     }
 
-                    quickRunGuidanceCard
-
-                    ATHLTHPlanSurface(ghost: false, density: .compact) {
-                        VStack(
-                            alignment: .leading,
-                            spacing: 10
-                        ) {
-                            WorkoutFriendPicker(
-                                selectedFriendIDs:
-                                    $selectedFriendIDs
-                            )
-
-                            if !selectedFriendIDs
-                                .isEmpty {
-                                Divider()
-
-                                WorkoutSocialModePicker(
-                                    mode:
-                                        $socialMode
-                                )
+                    if isAdvancedSetup {
+                        quickRunGuidanceCard
+                        ATHLTHPlanSurface(ghost: false, density: .compact) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                WorkoutFriendPicker(selectedFriendIDs: $selectedFriendIDs)
+                                if !selectedFriendIDs.isEmpty {
+                                    Divider()
+                                    WorkoutSocialModePicker(mode: $socialMode)
+                                }
                             }
                         }
                     }
@@ -1563,13 +1570,13 @@ struct RunQuickStartSheet: View {
                 )
             }
             .onChange(of: environment) { _, newValue in
-                if newValue == .treadmill,
+                if newValue != .outdoor,
                    mode == .route {
                     mode = .free
                     selectedRoute = nil
                 }
 
-                if newValue == .treadmill {
+                if newValue != .outdoor {
                     routeGuardianDraft.enabled = false
                     ghostDraft.enabled = false
                     autoPausePreference = .off
@@ -1761,7 +1768,7 @@ struct RunQuickStartSheet: View {
             }
 
             ForEach(RunQuickStartMode.allCases) { option in
-                let unavailable = environment == .treadmill && option == .route
+                let unavailable = environment != .outdoor && option == .route
 
                 ATHLTHPlanSelectionCard(
                     title: option.title,
@@ -2346,7 +2353,8 @@ struct RunQuickStartSheet: View {
                 socialMode:
                     socialMode,
                 gearIDs: selectedGearIDs,
-                watchStartMode: watchStartMode
+                watchStartMode: watchStartMode,
+                customWorkoutTitle: quickWorkoutName
             )
         configuration.routeWarmup = mode == .route ? routeWarmup : .disabled
         launchInProgress = true
