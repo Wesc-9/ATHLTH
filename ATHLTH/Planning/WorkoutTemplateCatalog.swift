@@ -3169,6 +3169,9 @@ struct WorkoutTemplateBuilderView: View {
     @State private var studioRoutePhase: WorkoutPhaseKind = .main
     @State private var studioVisiblePhases: Set<WorkoutPhaseKind> = []
     @State private var studioAdvanced = true
+    @State private var studioBasicRunMode: RunQuickStartMode = .free
+    @State private var studioBasicRunEnvironment: RunEnvironment = .outdoor
+    @State private var studioBasicDate = Date()
     @State private var showingCopyPicker = false
     @State private var pendingExerciseChoice: WorkoutBlockGroupKind?
     @State private var pendingSavedWorkoutPicker = false
@@ -3240,6 +3243,8 @@ struct WorkoutTemplateBuilderView: View {
         self.plannedDate = plannedDate
         self.initialActivity = initialActivity
         self.onScheduledTimeChanged = onScheduledTimeChanged
+        _studioAdvanced = State(initialValue: initialActivity == nil)
+        _studioBasicDate = State(initialValue: plannedDate ?? Date())
         self.planCopyDays = planCopyDays
         self.onCopyToPlan = onCopyToPlan
         _copyWeekIndex = State(initialValue: initialCopyWeekIndex)
@@ -3544,16 +3549,46 @@ struct WorkoutTemplateBuilderView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if isPlannedWorkout {
-                        ATHLTHPlannedWorkoutStudioHeader(
-                            workoutName: $title,
-                            activity: initialActivity,
-                            blocks: blocks,
-                            durationMinutes: resolvedDurationMinutes,
-                            route: session.savedRoutes.first { $0.id == selectedRouteID },
-                            plannedDate: plannedDate,
-                            onDateChanged: onScheduledTimeChanged
-                        )
-                        plannedStudio
+                        if !studioAdvanced && initialActivity == .running {
+                            ATHLTHRunBasicSetupView(
+                                workoutName: $title,
+                                mode: $studioBasicRunMode,
+                                environment: $studioBasicRunEnvironment,
+                                date: $studioBasicDate,
+                                scheduleEditable: true,
+                                selectedRouteTitle: session.savedRoutes.first {
+                                    $0.id == selectedRouteID
+                                }?.title,
+                                onChooseRoute: {
+                                    studioRoutePhase = .main
+                                    showingStudioRoutePicker = true
+                                },
+                                onChooseWorkout: {
+                                    selectedPhase = .main
+                                    showingSavedWorkoutPicker = true
+                                }
+                            )
+                            if blocks.count > 0 {
+                                Text(ATHLTHLocalization.format(
+                                    english: "%d workout steps selected",
+                                    norwegian: "%d deløkter valgt",
+                                    blocks.count
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(studioInk.opacity(0.65))
+                            }
+                        } else {
+                            ATHLTHPlannedWorkoutStudioHeader(
+                                workoutName: $title,
+                                activity: initialActivity,
+                                blocks: blocks,
+                                durationMinutes: resolvedDurationMinutes,
+                                route: session.savedRoutes.first { $0.id == selectedRouteID },
+                                plannedDate: plannedDate,
+                                onDateChanged: onScheduledTimeChanged
+                            )
+                            plannedStudio
+                        }
                         if let actionNotice {
                             Label(actionNotice, systemImage: "info.circle")
                                 .font(.caption)
@@ -3584,6 +3619,39 @@ struct WorkoutTemplateBuilderView: View {
                 .frame(maxWidth: .infinity)
             }
             .background(studioBackground.ignoresSafeArea())
+            .onChange(of: studioBasicDate) { _, value in
+                if !studioAdvanced && initialActivity == .running {
+                    onScheduledTimeChanged?(value)
+                }
+            }
+            .onChange(of: studioBasicRunEnvironment) { _, place in
+                guard isPlannedWorkout, initialActivity == .running else { return }
+                for index in blocks.indices where blocks[index].kind == .run {
+                    blocks[index].isIndoor = place != .outdoor
+                    blocks[index].treadmillInclinePercent =
+                        place == .treadmill ? 0 : nil
+                }
+                if place != .outdoor && studioBasicRunMode == .route {
+                    studioBasicRunMode = .free
+                    selectedRouteID = nil
+                }
+            }
+            .onChange(of: studioBasicRunMode) { _, mode in
+                guard isPlannedWorkout, initialActivity == .running else { return }
+                if mode == .free && blocks.isEmpty {
+                    selectedPhase = .main
+                    addRunBlock(activity: .running)
+                    blocks[blocks.count - 1].isIndoor =
+                        studioBasicRunEnvironment != .outdoor
+                }
+            }
+            .onAppear {
+                if isPlannedWorkout && !studioAdvanced &&
+                    initialActivity == .running && blocks.isEmpty {
+                    selectedPhase = .main
+                    addRunBlock(activity: .running)
+                }
+            }
             .sheet(isPresented: $showingBlockPicker, onDismiss: {
                 if pendingStandaloneExercise {
                     pendingStandaloneExercise = false
