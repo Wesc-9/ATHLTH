@@ -4511,6 +4511,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guard let current = currentStructuredRunningStep,
               current.phase == "warmup" ||
               current.phase == "cooldown" ||
+              current.measure == .open ||
               structuredRunningWorkout?.autoAdvanceTimedSteps == false else {
             // Prevent a double tap on Start main from skipping effort one.
             return
@@ -7410,6 +7411,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 (step.phase == "warmup" &&
                  structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
                 step.phase == "cooldown" ||
+                step.measure == .open ||
                 structuredRunningWorkout?.autoAdvanceTimedSteps == false
             snapshot.runningStepElapsedSeconds =
                 awaitingMainStart ? 0 : currentStructuredStepElapsedTime
