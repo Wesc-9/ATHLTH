@@ -117,6 +117,7 @@ struct ProductRootTabView: View {
         ATHLTHTrainNavigationRequest?
     @State private var showingDailyCheckInFromNotification = false
     @State private var deferredTabReminderTask: Task<Void, Never>?
+    @State private var showingCoachFromDock = false
 
     private func openPendingDailyCheckInIfNeeded() {
         guard pushManager.pendingDailyCheckInAccountID ==
@@ -394,8 +395,37 @@ struct ProductRootTabView: View {
         }
     }
 
-    var body: some View {
+    private var tabsWithCoachDock: some View {
         tabsWithNotifications
+            .overlay(alignment: .bottom) {
+                // Lightweight Coach affordance on every main tab; keep the
+                // system tab bar untouched and the rest of Home scrollable.
+                ATHLTHCoachDockHint {
+                    showingCoachFromDock = true
+                }
+                .padding(.bottom, 56)
+                .zIndex(40)
+            }
+            .sheet(isPresented: $showingCoachFromDock) {
+                NavigationStack {
+                    RecoveryCoachInboxDestinationView()
+                        .toolbar {
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button(ATHLTHLocalization.choose(
+                                    english: "Close", norwegian: "Lukk"
+                                )) {
+                                    showingCoachFromDock = false
+                                }
+                            }
+                        }
+                }
+                .presentationDragIndicator(.visible)
+            }
+            .athlthStablePresentationBoundary()
+    }
+
+    var body: some View {
+        tabsWithCoachDock
         .background {
             ATHLTHMirroredWorkoutPresenter()
                 .frame(width: 0, height: 0)
@@ -812,9 +842,6 @@ struct ATHLTHHomeView: View {
     @State private var lastHomeInitialLoadAt: Date?
     @State private var homeInitialLoadAccountID: UUID?
     @State private var showingGlobalSearch = false
-    @State private var homeCoachDraft = ""
-    @State private var homeCoachOutgoingQuestion: String?
-    @State private var showingHomeCoach = false
     @State private var showingHomeTodayCalendarAll = false
     @State private var showingHomeCalendarWorkoutPicker = false
     @State private var homeCalendarPendingKind: WorkoutKind?
@@ -963,23 +990,6 @@ struct ATHLTHHomeView: View {
 
                     homeDailyRecommendationAndCalendarRow
 
-                    // A real one-line composer, not a decorative Coach link.
-                    // Suggestions only fill the field; only Send submits.
-                    ATHLTHHomeCoachComposer(
-                        draft: $homeCoachDraft,
-                        hasPlannedWorkout: homeTodayPlanWorkout != nil,
-                        hasCoachAccess: session.hasPaidAccess,
-                        onOpen: {
-                            homeCoachOutgoingQuestion = nil
-                            showingHomeCoach = true
-                        },
-                        onSend: { prompt in
-                            homeCoachOutgoingQuestion = prompt
-                            homeCoachDraft = ""
-                            showingHomeCoach = true
-                        }
-                    )
-
                     HomeActiveFriendsStrip()
 
                     HomePersonalRecentActivitySection()
@@ -999,12 +1009,6 @@ struct ATHLTHHomeView: View {
             .ignoresSafeArea(.container, edges: .bottom)
             // Erase the large Home content before attaching modal sheets.
             .athlthStablePresentationBoundary()
-            .navigationDestination(isPresented: $showingHomeCoach) {
-                RecoveryCoachInboxDestinationView(
-                    initialQuestion: homeCoachOutgoingQuestion,
-                    submitInitialQuestion: homeCoachOutgoingQuestion != nil
-                )
-            }
             .sheet(
                 isPresented:
                     $showingGettingStartedPopup
