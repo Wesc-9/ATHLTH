@@ -30,8 +30,7 @@ enum ATHLTHSurfaceCoordinator {
         if let snapshot = workout,
            snapshot.state == .preparing ||
             snapshot.state == .running ||
-            snapshot.state == .paused ||
-            snapshot.state == .ending {
+            snapshot.state == .paused {
             activeWorkout = ATHLTHSurfaceWorkoutSnapshot(
                 title: snapshot.kind.title,
                 systemImage: snapshot.kind.systemImage,
@@ -130,8 +129,7 @@ enum ATHLTHSurfaceCoordinator {
                 snapshot.map {
                     $0.state == .preparing ||
                     $0.state == .running ||
-                    $0.state == .paused ||
-                    $0.state == .ending
+                    $0.state == .paused
                 } == true
             ATHLTHAliveController.workoutDidChange(
                 isActive: workoutIsActive
@@ -209,6 +207,9 @@ private final class ATHLTHLiveActivityController {
     private var lastUpdateAt: Date?
     private var lastPhase: WatchWorkoutMirrorState?
     private var lastSessionIdentity: ATHLTHLiveActivitySessionIdentity?
+    /// Never re-create an already stopped Watch session from a delayed
+    /// .running snapshot delivered after the terminal result.
+    private var lastFinishedSessionIdentity: ATHLTHLiveActivitySessionIdentity?
     private var syncRevision: UInt64 = 0
 
     private init() {}
@@ -256,9 +257,22 @@ private final class ATHLTHLiveActivityController {
                 snapshot.kind.title
         )
 
-        // A delayed completion from the previous session cannot finish the
+        // The Watch's .ending means recording has stopped and only saving
+        // remains. End the lock-screen timer immediately, not after the
+        // completion import/summary pipeline finishes.
+        let isTerminal = snapshot.state == .ending ||
+            snapshot.state == .completed || snapshot.state == .failed
+
+        // A late Watch snapshot must never resurrect an already closed
+        // ActivityKit session, even if it arrives after a completion receipt.
+        if !isTerminal,
+           lastFinishedSessionIdentity?.matches(identity) == true {
+            return
+        }
+
+        // A delayed completion from a previous session cannot finish the
         // Live Activity of a newly started workout.
-        if (snapshot.state == .completed || snapshot.state == .failed),
+        if isTerminal,
            let previous = lastSessionIdentity,
            !previous.matches(identity) {
             return
@@ -369,8 +383,7 @@ private final class ATHLTHLiveActivityController {
 
         if !phaseChanged &&
             !updateIsDue &&
-            snapshot.state != .completed &&
-            snapshot.state != .failed {
+            !isTerminal {
             return
         }
 
@@ -384,7 +397,7 @@ private final class ATHLTHLiveActivityController {
             Activity<ATHLTHWorkoutActivityAttributes>.activities
 
         switch snapshot.state {
-        case .preparing, .running, .paused, .ending:
+        case .preparing, .running, .paused:
             // Only the matching session can be reused. Close obsolete or
             // duplicate activities without retaining copied handle arrays.
             var reusedExistingActivity = false
@@ -425,7 +438,9 @@ private final class ATHLTHLiveActivityController {
                 }
             }
 
-        case .completed, .failed:
+        case .ending, .completed, .failed:
+            // Ending is authoritative for the lock-screen timer. Match by
+            // actual Watch session identity, not the display title.
             // Delayed completion must not close a different active workout.
             for activity in activities {
                 let matches = identity.matches(
@@ -438,13 +453,14 @@ private final class ATHLTHLiveActivityController {
                 if matches {
                     await activity.end(
                         content,
-                        dismissalPolicy: .after(
-                            Date().addingTimeInterval(60)
-                        )
+                        dismissalPolicy: .immediate
                     )
                     guard revision == syncRevision else { return }
                 }
             }
+            // Remember the finished workout so a delayed running snapshot
+            // cannot start the lock-screen timer again.
+            lastFinishedSessionIdentity = identity
             lastSessionIdentity = nil
             lastPhase = nil
             lastUpdateAt = nil
