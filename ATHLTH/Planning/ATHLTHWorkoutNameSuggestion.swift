@@ -11,7 +11,12 @@ enum ATHLTHWorkoutNameSuggestion {
     ) -> String {
         let hasRun = blocks.contains { $0.kind == .run && $0.cardioActivity != .walking }
         let hasWalk = blocks.contains { $0.kind == .run && $0.cardioActivity == .walking }
-        let hasStrength = blocks.contains { $0.kind == .exercise }
+        let hasStrength = blocks.contains {
+            $0.kind == .exercise &&
+            !["running", "run", "løping", "walking", "walk", "gåing"].contains(
+                $0.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            )
+        }
         let hasCycle = blocks.contains { $0.activityTag == "cycling" }
         let isHybrid = [hasRun, hasWalk, hasStrength, hasCycle].filter { $0 }.count > 1
         let isInterval = blocks.contains { $0.groupKind == .intervals }
@@ -20,16 +25,18 @@ enum ATHLTHWorkoutNameSuggestion {
         }
 
         let label: String
-        if isHybrid {
+        if isHybrid && (activity == nil || activity == .custom) {
             label = ATHLTHLocalization.choose(english: "Hybrid workout", norwegian: "Hybridøkt")
         } else if isInterval {
             label = ATHLTHLocalization.choose(english: "Interval workout", norwegian: "Intervalløkt")
         } else if isTreadmill {
             label = ATHLTHLocalization.choose(english: "Treadmill run", norwegian: "Tredemølle")
+        } else if let activity, activity != .custom {
+            label = activity == .strength
+                ? ATHLTHLocalization.choose(english: "Strength workout", norwegian: "Styrkeøkt")
+                : activity.title
         } else if hasStrength {
             label = ATHLTHLocalization.choose(english: "Strength workout", norwegian: "Styrkeøkt")
-        } else if let activity {
-            label = activity.title
         } else if hasRun {
             label = ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
         } else if hasWalk {

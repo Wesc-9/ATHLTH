@@ -3724,7 +3724,7 @@ struct WorkoutTemplateBuilderView: View {
                                $0.editorDragID == id
                            }) {
                             VStack(alignment: .leading, spacing: 15) {
-                                Text(blocks[index].title)
+                                Text(ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]))
                                     .font(.title2.weight(.semibold))
                                     .foregroundStyle(studioInk)
                                 blockDetails(index)
@@ -4876,7 +4876,7 @@ struct WorkoutTemplateBuilderView: View {
                 TextField(ATHLTHLocalization.choose(english: "Activity (jogging, strides, drills)",
                                                        norwegian: "Aktivitet (jogg, stigningsløp, drill)"),
                           text: Binding(
-                            get: { blocks[index].title },
+                            get: { ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]) },
                             set: { blocks[index].title = $0 }
                           ))
                     .font(.subheadline)
