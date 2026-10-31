@@ -1004,8 +1004,7 @@ enum WorkoutLaunchCoordinator {
                 ghostRace:
                     preparedGhostRace,
                 indoor:
-                    configuration.environment ==
-                    .treadmill,
+                    configuration.environment != .outdoor,
                 startMode: configuration.watchStartMode,
                 updatedAt: Date()
             )
@@ -1018,7 +1017,7 @@ enum WorkoutLaunchCoordinator {
         if configuration.watchStartMode != .onWatch {
             try await watchConnection.startWorkoutOnWatch(
                 .running,
-                indoor: configuration.environment == .treadmill
+                indoor: configuration.environment != .outdoor
             )
         }
 
