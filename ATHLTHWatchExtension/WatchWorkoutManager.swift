@@ -6136,10 +6136,16 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private func evaluateWorkoutTargetAlerts() {
+        let configuration = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: targetAlertConfiguration,
+            stepZone: awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRateZone,
+            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM
+        )
         guard state == .running,
+              !awaitingMainStart,
               kind == .running || kind == .walking,
-              let configuration =
-                targetAlertConfiguration
+              let configuration
         else {
             publish {
                 self.liveTargetStatus = nil
@@ -6188,18 +6194,14 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             hasEvaluableTarget = true
 
             if heartRate < minimum {
-                violation = (
-                    english:
-                        "Heart rate below target",
-                    norwegian:
-                        "Pulsen er under målområdet"
+                violation = ATHLTHHeartRateZoneCoachTarget.alertPhrase(
+                    zone: configuration.heartRateZone,
+                    below: true
                 )
             } else if heartRate > maximum {
-                violation = (
-                    english:
-                        "Heart rate above target",
-                    norwegian:
-                        "Pulsen er over målområdet"
+                violation = ATHLTHHeartRateZoneCoachTarget.alertPhrase(
+                    zone: configuration.heartRateZone,
+                    below: false
                 )
             }
         }
@@ -6285,17 +6287,22 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             if targetWasOutside {
                 targetWasOutside = false
 
-                if configuration
-                    .announceBackInTarget {
+                if configuration.announceBackInTarget {
+                    let recovery = ATHLTHHeartRateZoneCoachTarget
+                        .backInTargetPhrase(
+                            zone: configuration.heartRateEnabled
+                                ? configuration.heartRateZone : nil
+                        )
                     deliverWorkoutAlert(
-                        english: "Back in target",
-                        norwegian:
-                            "Tilbake i målområdet",
-                        delivery:
+                        english: recovery.english,
+                        norwegian: recovery.norwegian,
+                        delivery: ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
                             configuration.delivery,
+                            coachEnabled: audioCoachConfiguration.enabled &&
+                                configuration.heartRateEnabled
+                        ),
                         haptic: .success,
-                        priority:
-                            .targetCritical
+                        priority: .targetCritical
                     )
                 }
             }
@@ -6333,11 +6340,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         deliverWorkoutAlert(
             english: violation.english,
             norwegian: violation.norwegian,
-            delivery:
+            delivery: ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
                 configuration.delivery,
+                coachEnabled: audioCoachConfiguration.enabled &&
+                    configuration.heartRateEnabled
+            ),
             haptic: .notification,
-            priority:
-                .targetCritical
+            priority: .targetCritical
         )
     }
 
@@ -7256,6 +7265,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 )
             }
 
+        let effectiveHeartRateTarget = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: targetAlertConfiguration,
+            stepZone: awaitingMainStart ? nil :
+                currentRunningStep?.targetHeartRateZone,
+            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM
+        )
         var snapshot = WatchWorkoutLiveSnapshot(
             kind: kind,
             state: stateOverride ?? mirrorState(for: state),
@@ -7336,13 +7351,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             runningStepPhase: currentRunningStep?.phase,
             runningStepTargetHeartRateZone: currentRunningStep?.targetHeartRateZone,
             heartRateTargetZone:
-                targetAlertConfiguration?.heartRateZone,
+                effectiveHeartRateTarget?.heartRateZone,
             heartRateTargetMinimumBPM:
-                targetAlertConfiguration?
-                    .heartRateMinimumBPM,
+                effectiveHeartRateTarget?.heartRateMinimumBPM,
             heartRateTargetMaximumBPM:
-                targetAlertConfiguration?
-                    .heartRateMaximumBPM,
+                effectiveHeartRateTarget?.heartRateMaximumBPM,
             heartRateTargetStatus:
                 liveTargetStatus,
             ghostRaceTitle:
