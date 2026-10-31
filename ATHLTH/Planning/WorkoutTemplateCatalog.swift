@@ -3382,9 +3382,16 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var canSave: Bool {
-        (hasRunning || hasStrength || hasCycling || hasTimedWellness) &&
-        !hasIncompleteSuperset &&
-        (!isPlannedWorkout || resolvedDurationMinutes != nil)
+        let routeDistanceGoal = selectedRouteID != nil &&
+            blocks.contains { $0.kind == .run &&
+                ($0.distanceMeters ?? 0) > 0 &&
+                $0.isIndoor != true }
+        // A distance-based outdoor route is a complete planned workout,
+        // even without an estimated finishing time.
+        return (hasRunning || hasStrength || hasCycling || hasTimedWellness) &&
+            !hasIncompleteSuperset &&
+            (!isPlannedWorkout || resolvedDurationMinutes != nil ||
+             routeDistanceGoal)
     }
 
     private var hasIncompleteSuperset: Bool {
