@@ -2278,6 +2278,11 @@ final class IPhoneWorkoutStore:
             workout.structuredStepStartElapsedTime = workout.elapsed(at: Date())
             workout.structuredStepStartDistanceMeters = workout.distanceMeters
             workout.awaitingMainStart = false
+            if workout.structuredRunningWorkout?.deferRouteUntilMain == true,
+               workout.structuredStepIndex == 1 {
+                // Warm-up distance is part of the overall recording, not the route.
+                workout.routeLegDistanceOffsetMeters = workout.distanceMeters
+            }
             active = workout
             persistActiveCheckpoint(force: true)
             syncLiveActivity()
@@ -2895,6 +2900,13 @@ final class IPhoneWorkoutStore:
         workout: inout PhoneWorkout,
         location: CLLocation
     ) {
+        // GPS/HealthKit recording continues through warm-up, but the chosen
+        // route and its navigation cues must not begin until the main phase.
+        if workout.structuredRunningWorkout?.deferRouteUntilMain == true,
+           (workout.structuredStepIndex ?? 0) == 0 ||
+           workout.awaitingMainStart == true {
+            return
+        }
         restoreRouteGeometry(
             from: workout
         )
@@ -3971,6 +3983,10 @@ final class IPhoneWorkoutStore:
             nextIndex
         workout.awaitingMainStart = step.phase == "warmup" &&
             plan.autoStartMainAfterWarmup != true
+        if step.phase == "warmup",
+           plan.deferRouteUntilMain == true {
+            workout.routeLegDistanceOffsetMeters = workout.distanceMeters
+        }
         workout.structuredStepStartElapsedTime = endElapsed
         workout.structuredStepStartDistanceMeters =
             workout.distanceMeters
