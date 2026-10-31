@@ -77,21 +77,23 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                 }
                 Spacer(minLength: 0)
             }
-            HStack(spacing: 8) {
-                Text(ATHLTHLocalization.choose(
-                    english: "Name", norwegian: "Navn"
+            TextField(
+                "", text: $workoutName,
+                prompt: Text(ATHLTHWorkoutNameSuggestion.suggested(
+                    activity: activity, blocks: blocks,
+                    durationMinutes: durationMinutes, routeTitle: route?.title
                 ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                TextField(ATHLTHLocalization.choose(
-                    english: "Name your workout", norwegian: "Gi økten et navn"
-                ), text: $workoutName)
-                .font(.subheadline.weight(.semibold))
-                .multilineTextAlignment(.trailing)
-                .foregroundStyle(ink)
-            }
-            .frame(minHeight: 43)
-            .padding(.horizontal, 12)
+                .foregroundStyle(.secondary.opacity(0.55))
+            )
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(ink)
+            .tint(bronze)
+            .textInputAutocapitalization(.sentences)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Workout name (optional)", norwegian: "Øktnavn (valgfritt)"
+            ))
+            .frame(minHeight: 43, alignment: .leading)
+            .padding(.horizontal, 13)
             .background(ATHLTHPlanDesign.canvas,
                         in: RoundedRectangle(cornerRadius: 12))
 

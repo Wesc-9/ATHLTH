@@ -97,20 +97,15 @@ struct ATHLTHRunBasicSetupView: View {
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: 10) {
-                Text(ATHLTHLocalization.choose(
-                    english: "Name", norwegian: "Navn"
-                ))
-                .font(.caption.weight(.medium))
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
+            HStack(spacing: 8) {
                 TextField(
                     "", text: $workoutName,
                     prompt: Text(suggestedName)
-                        .foregroundStyle(ATHLTHTrainDesign.secondary.opacity(0.48))
+                        .foregroundStyle(.secondary.opacity(0.55))
                 )
-                .font(.subheadline.weight(.semibold))
-                .multilineTextAlignment(.trailing)
+                .font(.subheadline.weight(.medium))
                 .tint(bronze)
+                .textInputAutocapitalization(.sentences)
                 .accessibilityLabel(ATHLTHLocalization.choose(
                     english: "Workout name (optional)", norwegian: "Navn på økt (valgfritt)"
                 ))
@@ -118,16 +113,17 @@ struct ATHLTHRunBasicSetupView: View {
                     Button {
                         workoutName = ""
                     } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(.secondary.opacity(0.6))
+                        Label(ATHLTHLocalization.choose(
+                            english: "Clear name", norwegian: "Fjern navn"
+                        ), systemImage: "xmark.circle.fill")
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(.secondary)
                     }
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Clear workout name", norwegian: "Fjern øktnavn"
-                    ))
+                    .frame(minWidth: 44, minHeight: 44)
                 }
             }
-            .frame(minHeight: 40)
-            .padding(.horizontal, 12)
+            .frame(minHeight: 43)
+            .padding(.horizontal, 13)
             .background(ATHLTHPlanDesign.canvas,
                         in: RoundedRectangle(cornerRadius: 12))
 

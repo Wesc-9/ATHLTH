@@ -282,81 +282,24 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         position: Int,
         phase: WorkoutPhaseKind
     ) -> some View {
-        let isPause = block.isRestOrActiveRecovery
-        let time = block.durationSeconds.map { "\(Int($0 / 60)) min" }
-            ?? block.distanceMeters.map { "\(Int($0)) m" } ?? "–"
-        let zone = block.targetHeartRateZone.map { "Z\($0)" }
-            ?? (isPause ? "Pause" : "–")
-        return Button {
-            onEdit(block.editorDragID)
-        } label: {
-            HStack(spacing: 9) {
-                Text("\(position)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(isPause ? .secondary : bronze)
-                    .frame(width: 23)
-                Image(systemName: isPause ? "pause.fill" : block.kind.systemImage)
-                    .font(.system(size: 15))
-                    .foregroundStyle(isPause ? .secondary : ink)
-                    .frame(width: 24)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(isPause
-                        ? ATHLTHLocalization.choose(
-                            english: "Recovery", norwegian: "Pause"
-                          )
-                        : block.title)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.85)
-                }
-                Spacer(minLength: 0)
-                Text(time)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(ink)
-                    .lineLimit(1)
-                Text(zone)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(bronze)
-                    .frame(minWidth: 30)
-                Image(systemName: "chevron.right")
-                    .font(.caption2.weight(.semibold))
-                    .foregroundStyle(.secondary)
+        let rows = entries(in: phase)
+        return ATHLTHPlannedWorkoutStepRow(
+            block: block,
+            position: position,
+            canMoveUp: position > 1,
+            canMoveDown: position < rows.count,
+            onEdit: { onEdit(block.editorDragID) },
+            onDelete: { onRemove(block.editorDragID) },
+            onMoveBy: { delta in
+                let destination = position - 1 + delta
+                guard rows.indices.contains(destination) else { return }
+                onMove(block.editorDragID, phase, rows[destination].editorDragID)
+            },
+            onBeginDrag: {
+                draggingID = block.editorDragID
+                return NSItemProvider(object: block.editorDragID.uuidString as NSString)
             }
-            .padding(.horizontal, 10)
-            .frame(minHeight: 49)
-            .background(
-                isPause ? ATHLTHPlanDesign.warmSurface.opacity(0.56)
-                    : ATHLTHPlanDesign.canvas,
-                in: RoundedRectangle(cornerRadius: 12)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 12))
-        }
-        .buttonStyle(.plain)
-        .accessibilityHint(ATHLTHLocalization.choose(
-            english: "Edit duration, zone, pace and activity type",
-            norwegian: "Endre tid, sone, tempo og aktivitetstype"
-        ))
-        .contextMenu {
-            Button(role: .destructive) {
-                onRemove(block.editorDragID)
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Remove step", norwegian: "Fjern deløkt"
-                ), systemImage: "trash")
-            }
-            ForEach(WorkoutPhaseKind.allCases) { target in
-                Button {
-                    onMove(block.editorDragID, target, nil)
-                } label: {
-                    Label(target.title, systemImage: target.symbol)
-                }
-            }
-        }
-        .onDrag {
-            draggingID = block.editorDragID
-            return NSItemProvider(object: block.editorDragID.uuidString as NSString)
-        }
+        )
         .onDrop(of: [UTType.plainText], isTargeted: nil) { _ in
             moveDragged(to: phase, before: block.editorDragID)
         }

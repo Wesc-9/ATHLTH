@@ -3758,12 +3758,7 @@ struct WorkoutTemplateBuilderView: View {
             .toolbar {
                 if isPlannedWorkout {
                     ToolbarItem(placement: .confirmationAction) {
-                        Picker(tr("Mode", "Modus"), selection: $studioAdvanced) {
-                            Text(tr("Simple", "Enkel")).tag(false)
-                            Text(tr("Advanced", "Avansert")).tag(true)
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(width: 166)
+                        ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
@@ -4121,29 +4116,15 @@ struct WorkoutTemplateBuilderView: View {
     private func moveStudioBlock(
         _ id: UUID, to phase: WorkoutPhaseKind, before targetID: UUID?
     ) {
-        guard let original = blocks.firstIndex(where: {
-            $0.editorDragID == id
-        }) else { return }
-        // Retain group integrity when a repeated interval/superset is moved.
-        blocks = ATHLTHWorkoutPhasePlacement.relocatingSelection(
-            at: original, to: phase, in: blocks
+        let moved = ATHLTHStudioBlockReorder.moving(
+            id, to: phase, over: targetID, in: blocks
         )
-        guard let targetID,
-              let newIndex = blocks.firstIndex(where: {
-                  $0.editorDragID == id
-              }),
-              let targetIndex = blocks.firstIndex(where: {
-                  $0.editorDragID == targetID
-              }),
-              newIndex != targetIndex,
-              blocks[newIndex].groupID == nil
-        else { return }
-        let moving = blocks.remove(at: newIndex)
-        let destination = blocks.firstIndex(where: {
-            $0.editorDragID == targetID
-        }) ?? blocks.count
-        blocks.insert(moving, at: destination)
-        resequence()
+        guard moved.map(\.editorDragID) != blocks.map(\.editorDragID)
+                || moved != blocks else { return }
+        withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
+            blocks = moved
+            expandedBlockIndex = nil
+        }
     }
 
     private var timeline: some View {
@@ -5830,7 +5811,15 @@ struct WorkoutTemplateBuilderView: View {
                 return blocks.first?.title ?? RunQuickStartMode.structured.title
             }
         }()
-        let cleanTitle = requestedTitle.isEmpty ? suggestedBasicTitle : requestedTitle
+        let suggestedAdvancedTitle = ATHLTHWorkoutNameSuggestion.suggested(
+            activity: initialActivity,
+            blocks: blocks,
+            durationMinutes: resolvedDurationMinutes,
+            routeTitle: session.savedRoutes.first { $0.id == selectedRouteID }?.title
+        )
+        let fallbackTitle = isPlannedWorkout && studioAdvanced
+            ? suggestedAdvancedTitle : suggestedBasicTitle
+        let cleanTitle = requestedTitle.isEmpty ? fallbackTitle : requestedTitle
 
         var workout = PlannedSession(
             id: UUID(),
