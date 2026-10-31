@@ -2470,7 +2470,7 @@ struct RunQuickStartSheet: View {
                             .ghostRaceAudioConfiguration
                         : nil,
                 autoPauseEnabled:
-                    environment == .outdoor &&
+                    runEnvironment == .outdoor &&
                     (
                         isAdvancedSetup
                             ? autoPausePreference
