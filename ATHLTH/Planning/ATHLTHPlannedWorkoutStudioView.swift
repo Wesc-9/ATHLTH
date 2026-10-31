@@ -9,6 +9,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     @Binding var visiblePhases: Set<WorkoutPhaseKind>
     @Binding var selectedPhase: WorkoutPhaseKind
 
+    let advanced: Bool
     let onAddRun: (WorkoutPhaseKind) -> Void
     let onAddIntervals: (WorkoutPhaseKind) -> Void
     let onAddExercise: (WorkoutPhaseKind) -> Void
@@ -180,7 +181,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     private func phaseCard(_ phase: WorkoutPhaseKind) -> some View {
         let rows = entries(in: phase)
-        let expanded = !collapsedPhases.contains(phase)
+        let expanded = advanced && !collapsedPhases.contains(phase)
         let totalSeconds = rows.expandedForExecution()
             .compactMap(\.durationSeconds).reduce(0, +)
         return VStack(alignment: .leading, spacing: 8) {
