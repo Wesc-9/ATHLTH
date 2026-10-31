@@ -4526,6 +4526,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         structuredStepStartDistanceMeters = distanceMeters
         lastIntervalProgressCueKey = nil
         lastIntervalWarningCueKey = nil
+        if structuredRunningWorkout?.deferRouteUntilMain == true,
+           structuredStepIndex == 1 {
+            routeLegDistanceOffsetMeters = distanceMeters
+        }
         publish { self.awaitingMainStart = false }
         persistWorkoutRecoveryState()
         WKInterfaceDevice.current().play(.start)
@@ -4601,6 +4605,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let mustStartMainManually = finishedStep?.phase == "warmup" &&
             workout.autoStartMainAfterWarmup != true
+        if finishedStep?.phase == "warmup",
+           workout.deferRouteUntilMain == true {
+            routeLegDistanceOffsetMeters = distanceMeters
+        }
         publish {
             self.structuredStepIndex = nextIndex
             self.awaitingMainStart = mustStartMainManually
@@ -4911,6 +4919,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func updateRouteNavigation(
         using location: CLLocation
     ) {
+        if structuredRunningWorkout?.deferRouteUntilMain == true,
+           structuredStepIndex == 0 || awaitingMainStart {
+            return
+        }
         guard let guidance =
                 ATHLTHRouteGuidanceEngine.state(
                     location: location,
