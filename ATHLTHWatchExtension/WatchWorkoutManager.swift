@@ -7401,6 +7401,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         snapshot.runningStepTargetPaceSecondsPerKilometer =
             currentRunningStep?.targetPaceMinSecondsPerKilometer
         snapshot.runningAwaitingMainStart = awaitingMainStart
+        snapshot.runningRouteWarmup =
+            structuredRunningWorkout?.deferRouteUntilMain == true &&
+            currentRunningStep?.phase == "warmup"
         if let step = currentRunningStep {
             snapshot.runningManualAdvanceRequired =
                 awaitingMainStart ||
