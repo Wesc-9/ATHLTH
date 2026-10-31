@@ -260,13 +260,17 @@ private final class ATHLTHLiveActivityController {
         // The Watch's .ending means recording has stopped and only saving
         // remains. End the lock-screen timer immediately, not after the
         // completion import/summary pipeline finishes.
-        let isTerminal = snapshot.state == .ending ||
-            snapshot.state == .completed || snapshot.state == .failed
+        let isTerminal = ATHLTHLiveActivityStopPolicy.shouldDismiss(
+            snapshot.state
+        )
 
         // A late Watch snapshot must never resurrect an already closed
         // ActivityKit session, even if it arrives after a completion receipt.
         if !isTerminal,
-           lastFinishedSessionIdentity?.matches(identity) == true {
+           !ATHLTHLiveActivityStopPolicy.mayStart(
+                identity: identity,
+                lastStopped: lastFinishedSessionIdentity
+           ) {
             return
         }
 
@@ -439,8 +443,12 @@ private final class ATHLTHLiveActivityController {
             }
 
         case .ending, .completed, .failed:
-            // Ending is authoritative for the lock-screen timer. Match by
-            // actual Watch session identity, not the display title.
+            // Ending is authoritative for the lock-screen timer. Set the
+            // stopped-session guard *before* any ActivityKit await; a new
+            // snapshot may arrive while an older activity is being dismissed.
+            lastFinishedSessionIdentity = identity
+
+            // Match by Watch session identity, not its display title.
             // Delayed completion must not close a different active workout.
             for activity in activities {
                 let matches = identity.matches(
@@ -458,9 +466,6 @@ private final class ATHLTHLiveActivityController {
                     guard revision == syncRevision else { return }
                 }
             }
-            // Remember the finished workout so a delayed running snapshot
-            // cannot start the lock-screen timer again.
-            lastFinishedSessionIdentity = identity
             lastSessionIdentity = nil
             lastPhase = nil
             lastUpdateAt = nil
