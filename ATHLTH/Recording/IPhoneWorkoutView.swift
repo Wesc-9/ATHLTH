@@ -1088,6 +1088,7 @@ private struct IPhoneStructuredStepCard: View {
                                        (step.phase == "warmup" &&
                                         workout.structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
                                        step.phase == "cooldown" ||
+                                       step.measure == .open ||
                                        workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false {
                                         HStack(spacing: 12) {
                                             if let next = recorder.nextStructuredStep {
