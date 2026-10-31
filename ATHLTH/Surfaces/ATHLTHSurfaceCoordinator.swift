@@ -118,6 +118,13 @@ enum ATHLTHSurfaceCoordinator {
     static func syncLiveActivity(
         with snapshot: WatchWorkoutLiveSnapshot?
     ) {
+        // WatchConnectivity completion can arrive while the tab observer
+        // is suspended. Immediately clear the matching Home/Lock Screen
+        // widget snapshot as well as ending its ActivityKit presentation.
+        if let snapshot,
+           ATHLTHLiveActivityStopPolicy.shouldDismiss(snapshot.state) {
+            clearFinishedWidgetWorkout(matching: snapshot)
+        }
         let generation = accountGeneration
         Task {
             guard generation == accountGeneration else { return }
@@ -135,6 +142,39 @@ enum ATHLTHSurfaceCoordinator {
                 isActive: workoutIsActive
             )
         }
+    }
+
+    private static func clearFinishedWidgetWorkout(
+        matching finished: WatchWorkoutLiveSnapshot
+    ) {
+        var stored = ATHLTHSurfaceSharedStore.load()
+        guard let active = stored.activeWorkout else { return }
+
+        // Never clear a new iPhone or Watch workout just because a delayed
+        // completion receipt from a previous Watch session arrived.
+        let storedIdentity = ATHLTHLiveActivitySessionIdentity(
+            systemImage: active.systemImage,
+            startedAt: active.startedAt,
+            fallbackTitle: active.title
+        )
+        let finishedIdentity = ATHLTHLiveActivitySessionIdentity(
+            systemImage: finished.kind.systemImage,
+            startedAt: finished.startedAt,
+            fallbackTitle: finished.kind.title
+        )
+        guard storedIdentity.matches(finishedIdentity) else { return }
+
+        stored.activeWorkout = nil
+        stored.updatedAt = Date()
+        ATHLTHSurfaceSharedStore.save(stored)
+        lastSnapshotWriteAt = Date()
+        WidgetCenter.shared.reloadTimelines(
+            ofKind: "ATHLTHHomeWidget"
+        )
+        WidgetCenter.shared.reloadTimelines(
+            ofKind: "ATHLTHLockScreenWidget"
+        )
+        lastWidgetReloadAt = Date()
     }
 
     static func clearAccountSurfaces() {
