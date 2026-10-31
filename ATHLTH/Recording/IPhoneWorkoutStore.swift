@@ -2290,8 +2290,9 @@ final class IPhoneWorkoutStore:
             announceStructuredStepIfNeeded(prefix: "Starting")
             return
         }
-        guard let phase = currentStructuredStep?.phase,
-              phase == "warmup" || phase == "cooldown" ||
+        guard let step = currentStructuredStep,
+              step.phase == "warmup" || step.phase == "cooldown" ||
+              step.measure == .open ||
               workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false
         else { return }
         evaluateStructuredWorkout(&workout, forceManualAdvance: true)
@@ -5269,6 +5270,7 @@ final class IPhoneWorkoutStore:
                         (step.phase == "warmup" &&
                          workout.structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
                         step.phase == "cooldown" ||
+                        step.measure == .open ||
                         workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false
                     },
                 runningAwaitingMainStart: workout.awaitingMainStart == true,
