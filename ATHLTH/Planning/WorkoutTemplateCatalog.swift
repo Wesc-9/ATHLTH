@@ -3262,6 +3262,16 @@ struct ATHLTHPlanCopyDay: Identifiable, Hashable {
     var id: Int { weekIndex * 7 + weekday }
 }
 
+private enum ATHLTHWorkoutExtraDestination: String, Identifiable {
+    case planWithFriend
+    case spotify
+    case heartRateAndPace
+    case audioCoach
+    case ghostRace
+
+    var id: String { rawValue }
+}
+
 struct WorkoutTemplateBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -3296,6 +3306,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingStudioRoutePicker = false
     @State private var showingStudioRouteBuilder = false
     @State private var showingStudioStepEditor = false
+    @State private var selectedWorkoutExtra: ATHLTHWorkoutExtraDestination?
     @State private var studioEditedStepID: UUID?
     @State private var studioRoutePhase: WorkoutPhaseKind = .main
     @State private var studioVisiblePhases: Set<WorkoutPhaseKind> = []
@@ -3641,6 +3652,27 @@ struct WorkoutTemplateBuilderView: View {
         manualDurationMinutes ?? knownDurationMinutes
     }
 
+    private var workoutExtrasMenu: some View {
+        ATHLTHWorkoutExtrasMenu(
+            onPlanWithFriend: {
+                persistWorkoutDraft()
+                selectedWorkoutExtra = .planWithFriend
+            },
+            onSpotify: { selectedWorkoutExtra = .spotify },
+            onHeartRateAndPace: { selectedWorkoutExtra = .heartRateAndPace },
+            onAudioCoach: { selectedWorkoutExtra = .audioCoach },
+            onGhostRace: { selectedWorkoutExtra = .ghostRace },
+            onChooseRoute: {
+                studioRoutePhase = selectedPhase
+                showingStudioRoutePicker = true
+            },
+            onCreateRoute: {
+                studioRoutePhase = selectedPhase
+                showingStudioRouteBuilder = true
+            }
+        )
+    }
+
     private var durationSettings: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
@@ -3702,6 +3734,10 @@ struct WorkoutTemplateBuilderView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if isPlannedWorkout {
                         if !studioAdvanced && initialActivity == .running {
+                            HStack {
+                                Spacer()
+                                workoutExtrasMenu
+                            }
                             ATHLTHRunBasicSetupView(
                                 workoutName: $title,
                                 mode: $studioBasicRunMode,
@@ -3740,6 +3776,11 @@ struct WorkoutTemplateBuilderView: View {
                                 plannedDate: plannedDate,
                                 onDateChanged: onScheduledTimeChanged
                             )
+                            .overlay(alignment: .topTrailing) {
+                                workoutExtrasMenu
+                                    .padding(.top, 18)
+                                    .padding(.trailing, 18)
+                            }
                             plannedStudio
                         }
                         if let actionNotice {
@@ -3753,6 +3794,10 @@ struct WorkoutTemplateBuilderView: View {
                                 plannedDate.formatted(.dateTime.day().month().year()),
                                 systemImage: "calendar"
                             )
+                        }
+                        HStack {
+                            Spacer()
+                            workoutExtrasMenu
                         }
                         workoutOverview
                         durationSettings
@@ -3844,6 +3889,53 @@ struct WorkoutTemplateBuilderView: View {
                     }) else { return }
                     useRoute(route, in: studioRoutePhase)
                 })
+            }
+            .sheet(item: $selectedWorkoutExtra) { destination in
+                switch destination {
+                case .planWithFriend:
+                    NavigationStack {
+                        TrainTogetherPostCreateView(
+                            initialWorkout: blocks.isEmpty ? nil : workoutSnapshot()
+                        )
+                    }
+                case .spotify:
+                    NavigationStack {
+                        SpotifySettingsView()
+                            .navigationTitle("Spotify")
+                            .navigationBarTitleDisplayMode(.inline)
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button(tr("Done", "Ferdig")) {
+                                        selectedWorkoutExtra = nil
+                                    }
+                                }
+                            }
+                    }
+                case .heartRateAndPace:
+                    ATHLTHWorkoutTargetsQuickSheet(blocks: $blocks)
+                case .audioCoach:
+                    NavigationStack {
+                        ATHLTHAudioCoachSettingsView()
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button(tr("Done", "Ferdig")) {
+                                        selectedWorkoutExtra = nil
+                                    }
+                                }
+                            }
+                    }
+                case .ghostRace:
+                    NavigationStack {
+                        GhostRaceHubView()
+                            .toolbar {
+                                ToolbarItem(placement: .cancellationAction) {
+                                    Button(tr("Done", "Ferdig")) {
+                                        selectedWorkoutExtra = nil
+                                    }
+                                }
+                            }
+                    }
+                }
             }
             .sheet(isPresented: $showingStudioStepEditor) {
                 NavigationStack {

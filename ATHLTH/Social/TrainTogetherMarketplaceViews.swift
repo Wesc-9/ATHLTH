@@ -2697,7 +2697,8 @@ struct TrainTogetherPostCreateView:
 
     init(
         initialParticipationMode: SocialWorkoutParticipationMode = .physical,
-        repeating post: TrainTogetherPost? = nil
+        repeating post: TrainTogetherPost? = nil,
+        initialWorkout: PlannedSession? = nil
     ) {
         _participationMode = State(
             initialValue: post?.resolvedParticipationMode ??
@@ -2720,6 +2721,23 @@ struct TrainTogetherPostCreateView:
             _maxGuests = State(initialValue: post.maxGuests)
             if post.resolvedParticipationMode == .physical {
                 _broadArea = State(initialValue: post.broadArea)
+            }
+        } else if let initialWorkout {
+            // Prefill the existing invitation composer from the unsaved
+            // workout draft. Never publish it until the user taps Publish.
+            _preparedWorkout = State(initialValue: initialWorkout)
+            _title = State(initialValue: initialWorkout.title)
+            _kind = State(initialValue: initialWorkout.kind)
+            _durationMinutes = State(initialValue: initialWorkout.durationMinutes ?? 0)
+            _distanceText = State(initialValue:
+                initialWorkout.targetDistanceKilometers.map {
+                    String(format: "%g", $0)
+                } ?? ""
+            )
+            _plannedExercises = State(initialValue: initialWorkout.exercises)
+            if let planned = initialWorkout.scheduledStart,
+               planned > Date().addingTimeInterval(10 * 60) {
+                _scheduledStart = State(initialValue: planned)
             }
         }
     }
