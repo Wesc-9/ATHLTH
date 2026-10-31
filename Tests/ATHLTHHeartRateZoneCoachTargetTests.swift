@@ -51,6 +51,15 @@ final class ATHLTHHeartRateZoneCoachTargetTests: XCTestCase {
         ))
     }
 
+    func testMissingMaximumNeverUsesAnotherIntervalsOldZone() {
+        let target = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: oldConfiguration, stepZone: 4, maximumBPM: nil
+        )
+        XCTAssertEqual(target?.heartRateEnabled, false)
+        XCTAssertNil(target?.heartRateZone)
+        XCTAssertTrue(target?.paceAlertsEnabled == true)
+    }
+
     func testNeverReplacesExplicitBpmTargetWhenNoZoneSelected() {
         let target = ATHLTHHeartRateZoneCoachTarget.configuration(
             configured: oldConfiguration, stepZone: nil, maximumBPM: 190
