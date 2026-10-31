@@ -332,6 +332,7 @@ enum RunQuickStartMode: String, CaseIterable, Identifiable {
 
 enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
     case outdoor
+    case indoor
     case treadmill
 
     var id: String { rawValue }
@@ -340,11 +341,12 @@ enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
     /// Treadmill never implicitly inherits an outdoor route or GPS session.
     static func forPlannedSession(_ workout: PlannedSession?) -> RunEnvironment {
         guard let workout, workout.kind == .running else { return .outdoor }
-        if workout.workoutCategory == "treadmill" ||
-            workout.resolvedWorkoutBlocks.contains(where: {
-                $0.kind == .run && $0.isIndoor == true
-            }) {
-            return .treadmill
+        if workout.workoutCategory == "treadmill" { return .treadmill }
+        if workout.workoutCategory == "indoor" { return .indoor }
+        if workout.resolvedWorkoutBlocks.contains(where: {
+            $0.kind == .run && $0.isIndoor == true
+        }) {
+            return .indoor
         }
         return .outdoor
     }
@@ -355,6 +357,10 @@ enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
             return ATHLTHLocalization.choose(
                 english: "Outdoor",
                 norwegian: "Ute"
+            )
+        case .indoor:
+            return ATHLTHLocalization.choose(
+                english: "Indoor", norwegian: "Innendørs"
             )
         case .treadmill:
             return ATHLTHLocalization.choose(
@@ -371,6 +377,10 @@ enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
                 english: "GPS route, pace and elevation",
                 norwegian: "GPS-rute, tempo og høyde"
             )
+        case .indoor:
+            return ATHLTHLocalization.choose(
+                english: "Indoor without GPS", norwegian: "Uten GPS"
+            )
         case .treadmill:
             return ATHLTHLocalization.choose(
                 english: "Indoor run without GPS",
@@ -382,6 +392,7 @@ enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
     var systemImage: String {
         switch self {
         case .outdoor: return "figure.run"
+        case .indoor: return "building.2"
         case .treadmill: return "figure.run.treadmill"
         }
     }
@@ -407,8 +418,13 @@ struct RunQuickStartConfiguration {
     let gearIDs: Set<UUID>
     var watchStartMode: WatchWorkoutStartMode = .immediate
     var routeWarmup: ATHLTHRouteWarmupConfiguration = .disabled
+    var customWorkoutTitle: String? = nil
 
     var title: String {
+        if let customWorkoutTitle,
+           !customWorkoutTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return customWorkoutTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
         switch mode {
         case .free:
             return "Free Run"
