@@ -126,6 +126,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var quickStudioOption: QuickDayOption?
     @State private var addingExtraWorkout = false
     @State private var editingWorkoutIndex = 0
+    @State private var editingFocusedBlockIndex: Int?
     @State private var previousGuidedEdits: [Int: ATHLTHPlanWeekDayEdit]?
     @State private var selectingExtraFromLibrary = false
 
@@ -768,6 +769,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 initialBlocks: quickStudioOption.map { quickDaySeed($0) } ??
                     (addingExtraWorkout ? [] : (selectedWorkoutForEditor(day: selection.id)?.blocks ?? [])),
                 initialRouteID: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeID,
+                initialFocusedBlockIndex: addingExtraWorkout ? nil : editingFocusedBlockIndex,
+                openFocusedStepEditor: !addingExtraWorkout && editingFocusedBlockIndex != nil,
                 initialExtras: ATHLTHWorkoutPlannerExtras(
                     gearIDs: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.gearIDs,
                     spotifyPlaylist: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.spotifyPlaylist,
@@ -3945,6 +3948,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selectedPlanWeekIndex = guidedCurrentWeek
                 editPreviewWorkout(guidedCurrentWeekday, index: index)
             },
+            onEditBlock: { workoutIndex, blockIndex in
+                selectedPlanWeekIndex = guidedCurrentWeek
+                editPreviewWorkout(
+                    guidedCurrentWeekday, index: workoutIndex,
+                    focusedBlockIndex: blockIndex
+                )
+            },
             onRestDay: {
                 selectedPlanWeekIndex = guidedCurrentWeek
                 toggleRestDay(guidedCurrentWeekday)
@@ -5172,8 +5182,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         editingWeekDay = WeekDayEditorSelection(id: day)
     }
 
-    private func editPreviewWorkout(_ day: Int, index: Int) {
+    private func editPreviewWorkout(
+        _ day: Int, index: Int, focusedBlockIndex: Int? = nil
+    ) {
         editingWorkoutIndex = index
+        editingFocusedBlockIndex = focusedBlockIndex
         addingExtraWorkout = false
         quickStudioOption = nil
         composingAdvancedDay = WeekDayEditorSelection(id: day)
@@ -5190,6 +5203,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         // The new workout must be appended, never overwrite the first one.
         quickStudioOption = nil
         editingWorkoutIndex = 0
+        editingFocusedBlockIndex = nil
         addingExtraWorkout = true
         composingAdvancedDay = WeekDayEditorSelection(id: day)
     }
