@@ -43,43 +43,20 @@ final class ATHLTHCommunityV5NavigationTests: XCTestCase {
         XCTAssertFalse(CommunityInterest.strength.matchesClub(club))
     }
 
-    func testApprovedCommunityReferenceArtworkIsBundled() {
-        for name in [
-            "CommunityClubsFeatured",
-            "CommunityClubsRecommendedHike",
-            "CommunityClubsRecommendedCity",
-            "CommunityArenaFeatured",
-            "CommunityEventsFeatured",
-            "CommunityEventsRunning",
-            "CommunityEventsYoga",
-            "CommunityEventsStrength"
-        ] {
+    func testOnlyThreeNewCommunityHeroAssets() {
+        let mapping: [ATHLTHCommunityMainTab: String] = [
+            .overview: "CommunityHero",
+            .clubs: "CommunityClubsHero",
+            .arena: "CommunityArenaHero",
+            .events: "CommunityEventsHero"
+        ]
+        XCTAssertEqual(mapping.count, ATHLTHCommunityMainTab.allCases.count)
+        for name in mapping.values {
             XCTAssertNotNil(
                 UIImage(named: name),
-                "Missing photo asset from approved Community reference: \(name)"
+                "Community hero image missing from the asset catalog: \(name)"
             )
         }
-    }
-
-    func testCommunityEventFallbackArtworkMatchesActivity() {
-        XCTAssertEqual(
-            ATHLTHCommunityReferenceArtwork.eventFallback(activity: "running"),
-            "CommunityEventsRunning"
-        )
-        XCTAssertEqual(
-            ATHLTHCommunityReferenceArtwork.eventFallback(activity: "strength"),
-            "CommunityEventsStrength"
-        )
-        XCTAssertEqual(
-            ATHLTHCommunityReferenceArtwork.eventFallback(activity: "yoga"),
-            "CommunityEventsYoga"
-        )
-        XCTAssertEqual(
-            ATHLTHCommunityReferenceArtwork.eventFallback(
-                activity: "hiking", featured: true
-            ),
-            "CommunityEventsFeatured"
-        )
     }
 
     func testClubDiscoveryNormalizesNorwegianNames() {
