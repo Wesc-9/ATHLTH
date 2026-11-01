@@ -105,8 +105,7 @@ enum ATHLTHShareDraftFactory {
                         ownerID: UUID,
                         savedWorkouts: [PlannedSession] = []) throws -> MessageShareDraft {
         guard ATHLTHPersonalSharePolicy.workout(original),
-              savedWorkouts.contains(where: { $0.id == original.id &&
-                  ATHLTHPersonalSharePolicy.workout($0) }) else {
+              savedWorkouts.contains(original) else {
             throw ATHLTHDirectShareError.onlySavedPersonalContent
         }
         let copy = safeWorkout(original, library: library)
@@ -124,8 +123,7 @@ enum ATHLTHShareDraftFactory {
                      ownerID: UUID,
                      savedPlans: [TrainingPlan] = []) throws -> MessageShareDraft {
         guard ATHLTHPersonalSharePolicy.plan(original, ownerID: ownerID),
-              savedPlans.contains(where: { $0.id == original.id &&
-                  ATHLTHPersonalSharePolicy.plan($0, ownerID: ownerID) }) else {
+              savedPlans.contains(original) else {
             throw ATHLTHDirectShareError.onlySavedPersonalContent
         }
         var copy = ATHLTHExerciseReferenceResolver.portablePlan(
@@ -161,8 +159,10 @@ enum ATHLTHShareDraftFactory {
 
     static func exercise(_ entry: ExerciseLibraryEntry,
                          ownerID: UUID,
-                         creatorUsername: String? = nil) throws -> MessageShareDraft {
-        guard ATHLTHPersonalExerciseSharing.isEligible(entry, ownerID: ownerID) else {
+                         creatorUsername: String? = nil,
+                         savedExercises: [ExerciseLibraryEntry] = []) throws -> MessageShareDraft {
+        guard ATHLTHPersonalExerciseSharing.isEligible(entry, ownerID: ownerID),
+              savedExercises.contains(entry) else {
             throw ATHLTHDirectShareError.onlyPersonalExercises
         }
         guard let consented = ATHLTHExerciseReferenceResolver.shareableSnapshot(

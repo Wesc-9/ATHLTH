@@ -1657,7 +1657,8 @@ struct ExerciseDetailView: View {
                         do {
                             preparedShare = try ATHLTHShareDraftFactory.exercise(
                                 currentEntry, ownerID: session.profile.userID,
-                                creatorUsername: session.profile.username
+                                creatorUsername: session.profile.username,
+                                savedExercises: library.customExercises
                             )
                         } catch {
                             shareError = error.localizedDescription
