@@ -142,6 +142,57 @@ struct ATHLTHAIProgramIntake: Equatable {
         }
     }
 
+    enum InjuryCondition: String, CaseIterable, Identifiable {
+        case trainLightly
+        case someLimitations
+        case avoidLoading
+
+        var id: String { rawValue }
+
+        var title: String {
+            switch self {
+            case .trainLightly:
+                ATHLTHLocalization.choose(
+                    english: "Can train lightly", norwegian: "Kan trene lett"
+                )
+            case .someLimitations:
+                ATHLTHLocalization.choose(
+                    english: "Some limitations", norwegian: "Noen begrensninger"
+                )
+            case .avoidLoading:
+                ATHLTHLocalization.choose(
+                    english: "Do not train affected area",
+                    norwegian: "Ikke tren området"
+                )
+            }
+        }
+
+        var severity: InjurySeverity {
+            switch self {
+            case .trainLightly: .mild
+            case .someLimitations: .moderate
+            case .avoidLoading: .severe
+            }
+        }
+
+        var instruction: String {
+            switch self {
+            case .trainLightly:
+                "Only gentle, low-load movements if they do not increase symptoms."
+            case .someLimitations:
+                "Adapt exercises, intensity and loading. Avoid aggravating movements."
+            case .avoidLoading:
+                "Do not prescribe loading or exercise involving this affected area."
+            }
+        }
+    }
+
+    struct InjuryEntry: Identifiable, Equatable {
+        var id = UUID()
+        var area: String?
+        var condition: InjuryCondition?
+    }
+
     var trainingTypes: Set<TrainingFocus> = []
     var outcomes: Set<Outcome> = []
     var muscleGroups: Set<String> = []
@@ -157,6 +208,9 @@ struct ATHLTHAIProgramIntake: Equatable {
     var equipment: Set<String> = []
     var otherEquipment = ""
     var injuryStatus: InjuryStatus?
+    /// Each injury independently identifies a body area and limitation.
+    var injuries: [InjuryEntry] = []
+    /// Compatibility for legacy and older callers; new intake uses injuries.
     var injuryAreas: Set<String> = []
     var injurySeverity: InjurySeverity?
     var injuryRestriction: InjuryRestriction?
@@ -181,13 +235,18 @@ struct ATHLTHAIProgramIntake: Equatable {
             issues.append("muscleGroups")
         }
         if experience == nil { issues.append("experience") }
-        if durationWeeks == nil { issues.append("durationWeeks") }
+        if durationWeeks == nil || !(1...52).contains(durationWeeks ?? 0) {
+            issues.append("durationWeeks")
+        }
         if sessionsPerWeek == nil { issues.append("sessionsPerWeek") }
         if availableDays.isEmpty { issues.append("availableDays") }
         if let sessionsPerWeek, availableDays.count < sessionsPerWeek {
             issues.append("availableDayCount")
         }
-        if sessionDurationMinutes == nil { issues.append("sessionDurationMinutes") }
+        if sessionDurationMinutes == nil ||
+           !(10...180).contains(sessionDurationMinutes ?? 0) {
+            issues.append("sessionDurationMinutes")
+        }
         if locations.isEmpty { issues.append("locations") }
         if equipment.isEmpty { issues.append("equipment") }
         if locations.contains(.gym) && locations.contains(.outdoors) &&
@@ -195,12 +254,19 @@ struct ATHLTHAIProgramIntake: Equatable {
             issues.append("locationBalance")
         }
         if injuryStatus == nil { issues.append("injuryStatus") }
-        if injuryStatus == .considerations && healthSharingAuthorized {
-            // Ask for details only when the athlete opted to send them.
-            // Without consent, generate only generic, conservative guidance.
-            if injuryAreas.isEmpty { issues.append("injuryAreas") }
-            if injurySeverity == nil { issues.append("injurySeverity") }
-            if injuryRestriction == nil { issues.append("injuryRestriction") }
+        if injuryStatus == .considerations {
+            if !injuries.isEmpty {
+                // A row is an independent selection: never apply one global
+                // severity to another injury or silently fill an empty row.
+                if injuries.contains(where: { $0.area == nil || $0.condition == nil }) {
+                    issues.append("injuryEntries")
+                }
+            } else if healthSharingAuthorized {
+                // Preserve explicit consent validation for older callers.
+                if injuryAreas.isEmpty { issues.append("injuryAreas") }
+                if injurySeverity == nil { issues.append("injurySeverity") }
+                if injuryRestriction == nil { issues.append("injuryRestriction") }
+            }
         }
         return issues
     }
@@ -217,15 +283,39 @@ struct ATHLTHAIProgramIntake: Equatable {
         return Array(Set(candidates)).sorted().prefix(40).map { String($0.prefix(100)) }
     }
 
+    /// A blocked lower-body region must not produce leg workouts even when
+    /// the rest of the generated plan looks plausible.
+    var avoidLowerBodyTraining: Bool {
+        let lowerBodyAreas: Set<String> = ["Knees", "Feet / ankles", "Hips"]
+        return injuries.contains {
+            $0.area.map(lowerBodyAreas.contains) == true &&
+            $0.condition == .avoidLoading
+        } || (injuries.isEmpty && injuryRestriction == .avoidLowerBody)
+    }
+
     /// Explicitly consented data only; pass separately from generic notes
     /// so request truncation can never silently remove safety restrictions.
     var sharedInjurySafetyNotes: String? {
         guard injuryStatus == .considerations, healthSharingAuthorized else { return nil }
+        let detailedEntries = injuries.compactMap { injury -> String? in
+            guard let area = injury.area, let condition = injury.condition else {
+                return nil
+            }
+            return "\(area): \(condition.title). \(condition.instruction)"
+        }
+        let summary: String
+        if !detailedEntries.isEmpty {
+            summary = detailedEntries.joined(separator: "\n")
+        } else {
+            summary = """
+            Affected areas: \(injuryAreas.sorted().joined(separator: ", ")).
+            Severity: \(injurySeverity?.title ?? "Not specified").
+            Mandatory restriction: \(injuryRestriction?.title ?? "Not specified").
+            """
+        }
         return """
         Athlete-provided injuries / training limitations (use only for exercise avoidance):
-        Affected areas: \(injuryAreas.sorted().joined(separator: ", ")).
-        Severity: \(injurySeverity?.title ?? "Not specified").
-        Mandatory restriction: \(injuryRestriction?.title ?? "Not specified").
+        \(summary)
         Athlete description: \(String(injuryNotes.prefix(1_200))).
         Exercises or movements that must NOT be prescribed: \(excludedExerciseNames.joined(separator: "; ")).
         Do not include exercises, variations or intensity that violate these restrictions.

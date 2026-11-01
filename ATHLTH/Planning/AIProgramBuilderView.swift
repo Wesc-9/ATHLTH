@@ -225,7 +225,7 @@ struct AIProgramBuilderView: View {
             issues += ATHLTHAIInjurySafetyValidator.violations(
                 in: draft,
                 excludedMovements: standaloneIntake.excludedExerciseNames,
-                avoidLowerBody: standaloneIntake.injuryRestriction == .avoidLowerBody
+                avoidLowerBody: standaloneIntake.avoidLowerBodyTraining
             ).map { "excludedExercise:\($0)" }
         }
         return issues
@@ -420,7 +420,7 @@ struct AIProgramBuilderView: View {
                     english: "PLAN FOUNDATION", norwegian: "GRUNNLAG FOR PLANEN"))
                     .font(.caption.bold())
                     .tracking(1.8)
-                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
                 Spacer()
                 Text(ATHLTHLocalization.choose(
                     english: "Nothing is preselected",
@@ -435,6 +435,7 @@ struct AIProgramBuilderView: View {
                 norwegian: "Fortell Coach hva du faktisk trenger."))
                 .font(.largeTitle)
                 .fontDesign(.serif)
+                .foregroundStyle(ATHLTHTrainDesign.ink)
 
             Text(ATHLTHLocalization.choose(
                 english: "Coach waits until the required choices are yours. A linked main goal is optional.",
@@ -465,9 +466,9 @@ struct AIProgramBuilderView: View {
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(14)
+                .padding(16)
                 .background(ATHLTHPlanDesign.selectedSurface,
-                            in: RoundedRectangle(cornerRadius: 15))
+                            in: RoundedRectangle(cornerRadius: 19))
             } else {
                 Text(ATHLTHLocalization.choose(
                     english: "Training-history analysis is disabled until you enable Coach History. Your locally saved workouts remain unchanged.",
@@ -623,19 +624,20 @@ struct AIProgramBuilderView: View {
                            displayedComponents: .date)
                     .tint(ATHLTHTrainDesign.bronze)
 
-                Text(ATHLTHLocalization.choose(
-                    english: "Plan duration", norwegian: "Planens varighet"))
-                    .font(.subheadline.bold())
-                coachChoiceGrid {
-                    ForEach([4, 6, 8, 12, 16, 24], id: \.self) { weeks in
-                        coachToggleOption(
-                            ATHLTHLocalization.format(
-                                english: "%d weeks", norwegian: "%d uker", weeks),
-                            selected: standaloneIntake.durationWeeks == weeks
-                        ) {
-                            standaloneIntake.durationWeeks = weeks
-                        }
-                    }
+                HStack(alignment: .center, spacing: 9) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Plan duration", norwegian: "Planens varighet"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 6)
+                    ATHLTHCoachNumberInput(
+                        label: ATHLTHLocalization.choose(
+                            english: "Plan duration", norwegian: "Planens varighet"),
+                        unit: ATHLTHLocalization.choose(
+                            english: "weeks", norwegian: "uker"),
+                        value: $standaloneIntake.durationWeeks,
+                        range: 1...52,
+                        step: 1
+                    )
                 }
 
                 Text(ATHLTHLocalization.choose(
@@ -672,7 +674,7 @@ struct AIProgramBuilderView: View {
 
                 Text(ATHLTHLocalization.choose(
                     english: "Sessions per week", norwegian: "Antall økter per uke"))
-                    .font(.subheadline.bold())
+                    .font(.subheadline.weight(.semibold))
                 coachChoiceGrid {
                     ForEach(1...7, id: \.self) { count in
                         coachToggleOption(
@@ -685,10 +687,21 @@ struct AIProgramBuilderView: View {
                     }
                 }
 
-                Text(ATHLTHLocalization.choose(
-                    english: "Approximate time per session",
-                    norwegian: "Omtrentlig tid per økt"))
-                    .font(.subheadline.bold())
+                HStack(alignment: .center, spacing: 8) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Approximate time per session",
+                        norwegian: "Omtrentlig tid per økt"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 5)
+                    ATHLTHCoachNumberInput(
+                        label: ATHLTHLocalization.choose(
+                            english: "Minutes per workout", norwegian: "Minutter per økt"),
+                        unit: "min",
+                        value: $standaloneIntake.sessionDurationMinutes,
+                        range: 10...180,
+                        step: 5
+                    )
+                }
                 coachChoiceGrid {
                     ForEach([20, 30, 45, 60, 75, 90], id: \.self) { minutes in
                         coachToggleOption(
@@ -775,15 +788,36 @@ struct AIProgramBuilderView: View {
                     norwegian: "Velg kroppsvekt dersom du ikke har utstyr."))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
-                coachChoiceGrid {
-                    ForEach(equipmentOptions, id: \.self) { equipment in
-                        coachToggleOption(
-                            localizedEquipment(equipment),
-                            selected: standaloneIntake.equipment.contains(equipment)
-                        ) {
-                            toggle(equipment, in: &standaloneIntake.equipment)
+                if !standaloneIntake.equipment.isEmpty {
+                    coachChoiceGrid {
+                        ForEach(equipmentOptions.filter {
+                            standaloneIntake.equipment.contains($0)
+                        }, id: \.self) { equipment in
+                            coachToggleOption(
+                                localizedEquipment(equipment) + "  ×",
+                                selected: false
+                            ) {
+                                standaloneIntake.equipment.remove(equipment)
+                            }
                         }
                     }
+                }
+                Menu {
+                    ForEach(equipmentOptions.filter {
+                        !standaloneIntake.equipment.contains($0)
+                    }, id: \.self) { equipment in
+                        Button(localizedEquipment(equipment)) {
+                            standaloneIntake.equipment.insert(equipment)
+                        }
+                    }
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Add equipment", norwegian: "Legg til utstyr"
+                    ), systemImage: "plus")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(maxWidth: .infinity, minHeight: 44,
+                               alignment: .leading)
                 }
                 TextField(ATHLTHLocalization.choose(
                     english: "Other equipment (optional)",
@@ -796,57 +830,14 @@ struct AIProgramBuilderView: View {
             coachIntakeCard("cross.case.fill", ATHLTHLocalization.choose(
                 english: "Injuries and limitations",
                 norwegian: "Skader og begrensninger")) {
-                ForEach(ATHLTHAIProgramIntake.InjuryStatus.allCases) { status in
-                    coachToggleOption(
-                        status.title,
-                        selected: standaloneIntake.injuryStatus == status
-                    ) {
-                        chooseInjuryStatus(status)
-                    }
-                }
+                ATHLTHCoachInjuryEntriesView(
+                    intake: $standaloneIntake,
+                    areas: injuryAreaOptions,
+                    areaTitle: { localizedInjuryArea($0) }
+                )
 
                 if standaloneIntake.injuryStatus == .considerations {
                     Divider()
-                    Text(ATHLTHLocalization.choose(
-                        english: "Affected areas", norwegian: "Berørte områder"))
-                        .font(.subheadline.bold())
-                    coachChoiceGrid {
-                        ForEach(injuryAreaOptions, id: \.self) { area in
-                            coachToggleOption(
-                                localizedInjuryArea(area),
-                                selected: standaloneIntake.injuryAreas.contains(area)
-                            ) {
-                                toggle(area, in: &standaloneIntake.injuryAreas)
-                            }
-                        }
-                    }
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "How severe is it?", norwegian: "Hvor alvorlig er det?"))
-                        .font(.subheadline.bold())
-                    coachChoiceGrid {
-                        ForEach(ATHLTHAIProgramIntake.InjurySeverity.allCases) { severity in
-                            coachToggleOption(
-                                severity.title,
-                                selected: standaloneIntake.injurySeverity == severity
-                            ) {
-                                standaloneIntake.injurySeverity = severity
-                            }
-                        }
-                    }
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "Required restriction", norwegian: "Påkrevd hensyn"))
-                        .font(.subheadline.bold())
-                    ForEach(ATHLTHAIProgramIntake.InjuryRestriction.allCases) { restriction in
-                        coachToggleOption(
-                            restriction.title,
-                            selected: standaloneIntake.injuryRestriction == restriction
-                        ) {
-                            standaloneIntake.injuryRestriction = restriction
-                        }
-                    }
-
                     HStack {
                         Text(ATHLTHLocalization.choose(
                             english: "Your saved profile notes — edit for this plan",
@@ -969,15 +960,10 @@ struct AIProgramBuilderView: View {
         }
     }
 
-    @ViewBuilder
     private func coachChoiceGrid<Content: View>(
         @ViewBuilder content: () -> Content
     ) -> some View {
-        LazyVGrid(
-            columns: [GridItem(.adaptive(minimum: 112), spacing: 8)],
-            alignment: .leading,
-            spacing: 8
-        ) {
+        ATHLTHCoachChipLayout(spacing: 7, rowSpacing: 8) {
             content()
         }
     }
@@ -988,27 +974,9 @@ struct AIProgramBuilderView: View {
         enabled: Bool = true,
         action: @escaping () -> Void
     ) -> some View {
-        Button(action: action) {
-            HStack(spacing: 7) {
-                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
-                Text(title)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 0)
-            }
-            .font(.subheadline)
-            .foregroundStyle(selected ? .white : ATHLTHTrainDesign.ink)
-            .padding(.horizontal, 10)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .background(
-                selected ? ATHLTHTrainDesign.bronze : ATHLTHTrainDesign.canvas,
-                in: RoundedRectangle(cornerRadius: 12)
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .disabled(!enabled)
-        .opacity(enabled ? 1 : 0.35)
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        ATHLTHCoachSelectChip(
+            title: title, selected: selected, enabled: enabled, action: action
+        )
     }
 
     private func toggleStandaloneTrainingType(_ focus: TrainingFocus) {
@@ -1054,6 +1022,7 @@ struct AIProgramBuilderView: View {
     ) {
         standaloneIntake.injuryStatus = status
         if status == .none {
+            standaloneIntake.injuries = []
             standaloneIntake.injuryAreas.removeAll()
             standaloneIntake.injurySeverity = nil
             standaloneIntake.injuryRestriction = nil
@@ -1124,6 +1093,10 @@ struct AIProgramBuilderView: View {
             return ATHLTHLocalization.choose(english: "Choose available equipment or bodyweight", norwegian: "Velg tilgjengelig utstyr eller kroppsvekt")
         case "injuryStatus":
             return ATHLTHLocalization.choose(english: "Confirm injury status", norwegian: "Bekreft skadestatus")
+        case "injuryEntries":
+            return ATHLTHLocalization.choose(
+                english: "Complete each injury and its training limitation",
+                norwegian: "Velg område og tilstand for hver skade")
         case "injuryAreas":
             return ATHLTHLocalization.choose(english: "Choose affected areas", norwegian: "Velg berørte områder")
         case "injurySeverity":
@@ -1193,13 +1166,19 @@ struct AIProgramBuilderView: View {
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
                     .frame(width: 34, height: 34)
                     .background(ATHLTHTrainDesign.paleGold, in: Circle())
-                Text(title).font(.system(size: 17, weight: .medium, design: .serif))
+                Text(title)
+                    .font(.system(size: 19, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
                 Spacer()
             }
             content()
         }
-        .padding(13)
-        .background(.white.opacity(0.95), in: RoundedRectangle(cornerRadius: 18))
+        .padding(17)
+        .background(.white.opacity(0.96), in: RoundedRectangle(cornerRadius: 21))
+        .overlay {
+            RoundedRectangle(cornerRadius: 21)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.65), lineWidth: 0.7)
+        }
     }
 
     private func intakeOption(
