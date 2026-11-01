@@ -20,6 +20,67 @@ enum ATHLTHCommunityMainTab: String, CaseIterable, Identifiable {
     }
 }
 
+
+// Interest chips organize real content only; no fictitious clubs or events.
+enum CommunityInterest: String, CaseIterable, Identifiable {
+    case all, running, strength, yoga, outdoors, social
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return ATHLTHLocalization.choose(english: "All", norwegian: "Alle")
+        case .running: return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case .strength: return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+        case .yoga: return "Yoga"
+        case .outdoors: return ATHLTHLocalization.choose(english: "Outdoors", norwegian: "Tur")
+        case .social: return ATHLTHLocalization.choose(english: "Social", norwegian: "Sosialt")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .all: "square.grid.2x2"
+        case .running: "figure.run"
+        case .strength: "dumbbell"
+        case .yoga: "figure.mind.and.body"
+        case .outdoors: "mountain.2"
+        case .social: "person.3"
+        }
+    }
+
+    // Search public descriptions rather than claiming unsupported categories.
+    func matchesClub(_ club: CommunityGroupRecord) -> Bool {
+        guard self != .all else { return true }
+        let text = [club.name, club.summary].joined(separator: " ").lowercased()
+        let terms: [String]
+        switch self {
+        case .all: return true
+        case .running: terms = ["løp", "run", "jogg", "maraton"]
+        case .strength: terms = ["styrke", "strength", "gym", "crossfit"]
+        case .yoga: terms = ["yoga", "pilates"]
+        case .outdoors: terms = ["tur", "fjell", "friluft", "hike", "walk", "outdoor"]
+        case .social: terms = ["sosial", "social", "fellesskap", "community"]
+        }
+        return terms.contains { text.contains($0) }
+    }
+
+    func matchesEvent(_ event: CommunityGroupEventRecord) -> Bool {
+        guard self != .all else { return true }
+        let text = [event.activityType, event.title, event.summary]
+            .joined(separator: " ").lowercased()
+        let terms: [String]
+        switch self {
+        case .all: return true
+        case .running: terms = ["running", "løp", "jogg", "run"]
+        case .strength: terms = ["strength", "styrke", "gym"]
+        case .yoga: terms = ["yoga", "pilates"]
+        case .outdoors: terms = ["hiking", "walking", "tur", "fjell", "outdoor", "friluft"]
+        case .social: terms = ["social", "sosial", "meetup", "samling"]
+        }
+        return terms.contains { text.contains($0) }
+    }
+}
+
 private enum CommunityReferenceStyle {
     static let gold = Color(red: 0.65, green: 0.49, blue: 0.31)
     static let darkGold = Color(red: 0.45, green: 0.34, blue: 0.22)
@@ -71,6 +132,8 @@ struct ATHLTHCommunityV5View: View {
     @FocusState private var searchFocused: Bool
     @State private var showCreateClub = false
     @State private var query = ""
+    @State private var clubInterest: CommunityInterest = .all
+    @State private var eventInterest: CommunityInterest = .all
     @State private var respondingToInvite: UUID?
     @State private var inviteError: String?
 
@@ -407,26 +470,84 @@ struct ATHLTHCommunityV5View: View {
     }
 
     private var clubsPage: some View {
-        VStack(spacing: 12) {
-            twoColumns {
-                joinedClubCard
+        VStack(alignment: .leading, spacing: 13) {
+            if let club = myClub {
+                featuredClub(club)
+            } else {
+                discoverClubWelcome
+            }
+            HStack(spacing: 9) {
                 Button {
                     tab = .clubs
                     showSearch = true
                 } label: {
-                    basicLinkCard(
-                        title: ATHLTHLocalization.choose(
-                            english: "Find a club", norwegian: "Finn en klubb"),
-                        description: ATHLTHLocalization.choose(
-                            english: "Find people to train with.",
-                            norwegian: "Finn noen å trene sammen med."),
-                        icon: "person.3"
+                    smallAction(
+                        title: tr("Find clubs", "Finn klubber"),
+                        subtitle: tr("Search members and clubs", "Søk etter klubber"),
+                        icon: "magnifyingglass"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button { showCreateClub = true } label: {
+                    smallAction(
+                        title: tr("Create club", "Opprett klubb"),
+                        subtitle: tr("Build your community", "Samle treningsvenner"),
+                        icon: "plus"
                     )
                 }
                 .buttonStyle(.plain)
             }
-            clubsDirectory
+
+            communitySectionHeading(
+                tr("Explore your interests", "Utforsk etter interesse"),
+                icon: "tag"
+            )
+            interestPicker(selection: $clubInterest, showSocial: false)
             membersStrip
+
+            HStack(alignment: .firstTextBaseline) {
+                communitySectionHeading(
+                    tr("Recommended clubs", "Anbefalte klubber"),
+                    icon: "sparkles"
+                )
+                Spacer()
+                Button(tr("See all", "Se alle")) {
+                    clubInterest = .all
+                    showSearch = true
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(CommunityReferenceStyle.darkGold)
+            }
+
+            let recommendations = matchingPublicClubs.filter {
+                clubInterest.matchesClub($0)
+            }
+            if recommendations.isEmpty {
+                emptyEditorial(
+                    tr("No clubs in this category yet", "Ingen klubber i denne kategorien ennå"),
+                    detail: tr(
+                        "Try another interest or search for a club.",
+                        "Prøv en annen interesse eller søk etter en klubb."
+                    ),
+                    symbol: "person.3"
+                )
+            } else {
+                LazyVGrid(columns: [
+                    GridItem(.flexible(), spacing: 9),
+                    GridItem(.flexible(), spacing: 9)
+                ], spacing: 10) {
+                    ForEach(Array(recommendations.prefix(6))) { club in
+                        NavigationLink {
+                            CommunityGroupDetailView(group: club)
+                        } label: {
+                            recommendedClub(club)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
             if let invite = pendingClubInvitation {
                 invitationBanner(invite)
             }
@@ -434,45 +555,156 @@ struct ATHLTHCommunityV5View: View {
     }
 
     private var arenaPage: some View {
-        VStack(spacing: 12) {
-            twoColumns {
-                arenaDuelCard
-                weeklyChallengeCard
+        VStack(alignment: .leading, spacing: 13) {
+            arenaFeaturedDuel
+
+            HStack(spacing: 8) {
+                NavigationLink {
+                    ATHLTHArenaHomeView()
+                } label: {
+                    smallAction(
+                        title: tr("Duels", "Dueller"),
+                        subtitle: tr("Compete with friends", "Utfordre venner"),
+                        icon: "figure.run"
+                    )
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    ChallengeHubView()
+                } label: {
+                    smallAction(
+                        title: tr("Challenges", "Utfordringer"),
+                        subtitle: tr("Join a new challenge", "Finn en utfordring"),
+                        icon: "star"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack(alignment: .firstTextBaseline) {
+                communitySectionHeading(
+                    tr("This week's challenge", "Ukens utfordring"),
+                    icon: "star.fill"
+                )
+                Spacer()
+                NavigationLink {
+                    ChallengeHubView()
+                } label: {
+                    Text(tr("See all", "Se alle"))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(CommunityReferenceStyle.darkGold)
+                }
+            }
+            arenaChallengeHighlight
+
+            communitySectionHeading(
+                tr("Your Arena", "Din uke i Arena"),
+                icon: "chart.bar.fill"
+            )
+            arenaStatusCard
+
+            communitySectionHeading(
+                tr("Compete your way", "Finn din konkurranse"),
+                icon: "trophy"
+            )
+            HStack(spacing: 9) {
+                arenaActionTile(
+                    tr("Duels", "Dueller"),
+                    subtitle: tr("One against one", "Én mot én"),
+                    icon: "person.2.fill",
+                    action: .duels
+                )
+                arenaActionTile(
+                    tr("Friends", "Venner"),
+                    subtitle: tr("Compare results", "Sammenlign økter"),
+                    icon: "person.3.fill",
+                    action: .friends
+                )
+                arenaActionTile(
+                    tr("Ranking", "Rangering"),
+                    subtitle: tr("See results", "Se resultater"),
+                    icon: "chart.bar.xaxis",
+                    action: .duels
+                )
             }
             NavigationLink {
-                ATHLTHArenaHomeView()
+                CommunityFriendsVsFriendsDetailView()
             } label: {
-                singleLinkRow(
-                    title: "Arena",
-                    subtitle: ATHLTHLocalization.choose(
-                        english: "Competitions, duels and standings",
-                        norwegian: "Konkurranser, dueller og resultater"),
-                    icon: "trophy.fill"
-                )
+                inviteToDuelStrip
             }
             .buttonStyle(.plain)
         }
     }
 
     private var eventsPage: some View {
-        VStack(spacing: 12) {
-            twoColumns {
-                nextGatheringCard
+        VStack(alignment: .leading, spacing: 14) {
+            interestPicker(selection: $eventInterest, showSocial: true)
+            if let featured = filteredUpcomingEvents.first,
+               let club = groups.group(for: featured.groupID) {
+                featuredEvent(featured, club: club)
+            } else {
+                emptyEditorial(
+                    tr("Find your next shared workout", "Finn din neste fellesøkt"),
+                    detail: tr(
+                        "New events from your clubs will appear here.",
+                        "Nye arrangementer fra klubbene dine vises her."
+                    ),
+                    symbol: "calendar.badge.plus"
+                )
+            }
+
+            HStack(alignment: .firstTextBaseline) {
+                communitySectionHeading(
+                    tr("Upcoming events", "Kommende arrangementer"),
+                    icon: "calendar"
+                )
+                Spacer()
                 NavigationLink {
                     CommunityEventsView()
                 } label: {
-                    basicLinkCard(
-                        title: ATHLTHLocalization.choose(
-                            english: "Explore events", norwegian: "Finn arrangementer"),
-                        description: ATHLTHLocalization.choose(
-                            english: "Meet others and join a workout.",
-                            norwegian: "Møt andre og bli med på en økt."),
-                        icon: "calendar"
-                    )
+                    Text(tr("See calendar", "Se kalender"))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(CommunityReferenceStyle.darkGold)
                 }
-                .buttonStyle(.plain)
             }
-            upcomingEventsDirectory
+
+            let upcoming = Array(filteredUpcomingEvents.dropFirst().prefix(8))
+            if upcoming.isEmpty {
+                emptyEditorial(
+                    tr("Nothing else scheduled", "Ingen flere planlagte arrangementer"),
+                    detail: tr(
+                        "Explore public events or create a gathering for your club.",
+                        "Utforsk åpne arrangementer eller opprett en samling i klubben."
+                    ),
+                    symbol: "calendar"
+                )
+            } else {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(alignment: .top, spacing: 10) {
+                        ForEach(upcoming) { event in
+                            if let club = groups.group(for: event.groupID) {
+                                NavigationLink {
+                                    CommunityGroupEventDetailView(group: club, event: event)
+                                } label: {
+                                    upcomingEventTile(event, club: club)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
+            if let invite = pendingClubInvitation {
+                invitationBanner(invite)
+            }
+            NavigationLink {
+                CommunityEventsView()
+            } label: {
+                eventsOverviewStrip
+            }
+            .buttonStyle(.plain)
         }
     }
 
@@ -484,6 +716,649 @@ struct ATHLTHCommunityV5View: View {
         }
     }
 
+
+    // MARK: - Fellesskap 2.0.6: native editorial components
+    // Screenshot images inform the layout. These cards read real store state
+    // and route into the existing, authoritative detail editors.
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
+    private var availableUpcomingEvents: [CommunityGroupEventRecord] {
+        groups.calendarEvents
+            .filter { $0.startsAt >= Date() &&
+                $0.status != "cancelled" && $0.status != "draft" &&
+                groups.group(for: $0.groupID) != nil }
+            .sorted { $0.startsAt < $1.startsAt }
+    }
+
+    private var filteredUpcomingEvents: [CommunityGroupEventRecord] {
+        availableUpcomingEvents.filter { eventInterest.matchesEvent($0) }
+    }
+
+    private func communitySectionHeading(_ title: String, icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(CommunityReferenceStyle.ink)
+            .labelStyle(.titleAndIcon)
+    }
+
+    private func smallAction(
+        title: String, subtitle: String, icon: String
+    ) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(CommunityReferenceStyle.darkGold)
+                .frame(width: 38, height: 38)
+                .background(CommunityReferenceStyle.cream, in: Circle())
+            Text(title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+            Text(subtitle)
+                .font(.system(size: 10))
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
+        .frame(maxWidth: .infinity, minHeight: 97)
+        .padding(8)
+        .communityReferenceCard()
+        .accessibilityElement(children: .combine)
+    }
+
+    private func interestPicker(
+        selection: Binding<CommunityInterest>,
+        showSocial: Bool
+    ) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 7) {
+                ForEach(CommunityInterest.allCases.filter {
+                    showSocial || $0 != .social
+                }) { interest in
+                    let selected = selection.wrappedValue == interest
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selection.wrappedValue = interest
+                        }
+                    } label: {
+                        Label(interest.title, systemImage: interest.symbol)
+                            .font(.system(size: 11, weight: selected ? .semibold : .medium))
+                            .foregroundStyle(selected ? .white :
+                                CommunityReferenceStyle.darkGold)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 39)
+                            .background(selected ?
+                                CommunityReferenceStyle.gold :
+                                CommunityReferenceStyle.paper,
+                                in: Capsule())
+                            .overlay {
+                                Capsule().strokeBorder(
+                                    selected ? Color.clear :
+                                        CommunityReferenceStyle.edge,
+                                    lineWidth: 0.8
+                                )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
+                }
+            }
+        }
+    }
+
+    private var discoverClubWelcome: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image("GoalAdventure")
+                .resizable()
+                .scaledToFill()
+                .frame(height: 125)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+            Text(tr("Find your people", "Finn ditt treningsfellesskap"))
+                .font(.system(size: 23, weight: .regular, design: .serif))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+            Text(tr(
+                "Join a club to discover sessions, friends and shared adventures.",
+                "Bli med i en klubb med økter, treningsvenner og felles opplevelser."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(CommunityReferenceStyle.muted)
+            Button {
+                showSearch = true
+            } label: {
+                creamButton(tr("Explore clubs", "Utforsk klubber"), symbol: "arrow.right")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .communityReferenceCard()
+    }
+
+    private func featuredClub(_ club: CommunityGroupRecord) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            ZStack(alignment: .topLeading) {
+                ATHLTHArtworkImage(
+                    reference: club.headerImageURL ?? club.imageURL,
+                    fallbackAssetName: "GoalMountain",
+                    maxPixelSize: 1200
+                )
+                .athlthBoundedFill()
+                .frame(height: 133)
+                .frame(maxWidth: .infinity)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 14))
+                Label(tr("Your club", "Din klubb"), systemImage: "star.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(CommunityReferenceStyle.darkGold)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(11)
+            }
+            NavigationLink {
+                CommunityGroupDetailView(group: club)
+            } label: {
+                HStack(spacing: 11) {
+                    ATHLTHArtworkImage(
+                        reference: club.imageURL ?? club.headerImageURL,
+                        fallbackAssetName: "CommunityHero",
+                        maxPixelSize: 450
+                    )
+                    .athlthBoundedFill()
+                    .frame(width: 51, height: 51)
+                    .clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(club.name)
+                            .font(.headline)
+                            .foregroundStyle(CommunityReferenceStyle.ink)
+                            .lineLimit(1)
+                        Text(club.summary.isEmpty ?
+                            tr("Train together. Go further.", "Tren sammen. Kom lenger.") :
+                            club.summary)
+                            .font(.caption)
+                            .foregroundStyle(CommunityReferenceStyle.muted)
+                            .lineLimit(2)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(CommunityReferenceStyle.darkGold)
+                }
+            }
+            .buttonStyle(.plain)
+
+            HStack(spacing: 0) {
+                clubMetric(groups.members(in: club.id).count,
+                           label: tr("Members", "Medlemmer"), icon: "person.3.fill")
+                clubMetric(groups.challenges(in: club.id).count,
+                           label: tr("Challenges", "Utfordringer"), icon: "chart.bar.fill")
+                clubMetric(groups.events(in: club.id).count,
+                           label: tr("Events", "Arrangementer"), icon: "calendar")
+            }
+            .padding(.vertical, 4)
+            if !groups.members(in: club.id).isEmpty {
+                memberAvatars(groups.members(in: club.id))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            NavigationLink {
+                CommunityGroupDetailView(group: club)
+            } label: {
+                creamButton(tr("Open club", "Åpne klubb"), symbol: "arrow.right")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .communityReferenceCard()
+    }
+
+    private func clubMetric(_ value: Int, label: String, icon: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundStyle(CommunityReferenceStyle.darkGold)
+            Text(value.formatted())
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+            Text(label)
+                .font(.system(size: 9))
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func recommendedClub(_ club: CommunityGroupRecord) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ATHLTHArtworkImage(
+                reference: club.headerImageURL ?? club.imageURL,
+                fallbackAssetName: "GoalAdventure",
+                maxPixelSize: 650
+            )
+            .athlthBoundedFill()
+            .frame(height: 93)
+            .frame(maxWidth: .infinity)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            Text(club.name)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+                .lineLimit(2)
+            Label(club.locationName.isEmpty ?
+                tr("Online club", "Digital klubb") : club.locationName,
+                systemImage: "mappin")
+                .font(.caption2)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .lineLimit(1)
+            Text(club.summary)
+                .font(.system(size: 10))
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 0)
+            creamButton(tr("Open", "Åpne"), symbol: "arrow.right")
+        }
+        .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
+        .padding(10)
+        .communityReferenceCard()
+    }
+
+    private func emptyEditorial(
+        _ title: String, detail: String, symbol: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
+            Image(systemName: symbol)
+                .font(.title2)
+                .foregroundStyle(CommunityReferenceStyle.gold)
+            Text(title)
+                .font(.system(size: 18, weight: .regular, design: .serif))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+            Text(detail)
+                .font(.subheadline)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .communityReferenceCard()
+    }
+
+    private var arenaFeaturedDuel: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                communitySectionHeading(
+                    tr("Featured duel", "Fremhevet duell"),
+                    icon: "trophy.fill"
+                )
+                Spacer()
+                if activeDuel != nil {
+                    Text(tr("Active", "Pågår"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(CommunityReferenceStyle.darkGold)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 6)
+                        .background(CommunityReferenceStyle.cream, in: Capsule())
+                }
+            }
+            if let duel = activeDuel {
+                let leaders = Array(challenges.leaderboard(for: duel.id).prefix(2))
+                Text(duel.title)
+                    .font(.system(size: 24, weight: .regular, design: .serif))
+                    .foregroundStyle(CommunityReferenceStyle.ink)
+                    .lineLimit(2)
+                HStack(spacing: 6) {
+                    ForEach(leaders) { entry in
+                        VStack(spacing: 7) {
+                            Image(systemName: "person.crop.circle.fill")
+                                .font(.system(size: 48))
+                                .foregroundStyle(CommunityReferenceStyle.gold.opacity(0.8))
+                            Text(entry.participant.displayName)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(CommunityReferenceStyle.ink)
+                                .lineLimit(1)
+                            Text(scoreText(entry, for: duel))
+                                .font(.headline)
+                                .foregroundStyle(CommunityReferenceStyle.ink)
+                        }
+                        .frame(maxWidth: .infinity)
+                        if entry.id == leaders.first?.id && leaders.count == 2 {
+                            Text("VS")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(CommunityReferenceStyle.darkGold)
+                                .frame(width: 39, height: 39)
+                                .background(CommunityReferenceStyle.cream, in: Circle())
+                        }
+                    }
+                }
+                .padding(.vertical, 7)
+            } else {
+                ZStack(alignment: .bottomLeading) {
+                    Image("GoalSprint")
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 149)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 15))
+                    LinearGradient(
+                        colors: [.clear, .black.opacity(0.65)],
+                        startPoint: .center, endPoint: .bottom
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 15))
+                    Text(tr(
+                        "Your next duel starts here",
+                        "Din neste duell starter her"
+                    ))
+                    .font(.system(size: 21, weight: .medium, design: .serif))
+                    .foregroundStyle(.white)
+                    .padding(16)
+                }
+                .frame(height: 149)
+                Text(tr(
+                    "Challenge a friend and compare real training results.",
+                    "Utfordre en venn og sammenlign faktiske treningsresultater."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+            }
+            NavigationLink {
+                ATHLTHArenaHomeView()
+            } label: {
+                creamButton(activeDuel == nil ?
+                    tr("Find a duel", "Finn en duell") :
+                    tr("View the duel", "Se duellen"),
+                    symbol: "arrow.right")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(14)
+        .communityReferenceCard()
+    }
+
+    private var arenaChallengeHighlight: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let challenge = weekly.activeChallenge {
+                NavigationLink {
+                    OfficialWeeklyChallengeDetailView(challengeID: challenge.id)
+                } label: {
+                    HStack(spacing: 11) {
+                        Image("GoalMountain")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 89, height: 96)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(challenge.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(CommunityReferenceStyle.ink)
+                                .lineLimit(2)
+                            Text(challenge.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(CommunityReferenceStyle.muted)
+                                .lineLimit(3)
+                            Text(weekly.isJoined(challenge.id)
+                                ? OfficialWeeklyChallengeProgress.valueText(
+                                    challenge: challenge, workouts: health.workouts)
+                                : tr("Join to track your progress", "Bli med for å følge fremgangen"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(CommunityReferenceStyle.darkGold)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                progressDots(challenge)
+            } else {
+                Text(tr(
+                    "The next official challenge appears here when published.",
+                    "Neste offisielle utfordring vises her når den er publisert."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                NavigationLink {
+                    ChallengeHubView()
+                } label: {
+                    creamButton(tr("Explore", "Utforsk"), symbol: "arrow.right")
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(13)
+        .communityReferenceCard()
+    }
+
+    private var arenaStatusCard: some View {
+        let active = challenges.trainingChallenges(for: session.profile.userID)
+            .filter { $0.hasAcceptedOpponent && !$0.expiredWithoutOpponent() }.count
+        let joined = weekly.activeChallenge.map { weekly.isJoined($0.id) } ?? false
+        return HStack(spacing: 13) {
+            Image(systemName: "trophy.fill")
+                .font(.title2)
+                .foregroundStyle(CommunityReferenceStyle.gold)
+                .frame(width: 54, height: 54)
+                .background(CommunityReferenceStyle.cream, in: RoundedRectangle(cornerRadius: 16))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(tr("Your active competitions", "Dine aktive konkurranser"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(CommunityReferenceStyle.ink)
+                Text(tr(
+                    "\(active) duels · \(joined ? 1 : 0) weekly challenges",
+                    "\(active) dueller · \(joined ? 1 : 0) ukesutfordringer"
+                ))
+                .font(.caption)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+            }
+            Spacer(minLength: 0)
+            NavigationLink {
+                ATHLTHArenaHomeView()
+            } label: {
+                Image(systemName: "chevron.right")
+                    .foregroundStyle(CommunityReferenceStyle.darkGold)
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
+            }
+            .accessibilityLabel(tr("Open Arena", "Åpne Arena"))
+        }
+        .padding(13)
+        .communityReferenceCard()
+    }
+
+    private enum ArenaTarget { case duels, friends }
+
+    private func arenaActionTile(
+        _ title: String, subtitle: String, icon: String,
+        action: ArenaTarget
+    ) -> some View {
+        Group {
+            switch action {
+            case .duels:
+                NavigationLink {
+                    ATHLTHArenaHomeView()
+                } label: {
+                    arenaActionContent(title, subtitle: subtitle, icon: icon)
+                }
+            case .friends:
+                NavigationLink {
+                    CommunityFriendsVsFriendsDetailView()
+                } label: {
+                    arenaActionContent(title, subtitle: subtitle, icon: icon)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func arenaActionContent(
+        _ title: String, subtitle: String, icon: String
+    ) -> some View {
+        VStack(spacing: 7) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundStyle(CommunityReferenceStyle.darkGold)
+                .frame(height: 32)
+            Text(title)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.72)
+            Text(subtitle)
+                .font(.system(size: 9))
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 108)
+        .padding(7)
+        .communityReferenceCard()
+    }
+
+    private var inviteToDuelStrip: some View {
+        HStack(spacing: 11) {
+            Image(systemName: "person.crop.circle.badge.plus")
+                .font(.title2)
+                .foregroundStyle(CommunityReferenceStyle.darkGold)
+                .frame(width: 44, height: 44)
+                .background(CommunityReferenceStyle.cream, in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(tr("Challenge a friend", "Inviter en venn til duell"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(CommunityReferenceStyle.ink)
+                Text(tr(
+                    "Create a challenge with someone you follow.",
+                    "Start en duell med en treningsvenn."
+                ))
+                .font(.caption)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .foregroundStyle(CommunityReferenceStyle.darkGold)
+        }
+        .padding(13)
+        .background(CommunityReferenceStyle.cream.opacity(0.7),
+                    in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func featuredEvent(
+        _ event: CommunityGroupEventRecord, club: CommunityGroupRecord
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            NavigationLink {
+                CommunityGroupEventDetailView(group: club, event: event)
+            } label: {
+                VStack(alignment: .leading, spacing: 9) {
+                    ZStack(alignment: .topLeading) {
+                        ATHLTHArtworkImage(
+                            reference: event.imageURL,
+                            fallbackAssetName: "GoalAdventure",
+                            maxPixelSize: 1200
+                        )
+                        .athlthBoundedFill()
+                        .frame(height: 156)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                        Label(tr("Featured event", "Fremhevet arrangement"),
+                              systemImage: "star.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(CommunityReferenceStyle.darkGold)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 7)
+                            .background(.regularMaterial, in: Capsule())
+                            .padding(9)
+                    }
+                    Text(event.title)
+                        .font(.system(size: 23, weight: .regular, design: .serif))
+                        .foregroundStyle(CommunityReferenceStyle.ink)
+                        .lineLimit(2)
+                    Text(event.summary.isEmpty ? club.name : event.summary)
+                        .font(.caption)
+                        .foregroundStyle(CommunityReferenceStyle.muted)
+                        .lineLimit(2)
+                    HStack(spacing: 11) {
+                        Label(event.startsAt.formatted(.dateTime.weekday(.abbreviated)
+                            .day().month(.abbreviated)), systemImage: "calendar")
+                        Label(event.meetingName.isEmpty ?
+                            club.locationName : event.meetingName,
+                            systemImage: "mappin")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(CommunityReferenceStyle.muted)
+                    .lineLimit(1)
+                }
+            }
+            .buttonStyle(.plain)
+            NavigationLink {
+                CommunityGroupEventDetailView(group: club, event: event)
+            } label: {
+                creamButton(tr("View event", "Se arrangement"), symbol: "arrow.right")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .communityReferenceCard()
+    }
+
+    private func upcomingEventTile(
+        _ event: CommunityGroupEventRecord,
+        club: CommunityGroupRecord
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ATHLTHArtworkImage(
+                reference: event.imageURL,
+                fallbackAssetName: "GoalAdventure",
+                maxPixelSize: 650
+            )
+            .athlthBoundedFill()
+            .frame(height: 113)
+            .frame(maxWidth: .infinity)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            Text(event.title)
+                .font(.system(size: 14, weight: .semibold, design: .serif))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+                .lineLimit(2)
+            Text(club.name)
+                .font(.caption2)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .lineLimit(1)
+            Label(event.startsAt.formatted(.dateTime.day().month(.abbreviated)
+                .hour().minute()), systemImage: "calendar")
+                .font(.caption2)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+            creamButton(tr("Details", "Detaljer"), symbol: "chevron.right")
+        }
+        .frame(width: 190, height: 237, alignment: .topLeading)
+        .padding(10)
+        .communityReferenceCard()
+    }
+
+    private var eventsOverviewStrip: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "calendar")
+                .font(.title2)
+                .foregroundStyle(CommunityReferenceStyle.gold)
+                .frame(width: 47, height: 47)
+                .background(CommunityReferenceStyle.cream, in: Circle())
+            VStack(alignment: .leading, spacing: 4) {
+                Text(tr("Events in your community", "Arrangementer i fellesskapet"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(CommunityReferenceStyle.ink)
+                Text(tr(
+                    "\(availableUpcomingEvents.count) upcoming club events",
+                    "\(availableUpcomingEvents.count) kommende klubbarrangementer"
+                ))
+                .font(.caption)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "chevron.right")
+                .foregroundStyle(CommunityReferenceStyle.darkGold)
+        }
+        .padding(13)
+        .communityReferenceCard()
+    }
 
     // MARK: - Clubs and events use the same reference cards, not V5 lists
 
