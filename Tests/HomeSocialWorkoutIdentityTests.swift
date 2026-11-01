@@ -96,4 +96,41 @@ final class HomeSocialWorkoutIdentityTests: XCTestCase {
             item: nonWorkout, ownerID: owner, workoutIDs: ids
         ))
     }
+
+    func testHomeFriendStripRequiresMutualFollow() {
+        let friend = UUID(), followerOnly = UUID(), followingOnly = UUID()
+        let result = ATHLTHHomeFriendsEligibility.mutualIDs(
+            followers: [friend, followerOnly],
+            following: [friend, followingOnly],
+            blocked: [],
+            muted: []
+        )
+        XCTAssertEqual(result, [friend])
+    }
+
+    func testMutedAndBlockedFriendsNeverEnterHomeStrip() {
+        let visible = UUID(), blocked = UUID(), muted = UUID()
+        let all = Set([visible, blocked, muted])
+        let result = ATHLTHHomeFriendsEligibility.mutualIDs(
+            followers: all,
+            following: all,
+            blocked: [blocked],
+            muted: [muted]
+        )
+        XCTAssertEqual(result, [visible])
+    }
+
+    func testOfflineMutualFriendRemainsEligibleForHome() {
+        // Online/training status is intentionally not an eligibility input.
+        let friend = UUID()
+        XCTAssertEqual(
+            ATHLTHHomeFriendsEligibility.mutualIDs(
+                followers: [friend],
+                following: [friend],
+                blocked: [],
+                muted: []
+            ),
+            [friend]
+        )
+    }
 }
