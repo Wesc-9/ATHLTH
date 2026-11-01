@@ -171,7 +171,7 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
     func testAdvancedSetupWithCompactPlanningMethodsFitsSmallPhones() {
         // Both plans use the same form. The weekly option reveals an extra
         // variation control; the daily option must not reserve space for it.
-        for planningApproach: ATHLTHPlanWeekPlanningApproach in [.guided, .quick] {
+        for planningApproach in [ATHLTHPlanWeekPlanningApproach.guided, .quick] {
             for width in [320.0, 375.0, 430.0] {
                 let screen = ATHLTHPlanAdvancedScheduleEntryView(
                     title: .constant(""),
