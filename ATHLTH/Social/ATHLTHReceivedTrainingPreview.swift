@@ -19,7 +19,13 @@ struct ATHLTHReceivedTrainingPreview: View {
                let exercise = message.decodeSnapshot(ATHLTHSharedExerciseAttachment.self) {
                 ATHLTHLinkedExerciseDetailView(
                     block: exercise.previewBlock,
-                    sharedByUsername: sharedByUsername
+                    sharedByUsername: sharedByUsername,
+                    originalCreatorID: exercise.originalCreatorID ?? message.sourceOwnerID,
+                    originalCreatorUsername: exercise.originalCreatorUsername ??
+                        (message.sourceOwnerID == message.senderID
+                            ? sharedByUsername : nil),
+                    originalExerciseID: exercise.originalExerciseID ??
+                        message.sourceObjectID ?? exercise.sourceID
                 )
             } else {
                 NavigationStack {

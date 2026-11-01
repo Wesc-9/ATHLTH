@@ -325,18 +325,23 @@ struct Exercise: Identifiable, Codable, Hashable {
     /// The username of the athlete who sent this private copy.
     /// Only imported exercises have attribution; older saved items decode nil.
     var sharedByUsername: String? = nil
+    /// The original creator remains the same after any number of shares.
+    /// A receiver's ownerID is never interpreted as authorship.
+    var originalCreatorID: UUID? = nil
+    var originalCreatorUsername: String? = nil
+    var originalExerciseID: UUID? = nil
 
     /// Short, neutral provenance used in both grid and list cards.
     var sharedAttributionText: String? {
         guard origin == .custom,
-              let sharedByUsername else { return nil }
-        let name = sharedByUsername
+              let originalCreatorUsername else { return nil }
+        let name = originalCreatorUsername
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
         guard !name.isEmpty else { return nil }
         return ATHLTHLocalization.choose(
-            english: "Shared by @\(name)",
-            norwegian: "Delt av @\(name)"
+            english: "Created by @\(name)",
+            norwegian: "Laget av @\(name)"
         )
     }
 

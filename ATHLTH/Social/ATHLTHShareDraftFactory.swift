@@ -5,6 +5,9 @@ struct ATHLTHSharedExerciseAttachment: Codable, Hashable {
     let sourceID: UUID?
     let sourceIdentifier: String?
     let snapshot: ExerciseSnapshot?
+    var originalCreatorID: UUID? = nil
+    var originalCreatorUsername: String? = nil
+    var originalExerciseID: UUID? = nil
 
     var previewBlock: WorkoutTemplateBlock {
         var block = WorkoutTemplateBlock(
@@ -101,7 +104,8 @@ enum ATHLTHShareDraftFactory {
     }
 
     static func exercise(_ entry: ExerciseLibraryEntry,
-                         ownerID: UUID) throws -> MessageShareDraft {
+                         ownerID: UUID,
+                         creatorUsername: String? = nil) throws -> MessageShareDraft {
         guard ATHLTHPersonalExerciseSharing.isEligible(entry, ownerID: ownerID) else {
             throw ATHLTHDirectShareError.onlyPersonalExercises
         }
@@ -113,20 +117,29 @@ enum ATHLTHShareDraftFactory {
         let snapshot = ATHLTHExerciseReferenceResolver.safeImportedSnapshot(
             consented, fallbackTitle: entry.canonicalName
         )
-        let attachment = ATHLTHSharedExerciseAttachment(
+        let originalID = entry.exercise.originalExerciseID ??
+            entry.exercise.sharedSourceExerciseID ?? entry.id
+        let originalCreatorID = entry.exercise.originalCreatorID ??
+            entry.exercise.ownerID ?? ownerID
+        let originalCreatorUsername = entry.exercise.originalCreatorUsername ??
+            (originalCreatorID == ownerID ? creatorUsername : nil)
+        var attachment = ATHLTHSharedExerciseAttachment(
             name: String(entry.canonicalName.prefix(140)),
-            sourceID: entry.id,
+            sourceID: originalID,
             sourceIdentifier: nil,
             snapshot: snapshot
         )
+        attachment.originalCreatorID = originalCreatorID
+        attachment.originalCreatorUsername = originalCreatorUsername
+        attachment.originalExerciseID = originalID
         return try MessageShareDraft(
             kind: .exercise, title: attachment.name,
             subtitle: ATHLTHLocalization.choose(
                 english: "Exercise", norwegian: "Øvelse"
             ),
             snapshot: attachment,
-            sourceObjectID: entry.id,
-            sourceOwnerID: ownerID
+            sourceObjectID: originalID,
+            sourceOwnerID: originalCreatorID
         )
     }
 }

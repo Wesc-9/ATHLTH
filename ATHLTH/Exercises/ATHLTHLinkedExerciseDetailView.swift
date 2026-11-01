@@ -10,6 +10,9 @@ struct ATHLTHLinkedExerciseDetailView: View {
 
     let block: WorkoutTemplateBlock
     var sharedByUsername: String? = nil
+    var originalCreatorID: UUID? = nil
+    var originalCreatorUsername: String? = nil
+    var originalExerciseID: UUID? = nil
 
     @State private var imported = false
 
@@ -48,6 +51,9 @@ struct ATHLTHLinkedExerciseDetailView: View {
             isVisibleOutsideOwnerLibrary: false
         )
         exercise.sharedByUsername = sharedByUsername
+        exercise.originalCreatorID = originalCreatorID
+        exercise.originalCreatorUsername = originalCreatorUsername
+        exercise.originalExerciseID = originalExerciseID
         return ExerciseLibraryEntry(
             id: exercise.id,
             exercise: exercise,
@@ -97,8 +103,11 @@ struct ATHLTHLinkedExerciseDetailView: View {
                             let result = library.importSharedExercise(
                                 previewSnapshot,
                                 ownerID: session.profile.userID,
-                                sourceExerciseID: block.exerciseID,
-                                sharedByUsername: sharedByUsername
+                                sourceExerciseID: originalExerciseID ?? block.exerciseID,
+                                sharedByUsername: sharedByUsername,
+                                originalCreatorID: originalCreatorID,
+                                originalCreatorUsername: originalCreatorUsername,
+                                originalExerciseID: originalExerciseID
                             )
                             if result != nil {
                                 imported = true
