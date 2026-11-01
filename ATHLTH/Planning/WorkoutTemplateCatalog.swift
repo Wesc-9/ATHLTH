@@ -3336,6 +3336,7 @@ struct WorkoutTemplateBuilderView: View {
     private let initialQuickAdd: String?
     private let initialFocusedBlockIndex: Int?
     private let initialFocusedExecutionStepIndex: Int?
+    private let openFocusedStepEditor: Bool
     private let plannedDate: Date?
     private let initialActivity: ATHLTHPlannedWorkoutType?
     private let onScheduledTimeChanged: ((Date) -> Void)?
@@ -3359,6 +3360,7 @@ struct WorkoutTemplateBuilderView: View {
         initialPhase: WorkoutPhaseKind? = nil,
         initialFocusedBlockIndex: Int? = nil,
         initialFocusedExecutionStepIndex: Int? = nil,
+        openFocusedStepEditor: Bool = false,
         initialDurationOverrideMinutes: Int? = nil,
         initialExtras: ATHLTHWorkoutPlannerExtras = .init(),
         draftContext: String = "shared-template",
@@ -3397,6 +3399,7 @@ struct WorkoutTemplateBuilderView: View {
         self.initialQuickAdd = initialQuickAdd
         self.initialFocusedBlockIndex = initialFocusedBlockIndex
         self.initialFocusedExecutionStepIndex = initialFocusedExecutionStepIndex
+        self.openFocusedStepEditor = openFocusedStepEditor
         self.plannedDate = plannedDate
         self.initialActivity = initialActivity
         self.onScheduledTimeChanged = onScheduledTimeChanged
@@ -4092,6 +4095,17 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
                 draftActive = true
+                if openFocusedStepEditor, let focused = expandedBlockIndex {
+                    // The parent opens this workout for one tapped plan row.
+                    // Present its real step editor after the workout sheet has
+                    // appeared, so the edit still uses the existing Save-to-Plan flow.
+                    Task { @MainActor in
+                        await Task.yield()
+                        guard blocks.indices.contains(focused) else { return }
+                        studioEditedStepID = blocks[focused].editorDragID
+                        showingStudioStepEditor = true
+                    }
+                }
                 // Apply one explicitly requested block after the draft is
                 // restored. Never insert it twice on sheet reappearance.
                 if !isPlannedWorkout, !draftRestored,
