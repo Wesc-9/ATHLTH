@@ -918,14 +918,15 @@ final class ExerciseLibraryStore: ObservableObject {
         equipment: [String],
         isVisibleOutsideOwnerLibrary: Bool,
         imageData: Data? = nil,
-        videoURL: URL? = nil
+        videoURL: URL? = nil,
+        creatorUsername: String? = nil
     ) -> ExerciseLibraryEntry {
         let exerciseID = UUID()
         let imageURL = imageData.flatMap {
             try? saveCustomImageData($0, exerciseID: exerciseID)
         }
 
-        let exercise = Exercise(
+        var exercise = Exercise(
             id: exerciseID,
             origin: .custom,
             ownerID: ownerID,
@@ -938,6 +939,14 @@ final class ExerciseLibraryStore: ObservableObject {
             isVisibleOutsideOwnerLibrary: isVisibleOutsideOwnerLibrary,
             videoURL: videoURL
         )
+        exercise.originalCreatorID = ownerID
+        exercise.originalExerciseID = exerciseID
+        let name = creatorUsername?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        if let name, !name.isEmpty {
+            exercise.originalCreatorUsername = String(name.prefix(40))
+        }
 
         let entry = ExerciseLibraryEntry(
             id: exercise.id,
@@ -970,7 +979,10 @@ final class ExerciseLibraryStore: ObservableObject {
         _ source: ExerciseSnapshot,
         ownerID: UUID,
         sourceExerciseID: UUID? = nil,
-        sharedByUsername: String? = nil
+        sharedByUsername: String? = nil,
+        originalCreatorID: UUID? = nil,
+        originalCreatorUsername: String? = nil,
+        originalExerciseID: UUID? = nil
     ) -> ExerciseLibraryEntry? {
         guard accountID == ownerID,
               let safe = ATHLTHExerciseReferenceResolver.safeImportedSnapshot(
@@ -1012,7 +1024,14 @@ final class ExerciseLibraryStore: ObservableObject {
             isVisibleOutsideOwnerLibrary: false
         )
         var owned = imported.exercise
-        owned.sharedSourceExerciseID = sourceExerciseID
+        owned.sharedSourceExerciseID = originalExerciseID ?? sourceExerciseID
+        owned.originalCreatorID = originalCreatorID
+        owned.originalExerciseID = originalExerciseID ?? sourceExerciseID
+        let creator = originalCreatorUsername?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        owned.originalCreatorUsername = creator?.isEmpty == false
+            ? String(creator!.prefix(40)) : nil
         // Store the sender's public username as a small local provenance
         // label. Never copy personal identifiers or sender-owned media.
         let cleanedUsername = sharedByUsername?

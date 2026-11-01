@@ -7482,7 +7482,8 @@ struct MessageSharePicker: View {
                     ) {
                         do {
                             onSelect(try ATHLTHShareDraftFactory.exercise(
-                                exercise, ownerID: session.profile.userID
+                                exercise, ownerID: session.profile.userID,
+                                creatorUsername: session.profile.username
                             ))
                         } catch {
                             shareError = error.localizedDescription

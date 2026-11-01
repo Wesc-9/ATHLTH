@@ -120,7 +120,7 @@ enum ATHLTHShareDraftFactory {
         let originalID = entry.exercise.originalExerciseID ??
             entry.exercise.sharedSourceExerciseID ?? entry.id
         let originalCreatorID = entry.exercise.originalCreatorID ??
-            entry.exercise.ownerID ?? ownerID
+            (entry.exercise.sharedSourceExerciseID == nil ? ownerID : nil)
         let originalCreatorUsername = entry.exercise.originalCreatorUsername ??
             (originalCreatorID == ownerID ? creatorUsername : nil)
         var attachment = ATHLTHSharedExerciseAttachment(

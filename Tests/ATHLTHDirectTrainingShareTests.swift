@@ -79,7 +79,7 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
             sourceExerciseID: UUID(),
             sharedByUsername: "sender_athlete"
         ))
-        XCTAssertTrue(imported.exercise.sharedAttributionText?.contains("@sender_athlete") == true)
+        XCTAssertNil(imported.exercise.sharedAttributionText)
         let reloaded = ExerciseLibraryStore()
         reloaded.switchAccount(ownerID)
         XCTAssertEqual(
@@ -87,6 +87,47 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
                 .exercise.sharedByUsername,
             "sender_athlete"
         )
+    }
+
+    @MainActor
+    func testForwardedExerciseKeepsOriginalCreator() throws {
+        let receiver = UUID()
+        let creator = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(receiver)
+        let snapshot = ExerciseSnapshot(
+            name: "Unique Shoulder Series",
+            instructions: ["Steady movement"], primaryMuscles: ["Shoulders"],
+            secondaryMuscles: [], equipment: ["Band"], imageURL: nil
+        )
+        let sourceID = UUID()
+        let imported = try XCTUnwrap(library.importSharedExercise(
+            snapshot, ownerID: receiver, sourceExerciseID: sourceID,
+            sharedByUsername: "middleman",
+            originalCreatorID: creator,
+            originalCreatorUsername: "originalauthor",
+            originalExerciseID: sourceID
+        ))
+        XCTAssertTrue(imported.exercise.sharedAttributionText?.contains(
+            "@originalauthor"
+        ) == true)
+        var shareable = imported.exercise
+        shareable.isVisibleOutsideOwnerLibrary = true
+        library.updateCustomExercise(shareable)
+        let local = try XCTUnwrap(library.customExercises.first {
+            $0.id == imported.id
+        })
+        let forward = try ATHLTHShareDraftFactory.exercise(
+            local, ownerID: receiver, creatorUsername: "middleman"
+        )
+        let payload = try JSONDecoder().decode(
+            ATHLTHSharedExerciseAttachment.self,
+            from: Data(forward.payload.utf8)
+        )
+        XCTAssertEqual(payload.originalCreatorID, creator)
+        XCTAssertEqual(payload.originalCreatorUsername, "originalauthor")
+        XCTAssertEqual(payload.originalExerciseID, sourceID)
+        XCTAssertEqual(forward.sourceOwnerID, creator)
     }
 
     @MainActor

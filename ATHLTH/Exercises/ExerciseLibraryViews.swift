@@ -1572,7 +1572,8 @@ struct ExerciseDetailView: View {
                     Button {
                         do {
                             preparedShare = try ATHLTHShareDraftFactory.exercise(
-                                currentEntry, ownerID: session.profile.userID
+                                currentEntry, ownerID: session.profile.userID,
+                                creatorUsername: session.profile.username
                             )
                         } catch {
                             shareError = error.localizedDescription
@@ -2463,6 +2464,12 @@ struct CustomExerciseEditorView: View {
                 updated.equipment = splitCSV(equipment)
                 updated.isVisibleOutsideOwnerLibrary = shareable
                 updated.videoURL = video
+                if updated.originalCreatorID == nil &&
+                   updated.sharedSourceExerciseID == nil {
+                    updated.originalCreatorID = session.profile.userID
+                    updated.originalExerciseID = updated.id
+                    updated.originalCreatorUsername = session.profile.username
+                }
                 if let selectedImageData {
                     updated.imageURL = try library.updateCustomImageData(
                         selectedImageData, for: editing.id
@@ -2484,7 +2491,8 @@ struct CustomExerciseEditorView: View {
                     equipment: splitCSV(equipment),
                     isVisibleOutsideOwnerLibrary: shareable,
                     imageData: selectedImageData,
-                    videoURL: video
+                    videoURL: video,
+                    creatorUsername: session.profile.username
                 )
                 onSaved?(created)
             }
