@@ -996,20 +996,21 @@ final class ExerciseLibraryStore: ObservableObject {
             return existing
         }
 
-        // Names do not prove two personal exercises are identical. Never
-        // overwrite the receiver's exercise; give the imported copy a unique
-        // name if a different local record already uses that title.
+        // Different custom exercises may share the same display name.
+        // Their immutable source UUID and original creator identify them.
+        // Only collision with the built-in catalog requires a renamed copy.
         var localName = safe.name
-        let used = Set(customExercises.map {
-            ATHLTHExerciseReferenceResolver.key($0.canonicalName)
-        })
-        if used.contains(ATHLTHExerciseReferenceResolver.key(localName)) {
+        if ATHLTHExerciseNamePolicy.collidesWithCatalog(
+            localName, library: self
+        ) {
             let suffix = ATHLTHLocalization.choose(
                 english: " (shared copy)", norwegian: " (delt kopi)"
             )
             localName = safe.name + suffix
             var counter = 2
-            while used.contains(ATHLTHExerciseReferenceResolver.key(localName)) {
+            while ATHLTHExerciseNamePolicy.collidesWithCatalog(
+                localName, library: self
+            ) {
                 localName = safe.name + suffix + " \(counter)"
                 counter += 1
             }

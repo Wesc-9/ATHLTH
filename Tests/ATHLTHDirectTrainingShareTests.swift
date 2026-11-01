@@ -131,6 +131,30 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
     }
 
     @MainActor
+    func testDistinctCustomExercisesKeepSameTitleOnImport() throws {
+        let accountID = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(accountID)
+        let snapshot = ExerciseSnapshot(
+            name: "Two people same title",
+            instructions: ["Controlled move"],
+            primaryMuscles: ["Core"], secondaryMuscles: [],
+            equipment: [], imageURL: nil
+        )
+        let first = try XCTUnwrap(library.importSharedExercise(
+            snapshot, ownerID: accountID, sourceExerciseID: UUID(),
+            originalCreatorID: UUID(), originalCreatorUsername: "first"
+        ))
+        let second = try XCTUnwrap(library.importSharedExercise(
+            snapshot, ownerID: accountID, sourceExerciseID: UUID(),
+            originalCreatorID: UUID(), originalCreatorUsername: "second"
+        ))
+        XCTAssertNotEqual(first.id, second.id)
+        XCTAssertEqual(first.canonicalName, second.canonicalName)
+        XCTAssertEqual(first.canonicalName, snapshot.name)
+    }
+
+    @MainActor
     func testSharedWorkoutStripsPrivateCalendarAndInvitationData() throws {
         let owner = UUID()
         var workout = PlannedSession(
