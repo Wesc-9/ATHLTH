@@ -4099,7 +4099,10 @@ private struct HomeWeeklyProgressDaySheet: View {
         ((PlannedSession, WorkoutCaptureDevice) -> Void)? = nil
     let onOpenWorkout: () -> Void
 
-    @StateObject private var workoutCatalog = WorkoutTemplateCatalogStore()
+    // Build the sizable offline workout catalog only after the day sheet
+    // becomes visible. It is not needed to render the chosen day's schedule.
+    @State private var suggestionCatalogEntries: [WorkoutTemplateCatalogEntry] = []
+    @State private var suggestionsReady = false
     @State private var showingStandaloneSessionEditor = false
     @State private var showingWorkoutPicker = false
     @State private var showingInspiration = false
@@ -4150,7 +4153,7 @@ private struct HomeWeeklyProgressDaySheet: View {
         // showing three HYROX tiles simply because they sort first.
         let saved = session.savedWorkoutTemplates
         let savedTemplateIDs = Set(saved.compactMap(\.workoutTemplateID))
-        let catalog = workoutCatalog.entries.filter {
+        let catalog = suggestionCatalogEntries.filter {
             !savedTemplateIDs.contains($0.id)
         }
         let runs = runningLibrary.allTemplates
@@ -4209,7 +4212,7 @@ private struct HomeWeeklyProgressDaySheet: View {
     }
 
     private var allInspirationWorkouts: [PlannedSession] {
-        let fullCatalog = workoutCatalog.entries.map { $0.plannedSession() }
+        let fullCatalog = suggestionCatalogEntries.map { $0.plannedSession() }
         let running = runningLibrary.allTemplates.map { $0.plannedSession() }
         return session.savedWorkoutTemplates + fullCatalog + running
     }
@@ -4250,7 +4253,11 @@ private struct HomeWeeklyProgressDaySheet: View {
                         emptyTodayCard
                     }
 
-                    workoutSuggestionSection
+                    // Populate recommendations after the sheet has opened.
+                    // The day schedule itself never waits for library or chat.
+                    if suggestionsReady {
+                        workoutSuggestionSection
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 22)
@@ -4428,9 +4435,27 @@ private struct HomeWeeklyProgressDaySheet: View {
                 }
             }
             .task {
-                async let refreshWorkouts: Void = workoutCatalog.refresh()
+                // Allow the sheet presentation and first schedule frame to
+                // finish before constructing hundreds of template records.
+                do {
+                    try await Task.sleep(for: .milliseconds(240))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+
+                let catalog = WorkoutTemplateCatalogStore()
+                guard !Task.isCancelled else { return }
+                suggestionCatalogEntries = catalog.entries
+                suggestionsReady = true
+
+                // Refresh supplemental recommendations and shared messages
+                // after first paint; never gate the day's initial UI on I/O.
+                async let refreshWorkouts: Void = catalog.refresh()
                 async let refreshMessages: Void = messaging.refresh(force: true)
                 _ = await (refreshWorkouts, refreshMessages)
+                guard !Task.isCancelled else { return }
+                suggestionCatalogEntries = catalog.entries
                 session.syncApprovedSharedWorkouts(from: messaging.recentMessages)
             }
         }
