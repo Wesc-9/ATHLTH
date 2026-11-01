@@ -712,6 +712,7 @@ struct ChallengeCreationView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
 
     let preselectedFriends: [SocialProfileCard]
     let preselectedRouteID: UUID?
@@ -740,6 +741,14 @@ struct ChallengeCreationView: View {
             _sport = State(initialValue: challenge.sport)
             _scoring = State(initialValue: r.scoring == .fastestRoute
                 ? .fastestDistance : r.scoring)
+            _runningFocus = State(initialValue: r.runningFocus ?? .standard)
+            _runningComparison = State(
+                initialValue: r.runningComparison ?? .fastestWork
+            )
+            _runningTemplateID = State(initialValue: r.runningTemplateID)
+            _runningMinimumRepetitions = State(
+                initialValue: r.runningMinimumRepetitions ?? 3
+            )
             _title = State(initialValue: challenge.title)
             _challengeSummary = State(initialValue: r.summary ?? "")
             _selectedCoverArtworkName = State(initialValue:
@@ -830,6 +839,11 @@ struct ChallengeCreationView: View {
     @State private var step = 0
     @State private var sport: ATHLTHChallengeSport = .running
     @State private var scoring: ATHLTHChallengeScoring = .fastestDistance
+    @State private var runningFocus: ATHLTHChallengeRunningFocus = .standard
+    @State private var runningComparison: ATHLTHChallengeRunningComparison = .fastestWork
+    @State private var runningTemplateID: UUID?
+    @State private var runningMinimumRepetitions = 3
+    @State private var showingRunningTemplatePicker = false
     @State private var title = ""
     @State private var challengeSummary = ""
     @State private var selectedCoverArtworkName = "GoalRunning"
@@ -1087,6 +1101,24 @@ struct ChallengeCreationView: View {
                     }
                 }
             }
+            .onChange(of: runningFocus) { _, focus in
+                if focus != .standard {
+                    runningTemplateID = nil
+                    usesSpecificRoute = false
+                    selectedRouteID = nil
+                    runningComparison = .fastestWork
+                    scoring = .fastestDistance
+                    gpsRequired = focus == .hills
+                    allowTreadmill = false
+                } else {
+                    scoring = .fastestDistance
+                }
+            }
+            .onChange(of: runningComparison) { _, comparison in
+                guard runningFocus != .standard else { return }
+                scoring = comparison == .fastestWork
+                    ? .fastestDistance : .farthestInTime
+            }
             .onChange(of: sport) { _, newSport in
                 if !coverWasManuallySelected &&
                     selectedCoverImageData == nil {
@@ -1288,6 +1320,9 @@ struct ChallengeCreationView: View {
             .sheet(isPresented: $showingExercisePicker) {
                 strengthExercisePicker
             }
+            .sheet(isPresented: $showingRunningTemplatePicker) {
+                creationRunningTemplatePicker
+            }
             .sheet(
                 item:
                     $activeSelectionSheet
@@ -1484,7 +1519,9 @@ struct ChallengeCreationView: View {
                         activeSelectionSheet = .scoring
                     } label: {
                         creationHeroChip(
-                            title: effectiveScoring.title,
+                            title: sport == .running && runningFocus != .standard
+                                ? runningComparison.title
+                                : effectiveScoring.title,
                             icon: scoringIcon(effectiveScoring)
                         )
                     }
@@ -1616,7 +1653,9 @@ struct ChallengeCreationView: View {
                     )
 
                     Label(
-                        effectiveScoring.title,
+                        sport == .running && runningFocus != .standard
+                            ? runningComparison.title
+                            : effectiveScoring.title,
                         systemImage:
                             scoringIcon(
                                 effectiveScoring
@@ -2753,6 +2792,14 @@ struct ChallengeCreationView: View {
     @ViewBuilder
     private var creationRunningRules:
         some View {
+        VStack(alignment: .leading, spacing: 14) {
+            challengeSegmentedRow(
+                items: ATHLTHChallengeRunningFocus.allCases,
+                selected: $runningFocus,
+                label: { $0.title }
+            )
+
+            if runningFocus == .standard {
         if scoring ==
             .fastestDistance {
             Button {
@@ -2910,6 +2957,184 @@ struct ChallengeCreationView: View {
                             "Forsøk på bestemt rute krever alltid GPS."
                     )
             )
+        } else {
+                creationSpecialRunningRules
+            }
+        }
+    }
+
+    private var availableSpecialWorkouts: [RunningWorkoutTemplate] {
+        runningLibrary.allTemplates.filter { template in
+            guard template.blocks.contains(where: { $0.kind == .work }) else {
+                return false
+            }
+            switch runningFocus {
+            case .standard: return false
+            case .hills: return template.type == .hills
+            case .intervals:
+                return template.type == .intervals || template.type == .custom ||
+                    template.type == .fartlek
+            }
+        }
+    }
+
+    private var selectedRunningTemplate: RunningWorkoutTemplate? {
+        availableSpecialWorkouts.first { $0.id == runningTemplateID }
+    }
+
+    private var creationSpecialRunningRules: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(ATHLTHLocalization.choose(
+                english: "Competition result",
+                norwegian: "Hva skal avgjøre vinneren?"
+            ))
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(ChallengePlanTheme.ink)
+
+            challengeSegmentedRow(
+                items: ATHLTHChallengeRunningComparison.allCases,
+                selected: $runningComparison,
+                label: { $0.title }
+            )
+
+            Button {
+                showingRunningTemplatePicker = true
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "list.bullet.rectangle")
+                        .foregroundStyle(ChallengePlanTheme.gold)
+                        .frame(width: 38, height: 38)
+                        .background(
+                            ATHLTHTheme.cardWarm,
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Workout from the library or My Workouts",
+                            norwegian: "Økt fra biblioteket eller Mine økter"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        Text(selectedRunningTemplate?.title ??
+                            ATHLTHLocalization.choose(
+                                english: "Choose a saved workout",
+                                norwegian: "Velg en lagret økt"
+                            ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ChallengePlanTheme.ink)
+                        .lineLimit(2)
+                    }
+                    Spacer(minLength: 5)
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if runningFocus == .hills {
+                Stepper(
+                    value: $runningMinimumRepetitions, in: 1...20
+                ) {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Minimum hill repeats",
+                            norwegian: "Minst antall bakkedrag"
+                        ))
+                        Spacer()
+                        Text("\(runningMinimumRepetitions)")
+                            .monospacedDigit()
+                            .foregroundStyle(ChallengePlanTheme.gold)
+                    }
+                    .font(.subheadline)
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "The uphill work steps count. Downhill recovery and warmup are excluded. GPS is required.",
+                    norwegian: "Bakkedragene teller. Nedoverjogg, oppvarming og nedjogging holdes utenfor. GPS kreves."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else {
+                Text(ATHLTHLocalization.choose(
+                    english: "Only recorded work intervals in the main part count. Warmup, rest and cooldown are excluded. Everyone uses the selected workout.",
+                    norwegian: "Bare registrerte arbeidsdrag i hoveddelen teller. Oppvarming, pauser og nedjogging er utenfor. Alle bruker den valgte økten."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Requires a completed ATHLTH workout with measured work steps. A normal Apple Health session cannot be counted as an interval attempt.",
+                norwegian: "Krever fullført ATHLTH-økt med målte drag. Vanlige Apple Health-økter kan ikke brukes som intervallresultat."
+            ))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var creationRunningTemplatePicker: some View {
+        NavigationStack {
+            List {
+                if availableSpecialWorkouts.isEmpty {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english: "No suitable workouts",
+                            norwegian: "Ingen passende økter"
+                        ),
+                        systemImage: "figure.run",
+                        description: Text(ATHLTHLocalization.choose(
+                            english: "Save a structured workout with work intervals first.",
+                            norwegian: "Lagre en økt med arbeidsdrag først."
+                        ))
+                    )
+                } else {
+                    ForEach(availableSpecialWorkouts) { item in
+                        Button {
+                            runningTemplateID = item.id
+                            showingRunningTemplatePicker = false
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: item.type.systemImage)
+                                    .foregroundStyle(ChallengePlanTheme.gold)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(item.title)
+                                        .foregroundStyle(ChallengePlanTheme.ink)
+                                    Text(item.isBuiltIn
+                                        ? ATHLTHLocalization.choose(
+                                            english: "Library", norwegian: "Bibliotek"
+                                        )
+                                        : ATHLTHLocalization.choose(
+                                            english: "My Workouts", norwegian: "Mine økter"
+                                        ))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                if runningTemplateID == item.id {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(ChallengePlanTheme.gold)
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .athlthBrandedForm()
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Choose workout", norwegian: "Velg treningsøkt"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Done", norwegian: "Ferdig"
+                    )) {
+                        showingRunningTemplatePicker = false
+                    }
+                }
+            }
         }
     }
 
@@ -4131,6 +4356,11 @@ struct ChallengeCreationView: View {
 
         switch sport {
         case .running, .walking:
+            if sport == .running && runningFocus != .standard {
+                return selectedRunningTemplate != nil &&
+                    (runningFocus != .hills ||
+                     runningMinimumRepetitions > 0)
+            }
             if scoring ==
                 .fastestDistance {
                 return usesSpecificRoute
@@ -6609,6 +6839,10 @@ struct ChallengeCreationView: View {
     }
 
     private var effectiveScoring: ATHLTHChallengeScoring {
+        if sport == .running && runningFocus != .standard {
+            return runningComparison == .fastestWork
+                ? .fastestDistance : .farthestInTime
+        }
         if (sport == .running ||
             sport == .walking) &&
             scoring == .fastestDistance &&
@@ -6633,7 +6867,10 @@ struct ChallengeCreationView: View {
             sport: sport,
             scoring: effectiveScoring,
             creatorName: session.profile.displayName,
-            invitedNames: invitees.map(\.displayName)
+            invitedNames: invitees.map(\.displayName),
+            scoringTitle: sport == .running && runningFocus != .standard
+                ? sport.title + " · " + runningComparison.title
+                : nil
         )
     }
 
@@ -6852,16 +7089,19 @@ struct ChallengeCreationView: View {
                     : .verifiedRequired,
             targetDistanceMeters:
                 scoring == .fastestDistance &&
-                !usesSpecificRoute
+                !usesSpecificRoute &&
+                (sport != .running || runningFocus == .standard)
                     ? targetDistanceKm * 1_000
                     : nil,
-            targetDurationSeconds: scoring == .farthestInTime
+            targetDurationSeconds: scoring == .farthestInTime &&
+                (sport != .running || runningFocus == .standard)
                 ? targetDurationMinutes * 60
                 : nil,
             timeBasis: timeBasis,
             route: routeSnapshot,
             gpsRequired:
-                usesSpecificRoute ? true : gpsRequired,
+                sport == .running && runningFocus == .hills
+                    ? true : (usesSpecificRoute ? true : gpsRequired),
             minimumRouteMatchPercent:
                 usesSpecificRoute
                     ? routeMatchPercent
@@ -6937,6 +7177,15 @@ struct ChallengeCreationView: View {
                     ? selectedCoverArtworkName
                     : nil,
             coverImageURL: uploadedCoverURL,
+            runningFocus: sport == .running && runningFocus != .standard
+                ? runningFocus : nil,
+            runningComparison: sport == .running && runningFocus != .standard
+                ? runningComparison : nil,
+            runningTemplateID: sport == .running && runningFocus != .standard
+                ? runningTemplateID : nil,
+            runningMinimumRepetitions: sport == .running &&
+                runningFocus == .hills
+                ? runningMinimumRepetitions : nil,
             startsAt: startsAt,
             endsAt: hasEnd ? endsAt : nil,
             allowMultipleAttempts: allowMultipleAttempts,
