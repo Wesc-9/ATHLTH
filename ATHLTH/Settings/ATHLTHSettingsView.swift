@@ -1008,6 +1008,32 @@ settingsSection(ATHLTHLocalization.choose(
                             .buttonStyle(.plain)
                             .disabled(healthRequestInProgress)
                         }
+
+                        if health.hasRequestedAuthorization &&
+                           settings.appleHealthIntegrationEnabled {
+                            SettingsDivider()
+
+                            Button {
+                                reviewAppleHealthPermissions()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "checkmark.shield",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Review Health access",
+                                        norwegian: "Oppdater helsetilgang"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Ask iOS to review newly added data types, including cardio recovery",
+                                        norwegian: "Be iOS om tilgang til nye målinger, blant annet pulsfall"
+                                    )
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(healthRequestInProgress)
+                        }
                     }
                 }
 
@@ -2384,6 +2410,30 @@ if session.currentRole.canAccessControlCenter {
             return "Kobler til…"
         default:
             return status
+        }
+    }
+
+    /// Existing connections can gain new HealthKit read types after updates.
+    /// A regular sync must not reopen the permission sheet, so keep this
+    /// explicit, user-initiated action available for connected accounts.
+    private func reviewAppleHealthPermissions() {
+        guard settings.appleHealthIntegrationEnabled,
+              !healthRequestInProgress else { return }
+
+        Task {
+            healthRequestInProgress = true
+            defer { healthRequestInProgress = false }
+
+            await health.requestAuthorization()
+            guard health.authorizationError == nil else { return }
+
+            await health.completeAuthorizationSetup()
+            await health.configureBackgroundSync(
+                allowed: settings.backgroundHealthSyncEnabled
+            )
+            _ = await health.refreshWorkoutImportInbox()
+            await health.refreshAll()
+            syncHealthProfileFromAppleHealthIfAppropriate()
         }
     }
 
