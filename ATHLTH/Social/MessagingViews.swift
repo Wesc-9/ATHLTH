@@ -7430,7 +7430,7 @@ struct MessageSharePicker: View {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(english: "No saved workouts", norwegian: "Ingen lagrede økter"),
                     systemImage: "dumbbell",
-                    description: Text(ATHLTHLocalization.choose(english: "Create a workout or add one to a training plan first.", norwegian: "Opprett en økt eller legg en til i treningsplanen først."))
+                    description: Text(ATHLTHLocalization.choose(english: "Create and save your own workout first.", norwegian: "Opprett og lagre din egen treningsøkt først."))
                 )
             } else {
                 ForEach(workouts) { workout in
@@ -7443,7 +7443,8 @@ struct MessageSharePicker: View {
                             onSelect(try ATHLTHShareDraftFactory.workout(
                                 workout,
                                 library: exerciseLibrary.allExercises,
-                                ownerID: session.profile.userID
+                                ownerID: session.profile.userID,
+                                savedWorkouts: session.savedWorkoutTemplates
                             ))
                         } catch {
                             shareError = error.localizedDescription
@@ -7498,7 +7499,7 @@ struct MessageSharePicker: View {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(english: "No training plans", norwegian: "Ingen treningsplaner"),
                     systemImage: "calendar",
-                    description: Text(ATHLTHLocalization.choose(english: "Create or save a training plan first.", norwegian: "Opprett eller lagre en treningsplan først."))
+                    description: Text(ATHLTHLocalization.choose(english: "Create and save your own plan first.", norwegian: "Opprett og lagre din egen treningsplan først."))
                 )
             } else {
                 ForEach(plans) { plan in
@@ -7511,7 +7512,8 @@ struct MessageSharePicker: View {
                             onSelect(try ATHLTHShareDraftFactory.plan(
                                 plan,
                                 library: exerciseLibrary.allExercises,
-                                ownerID: session.profile.userID
+                                ownerID: session.profile.userID,
+                                savedPlans: session.planTemplates + session.scheduledPlans
                             ))
                         } catch {
                             shareError = error.localizedDescription
@@ -7521,19 +7523,30 @@ struct MessageSharePicker: View {
             }
 
         case .runningWorkout:
-            if runningLibrary.customTemplates.isEmpty {
+            let workouts = runningLibrary.customTemplates.filter {
+                ATHLTHPersonalSharePolicy.runningWorkout($0)
+            }
+            if workouts.isEmpty {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(english: "No custom running workouts", norwegian: "Ingen lagrede løpeøkter"),
                     systemImage: "figure.run",
                     description: Text(ATHLTHLocalization.choose(english: "Create a running workout first.", norwegian: "Opprett en løpeøkt først."))
                 )
             } else {
-                ForEach(runningLibrary.customTemplates) { workout in
+                ForEach(workouts) { workout in
                     shareRow(
                         icon: "figure.run",
                         title: workout.title,
                         subtitle: workout.summary
                     ) {
+                        guard ATHLTHPersonalSharePolicy.runningWorkout(workout),
+                              runningLibrary.customTemplates.contains(where: {
+                                  $0.id == workout.id &&
+                                  ATHLTHPersonalSharePolicy.runningWorkout($0)
+                              }) else {
+                            shareError = ATHLTHDirectShareError.onlySavedPersonalContent.localizedDescription
+                            return
+                        }
                         createDraft(
                             kind: .runningWorkout,
                             title: workout.title,
@@ -7547,20 +7560,34 @@ struct MessageSharePicker: View {
             }
 
         case .route:
-            if session.savedRoutes.isEmpty {
+            let routes = ATHLTHPersonalSharePolicy.savedRoutes(
+                session.savedRoutes, ownerID: session.profile.userID
+            )
+            if routes.isEmpty {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(english: "No saved routes", norwegian: "Ingen lagrede ruter"),
                     systemImage: "map",
-                    description: Text(ATHLTHLocalization.choose(english: "Save or import a route first.", norwegian: "Lagre eller importer en rute først."))
+                    description: Text(ATHLTHLocalization.choose(english: "Create and save your own route first.", norwegian: "Opprett og lagre din egen rute først."))
                 )
             } else {
-                ForEach(session.savedRoutes) { route in
+                ForEach(routes) { route in
                     let safeRoute = privacySafeRoute(route)
                     shareRow(
                         icon: "map.fill",
                         title: route.title,
                         subtitle: routeSubtitle(safeRoute)
                     ) {
+                        guard ATHLTHPersonalSharePolicy.route(
+                            route, ownerID: session.profile.userID
+                        ), session.savedRoutes.contains(where: {
+                            $0.id == route.id &&
+                            ATHLTHPersonalSharePolicy.route(
+                                $0, ownerID: session.profile.userID
+                            )
+                        }) else {
+                            shareError = ATHLTHDirectShareError.onlySavedPersonalContent.localizedDescription
+                            return
+                        }
                         createDraft(
                             kind: .route,
                             title: route.title,
@@ -7612,27 +7639,14 @@ struct MessageSharePicker: View {
     }
 
     private var shareablePlans: [TrainingPlan] {
-        var result: [TrainingPlan] = []
-        if let activePlan = session.activePlan {
-            result.append(activePlan)
-        }
-        result.append(contentsOf: session.planTemplates)
-        return result
+        ATHLTHPersonalSharePolicy.savedPlans(
+            session.planTemplates + session.scheduledPlans,
+            ownerID: session.profile.userID
+        )
     }
 
     private var shareableWorkouts: [PlannedSession] {
-        var result = session.savedWorkoutTemplates
-
-        if let plan = session.activePlan {
-            result.append(
-                contentsOf: plan.weeks
-                    .flatMap(\.days)
-                    .flatMap(\.sessions)
-            )
-        }
-
-        var seen = Set<UUID>()
-        return result.filter { seen.insert($0.id).inserted }
+        ATHLTHPersonalSharePolicy.savedWorkouts(session.savedWorkoutTemplates)
     }
 
     private func workoutSubtitle(_ workout: PlannedSession) -> String {
