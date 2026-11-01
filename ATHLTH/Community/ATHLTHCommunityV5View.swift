@@ -1377,6 +1377,93 @@ struct ATHLTHCommunityV5View: View {
         .communityReferenceCard()
     }
 
+    private func featuredPublicEvent(_ item: CommunityEventItem) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            NavigationLink {
+                CommunityEventDetailView(eventID: item.id)
+            } label: {
+                VStack(alignment: .leading, spacing: 9) {
+                    ZStack(alignment: .topLeading) {
+                        ATHLTHArtworkImage(
+                            reference: item.event.coverImageURL,
+                            fallbackAssetName: item.event.coverArtworkName ?? "GoalRunning",
+                            maxPixelSize: 1200
+                        )
+                        .athlthBoundedFill()
+                        .frame(height: 156)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: 13))
+                        Label(tr("Featured event", "Fremhevet arrangement"),
+                              systemImage: "star.fill")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(CommunityReferenceStyle.darkGold)
+                            .padding(.horizontal, 11)
+                            .padding(.vertical, 7)
+                            .background(.regularMaterial, in: Capsule())
+                            .padding(9)
+                    }
+                    Text(item.event.title)
+                        .font(.system(size: 23, weight: .regular, design: .serif))
+                        .foregroundStyle(CommunityReferenceStyle.ink)
+                        .lineLimit(2)
+                    Text(item.event.summary)
+                        .font(.caption)
+                        .foregroundStyle(CommunityReferenceStyle.muted)
+                        .lineLimit(2)
+                    HStack(spacing: 10) {
+                        Label(item.event.startsAt.formatted(.dateTime.weekday(.abbreviated)
+                            .day().month(.abbreviated)), systemImage: "calendar")
+                        Label(item.event.meetingName, systemImage: "mappin")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(CommunityReferenceStyle.muted)
+                    .lineLimit(1)
+                }
+            }
+            .buttonStyle(.plain)
+            NavigationLink {
+                CommunityEventDetailView(eventID: item.id)
+            } label: {
+                creamButton(tr("View event", "Se arrangement"), symbol: "arrow.right")
+            }
+            .buttonStyle(.plain)
+        }
+        .padding(12)
+        .communityReferenceCard()
+    }
+
+    private func publicEventTile(_ item: CommunityEventItem) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ATHLTHArtworkImage(
+                reference: item.event.coverImageURL,
+                fallbackAssetName: item.event.coverArtworkName ?? "GoalRunning",
+                maxPixelSize: 650
+            )
+            .athlthBoundedFill()
+            .frame(height: 113)
+            .frame(maxWidth: .infinity)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            Text(item.event.title)
+                .font(.system(size: 14, weight: .semibold, design: .serif))
+                .foregroundStyle(CommunityReferenceStyle.ink)
+                .lineLimit(2)
+            Label(item.event.meetingName, systemImage: "mappin")
+                .font(.caption2)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+                .lineLimit(1)
+            Label(item.event.startsAt.formatted(.dateTime.day().month(.abbreviated)
+                .hour().minute()), systemImage: "calendar")
+                .font(.caption2)
+                .foregroundStyle(CommunityReferenceStyle.muted)
+            creamButton(tr("Details", "Detaljer"), symbol: "chevron.right")
+        }
+        .frame(width: 190, height: 237, alignment: .topLeading)
+        .padding(10)
+        .communityReferenceCard()
+    }
+
     private var eventsOverviewStrip: some View {
         HStack(spacing: 12) {
             Image(systemName: "calendar")
