@@ -149,6 +149,7 @@ enum ATHLTHInsightHealthMetric: String, CaseIterable, Identifiable {
 
     /// A missing measurement remains nil. Never synthesize a reading from age,
     /// workout duration, or a different physiological quantity.
+    @MainActor
     func currentValue(in health: HealthKitManager) -> Double? {
         switch self {
         case .sleepDuration: return health.sleep.totalAsleep > 0 ? health.sleep.totalAsleep / 3600 : nil
