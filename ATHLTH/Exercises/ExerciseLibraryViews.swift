@@ -9,6 +9,7 @@ import UIKit
 enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
     case library
     case mine
+    case marketplace
 
     var id: String { rawValue }
 
@@ -16,11 +17,15 @@ enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
         switch self {
         case .library:
             return ATHLTHLocalization.choose(
-                english: "ATHLTH Library", norwegian: "ATHLTH-bibliotek"
+                english: "Library", norwegian: "Bibliotek"
             )
         case .mine:
             return ATHLTHLocalization.choose(
-                english: "My Exercises", norwegian: "Mine øvelser"
+                english: "Mine", norwegian: "Mine"
+            )
+        case .marketplace:
+            return ATHLTHLocalization.choose(
+                english: "Marketplace", norwegian: "Marked"
             )
         }
     }
@@ -107,6 +112,8 @@ struct ExerciseLibraryView: View {
                 sourceMatches = entry.source != .custom
             case .mine:
                 sourceMatches = entry.source == .custom
+            case .marketplace:
+                sourceMatches = false
             }
 
             let favoriteMatches =
@@ -169,6 +176,9 @@ struct ExerciseLibraryView: View {
                 .padding(.bottom, 4)
             }
 
+            if selectedSection == .marketplace {
+                ATHLTHExerciseMarketplaceView()
+            } else {
             HStack {
                 Text(ATHLTHLocalization.choose(
                     english: "View", norwegian: "Visning"
@@ -521,6 +531,7 @@ struct ExerciseLibraryView: View {
                     }
                 }
             }
+        }
         }
         .background(
             ATHLTHPremiumCanvas(
@@ -1309,6 +1320,8 @@ struct ExerciseDetailView: View {
     @State private var showingEdit = false
     @State private var exerciseHistory: [StrengthWorkoutLog] = []
     @State private var preparedShare: MessageShareDraft?
+    @StateObject private var marketplace = ATHLTHExerciseMarketplaceStore()
+    @State private var marketplaceFeedback: String?
 
     private func refreshExerciseHistory() {
         exerciseHistory = AccountLocalStorage.read(
@@ -1550,6 +1563,77 @@ struct ExerciseDetailView: View {
                     }
                 }
 
+                if currentEntry.source == .custom &&
+                   currentEntry.exercise.sharedSourceExerciseID == nil &&
+                   (currentEntry.exercise.originalCreatorID == nil ||
+                    currentEntry.exercise.originalCreatorID == session.profile.userID) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Exercise Marketplace",
+                            norwegian: "Øvelsesmarked"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        Text(ATHLTHLocalization.choose(
+                            english: "Publishing is optional. Your exercise becomes visible to other ATHLTH athletes; private media stays on this device.",
+                            norwegian: "Publisering er valgfritt. Øvelsen blir synlig for andre utøvere, men private bilder og videoer forblir på enheten."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                        Button {
+                            Task {
+                                let success: Bool
+                                if marketplace.isPublished(currentEntry.id) {
+                                    success = await marketplace.remove(
+                                        currentEntry.id, ownerID: session.profile.userID
+                                    )
+                                } else {
+                                    success = await marketplace.publish(
+                                        currentEntry, library: library,
+                                        ownerID: session.profile.userID,
+                                        username: session.profile.username
+                                    )
+                                }
+                                if success {
+                                    marketplaceFeedback = ATHLTHLocalization.choose(
+                                        english: "Marketplace updated.",
+                                        norwegian: "Øvelsesmarkedet er oppdatert."
+                                    )
+                                }
+                            }
+                        } label: {
+                            Label(
+                                marketplace.isPublished(currentEntry.id)
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Unpublish exercise",
+                                        norwegian: "Fjern fra markedet"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Publish publicly",
+                                        norwegian: "Publiser offentlig"
+                                    ),
+                                systemImage: marketplace.isPublished(currentEntry.id)
+                                    ? "eye.slash" : "globe"
+                            )
+                            .font(.subheadline.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(ATHLTHTheme.premiumGold)
+                        .disabled(marketplace.isWorking)
+                        if let message = marketplace.errorMessage ?? marketplaceFeedback {
+                            Text(message)
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(15)
+                    .background(
+                        ATHLTHPlanDesign.selectedSurface,
+                        in: RoundedRectangle(cornerRadius: 18)
+                    )
+                }
+
                 if currentEntry.source == .custom {
                     Button("Delete Custom Exercise", role: .destructive) {
                         showingDelete = true
@@ -1600,6 +1684,12 @@ struct ExerciseDetailView: View {
             }
         }
         .onAppear(perform: refreshExerciseHistory)
+        .task(id: currentEntry.id) {
+            if currentEntry.source == .custom &&
+               currentEntry.exercise.sharedSourceExerciseID == nil {
+                await marketplace.refresh()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .athlthTrainingDataDidChange)) { _ in
             refreshExerciseHistory()
         }
@@ -2454,6 +2544,17 @@ struct CustomExerciseEditorView: View {
 
     private func saveExercise() {
         do {
+            // Only the shipped library's names are reserved. Two athletes
+            // may independently create custom exercises with identical names.
+            guard !ATHLTHExerciseNamePolicy.collidesWithCatalog(
+                name, library: library
+            ) else {
+                studioError = ATHLTHLocalization.choose(
+                    english: "The name is already used by a library exercise. Please choose another name.",
+                    norwegian: "Navnet finnes allerede i øvelsesbiblioteket. Velg et annet navn."
+                )
+                return
+            }
             let video = previewVideoURL
             if let editing {
                 var updated = editing.exercise
