@@ -9,6 +9,8 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
     @Binding var linkedGoalIDs: Set<UUID>
     @Binding var varyWeekdays: Bool
 
+    let planningApproach: ATHLTHPlanWeekPlanningApproach?
+    let onChooseApproach: (ATHLTHPlanWeekPlanningApproach) -> Void
     let selectedDays: Set<Int>
     let goals: [ATHLTHGoal]
     let suggestedName: String
@@ -26,9 +28,11 @@ struct ATHLTHPlanAdvancedScheduleEntryView: View {
             goals: goals,
             suggestedName: suggestedName,
             advanced: true,
+            planningApproach: planningApproach,
             varyWeekdays: $varyWeekdays,
             onToggleDay: onToggleDay,
             onCreateGoal: onCreateGoal,
+            onChooseApproach: onChooseApproach,
             onModeChange: { isAdvanced in
                 if !isAdvanced { onSelectSimple() }
             }
