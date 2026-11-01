@@ -98,37 +98,6 @@ enum CommunityInterest: String, CaseIterable, Identifiable {
 }
 
 
-/// Curated fallback photography taken from the approved Community reference
-/// screenshots. Real user-uploaded cover photos always take precedence.
-enum ATHLTHCommunityReferenceArtwork {
-    static func clubFallback(_ club: CommunityGroupRecord) -> String {
-        let location = (club.locationName + " " + club.name).lowercased()
-        if location.contains("bergen") {
-            return "CommunityClubsRecommendedCity"
-        }
-        if CommunityInterest.outdoors.matchesClub(club) {
-            return "CommunityClubsRecommendedHike"
-        }
-        return "CommunityClubsFeatured"
-    }
-
-    static func eventFallback(activity: String, featured: Bool = false) -> String {
-        let type = activity.lowercased()
-        if type.contains("yoga") || type.contains("pilates") {
-            return "CommunityEventsYoga"
-        }
-        if type.contains("strength") || type.contains("styrke") ||
-            type.contains("weight") || type.contains("gym") {
-            return "CommunityEventsStrength"
-        }
-        if type.contains("running") || type.contains("løp") ||
-            type.contains("run") || type.contains("jogg") {
-            return "CommunityEventsRunning"
-        }
-        return featured ? "CommunityEventsFeatured" : "CommunityClubsRecommendedHike"
-    }
-}
-
 private enum CommunityReferenceStyle {
     static let gold = Color(red: 0.65, green: 0.49, blue: 0.31)
     static let darkGold = Color(red: 0.45, green: 0.34, blue: 0.22)
@@ -310,12 +279,21 @@ struct ATHLTHCommunityV5View: View {
         }
     }
 
-    // MARK: - Screenshot hero
+    // MARK: - Hero images: one per Community destination.
+
+    private var communityHeroImageName: String {
+        switch tab {
+        case .overview: "CommunityHero"
+        case .clubs: "CommunityClubsHero"
+        case .arena: "CommunityArenaHero"
+        case .events: "CommunityEventsHero"
+        }
+    }
 
     private var cover: some View {
         ZStack(alignment: .topLeading) {
             GeometryReader { geo in
-                Image("CommunityHero")
+                Image(communityHeroImageName)
                     .resizable()
                     .interpolation(.high)
                     .scaledToFill()
@@ -331,6 +309,11 @@ struct ATHLTHCommunityV5View: View {
                 ],
                 startPoint: .top, endPoint: .bottom
             )
+            LinearGradient(
+                colors: [.white.opacity(0.60), .white.opacity(0.03)],
+                startPoint: .leading, endPoint: .trailing
+            )
+            .allowsHitTesting(false)
             VStack(alignment: .leading, spacing: 0) {
                 // The hero is image-and-title only. Global icons belong in
                 // their respective destinations, not atop Fellesskap.
@@ -819,7 +802,7 @@ struct ATHLTHCommunityV5View: View {
             ZStack(alignment: .topLeading) {
                 ATHLTHArtworkImage(
                     reference: club.headerImageURL ?? club.imageURL,
-                    fallbackAssetName: "CommunityClubsFeatured",
+                    fallbackAssetName: "GoalMountain",
                     maxPixelSize: 1200
                 )
                 .athlthBoundedFill()
@@ -841,7 +824,7 @@ struct ATHLTHCommunityV5View: View {
                 HStack(spacing: 11) {
                     ATHLTHArtworkImage(
                         reference: club.imageURL ?? club.headerImageURL,
-                        fallbackAssetName: "CommunityClubsFeatured",
+                        fallbackAssetName: "CommunityHero",
                         maxPixelSize: 450
                     )
                     .athlthBoundedFill()
@@ -911,7 +894,7 @@ struct ATHLTHCommunityV5View: View {
         VStack(alignment: .leading, spacing: 8) {
             ATHLTHArtworkImage(
                 reference: club.headerImageURL ?? club.imageURL,
-                fallbackAssetName: ATHLTHCommunityReferenceArtwork.clubFallback(club),
+                fallbackAssetName: "GoalAdventure",
                 maxPixelSize: 650
             )
             .athlthBoundedFill()
@@ -1011,7 +994,7 @@ struct ATHLTHCommunityV5View: View {
                 .padding(.vertical, 7)
             } else {
                 ZStack(alignment: .bottomLeading) {
-                    Image("CommunityArenaFeatured")
+                    Image("GoalSprint")
                         .resizable()
                         .scaledToFill()
                         .frame(height: 149)
@@ -1228,9 +1211,7 @@ struct ATHLTHCommunityV5View: View {
                     ZStack(alignment: .topLeading) {
                         ATHLTHArtworkImage(
                             reference: event.imageURL,
-                            fallbackAssetName: ATHLTHCommunityReferenceArtwork.eventFallback(
-                                activity: event.activityType, featured: true
-                            ),
+                            fallbackAssetName: "GoalAdventure",
                             maxPixelSize: 1200
                         )
                         .athlthBoundedFill()
@@ -1286,9 +1267,7 @@ struct ATHLTHCommunityV5View: View {
         VStack(alignment: .leading, spacing: 8) {
             ATHLTHArtworkImage(
                 reference: event.imageURL,
-                fallbackAssetName: ATHLTHCommunityReferenceArtwork.eventFallback(
-                    activity: event.activityType
-                ),
+                fallbackAssetName: "GoalAdventure",
                 maxPixelSize: 650
             )
             .athlthBoundedFill()
@@ -1324,10 +1303,7 @@ struct ATHLTHCommunityV5View: View {
                     ZStack(alignment: .topLeading) {
                         ATHLTHArtworkImage(
                             reference: item.event.coverImageURL,
-                            fallbackAssetName: item.event.coverArtworkName ??
-                                ATHLTHCommunityReferenceArtwork.eventFallback(
-                                    activity: item.event.activityType.rawValue, featured: true
-                                ),
+                            fallbackAssetName: item.event.coverArtworkName ?? "GoalRunning",
                             maxPixelSize: 1200
                         )
                         .athlthBoundedFill()
@@ -1378,10 +1354,7 @@ struct ATHLTHCommunityV5View: View {
         VStack(alignment: .leading, spacing: 8) {
             ATHLTHArtworkImage(
                 reference: item.event.coverImageURL,
-                fallbackAssetName: item.event.coverArtworkName ??
-                    ATHLTHCommunityReferenceArtwork.eventFallback(
-                        activity: item.event.activityType.rawValue
-                    ),
+                fallbackAssetName: item.event.coverArtworkName ?? "GoalRunning",
                 maxPixelSize: 650
             )
             .athlthBoundedFill()
@@ -1461,7 +1434,7 @@ struct ATHLTHCommunityV5View: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Image("CommunityClubsFeatured")
+                Image("CommunityHero")
                     .resizable()
                     .scaledToFill()
                     .frame(height: 68)
@@ -1497,7 +1470,7 @@ struct ATHLTHCommunityV5View: View {
             HStack(spacing: 7) {
                 ATHLTHArtworkImage(
                     reference: club.headerImageURL ?? club.imageURL,
-                    fallbackAssetName: "CommunityClubsFeatured",
+                    fallbackAssetName: "CommunityHero",
                     maxPixelSize: 700
                 )
                 .athlthBoundedFill()
@@ -1770,9 +1743,7 @@ struct ATHLTHCommunityV5View: View {
                         ZStack(alignment: .topTrailing) {
                             ATHLTHArtworkImage(
                                 reference: event.imageURL,
-                                fallbackAssetName: ATHLTHCommunityReferenceArtwork.eventFallback(
-                                    activity: event.activityType, featured: true
-                                ),
+                                fallbackAssetName: "GoalAdventure",
                                 maxPixelSize: 1200
                             )
                             .athlthBoundedFill()
@@ -1819,7 +1790,7 @@ struct ATHLTHCommunityV5View: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                Image("CommunityEventsFeatured")
+                Image("GoalAdventure")
                     .resizable()
                     .scaledToFill()
                     .frame(height: 65)
