@@ -294,13 +294,12 @@ private struct ATHLTHExclusiveHomeSheetShape: Shape {
 ///
 /// The hero has only one primary job: expose today's next action. When no
 /// workout is planned it shows two compact Quick Train actions. When a workout
-/// exists it becomes the workout launcher. Weather is intentionally secondary
-/// and lives on the right edge of the artwork.
+/// exists it becomes the workout launcher. Utility shortcuts are overlaid
+/// by the Home screen instead of inside this hero.
 struct ATHLTHHomeDashboardHero: View {
     let imageName: String
     let workout: PlannedSession?
     let isStarting: Bool
-    let weather: HomeWeatherSnapshot?
     let onStart: () -> Void
     let onOpenPlan: () -> Void
 
@@ -360,8 +359,6 @@ struct ATHLTHHomeDashboardHero: View {
                     alignment: .leading
                 )
 
-                // Weather is rendered beside search in the Home toolbar,
-                // not twice or against the left side of the hero.
             }
         }
         .frame(height: resolvedHeight)
@@ -545,54 +542,6 @@ struct ATHLTHHomeDashboardHero: View {
             color: Color.black.opacity(0.22),
             radius: 8,
             y: 3
-        )
-    }
-
-    // Compact, informational weather glass pill. ViewThatFits hides the
-    // city on small phones before the pill can collide with Home actions.
-    @ViewBuilder
-    private var weatherBadge: some View {
-        if let weather {
-            ViewThatFits(in: .horizontal) {
-                weatherContent(weather, showsLocation: true)
-                weatherContent(weather, showsLocation: false)
-            }
-            .accessibilityElement(children: .combine)
-        }
-    }
-
-    private func weatherContent(
-        _ weather: HomeWeatherSnapshot,
-        showsLocation: Bool
-    ) -> some View {
-        HStack(spacing: 5) {
-            Image(systemName: weather.symbolName)
-                .symbolRenderingMode(.hierarchical)
-                .font(.system(size: 13, weight: .semibold))
-
-            Text("\(Int(weather.temperatureCelsius.rounded()))°")
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-
-            if showsLocation,
-               let city = weather.locationName,
-               !city.isEmpty {
-                Text(city)
-                    .font(.system(size: 10, weight: .medium))
-                    .lineLimit(1)
-            }
-        }
-        .foregroundStyle(.white)
-        .fixedSize(horizontal: true, vertical: false)
-        .padding(.horizontal, 10)
-        .frame(height: 36)
-        .background(Color.black.opacity(0.27), in: Capsule())
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule().strokeBorder(.white.opacity(0.38), lineWidth: 0.8)
-        }
-        .accessibilityLabel(
-            "\(Int(weather.temperatureCelsius.rounded())) grader" +
-            (weather.locationName.map { ", \($0)" } ?? "")
         )
     }
 
