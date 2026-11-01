@@ -193,7 +193,7 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
             )
             XCTAssertLessThanOrEqual(
                 measured.width, available + 1,
-                "Advanced plan setup overflows a \\(Int(width))-pt phone"
+                "Advanced plan setup overflows a \(Int(width))-pt phone"
             )
         }
     }
