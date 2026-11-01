@@ -30,6 +30,7 @@ final class SocialStore: ObservableObject {
     @Published private(set) var workoutMedia: [WorkoutMediaRecord] = []
     @Published private(set) var isRefreshing = false
     @Published private(set) var isHomeFeedRefreshing = false
+    @Published private(set) var isHomeFriendsRefreshing = false
     @Published var errorMessage: String?
 
     // Session-local Quick Train choice. This is never persisted to the backend.
@@ -43,6 +44,8 @@ final class SocialStore: ObservableObject {
 
     private let service: SupabaseSocialService
     private var lastHomeFeedRefreshAt: Date?
+    private var lastHomeFriendsRefreshAt: Date?
+    private var lastHomeFriendsAccountID: UUID?
     private var lastFullRefreshAt: Date?
     private var profileCache: [UUID: SocialFriendProfile] = [:]
     private let activationDate: Date
@@ -490,6 +493,83 @@ final class SocialStore: ObservableObject {
             guard !Task.isCancelled else { return }
             // Keep the last cached Home content. A full Community refresh can
             // surface a detailed error if the backend remains unavailable.
+        }
+    }
+
+    /// Refresh mutual follows independently of the activity feed. The feed
+    /// intentionally does not load followers or profile cards, so relying on
+    /// it made Home's friend strip vanish until Community was opened.
+    /// Keep the last successful snapshot on temporary network failure.
+    func refreshHomeFriends(force: Bool = false) async {
+        guard let userID = service.currentUserID else {
+            reset()
+            return
+        }
+        if !force,
+           lastHomeFriendsAccountID == userID,
+           let lastHomeFriendsRefreshAt,
+           Date().timeIntervalSince(lastHomeFriendsRefreshAt) < 120 {
+            return
+        }
+        // The full refresh owns these same relationship collections.
+        guard !isHomeFriendsRefreshing, !isRefreshing else { return }
+        isHomeFriendsRefreshing = true
+        defer { isHomeFriendsRefreshing = false }
+
+        do {
+            async let followingTask = service.loadFollowing(for: userID)
+            async let followerTask = service.loadFollowers(for: userID)
+            async let mutedTask = service.loadMutedUserIDs()
+            async let blockedTask = service.loadBlockedUserIDs()
+
+            let followingRows = try await followingTask
+            let followerRows = try await followerTask
+            let mutedIDs = try await mutedTask
+            let blockedIDs = try await blockedTask
+
+            let incomingIDs = Set(followerRows.map(\.followerID))
+                .subtracting(blockedIDs)
+            let outgoingIDs = Set(followingRows.map(\.followingID))
+                .subtracting(blockedIDs)
+            let mutualIDs = incomingIDs.intersection(outgoingIDs)
+                .subtracting(mutedIDs)
+            // Query the exact mutual IDs, not the first 500 directory cards.
+            let cards = try await service.loadProfileCards(for: mutualIDs)
+
+            guard !Task.isCancelled,
+                  service.currentUserID == userID,
+                  !isRefreshing
+            else { return }
+
+            let validCards = cards.filter {
+                mutualIDs.contains($0.userID)
+                    && !blockedIDs.contains($0.userID)
+                    && !mutedIDs.contains($0.userID)
+            }
+            let existingOthers = visibleProfiles.filter {
+                !mutualIDs.contains($0.userID) &&
+                    !blockedIDs.contains($0.userID)
+            }
+            let updatedCards = existingOthers + validCards
+            if visibleProfiles != updatedCards {
+                visibleProfiles = updatedCards
+            }
+            if followerIDs != incomingIDs {
+                followerIDs = incomingIDs
+            }
+            if followingIDs != outgoingIDs {
+                followingIDs = outgoingIDs
+            }
+            if mutedUserIDs != mutedIDs {
+                mutedUserIDs = mutedIDs
+            }
+            lastHomeFriendsAccountID = userID
+            lastHomeFriendsRefreshAt = Date()
+        } catch is CancellationError {
+            return
+        } catch {
+            // Keep already loaded friends. An empty/error response must not
+            // be mistaken for the user removing every mutual follow.
         }
     }
 
@@ -3357,6 +3437,9 @@ final class SocialStore: ObservableObject {
         discoverResults = []
         challengeSearchResults = []
         visibleProfiles = []
+        lastHomeFriendsAccountID = nil
+        lastHomeFriendsRefreshAt = nil
+        isHomeFriendsRefreshing = false
         feed = []
         blockedUsers = []
         mutedUserIDs = []
