@@ -1005,7 +1005,7 @@ struct PostWorkoutReviewView: View {
         self.initialVisibilityOverride = initialVisibilityOverride
     }
 
-    @State private var visibility: ProfileVisibility = .friends
+    @State private var visibility: ProfileVisibility = .publicProfile
     @State private var descriptionText = ""
     @State private var effort = 5.0
     @State private var selectedFriendIDs: Set<UUID> = []
@@ -4391,7 +4391,7 @@ struct PostWorkoutReviewView: View {
     private func loadExistingReview() async {
         visibility =
             initialVisibilityOverride ??
-            .friends
+            settings.defaultActivityVisibility
         selectedFriendIDs =
             social.workoutAssociatedFriendIDs(
                 for: workout.id
