@@ -640,7 +640,12 @@ final class HealthKitManager: ObservableObject {
             .cyclingPower,
             .swimmingStrokeCount,
             .height,
-            .bodyMass
+            .bodyMass,
+            // Optional Insights-only samples: no synthetic scores or targets.
+            .bodyMassIndex,
+            .bodyFatPercentage,
+            .appleSleepingWristTemperature,
+            .heartRateRecoveryOneMinute
         ]
     }
 
@@ -1745,6 +1750,74 @@ final class HealthKitManager: ObservableObject {
             previousWorkoutDistanceMeters:
                 previous.workoutDistanceMeters
         )
+    }
+
+    /// Read only the requested metric and period after the user opens it.
+    /// Bounded HealthKit statistics preserve Apple's source de-duplication.
+    /// Missing authorization or missing measurements returns an empty series.
+    func insightDailyValues(
+        for metric: ATHLTHInsightHealthMetric,
+        days: Int
+    ) async -> [ATHLTHInsightHealthDay] {
+        guard integrationEnabled, Self.healthDataAvailable else { return [] }
+        let count = min(max(days, 7), 180)
+        let calendar = Calendar.current
+        let now = Date()
+        let start = calendar.date(
+            byAdding: .day, value: -(count - 1),
+            to: calendar.startOfDay(for: now)
+        ) ?? now.addingTimeInterval(-Double(count - 1) * 86_400)
+
+        if metric == .sleepDuration {
+            let snapshot = await recoveryTrendSnapshot(days: min(count, 90))
+            return snapshot.days.compactMap { day in
+                guard day.date >= start,
+                      let duration = day.sleepDuration,
+                      duration.isFinite, duration > 0 else { return nil }
+                return ATHLTHInsightHealthDay(
+                    date: day.date, value: duration / 3600
+                )
+            }
+        }
+
+        // Sleep stages are derived only from the selected last main sleep
+        // session. Never project that session backwards over historical days.
+        if metric.area == .sleep {
+            guard let value = metric.currentValue(in: self),
+                  let sleepEnd = sleep.sleepEnd, value > 0,
+                  sleepEnd >= start else { return [] }
+            return [ATHLTHInsightHealthDay(
+                date: calendar.startOfDay(for: sleepEnd), value: value
+            )]
+        }
+
+        guard let query = metric.query else { return [] }
+        let measurements: [Date: Double]
+        do {
+            if metric.cumulative {
+                measurements = try await dailyCumulativeQuantities(
+                    identifier: query.identifier,
+                    unit: query.unit, startDate: start, endDate: now
+                )
+            } else {
+                measurements = try await dailyAverageQuantities(
+                    identifier: query.identifier,
+                    unit: query.unit, startDate: start, endDate: now
+                )
+            }
+        } catch {
+            // Read access is private in HealthKit. Do not interpret a
+            // denied or empty result as a real zero measurement.
+            return []
+        }
+
+        return measurements.compactMap { day, raw in
+            let value = raw * query.multiplier
+            guard raw.isFinite, value.isFinite,
+                  value >= 0 else { return nil }
+            return ATHLTHInsightHealthDay(date: day, value: value)
+        }
+        .sorted { $0.date < $1.date }
     }
 
     func recoveryTrendSnapshot(
