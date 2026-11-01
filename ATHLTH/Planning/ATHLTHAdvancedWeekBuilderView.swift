@@ -30,6 +30,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     let workoutsPerWeek: [Int]
     let weekSymbols: [[String]]
     let onEditWorkout: (Int, Int) -> Void
+    let onEditBlock: (Int, Int, Int) -> Void
     let onAddExercise: (Int, Int, WorkoutPhaseKind) -> Void
     let onAddWorkout: (Int) -> Void
     let onMarkRest: (Int) -> Void
@@ -486,7 +487,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 .buttonStyle(.plain)
             }
             ForEach(ATHLTHWorkoutTimelinePresentation.sections(for: workout.blocks)) { section in
-                phase(section, day: day, index: index)
+                phase(section, day: day, index: index, workout: workout)
             }
         }
         .padding(13)
@@ -494,7 +495,8 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     }
 
     private func phase(_ section: ATHLTHWorkoutTimelinePresentation.Section,
-                       day: Int, index: Int) -> some View {
+                       day: Int, index: Int,
+                       workout: ATHLTHPlanStructuredWorkoutBlueprint) -> some View {
         let phase = section.phase
         let blocks = section.blocks
         return VStack(alignment: .leading, spacing: 6) {
@@ -516,24 +518,48 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 .accessibilityLabel(tr("Add to", "Legg til i") + " " + phase.title)
             }
             ForEach(Array(blocks.enumerated()), id: \.offset) { pair in
-                HStack(spacing: 9) {
-                    Image(systemName: pair.element.kind == .rest
-                          ? "pause.circle.fill" : pair.element.kind == .exercise
-                          ? "dumbbell" : pair.element.kind == .run ? "figure.run" : "leaf")
-                        .font(.caption).foregroundStyle(gold)
-                        .frame(width: 18)
-                    Text(pair.element.title)
-                        .font(.system(size: 12, weight: .medium))
-                        .lineLimit(2)
-                    Spacer()
-                    Text(pair.element.targetText ?? "")
-                        .font(.system(size: 10)).foregroundStyle(secondary)
-                        .lineLimit(2).multilineTextAlignment(.trailing)
+                Button {
+                    // Phase rows are a grouped display of the original
+                    // workout. Pass the underlying block index to the editor.
+                    if let blockIndex = workout.blocks.firstIndex(where: {
+                        $0.editorDragID == pair.element.editorDragID
+                    }) {
+                        onEditBlock(day, index, blockIndex)
+                    } else {
+                        onEditWorkout(day, index)
+                    }
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: pair.element.kind == .rest
+                              ? "pause.circle.fill" : pair.element.kind == .exercise
+                              ? "dumbbell" : pair.element.kind == .run ? "figure.run" : "leaf")
+                            .font(.caption).foregroundStyle(gold)
+                            .frame(width: 18)
+                        Text(pair.element.title)
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(2)
+                        Spacer(minLength: 0)
+                        Text(pair.element.targetText ?? "")
+                            .font(.caption).foregroundStyle(secondary)
+                            .lineLimit(2).multilineTextAlignment(.trailing)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(secondary)
+                            .accessibilityHidden(true)
+                    }
+                    .foregroundStyle(ink)
+                    .padding(10)
+                    .frame(minHeight: 44)
+                    .contentShape(RoundedRectangle(cornerRadius: 10))
+                    .background(pair.element.kind == .rest
+                                ? ATHLTHTrainDesign.paleGold.opacity(0.5) : paper.opacity(0.65),
+                                in: RoundedRectangle(cornerRadius: 10))
                 }
-                .padding(10)
-                .background(pair.element.kind == .rest
-                            ? ATHLTHTrainDesign.paleGold.opacity(0.5) : paper.opacity(0.65),
-                            in: RoundedRectangle(cornerRadius: 10))
+                .buttonStyle(.plain)
+                .accessibilityHint(tr(
+                    "Edit the duration, pace, intensity or recovery for this step.",
+                    "Rediger varighet, tempo, intensitet eller pause for denne deløkten."
+                ))
             }
             action(tr("Add to", "Legg til i") + " " + phase.title, icon: "plus") {
                 onAddExercise(day, index, phase)
