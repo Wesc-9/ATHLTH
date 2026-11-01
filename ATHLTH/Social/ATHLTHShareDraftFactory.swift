@@ -162,7 +162,11 @@ enum ATHLTHShareDraftFactory {
                          creatorUsername: String? = nil,
                          savedExercises: [ExerciseLibraryEntry] = []) throws -> MessageShareDraft {
         guard ATHLTHPersonalExerciseSharing.isEligible(entry, ownerID: ownerID),
-              savedExercises.contains(entry) else {
+              savedExercises.contains(where: {
+                  $0.id == entry.id &&
+                  $0.exercise == entry.exercise &&
+                  $0.source == entry.source
+              }) else {
             throw ATHLTHDirectShareError.onlyPersonalExercises
         }
         guard let consented = ATHLTHExerciseReferenceResolver.shareableSnapshot(
