@@ -971,8 +971,8 @@ struct ATHLTHHomeView: View {
                             homeRecoveryTrendSnapshot,
                         sleepText:
                             homeSleepMetricText,
-                        respiratoryRateText:
-                            homeRespiratoryRateMetricText,
+                        stepsText:
+                            homeStepsMetricText,
                         hrvText:
                             homeHRVMetricText,
                         loadText:
@@ -1817,23 +1817,17 @@ struct ATHLTHHomeView: View {
         return health.sleep.totalAsleep.shortDuration
     }
 
-    private var homeRespiratoryRateMetricText: String {
-        guard let value =
-                homeRecoveryTrendSnapshot.days
-                    .reversed()
-                    .compactMap(\.respiratoryRate)
-                    .first,
+    private var homeStepsMetricText: String {
+        guard let value = health.training.stepsToday,
               value.isFinite,
-              value > 0
+              value >= 0,
+              value < Double(Int.max)
         else {
+            // Missing HealthKit permission/data is different from 0 steps.
             return "—"
         }
 
-        return String(
-            format: "%.1f/min",
-            locale: Locale.current,
-            value
-        )
+        return Int(value.rounded(.down)).formatted()
     }
 
     private var homeHRVMetricText: String {
