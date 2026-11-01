@@ -54,44 +54,65 @@ enum ATHLTHWorkoutMainSectionLibrary {
 
     @discardableResult
     static func capture(_ workout: PlannedSession, userID: UUID) -> Bool {
-        // Use the unified recipe even for historic strength/running sessions
-        // that still store their steps in older source-specific fields.
-        let source = workout.resolvedWorkoutBlocks
-        let main = source.filter { $0.resolvedPhase == .main }
-        guard !main.isEmpty else { return false }
+        captureAll([workout], userID: userID) > 0
+    }
 
-        let copied = main.enumerated().map { index, original in
-            var block = original
-            block.phase = .main
-            return ATHLTHWorkoutPhasePlacement.renumbered(block, sequence: index + 1)
-        }
-        let trimmed = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let title = trimmed.isEmpty ? workout.kind.title : trimmed
+    /// Capture a complete plan in one storage transaction. No writes are made
+    /// for unchanged sessions, keeping long training plans fast to save.
+    @discardableResult
+    static func captureAll(_ workouts: [PlannedSession], userID: UUID) -> Int {
         var saved = load(userID: userID)
+        var changed = false
+        var captured = 0
 
-        if let index = saved.firstIndex(where: { $0.sourceWorkoutID == workout.id }) {
-            // No extra disk write for repeated saves of an unchanged workout.
-            if saved[index].title == title &&
-               saved[index].kind == workout.kind &&
-               saved[index].blocks == copied {
-                return true
+        for workout in workouts {
+            // Presentation keeps recovery rows with the preceding active
+            // main phase, even when historic data tags them as .recovery.
+            let main = ATHLTHWorkoutTimelinePresentation.sections(
+                for: workout.resolvedWorkoutBlocks
+            ).filter { $0.phase == .main }.flatMap(\.blocks)
+            guard !main.isEmpty else { continue }
+
+            let copied = main.enumerated().map { index, original in
+                var block = original
+                block.phase = .main
+                return ATHLTHWorkoutPhasePlacement.renumbered(
+                    block, sequence: index + 1
+                )
             }
-            saved[index].title = title
-            saved[index].kind = workout.kind
-            saved[index].blocks = copied
-            saved[index].savedAt = Date()
-        } else {
-            saved.append(ATHLTHWorkoutMainSection(
-                id: UUID(),
-                sourceWorkoutID: workout.id,
-                title: title,
-                kind: workout.kind,
-                blocks: copied,
-                savedAt: Date()
-            ))
+            let trimmed = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
+            let title = trimmed.isEmpty ? workout.kind.title : trimmed
+
+            if let index = saved.firstIndex(where: {
+                $0.sourceWorkoutID == workout.id
+            }) {
+                if saved[index].title != title ||
+                   saved[index].kind != workout.kind ||
+                   saved[index].blocks != copied {
+                    saved[index].title = title
+                    saved[index].kind = workout.kind
+                    saved[index].blocks = copied
+                    saved[index].savedAt = Date()
+                    changed = true
+                }
+            } else {
+                saved.append(ATHLTHWorkoutMainSection(
+                    id: UUID(),
+                    sourceWorkoutID: workout.id,
+                    title: title,
+                    kind: workout.kind,
+                    blocks: copied,
+                    savedAt: Date()
+                ))
+                changed = true
+            }
+            captured += 1
         }
-        AccountLocalStorage.write(saved, name: storageName, userID: userID)
-        return true
+
+        if changed {
+            AccountLocalStorage.write(saved, name: storageName, userID: userID)
+        }
+        return captured
     }
 
     static func delete(_ id: UUID, userID: UUID) {
