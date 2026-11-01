@@ -1759,7 +1759,7 @@ final class HealthKitManager: ObservableObject {
         for metric: ATHLTHInsightHealthMetric,
         days: Int
     ) async -> [ATHLTHInsightHealthDay] {
-        guard integrationEnabled, Self.healthDataAvailable else { return [] }
+        guard integrationEnabled, healthDataAvailable else { return [] }
         let count = min(max(days, 7), 180)
         let calendar = Calendar.current
         let now = Date()
