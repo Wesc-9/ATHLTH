@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// A single confirmation surface for the *exact* workout described by the
-/// Home recommendation. Uses the existing planner/recorder after selection.
+/// Shows the exact Home recommendation without changing its workout or
+/// start-flow semantics. The execution actions remain in the pinned footer.
 struct HomeDailyRecommendedWorkoutSheet: View {
     let workout: PlannedSession
     let isPlanWorkout: Bool
@@ -12,122 +12,125 @@ struct HomeDailyRecommendedWorkoutSheet: View {
 
     @Environment(\.dismiss) private var dismiss
 
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
+    }
+
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    HStack(spacing: 13) {
-                        Image(systemName: workout.kind.systemImage)
-                            .font(.system(size: 24, weight: .semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            .frame(width: 56, height: 56)
+            VStack(spacing: 0) {
+                HStack(spacing: 10) {
+                    Button(action: { dismiss() }) {
+                        Image(systemName: "xmark")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.ink)
+                            .frame(width: 42, height: 42)
                             .background(
                                 ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 16)
+                                in: Circle()
                             )
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(workout.title)
-                                .font(.title2.bold())
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                                .fixedSize(horizontal: false, vertical: true)
-                            if let minutes = workout.durationMinutes {
-                                Label("\(minutes) min", systemImage: "clock")
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(tr("Close", "Lukk"))
+
+                    Spacer(minLength: 0)
+
+                    Text(tr("Recommended workout", "Anbefalt treningsøkt"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+
+                    Spacer(minLength: 0)
+                    // Balance the leading close control to keep the title centered.
+                    Color.clear
+                        .frame(width: 42, height: 42)
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 18)
+                .padding(.top, 12)
+                .padding(.bottom, 7)
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        HomeDailyRecommendedWorkoutHero(workout: workout)
+
+                        if !workout.resolvedWorkoutBlocks.isEmpty {
+                            ATHLTHWorkoutContentsPreview(
+                                workout: workout,
+                                maximumVisibleBlocks: nil
+                            )
+                            .padding(17)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                Color.white,
+                                in: RoundedRectangle(cornerRadius: 19)
+                            )
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 19)
+                                    .strokeBorder(
+                                        ATHLTHPlanDesign.outline.opacity(0.75),
+                                        lineWidth: 0.8
+                                    )
                             }
                         }
-                    }
 
-                    if let notes = workout.notes, !notes.isEmpty {
-                        Text(notes)
-                            .font(.subheadline)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-
-                    if !workout.resolvedWorkoutBlocks.isEmpty {
-                        ATHLTHWorkoutContentsPreview(
-                            workout: workout, maximumVisibleBlocks: nil
-                        )
-                        .padding(14)
-                        .background(
-                            .white, in: RoundedRectangle(cornerRadius: 18)
-                        )
-                    }
-
-                    if isPlanWorkout {
-                        Text(ATHLTHLocalization.choose(
-                            english: "This is the actual workout in your plan. Open it to start using the plan's existing tracking and completion rules.",
-                            norwegian: "Dette er den faktiske økten i treningsplanen. Åpne den for å starte med planens eksisterende registrering og fullføringsregler."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                }
-                .padding(18)
-            }
-            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-            .navigationTitle(ATHLTHLocalization.choose(
-                english: "Recommended workout", norwegian: "Anbefalt treningsøkt"
-            ))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button(ATHLTHLocalization.choose(
-                        english: "Close", norwegian: "Lukk"
-                    )) {
-                        dismiss()
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                VStack(spacing: 9) {
-                    if isPlanWorkout {
-                        Button {
-                            onOpenPlannedWorkout()
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Open workout and start",
-                                    norwegian: "Åpne økten og start"
-                                ),
-                                systemImage: "play.fill"
-                            )
-                            .frame(maxWidth: .infinity, minHeight: 49)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
-                    } else {
-                        Button(action: onStartOnPhone) {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Start with iPhone",
-                                    norwegian: "Start med iPhone"
-                                ),
-                                systemImage: "iphone"
-                            )
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
-
-                        if canStartWithWatch {
-                            Button(action: onStartOnWatch) {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Start with Apple Watch",
-                                        norwegian: "Start med Apple Watch"
-                                    ),
-                                    systemImage: "applewatch"
-                                )
-                                .frame(maxWidth: .infinity, minHeight: 45)
+                        if isPlanWorkout {
+                            Label {
+                                Text(tr(
+                                    "This is the workout in your plan. Open it to use the plan's existing tracking and completion rules.",
+                                    "Dette er økten i treningsplanen. Åpne den for å bruke planens registrering og fullføringsregler."
+                                ))
+                            } icon: {
+                                Image(systemName: "checkmark.seal")
                             }
-                            .buttonStyle(.bordered)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 6)
                         }
                     }
+                    .frame(maxWidth: 620)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 18)
+                    .padding(.top, 10)
+                    .padding(.bottom, 18)
                 }
-                .padding(.horizontal, 17)
-                .padding(.vertical, 12)
-                .background(.regularMaterial)
+                .scrollIndicators(.hidden)
+            }
+            .background {
+                LinearGradient(
+                    colors: [
+                        ATHLTHTrainDesign.paper,
+                        ATHLTHPlanDesign.canvas
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea()
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HomeDailyRecommendedWorkoutActions(
+                    isPlanWorkout: isPlanWorkout,
+                    canStartWithWatch: canStartWithWatch,
+                    onOpenPlannedWorkout: onOpenPlannedWorkout,
+                    onStartOnPhone: onStartOnPhone,
+                    onStartOnWatch: onStartOnWatch
+                )
+                .padding(.horizontal, 20)
+                .padding(.top, 12)
+                .padding(.bottom, 12)
+                .frame(maxWidth: 660)
+                .frame(maxWidth: .infinity)
+                .background {
+                    ATHLTHPlanDesign.canvas
+                        .ignoresSafeArea(edges: .bottom)
+                }
+                .overlay(alignment: .top) {
+                    ATHLTHPlanDesign.outline.opacity(0.55)
+                        .frame(height: 0.75)
+                }
             }
         }
     }
