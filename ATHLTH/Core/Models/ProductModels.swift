@@ -322,6 +322,23 @@ struct Exercise: Identifiable, Codable, Hashable {
     /// A private import may retain the source UUID as provenance, not as a
     /// shared ownership or edit permission. Missing for legacy exercises.
     var sharedSourceExerciseID: UUID? = nil
+    /// The username of the athlete who sent this private copy.
+    /// Only imported exercises have attribution; older saved items decode nil.
+    var sharedByUsername: String? = nil
+
+    /// Short, neutral provenance used in both grid and list cards.
+    var sharedAttributionText: String? {
+        guard origin == .custom,
+              let sharedByUsername else { return nil }
+        let name = sharedByUsername
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        guard !name.isEmpty else { return nil }
+        return ATHLTHLocalization.choose(
+            english: "Shared by @\(name)",
+            norwegian: "Delt av @\(name)"
+        )
+    }
 
     var displayName: String {
         guard origin != .custom else {

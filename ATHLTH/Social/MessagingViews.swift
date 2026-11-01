@@ -3342,7 +3342,11 @@ struct DirectMessageThreadView: View {
             }
         }
         .sheet(item: $selectedPreviewAttachment) { message in
-            ATHLTHReceivedTrainingPreview(message: message) {
+            ATHLTHReceivedTrainingPreview(
+                message: message,
+                sharedByUsername: message.senderID == friend.userID
+                    ? friend.username : nil
+            ) {
                 saveAttachment(message)
             }
         }
@@ -7449,11 +7453,22 @@ struct MessageSharePicker: View {
             }
 
         case .exercise:
-            let exercises = exerciseLibrary.allExercises
+            let exercises = exerciseLibrary.customExercises.filter {
+                ATHLTHPersonalExerciseSharing.isEligible(
+                    $0, ownerID: session.profile.userID
+                )
+            }
             if exercises.isEmpty {
                 ContentUnavailableView(
-                    ATHLTHLocalization.choose(english: "No exercises", norwegian: "Ingen øvelser"),
-                    systemImage: "dumbbell"
+                    ATHLTHLocalization.choose(
+                        english: "No personal exercises yet",
+                        norwegian: "Ingen egne øvelser ennå"
+                    ),
+                    systemImage: "dumbbell",
+                    description: Text(ATHLTHLocalization.choose(
+                        english: "Create an exercise in My Exercises to share it. Catalog exercises are already available to everyone.",
+                        norwegian: "Opprett en øvelse i Mine øvelser for å dele den. Øvelser fra biblioteket har alle allerede."
+                    ))
                 )
             } else {
                 ForEach(exercises) { exercise in
@@ -7461,8 +7476,8 @@ struct MessageSharePicker: View {
                         icon: "dumbbell.fill",
                         title: exerciseLibrary.localizedExerciseName(exercise),
                         subtitle: ATHLTHLocalization.choose(
-                            english: "Exercise from the library",
-                            norwegian: "Øvelse fra biblioteket"
+                            english: "My Exercises",
+                            norwegian: "Mine øvelser"
                         )
                     ) {
                         do {

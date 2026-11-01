@@ -969,7 +969,8 @@ final class ExerciseLibraryStore: ObservableObject {
     func importSharedExercise(
         _ source: ExerciseSnapshot,
         ownerID: UUID,
-        sourceExerciseID: UUID? = nil
+        sourceExerciseID: UUID? = nil,
+        sharedByUsername: String? = nil
     ) -> ExerciseLibraryEntry? {
         guard accountID == ownerID,
               let safe = ATHLTHExerciseReferenceResolver.safeImportedSnapshot(
@@ -1010,9 +1011,16 @@ final class ExerciseLibraryStore: ObservableObject {
             equipment: safe.equipment,
             isVisibleOutsideOwnerLibrary: false
         )
-        guard let sourceExerciseID else { return imported }
         var owned = imported.exercise
         owned.sharedSourceExerciseID = sourceExerciseID
+        // Store the sender's public username as a small local provenance
+        // label. Never copy personal identifiers or sender-owned media.
+        let cleanedUsername = sharedByUsername?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+        if let cleanedUsername, !cleanedUsername.isEmpty {
+            owned.sharedByUsername = String(cleanedUsername.prefix(40))
+        }
         updateCustomExercise(owned)
         return customExercises.first(where: { $0.id == owned.id }) ?? imported
     }

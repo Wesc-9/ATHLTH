@@ -1151,6 +1151,13 @@ struct ExerciseLibraryView: View {
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 .lineLimit(1)
+            if let attribution = entry.exercise.sharedAttributionText {
+                Text(attribution)
+                    .font(.system(size: 9, weight: .regular))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
             Spacer(minLength: 0)
         }
         .padding(12)
@@ -1196,6 +1203,13 @@ struct ExerciseLibraryView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .lineLimit(1)
+
+                if let attribution = entry.exercise.sharedAttributionText {
+                    Text(attribution)
+                        .font(.system(size: 10, weight: .regular))
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
                 if let difficulty = entry.difficulty {
                     Text(library.localizedDifficultyTitle(difficulty))
@@ -1348,6 +1362,13 @@ struct ExerciseDetailView: View {
                     )
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
+
+                    if let attribution = currentEntry.exercise.sharedAttributionText {
+                        Text(attribution)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
                 }
 
                 ATHLTHLastWorkoutHistoryCard(summary:
@@ -1544,21 +1565,25 @@ struct ExerciseDetailView: View {
         ))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    do {
-                        preparedShare = try ATHLTHShareDraftFactory.exercise(
-                            currentEntry, ownerID: session.profile.userID
-                        )
-                    } catch {
-                        shareError = error.localizedDescription
+            if ATHLTHPersonalExerciseSharing.isEligible(
+                currentEntry, ownerID: session.profile.userID
+            ) {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        do {
+                            preparedShare = try ATHLTHShareDraftFactory.exercise(
+                                currentEntry, ownerID: session.profile.userID
+                            )
+                        } catch {
+                            shareError = error.localizedDescription
+                        }
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
                     }
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Share exercise", norwegian: "Del øvelse"
+                    ))
                 }
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Share exercise", norwegian: "Del øvelse"
-                ))
             }
             if currentEntry.source == .custom {
                 ToolbarItem(placement: .topBarTrailing) {

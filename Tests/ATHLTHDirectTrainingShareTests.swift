@@ -33,6 +33,63 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
     }
 
     @MainActor
+    func testOnlyOwnerCreatedExercisesAppearInSharePicker() throws {
+        let ownerID = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(ownerID)
+        let mine = library.createCustomExercise(
+            ownerID: ownerID, name: "My Cable Drill",
+            instructions: ["Keep steady"],
+            primaryMuscles: ["Back"], secondaryMuscles: [],
+            equipment: ["Cable"], isVisibleOutsideOwnerLibrary: true
+        )
+        XCTAssertTrue(ATHLTHPersonalExerciseSharing.isEligible(
+            mine, ownerID: ownerID
+        ))
+        XCTAssertFalse(ATHLTHPersonalExerciseSharing.isEligible(
+            mine, ownerID: UUID()
+        ))
+        let builtIn = try XCTUnwrap(library.allExercises.first {
+            $0.source != .custom
+        })
+        XCTAssertFalse(ATHLTHPersonalExerciseSharing.isEligible(
+            builtIn, ownerID: ownerID
+        ))
+        XCTAssertThrowsError(try ATHLTHShareDraftFactory.exercise(
+            builtIn, ownerID: ownerID
+        ))
+        let draft = try ATHLTHShareDraftFactory.exercise(mine, ownerID: ownerID)
+        XCTAssertEqual(draft.kind, .exercise)
+        XCTAssertEqual(draft.sourceObjectID, mine.id)
+    }
+
+    @MainActor
+    func testImportedExerciseRetainsSmallSenderLabelThroughLocalStorage() throws {
+        let ownerID = UUID()
+        let library = ExerciseLibraryStore()
+        library.switchAccount(ownerID)
+        let snapshot = ExerciseSnapshot(
+            name: "Shared Row", instructions: ["Keep steady"],
+            primaryMuscles: ["Back"], secondaryMuscles: [],
+            equipment: ["Cable"], imageURL: nil
+        )
+        let imported = try XCTUnwrap(library.importSharedExercise(
+            snapshot,
+            ownerID: ownerID,
+            sourceExerciseID: UUID(),
+            sharedByUsername: "sender_athlete"
+        ))
+        XCTAssertTrue(imported.exercise.sharedAttributionText?.contains("@sender_athlete") == true)
+        let reloaded = ExerciseLibraryStore()
+        reloaded.switchAccount(ownerID)
+        XCTAssertEqual(
+            reloaded.customExercises.first(where: { $0.id == imported.id })?
+                .exercise.sharedByUsername,
+            "sender_athlete"
+        )
+    }
+
+    @MainActor
     func testSharedWorkoutStripsPrivateCalendarAndInvitationData() throws {
         let owner = UUID()
         var workout = PlannedSession(

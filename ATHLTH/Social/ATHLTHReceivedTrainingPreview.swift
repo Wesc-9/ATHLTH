@@ -6,6 +6,7 @@ import SwiftUI
 struct ATHLTHReceivedTrainingPreview: View {
     @Environment(\.dismiss) private var dismiss
     let message: DirectMessageRecord
+    let sharedByUsername: String?
     let onSave: () -> Void
 
     private func tr(_ en: String, _ no: String) -> String {
@@ -16,7 +17,10 @@ struct ATHLTHReceivedTrainingPreview: View {
         Group {
             if message.attachmentKind == .exercise,
                let exercise = message.decodeSnapshot(ATHLTHSharedExerciseAttachment.self) {
-                ATHLTHLinkedExerciseDetailView(block: exercise.previewBlock)
+                ATHLTHLinkedExerciseDetailView(
+                    block: exercise.previewBlock,
+                    sharedByUsername: sharedByUsername
+                )
             } else {
                 NavigationStack {
                     ScrollView {

@@ -19,6 +19,16 @@ struct ATHLTHSharedExerciseAttachment: Codable, Hashable {
     }
 }
 
+/// Only account-owned exercises from Mine øvelser can be sent.
+/// The public catalog is already installed for every ATHLTH athlete.
+enum ATHLTHPersonalExerciseSharing {
+    static func isEligible(_ entry: ExerciseLibraryEntry, ownerID: UUID) -> Bool {
+        entry.source == .custom &&
+        entry.exercise.origin == .custom &&
+        entry.exercise.ownerID == ownerID
+    }
+}
+
 enum ATHLTHShareDraftFactory {
     static func safeWorkout(
         _ original: PlannedSession, library: [ExerciseLibraryEntry]
@@ -92,22 +102,21 @@ enum ATHLTHShareDraftFactory {
 
     static func exercise(_ entry: ExerciseLibraryEntry,
                          ownerID: UUID) throws -> MessageShareDraft {
-        let custom = entry.source == .custom
-        var snapshot: ExerciseSnapshot?
-        if custom {
-            guard let consented = ATHLTHExerciseReferenceResolver.shareableSnapshot(
-                entry.exercise
-            ) else {
-                throw ATHLTHDirectShareError.privateExercise
-            }
-            snapshot = ATHLTHExerciseReferenceResolver.safeImportedSnapshot(
-                consented, fallbackTitle: entry.canonicalName
-            )
+        guard ATHLTHPersonalExerciseSharing.isEligible(entry, ownerID: ownerID) else {
+            throw ATHLTHDirectShareError.onlyPersonalExercises
         }
+        guard let consented = ATHLTHExerciseReferenceResolver.shareableSnapshot(
+            entry.exercise
+        ) else {
+            throw ATHLTHDirectShareError.privateExercise
+        }
+        let snapshot = ATHLTHExerciseReferenceResolver.safeImportedSnapshot(
+            consented, fallbackTitle: entry.canonicalName
+        )
         let attachment = ATHLTHSharedExerciseAttachment(
             name: String(entry.canonicalName.prefix(140)),
-            sourceID: custom ? entry.id : nil,
-            sourceIdentifier: entry.sourceIdentifier,
+            sourceID: entry.id,
+            sourceIdentifier: nil,
             snapshot: snapshot
         )
         return try MessageShareDraft(
@@ -124,11 +133,21 @@ enum ATHLTHShareDraftFactory {
 
 enum ATHLTHDirectShareError: LocalizedError {
     case privateExercise
+    case onlyPersonalExercises
+
     var errorDescription: String? {
-        ATHLTHLocalization.choose(
-            english: "Enable sharing for this private exercise in My Exercises before sending it.",
-            norwegian: "Tillat deling av denne private øvelsen i Mine øvelser før du sender den."
-        )
+        switch self {
+        case .privateExercise:
+            return ATHLTHLocalization.choose(
+                english: "Enable sharing for this private exercise in My Exercises before sending it.",
+                norwegian: "Tillat deling av denne private øvelsen i Mine øvelser før du sender den."
+            )
+        case .onlyPersonalExercises:
+            return ATHLTHLocalization.choose(
+                english: "Only your own exercises from My Exercises can be shared.",
+                norwegian: "Du kan bare sende egne øvelser fra Mine øvelser."
+            )
+        }
     }
 }
 

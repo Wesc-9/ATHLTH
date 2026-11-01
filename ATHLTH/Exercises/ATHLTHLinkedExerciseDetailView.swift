@@ -9,6 +9,7 @@ struct ATHLTHLinkedExerciseDetailView: View {
     @EnvironmentObject private var session: AppSessionStore
 
     let block: WorkoutTemplateBlock
+    var sharedByUsername: String? = nil
 
     @State private var imported = false
 
@@ -34,7 +35,7 @@ struct ATHLTHLinkedExerciseDetailView: View {
     private var displayEntry: ExerciseLibraryEntry {
         if let matched { return matched }
         let details = previewSnapshot
-        let exercise = Exercise(
+        var exercise = Exercise(
             id: block.exerciseID ?? UUID(),
             origin: .publicCatalog,
             ownerID: nil,
@@ -46,6 +47,7 @@ struct ATHLTHLinkedExerciseDetailView: View {
             imageURL: nil,
             isVisibleOutsideOwnerLibrary: false
         )
+        exercise.sharedByUsername = sharedByUsername
         return ExerciseLibraryEntry(
             id: exercise.id,
             exercise: exercise,
@@ -95,7 +97,8 @@ struct ATHLTHLinkedExerciseDetailView: View {
                             let result = library.importSharedExercise(
                                 previewSnapshot,
                                 ownerID: session.profile.userID,
-                                sourceExerciseID: block.exerciseID
+                                sourceExerciseID: block.exerciseID,
+                                sharedByUsername: sharedByUsername
                             )
                             if result != nil {
                                 imported = true
