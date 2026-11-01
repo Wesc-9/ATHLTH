@@ -69,12 +69,14 @@ struct ATHLTHInsightsHealthLibraryView: View {
         .background(ATHLTHInsightsStyle.canvas.ignoresSafeArea())
         .navigationTitle(ATHLTHLocalization.choose(english: "Health", norwegian: "Helse"))
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
     }
 }
 
 struct ATHLTHInsightsHealthAreaView: View {
     let area: ATHLTHInsightHealthArea
     @EnvironmentObject private var health: HealthKitManager
+    @State private var latest: [ATHLTHInsightHealthMetric: Double] = [:]
 
     var body: some View {
         ScrollView {
@@ -114,7 +116,9 @@ struct ATHLTHInsightsHealthAreaView: View {
                                 .foregroundStyle(ATHLTHInsightsStyle.ink)
                                 .lineLimit(2)
                             Spacer(minLength: 4)
-                            Text(metric.formatted(metric.currentValue(in: health)))
+                            Text(metric.formatted(
+                                metric.currentValue(in: health) ?? latest[metric]
+                            ))
                                 .font(.subheadline.weight(.semibold))
                                 .foregroundStyle(ATHLTHInsightsStyle.ink)
                                 .lineLimit(1)
@@ -143,6 +147,21 @@ struct ATHLTHInsightsHealthAreaView: View {
         .background(ATHLTHInsightsStyle.canvas.ignoresSafeArea())
         .navigationTitle(area.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .task(id: area) {
+            // Read only the opened category, never every Health type at
+            // launch. This keeps new body and running metrics visible
+            // without an extra tap into each detail chart.
+            for metric in ATHLTHInsightHealthMetric.allCases where metric.area == area {
+                guard !Task.isCancelled else { return }
+                if metric.currentValue(in: health) != nil { continue }
+                let samples = await health.insightDailyValues(for: metric, days: 30)
+                guard !Task.isCancelled else { return }
+                if let value = samples.last?.value {
+                    latest[metric] = value
+                }
+            }
+        }
     }
 }
 
@@ -278,6 +297,7 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
         .background(ATHLTHInsightsStyle.canvas.ignoresSafeArea())
         .navigationTitle(metric.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .task(id: period) {
             loading = true
             attempted = true
