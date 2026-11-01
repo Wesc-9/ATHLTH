@@ -403,7 +403,9 @@ struct ProductRootTabView: View {
                 ATHLTHCoachDockHint {
                     showingCoachFromDock = true
                 }
-                .padding(.bottom, 56)
+                // Move the visible handle 12 pt closer to the bottom tab bar,
+                // while keeping the full 44-pt accessible touch target.
+                .padding(.bottom, 44)
                 .zIndex(40)
             }
             .sheet(isPresented: $showingCoachFromDock) {
