@@ -235,20 +235,14 @@ enum ATHLTHCoachRouteGenerator {
                         if matchesRequestedDistance(
                             actualMeters: meters, targetMeters: target
                         ) {
-                            let destination = traced.coordinates.last!
                             let duplicatesExisting = suggestions.contains { current in
                                 guard current.shape == shape else { return false }
                                 let prior = shape == .oneWay
-                                    ? current.coordinates.last
-                                    : current.coordinates.dropFirst().dropLast().dropFirst(
-                                        max(current.coordinates.count / 2 - 1, 0)
-                                    ).first
+                                    ? current.coordinates[current.coordinates.count - 1]
+                                    : current.coordinates[current.coordinates.count / 2]
                                 let candidate = shape == .oneWay
-                                    ? traced.coordinates.last
-                                    : traced.coordinates.dropFirst().dropLast().dropFirst(
-                                        max(traced.coordinates.count / 2 - 1, 0)
-                                    ).first
-                                guard let prior, let candidate else { return false }
+                                    ? traced.coordinates[traced.coordinates.count - 1]
+                                    : traced.coordinates[traced.coordinates.count / 2]
                                 return CLLocation(
                                     latitude: prior.latitude, longitude: prior.longitude
                                 ).distance(from: CLLocation(
