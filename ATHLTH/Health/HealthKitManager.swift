@@ -248,7 +248,7 @@ final class HealthKitManager: ObservableObject {
     // Tracks the newest permission set ATHLTH has explicitly requested.
     // Never use this value alone as the connection state: an app update or
     // a newly added Health type must not disconnect an existing Health setup.
-    private let currentAuthorizationVersion = 2
+    private let currentAuthorizationVersion = 3
 
     static func hasPersistedAuthorizationMarker(
         legacyRequested: Bool,
@@ -1769,15 +1769,16 @@ final class HealthKitManager: ObservableObject {
         ) ?? now.addingTimeInterval(-Double(count - 1) * 86_400)
 
         if metric == .sleepDuration {
-            let snapshot = await recoveryTrendSnapshot(days: min(count, 90))
-            return snapshot.days.compactMap { day in
-                guard day.date >= start,
-                      let duration = day.sleepDuration,
-                      duration.isFinite, duration > 0 else { return nil }
-                return ATHLTHInsightHealthDay(
-                    date: day.date, value: duration / 3600
-                )
+            // Use real sleep records for the full selected period, up to 180
+            // days. Recovery snapshots intentionally stop at 90 days.
+            let durations = (try? await sleepDurationsByWakeDay(
+                startDate: start, endDate: now
+            )) ?? [:]
+            return durations.compactMap { day, duration in
+                guard duration.isFinite, duration > 0 else { return nil }
+                return ATHLTHInsightHealthDay(date: day, value: duration / 3600)
             }
+            .sorted { $0.date < $1.date }
         }
 
         // Sleep stages are derived only from the selected last main sleep
