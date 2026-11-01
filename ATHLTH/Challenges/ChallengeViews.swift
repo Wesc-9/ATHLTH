@@ -768,7 +768,7 @@ struct ChallengeCreationView: View {
             _heartRateZone = State(initialValue: r.heartRateZone ?? 5)
             _heartRateAggregation = State(initialValue:
                 r.heartRateAggregation ?? .totalChallenge)
-            _exerciseName = State(initialValue: r.exerciseName ?? "Bench Press")
+            _exerciseName = State(initialValue: r.exerciseName ?? "")
             _requiredWeightEnabled = State(initialValue:
                 r.fixedWeightKilograms != nil)
             _requiredWeightKg = State(initialValue:
@@ -861,7 +861,8 @@ struct ChallengeCreationView: View {
     @State private var heartRateAggregation:
         ChallengeHeartRateAggregation = .totalChallenge
 
-    @State private var exerciseName = "Bench Press"
+    @State private var exerciseName = ""
+    @State private var selectedExerciseID: UUID?
     @State private var requiredWeightEnabled = false
     @State private var requiredWeightKg = 80.0
     @State private var verificationPolicy: ChallengeVerificationPolicy = .verifiedPreferredManualAllowed
@@ -899,7 +900,7 @@ struct ChallengeCreationView: View {
     @State private var exerciseSearchQuery = ""
 
     private var clubForest: Color { ChallengePlanTheme.ink }
-    private var clubEmerald: Color { ATHLTHTheme.accentDeep }
+    private var clubEmerald: Color { ChallengePlanTheme.gold }
     private var clubMint: Color { ChallengePlanTheme.soft }
 
     var body: some View {
@@ -1339,6 +1340,7 @@ struct ChallengeCreationView: View {
                     Button {
                         // Preserve the canonical exercise name for consistent scoring.
                         exerciseName = entry.name
+                        selectedExerciseID = entry.id
                         showingExercisePicker = false
                     } label: {
                         HStack(spacing: 12) {
@@ -2450,7 +2452,7 @@ struct ChallengeCreationView: View {
                 )
                 .foregroundStyle(
                     ATHLTHTheme
-                        .vitality
+                        .premiumGold
                 )
 
                 TextField(
@@ -2548,7 +2550,7 @@ struct ChallengeCreationView: View {
                                 .font(.title3)
                                 .foregroundStyle(
                                     ATHLTHTheme
-                                        .vitality
+                                        .premiumGold
                                 )
 
                                 VStack(
@@ -2642,7 +2644,7 @@ struct ChallengeCreationView: View {
                     .font(.title3)
                     .foregroundStyle(
                         ATHLTHTheme
-                            .vitality
+                            .premiumGold
                     )
 
                     VStack(
@@ -2704,7 +2706,7 @@ struct ChallengeCreationView: View {
                 .padding(11)
                 .background(
                     ATHLTHTheme
-                        .vitalitySoft,
+                        .cardWarm,
                     in: RoundedRectangle(
                         cornerRadius: 15,
                         style: .continuous
@@ -3032,20 +3034,31 @@ struct ChallengeCreationView: View {
     private var creationStrengthRules:
         some View {
         if scoring != .workoutVolume {
-            creationTextField(
-                title:
-                    ATHLTHLocalization.choose(
-                        english: "Exercise",
-                        norwegian: "Øvelse"
-                    ),
-                placeholder:
-                    ATHLTHLocalization.choose(
-                        english: "Exercise",
-                        norwegian: "Øvelse"
-                    ),
-                text: $exerciseName,
-                icon: "dumbbell.fill"
-            )
+            HStack(spacing: 12) {
+                Image(systemName: "dumbbell.fill")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(ChallengePlanTheme.gold)
+                    .frame(width: 38, height: 38)
+                    .background(ATHLTHTheme.cardWarm,
+                                in: RoundedRectangle(cornerRadius: 12))
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Exercise", norwegian: "Øvelse"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    Text(exerciseName.isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "Choose an exercise",
+                            norwegian: "Velg øvelse"
+                        )
+                        : exerciseName)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ChallengePlanTheme.ink)
+                }
+                Spacer(minLength: 2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             Button {
                 exerciseSearchQuery = ""
@@ -3462,23 +3475,38 @@ struct ChallengeCreationView: View {
                 creationAttemptControls
 
                 Button {
-                    resetRunningAdvancedRules()
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        resetRunningAdvancedRules()
+                    }
                 } label: {
                     Label(
                         ATHLTHLocalization.choose(
-                            english:
-                                "Reset to recommended",
-                            norwegian:
-                                "Tilbakestill til anbefalt"
+                            english: "Use recommended settings",
+                            norwegian: "Bruk anbefalte innstillinger"
                         ),
-                        systemImage:
-                            "arrow.counterclockwise"
+                        systemImage: "arrow.uturn.backward"
                     )
-                    .frame(
-                        maxWidth: .infinity
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ChallengePlanTheme.ink)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(
+                        LinearGradient(
+                            colors: [
+                                ATHLTHTheme.cardWarm,
+                                ATHLTHTheme.card
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        in: RoundedRectangle(cornerRadius: 15)
                     )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15)
+                            .stroke(ChallengePlanTheme.gold.opacity(0.35),
+                                    lineWidth: 1)
+                    }
                 }
-                .buttonStyle(.bordered)
+                .buttonStyle(.plain)
             }
 
         case .walking:
@@ -3540,72 +3568,116 @@ struct ChallengeCreationView: View {
         }
     }
 
-    private var creationAttemptControls:
-        some View {
-        VStack(
-            alignment: .leading,
-            spacing: 10
-        ) {
+    private var creationAttemptControls: some View {
+        VStack(alignment: .leading, spacing: 12) {
             Toggle(
                 ATHLTHLocalization.choose(
-                    english:
-                        "Allow multiple attempts",
-                    norwegian:
-                        "Tillat flere forsøk"
+                    english: "Allow multiple attempts",
+                    norwegian: "Tillat flere forsøk"
                 ),
-                isOn:
-                    $allowMultipleAttempts
+                isOn: $allowMultipleAttempts
             )
+            .tint(ChallengePlanTheme.gold)
+            .frame(maxWidth: .infinity)
 
-            if allowMultipleAttempts &&
-                sport == .running {
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Attempt policy",
-                        norwegian:
-                            "Hvilket forsøk teller"
-                    ),
-                    selection:
-                        $attemptPolicy
-                ) {
-                    ForEach(
-                        ChallengeAttemptPolicy
-                            .allCases
-                    ) { policy in
-                        Text(
-                            policy.title
-                        )
-                        .tag(policy)
-                    }
-                }
-                .pickerStyle(.segmented)
+            if allowMultipleAttempts {
+                HStack(spacing: 12) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Maximum attempts",
+                        norwegian: "Antall forsøk"
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ChallengePlanTheme.ink)
 
-                Picker(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Maximum attempts",
-                        norwegian:
-                            "Maks forsøk"
-                    ),
-                    selection:
-                        $attemptLimit
-                ) {
-                    Text(
+                    Spacer(minLength: 5)
+
+                    Picker(
                         ATHLTHLocalization.choose(
-                            english:
-                                "Unlimited",
-                            norwegian:
-                                "Ubegrenset"
-                        )
+                            english: "Maximum attempts",
+                            norwegian: "Antall forsøk"
+                        ),
+                        selection: $attemptLimit
+                    ) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Unlimited",
+                            norwegian: "Ubegrenset"
+                        )).tag(0)
+                        Text("2").tag(2)
+                        Text("3").tag(3)
+                        Text("5").tag(5)
+                        Text("10").tag(10)
+                    }
+                    .labelsHidden()
+                    .tint(ChallengePlanTheme.ink)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(ATHLTHTheme.cardWarm,
+                                in: RoundedRectangle(cornerRadius: 13))
+                    .fixedSize(horizontal: true, vertical: false)
+                }
+                .frame(maxWidth: .infinity)
+
+                if sport == .running {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Which attempt counts?",
+                        norwegian: "Hvilket forsøk teller?"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    challengeSegmentedRow(
+                        items: ChallengeAttemptPolicy.allCases,
+                        selected: $attemptPolicy,
+                        label: { $0.title }
                     )
-                    .tag(0)
-                    Text("3")
-                        .tag(3)
-                    Text("5")
-                        .tag(5)
                 }
             }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func challengeSegmentedRow<Item: Hashable & Identifiable>(
+        items: [Item],
+        selected: Binding<Item>,
+        label: @escaping (Item) -> String
+    ) -> some View {
+        HStack(spacing: 4) {
+            ForEach(items) { item in
+                Button {
+                    selected.wrappedValue = item
+                } label: {
+                    Text(label(item))
+                        .font(.caption.weight(
+                            selected.wrappedValue == item ? .semibold : .regular
+                        ))
+                        .foregroundStyle(
+                            selected.wrappedValue == item
+                                ? ChallengePlanTheme.ink
+                                : ATHLTHTheme.mutedText
+                        )
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.75)
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                        .background(
+                            selected.wrappedValue == item
+                                ? ATHLTHTheme.card
+                                : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 12)
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(4)
+        .frame(maxWidth: .infinity)
+        .background(
+            ATHLTHTheme.cardWarm,
+            in: RoundedRectangle(cornerRadius: 16)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(ChallengePlanTheme.gold.opacity(0.16),
+                        lineWidth: 0.75)
         }
     }
 
@@ -3748,7 +3820,7 @@ struct ChallengeCreationView: View {
                     Spacer()
                     Image(systemName: "lock.shield.fill")
                         .font(.subheadline)
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ChallengePlanTheme.gold)
                 }
             } else {
             Button {
@@ -4076,17 +4148,12 @@ struct ChallengeCreationView: View {
             return true
 
         case .strength:
-            if scoring !=
-                .workoutVolume &&
-                exerciseName
-                    .trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    )
-                    .isEmpty {
-                return false
+            if scoring != .workoutVolume {
+                return exerciseLibrary.allExercises.contains {
+                    $0.name == exerciseName &&
+                    (selectedExerciseID == nil || $0.id == selectedExerciseID)
+                }
             }
-
             return true
 
         case .heartRate:
@@ -4106,7 +4173,7 @@ struct ChallengeCreationView: View {
                 ATHLTHPremiumCanvas(
                     accent:
                         ATHLTHTheme
-                            .vitality
+                            .premiumGold
                             .opacity(0.14)
                 )
 
@@ -4370,7 +4437,7 @@ struct ChallengeCreationView: View {
                 selected: selected,
                 tint:
                     ATHLTHTheme
-                        .vitality
+                        .premiumGold
             )
         }
         .buttonStyle(.plain)
@@ -4687,7 +4754,7 @@ struct ChallengeCreationView: View {
             subtitle: subtitle,
             tint:
                 ATHLTHTheme
-                    .vitality
+                    .premiumGold
         )
     }
 
@@ -5236,7 +5303,7 @@ struct ChallengeCreationView: View {
                 usesSpecificRoute {
                 HStack(spacing: 10) {
                     Image(systemName: "location.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ChallengePlanTheme.gold)
 
                     VStack(alignment: .leading, spacing: 2) {
                         Text("GPS verification required")
@@ -5251,7 +5318,7 @@ struct ChallengeCreationView: View {
                     Spacer()
 
                     Image(systemName: "checkmark.seal.fill")
-                        .foregroundStyle(.green)
+                        .foregroundStyle(ChallengePlanTheme.gold)
                 }
                 .padding()
                 .challengeCard()
@@ -6561,12 +6628,13 @@ struct ChallengeCreationView: View {
     }
 
     private var resolvedTitle: String {
-        ChallengeCreationPolicy
-            .resolvedTitle(
-                title,
-                sport: sport,
-                scoring: effectiveScoring
-            )
+        ChallengeCreationPolicy.resolvedTitle(
+            title,
+            sport: sport,
+            scoring: effectiveScoring,
+            creatorName: session.profile.displayName,
+            invitedNames: invitees.map(\.displayName)
+        )
     }
 
     private var resolvedSummary: String? {
@@ -7773,7 +7841,7 @@ struct MeetupLocationPicker: View {
                     )
                     .tint(
                         ATHLTHTheme
-                            .vitality
+                            .premiumGold
                     )
                 }
             }

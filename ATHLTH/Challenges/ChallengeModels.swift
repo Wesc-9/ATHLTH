@@ -107,6 +107,38 @@ enum ChallengeCreationPolicy {
             : String(clean.prefix(60))
     }
 
+    static func resolvedTitle(
+        _ title: String,
+        sport: ATHLTHChallengeSport,
+        scoring: ATHLTHChallengeScoring,
+        creatorName: String,
+        invitedNames: [String]
+    ) -> String {
+        let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard clean.isEmpty else { return String(clean.prefix(100)) }
+
+        func shortName(_ raw: String) -> String {
+            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return String((trimmed.isEmpty ? "ATHLTH" : trimmed).prefix(20))
+        }
+
+        let people: String
+        switch invitedNames.count {
+        case 0:
+            people = shortName(creatorName)
+        case 1:
+            people = shortName(creatorName) + " · " + shortName(invitedNames[0])
+        case 2:
+            people = shortName(creatorName) + " · " +
+                invitedNames.map(shortName).joined(separator: " · ")
+        default:
+            people = shortName(creatorName) + " + " +
+                String(invitedNames.count)
+        }
+        return String((automaticTitle(sport: sport, scoring: scoring) +
+            " · " + people).prefix(120))
+    }
+
     static func requiresDirectInvite(
         visibility: ProfileVisibility
     ) -> Bool {
