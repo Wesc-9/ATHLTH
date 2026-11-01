@@ -98,6 +98,9 @@ final class AppSessionStore: ObservableObject {
     @Published private(set) var aiHealthDataSharingEnabled: Bool
 
     private let defaults: UserDefaults
+    // A verified backend profile is cached only after successful authentication.
+    // This is local UI identity, never a replacement for server credentials.
+    private let verifiedOfflineProfileKey = "session.verifiedOfflineProfile.v1"
     private var localAccountID: UUID?
     private var loadingAccountContent = false
     private var accountContentSaveTask: Task<Void, Never>?
@@ -207,6 +210,47 @@ final class AppSessionStore: ObservableObject {
             }
         }
 
+        // An existing, previously authenticated account must be usable
+        // immediately in airplane mode. Do not wait for a Supabase request to
+        // recover its local plans, sessions and routes.
+        if signedIn {
+            _ = restoreOfflineAccount(persistedAuthUserID: nil)
+        }
+    }
+
+    /// Recover local training content only for the account previously
+    /// authenticated on this installation. No server data is fabricated.
+    /// On older installs without a profile cache, the Keychain-backed
+    /// Supabase current user ID supplies the missing account association.
+    @discardableResult
+    func restoreOfflineAccount(persistedAuthUserID: UUID?) -> Bool {
+        guard signedIn else { return false }
+
+        if let data = defaults.data(forKey: verifiedOfflineProfileKey),
+           let cached = try? JSONDecoder().decode(UserProfile.self, from: data),
+           persistedAuthUserID == nil || persistedAuthUserID == cached.userID {
+            profile = cached
+            activateLocalAccount(cached.userID)
+            return true
+        }
+
+        // Never load another person's cached training data when the
+        // Keychain identifies a different current account.
+        guard defaults.data(forKey: verifiedOfflineProfileKey) == nil,
+              let persistedAuthUserID else { return false }
+
+        profile.userID = persistedAuthUserID
+        profile.username = defaults.string(forKey: "session.usernameSeed") ?? ""
+        profile.displayName = defaults.string(forKey: "session.usernameSeed")
+            ?? "ATHLTH"
+        activateLocalAccount(persistedAuthUserID)
+        return true
+    }
+
+    private func cacheVerifiedProfile() {
+        guard signedIn,
+              let data = try? JSONEncoder().encode(profile) else { return }
+        defaults.set(data, forKey: verifiedOfflineProfileKey)
     }
 
     private static func makeSignedOutProfile() -> UserProfile {
@@ -334,6 +378,8 @@ final class AppSessionStore: ObservableObject {
             ?? bootstrap.profile.username
             ?? "athlete"
         setUsernameSeed(seed)
+        // Persist only after a successful authenticated backend bootstrap.
+        cacheVerifiedProfile()
     }
 
     func startNewUserPaidTrialIfNeeded() {
@@ -431,6 +477,7 @@ final class AppSessionStore: ObservableObject {
         profile.bio = bio
         profile.avatarURL = avatarURL
         setUsernameSeed(displayName)
+        cacheVerifiedProfile()
     }
 
     func saveOnboardingProfile(_ data: OnboardingProfileData) {
@@ -668,6 +715,7 @@ final class AppSessionStore: ObservableObject {
         onboardingProfile = nil
         aiHealthDataSharingEnabled = false
         defaults.removeObject(forKey: "session.signedIn")
+        defaults.removeObject(forKey: verifiedOfflineProfileKey)
         defaults.removeObject(forKey: "session.onboardingCompleted")
         defaults.removeObject(forKey: "session.signInMethod")
         defaults.removeObject(forKey: "session.onboardingProfile")

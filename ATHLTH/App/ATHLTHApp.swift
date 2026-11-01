@@ -885,47 +885,10 @@ struct AppRootView: View {
         // first priority before any later Health refresh decisions.
         await allowWatchMirroringToAttachIfNeeded()
 
-        await subscriptionStore.start()
-        appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
-        await submitLatestStoreProofIfPossible()
-
-        if appSession.signedIn {
-            // Keep launch responsive: load only Home-critical account
-            // context first and let independent network work overlap.
-            async let pushToken: Void =
-                APNsPushManager.shared.repairRegistrationIfAuthorized()
-            async let pushPreferences: Void =
-                syncPushPreferences()
-            async let socialHome: Void =
-                refreshSocialHomeCore()
-            async let messages: Void =
-                messaging.refresh()
-            async let gearRefresh: Void =
-                gear.refresh()
-            async let calendarRefresh: Void =
-                syncCalendarIfAllowed()
-
-            _ = await (
-                pushToken,
-                pushPreferences,
-                socialHome,
-                messages,
-                gearRefresh,
-                calendarRefresh
-            )
-
-            if ATHLTHDeviceRole.isIPhone {
-                await realtimeSocial
-                    .configureOnlinePresence(
-                        appIsActive: true,
-                        enabled:
-                            social.privacy?
-                                .showOnlineStatus ??
-                            false
-                    )
-            }
-            await realtimeSocial
-                .refreshVisibleLiveSessions()
+        // Optional backend, StoreKit, social and calendar requests must not
+        // hold up HealthKit, Watch mirroring or offline workout launch.
+        Task { @MainActor in
+            await refreshOnlineServicesAfterLaunch()
         }
 
         // Reconcile the app-local marker with HealthKit before deciding
@@ -1002,6 +965,39 @@ struct AppRootView: View {
         }
 
         lastFullLifecycleRefreshAt = Date()
+    }
+
+    @MainActor
+    private func refreshOnlineServicesAfterLaunch() async {
+        await subscriptionStore.start()
+        appSession.applyStoreKitEntitlement(subscriptionStore.activeEntitlement)
+        await submitLatestStoreProofIfPossible()
+
+        guard appSession.signedIn else { return }
+
+        // Each independent network service may fail offline without
+        // affecting the local session or blocking the workout recorder.
+        async let pushToken: Void =
+            APNsPushManager.shared.repairRegistrationIfAuthorized()
+        async let pushPreferences: Void = syncPushPreferences()
+        async let socialHome: Void = refreshSocialHomeCore()
+        async let messages: Void = messaging.refresh()
+        async let gearRefresh: Void = gear.refresh()
+        async let calendarRefresh: Void = syncCalendarIfAllowed()
+
+        _ = await (
+            pushToken, pushPreferences, socialHome,
+            messages, gearRefresh, calendarRefresh
+        )
+
+        guard appSession.signedIn else { return }
+        if ATHLTHDeviceRole.isIPhone {
+            await realtimeSocial.configureOnlinePresence(
+                appIsActive: true,
+                enabled: social.privacy?.showOnlineStatus ?? false
+            )
+        }
+        await realtimeSocial.refreshVisibleLiveSessions()
     }
 
     private var lifecycleRootContent: AnyView {
@@ -2176,81 +2172,47 @@ struct AppRootView: View {
 
     @MainActor
     private func resolveStartupAuthentication() async {
-        // UserDefaults is removed with the app, while Supabase's iOS
-        // Keychain-backed session can survive an uninstall. Never use that
-        // orphaned session to bypass the account/onboarding screen.
+        // The first frame and all on-device workouts must not depend on
+        // server reachability. A prior successful sign-in is restored from
+        // the account-scoped local cache; reinstall without that marker
+        // still requires interactive authentication.
         guard appSession.signedIn else {
-            // Do not clear a Supabase session from the signed-out startup
-            // path. Email confirmation can launch ATHLTH through
-            // athlth://auth/confirm while this startup task is running. The
-            // callback establishes the new session before applying the
-            // backend bootstrap, and clearing here can race with that flow:
-            // AppSession becomes signed in while Supabase has already been
-            // downgraded to the anonymous publishable-key role.
-            //
-            // Stale Keychain sessions are still cleared immediately before
-            // interactive authentication by SupabaseAccountService.
             startupAuthenticationResolved = true
             return
         }
 
-        // A network/auth restoration must never leave a previously signed-in
-        // user parked on the launch gate indefinitely.
-        let timeoutTask = Task { @MainActor in
-            try? await Task.sleep(
-                nanoseconds: 10_000_000_000
-            )
+        let keychainUserID = accountService.currentUserID
+        let ready = appSession.restoreOfflineAccount(
+            persistedAuthUserID: keychainUserID
+        )
+        startupAuthenticationResolved = true
 
-            guard !Task.isCancelled,
-                  !startupAuthenticationResolved
-            else {
-                return
-            }
-
-            appSession.resetAuthenticationState()
-            await accountService
-                .discardUnexpectedPersistedSession()
-            startupAuthenticationResolved = true
+        // Older installations may have a signed-in marker but no cached
+        // identity and no currently loaded Supabase user. Do not expose
+        // another account's content based on a random profile UUID.
+        guard ready else {
+            // A later online sign-in remains possible without deleting
+            // local training records or the persisted authentication.
+            return
         }
 
-        defer {
-            timeoutTask.cancel()
-            startupAuthenticationResolved = true
-        }
-
-        // Existing installs may restore silently, but the main product UI is
-        // held behind ATHLTHLaunchGateView until the backend session and
-        // profile have both been validated.
-        do {
-            guard let bootstrap =
-                    try await accountService
-                        .restoreCurrentUser()
-            else {
-                appSession.resetAuthenticationState()
-                await accountService
-                    .discardUnexpectedPersistedSession()
-                return
+        let expectedUserID = appSession.profile.userID
+        // Online reconciliation is deliberately detached from the launch
+        // gate. A timeout, airplane mode or transient server error must
+        // never erase saved plans or force a login during a workout.
+        Task { @MainActor in
+            do {
+                guard let bootstrap = try await accountService.restoreCurrentUser(),
+                      bootstrap.profile.id == expectedUserID,
+                      appSession.signedIn,
+                      appSession.profile.userID == expectedUserID
+                else { return }
+                appSession.applyBackendBootstrap(bootstrap)
+            } catch {
+                // Network and authentication failures are not treated as
+                // proof that this locally authenticated device signed out.
+                // Explicit sign-out / account deletion still clears the cache.
             }
-
-            // If the fallback already recovered the launch UI, ignore a late
-            // backend response instead of unexpectedly switching screens.
-            guard !startupAuthenticationResolved else {
-                return
-            }
-
-            appSession.applyBackendBootstrap(
-                bootstrap
-            )
-        } catch {
-            // Never enter ProductRootTabView with a stale/partial profile.
-            // Falling back to the login screen is safer and recoverable.
-            guard !startupAuthenticationResolved else {
-                return
-            }
-
-            appSession.resetAuthenticationState()
-            await accountService
-                .discardUnexpectedPersistedSession()
         }
     }
 
