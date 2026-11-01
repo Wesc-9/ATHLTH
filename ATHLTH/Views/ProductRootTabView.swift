@@ -862,8 +862,6 @@ struct ATHLTHHomeView: View {
     @State private var showingGettingStartedPopup = false
     @State private var homeRecoveryTrendSnapshot =
         RecoveryTrendSnapshot.empty
-    @StateObject private var homeWeather =
-        HomeWeatherStore()
     @AppStorage("hasEditedATHLTHProfile")
     private var hasEditedATHLTHProfile = false
 
@@ -882,8 +880,6 @@ struct ATHLTHHomeView: View {
                                 .workout,
                         isStarting:
                             homeDirectStartInProgress,
-                        weather:
-                            homeWeather.snapshot,
                         onStart: {
                             guard let selection =
                                     homeTodayPlanWorkout
@@ -1297,9 +1293,6 @@ struct ATHLTHHomeView: View {
                         await health.recoveryTrendSnapshot(
                             days: 14
                         )
-                    homeWeather.refreshIfNeeded(
-                        force: true
-                    )
 
                     async let streakRefresh: Void = loadHomeStreak()
                     async let goalsRefresh: Void =
@@ -1427,8 +1420,6 @@ struct ATHLTHHomeView: View {
             }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
-                homeWeather.refreshIfNeeded()
-
                 // Let the Home hierarchy paint before starting refresh work.
                 // The compatibility preview is intentionally data-static so
                 // smoke tests measure rendering rather than backend latency.
