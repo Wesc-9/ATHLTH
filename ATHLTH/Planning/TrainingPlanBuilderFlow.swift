@@ -103,7 +103,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var expandedWeekPreviewDays: Set<Int> = []
     @State private var guidedTrainingPlaceExpanded = false
     @State private var weekDayEdits: [Int: ATHLTHPlanWeekDayEdit] = [:]
-    @State private var weekPlanningApproach: ATHLTHPlanWeekPlanningApproach?
+    // New advanced plans default to Dagsplan, matching the former method
+    // selector. Restored drafts still keep their explicitly saved choice.
+    @State private var weekPlanningApproach: ATHLTHPlanWeekPlanningApproach? = .guided
     @State private var advancedAddDestination: AdvancedAddDestination?
 
     private struct AdvancedAddDestination: Identifiable {
@@ -1337,33 +1339,73 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
-    private var goalContinueBar: some View {
-        Button {
-            guard canContinue else { return }
-            goForward()
-        } label: {
-            HStack(spacing: 12) {
-                Spacer(minLength: 12)
-                Text(ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
-                    .font(.subheadline.weight(.semibold))
-                Spacer(minLength: 0)
-                Image(systemName: "arrow.right")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity, minHeight: 55)
-            .background(
-                LinearGradient(
-                    colors: [ATHLTHTrainDesign.bronze,
-                             Color(red: 0.70, green: 0.52, blue: 0.30)],
-                    startPoint: .leading, endPoint: .trailing
-                ),
-                in: RoundedRectangle(cornerRadius: 22)
-            )
+    private var advancedSetupSummary: String {
+        let method: String
+        switch weekPlanningApproach {
+        case .guided:
+            method = ATHLTHLocalization.choose(english: "Daily plan", norwegian: "Dagsplan")
+        case .quick:
+            method = ATHLTHLocalization.choose(english: "Weekly plan", norwegian: "Ukeplan")
+        case .none:
+            method = ATHLTHLocalization.choose(english: "Select layout", norwegian: "Velg oppsett")
         }
-        .buttonStyle(.plain)
-        .disabled(!canContinue)
+        let weeks = ATHLTHLocalization.choose(
+            english: "\(weekCount) weeks", norwegian: "\(weekCount) uker"
+        )
+        let count = selectedDays.count
+        let days = ATHLTHLocalization.choose(
+            english: "\(count) training \(count == 1 ? "day" : "days")",
+            norwegian: "\(count) trenings\(count == 1 ? "dag" : "dager")"
+        )
+        return [method, weeks, days].joined(separator: " · ")
+    }
+
+    private var goalContinueBar: some View {
+        VStack(spacing: 7) {
+            if step == .basics && mode == .advanced {
+                HStack(spacing: 6) {
+                    Image(systemName: "checkmark.circle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .accessibilityHidden(true)
+                    Text(advancedSetupSummary)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 4)
+                .accessibilityElement(children: .combine)
+            }
+            Button {
+                guard canContinue else { return }
+                goForward()
+            } label: {
+                HStack(spacing: 12) {
+                    Spacer(minLength: 12)
+                    Text(ATHLTHLocalization.choose(english: "Next", norwegian: "Neste"))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.right")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 20)
+                .frame(maxWidth: .infinity, minHeight: 55)
+                .background(
+                    LinearGradient(
+                        colors: [ATHLTHTrainDesign.bronze,
+                                 Color(red: 0.70, green: 0.52, blue: 0.30)],
+                        startPoint: .leading, endPoint: .trailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 22)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!canContinue)
+            .opacity(canContinue ? 1 : 0.50)
+        }
         .padding(.horizontal, 18)
         .padding(.top, 10)
         .padding(.bottom, 9)
