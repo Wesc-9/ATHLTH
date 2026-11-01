@@ -64,6 +64,22 @@ enum CommunityInterest: String, CaseIterable, Identifiable {
         return terms.contains { text.contains($0) }
     }
 
+    func matchesPublicEvent(_ event: CommunityEventRecord) -> Bool {
+        guard self != .all else { return true }
+        let text = [event.activityType.rawValue, event.title, event.summary]
+            .joined(separator: " ").lowercased()
+        let terms: [String]
+        switch self {
+        case .all: return true
+        case .running: terms = ["running", "løp", "jogg", "run"]
+        case .strength: terms = ["strength", "styrke", "gym"]
+        case .yoga: terms = ["yoga", "pilates"]
+        case .outdoors: terms = ["hiking", "walking", "tur", "fjell", "outdoor", "friluft"]
+        case .social: terms = ["social", "sosial", "meetup", "samling"]
+        }
+        return terms.contains { text.contains($0) }
+    }
+
     func matchesEvent(_ event: CommunityGroupEventRecord) -> Bool {
         guard self != .all else { return true }
         let text = [event.activityType, event.title, event.summary]
@@ -643,6 +659,8 @@ struct ATHLTHCommunityV5View: View {
             if let featured = filteredUpcomingEvents.first,
                let club = groups.group(for: featured.groupID) {
                 featuredEvent(featured, club: club)
+            } else if let publicEvent = filteredPublicEvents.first {
+                featuredPublicEvent(publicEvent)
             } else {
                 emptyEditorial(
                     tr("Find your next shared workout", "Finn din neste fellesøkt"),
@@ -696,6 +714,25 @@ struct ATHLTHCommunityV5View: View {
                     .padding(.vertical, 2)
                 }
             }
+            if !filteredPublicEvents.isEmpty {
+                communitySectionHeading(
+                    tr("Open community events", "Åpne arrangementer"),
+                    icon: "person.3"
+                )
+                ScrollView(.horizontal, showsIndicators: false) {
+                    LazyHStack(spacing: 10) {
+                        ForEach(filteredPublicEvents.prefix(8)) { event in
+                            NavigationLink {
+                                CommunityEventDetailView(eventID: event.id)
+                            } label: {
+                                publicEventTile(event)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.vertical, 2)
+                }
+            }
             if let invite = pendingClubInvitation {
                 invitationBanner(invite)
             }
@@ -735,6 +772,12 @@ struct ATHLTHCommunityV5View: View {
 
     private var filteredUpcomingEvents: [CommunityGroupEventRecord] {
         availableUpcomingEvents.filter { eventInterest.matchesEvent($0) }
+    }
+
+    private var filteredPublicEvents: [CommunityEventItem] {
+        community.upcomingEvents
+            .filter { eventInterest.matchesPublicEvent($0.event) }
+            .sorted { $0.event.startsAt < $1.event.startsAt }
     }
 
     private func communitySectionHeading(_ title: String, icon: String) -> some View {
@@ -1346,8 +1389,8 @@ struct ATHLTHCommunityV5View: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(CommunityReferenceStyle.ink)
                 Text(tr(
-                    "\(availableUpcomingEvents.count) upcoming club events",
-                    "\(availableUpcomingEvents.count) kommende klubbarrangementer"
+                    "\(availableUpcomingEvents.count + community.upcomingEvents.count) upcoming events",
+                    "\(availableUpcomingEvents.count + community.upcomingEvents.count) kommende arrangementer"
                 ))
                 .font(.caption)
                 .foregroundStyle(CommunityReferenceStyle.muted)
