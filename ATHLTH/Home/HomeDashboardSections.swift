@@ -1592,7 +1592,7 @@ private enum HomeHealthMetricRange:
 struct HomeHealthMetricStrip: View {
     let snapshot: RecoveryTrendSnapshot
     let sleepText: String
-    let respiratoryRateText: String
+    let stepsText: String
     let hrvText: String
     let loadText: String
     let readinessText: String?
@@ -1604,11 +1604,9 @@ struct HomeHealthMetricStrip: View {
                 value: sleepText
             )
 
-            metricLink(
-                .respiratoryRate,
-                value:
-                    respiratoryRateText
-            )
+            // Activity on Home is informational; no target, percentage,
+            // progress bar or artificial step goal is shown.
+            stepsCard
 
             metricLink(
                 .hrv,
@@ -1622,6 +1620,62 @@ struct HomeHealthMetricStrip: View {
                     readinessText
             )
         }
+    }
+
+    private var stepsCard: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                Image(systemName: "figure.walk")
+                    .font(.system(size: 11.5, weight: .semibold))
+                    .foregroundStyle(Color.blue)
+                    .accessibilityHidden(true)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Steps", norwegian: "Skritt"
+                ))
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+
+                Spacer(minLength: 0)
+            }
+
+            Text(stepsText)
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+                .contentTransition(.numericText())
+
+            Text(ATHLTHLocalization.choose(
+                english: "Today", norwegian: "I dag"
+            ))
+            .font(.system(size: 9, weight: .medium))
+            .foregroundStyle(ATHLTHTheme.mutedText)
+            .frame(height: 13)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(height: 114)
+        .background(
+            ATHLTHTrainDesign.paper,
+            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .stroke(
+                    ATHLTHTrainDesign.rule.opacity(0.34),
+                    lineWidth: 0.7
+                )
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(ATHLTHLocalization.choose(
+            english: "Steps today: \\(stepsText)",
+            norwegian: "Skritt i dag: \\(stepsText)"
+        ))
     }
 
     private func metricLink(
