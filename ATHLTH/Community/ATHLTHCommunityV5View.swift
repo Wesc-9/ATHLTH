@@ -563,7 +563,12 @@ struct ATHLTHCommunityV5View: View {
                 )
             }
             NavigationLink {
-                CommunityFriendsVsFriendsDetailView()
+                CommunityFriendsVsFriendsDetailView(
+                    currentUserID: session.profile.userID,
+                    currentDisplayName: session.profile.displayName,
+                    currentAvatarURL: session.profile.avatarURL,
+                    friends: social.mutualFollows
+                )
             } label: {
                 inviteToDuelStrip
             }
@@ -1141,7 +1146,12 @@ struct ATHLTHCommunityV5View: View {
                 }
             case .friends:
                 NavigationLink {
-                    CommunityFriendsVsFriendsDetailView()
+                    CommunityFriendsVsFriendsDetailView(
+                    currentUserID: session.profile.userID,
+                    currentDisplayName: session.profile.displayName,
+                    currentAvatarURL: session.profile.avatarURL,
+                    friends: social.mutualFollows
+                )
                 } label: {
                     arenaActionContent(title, subtitle: subtitle, icon: icon)
                 }

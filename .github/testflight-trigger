@@ -185,3 +185,5 @@ ATHLTH 2.0.4 build 112 — user-approved retry 2026-10-30 after correcting Swift
 ATHLTH 2.0.5 build 113 — TestFlight upload explicitly authorized 2026-10-31 Europe/Oslo; upload current release/v2.0.5 (latest source db188aee987ebbc3e1bfb0c37cb3d869d52e8277) only after same-commit Build ATHLTH iOS XCTest and backend regressions succeed, validated signed iPhone/Watch/Widget archive, then verified App Store Connect upload. Keep release/v2.0.5 active; no main merge.
 
 ATHLTH 2.0.6 build 114 — user-authorized TestFlight upload 2026-11-01 Europe/Oslo. Run release/v2.0.6 through same-commit iOS XCTest and backend regression gates, signed iPhone/Apple Watch/Widget archive validation, and verified App Store Connect upload. Keep release/v2.0.6 active and unlocked; no main merge.
+
+ATHLTH 2.0.6 build 114 — user-authorized TestFlight retry 2026-11-01 after fixing missing required args in Community friend-vs-friend navigation. Require same-commit Build ATHLTH, backend regressions, signed iOS + Watch + Widget archive validation and verified Apple upload. Keep release/v2.0.6 active and unlocked.
