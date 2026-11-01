@@ -5029,7 +5029,7 @@ struct WorkoutPublishView: View {
     @EnvironmentObject private var settings: AppSettingsStore
 
     @State private var selectedWorkoutID: UUID?
-    @State private var visibility: ProfileVisibility = .friends
+    @State private var visibility: ProfileVisibility = .publicProfile
     @State private var caption = ""
     @State private var publishing = false
     @State private var selectedAlreadyPublished = false
@@ -5282,7 +5282,7 @@ struct WorkoutPublishView: View {
                 } else {
                     selectedAlreadyPublished = false
                     caption = ""
-                    visibility = settings.defaultActivityVisibility
+                    visibility = initialVisibility ?? settings.defaultActivityVisibility
                 }
                 guard !Task.isCancelled, self.selectedWorkoutID == selectedWorkoutID,
                       let workout = selectedWorkout, workout.isIndoor != true else { return }
