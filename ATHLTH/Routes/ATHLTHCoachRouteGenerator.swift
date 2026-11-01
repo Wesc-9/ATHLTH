@@ -237,15 +237,23 @@ enum ATHLTHCoachRouteGenerator {
                         ) {
                             let destination = traced.coordinates.last!
                             let duplicatesExisting = suggestions.contains { current in
-                                guard current.shape == shape,
-                                      let last = current.coordinates.last else {
-                                    return false
-                                }
+                                guard current.shape == shape else { return false }
+                                let prior = shape == .oneWay
+                                    ? current.coordinates.last
+                                    : current.coordinates.dropFirst().dropLast().dropFirst(
+                                        max(current.coordinates.count / 2 - 1, 0)
+                                    ).first
+                                let candidate = shape == .oneWay
+                                    ? traced.coordinates.last
+                                    : traced.coordinates.dropFirst().dropLast().dropFirst(
+                                        max(traced.coordinates.count / 2 - 1, 0)
+                                    ).first
+                                guard let prior, let candidate else { return false }
                                 return CLLocation(
-                                    latitude: last.latitude, longitude: last.longitude
+                                    latitude: prior.latitude, longitude: prior.longitude
                                 ).distance(from: CLLocation(
-                                    latitude: destination.latitude,
-                                    longitude: destination.longitude
+                                    latitude: candidate.latitude,
+                                    longitude: candidate.longitude
                                 )) < 150
                             }
                             if !duplicatesExisting {
@@ -331,7 +339,8 @@ enum ATHLTHCoachRouteGenerator {
         if shape == .outAndBack {
             // Only this explicit fallback returns over the *same verified*
             // geometry. One-way A–B must remain a genuine one-way route.
-            coordinates.append(contentsOf: coordinates.dropLast().reversed())
+            let returnPath = Array(coordinates.dropLast().reversed())
+            coordinates.append(contentsOf: returnPath)
             meters *= 2
         }
         return (coordinates, meters)
