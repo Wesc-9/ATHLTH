@@ -234,40 +234,45 @@ struct ATHLTHCommunityV5View: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    cover
-                        .padding(.horizontal, -14)
+            GeometryReader { viewport in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        cover
+                            .padding(.horizontal, -14)
 
-                    VStack(alignment: .leading, spacing: 12) {
-                        tabs
-                        // Search is a Clubs-specific action, not a global header.
-                        if tab == .clubs && showSearch {
-                            searchBar
+                        VStack(alignment: .leading, spacing: 12) {
+                            tabs
+                            // Search is a Clubs-specific action, not a global header.
+                            if tab == .clubs && showSearch {
+                                searchBar
+                            }
+                            switch tab {
+                            case .overview:
+                                overview
+                            case .clubs:
+                                clubsPage
+                            case .arena:
+                                arenaPage
+                            case .events:
+                                eventsPage
+                            }
                         }
-                        switch tab {
-                        case .overview:
-                            overview
-                        case .clubs:
-                            clubsPage
-                        case .arena:
-                            arenaPage
-                        case .events:
-                            eventsPage
-                        }
+                        .padding(.top, -30)
+                        .padding(.bottom, 34)
+                        .zIndex(1)
                     }
-                    .padding(.top, -30)
-                    .padding(.bottom, 34)
-                    .zIndex(1)
+                    .padding(.horizontal, 14)
+                    // A vertical ScrollView does not impose a finite content
+                    // width. Propose the visible width explicitly so an
+                    // aspect-fill image cannot make every tab scroll sideways.
+                    .frame(width: min(viewport.size.width, 760))
+                    .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, 14)
-                .frame(maxWidth: 760)
-                .frame(maxWidth: .infinity)
+                .scrollIndicators(.hidden)
+                .scrollDismissesKeyboard(.interactively)
+                .ignoresSafeArea(.container, edges: .top)
+                .background(CommunityReferenceStyle.canvas.ignoresSafeArea())
             }
-            .scrollIndicators(.hidden)
-            .scrollDismissesKeyboard(.interactively)
-            .ignoresSafeArea(.container, edges: .top)
-            .background(CommunityReferenceStyle.canvas.ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .onChange(of: showSearch) { _, visible in
                 searchFocused = visible
@@ -1109,26 +1114,35 @@ struct ATHLTHCommunityV5View: View {
                 }
                 .padding(.vertical, 7)
             } else {
-                ZStack(alignment: .bottomLeading) {
-                    Image("GoalSprint")
-                        .resizable()
-                        .scaledToFill()
-                        .frame(height: 149)
-                        .frame(maxWidth: .infinity)
-                        .clipped()
-                        .clipShape(RoundedRectangle(cornerRadius: 15))
-                    LinearGradient(
-                        colors: [.clear, .black.opacity(0.65)],
-                        startPoint: .center, endPoint: .bottom
+                GeometryReader { imageArea in
+                    ZStack(alignment: .bottomLeading) {
+                        Image("GoalSprint")
+                            .resizable()
+                            .scaledToFill()
+                            .frame(
+                                width: imageArea.size.width,
+                                height: imageArea.size.height
+                            )
+                            .clipped()
+                        LinearGradient(
+                            colors: [.clear, .black.opacity(0.65)],
+                            startPoint: .center, endPoint: .bottom
+                        )
+                        Text(tr(
+                            "Your next duel starts here",
+                            "Din neste duell starter her"
+                        ))
+                        .font(.system(size: 21, weight: .medium, design: .serif))
+                        .foregroundStyle(.white)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.8)
+                        .padding(16)
+                    }
+                    .frame(
+                        width: imageArea.size.width,
+                        height: imageArea.size.height
                     )
                     .clipShape(RoundedRectangle(cornerRadius: 15))
-                    Text(tr(
-                        "Your next duel starts here",
-                        "Din neste duell starter her"
-                    ))
-                    .font(.system(size: 21, weight: .medium, design: .serif))
-                    .foregroundStyle(.white)
-                    .padding(16)
                 }
                 .frame(height: 149)
                 Text(tr(
@@ -1181,7 +1195,11 @@ struct ATHLTHCommunityV5View: View {
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(CommunityReferenceStyle.darkGold)
                         }
+                        // Long titles must wrap within the remaining width
+                        // beside the fixed-size image.
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .buttonStyle(.plain)
                 progressDots(challenge)
