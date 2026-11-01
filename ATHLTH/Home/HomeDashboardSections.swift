@@ -1673,8 +1673,8 @@ struct HomeHealthMetricStrip: View {
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Steps today: \\(stepsText)",
-            norwegian: "Skritt i dag: \\(stepsText)"
+            english: "Steps today: \(stepsText)",
+            norwegian: "Skritt i dag: \(stepsText)"
         ))
     }
 
