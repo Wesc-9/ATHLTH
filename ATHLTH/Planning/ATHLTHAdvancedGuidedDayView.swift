@@ -15,6 +15,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
     let onAddWorkout: () -> Void
     let onQuick: (String) -> Void
     let onEditWorkout: (Int) -> Void
+    let onEditBlock: (Int, Int) -> Void
     let onRestDay: () -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -237,7 +238,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
             }
             .buttonStyle(.plain)
             ForEach(ATHLTHWorkoutTimelinePresentation.sections(for: workout.blocks)) { section in
-                phaseSection(section, workoutIndex: index)
+                phaseSection(section, workoutIndex: index, workout: workout)
             }
             if index == 0 {
                 Button(action: onAddWorkout) {
@@ -261,7 +262,8 @@ struct ATHLTHAdvancedGuidedDayView: View {
 
     private func phaseSection(
         _ section: ATHLTHWorkoutTimelinePresentation.Section,
-        workoutIndex: Int
+        workoutIndex: Int,
+        workout: ATHLTHPlanStructuredWorkoutBlueprint
     ) -> some View {
         let phase = section.phase
         let blocks = section.blocks
@@ -285,28 +287,51 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 .accessibilityLabel(tr("Add to", "Legg til i") + " " + phase.title)
             }
             ForEach(Array(blocks.enumerated()), id: \.offset) { pair in
-                HStack(spacing: 9) {
-                    Image(systemName: pair.element.kind == .rest ? "pause.circle.fill" :
-                          pair.element.kind == .exercise ? "dumbbell" :
-                          pair.element.kind == .run ? "figure.run" : "figure.cooldown")
-                        .font(.caption)
-                        .foregroundStyle(pair.element.kind == .rest ? gold : secondary)
-                        .frame(width: 19)
-                    Text(pair.element.title)
-                        .font(.system(size: 11, weight: .medium))
-                        .lineLimit(1)
-                    Spacer(minLength: 0)
-                    Text(pair.element.targetText ?? "")
-                        .font(.system(size: 9))
-                        .foregroundStyle(secondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
+                Button {
+                    // Use the original blueprint index, not the index within
+                    // a displayed phase. This also handles interleaved rests.
+                    if let blockIndex = workout.blocks.firstIndex(where: {
+                        $0.editorDragID == pair.element.editorDragID
+                    }) {
+                        onEditBlock(workoutIndex, blockIndex)
+                    } else {
+                        onEditWorkout(workoutIndex)
+                    }
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: pair.element.kind == .rest ? "pause.circle.fill" :
+                              pair.element.kind == .exercise ? "dumbbell" :
+                              pair.element.kind == .run ? "figure.run" : "figure.cooldown")
+                            .font(.caption)
+                            .foregroundStyle(pair.element.kind == .rest ? gold : secondary)
+                            .frame(width: 19)
+                        Text(pair.element.title)
+                            .font(.subheadline.weight(.medium))
+                            .lineLimit(1)
+                        Spacer(minLength: 0)
+                        Text(pair.element.targetText ?? "")
+                            .font(.caption)
+                            .foregroundStyle(secondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                        Image(systemName: "chevron.right")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(secondary)
+                            .accessibilityHidden(true)
+                    }
+                    .foregroundStyle(ink)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 44)
+                    .contentShape(RoundedRectangle(cornerRadius: 9))
+                    .background(pair.element.kind == .rest
+                        ? ATHLTHTrainDesign.paleGold.opacity(0.43) : canvas.opacity(0.70),
+                        in: RoundedRectangle(cornerRadius: 9))
                 }
-                .padding(.horizontal, 10)
-                .frame(minHeight: 34)
-                .background(pair.element.kind == .rest
-                    ? ATHLTHTrainDesign.paleGold.opacity(0.43) : canvas.opacity(0.70),
-                    in: RoundedRectangle(cornerRadius: 9))
+                .buttonStyle(.plain)
+                .accessibilityHint(tr(
+                    "Edit the duration, pace, intensity or recovery for this step.",
+                    "Rediger varighet, tempo, intensitet eller pause for denne deløkten."
+                ))
             }
         }
     }
