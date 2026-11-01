@@ -3536,20 +3536,11 @@ struct ChallengeCreationView: View {
                             .weight(.semibold)
                     )
 
-                    Picker(
-                        "Timing",
-                        selection:
-                            $timeBasis
-                    ) {
-                        ForEach(
-                            ChallengeTimeBasis
-                                .allCases
-                        ) { basis in
-                            Text(basis.title)
-                                .tag(basis)
-                        }
-                    }
-                    .pickerStyle(.segmented)
+                    challengeSegmentedRow(
+                        items: ChallengeTimeBasis.allCases,
+                        selected: $timeBasis,
+                        label: { $0.title }
+                    )
                 }
 
                 if scoring ==
@@ -3640,28 +3631,17 @@ struct ChallengeCreationView: View {
                             step: 25
                         )
 
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Route direction",
-                                norwegian:
-                                    "Ruteretning"
-                            ),
-                            selection:
-                                $routeDirection
-                        ) {
-                            ForEach(
-                                ChallengeRouteDirection
-                                    .allCases
-                            ) { direction in
-                                Text(
-                                    direction.title
-                                )
-                                .tag(direction)
-                            }
-                        }
-                        .pickerStyle(
-                            .segmented
+                        Text(ATHLTHLocalization.choose(
+                            english: "Route direction",
+                            norwegian: "Ruteretning"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                        challengeSegmentedRow(
+                            items: ChallengeRouteDirection.allCases,
+                            selected: $routeDirection,
+                            label: { $0.title }
                         )
 
                         Toggle(
