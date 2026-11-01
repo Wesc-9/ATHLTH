@@ -194,7 +194,8 @@ enum ChallengeCreationPolicy {
         sport: ATHLTHChallengeSport,
         scoring: ATHLTHChallengeScoring,
         creatorName: String,
-        invitedNames: [String]
+        invitedNames: [String],
+        scoringTitle: String? = nil
     ) -> String {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard clean.isEmpty else { return String(clean.prefix(100)) }
@@ -217,8 +218,9 @@ enum ChallengeCreationPolicy {
             people = shortName(creatorName) + " + " +
                 String(invitedNames.count)
         }
-        return String((automaticTitle(sport: sport, scoring: scoring) +
-            " · " + people).prefix(120))
+        return String(((scoringTitle ?? automaticTitle(
+            sport: sport, scoring: scoring
+        )) + " · " + people).prefix(120))
     }
 
     static func requiresDirectInvite(
