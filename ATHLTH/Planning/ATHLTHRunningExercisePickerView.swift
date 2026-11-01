@@ -66,6 +66,18 @@ struct ATHLTHRunningExercisePickerView: View {
                                     onSelect(set.inserting())
                                     dismiss()
                                 }
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        ATHLTHRunningMainSet.delete(
+                                            id: set.id, userID: userID
+                                        )
+                                        savedSets = ATHLTHRunningMainSet.load(userID: userID)
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(
+                                            english: "Delete", norwegian: "Slett"
+                                        ), systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                     }
