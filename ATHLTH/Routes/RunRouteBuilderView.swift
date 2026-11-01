@@ -76,8 +76,8 @@ struct RunRouteBuilderView: View {
                             .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(ATHLTHLocalization.choose(
-                                english: "Let Coach suggest a route",
-                                norwegian: "La Coach foreslå en rute"
+                                english: "Create a running route with Coach",
+                                norwegian: "Lag en løperute med Coach"
                             ))
                             .font(.subheadline.weight(.semibold))
                             Text(ATHLTHLocalization.choose(
