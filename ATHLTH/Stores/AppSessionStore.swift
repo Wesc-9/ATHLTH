@@ -227,15 +227,21 @@ final class AppSessionStore: ObservableObject {
         guard signedIn else { return false }
 
         if let data = defaults.data(forKey: verifiedOfflineProfileKey),
-           let cached = try? JSONDecoder().decode(UserProfile.self, from: data),
-           persistedAuthUserID == nil || persistedAuthUserID == cached.userID {
+           let cached = try? JSONDecoder().decode(UserProfile.self, from: data) {
+            // If Keychain contains a different user, stop and require
+            // interactive sign-in. Do not expose the last user's local files.
+            if let persistedAuthUserID, persistedAuthUserID != cached.userID {
+                resetAuthenticationState()
+                return false
+            }
             profile = cached
             activateLocalAccount(cached.userID)
             return true
         }
 
-        // Never load another person's cached training data when the
-        // Keychain identifies a different current account.
+        // Never infer account identity from old workout data or a random
+        // profile UUID. Pre-cache app versions can migrate from a preserved
+        // Supabase Keychain user only while locally marked as signed in.
         guard defaults.data(forKey: verifiedOfflineProfileKey) == nil,
               let persistedAuthUserID else { return false }
 

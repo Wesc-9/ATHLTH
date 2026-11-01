@@ -437,6 +437,47 @@ private struct ATHLTHLaunchGateView: View {
     }
 }
 
+/// Shown only when an upgraded installation has an old signed-in marker
+/// but cannot identify its account from either local verified profile data
+/// or a persisted Supabase session. Never open someone else's training data.
+private struct ATHLTHOfflineAccountRecoveryView: View {
+    let retry: () -> Void
+    let signInAgain: () -> Void
+
+    var body: some View {
+        ZStack {
+            ATHLTHTheme.canvasTop.ignoresSafeArea()
+            VStack(spacing: 16) {
+                Image(systemName: "wifi.slash")
+                    .font(.system(size: 32))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Text(ATHLTHLocalization.choose(
+                    english: "Confirm your account once",
+                    norwegian: "Bekreft kontoen én gang"
+                ))
+                .font(.title3.bold())
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                Text(ATHLTHLocalization.choose(
+                    english: "This older installation needs one online sign-in to identify its saved local data. After that, workouts and plans open offline.",
+                    norwegian: "Denne eldre installasjonen trenger én tilkobling for å identifisere lagret innhold. Deretter kan trening og planer åpnes uten internett."
+                ))
+                .font(.subheadline)
+                .multilineTextAlignment(.center)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                Button(ATHLTHLocalization.choose(
+                    english: "Try again", norwegian: "Prøv igjen"
+                ), action: retry)
+                    .buttonStyle(.borderedProminent)
+                Button(ATHLTHLocalization.choose(
+                    english: "Sign in again", norwegian: "Logg inn på nytt"
+                ), action: signInAgain)
+                    .buttonStyle(.bordered)
+            }
+            .padding(28)
+        }
+    }
+}
+
 struct AppRootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
@@ -474,6 +515,7 @@ struct AppRootView: View {
 
     @State private var authCallbackError: String?
     @State private var startupAuthenticationResolved = false
+    @State private var offlineAccountRecoveryNeeded = false
     @State private var pendingWorkoutReview: SocialPublishableWorkout?
     @State private var pendingWorkoutReviewVisibilityOverride: ProfileVisibility?
     @State private var pendingFirstWorkoutSharePrompt: SocialPublishableWorkout?
@@ -1007,6 +1049,16 @@ struct AppRootView: View {
                 AnyView(ProductRootTabView())
             } else if appSession.signedIn && !startupAuthenticationResolved {
                 ATHLTHLaunchGateView()
+            } else if offlineAccountRecoveryNeeded && appSession.signedIn {
+                ATHLTHOfflineAccountRecoveryView(
+                    retry: {
+                        Task { await resolveStartupAuthentication() }
+                    },
+                    signInAgain: {
+                        appSession.resetAuthenticationState()
+                        offlineAccountRecoveryNeeded = false
+                    }
+                )
             } else if !appSession.signedIn || !appSession.onboardingCompleted {
                 OnboardingFlowView()
             } else {
@@ -2187,15 +2239,27 @@ struct AppRootView: View {
         )
         startupAuthenticationResolved = true
 
-        // Older installations may have a signed-in marker but no cached
-        // identity and no currently loaded Supabase user. Do not expose
-        // another account's content based on a random profile UUID.
+        // Older installs can have a local sign-in marker without a verified
+        // profile cache. Show a recoverable prompt rather than loading
+        // account-scoped content under a random ID.
         guard ready else {
-            // A later online sign-in remains possible without deleting
-            // local training records or the persisted authentication.
+            offlineAccountRecoveryNeeded = appSession.signedIn
+            if appSession.signedIn {
+                Task { @MainActor in
+                    do {
+                        guard let bootstrap = try await accountService.restoreCurrentUser(),
+                              appSession.signedIn else { return }
+                        appSession.applyBackendBootstrap(bootstrap)
+                        offlineAccountRecoveryNeeded = false
+                    } catch {
+                        // Offline: remain on explicit retry/sign-in recovery.
+                    }
+                }
+            }
             return
         }
 
+        offlineAccountRecoveryNeeded = false
         let expectedUserID = appSession.profile.userID
         // Online reconciliation is deliberately detached from the launch
         // gate. A timeout, airplane mode or transient server error must
