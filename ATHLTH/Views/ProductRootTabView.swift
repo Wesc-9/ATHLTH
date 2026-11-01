@@ -1004,7 +1004,7 @@ struct ATHLTHHomeView: View {
 
                     homeDailyRecommendationAndCalendarRow
 
-                    HomeActiveFriendsStrip()
+                    HomeActiveFriendsStrip(isActive: isActive)
 
                     HomePersonalRecentActivitySection()
                 }
@@ -1285,6 +1285,8 @@ struct ATHLTHHomeView: View {
                     refreshHomeGroupCalendar()
                 async let activityRefresh: Void =
                     social.refreshHomeFeed(force: true)
+                async let friendsRefresh: Void =
+                    social.refreshHomeFriends(force: true)
 
                 if !health.shouldDeferAutomaticHealthWork {
                     _ = await health.refreshWorkoutImportInbox()
@@ -1312,7 +1314,8 @@ struct ATHLTHHomeView: View {
                 _ = await (
                     communityRefresh,
                     groupRefresh,
-                    activityRefresh
+                    activityRefresh,
+                    friendsRefresh
                 )
             }
             // Present search outside Home's refreshable environment so its
