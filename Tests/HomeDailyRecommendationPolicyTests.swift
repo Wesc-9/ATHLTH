@@ -1,7 +1,53 @@
+import SwiftUI
 import XCTest
 @testable import ATHLTH
 
 final class HomeDailyRecommendationPolicyTests: XCTestCase {
+    @MainActor
+    func testCompactRecommendationKeepsSameHeightForShortAndLongAdvice() {
+        XCTAssertEqual(HomeTodayTwinCardLayout.height, 174)
+        let adviceSamples: [HomeDailyRecommendationPolicy.Advice] = [
+            .recommendation(
+                readiness: .ready,
+                hasWorkoutToday: false,
+                trainingLoadRatio: nil
+            ),
+            .recommendation(
+                readiness: .unavailable,
+                hasWorkoutToday: true,
+                trainingLoadRatio: nil
+            ),
+            .recommendation(
+                readiness: .balanced,
+                hasWorkoutToday: true,
+                trainingLoadRatio: 1.85,
+                plannedActivity: .running
+            )
+        ]
+
+        for width in [158.0, 185.0, 225.0] {
+            for advice in adviceSamples {
+                let card = HomeDailyRecommendationCard(
+                    advice: advice,
+                    onStartRecommendedWorkout: {},
+                    compact: true
+                )
+                .frame(width: width)
+
+                let host = UIHostingController(rootView: card)
+                host.loadViewIfNeeded()
+                let measured = host.sizeThatFits(in: CGSize(width: width, height: 400))
+                XCTAssertEqual(
+                    measured.height,
+                    HomeTodayTwinCardLayout.height,
+                    accuracy: 1,
+                    "Recommendation must match the calendar card height"
+                )
+                XCTAssertLessThanOrEqual(measured.width, width + 1)
+            }
+        }
+    }
+
     func testNoWearableDataStillShowsPlanBasedAdvice() {
         let advice = HomeDailyRecommendationPolicy.recommendation(
             readiness: .unavailable, hasWorkoutToday: true,
