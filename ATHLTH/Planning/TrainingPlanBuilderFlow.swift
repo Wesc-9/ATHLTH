@@ -6949,7 +6949,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private func goBack() {
         if step == .basics {
-            withAnimation(.easeInOut(duration: 0.18)) { step = .mode }
+            // Go back to the goal (step 2), not the initial method selector.
+            withAnimation(.easeInOut(duration: 0.18)) { step = .goal }
             return
         }
         if step == .approach {
