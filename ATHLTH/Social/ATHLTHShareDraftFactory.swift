@@ -28,7 +28,51 @@ enum ATHLTHPersonalExerciseSharing {
     static func isEligible(_ entry: ExerciseLibraryEntry, ownerID: UUID) -> Bool {
         entry.source == .custom &&
         entry.exercise.origin == .custom &&
-        entry.exercise.ownerID == ownerID
+        entry.exercise.ownerID == ownerID &&
+        entry.exercise.sharedSourceExerciseID == nil &&
+        entry.exercise.originalCreatorID.map { $0 == ownerID } != false
+    }
+}
+
+/// Only athlete-authored and persisted items can be shared.
+/// Imported copies and catalogue entries stay available for training.
+enum ATHLTHPersonalSharePolicy {
+    static func plan(_ item: TrainingPlan, ownerID: UUID) -> Bool {
+        item.ownerID == ownerID &&
+        item.sharedSourcePlanID == nil &&
+        item.sharedSourceOwnerID == nil &&
+        !item.tags.contains(where: { $0.hasPrefix("catalog:") })
+    }
+    static func workout(_ item: PlannedSession) -> Bool {
+        item.sharedSourceSessionID == nil && item.sharedSourceOwnerID == nil
+    }
+    static func runningWorkout(_ item: RunningWorkoutTemplate) -> Bool {
+        !item.isBuiltIn &&
+        item.sharedSourceWorkoutID == nil && item.sharedSourceOwnerID == nil
+    }
+    static func route(_ item: TrainingRoute, ownerID: UUID) -> Bool {
+        let source = item.routeSource?.lowercased() ?? ""
+        return item.ownerID == ownerID &&
+            item.sharedSourceRouteID == nil && item.sharedSourceOwnerID == nil &&
+            !["shared", "community", "catalog", "public", "discovery"].contains(source)
+    }
+    static func savedPlans(_ items: [TrainingPlan], ownerID: UUID) -> [TrainingPlan] {
+        var seen = Set<UUID>()
+        return items.filter {
+            plan($0, ownerID: ownerID) && seen.insert($0.id).inserted
+        }
+    }
+    static func savedWorkouts(_ items: [PlannedSession]) -> [PlannedSession] {
+        var seen = Set<UUID>()
+        return items.filter {
+            workout($0) && seen.insert($0.id).inserted
+        }
+    }
+    static func savedRoutes(_ items: [TrainingRoute], ownerID: UUID) -> [TrainingRoute] {
+        var seen = Set<UUID>()
+        return items.filter {
+            route($0, ownerID: ownerID) && seen.insert($0.id).inserted
+        }
     }
 }
 
@@ -58,7 +102,13 @@ enum ATHLTHShareDraftFactory {
 
     static func workout(_ original: PlannedSession,
                         library: [ExerciseLibraryEntry],
-                        ownerID: UUID) throws -> MessageShareDraft {
+                        ownerID: UUID,
+                        savedWorkouts: [PlannedSession] = []) throws -> MessageShareDraft {
+        guard ATHLTHPersonalSharePolicy.workout(original),
+              savedWorkouts.contains(where: { $0.id == original.id &&
+                  ATHLTHPersonalSharePolicy.workout($0) }) else {
+            throw ATHLTHDirectShareError.onlySavedPersonalContent
+        }
         let copy = safeWorkout(original, library: library)
         return try MessageShareDraft(
             kind: .workout, title: copy.title,
@@ -71,7 +121,13 @@ enum ATHLTHShareDraftFactory {
 
     static func plan(_ original: TrainingPlan,
                      library: [ExerciseLibraryEntry],
-                     ownerID: UUID) throws -> MessageShareDraft {
+                     ownerID: UUID,
+                     savedPlans: [TrainingPlan] = []) throws -> MessageShareDraft {
+        guard ATHLTHPersonalSharePolicy.plan(original, ownerID: ownerID),
+              savedPlans.contains(where: { $0.id == original.id &&
+                  ATHLTHPersonalSharePolicy.plan($0, ownerID: ownerID) }) else {
+            throw ATHLTHDirectShareError.onlySavedPersonalContent
+        }
         var copy = ATHLTHExerciseReferenceResolver.portablePlan(
             original, from: library
         )
@@ -147,6 +203,7 @@ enum ATHLTHShareDraftFactory {
 enum ATHLTHDirectShareError: LocalizedError {
     case privateExercise
     case onlyPersonalExercises
+    case onlySavedPersonalContent
 
     var errorDescription: String? {
         switch self {
@@ -157,8 +214,13 @@ enum ATHLTHDirectShareError: LocalizedError {
             )
         case .onlyPersonalExercises:
             return ATHLTHLocalization.choose(
-                english: "Only your own exercises from My Exercises can be shared.",
-                norwegian: "Du kan bare sende egne øvelser fra Mine øvelser."
+                english: "Only your saved, self-created exercises can be shared.",
+                norwegian: "Du kan bare sende øvelser du har laget selv og lagret i Mine øvelser."
+            )
+        case .onlySavedPersonalContent:
+            return ATHLTHLocalization.choose(
+                english: "Only items you created and saved can be shared.",
+                norwegian: "Du kan bare dele innhold du har laget selv og lagret."
             )
         }
     }
