@@ -6,6 +6,16 @@ import SwiftUI
 enum ATHLTHCommunityMainTab: String, CaseIterable, Identifiable {
     case overview, clubs, arena, events
     var id: String { rawValue }
+
+    var heroAssetName: String {
+        switch self {
+        case .overview: "CommunityHero"
+        case .clubs: "CommunityClubsHero"
+        case .arena: "CommunityArenaHero"
+        case .events: "CommunityEventsHero"
+        }
+    }
+
     var title: String {
         switch self {
         case .overview:
@@ -281,19 +291,10 @@ struct ATHLTHCommunityV5View: View {
 
     // MARK: - Hero images: one per Community destination.
 
-    private var communityHeroImageName: String {
-        switch tab {
-        case .overview: "CommunityHero"
-        case .clubs: "CommunityClubsHero"
-        case .arena: "CommunityArenaHero"
-        case .events: "CommunityEventsHero"
-        }
-    }
-
     private var cover: some View {
         ZStack(alignment: .topLeading) {
             GeometryReader { geo in
-                Image(communityHeroImageName)
+                Image(tab.heroAssetName)
                     .resizable()
                     .interpolation(.high)
                     .scaledToFill()
