@@ -3284,8 +3284,6 @@ struct WorkoutTemplateBuilderView: View {
     @State private var selectedRouteID: UUID?
     @State private var showingExercisePicker = false
     @State private var showingRunningExercisePicker = false
-    @State private var showingSaveRunningMainSet = false
-    @State private var runningMainSetTitle = ""
     @State private var selectedExerciseInfo: WorkoutTemplateBlock?
     @State private var selectedPhase: WorkoutPhaseKind = .main
     @State private var expandedBlockIndex: Int?
@@ -4079,24 +4077,6 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .presentationDetents([.large])
             }
-            .alert(tr("Save main set", "Lagre hoveddel"),
-                   isPresented: $showingSaveRunningMainSet) {
-                TextField(tr("Name", "Navn"), text: $runningMainSetTitle)
-                Button(tr("Save", "Lagre")) {
-                    let saved = ATHLTHRunningMainSet.save(
-                        title: runningMainSetTitle, from: blocks,
-                        userID: session.profile.userID
-                    )
-                    actionNotice = saved
-                        ? tr("Saved to My main sets", "Lagret i Mine hoveddeler")
-                        : tr("Main set requires running steps and a name",
-                             "Hoveddelen må ha løpedeløkter og et navn")
-                }
-                Button(tr("Cancel", "Avbryt"), role: .cancel) {}
-            } message: {
-                Text(tr("Save all running intervals and recovery steps in Main set.",
-                        "Lagre løpsdrag og pauser fra Hoveddel for senere bruk."))
-            }
             .onAppear {
                 guard !draftActive else { return }
                 restoreWorkoutDraft()
@@ -4282,7 +4262,6 @@ struct WorkoutTemplateBuilderView: View {
     // Replaces the old fixed warmup/main/cooldown selector AND the second
     // legacy timeline on planned workouts. Only one phase/step UI exists.
     private var plannedStudio: some View {
-        VStack(alignment: .leading, spacing: 10) {
         ATHLTHPlannedWorkoutStudioView(
             blocks: $blocks,
             visiblePhases: $studioVisiblePhases,
@@ -4377,27 +4356,6 @@ struct WorkoutTemplateBuilderView: View {
                 resequence()
             }
         )
-        if initialActivity == .running && studioAdvanced &&
-           blocks.contains(where: { $0.resolvedPhase == .main && $0.kind == .run }) {
-            Button {
-                runningMainSetTitle = ""
-                showingSaveRunningMainSet = true
-            } label: {
-                Label(tr("Save main set", "Lagre hoveddel"),
-                      systemImage: "bookmark")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.accent)
-                    .frame(maxWidth: .infinity, minHeight: 46)
-                    .background(ATHLTHPlanDesign.selectedSurface,
-                                in: RoundedRectangle(cornerRadius: 15))
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(tr(
-                "Save your entire main interval section for reuse.",
-                "Lagre hele hoveddelen med drag og pauser for gjenbruk."
-            ))
-        }
-        }
     }
 
     private func removeBasicOwnedBlocks() {
@@ -6124,6 +6082,8 @@ struct WorkoutTemplateBuilderView: View {
                 session.saveSharedWorkout(workout)
             }
         }
+        // Main sections are indexed when their session/template is committed
+        // by AppSessionStore, not through a special button in this editor.
         draftFinished = true
         UserDefaults.standard.removeObject(forKey: draftStorageKey)
         dismiss()
