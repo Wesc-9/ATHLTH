@@ -666,7 +666,25 @@ final class AppSettingsStore: ObservableObject {
 
         appearance = .light
         profileVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.profileVisibility") ?? "") ?? .publicProfile
-        defaultActivityVisibility = ProfileVisibility(rawValue: defaults.string(forKey: "settings.defaultActivityVisibility") ?? "") ?? .friends
+        // New workouts default to public in the share/review UI, but the user
+        // must still confirm publishing. Preserve an explicit Private choice.
+        // Migrate the old Friends default once for existing installations;
+        // later user changes are never overwritten on a subsequent launch.
+        let activityVisibilityKey = "settings.defaultActivityVisibility"
+        let publicDefaultMigrationKey = "settings.workoutsPublicByDefault.v207"
+        let storedActivityVisibility = ProfileVisibility(
+            rawValue: defaults.string(forKey: activityVisibilityKey) ?? ""
+        )
+        if !defaults.bool(forKey: publicDefaultMigrationKey) {
+            let newDefault: ProfileVisibility =
+                storedActivityVisibility == .privateOnly
+                    ? .privateOnly : .publicProfile
+            defaultActivityVisibility = newDefault
+            defaults.set(newDefault.rawValue, forKey: activityVisibilityKey)
+            defaults.set(true, forKey: publicDefaultMigrationKey)
+        } else {
+            defaultActivityVisibility = storedActivityVisibility ?? .publicProfile
+        }
         shareTrainingPresence = defaults.object(forKey: "settings.shareTrainingPresence") as? Bool ?? false
         hideRouteStartAndEnd = defaults.object(forKey: "settings.hideRouteStartAndEnd") as? Bool ?? true
 
@@ -675,14 +693,6 @@ final class AppSettingsStore: ObservableObject {
             defaults.object(forKey: "settings.profileSetupCompleted") as? Bool
             ?? false
         profileSetupCompleted = resolvedProfileSetupCompleted
-
-        if !resolvedProfileSetupCompleted {
-            defaultActivityVisibility = .friends
-            defaults.set(
-                ProfileVisibility.friends.rawValue,
-                forKey: "settings.defaultActivityVisibility"
-            )
-        }
 
         showTrainingFocusOnProfile = defaults.object(forKey: "settings.showTrainingFocusOnProfile") as? Bool ?? false
         showTrainingStatusOnProfile = defaults.object(forKey: "settings.showTrainingStatusOnProfile") as? Bool ?? false
