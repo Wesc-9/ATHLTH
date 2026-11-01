@@ -407,19 +407,40 @@ struct ATHLTHCommunityV5View: View {
 
     private var overview: some View {
         VStack(spacing: 12) {
+            weeklyChallengeSection
             twoColumns {
                 joinedClubCard
                 arenaDuelCard
             }
-            twoColumns {
-                weeklyChallengeCard
-                nextGatheringCard
-            }
+            nextGatheringCard
             membersStrip
             if let invitation = pendingClubInvitation {
                 invitationBanner(invitation)
             }
         }
+    }
+
+    // The weekly challenge lives once, at the top of Overview.
+    // Keep its existing progress and detail navigation unchanged.
+    private var weeklyChallengeSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                communitySectionHeading(
+                    tr("This week's challenge", "Ukens utfordring"),
+                    icon: "star.fill"
+                )
+                Spacer()
+                NavigationLink {
+                    ChallengeHubView()
+                } label: {
+                    Text(tr("See all", "Se alle"))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(CommunityReferenceStyle.darkGold)
+                }
+            }
+            weeklyChallengeHighlight
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var clubsPage: some View {
@@ -589,22 +610,6 @@ struct ATHLTHCommunityV5View: View {
                 }
                 .buttonStyle(.plain)
             }
-
-            HStack(alignment: .firstTextBaseline) {
-                communitySectionHeading(
-                    tr("This week's challenge", "Ukens utfordring"),
-                    icon: "star.fill"
-                )
-                Spacer()
-                NavigationLink {
-                    ChallengeHubView()
-                } label: {
-                    Text(tr("See all", "Se alle"))
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(CommunityReferenceStyle.darkGold)
-                }
-            }
-            arenaChallengeHighlight
 
             communitySectionHeading(
                 tr("Your Arena", "Din uke i Arena"),
@@ -1166,7 +1171,7 @@ struct ATHLTHCommunityV5View: View {
         .communityReferenceCard()
     }
 
-    private var arenaChallengeHighlight: some View {
+    private var weeklyChallengeHighlight: some View {
         VStack(alignment: .leading, spacing: 12) {
             if let challenge = weekly.activeChallenge {
                 NavigationLink {
@@ -1747,70 +1752,6 @@ struct ATHLTHCommunityV5View: View {
             return String(format: "%.1f km", score / 1_000)
         }
         return score.formatted(.number.precision(.fractionLength(0...1)))
-    }
-
-    private var weeklyChallengeCard: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            cardHeading(ATHLTHLocalization.choose(
-                english: "Weekly challenge", norwegian: "Ukens utfordring"
-            ), icon: "star.fill")
-            if let challenge = weekly.activeChallenge {
-                NavigationLink {
-                    OfficialWeeklyChallengeDetailView(challengeID: challenge.id)
-                } label: {
-                    VStack(alignment: .leading, spacing: 7) {
-                        HStack(spacing: 8) {
-                            Image(systemName: challenge.kind.icon)
-                                .font(.system(size: 20))
-                                .foregroundStyle(CommunityReferenceStyle.darkGold)
-                                .frame(width: 39, height: 39)
-                                .background(CommunityReferenceStyle.cream, in: Circle())
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(challenge.title)
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(CommunityReferenceStyle.ink)
-                                    .lineLimit(2)
-                                Text(challenge.subtitle)
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(CommunityReferenceStyle.muted)
-                                    .lineLimit(2)
-                            }
-                        }
-                        progressDots(challenge)
-                    }
-                }
-                .buttonStyle(.plain)
-                Spacer(minLength: 0)
-                NavigationLink {
-                    OfficialWeeklyChallengeDetailView(challengeID: challenge.id)
-                } label: {
-                    creamButton(ATHLTHLocalization.choose(
-                        english: "View challenge", norwegian: "Se utfordring"
-                    ), symbol: "arrow.right")
-                }
-                .buttonStyle(.plain)
-            } else {
-                Spacer(minLength: 0)
-                Text(ATHLTHLocalization.choose(
-                    english: "Next challenge will appear here.",
-                    norwegian: "Neste utfordring vises her."
-                ))
-                .font(.system(size: 11))
-                .foregroundStyle(CommunityReferenceStyle.muted)
-                Spacer(minLength: 0)
-                NavigationLink {
-                    ChallengeHubView()
-                } label: {
-                    creamButton(ATHLTHLocalization.choose(
-                        english: "Explore", norwegian: "Utforsk"
-                    ), symbol: "arrow.right")
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(11)
-        .frame(height: 173, alignment: .topLeading)
-        .communityReferenceCard()
     }
 
     private func progressDots(_ challenge: OfficialWeeklyChallenge) -> some View {
