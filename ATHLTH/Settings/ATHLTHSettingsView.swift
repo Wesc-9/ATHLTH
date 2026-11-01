@@ -3668,43 +3668,34 @@ private struct ATHLTHTrainingSettingsView: View {
             }
 
             Section("Activity sharing") {
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Default visibility for new workouts",
+                        norwegian: "Standard synlighet for nye økter"
+                    ),
+                    selection: $settings.defaultActivityVisibility
+                ) {
+                    ForEach(ProfileVisibility.allCases) { visibility in
+                        Text(visibility.title).tag(visibility)
+                    }
+                }
+
                 Toggle(
                     "Share completed workouts by default",
                     isOn: $settings.autoPublishCompletedWorkouts
                 )
                 .onChange(
                     of: settings.autoPublishCompletedWorkouts
-                ) { _, enabled in
+                ) { _, _ in
                     settings.workoutSharingChoiceCompleted = true
-
-                    if enabled &&
-                        settings.defaultActivityVisibility == .privateOnly {
-                        settings.defaultActivityVisibility = .friends
-                    }
                 }
 
-                if settings.autoPublishCompletedWorkouts {
-                    Picker(
-                        "Automatic visibility",
-                        selection: $settings.defaultActivityVisibility
-                    ) {
-                        ForEach(ProfileVisibility.allCases) { visibility in
-                            Text(visibility.title).tag(visibility)
-                        }
-                    }
-
-                    Text(
-                        "ATHLTH preselects your sharing visibility, but Workout Complete always opens before anything is published."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                } else {
-                    Text(
-                        "Completed workouts default to private. Workout Complete still opens after every session so you can choose what to share."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+                Text(ATHLTHLocalization.choose(
+                    english: "New workouts use this visibility when you choose to share them. You can change it for each workout. Workout Complete opens before publishing; existing posts are unchanged. Maps and health details are not shared automatically.",
+                    norwegian: "Nye økter får denne synligheten når du velger å dele dem. Du kan endre den for hver økt. Øktoppsummeringen åpnes før publisering, og eksisterende innlegg endres ikke. Kart og helsedetaljer deles ikke automatisk."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
         }
         .athlthBrandedForm()
