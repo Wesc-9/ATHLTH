@@ -161,7 +161,6 @@ struct ATHLTHInsightsView: View {
     private var developmentSection: some View {
         Group {
             whatChangedCard
-            ATHLTHInsightsHealthLibraryEntry()
             personalInsightsLibrary
             ATHLTHInsightsDailyCheckInCard(store: checkInStore) {
                 showingCheckIn = true
