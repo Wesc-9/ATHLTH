@@ -461,7 +461,7 @@ struct ChallengeHubView: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(
                         status == "Completed"
-                            ? Color.green
+                            ? ChallengePlanTheme.gold
                             : Color.orange
                     )
 
@@ -3790,69 +3790,95 @@ struct ChallengeCreationView: View {
         }
     }
 
+    /// Single compact control: one attempt or a configurable amount.
+    /// The old toggle and the separated "Unlimited" row were redundant.
+    private var attemptCountBinding: Binding<Int> {
+        Binding(
+            get: { allowMultipleAttempts ? attemptLimit : 1 },
+            set: { selected in
+                if selected == 1 {
+                    allowMultipleAttempts = false
+                    attemptLimit = 0
+                } else {
+                    allowMultipleAttempts = true
+                    attemptLimit = selected
+                }
+            }
+        )
+    }
+
     private var creationAttemptControls: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Toggle(
-                ATHLTHLocalization.choose(
-                    english: "Allow multiple attempts",
-                    norwegian: "Tillat flere forsøk"
-                ),
-                isOn: $allowMultipleAttempts
-            )
-            .tint(ChallengePlanTheme.gold)
-            .frame(maxWidth: .infinity)
-
-            if allowMultipleAttempts {
-                HStack(spacing: 12) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Maximum attempts",
-                        norwegian: "Antall forsøk"
-                    ))
-                    .font(.subheadline)
-                    .foregroundStyle(ChallengePlanTheme.ink)
-
-                    Spacer(minLength: 5)
-
-                    Picker(
-                        ATHLTHLocalization.choose(
-                            english: "Maximum attempts",
-                            norwegian: "Antall forsøk"
-                        ),
-                        selection: $attemptLimit
-                    ) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Unlimited",
-                            norwegian: "Ubegrenset"
-                        )).tag(0)
-                        Text("2").tag(2)
-                        Text("3").tag(3)
-                        Text("5").tag(5)
-                        Text("10").tag(10)
-                    }
-                    .labelsHidden()
-                    .tint(ChallengePlanTheme.ink)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
+            HStack(spacing: 12) {
+                Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
+                    .font(.system(size: 17, weight: .semibold))
+                    .foregroundStyle(ChallengePlanTheme.gold)
+                    .frame(width: 40, height: 40)
                     .background(ATHLTHTheme.cardWarm,
                                 in: RoundedRectangle(cornerRadius: 13))
-                    .fixedSize(horizontal: true, vertical: false)
-                }
-                .frame(maxWidth: .infinity)
 
-                if sport == .running {
+                VStack(alignment: .leading, spacing: 3) {
                     Text(ATHLTHLocalization.choose(
-                        english: "Which attempt counts?",
-                        norwegian: "Hvilket forsøk teller?"
+                        english: "Attempts", norwegian: "Forsøk"
                     ))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ChallengePlanTheme.ink)
 
-                    challengeSegmentedRow(
-                        items: ChallengeAttemptPolicy.allCases,
-                        selected: $attemptPolicy,
-                        label: { $0.title }
-                    )
+                    Text(ATHLTHLocalization.choose(
+                        english: "Number of permitted attempts",
+                        norwegian: "Antall tillatte forsøk"
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
                 }
+
+                Spacer(minLength: 5)
+
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Number of attempts", norwegian: "Antall forsøk"
+                    ),
+                    selection: attemptCountBinding
+                ) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Unlimited", norwegian: "Ubegrenset"
+                    )).tag(0)
+                    Text("1").tag(1)
+                    Text("2").tag(2)
+                    Text("3").tag(3)
+                    Text("5").tag(5)
+                    Text("10").tag(10)
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .tint(ChallengePlanTheme.ink)
+                .padding(.horizontal, 10)
+                .frame(minWidth: 112, minHeight: 40)
+                .background(
+                    ATHLTHTheme.cardWarm,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 13)
+                        .stroke(ChallengePlanTheme.gold.opacity(0.25),
+                                lineWidth: 0.8)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            if allowMultipleAttempts && sport == .running {
+                Text(ATHLTHLocalization.choose(
+                    english: "Which attempt counts?",
+                    norwegian: "Hvilket forsøk teller?"
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+                challengeSegmentedRow(
+                    items: ChallengeAttemptPolicy.allCases,
+                    selected: $attemptPolicy,
+                    label: { $0.title }
+                )
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -8380,7 +8406,7 @@ struct ChallengeDetailView: View {
                                 .frame(height: 48)
                             }
                             .buttonStyle(.bordered)
-                            .tint(ATHLTHTheme.accentDeep)
+                            .tint(ChallengePlanTheme.gold)
                         }
 
                         if challenge.sport == .running,
@@ -8440,7 +8466,7 @@ struct ChallengeDetailView: View {
                                         .frame(maxWidth: .infinity)
                                     }
                                     .buttonStyle(.borderedProminent)
-                                    .tint(ATHLTHTheme.accentDeep)
+                                    .tint(ChallengePlanTheme.gold)
                                     .disabled(!social.isMutualFollow(partnerID))
                                 }
                             }
@@ -8896,7 +8922,7 @@ struct ChallengeDetailView: View {
                 english: "Challenge accepted", norwegian: "Utfordringen er godtatt"
             )
             icon = "checkmark.circle.fill"
-            highlight = ATHLTHTheme.accentDeep
+            highlight = ChallengePlanTheme.gold
         } else if recipient?.state == .declined {
             title = ATHLTHLocalization.choose(
                 english: "Challenge declined", norwegian: "Utfordringen er avslått"
@@ -8906,7 +8932,7 @@ struct ChallengeDetailView: View {
         } else {
             title = ""
             icon = "circle"
-            highlight = ATHLTHTheme.accentDeep
+            highlight = ChallengePlanTheme.gold
         }
 
         return HStack(spacing: 10) {
@@ -9023,8 +9049,7 @@ struct ChallengeDetailView: View {
                     .borderedProminent
                 )
                 .tint(
-                    ATHLTHTheme
-                        .vitality
+                    ChallengePlanTheme.gold
                 )
                 .controlSize(.large)
             }
@@ -9089,8 +9114,7 @@ struct ChallengeDetailView: View {
             }
             .buttonStyle(.borderedProminent)
             .tint(
-                ATHLTHTheme
-                    .vitality
+                ChallengePlanTheme.gold
             )
             .controlSize(.large)
             }
@@ -9449,8 +9473,7 @@ struct ChallengeDetailView: View {
         )
         .background(
             emphasized
-                ? ATHLTHTheme
-                    .vitality
+                ? ChallengePlanTheme.gold
                 : ATHLTHTheme
                     .cardWarm
                     .opacity(0.72),
@@ -9634,8 +9657,7 @@ struct ChallengeDetailView: View {
                                                 .verification ==
                                                 .manual
                                                 ? Color.orange
-                                                : ATHLTHTheme
-                                                    .vitality
+                                                : ChallengePlanTheme.gold
                                         )
                                     } else {
                                         Text(
@@ -9754,16 +9776,14 @@ struct ChallengeDetailView: View {
                     )
                     .font(.title2)
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .vitality
+                        ChallengePlanTheme.gold
                     )
                     .frame(
                         width: 44,
                         height: 44
                     )
                     .background(
-                        ATHLTHTheme
-                            .vitalitySoft,
+                        ATHLTHTheme.cardWarm,
                         in: RoundedRectangle(
                             cornerRadius: 13,
                             style: .continuous
@@ -9899,8 +9919,7 @@ struct ChallengeDetailView: View {
                             )
                             .tracking(1.2)
                             .foregroundStyle(
-                                ATHLTHTheme
-                                    .vitality
+                                ChallengePlanTheme.gold
                             )
 
                             ForEach(
@@ -9914,8 +9933,7 @@ struct ChallengeDetailView: View {
                                     ) {
                                         Circle()
                                             .fill(
-                                                ATHLTHTheme
-                                                    .vitality
+                                                ChallengePlanTheme.gold
                                             )
                                             .frame(
                                                 width: 9,
@@ -9986,8 +10004,7 @@ struct ChallengeDetailView: View {
                                         minHeight: 54
                                     )
                                     .background(
-                                        ATHLTHTheme
-                                            .vitalitySoft
+                                        ATHLTHTheme.cardWarm
                                             .opacity(0.58),
                                         in: RoundedRectangle(
                                             cornerRadius: 15,
@@ -10056,8 +10073,7 @@ struct ChallengeDetailView: View {
                         .borderedProminent
                     )
                     .tint(
-                        ATHLTHTheme
-                            .vitality
+                        ChallengePlanTheme.gold
                     )
                     .disabled(
                         settings
@@ -10092,8 +10108,7 @@ struct ChallengeDetailView: View {
                 }
                 .buttonStyle(.bordered)
                 .tint(
-                    ATHLTHTheme
-                        .accentDeep
+                    ChallengePlanTheme.gold
                 )
             }
         }
@@ -10172,8 +10187,7 @@ struct ChallengeDetailView: View {
         )
         .foregroundStyle(
             active
-                ? ATHLTHTheme
-                    .vitality
+                ? ChallengePlanTheme.gold
                 : ATHLTHTheme
                     .mutedText
         )
@@ -10183,8 +10197,7 @@ struct ChallengeDetailView: View {
         .frame(height: 32)
         .background(
             active
-                ? ATHLTHTheme
-                    .vitalitySoft
+                ? ATHLTHTheme.cardWarm
                     .opacity(0.72)
                 : Color.primary
                     .opacity(0.035),
@@ -10685,8 +10698,7 @@ struct ChallengeDetailView: View {
                                 .accepted ||
                             participant.state ==
                                 .creator
-                                ? ATHLTHTheme
-                                    .vitality
+                                ? ChallengePlanTheme.gold
                                 : ATHLTHTheme
                                     .mutedText
                         )
@@ -10704,8 +10716,7 @@ struct ChallengeDetailView: View {
                                     .accepted ||
                                 participant.state ==
                                     .creator
-                                    ? ATHLTHTheme
-                                        .vitality
+                                    ? ChallengePlanTheme.gold
                                     : Color.secondary
                             )
                             .opacity(0.08),
