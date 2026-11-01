@@ -916,11 +916,10 @@ struct ATHLTHHomeView: View {
                         }
                     )
 
-                    // Keep the compact rail as handle + profile avatar.
-                    // Weather and the remaining shortcuts appear when expanded.
+                    // Compact premium toolbar: small handle + three shortcuts;
+                    // keep the original larger profile avatar visible in both states.
                     HStack(spacing: 0) {
                         HomeHeroUtilityButtons(
-                            weather: homeWeather.snapshot,
                             challengeInviteUnreadCount:
                                 social.inboxEvents.filter {
                                     $0.kind == "challenge_invite" &&
@@ -950,17 +949,34 @@ struct ATHLTHHomeView: View {
                             )
                         )
                     }
-                    .padding(.horizontal, 5)
-                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.horizontal, 4)
+                    .background {
+                        Capsule()
+                            .fill(.ultraThinMaterial)
+                            .overlay {
+                                Capsule()
+                                    .fill(
+                                        LinearGradient(
+                                            colors: [
+                                                .white.opacity(0.22),
+                                                .white.opacity(0.04)
+                                            ],
+                                            startPoint: .top,
+                                            endPoint: .bottom
+                                        )
+                                    )
+                                    .allowsHitTesting(false)
+                            }
+                    }
                     .overlay {
                         Capsule()
                             .strokeBorder(
-                                Color.white.opacity(0.25),
-                                lineWidth: 0.7
+                                Color.white.opacity(0.48),
+                                lineWidth: 0.8
                             )
                             .allowsHitTesting(false)
                     }
-                    .shadow(color: .black.opacity(0.055), radius: 7, y: 3)
+                    .shadow(color: .black.opacity(0.11), radius: 9, y: 4)
                     .padding(.top, 60)
                     .padding(.trailing, 16)
                 }
@@ -5285,7 +5301,6 @@ private struct HomeHeroUtilityButtons: View {
     @Environment(\.accessibilityReduceMotion)
     private var reduceMotion
 
-    let weather: HomeWeatherSnapshot?
     let challengeInviteUnreadCount: Int
     let pendingWorkoutImportCount: Int
     @Binding var expanded: Bool
@@ -5308,15 +5323,15 @@ private struct HomeHeroUtilityButtons: View {
                 ZStack(alignment: .topTrailing) {
                     Image(systemName: expanded
                           ? "chevron.right" : "chevron.left")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.94))
-                        .frame(width: 29, height: 29)
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.96))
+                        .frame(width: 23, height: 23)
                         .background(Color.black.opacity(0.22), in: Circle())
                         .overlay {
                             Circle()
                                 .strokeBorder(
-                                    Color.white.opacity(0.22),
-                                    lineWidth: 0.6
+                                    Color.white.opacity(0.32),
+                                    lineWidth: 0.7
                                 )
                                 .allowsHitTesting(false)
                         }
@@ -5331,7 +5346,7 @@ private struct HomeHeroUtilityButtons: View {
                             .accessibilityHidden(true)
                     }
                 }
-                .frame(width: 42, height: 44)
+                .frame(width: 37, height: 44)
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
@@ -5354,8 +5369,7 @@ private struct HomeHeroUtilityButtons: View {
             )
 
             if expanded {
-                weatherBadge
-
+                // Search now sits immediately beside the compact handle.
                 heroButton(
                     icon: "magnifyingglass",
                     action: onSearch
@@ -5406,49 +5420,6 @@ private struct HomeHeroUtilityButtons: View {
         }
     }
 
-    private var weatherBadge: some View {
-        HStack(spacing: 4) {
-            if let weather, weather.temperatureCelsius.isFinite {
-                Image(systemName: weather.symbolName)
-                    .symbolRenderingMode(.hierarchical)
-                    .font(.system(size: 13, weight: .medium))
-                Text("\(Int(weather.temperatureCelsius.rounded()))°")
-                    .font(.system(size: 13, weight: .semibold,
-                                  design: .rounded))
-            } else {
-                Image(systemName: "cloud.sun")
-                    .font(.system(size: 13, weight: .medium))
-                Text("—")
-                    .font(.system(size: 13, weight: .semibold,
-                                  design: .rounded))
-            }
-        }
-        .foregroundStyle(.white.opacity(0.94))
-        .frame(width: 67, height: 36)
-        .background(Color.black.opacity(0.20), in: Capsule())
-        .overlay {
-            Capsule()
-                .strokeBorder(
-                    Color.white.opacity(0.19),
-                    lineWidth: 0.6
-                )
-                .allowsHitTesting(false)
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(weatherAccessibilityLabel)
-    }
-
-    private var weatherAccessibilityLabel: String {
-        guard let weather, weather.temperatureCelsius.isFinite else {
-            return ATHLTHLocalization.choose(
-                english: "Weather not available",
-                norwegian: "Værdata ikke tilgjengelig"
-            )
-        }
-        return "\(Int(weather.temperatureCelsius.rounded()))°" +
-            (weather.locationName.map { ", \($0)" } ?? "")
-    }
-
     private func toggleExpanded() {
         setExpanded(!expanded)
     }
@@ -5474,10 +5445,10 @@ private struct HomeHeroUtilityButtons: View {
     ) -> some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 34, height: 34)
-                .background(Color.black.opacity(0.16), in: Circle())
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.98))
+                .frame(width: 32, height: 32)
+                .background(.white.opacity(0.12), in: Circle())
                 .overlay {
                     Circle().strokeBorder(.white.opacity(0.20), lineWidth: 0.6)
                 }
@@ -5493,10 +5464,10 @@ private struct HomeHeroUtilityButtons: View {
     ) -> some View {
         ZStack(alignment: .topTrailing) {
             Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 34, height: 34)
-                .background(Color.black.opacity(0.16), in: Circle())
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(.white.opacity(0.98))
+                .frame(width: 32, height: 32)
+                .background(.white.opacity(0.12), in: Circle())
                 .overlay {
                     Circle().strokeBorder(.white.opacity(0.20), lineWidth: 0.6)
                 }
