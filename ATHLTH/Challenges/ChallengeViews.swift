@@ -3845,64 +3845,61 @@ struct ChallengeCreationView: View {
         )
     }
 
+    /// Single compact row replaces the separate multiple-attempt switch and
+    /// the unlabeled unlimited picker. 1 = only one attempt; 0 = unlimited.
+    private var challengeAttemptCountSelection: Binding<Int> {
+        Binding(
+            get: { allowMultipleAttempts ? attemptLimit : 1 },
+            set: { count in
+                allowMultipleAttempts = count != 1
+                attemptLimit = count == 1 ? 0 : count
+            }
+        )
+    }
+
     private var creationAttemptControls: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(spacing: 12) {
-                Image(systemName: "arrow.trianglehead.2.clockwise.rotate.90")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(ChallengePlanTheme.gold)
-                    .frame(width: 40, height: 40)
-                    .background(ATHLTHTheme.cardWarm,
-                                in: RoundedRectangle(cornerRadius: 13))
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Attempts", norwegian: "Forsøk"
-                    ))
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ChallengePlanTheme.ink)
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "Number of permitted attempts",
-                        norwegian: "Antall tillatte forsøk"
-                    ))
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Number of attempts",
+                    norwegian: "Antall forsøk"
+                ))
+                .font(.subheadline)
+                .foregroundStyle(ChallengePlanTheme.ink)
 
                 Spacer(minLength: 5)
 
                 Picker(
                     ATHLTHLocalization.choose(
-                        english: "Number of attempts", norwegian: "Antall forsøk"
+                        english: "Number of attempts",
+                        norwegian: "Antall forsøk"
                     ),
-                    selection: attemptCountBinding
+                    selection: challengeAttemptCountSelection
                 ) {
                     Text(ATHLTHLocalization.choose(
-                        english: "Unlimited", norwegian: "Ubegrenset"
+                        english: "One attempt",
+                        norwegian: "Ett forsøk"
+                    )).tag(1)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Unlimited",
+                        norwegian: "Ubegrenset"
                     )).tag(0)
-                    Text("1").tag(1)
                     Text("2").tag(2)
                     Text("3").tag(3)
                     Text("5").tag(5)
                     Text("10").tag(10)
                 }
                 .labelsHidden()
-                .pickerStyle(.menu)
                 .tint(ChallengePlanTheme.ink)
                 .padding(.horizontal, 10)
-                .frame(minWidth: 112, minHeight: 40)
+                .padding(.vertical, 4)
                 .background(
                     ATHLTHTheme.cardWarm,
                     in: RoundedRectangle(cornerRadius: 13)
                 )
-                .overlay {
-                    RoundedRectangle(cornerRadius: 13)
-                        .stroke(ChallengePlanTheme.gold.opacity(0.25),
-                                lineWidth: 0.8)
-                }
+                .fixedSize(horizontal: true, vertical: false)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity)
 
             if allowMultipleAttempts && sport == .running {
                 Text(ATHLTHLocalization.choose(
