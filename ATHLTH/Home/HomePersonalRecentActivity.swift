@@ -537,6 +537,8 @@ private struct HomeRecentActivityRevision:
 // Small, low-cost Home presence strip. Uses the same server-authorized
 // mutual-follow status and avatar indicators as the rest of ATHLTH.
 struct HomeActiveFriendsStrip: View {
+    var isActive: Bool = true
+
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @EnvironmentObject private var messaging: MessagingStore
@@ -602,7 +604,8 @@ struct HomeActiveFriendsStrip: View {
         if !current.isEmpty { return current }
         // Keep existing avatars in place during a transient social refresh.
         // Never reuse them across accounts or after a completed empty refresh.
-        if social.isRefreshing && cachedForUserID == social.currentUserID {
+        if (social.isRefreshing || social.isHomeFriendsRefreshing) &&
+           cachedForUserID == social.currentUserID {
             return lastKnownFriends.filter { !social.isMuted($0.userID) }
         }
         return []
@@ -667,7 +670,16 @@ struct HomeActiveFriendsStrip: View {
         }.count
     }
 
+    private var activeSessionID: UUID? {
+        guard isActive && scenePhase == .active else { return nil }
+        return social.currentUserID
+    }
+
     var body: some View {
+        // Keep the owner mounted even before relationship data arrives.
+        // Previously all refresh work lived inside the nonempty branch,
+        // which could never run when the strip was initially empty.
+        VStack(alignment: .leading, spacing: 0) {
         if !visibleFriends.isEmpty {
             VStack(alignment: .leading, spacing: 7) {
                 HStack(spacing: 8) {
@@ -762,19 +774,6 @@ struct HomeActiveFriendsStrip: View {
             .onChange(of: social.mutualFollows.map(\.userID)) { _, _ in
                 rememberFriends()
             }
-            .task(id: scenePhase) {
-                guard scenePhase == .active else { return }
-                // Low-frequency refresh only while this strip is mounted.
-                // No synthetic online status if the server data is stale.
-                while !Task.isCancelled {
-                    await realtime.refreshOnlineUsers()
-                    do {
-                        try await Task.sleep(for: .seconds(90))
-                    } catch {
-                        break
-                    }
-                }
-            }
             .navigationDestination(item: $destination) { destination in
         switch destination {
         case .message(let friend):
@@ -798,7 +797,7 @@ struct HomeActiveFriendsStrip: View {
             .sheet(item: $shareRequest) { request in
                 ATHLTHFriendQuickShareFlow(request: request)
             }
-        } else if social.isRefreshing {
+        } else if social.isRefreshing || social.isHomeFriendsRefreshing {
             HStack(spacing: 8) {
                 Text(ATHLTHLocalization.choose(english: "Friends", norwegian: "Venner"))
                     .font(.system(size: 14, weight: .bold))
@@ -809,6 +808,27 @@ struct HomeActiveFriendsStrip: View {
             .frame(height: 75, alignment: .top)
             .padding(.top, 2)
         }
+        }
+        .task(id: activeSessionID) {
+            guard activeSessionID != nil else { return }
+            // Refresh mutual-follow cards even if there are no friends
+            // displayed yet. The service applies privacy and RLS rules.
+            while !Task.isCancelled {
+                await social.refreshHomeFriends()
+                guard !Task.isCancelled else { return }
+                if !visibleFriends.isEmpty {
+                    await realtime.refreshOnlineUsers()
+                }
+                do {
+                    try await Task.sleep(for: .seconds(125))
+                } catch {
+                    break
+                }
+            }
+        }
+        .onChange(of: social.isHomeFriendsRefreshing) { _, refreshing in
+            if !refreshing { rememberFriends() }
+        }
     }
 
     private func rememberFriends() {
@@ -816,7 +836,7 @@ struct HomeActiveFriendsStrip: View {
         if !current.isEmpty {
             lastKnownFriends = current
             cachedForUserID = social.currentUserID
-        } else if !social.isRefreshing {
+        } else if !social.isRefreshing && !social.isHomeFriendsRefreshing {
             lastKnownFriends = []
             cachedForUserID = nil
         }
