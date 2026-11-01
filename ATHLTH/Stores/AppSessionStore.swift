@@ -1762,6 +1762,11 @@ final class AppSessionStore: ObservableObject {
 
         persistScheduledPlans()
         refreshActivePlanForToday()
+        // This also covers complete plans created by Coach or from a template.
+        // Only finalized workouts with an actual main phase are indexed.
+        for workout in plan.weeks.flatMap(\.days).flatMap(\.sessions) {
+            ATHLTHWorkoutMainSectionLibrary.capture(workout, userID: profile.userID)
+        }
         return true
     }
 
@@ -3574,6 +3579,7 @@ final class AppSessionStore: ObservableObject {
             ($1.scheduledStart ?? .distantFuture)
         }
         persistAccountContent()
+        ATHLTHWorkoutMainSectionLibrary.capture(session, userID: profile.userID)
     }
 
     /// Apply organizer-approved revisions to the calendar copies of guests.
@@ -3666,6 +3672,7 @@ final class AppSessionStore: ObservableObject {
             ($1.scheduledStart ?? .distantFuture)
         }
         persistAccountContent()
+        ATHLTHWorkoutMainSectionLibrary.capture(session, userID: profile.userID)
     }
 
     func removeStandalonePlannedSession(
@@ -3896,6 +3903,7 @@ final class AppSessionStore: ObservableObject {
             plan.updatedAt = Date()
             plan.version += 1
             replaceTrainingPlan(plan)
+            ATHLTHWorkoutMainSectionLibrary.capture(session, userID: profile.userID)
             return
         }
     }
@@ -4123,6 +4131,9 @@ final class AppSessionStore: ObservableObject {
                 plan.updatedAt = Date()
                 plan.version += 1
                 replaceTrainingPlan(plan)
+                ATHLTHWorkoutMainSectionLibrary.capture(
+                    updatedSession, userID: profile.userID
+                )
                 return
             }
         }
@@ -4740,6 +4751,7 @@ final class AppSessionStore: ObservableObject {
 
         savedWorkoutTemplates.insert(copy, at: 0)
         persistSavedWorkoutTemplates()
+        ATHLTHWorkoutMainSectionLibrary.capture(copy, userID: profile.userID)
         return copy.id
     }
 
@@ -4765,6 +4777,7 @@ final class AppSessionStore: ObservableObject {
         stored.runningWorkouts = source.runningWorkouts
         savedWorkoutTemplates[index] = stored
         persistSavedWorkoutTemplates()
+        ATHLTHWorkoutMainSectionLibrary.capture(stored, userID: profile.userID)
         return true
     }
 
