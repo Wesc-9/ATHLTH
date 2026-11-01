@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import ATHLTH
 
 /// The approved 2026 reference has four tabs in one redesigned shell.
@@ -40,6 +41,45 @@ final class ATHLTHCommunityV5NavigationTests: XCTestCase {
         XCTAssertTrue(CommunityInterest.all.matchesClub(club))
         XCTAssertTrue(CommunityInterest.running.matchesClub(club))
         XCTAssertFalse(CommunityInterest.strength.matchesClub(club))
+    }
+
+    func testApprovedCommunityReferenceArtworkIsBundled() {
+        for name in [
+            "CommunityClubsFeatured",
+            "CommunityClubsRecommendedHike",
+            "CommunityClubsRecommendedCity",
+            "CommunityArenaFeatured",
+            "CommunityEventsFeatured",
+            "CommunityEventsRunning",
+            "CommunityEventsYoga",
+            "CommunityEventsStrength"
+        ] {
+            XCTAssertNotNil(
+                UIImage(named: name),
+                "Missing photo asset from approved Community reference: \(name)"
+            )
+        }
+    }
+
+    func testCommunityEventFallbackArtworkMatchesActivity() {
+        XCTAssertEqual(
+            ATHLTHCommunityReferenceArtwork.eventFallback(activity: "running"),
+            "CommunityEventsRunning"
+        )
+        XCTAssertEqual(
+            ATHLTHCommunityReferenceArtwork.eventFallback(activity: "strength"),
+            "CommunityEventsStrength"
+        )
+        XCTAssertEqual(
+            ATHLTHCommunityReferenceArtwork.eventFallback(activity: "yoga"),
+            "CommunityEventsYoga"
+        )
+        XCTAssertEqual(
+            ATHLTHCommunityReferenceArtwork.eventFallback(
+                activity: "hiking", featured: true
+            ),
+            "CommunityEventsFeatured"
+        )
     }
 
     func testClubDiscoveryNormalizesNorwegianNames() {
