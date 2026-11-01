@@ -2631,6 +2631,53 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
+        if let focus = rules.runningFocus,
+           focus != .standard {
+            // These challenges require a completed ATHLTH structured session
+            // with measured per-step data. A generic Apple Health workout has
+            // only whole-workout totals and must NEVER be scored as intervals.
+            guard let templateID = rules.runningTemplateID,
+                  let work = ATHLTHChallengeRunningWorkPolicy.measuredWork(
+                      from: result,
+                      expectedTemplateID: templateID,
+                      minimumRepetitions: rules.runningMinimumRepetitions ?? 1
+                  ) else {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: routeMatch,
+                    reason: "Completed ATHLTH structured work intervals are required. Warmup and cooldown are not counted."
+                )
+            }
+
+            let comparison = rules.runningComparison ?? .fastestWork
+            let score: Double
+            let detail: String
+            switch comparison {
+            case .fastestWork:
+                score = work.seconds
+                detail = "\(challengeClock(work.seconds)) work · \(work.count) reps"
+            case .mostWorkDistance:
+                score = work.meters
+                detail = String(format: "%.2f km work · %d reps",
+                                work.meters / 1_000, work.count)
+            case .completedRepeats:
+                score = Double(work.count)
+                detail = "\(work.count) completed work reps"
+            }
+            return ChallengeRunningEvidence(
+                startedAt: result.startedAt,
+                endedAt: result.endedAt,
+                durationSeconds: work.seconds,
+                distanceMeters: work.meters,
+                routeMatchPercent: routeMatch,
+                score: score,
+                detail: detail,
+                isEligible: true,
+                ineligibilityReason: nil
+            )
+        }
+
         switch rules.scoring {
         case .fastestDistance:
             guard let target =

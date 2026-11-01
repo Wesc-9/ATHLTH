@@ -82,6 +82,88 @@ enum ATHLTHChallengeScoring: String, CaseIterable, Identifiable, Codable, Hashab
     }
 }
 
+/// An optional specialty for running challenges. Old records decode as
+/// standard runs; this does not change the existing scoring enum.
+enum ATHLTHChallengeRunningFocus: String, CaseIterable, Identifiable, Codable, Hashable {
+    case standard
+    case hills
+    case intervals
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .standard:
+            return ATHLTHLocalization.choose(english: "Running", norwegian: "Vanlig løping")
+        case .hills:
+            return ATHLTHLocalization.choose(english: "Hill repeats", norwegian: "Bakkeløp")
+        case .intervals:
+            return ATHLTHLocalization.choose(english: "Intervals", norwegian: "Intervall")
+        }
+    }
+}
+
+enum ATHLTHChallengeRunningComparison: String, CaseIterable, Identifiable, Codable, Hashable {
+    case fastestWork
+    case mostWorkDistance
+    case completedRepeats
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .fastestWork:
+            return ATHLTHLocalization.choose(
+                english: "Fastest work time", norwegian: "Raskeste drag"
+            )
+        case .mostWorkDistance:
+            return ATHLTHLocalization.choose(
+                english: "Longest work distance", norwegian: "Lengst distanse i drag"
+            )
+        case .completedRepeats:
+            return ATHLTHLocalization.choose(
+                english: "Most completed repeats", norwegian: "Flest fullførte drag"
+            )
+        }
+    }
+}
+
+/// Only measured WORK steps in the actual completed structured session
+/// count. Warmup, recovery, downhill jog and cooldown are never included.
+enum ATHLTHChallengeRunningWorkPolicy {
+    struct Work: Equatable {
+        let seconds: Double
+        let meters: Double
+        let count: Int
+    }
+
+    static func measuredWork(
+        from result: WatchWorkoutResult,
+        expectedTemplateID: UUID,
+        minimumRepetitions: Int
+    ) -> Work? {
+        guard result.structuredWorkoutFullyCompleted == true,
+              result.structuredWorkoutSourceID == expectedTemplateID,
+              let steps = result.recordedRunningSteps,
+              !steps.isEmpty else { return nil }
+        let work = steps.filter {
+            $0.phase?.lowercased() == "work"
+        }
+        guard work.count >= max(1, minimumRepetitions),
+              work.allSatisfy({
+                  $0.activeSeconds.isFinite && $0.activeSeconds >= 1 &&
+                  $0.distanceMeters.isFinite && $0.distanceMeters >= 0 &&
+                  !$0.isUserReported
+              })
+        else { return nil }
+        let time = work.reduce(0.0) { $0 + $1.activeSeconds }
+        let distance = work.reduce(0.0) { $0 + $1.distanceMeters }
+        guard time.isFinite, time > 0,
+              distance.isFinite, distance > 0 else { return nil }
+        return Work(seconds: time, meters: distance, count: work.count)
+    }
+}
+
 enum ChallengeCreationPolicy {
     static func automaticTitle(
         sport: ATHLTHChallengeSport,
@@ -394,6 +476,14 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     // existing rules JSON, so older challenges remain fully compatible and no
     // database schema change is required.
     var headToHeadMetricRaw: String? = nil
+
+    // Specialty running challenges require the same saved/installed
+    // structured template for everyone. These fields are optional for old
+    // challenges and work with the existing rules JSON.
+    var runningFocus: ATHLTHChallengeRunningFocus? = nil
+    var runningComparison: ATHLTHChallengeRunningComparison? = nil
+    var runningTemplateID: UUID? = nil
+    var runningMinimumRepetitions: Int? = nil
 
     var startsAt: Date
     var endsAt: Date?
