@@ -7213,6 +7213,11 @@ struct ChallengeCreationView: View {
             runningMinimumRepetitions: sport == .running &&
                 runningFocus == .hills
                 ? runningMinimumRepetitions : nil,
+            runningTemplateSnapshot: sport == .running &&
+                runningFocus != .standard
+                ? selectedRunningTemplate.map {
+                    ATHLTHChallengeRunningTemplateTransfer.portable($0)
+                } : nil,
             startsAt: startsAt,
             endsAt: hasEnd ? endsAt : nil,
             allowMultipleAttempts: allowMultipleAttempts,
@@ -8304,6 +8309,7 @@ struct ChallengeDetailView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var realtime:
         ATHLTHRealtimeSocialStore
     @StateObject private var locationStore = ChallengeLocationStore()
@@ -8320,6 +8326,7 @@ struct ChallengeDetailView: View {
     @State private var showingChallengeCancellation = false
     @State private var cancellingChallenge = false
     @State private var challengeCancellationError: String?
+    @State private var savedChallengeTemplateID: UUID?
 
     private var challenge: ATHLTHChallenge? {
         challenges.challenge(id: challengeID)
@@ -8388,6 +8395,62 @@ struct ChallengeDetailView: View {
                             awaitingOpponentCard
                         }
                         rulesCard(challenge)
+
+                        if let sourceTemplate =
+                            challenge.rules.runningTemplateSnapshot,
+                            challenge.rules.runningFocus != nil {
+                            ATHLTHPlanSurface {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    Label(
+                                        sourceTemplate.title,
+                                        systemImage: "repeat"
+                                    )
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ChallengePlanTheme.ink)
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Everyone needs this same structured running workout. Only work intervals are scored.",
+                                        norwegian: "Alle må bruke samme løpeøkt. Bare arbeidsdrag teller i resultatet."
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+
+                                    if runningWorkoutLibrary.allTemplates.contains(where: {
+                                        $0.id == sourceTemplate.id
+                                    }) || savedChallengeTemplateID == sourceTemplate.id {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Workout ready",
+                                                norwegian: "Økten er tilgjengelig"
+                                            ),
+                                            systemImage: "checkmark.circle.fill"
+                                        )
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ChallengePlanTheme.gold)
+                                    } else {
+                                        Button {
+                                            var saved = sourceTemplate
+                                            saved.isBuiltIn = false
+                                            saved.sharedSourceOwnerID = challenge.creatorID
+                                            saved.sharedSourceWorkoutID = sourceTemplate.id
+                                            runningWorkoutLibrary.save(saved)
+                                            savedChallengeTemplateID = sourceTemplate.id
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Add workout to My Workouts",
+                                                    norwegian: "Legg økten til Mine økter"
+                                                ),
+                                                systemImage: "plus.circle"
+                                            )
+                                            .frame(maxWidth: .infinity, minHeight: 44)
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .tint(ChallengePlanTheme.gold)
+                                    }
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                        }
 
                         if challenge.creatorID != session.profile.userID,
                            (currentParticipant?.state == .invited ||

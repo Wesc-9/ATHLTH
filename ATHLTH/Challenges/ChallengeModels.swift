@@ -164,6 +164,25 @@ enum ATHLTHChallengeRunningWorkPolicy {
     }
 }
 
+/// A challenge may share a structured workout prescription with invitees,
+/// but never serializes account-owned route, coaching or Spotify settings.
+enum ATHLTHChallengeRunningTemplateTransfer {
+    static func portable(_ source: RunningWorkoutTemplate) -> RunningWorkoutTemplate {
+        var copy = source
+        copy.routeID = nil
+        copy.coachBrief = nil
+        copy.intervalGhostPaceSecondsPerKilometer = nil
+        copy.intervalGhostFollowRecovery = nil
+        copy.intervalGhostRecoverySlowdownPercent = nil
+        copy.blocks = copy.blocks.map { block in
+            var clean = block
+            clean.spotifyPlaylist = nil
+            return clean
+        }
+        return copy
+    }
+}
+
 enum ChallengeCreationPolicy {
     static func automaticTitle(
         sport: ATHLTHChallengeSport,
@@ -488,6 +507,9 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var runningComparison: ATHLTHChallengeRunningComparison? = nil
     var runningTemplateID: UUID? = nil
     var runningMinimumRepetitions: Int? = nil
+    /// Portable, explicitly shared workout prescription. Never includes
+    /// local route IDs, Spotify data, or private coach notes.
+    var runningTemplateSnapshot: RunningWorkoutTemplate? = nil
 
     var startsAt: Date
     var endsAt: Date?
