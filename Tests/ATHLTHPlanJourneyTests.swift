@@ -167,6 +167,37 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
         }
     }
 
+    @MainActor
+    func testAdvancedSetupWithCompactPlanningMethodsFitsSmallPhones() {
+        for width in [320.0, 375.0, 430.0] {
+            let screen = ATHLTHPlanAdvancedScheduleEntryView(
+                title: .constant(""),
+                startDate: .constant(Date()),
+                weekCount: .constant(4),
+                linkedGoalIDs: .constant(Set<UUID>()),
+                varyWeekdays: .constant(false),
+                planningApproach: .guided,
+                onChooseApproach: { _ in },
+                selectedDays: Set([1, 3, 5]),
+                goals: [],
+                suggestedName: "Løpeplan",
+                onToggleDay: { _ in },
+                onCreateGoal: {},
+                onSelectSimple: {}
+            )
+            let host = UIHostingController(rootView: screen)
+            host.loadViewIfNeeded()
+            let available = width - 36
+            let measured = host.sizeThatFits(
+                in: CGSize(width: available, height: 1_800)
+            )
+            XCTAssertLessThanOrEqual(
+                measured.width, available + 1,
+                "Advanced plan setup overflows a \\(Int(width))-pt phone"
+            )
+        }
+    }
+
     func testPlanDesignHasConsistentLayoutPriorities() {
         XCTAssertGreaterThan(
             ATHLTHPlanDesign.Density.comfortable.cardPadding,
