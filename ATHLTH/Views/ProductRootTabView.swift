@@ -2104,7 +2104,7 @@ struct ATHLTHHomeView: View {
     // On regular text sizes these two cards form one visual row. Their
     // backgrounds must end at the same baseline instead of relying on
     // different content-driven minimum heights.
-    private let homeTodayTwinCardHeight: CGFloat = 174
+    private let homeTodayTwinCardHeight: CGFloat = HomeTodayTwinCardLayout.height
 
     private var homeDailyRecommendationAndCalendarRow: some View {
         let advice = homeDailyRecommendation
