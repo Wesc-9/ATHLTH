@@ -335,16 +335,25 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             Button {
                 onAddExercise(phase)
             } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Exercise from library", norwegian: "Øvelse fra bibliotek"
-                ), systemImage: "dumbbell")
+                Label(activity == .running
+                    ? ATHLTHLocalization.choose(
+                        english: "Running exercises from library",
+                        norwegian: "Løpeøvelser fra bibliotek"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Exercise from library",
+                        norwegian: "Øvelse fra bibliotek"
+                    ),
+                    systemImage: activity == .running ? "figure.run" : "dumbbell")
             }
-            Button {
-                onAddWorkout(phase)
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Complete workout", norwegian: "Hel treningsøkt"
-                ), systemImage: "rectangle.stack")
+            if activity != .running {
+                Button {
+                    onAddWorkout(phase)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Complete workout", norwegian: "Hel treningsøkt"
+                    ), systemImage: "rectangle.stack")
+                }
             }
             Button {
                 onAddIntervals(phase)
