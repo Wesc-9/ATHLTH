@@ -62,6 +62,30 @@ final class SupabaseSocialService: Sendable {
             .value
     }
 
+    /// Fetch only a user's mutual-follow cards for Home. Unlike the
+    /// Community directory, this must not depend on the newest 500 profiles.
+    func loadProfileCards(
+        for userIDs: Set<UUID>
+    ) async throws -> [SocialProfileCard] {
+        guard !userIDs.isEmpty else { return [] }
+        return try await client
+            .from("social_profile_cards")
+            .select()
+            .in("user_id", values: Array(userIDs))
+            .execute()
+            .value
+    }
+
+    /// Home can filter blocked accounts without downloading the directory.
+    func loadBlockedUserIDs() async throws -> Set<UUID> {
+        let rows: [BackendBlockRecord] = try await client
+            .from("user_blocks")
+            .select()
+            .execute()
+            .value
+        return Set(rows.map(\.blockedID))
+    }
+
     func loadFriendRequests() async throws -> [SocialFriendRequestRecord] {
         try await client
             .from("friend_requests")
