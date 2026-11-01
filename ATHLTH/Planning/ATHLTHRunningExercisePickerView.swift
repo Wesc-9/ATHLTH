@@ -10,7 +10,7 @@ struct ATHLTHRunningExercisePickerView: View {
     let onSelect: ([WorkoutTemplateBlock]) -> Void
 
     @State private var selectedTab = 0
-    @State private var savedSets: [ATHLTHRunningMainSet] = []
+    @State private var savedSets: [ATHLTHWorkoutMainSection] = []
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,7 +21,7 @@ struct ATHLTHRunningExercisePickerView: View {
                     english: "Running exercises", norwegian: "Løpeøvelser"
                 )).tag(0)
                 Text(ATHLTHLocalization.choose(
-                    english: "My main sets", norwegian: "Mine hoveddeler"
+                    english: "My main workouts", norwegian: "Mine hovedøkter"
                 )).tag(1)
             }
             .pickerStyle(.segmented)
@@ -30,12 +30,12 @@ struct ATHLTHRunningExercisePickerView: View {
             if selectedTab == 1 && savedSets.isEmpty {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(
-                        english: "No saved main sets", norwegian: "Ingen lagrede hoveddeler"
+                        english: "No saved main workouts", norwegian: "Ingen lagrede hovedøkter"
                     ),
                     systemImage: "bookmark",
                     description: Text(ATHLTHLocalization.choose(
-                        english: "Save the main section of an advanced running workout to reuse it.",
-                        norwegian: "Lagre hoveddelen i en avansert løpeøkt for å bruke den igjen."
+                        english: "Main sections from saved running workouts appear here automatically.",
+                        norwegian: "Hoveddeler fra lagrede løpeøkter vises automatisk her."
                     ))
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -63,15 +63,17 @@ struct ATHLTHRunningExercisePickerView: View {
                                     ),
                                     symbol: "bookmark.fill"
                                 ) {
-                                    onSelect(set.inserting())
+                                    onSelect(set.blocksForReuse())
                                     dismiss()
                                 }
                                 .contextMenu {
                                     Button(role: .destructive) {
-                                        ATHLTHRunningMainSet.delete(
-                                            id: set.id, userID: userID
+                                        ATHLTHWorkoutMainSectionLibrary.delete(
+                                            set.id, userID: userID
                                         )
-                                        savedSets = ATHLTHRunningMainSet.load(userID: userID)
+                                        savedSets = ATHLTHWorkoutMainSectionLibrary.load(
+                                            userID: userID
+                                        ).filter(\.isRunningOnly)
                                     } label: {
                                         Label(ATHLTHLocalization.choose(
                                             english: "Delete", norwegian: "Slett"
@@ -97,7 +99,11 @@ struct ATHLTHRunningExercisePickerView: View {
                 }
             }
         }
-        .onAppear { savedSets = ATHLTHRunningMainSet.load(userID: userID) }
+        .onAppear {
+            savedSets = ATHLTHWorkoutMainSectionLibrary.load(
+                userID: userID
+            ).filter(\.isRunningOnly)
+        }
     }
 
     private func selectionRow(
