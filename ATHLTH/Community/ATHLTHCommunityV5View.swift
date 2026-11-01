@@ -142,7 +142,6 @@ struct ATHLTHCommunityV5View: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
 
-    @StateObject private var weather = HomeWeatherStore()
     @State private var tab: ATHLTHCommunityMainTab = .overview
     @State private var showSearch = false
     @FocusState private var searchFocused: Bool
@@ -222,7 +221,8 @@ struct ATHLTHCommunityV5View: View {
 
                     VStack(alignment: .leading, spacing: 12) {
                         tabs
-                        if showSearch {
+                        // Search is a Clubs-specific action, not a global header.
+                        if tab == .clubs && showSearch {
                             searchBar
                         }
                         switch tab {
@@ -256,16 +256,14 @@ struct ATHLTHCommunityV5View: View {
                 CommunityGroupCreateView()
             }
             .task {
-                weather.refreshIfNeeded()
                 await refreshContent(force: false)
             }
             .refreshable {
-                weather.refreshIfNeeded(force: true)
                 await refreshContent(force: true)
             }
             .task(id: showSearch ? query : "") {
                 let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard showSearch && term.count >= 2 else {
+                guard tab == .clubs && showSearch && term.count >= 2 else {
                     groups.clearSearch()
                     social.clearSearch()
                     return
@@ -302,14 +300,9 @@ struct ATHLTHCommunityV5View: View {
                 startPoint: .top, endPoint: .bottom
             )
             VStack(alignment: .leading, spacing: 0) {
-                HStack {
-                    Spacer(minLength: 0)
-                    headerTools
-                }
-                .padding(.top, 75)
-                .padding(.trailing, 14)
-
-                Spacer(minLength: 8)
+                // The hero is image-and-title only. Global icons belong in
+                // their respective destinations, not atop Fellesskap.
+                Spacer(minLength: 0)
 
                 VStack(alignment: .leading, spacing: 8) {
                     Text(ATHLTHLocalization.choose(
@@ -330,104 +323,13 @@ struct ATHLTHCommunityV5View: View {
                 .padding(.bottom, 55)
             }
         }
-        .frame(height: 263)
+        .frame(height: 229)
         .clipShape(
             UnevenRoundedRectangle(
                 bottomLeadingRadius: 21, bottomTrailingRadius: 21
             )
         )
         .accessibilityElement(children: .contain)
-    }
-
-    private var headerTools: some View {
-        HStack(spacing: 5) {
-            HStack(spacing: 5) {
-                if let snapshot = weather.snapshot,
-                   snapshot.temperatureCelsius.isFinite {
-                    Image(systemName: snapshot.symbolName)
-                    Text("\(Int(snapshot.temperatureCelsius.rounded()))°")
-                } else {
-                    Image(systemName: "cloud.sun")
-                    Text("—")
-                }
-            }
-            .font(.system(size: 13, weight: .semibold, design: .rounded))
-            .foregroundStyle(.white)
-            .frame(width: 62, height: 36)
-            .background(.black.opacity(0.20), in: Capsule())
-
-            Button {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    showSearch.toggle()
-                }
-            } label: {
-                toolIcon("magnifyingglass")
-            }
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Search Community", norwegian: "Søk i fellesskapet"
-            ))
-
-            NavigationLink {
-                MessageInboxDestinationView()
-            } label: {
-                toolIcon("tray", count:
-                    messaging.unreadCount + messaging.messageRequestCount)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Inbox", norwegian: "Innboks"
-            ))
-
-            NavigationLink {
-                ATHLTHCommunityActionCenterView()
-            } label: {
-                toolIcon("bell")
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Invitations", norwegian: "Invitasjoner"
-            ))
-
-            NavigationLink {
-                ATHLTHProfileView()
-            } label: {
-                CommunityShowcaseAvatar(
-                    url: session.profile.avatarURL,
-                    fallback: session.profile.displayName,
-                    size: 37
-                )
-                .overlay {
-                    Circle().strokeBorder(.white.opacity(0.9), lineWidth: 2)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Profile", norwegian: "Profil"
-            ))
-        }
-        .padding(6)
-        .background(.ultraThinMaterial, in: Capsule())
-        .overlay {
-            Capsule().strokeBorder(.white.opacity(0.42), lineWidth: 0.9)
-                .allowsHitTesting(false)
-        }
-    }
-
-    private func toolIcon(_ name: String, count: Int = 0) -> some View {
-        ZStack(alignment: .topTrailing) {
-            Image(systemName: name)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(.white)
-                .frame(width: 35, height: 35)
-                .background(.black.opacity(0.19), in: Circle())
-            if count > 0 {
-                Circle()
-                    .fill(CommunityReferenceStyle.gold)
-                    .frame(width: 7, height: 7)
-                    .offset(x: 0, y: 1)
-            }
-        }
-        .frame(minWidth: 35, minHeight: 44)
     }
 
     private var tabs: some View {
