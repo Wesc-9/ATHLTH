@@ -62,6 +62,10 @@ enum ATHLTHWorkoutMainSectionLibrary {
     @discardableResult
     static func captureAll(_ workouts: [PlannedSession], userID: UUID) -> Int {
         var saved = load(userID: userID)
+        var lookup: [UUID: Int] = [:]
+        for (index, item) in saved.enumerated() where lookup[item.sourceWorkoutID] == nil {
+            lookup[item.sourceWorkoutID] = index
+        }
         var changed = false
         var captured = 0
 
@@ -83,9 +87,7 @@ enum ATHLTHWorkoutMainSectionLibrary {
             let trimmed = workout.title.trimmingCharacters(in: .whitespacesAndNewlines)
             let title = trimmed.isEmpty ? workout.kind.title : trimmed
 
-            if let index = saved.firstIndex(where: {
-                $0.sourceWorkoutID == workout.id
-            }) {
+            if let index = lookup[workout.id] {
                 if saved[index].title != title ||
                    saved[index].kind != workout.kind ||
                    saved[index].blocks != copied {
@@ -104,6 +106,7 @@ enum ATHLTHWorkoutMainSectionLibrary {
                     blocks: copied,
                     savedAt: Date()
                 ))
+                lookup[workout.id] = saved.count - 1
                 changed = true
             }
             captured += 1
