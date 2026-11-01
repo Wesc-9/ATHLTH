@@ -1437,6 +1437,9 @@ struct ATHLTHHomeView: View {
                 if homeInitialLoadAccountID == session.profile.userID,
                    let lastHomeInitialLoadAt,
                    Date().timeIntervalSince(lastHomeInitialLoadAt) < 90 {
+                    // Home's general data can be fresh even if its mutual
+                    // friends failed to load on the first attempt.
+                    await social.refreshHomeFriends()
                     return
                 }
 
@@ -1450,13 +1453,15 @@ struct ATHLTHHomeView: View {
                 async let groupRefresh: Void =
                     refreshHomeGroupCalendar()
                 async let activityRefresh: Void = social.refreshHomeFeed()
+                async let friendsRefresh: Void = social.refreshHomeFriends()
 
                 guard !health.shouldDeferAutomaticHealthWork else {
                     await loadHomeStreak()
                     _ = await (
                         communityRefresh,
                         groupRefresh,
-                        activityRefresh
+                        activityRefresh,
+                        friendsRefresh
                     )
                     return
                 }
@@ -1484,7 +1489,8 @@ struct ATHLTHHomeView: View {
                     goalsRefresh,
                     communityRefresh,
                     groupRefresh,
-                    activityRefresh
+                    activityRefresh,
+                    friendsRefresh
                 )
                 guard !Task.isCancelled else { return }
                 homeInitialLoadAccountID = session.profile.userID
