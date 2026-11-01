@@ -21,9 +21,11 @@ struct ATHLTHPlanSimpleScheduleEntryView: View {
             linkedGoalIDs: $linkedGoalIDs,
             selectedDays: selectedDays, goals: goals,
             suggestedName: suggestedName, advanced: false,
+            planningApproach: nil,
             varyWeekdays: .constant(false),
             onToggleDay: onToggleDay,
             onCreateGoal: onCreateGoal,
+            onChooseApproach: { _ in },
             onModeChange: { isAdvanced in
                 if isAdvanced { onSelectAdvanced() }
             }
@@ -42,9 +44,11 @@ struct ATHLTHPlanSetupFields: View {
     let goals: [ATHLTHGoal]
     let suggestedName: String
     let advanced: Bool
+    let planningApproach: ATHLTHPlanWeekPlanningApproach?
     @Binding var varyWeekdays: Bool
     let onToggleDay: (Int) -> Void
     let onCreateGoal: () -> Void
+    let onChooseApproach: (ATHLTHPlanWeekPlanningApproach) -> Void
     let onModeChange: (Bool) -> Void
 
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -69,7 +73,12 @@ struct ATHLTHPlanSetupFields: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
-            hero
+            if advanced {
+                advancedIntro
+                planningApproachCard
+            } else {
+                hero
+            }
             nameCard
             if !advanced {
                 goalsCard
@@ -89,6 +98,114 @@ struct ATHLTHPlanSetupFields: View {
             }
         }
         .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+    }
+
+    private var advancedIntro: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text(tr("BUILD YOUR PLAN", "BYGG DIN PLAN"))
+                    .font(.caption2.weight(.semibold))
+                    .tracking(2.0)
+                    .foregroundStyle(muted)
+                Spacer(minLength: 0)
+                modeTab(false, title: tr("Simple", "Enkel"))
+                modeTab(true, title: tr("Advanced", "Avansert"))
+            }
+            Text(tr("Shape your training plan", "Tilpass treningsplanen"))
+                .font(.system(.largeTitle, design: .serif))
+                .foregroundStyle(ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+            Text(tr(
+                "Choose how to plan, then set your training days and goals.",
+                "Velg oppsett, treningsdager og mål. Du kan justere alt senere."
+            ))
+            .font(.subheadline)
+            .foregroundStyle(muted)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(.vertical, 8)
+    }
+
+    private var planningApproachCard: some View {
+        card {
+            cardHeading("square.grid.2x2",
+                        tr("Planning layout", "Hvordan vil du planlegge?"),
+                        detail: tr("Choose how to build your workouts",
+                                   "Velg hvordan du ønsker å sette opp øktene"))
+            VStack(spacing: 8) {
+                planningApproachOption(
+                    .guided,
+                    title: tr("Daily plan", "Dagsplan"),
+                    detail: tr(
+                        "Build one training day at a time, with exercises, intervals and rest.",
+                        "Sett opp én dag om gangen med økter, intervaller og hvile."
+                    ),
+                    icon: "calendar.day.timeline.left"
+                )
+                planningApproachOption(
+                    .quick,
+                    title: tr("Weekly plan", "Ukeplan"),
+                    detail: tr(
+                        "Build complete weeks and adjust workouts and progression.",
+                        "Sett sammen hele uken og juster økter og progresjon."
+                    ),
+                    icon: "calendar"
+                )
+            }
+        }
+    }
+
+    private func planningApproachOption(
+        _ choice: ATHLTHPlanWeekPlanningApproach,
+        title: String,
+        detail: String,
+        icon: String
+    ) -> some View {
+        let selected = planningApproach == choice
+        return Button {
+            onChooseApproach(choice)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(bronze)
+                    .frame(width: 39, height: 39)
+                    .background(ATHLTHTrainDesign.paleGold.opacity(0.50),
+                                in: RoundedRectangle(cornerRadius: 12))
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(.title3)
+                    .foregroundStyle(selected ? bronze : border)
+                    .accessibilityHidden(true)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 70, alignment: .leading)
+            .background(selected ? ATHLTHTrainDesign.paleGold.opacity(0.28)
+                                 : canvas.opacity(0.50),
+                        in: RoundedRectangle(cornerRadius: 13))
+            .overlay {
+                RoundedRectangle(cornerRadius: 13)
+                    .strokeBorder(selected ? bronze.opacity(0.75) : border.opacity(0.38),
+                                  lineWidth: selected ? 1.15 : 0.65)
+                    .allowsHitTesting(false)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 13))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title + ". " + detail)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     /// A pair of real buttons, each styled like the wizard's "Tilbake"
