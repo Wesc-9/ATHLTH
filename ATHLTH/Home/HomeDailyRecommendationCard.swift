@@ -1,5 +1,10 @@
 import SwiftUI
 
+/// Shared exact card height for the side-by-side Home recommendation/calendar.
+enum HomeTodayTwinCardLayout {
+    static let height: CGFloat = 174
+}
+
 /// Editorial daily context followed by a specific, executable recommendation.
 /// Only the workout row is interactive; the body assessment is never treated
 /// as medical advice or a measured state when Health data is missing.
@@ -10,7 +15,7 @@ struct HomeDailyRecommendationCard: View {
     var compact: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 6 : 10) {
+        VStack(alignment: .leading, spacing: compact ? 5 : 10) {
             HStack(spacing: 6) {
                 Image(systemName: "sparkles")
                     .font(.system(size: 12, weight: .medium))
@@ -19,7 +24,7 @@ struct HomeDailyRecommendationCard: View {
                     english: "Today's recommendation",
                     norwegian: "Dagens anbefaling"
                 ))
-                .font(.system(size: compact ? 11 : 12, weight: .bold))
+                .font(.system(size: compact ? 11.5 : 12, weight: .bold))
                 .foregroundStyle(ATHLTHTrainDesign.ink)
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
@@ -27,11 +32,14 @@ struct HomeDailyRecommendationCard: View {
             }
 
             Text(advice.dayDescription)
-                .font(.system(size: compact ? 10 : 11.5))
+                .font(.system(size: compact ? 11.5 : 12))
                 .foregroundStyle(ATHLTHTrainDesign.secondary)
+                .lineSpacing(compact ? 1.0 : 2)
                 .lineLimit(compact ? 4 : nil)
+                .minimumScaleFactor(compact ? 0.94 : 1)
                 .fixedSize(horizontal: false, vertical: !compact)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .layoutPriority(1)
 
             if let evidence = advice.evidence {
                 Text(evidence)
@@ -41,8 +49,8 @@ struct HomeDailyRecommendationCard: View {
                     .fixedSize(horizontal: false, vertical: !compact)
             }
 
-            Spacer(minLength: compact ? 0 : 4)
-
+            // Keep the divider close to the advice rather than letting a
+            // flexible Spacer create a large empty band above the workout.
             Rectangle()
                 .fill(ATHLTHTrainDesign.rule.opacity(0.45))
                 .frame(height: 0.7)
@@ -50,7 +58,7 @@ struct HomeDailyRecommendationCard: View {
             Text(ATHLTHLocalization.choose(
                 english: "RECOMMENDED WORKOUT", norwegian: "ANBEFALT ØKT"
             ))
-            .font(.system(size: compact ? 8.5 : 9, weight: .bold))
+            .font(.system(size: compact ? 9 : 9, weight: .bold))
             .tracking(0.8)
             .foregroundStyle(ATHLTHTrainDesign.bronze)
 
@@ -75,7 +83,7 @@ struct HomeDailyRecommendationCard: View {
                             .lineLimit(compact ? 2 : nil)
                             .fixedSize(horizontal: false, vertical: !compact)
                         Text(advice.suggestedDetail)
-                            .font(.system(size: compact ? 9 : 10))
+                            .font(.system(size: compact ? 9.5 : 10))
                             .foregroundStyle(ATHLTHTrainDesign.secondary)
                             .lineLimit(compact ? 2 : nil)
                             .fixedSize(horizontal: false, vertical: !compact)
@@ -95,12 +103,19 @@ struct HomeDailyRecommendationCard: View {
                 english: "Open and start exactly this workout.",
                 norwegian: "Åpner oppstart av akkurat denne økten."
             ))
+
+            // Remaining space belongs beneath the suggested workout, never
+            // between the assessment and the dividing line.
+            Spacer(minLength: 0)
         }
         .padding(compact ? 9 : 11)
+        .frame(maxWidth: .infinity, alignment: .topLeading)
         .frame(
-            maxWidth: .infinity,
-            minHeight: compact ? 0 : 180,
-            maxHeight: compact ? .infinity : nil,
+            minHeight: compact ? nil : 180,
+            alignment: .topLeading
+        )
+        .frame(
+            height: compact ? HomeTodayTwinCardLayout.height : nil,
             alignment: .topLeading
         )
         .background(
