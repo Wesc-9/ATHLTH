@@ -30,26 +30,28 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
         XCTAssertNil(ATHLTHPlanJourney.next(after: .basics, advanced: false))
     }
 
-    func testAdvancedUsesMethodChoiceInsteadOfMandatoryHealthIntake() {
+    func testAdvancedChoosesPlanningMethodWithinSetup() {
         XCTAssertEqual(
             ATHLTHPlanJourney.sequence(advanced: true),
-            [.mode, .goal, .basics, .approach, .week, .review]
+            [.mode, .goal, .basics, .week, .review]
         )
         XCTAssertFalse(ATHLTHPlanJourney.sequence(advanced: true).contains(.profile))
+        XCTAssertFalse(ATHLTHPlanJourney.sequence(advanced: true).contains(.approach))
         XCTAssertEqual(ATHLTHPlanJourney.displayedCount(advanced: true), 5)
-        XCTAssertEqual(ATHLTHPlanJourney.position(of: .approach, advanced: true), 4)
-        XCTAssertEqual(ATHLTHPlanJourney.position(of: .week, advanced: true), 5)
+        XCTAssertNil(ATHLTHPlanJourney.position(of: .approach, advanced: true))
+        XCTAssertEqual(ATHLTHPlanJourney.position(of: .basics, advanced: true), 3)
+        XCTAssertEqual(ATHLTHPlanJourney.position(of: .week, advanced: true), 4)
         XCTAssertEqual(ATHLTHPlanJourney.position(of: .review, advanced: true), 5)
-        XCTAssertEqual(ATHLTHPlanJourney.next(after: .basics, advanced: true), .approach)
-        XCTAssertEqual(ATHLTHPlanJourney.next(after: .approach, advanced: true), .week)
+        XCTAssertEqual(ATHLTHPlanJourney.next(after: .basics, advanced: true), .week)
+        XCTAssertEqual(ATHLTHPlanJourney.previous(before: .week, advanced: true), .basics)
     }
 
     func testResumeReturnsToLastAllowedWizardStage() {
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("goal", advanced: true), .goal)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("goal", advanced: false), .goal)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("week", advanced: true), .week)
-        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("profile", advanced: true), .approach)
-        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("approach", advanced: true), .approach)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("profile", advanced: true), .basics)
+        XCTAssertEqual(ATHLTHPlanJourney.restoredStep("approach", advanced: true), .basics)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("review", advanced: true), .review)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("basics", advanced: false), .basics)
         XCTAssertEqual(ATHLTHPlanJourney.restoredStep("week", advanced: false), .basics)
