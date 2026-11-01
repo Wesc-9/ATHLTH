@@ -687,6 +687,24 @@ private enum ChallengeCreationSelectionSheet:
     var id: String { rawValue }
 }
 
+
+/// Participant caption for the challenge preview. Single and direct
+/// challenges show names; larger groups stay compact and show only count.
+enum ATHLTHChallengePreviewPeople {
+    static func label(creatorName: String, invitedNames: [String]) -> String {
+        let total = 1 + invitedNames.count
+        guard total <= 2 else { return String(total) }
+        let creator = creatorName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let names = ([creator] + invitedNames).map { raw -> String in
+            let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return String((clean.isEmpty
+                ? ATHLTHLocalization.choose(english: "Athlete", norwegian: "Utøver")
+                : clean).prefix(22))
+        }
+        return "\(total) · " + names.joined(separator: " + ")
+    }
+}
+
 struct ChallengeCreationView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var challenges: ChallengeStore
@@ -817,6 +835,7 @@ struct ChallengeCreationView: View {
     @State private var selectedCoverArtworkName = "GoalRunning"
     @State private var selectedCoverPhoto: PhotosPickerItem?
     @State private var selectedCoverImageData: Data?
+    @State private var challengeImageExpanded = false
     @State private var coverWasManuallySelected = false
 
     @State private var targetDistanceKm = 5.0
@@ -1370,245 +1389,125 @@ struct ChallengeCreationView: View {
         }
     }
 
+    /// Premium compact creation layout: preview first, optional image
+    /// picker second, activity and rule chips next. No redundant hero card.
     private var creationHero: some View {
-        ATHLTHPlanSurface {
-            VStack(
-                alignment: .leading,
-                spacing: 15
-            ) {
-                HStack(
-                    alignment: .top,
-                    spacing: 14
-                ) {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 6
-                    ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "CREATE CHALLENGE",
-                                norwegian:
-                                    "OPPRETT CHALLENGE"
-                            )
-                        )
-                        .font(
-                            .caption2
-                                .weight(.bold)
-                        )
-                        .tracking(2)
+        VStack(alignment: .leading, spacing: 13) {
+            creationLivePreview
+
+            DisclosureGroup(isExpanded: $challengeImageExpanded) {
+                creationArtworkPicker
+                    .padding(.top, 10)
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ChallengePlanTheme.gold)
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Build the challenge.",
-                                norwegian:
-                                    "Bygg utfordringen."
-                            )
-                        )
-                        .font(.system(size: 30, weight: .regular, design: .serif))
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
-                    }
-
-                    Spacer(minLength: 8)
-
-                    Image(
-                        systemName:
-                            sport.systemImage
-                    )
-                    .font(
-                        .system(
-                            size: 27,
-                            weight: .semibold
-                        )
-                    )
-                    .foregroundStyle(.white)
-                    .frame(
-                        width: 62,
-                        height: 62
-                    )
-                    .background(clubForest, in: Circle())
+                    Text(ATHLTHLocalization.choose(
+                        english: "Challenge image",
+                        norwegian: "Challenge-bilde"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ChallengePlanTheme.ink)
+                    Spacer()
                 }
+                .padding(.vertical, 6)
+                .contentShape(Rectangle())
+            }
+            .tint(ChallengePlanTheme.gold)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .athlthBrandedCard(radius: 18)
 
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Choose activity, rules, participants and timing. ATHLTH keeps the setup compact and easy to review.",
-                        norwegian:
-                            "Velg aktivitet, regler, deltakere og tidspunkt. ATHLTH holder oppsettet kompakt og enkelt å kontrollere."
-                    )
-                )
-                .font(.subheadline)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
-                .fixedSize(
-                    horizontal: false,
-                    vertical: true
-                )
+            VStack(alignment: .leading, spacing: 10) {
+                Text(ATHLTHLocalization.choose(
+                    english: "CHOOSE ACTIVITY",
+                    norwegian: "VELG AKTIVITET"
+                ))
+                .font(.caption2.bold())
+                .tracking(1.1)
+                .foregroundStyle(ATHLTHTheme.mutedText)
 
-                if !preselectedFriends.isEmpty &&
-                    preselectedRouteID == nil {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 9
-                    ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "CHOOSE ACTIVITY",
-                                norwegian:
-                                    "VELG AKTIVITET"
-                            )
-                        )
-                        .font(
-                            .caption2
-                                .weight(.bold)
-                        )
-                        .tracking(1.1)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-
-                        HStack(spacing: 8) {
-                            ForEach(
-                                challengeSportOptions
-                            ) { option in
-                                Button {
-                                    sport = option
-                                } label: {
-                                    HStack(spacing: 6) {
-                                        Image(
-                                            systemName:
-                                                option
-                                                    .systemImage
-                                        )
-                                        .font(
-                                            .caption
-                                                .weight(
-                                                    .semibold
-                                                )
-                                        )
-
-                                        Text(
-                                            option.title
-                                        )
-                                        .font(
-                                            .caption
-                                                .weight(
-                                                    .semibold
-                                                )
-                                        )
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(
-                                            0.75
-                                        )
-                                    }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(challengeSportOptions) { option in
+                            Button {
+                                sport = option
+                            } label: {
+                                Label(option.title, systemImage: option.systemImage)
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
                                     .foregroundStyle(
                                         sport == option
                                             ? Color.white
-                                            : ATHLTHTheme
-                                                .accentDeep
+                                            : ChallengePlanTheme.ink
                                     )
-                                    .frame(
-                                        maxWidth:
-                                            .infinity
-                                    )
-                                    .frame(height: 40)
+                                    .frame(minWidth: 88, minHeight: 40)
+                                    .padding(.horizontal, 7)
                                     .background(
                                         sport == option
-                                            ? ATHLTHTheme
-                                                .vitality
-                                            : ATHLTHTheme
-                                                .surfaceSage
-                                                .opacity(
-                                                    0.76
-                                                ),
-                                        in:
-                                            RoundedRectangle(
-                                                cornerRadius:
-                                                    13,
-                                                style:
-                                                    .continuous
-                                            )
+                                            ? ChallengePlanTheme.ink
+                                            : ATHLTHTheme.cardWarm,
+                                        in: RoundedRectangle(cornerRadius: 13)
                                     )
                                     .overlay {
-                                        RoundedRectangle(
-                                            cornerRadius:
-                                                13,
-                                            style:
-                                                .continuous
-                                        )
-                                        .stroke(
-                                            sport == option
-                                                ? ATHLTHTheme
-                                                    .vitality
-                                                    .opacity(
-                                                        0.35
-                                                    )
-                                                : Color
-                                                    .black
-                                                    .opacity(
-                                                        0.04
-                                                    ),
-                                            lineWidth:
-                                                0.8
-                                        )
+                                        RoundedRectangle(cornerRadius: 13)
+                                            .stroke(
+                                                ChallengePlanTheme.gold.opacity(
+                                                    sport == option ? 0.45 : 0.22
+                                                ),
+                                                lineWidth: 0.8
+                                            )
                                     }
-                                }
-                                .buttonStyle(.plain)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityAddTraits(
+                                sport == option ? .isSelected : []
+                            )
                         }
                     }
                 }
 
                 HStack(spacing: 8) {
-                    creationHeroChip(
-                        title: sport.title,
-                        icon:
-                            sport.systemImage
-                    )
+                    Button {
+                        activeSelectionSheet = .sport
+                    } label: {
+                        creationHeroChip(
+                            title: sport.title, icon: sport.systemImage
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                    creationHeroChip(
-                        title:
-                            effectiveScoring
-                                .title,
-                        icon:
-                            scoringIcon(
-                                effectiveScoring
-                            )
-                    )
+                    Button {
+                        activeSelectionSheet = .scoring
+                    } label: {
+                        creationHeroChip(
+                            title: effectiveScoring.title,
+                            icon: scoringIcon(effectiveScoring)
+                        )
+                    }
+                    .buttonStyle(.plain)
 
-                    creationHeroChip(
-                        title:
-                            hasEnd
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            hasEnd.toggle()
+                        }
+                    } label: {
+                        creationHeroChip(
+                            title: hasEnd
                                 ? ATHLTHLocalization.choose(
-                                    english:
-                                        "Timed",
-                                    norwegian:
-                                        "Tidsbestemt"
+                                    english: "Timed", norwegian: "Tidsbestemt"
                                 )
                                 : ATHLTHLocalization.choose(
-                                    english:
-                                        "Open",
-                                    norwegian:
-                                        "Åpen"
+                                    english: "Open", norwegian: "Åpen"
                                 ),
-                        icon:
-                            "calendar"
-                    )
+                            icon: "calendar"
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
-
-                creationLivePreview
-
-                creationArtworkPicker
             }
+            .padding(.horizontal, 2)
         }
     }
 
@@ -1722,24 +1621,24 @@ struct ChallengeCreationView: View {
                             )
                     )
 
-                    if !invitees.isEmpty {
-                        Label(
-                            "\(invitees.count)",
-                            systemImage:
-                                "person.2.fill"
-                        )
-                    }
+
                 }
-                .font(
-                    .caption2.weight(
-                        .semibold
-                    )
-                )
-                .foregroundStyle(
-                    .white.opacity(0.94)
-                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.94))
                 .lineLimit(1)
                 .minimumScaleFactor(0.68)
+
+                Label(
+                    ATHLTHChallengePreviewPeople.label(
+                        creatorName: session.profile.displayName,
+                        invitedNames: invitees.map(\.displayName)
+                    ),
+                    systemImage: "person.2.fill"
+                )
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.95))
+                .lineLimit(1)
+                .minimumScaleFactor(0.76)
             }
             .padding(14)
             .padding(.trailing, 48)
@@ -1786,7 +1685,7 @@ struct ChallengeCreationView: View {
             )
             .padding(11)
         }
-        .frame(height: 176)
+        .frame(height: 200)
         .frame(maxWidth: .infinity)
         .clipped()
         .clipShape(
@@ -1817,9 +1716,9 @@ struct ChallengeCreationView: View {
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "Challenge image",
+                            "Choose image",
                         norwegian:
-                            "Challenge-bilde"
+                            "Velg bilde"
                     )
                 )
                 .font(
@@ -2205,45 +2104,54 @@ struct ChallengeCreationView: View {
             creationDivider
 
             Button {
-                activeSelectionSheet = .sport
-            } label: {
-                creationSelectionRow(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Activity",
-                            norwegian: "Aktivitet"
-                        ),
-                    value: sport.title,
-                    icon: sport.systemImage
-                )
-            }
-            .buttonStyle(.plain)
-
-            creationDivider
-
-            Button {
                 activeSelectionSheet = .scoring
             } label: {
-                creationSelectionRow(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Scoring",
-                            norwegian: "Poengberegning"
-                        ),
-                    value:
-                        effectiveScoring.title,
-                    icon:
-                        scoringIcon(
-                            effectiveScoring
-                        ),
-                    subtitle:
-                        scoringSubtitle(
-                            effectiveScoring
-                        )
-                )
+                creationScoringSelectionRow
             }
             .buttonStyle(.plain)
         }
+    }
+
+    /// Full-width title and a wrap-capable selected value: the iOS system
+    /// LabeledContent style previously shortened "Heaviest weight" to "Heaviest…".
+    private var creationScoringSelectionRow: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Image(systemName: scoringIcon(effectiveScoring))
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundStyle(ChallengePlanTheme.gold)
+                .frame(width: 43, height: 43)
+                .background(
+                    ATHLTHTheme.cardWarm,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Scoring", norwegian: "Poengberegning"
+                ))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ChallengePlanTheme.ink)
+
+                Text(scoringSubtitle(effectiveScoring))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Text(effectiveScoring.title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ChallengePlanTheme.ink)
+                .multilineTextAlignment(.trailing)
+                .fixedSize(horizontal: false, vertical: true)
+                .layoutPriority(1)
+
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(.vertical, 7)
+        .contentShape(Rectangle())
     }
 
     private var creationRulesSection:
