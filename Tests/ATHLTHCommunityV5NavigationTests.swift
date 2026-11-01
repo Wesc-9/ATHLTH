@@ -43,7 +43,7 @@ final class ATHLTHCommunityV5NavigationTests: XCTestCase {
         XCTAssertFalse(CommunityInterest.strength.matchesClub(club))
     }
 
-    func testOnlyThreeNewCommunityHeroAssets() {
+    func testOnlyThreeNewCommunityHeroAssets() throws {
         let mapping: [ATHLTHCommunityMainTab: String] = [
             .overview: "CommunityHero",
             .clubs: "CommunityClubsHero",
