@@ -1503,6 +1503,7 @@ enum HomeHealthMetricKind:
     Identifiable {
 
     case sleep
+    case steps
     case respiratoryRate
     case hrv
     case load
@@ -1513,6 +1514,8 @@ enum HomeHealthMetricKind:
         switch self {
         case .sleep:
             return "Søvn"
+        case .steps:
+            return "Skritt"
         case .respiratoryRate:
             return "Respirasjon"
         case .hrv:
@@ -1526,6 +1529,8 @@ enum HomeHealthMetricKind:
         switch self {
         case .sleep:
             return "moon.fill"
+        case .steps:
+            return "figure.walk"
         case .respiratoryRate:
             return "lungs.fill"
         case .hrv:
@@ -1541,6 +1546,7 @@ enum HomeHealthMetricKind:
         // metric's icon and real measurements, never missing values.
         switch self {
         case .sleep: return .indigo
+        case .steps: return .blue
         case .respiratoryRate: return .blue
         case .hrv: return .red
         case .load: return .green
@@ -1551,6 +1557,8 @@ enum HomeHealthMetricKind:
         switch self {
         case .sleep:
             return "timer"
+        case .steps:
+            return "steps"
         case .respiratoryRate:
             return "bpm"
         case .hrv:
@@ -1561,12 +1569,39 @@ enum HomeHealthMetricKind:
     }
 }
 
-private struct HomeMetricPoint:
+struct HomeMetricPoint:
     Identifiable {
     let date: Date
     let value: Double?
 
     var id: Date { date }
+}
+
+/// The step trend uses Apple's cumulative daily quantities, never estimated
+/// values. Keep every calendar day in the sequence so the Home mini chart has
+/// seven positions; missing HealthKit readings remain nil, not invented zeroes.
+enum HomeStepsTrend {
+    static func points(
+        from samples: [ATHLTHInsightHealthDay],
+        days: Int,
+        endingAt referenceDate: Date = Date(),
+        calendar: Calendar = .current
+    ) -> [HomeMetricPoint] {
+        let count = min(max(days, 1), 90)
+        let today = calendar.startOfDay(for: referenceDate)
+        var byDay: [Date: Double] = [:]
+        for sample in samples where sample.value.isFinite && sample.value >= 0 {
+            byDay[calendar.startOfDay(for: sample.date)] = sample.value
+        }
+        return (0..<count).compactMap { index in
+            guard let date = calendar.date(
+                byAdding: .day,
+                value: index - count + 1,
+                to: today
+            ) else { return nil }
+            return HomeMetricPoint(date: date, value: byDay[date])
+        }
+    }
 }
 
 private enum HomeHealthMetricRange:
@@ -1590,6 +1625,9 @@ private enum HomeHealthMetricRange:
 }
 
 struct HomeHealthMetricStrip: View {
+    @EnvironmentObject private var health: HealthKitManager
+    @State private var stepHistory: [ATHLTHInsightHealthDay] = []
+
     let snapshot: RecoveryTrendSnapshot
     let sleepText: String
     let stepsText: String
@@ -1604,9 +1642,12 @@ struct HomeHealthMetricStrip: View {
                 value: sleepText
             )
 
-            // Activity on Home is informational; no target, percentage,
-            // progress bar or artificial step goal is shown.
-            stepsCard
+            // Steps now use the same tappable trend card as the other
+            // Home measurements. No artificial step target is introduced.
+            metricLink(
+                .steps,
+                value: stepsText
+            )
 
             metricLink(
                 .hrv,
@@ -1620,62 +1661,15 @@ struct HomeHealthMetricStrip: View {
                     readinessText
             )
         }
-    }
-
-    private var stepsCard: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 4) {
-                Image(systemName: "figure.walk")
-                    .font(.system(size: 11.5, weight: .semibold))
-                    .foregroundStyle(Color.blue)
-                    .accessibilityHidden(true)
-
-                Text(ATHLTHLocalization.choose(
-                    english: "Steps", norwegian: "Skritt"
-                ))
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-
-                Spacer(minLength: 0)
-            }
-
-            Text(stepsText)
-                .font(.system(size: 17, weight: .bold, design: .rounded))
-                .foregroundStyle(ATHLTHTheme.primaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.62)
-                .contentTransition(.numericText())
-
-            Text(ATHLTHLocalization.choose(
-                english: "Today", norwegian: "I dag"
-            ))
-            .font(.system(size: 9, weight: .medium))
-            .foregroundStyle(ATHLTHTheme.mutedText)
-            .frame(height: 13)
-
-            Spacer(minLength: 0)
+        .task {
+            // A bounded HealthKit query; values and gaps are real.
+            let readings = await health.insightDailyValues(
+                for: .steps,
+                days: 14
+            )
+            guard !Task.isCancelled else { return }
+            stepHistory = readings
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: 114)
-        .background(
-            ATHLTHTrainDesign.paper,
-            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 17, style: .continuous)
-                .stroke(
-                    ATHLTHTrainDesign.rule.opacity(0.34),
-                    lineWidth: 0.7
-                )
-        }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(ATHLTHLocalization.choose(
-            english: "Steps today: \(stepsText)",
-            norwegian: "Skritt i dag: \(stepsText)"
-        ))
     }
 
     private func metricLink(
@@ -1871,7 +1865,11 @@ struct HomeHealthMetricStrip: View {
     private func points(
         for kind: HomeHealthMetricKind
     ) -> [HomeMetricPoint] {
-        snapshot.days.map { day in
+        if kind == .steps {
+            return HomeStepsTrend.points(from: stepHistory, days: 14)
+        }
+
+        return snapshot.days.map { day in
             let value: Double?
 
             switch kind {
@@ -1880,6 +1878,9 @@ struct HomeHealthMetricStrip: View {
                     day.sleepDuration.map {
                         $0 / 3_600
                     }
+            case .steps:
+                // Handled by HealthKit's daily cumulative step history above.
+                value = nil
             case .respiratoryRate:
                 value =
                     day.respiratoryRate
@@ -1963,6 +1964,9 @@ struct HomeHealthMetricStrip: View {
         switch kind {
         case .respiratoryRate:
             return ATHLTHTheme.accentDeep
+        case .steps:
+            // Step counts describe activity, not a good/bad recovery score.
+            return .blue
         case .load:
             return ATHLTHTheme
                 .accentDeep
@@ -2072,6 +2076,7 @@ struct HomeHealthMetricDetailView:
         HomeHealthMetricRange = .week
     @State private var loadedSnapshot:
         RecoveryTrendSnapshot?
+    @State private var loadedSteps: [ATHLTHInsightHealthDay] = []
     @State private var isLoadingRange = false
 
     var body: some View {
@@ -2251,9 +2256,26 @@ struct HomeHealthMetricDetailView:
                         .padding(.top, 6)
                     }
 
-                    detailChart
+                    if kind == .steps &&
+                        !isLoadingRange &&
+                        points.allSatisfy({ $0.value == nil }) {
+                        ContentUnavailableView(
+                            ATHLTHLocalization.choose(
+                                english: "No steps recorded",
+                                norwegian: "Ingen registrerte skritt"
+                            ),
+                            systemImage: "figure.walk",
+                            description: Text(ATHLTHLocalization.choose(
+                                english: "Apple Health has no readable step data for this period.",
+                                norwegian: "Apple Health har ingen lesbare skrittdata i denne perioden."
+                            ))
+                        )
                         .frame(height: 210)
-                        .padding(.top, 10)
+                    } else {
+                        detailChart
+                            .frame(height: 210)
+                            .padding(.top, 10)
+                    }
                 }
 
                 ATHLTHUnifiedCard {
@@ -2429,7 +2451,13 @@ struct HomeHealthMetricDetailView:
 
     private var points:
         [HomeMetricPoint] {
-        activeSnapshot.days
+        if kind == .steps {
+            return HomeStepsTrend.points(
+                from: loadedSteps,
+                days: selectedRange.rawValue
+            )
+        }
+        return activeSnapshot.days
             .suffix(selectedRange.rawValue)
             .map { day in
                 let value: Double?
@@ -2440,6 +2468,9 @@ struct HomeHealthMetricDetailView:
                         day.sleepDuration.map {
                             $0 / 3_600
                         }
+                case .steps:
+                    // Step history is fetched separately from Apple Health.
+                    value = nil
                 case .respiratoryRate:
                     value =
                         day.restingHeartRate
@@ -2463,6 +2494,18 @@ struct HomeHealthMetricDetailView:
         async {
         let requestedDays =
             selectedRange.rawValue
+
+        if kind == .steps {
+            isLoadingRange = true
+            let readings = await health.insightDailyValues(
+                for: .steps,
+                days: requestedDays
+            )
+            guard !Task.isCancelled else { return }
+            loadedSteps = readings
+            isLoadingRange = false
+            return
+        }
 
         if requestedDays <=
             snapshot.days.count {
@@ -2498,6 +2541,10 @@ struct HomeHealthMetricDetailView:
         // Match the live Home sleep value, not a possibly older trend cache.
         if kind == .sleep, health.sleep.totalAsleep > 0 {
             return formattedMetricValue(health.sleep.totalAsleep / 3_600)
+        }
+        if kind == .steps, let today = health.training.stepsToday,
+            today.isFinite, today >= 0 {
+            return formattedMetricValue(today)
         }
 
         guard let value =
@@ -2549,6 +2596,8 @@ struct HomeHealthMetricDetailView:
                 )
             return
                 "\(totalMinutes / 60) t \(totalMinutes % 60) min"
+        case .steps:
+            return Int(value.rounded()).formatted()
         case .respiratoryRate:
             return
                 "\(Int(value.rounded())) bpm"
@@ -2567,6 +2616,11 @@ struct HomeHealthMetricDetailView:
         case .sleep:
             return
                 "Registrert søvn fra Apple Health."
+        case .steps:
+            return ATHLTHLocalization.choose(
+                english: "Recorded steps from Apple Health.",
+                norwegian: "Registrerte skritt fra Apple Health."
+            )
         case .respiratoryRate:
             return
                 "Daglig respirasjonsfrekvens fra Apple Health."
@@ -2643,6 +2697,11 @@ struct HomeHealthMetricDetailView:
                 norwegian:
                     "Søvn viser hvor mye søvn som er registrert gjennom natten. Det er mest nyttig som en trend sammen med hvordan du faktisk føler deg."
             )
+        case .steps:
+            return ATHLTHLocalization.choose(
+                english: "Steps show the total number of steps recorded during a day. There is no automatic step goal.",
+                norwegian: "Skritt viser det totale antallet registrerte skritt i løpet av dagen. Det settes ikke noe automatisk skrittmål."
+            )
         case .respiratoryRate:
             return ATHLTHLocalization.choose(
                 english:
@@ -2676,6 +2735,11 @@ struct HomeHealthMetricDetailView:
                 norwegian:
                     "ATHLTH leser kompatible søvnregistreringer fra Apple Health. Apple Watch og andre støttede kilder kan bidra med data. Netter uten data blir stående tomme i stedet for å bli estimert."
             )
+        case .steps:
+            return ATHLTHLocalization.choose(
+                english: "ATHLTH reads daily cumulative step counts from Apple Health, including supported iPhone and Apple Watch sources. Days without readings remain empty, not estimated.",
+                norwegian: "ATHLTH leser daglige skrittellinger fra Apple Health, blant annet fra iPhone og Apple Watch. Dager uten målinger blir stående tomme, ikke estimert."
+            )
         case .respiratoryRate:
             return ATHLTHLocalization.choose(
                 english:
@@ -2708,6 +2772,11 @@ struct HomeHealthMetricDetailView:
                     "Use several nights together with energy, soreness and your planned session. Repeatedly short sleep can be a reason to reduce volume or intensity, while one short night does not automatically require a change.",
                 norwegian:
                     "Se flere netter i sammenheng med energi, muskelømhet og den planlagte økten. Gjentatt kort søvn kan være et signal om å redusere volum eller intensitet, mens én kort natt ikke automatisk betyr at planen må endres."
+            )
+        case .steps:
+            return ATHLTHLocalization.choose(
+                english: "Compare daily movement with recent training and recovery. The trend describes activity, not whether you met a target or need harder exercise.",
+                norwegian: "Se skrittene i sammenheng med daglig aktivitet, trening og restitusjon. Trenden viser bevegelse, ikke om du har nådd et mål eller bør trene hardere."
             )
         case .respiratoryRate:
             return ATHLTHLocalization.choose(
