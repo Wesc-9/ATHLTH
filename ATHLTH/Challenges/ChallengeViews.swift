@@ -2104,9 +2104,9 @@ struct ChallengeCreationView: View {
                 Text(
                     ATHLTHLocalization.choose(
                         english:
-                            "If left empty, ATHLTH uses “\(automaticTitle)”.",
+                            "If left empty, ATHLTH uses “\(resolvedTitle)”.",
                         norwegian:
-                            "Står feltet tomt, brukes «\(automaticTitle)»."
+                            "Står feltet tomt, brukes «\(resolvedTitle)»."
                     )
                 )
                 .font(.caption)
@@ -4380,9 +4380,13 @@ struct ChallengeCreationView: View {
         switch sport {
         case .running, .walking:
             if sport == .running && runningFocus != .standard {
-                return selectedRunningTemplate != nil &&
-                    (runningFocus != .hills ||
-                     runningMinimumRepetitions > 0)
+                guard let template = selectedRunningTemplate else { return false }
+                let availableRepetitions = template.blocks.reduce(0) { total, block in
+                    total + (block.kind == .work ? max(1, block.repetitions) : 0)
+                }
+                return runningFocus != .hills ||
+                    ((1...20).contains(runningMinimumRepetitions) &&
+                     availableRepetitions >= runningMinimumRepetitions)
             }
             if scoring ==
                 .fastestDistance {
@@ -6892,7 +6896,7 @@ struct ChallengeCreationView: View {
             creatorName: session.profile.displayName,
             invitedNames: invitees.map(\.displayName),
             scoringTitle: sport == .running && runningFocus != .standard
-                ? sport.title + " · " + runningComparison.title
+                ? sport.title + " • " + runningComparison.title
                 : nil
         )
     }

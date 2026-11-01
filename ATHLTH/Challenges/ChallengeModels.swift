@@ -218,9 +218,11 @@ enum ChallengeCreationPolicy {
             people = shortName(creatorName) + " + " +
                 String(invitedNames.count)
         }
-        return String(((scoringTitle ?? automaticTitle(
+        let titlePart = (scoringTitle ?? automaticTitle(
             sport: sport, scoring: scoring
-        )) + " · " + people).prefix(120))
+        )).replacingOccurrences(of: " · ", with: " • ")
+        return String((titlePart + " • " +
+            people.replacingOccurrences(of: " · ", with: " • ")).prefix(120))
     }
 
     static func requiresDirectInvite(

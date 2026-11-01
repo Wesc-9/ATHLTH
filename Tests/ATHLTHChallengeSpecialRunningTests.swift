@@ -90,9 +90,9 @@ final class ATHLTHChallengeSpecialRunningTests: XCTestCase {
             ChallengeCreationPolicy.resolvedTitle(
                 "", sport: .running, scoring: .fastestDistance,
                 creatorName: "Stian", invitedNames: ["Malin"],
-                scoringTitle: "Løping · Raskeste drag"
+                scoringTitle: "Løping • Raskeste drag"
             ),
-            "Løping · Raskeste drag · Stian · Malin"
+            "Løping • Raskeste drag • Stian • Malin"
         )
     }
 
