@@ -18,6 +18,30 @@ final class ATHLTHCommunityV5NavigationTests: XCTestCase {
         }
     }
 
+    func testCommunityInterestFiltersAreDistinctAndAvailableToEachScreen() {
+        XCTAssertEqual(CommunityInterest.allCases.count, 6)
+        XCTAssertEqual(Set(CommunityInterest.allCases.map(\.id)).count, 6)
+        XCTAssertTrue(CommunityInterest.allCases.allSatisfy {
+            !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        })
+    }
+
+    func testClubCategoriesUseRealPublicMetadata() {
+        let club = CommunityGroupRecord(
+            id: UUID(), creatorID: UUID(),
+            name: "Trondheim Løpeklubb",
+            summary: "Felles løpeturer og intervaller",
+            locationName: "Trondheim",
+            visibility: "public", imageURL: nil,
+            headerImageURL: nil, featuredChallengeID: nil,
+            joinMode: "open", membersCanCreateContent: true,
+            createdAt: Date(), updatedAt: Date()
+        )
+        XCTAssertTrue(CommunityInterest.all.matchesClub(club))
+        XCTAssertTrue(CommunityInterest.running.matchesClub(club))
+        XCTAssertFalse(CommunityInterest.strength.matchesClub(club))
+    }
+
     func testClubDiscoveryNormalizesNorwegianNames() {
         XCTAssertTrue(ATHLTHCommunityDiscoveryPolicy.matches(
             "loPE", in: ["Løpeklubb", "Trondheim"]))
