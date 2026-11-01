@@ -36,6 +36,11 @@ struct ATHLTHRunningMainSet: Codable, Identifiable {
         return true
     }
 
+    static func delete(id: UUID, userID: UUID) {
+        let remaining = load(userID: userID).filter { $0.id != id }
+        AccountLocalStorage.write(remaining, name: storageName, userID: userID)
+    }
+
     func inserting(in phase: WorkoutPhaseKind = .main) -> [WorkoutTemplateBlock] {
         var groupIDs: [UUID: UUID] = [:]
         return blocks.enumerated().map { index, original in
