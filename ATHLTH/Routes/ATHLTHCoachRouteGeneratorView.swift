@@ -106,16 +106,18 @@ struct ATHLTHCoachRouteGeneratorView: View {
                             }
                         }
                     }
-                    Toggle(tr("Return to start", "Rundtur"),
-                           isOn: $brief.isLoop)
-                        .tint(ATHLTHTrainDesign.bronze)
-                    Text(brief.isLoop
-                        ? tr("A connected loop returning to its starting point.",
-                             "Sammenhengende rundtur tilbake til startstedet.")
-                        : tr("Out and back on the same verified route.",
-                             "Tur-retur langs samme beregnede strekning."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Picker(tr("Route type", "Rutetype"),
+                           selection: $brief.routeShape) {
+                        ForEach(ATHLTHCoachRouteBrief.RouteShape.allCases) { shape in
+                            Text(shape.title).tag(shape)
+                        }
+                    }
+                    Text(tr(
+                        "A–B is preferred. Automatic also tries A–B–A when needed. Only verified routes within 5% of your target are shown.",
+                        "A–B foretrekkes. Automatisk prøver også A–B–A ved behov. Bare bekreftede ruter innenfor 5 % av målet vises."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
 
                 Section(tr("Terrain and surroundings", "Underlag og omgivelser")) {
@@ -185,6 +187,9 @@ struct ATHLTHCoachRouteGeneratorView: View {
                                              ? tr("Best distance match", "Nærmest ønsket distanse")
                                              : tr("Alternative", "Alternativ") + " \(item.variation)")
                                             .font(.subheadline.weight(.semibold))
+                                        Text(item.shape.title)
+                                            .font(.caption2.weight(.medium))
+                                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                         Text(String(format: "%.1f km · ca. %.0f min",
                                                     item.distanceMeters / 1000,
                                                     item.predictedRunMinutes))
@@ -210,6 +215,14 @@ struct ATHLTHCoachRouteGeneratorView: View {
                                     Image(systemName: "mappin.circle.fill")
                                         .font(.title2)
                                         .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                }
+                                if selected.shape == .oneWay,
+                                   let destination = selected.coordinates.last {
+                                    Annotation(tr("Finish", "Mål"), coordinate: destination) {
+                                        Image(systemName: "flag.checkered.circle.fill")
+                                            .font(.title2)
+                                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                    }
                                 }
                             }
                             .frame(height: 235)
@@ -268,14 +281,12 @@ struct ATHLTHCoachRouteGeneratorView: View {
             ))
             .font(.caption2)
             .foregroundStyle(.secondary)
-            if abs(item.distanceMeters - brief.targetMeters) / brief.targetMeters > 0.15 {
-                Text(tr(
-                    "This suggestion differs by more than 15% from your desired distance.",
-                    "Dette forslaget avviker mer enn 15 % fra ønsket distanse."
-                ))
-                .font(.caption)
-                .foregroundStyle(.orange)
-            }
+            Text(tr(
+                "Verified route distance is within 5% of your target.",
+                "Beregnet rutelengde er innenfor 5 % av målet ditt."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHPlanDesign.accentInk)
         }
         .padding(.vertical, 5)
     }
@@ -333,7 +344,11 @@ struct ATHLTHCoachRouteGeneratorView: View {
     }
 
     private func save(_ selected: ATHLTHCoachRouteSuggestion) {
-        guard selected.coordinates.count >= 2 else { return }
+        guard selected.coordinates.count >= 2,
+              ATHLTHCoachRouteGenerator.matchesRequestedDistance(
+                  actualMeters: selected.distanceMeters,
+                  targetMeters: brief.targetMeters
+              ) else { return }
         let routeTitle = customTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         let route = TrainingRoute(
             id: UUID(),
@@ -358,8 +373,9 @@ struct ATHLTHCoachRouteGeneratorView: View {
             startName: brief.startMode == .current
                 ? tr("My location", "Der jeg er")
                 : tr("Nearby start", "Start i nærheten"),
-            endName: brief.isLoop
-                ? tr("Return to start", "Tilbake til start") : nil,
+            endName: selected.shape == .oneWay
+                ? tr("Destination", "Mål")
+                : tr("Return to start", "Tilbake til start"),
             expectedTravelTimeSeconds: selected.predictedRunMinutes * 60,
             routeSource: "athlth_coach_apple_walking"
         )
