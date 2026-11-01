@@ -79,6 +79,7 @@ struct ATHLTHDataExportView: View {
                 }
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Export Data")
         .navigationBarTitleDisplayMode(.inline)
         .task {

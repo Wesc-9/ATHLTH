@@ -698,6 +698,7 @@ struct ATHLTHEditProfileView: View {
                     ))
                 }
             }
+            .athlthBrandedForm()
             .navigationTitle(field.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -2488,6 +2489,7 @@ struct PersonalHealthProfileView: View {
                     }
                 }
             }
+            .athlthBrandedForm()
             .navigationTitle(field.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -3431,6 +3433,7 @@ struct ATHLTHAccountSecurityView: View {
                 Text("Deleting your account is permanent. Signing out keeps your account and clears account-specific cached data from this device.")
             }
         }
+        .athlthBrandedForm()
         .navigationTitle(
             accountText(
                 english: "Account & Security",
@@ -3743,6 +3746,7 @@ struct SpotifySettingsView: View {
                 .foregroundStyle(.secondary)
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Spotify")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingPlaylistPicker) {

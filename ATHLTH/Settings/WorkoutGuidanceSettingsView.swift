@@ -86,6 +86,7 @@ struct ATHLTHWorkoutGuidanceSettingsView: View {
             }
 
         }
+        .athlthBrandedForm()
         .navigationTitle("Workout Guidance")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -259,6 +260,7 @@ struct ATHLTHRouteGuardianSettingsView: View {
                 }
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Route Guardian")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -922,6 +924,7 @@ struct ATHLTHGuidancePrioritySettingsView: View {
                 .foregroundStyle(.secondary)
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Alert Priority")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {

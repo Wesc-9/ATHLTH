@@ -172,6 +172,7 @@ struct ATHLTHProfileSetupView: View {
                 .disabled(selectedFocuses.isEmpty || saving)
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Profile Setup")
         .navigationBarTitleDisplayMode(.inline)
         .task {

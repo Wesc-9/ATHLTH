@@ -62,6 +62,7 @@ struct DeleteAccountView: View {
                 }
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Delete Account")
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(

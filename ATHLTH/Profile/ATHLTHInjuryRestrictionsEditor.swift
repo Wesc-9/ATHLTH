@@ -181,6 +181,7 @@ struct ATHLTHInjuryRestrictionEntryView: View {
                     Text(tr("Additional details", "Tilleggsopplysninger"))
                 }
             }
+            .athlthBrandedForm()
             .navigationTitle(tr("Training limitation", "Treningshensyn"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
