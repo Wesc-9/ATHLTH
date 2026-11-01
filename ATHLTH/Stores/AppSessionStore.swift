@@ -1764,9 +1764,10 @@ final class AppSessionStore: ObservableObject {
         refreshActivePlanForToday()
         // This also covers complete plans created by Coach or from a template.
         // Only finalized workouts with an actual main phase are indexed.
-        for workout in plan.weeks.flatMap(\.days).flatMap(\.sessions) {
-            ATHLTHWorkoutMainSectionLibrary.capture(workout, userID: profile.userID)
-        }
+        ATHLTHWorkoutMainSectionLibrary.captureAll(
+            plan.weeks.flatMap(\.days).flatMap(\.sessions),
+            userID: profile.userID
+        )
         return true
     }
 
@@ -2239,6 +2240,12 @@ final class AppSessionStore: ObservableObject {
 
         persistScheduledPlans()
         refreshActivePlanForToday()
+        // Covers direct calendar edits and copied workouts as well as the
+        // dedicated Add Session editor, without adding a save button.
+        ATHLTHWorkoutMainSectionLibrary.captureAll(
+            plan.weeks.flatMap(\.days).flatMap(\.sessions),
+            userID: profile.userID
+        )
     }
 
     private func normalizedTrainingPlan(
@@ -3903,7 +3910,6 @@ final class AppSessionStore: ObservableObject {
             plan.updatedAt = Date()
             plan.version += 1
             replaceTrainingPlan(plan)
-            ATHLTHWorkoutMainSectionLibrary.capture(session, userID: profile.userID)
             return
         }
     }
@@ -4131,9 +4137,6 @@ final class AppSessionStore: ObservableObject {
                 plan.updatedAt = Date()
                 plan.version += 1
                 replaceTrainingPlan(plan)
-                ATHLTHWorkoutMainSectionLibrary.capture(
-                    updatedSession, userID: profile.userID
-                )
                 return
             }
         }
