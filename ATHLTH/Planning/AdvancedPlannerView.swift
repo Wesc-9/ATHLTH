@@ -8043,75 +8043,40 @@ struct SessionEditorView: View {
         }
     }
 
-    /// Entry from a friend's Train Together action is recipient-specific.
-    /// No "Just me", "Others" or alternative people can be selected here.
+    /// Exactly the same surface, heading and recipient-row component as
+    /// Challenge creation when launched directly from a friend's profile.
     private var lockedTrainingPartnerCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 9) {
-                RoundedRectangle(cornerRadius: 2)
-                    .fill(ATHLTHPlanDesign.accent)
-                    .frame(width: 3, height: 24)
-                Image(systemName: "person.2.fill")
-                    .foregroundStyle(ATHLTHPlanDesign.accent)
-                Text(ATHLTHLocalization.choose(
-                    english: "Participants", norwegian: "Deltakere"
-                ))
-                .font(.system(size: 20, weight: .semibold, design: .serif))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-            }
-
-            HStack(spacing: 12) {
-                if let directPartnerID,
-                   let friend = social.trainingPartners.first(where: {
-                       $0.userID == directPartnerID
-                   }) {
-                    ATHLTHSocialStatusAvatar(profile: friend, size: 48)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(friend.resolvedName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            .lineLimit(2)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Direct training invitation · one recipient",
-                            norwegian: "Direkte treningsinvitasjon · én mottaker"
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                } else {
-                    Image(systemName: "person.crop.circle")
-                        .font(.system(size: 30))
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        ATHLTHPlanSurface {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(spacing: 9) {
+                    Capsule()
+                        .fill(ATHLTHPlanDesign.accent)
+                        .frame(width: 3, height: 20)
+                    Image(systemName: "person.2.fill")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(ATHLTHPlanDesign.accent)
                     Text(ATHLTHLocalization.choose(
+                        english: "Participants", norwegian: "Deltakere"
+                    ))
+                    .font(.system(size: 23, weight: .regular, design: .serif))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Spacer(minLength: 0)
+                }
+
+                ATHLTHDirectParticipantRow(
+                    recipient: social.trainingPartners.first {
+                        $0.userID == directPartnerID
+                    },
+                    fallbackTitle: ATHLTHLocalization.choose(
                         english: "Selected training partner",
                         norwegian: "Valgt treningspartner"
-                    ))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "lock.shield.fill")
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Recipient locked", norwegian: "Mottaker låst"
-                    ))
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Direct training invitation · one recipient",
+                        norwegian: "Direkte treningsinvitasjon · én mottaker"
+                    )
+                )
             }
-
-            Toggle(
-                ATHLTHLocalization.choose(
-                    english: "Allow guest to add exercises",
-                    norwegian: "La invitert legge til øvelser"
-                ),
-                isOn: $allowInviteeExercises
-            )
-            .tint(ATHLTHPlanDesign.accent)
-        }
-        .padding(15)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ATHLTHPlanDesign.surface,
-                    in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius))
-        .overlay {
-            RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius)
-                .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
         }
     }
 
@@ -8119,6 +8084,16 @@ struct SessionEditorView: View {
         Section {
             if directPartnerID != nil {
                 lockedTrainingPartnerCard
+
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Allow guest to add exercises",
+                        norwegian: "La invitert legge til øvelser"
+                    ),
+                    isOn: $allowInviteeExercises
+                )
+                .tint(ATHLTHPlanDesign.accent)
+                .padding(.horizontal, 2)
             } else {
             VStack(alignment: .leading, spacing: 12) {
                 Button {
@@ -8187,12 +8162,20 @@ struct SessionEditorView: View {
             .padding(.vertical, 9)
             }
         } header: {
-            Text(ATHLTHLocalization.choose(
-                english: "Train together",
-                norwegian: "Tren sammen"
-            ))
+            if directPartnerID == nil {
+                Text(ATHLTHLocalization.choose(
+                    english: "Train together",
+                    norwegian: "Tren sammen"
+                ))
+            }
         }
-        .listRowBackground(ATHLTHTheme.card)
+        .listRowBackground(
+            directPartnerID == nil ? ATHLTHTheme.card : Color.clear
+        )
+        .listRowInsets(directPartnerID == nil
+            ? EdgeInsets(top: 8, leading: 14, bottom: 8, trailing: 14)
+            : EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16)
+        )
         .listRowSeparator(.hidden)
     }
 
