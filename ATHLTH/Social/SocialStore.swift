@@ -531,8 +531,12 @@ final class SocialStore: ObservableObject {
                 .subtracting(blockedIDs)
             let outgoingIDs = Set(followingRows.map(\.followingID))
                 .subtracting(blockedIDs)
-            let mutualIDs = incomingIDs.intersection(outgoingIDs)
-                .subtracting(mutedIDs)
+            let mutualIDs = ATHLTHHomeFriendsEligibility.mutualIDs(
+                followers: incomingIDs,
+                following: outgoingIDs,
+                blocked: blockedIDs,
+                muted: mutedIDs
+            )
             // Query the exact mutual IDs, not the first 500 directory cards.
             let cards = try await service.loadProfileCards(for: mutualIDs)
 
@@ -3521,6 +3525,21 @@ final class SocialStore: ObservableObject {
         }
 
         return "\(minutes) min"
+    }
+}
+
+/// Shared eligibility rule for Home's optional friend strip.
+/// Status (online/training) never affects whether a mutual friend exists.
+enum ATHLTHHomeFriendsEligibility {
+    static func mutualIDs(
+        followers: Set<UUID>,
+        following: Set<UUID>,
+        blocked: Set<UUID>,
+        muted: Set<UUID>
+    ) -> Set<UUID> {
+        followers.intersection(following)
+            .subtracting(blocked)
+            .subtracting(muted)
     }
 }
 
