@@ -2957,7 +2957,8 @@ struct ChallengeCreationView: View {
                             "Forsøk på bestemt rute krever alltid GPS."
                     )
             )
-        } else {
+        }
+            } else {
                 creationSpecialRunningRules
             }
         }
