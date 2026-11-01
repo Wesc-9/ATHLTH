@@ -51,7 +51,9 @@ final class ATHLTHCommunityV5NavigationTests: XCTestCase {
             .events: "CommunityEventsHero"
         ]
         XCTAssertEqual(mapping.count, ATHLTHCommunityMainTab.allCases.count)
-        for name in mapping.values {
+        for tab in ATHLTHCommunityMainTab.allCases {
+            let name = try XCTUnwrap(mapping[tab])
+            XCTAssertEqual(tab.heroAssetName, name)
             XCTAssertNotNil(
                 UIImage(named: name),
                 "Community hero image missing from the asset catalog: \(name)"
