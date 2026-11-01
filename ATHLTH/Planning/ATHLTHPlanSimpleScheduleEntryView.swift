@@ -341,7 +341,7 @@ struct ATHLTHPlanSetupFields: View {
 
     private var nameCard: some View {
         card {
-            cardHeading("pencil", tr("Plan name", "Navn på planen"))
+            cardHeading("pencil", tr("Plan name (optional)", "Navn på planen (valgfritt)"))
             TextField(suggestedName, text: $title)
                 .font(.system(size: 12))
                 .foregroundStyle(ink)
@@ -496,7 +496,9 @@ struct ATHLTHPlanSetupFields: View {
                     }
                 }
             }
-            if advanced {
+            if advanced && planningApproach == .quick {
+                // Dagsplan edits each date directly, so a week variation toggle
+                // would be redundant. Preserve the saved choice for Ukeplan.
                 HStack(spacing: 8) {
                     Image(systemName: "shuffle")
                         .foregroundStyle(bronze)
