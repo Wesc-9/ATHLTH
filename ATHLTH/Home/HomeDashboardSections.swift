@@ -4601,7 +4601,11 @@ private struct HomeWeeklyProgressDaySheet: View {
     }
 
     private var workoutSuggestionSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        // Computing plannedSession() for a catalog entry can be costly.
+        // Resolve recommendations once per view pass, not once for empty
+        // checking and again for ForEach.
+        let suggestions = workoutSuggestions
+        return VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(ATHLTHLocalization.choose(
                     english: "Suggestions from Workouts",
@@ -4623,7 +4627,7 @@ private struct HomeWeeklyProgressDaySheet: View {
                 .buttonStyle(.plain)
             }
 
-            if workoutSuggestions.isEmpty {
+            if suggestions.isEmpty {
                 Text(ATHLTHLocalization.choose(
                     english: "Explore the Workouts library to find ready-made sessions.",
                     norwegian: "Utforsk Workouts-biblioteket for ferdige treningsøkter."
@@ -4633,7 +4637,7 @@ private struct HomeWeeklyProgressDaySheet: View {
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(alignment: .top, spacing: 10) {
-                        ForEach(Array(workoutSuggestions.enumerated()), id: \.offset) { index, workout in
+                        ForEach(Array(suggestions.enumerated()), id: \.offset) { index, workout in
                             Button {
                                 presentSuggestion(workout)
                             } label: {
