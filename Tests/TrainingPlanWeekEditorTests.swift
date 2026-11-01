@@ -35,15 +35,19 @@ final class TrainingPlanWeekEditorTests: XCTestCase {
         XCTAssertNil(updated.preferredWorkoutMinutesByDay)
     }
 
-    func testAdvancedPlanJourneyUsesGoalAndBuildMethodInsteadOfLegacyProfile() {
+    func testAdvancedPlanJourneyKeepsBuildMethodWithinBasicsAndMigratesLegacyProfile() {
         let stages = ATHLTHPlanJourney.sequence(advanced: true)
-        XCTAssertEqual(stages, [.mode, .goal, .basics, .approach, .week, .review])
+        XCTAssertEqual(stages, [.mode, .goal, .basics, .week, .review])
         XCTAssertFalse(stages.contains(.profile))
+        XCTAssertFalse(stages.contains(.approach))
         XCTAssertEqual(
-            ATHLTHPlanJourney.previous(before: .week, advanced: true), .approach
+            ATHLTHPlanJourney.previous(before: .week, advanced: true), .basics
         )
         XCTAssertEqual(
-            ATHLTHPlanJourney.restoredStep("profile", advanced: true), .approach
+            ATHLTHPlanJourney.restoredStep("profile", advanced: true), .basics
+        )
+        XCTAssertEqual(
+            ATHLTHPlanJourney.restoredStep("approach", advanced: true), .basics
         )
         XCTAssertEqual(ATHLTHPlanJourney.displayedCount(advanced: true), 5)
     }

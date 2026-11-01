@@ -13,15 +13,23 @@ final class ATHLTHCoachPlanModernIntakeTests: XCTestCase {
         intake.sessionDurationMinutes = 45
         intake.locations = [.outdoors]
         intake.equipment = ["Bodyweight / no equipment"]
-        intake.injuryStatus = .none
+        // Explicit enum case: `.none` on the optional property means nil.
+        intake.injuryStatus = ATHLTHAIProgramIntake.InjuryStatus.none
         return intake
+    }
+
+    func testNoInjuriesIsAnExplicitAnswerRatherThanMissingInput() {
+        let intake = completeBase()
+        XCTAssertEqual(intake.injuryStatus?.rawValue, "none")
+        XCTAssertFalse(intake.validationIssues.contains("injuryStatus"))
+        XCTAssertTrue(intake.isComplete, "Unexpected intake issues: \(intake.validationIssues)")
     }
 
     func testAnyWeekCountAndWorkoutMinutesWithinSupportedRange() {
         var intake = completeBase()
         intake.durationWeeks = 13
         intake.sessionDurationMinutes = 37
-        XCTAssertTrue(intake.isComplete)
+        XCTAssertTrue(intake.isComplete, "Unexpected intake issues: \(intake.validationIssues)")
 
         intake.durationWeeks = 0
         XCTAssertTrue(intake.validationIssues.contains("durationWeeks"))
