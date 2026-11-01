@@ -3538,6 +3538,7 @@ private struct GarminConnectionSetupView: View {
                 Label("Steps and activity", systemImage: "figure.walk")
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Garmin Setup")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -3706,6 +3707,7 @@ private struct ATHLTHTrainingSettingsView: View {
                 }
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Training")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -3854,6 +3856,7 @@ private struct ATHLTHAchievementSettingsView:
                 .font(.caption)
             }
         }
+        .athlthBrandedForm()
         .navigationTitle(
             ATHLTHLocalization.choose(
                 english:
@@ -4034,6 +4037,7 @@ private struct ATHLTHNotificationSettingsView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: notifications.authorizationStatus) { _, _ in

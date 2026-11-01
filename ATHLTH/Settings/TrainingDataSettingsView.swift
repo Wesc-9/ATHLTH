@@ -62,6 +62,7 @@ struct TrainingDataSettingsView: View {
                 }
             }
         }
+        .athlthBrandedForm()
         .navigationTitle("Training data & Coach")
         .task(id: session.profile.userID) {
             consent = AccountLocalStorage.read(Bool.self, name: "coachHistoryConsent", userID: session.profile.userID) ?? false

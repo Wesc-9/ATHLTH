@@ -2445,6 +2445,7 @@ struct CustomExerciseEditorView: View {
                     .foregroundStyle(.secondary)
                 }
             }
+            .athlthBrandedForm()
             .navigationTitle(ATHLTHLocalization.choose(
                 english: editing == nil ? "Exercise Studio" : "Edit exercise",
                 norwegian: editing == nil ? "Øvelsesstudio" : "Rediger øvelse"

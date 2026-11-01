@@ -40,10 +40,10 @@ enum ATHLTHTheme {
     // reading as flat white. Existing names are retained to avoid breaking
     // screens that already depend on the theme API.
     static let canvasTop = Color(red: 0.986, green: 0.978, blue: 0.962)
-    static let canvasBottom = Color(red: 0.938, green: 0.947, blue: 0.944)
+    static let canvasBottom = Color(red: 0.961, green: 0.950, blue: 0.932)
     static let card = Color(red: 0.995, green: 0.992, blue: 0.984).opacity(0.98)
     static let cardWarm = Color(red: 0.975, green: 0.956, blue: 0.922)
-    static let surfaceStone = Color(red: 0.955, green: 0.958, blue: 0.950)
+    static let surfaceStone = Color(red: 0.967, green: 0.956, blue: 0.937)
     static let surfaceSage = Color(red: 0.925, green: 0.950, blue: 0.934)
     static let primaryText = Color(red: 0.07, green: 0.08, blue: 0.10)
     static let mutedText = Color(red: 0.43, green: 0.46, blue: 0.53)
@@ -204,7 +204,7 @@ struct ATHLTHSectionHeader: View {
 struct ATHLTHPremiumFormSection<Content: View>: View {
     let title: String
     let icon: String
-    var tint: Color = ATHLTHTheme.vitality
+    var tint: Color = ATHLTHTheme.premiumGold
     @ViewBuilder var content: Content
 
     var body: some View {
@@ -258,7 +258,7 @@ struct ATHLTHPremiumSelectionRow: View {
     let value: String
     let icon: String
     var subtitle: String? = nil
-    var tint: Color = ATHLTHTheme.vitality
+    var tint: Color = ATHLTHTheme.premiumGold
 
     var body: some View {
         HStack(
@@ -362,7 +362,7 @@ struct ATHLTHPremiumChoiceRow: View {
     let icon: String
     var subtitle: String? = nil
     var selected: Bool = false
-    var tint: Color = ATHLTHTheme.vitality
+    var tint: Color = ATHLTHTheme.premiumGold
 
     var body: some View {
         HStack(spacing: 12) {
@@ -440,7 +440,7 @@ struct ATHLTHPremiumChoiceRow: View {
         .background(
             selected
                 ? tint.opacity(0.075)
-                : Color.white.opacity(0.42),
+                : ATHLTHTheme.cardWarm.opacity(0.50),
             in: RoundedRectangle(
                 cornerRadius: 16,
                 style: .continuous
@@ -504,7 +504,7 @@ struct ATHLTHPremiumScreenHeader<Actions: View>: View {
     let title: String
     let subtitle: String
     let icon: String
-    var tint: Color = ATHLTHTheme.vitality
+    var tint: Color = ATHLTHTheme.premiumGold
     @ViewBuilder var actions: Actions
 
     var body: some View {
@@ -1559,7 +1559,7 @@ struct ATHLTHPremiumSegmentedControl: View {
                                     .fill(
                                         LinearGradient(
                                             colors: [
-                                                Color.white,
+                                                ATHLTHTheme.card,
                                                 ATHLTHTheme.cardWarm
                                             ],
                                             startPoint: .topLeading,

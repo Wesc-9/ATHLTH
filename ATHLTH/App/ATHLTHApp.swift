@@ -109,7 +109,7 @@ private struct ATHLTHSceneRootView: View {
                         \.locale,
                         settings.interfaceLocale
                     )
-                    .tint(ATHLTHTheme.accent)
+                    .tint(ATHLTHPlanDesign.accentInk)
                     .onOpenURL { url in
                         Task {
                             do {
@@ -198,7 +198,7 @@ private struct ATHLTHSceneRootView: View {
                     settings.interfaceLocale
                 )
                 .preferredColorScheme(.light)
-                .tint(ATHLTHTheme.accent)
+                .tint(ATHLTHPlanDesign.accentInk)
             }
         }
         .onAppear {

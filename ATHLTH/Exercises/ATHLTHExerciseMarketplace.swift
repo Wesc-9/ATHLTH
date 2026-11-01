@@ -353,17 +353,18 @@ struct ATHLTHExerciseMarketplaceView: View {
                             .font(.caption.weight(.semibold))
                         }
                         .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.premiumGold)
+                        .tint(ATHLTHPlanDesign.accentInk)
                         .disabled(savedIDs.contains(item.id))
                     }
                     .padding(16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 20))
+                    .athlthBrandedCard(radius: 20)
                 }
             }
             .padding(17)
         }
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
         .navigationTitle(ATHLTHLocalization.choose(
             english: "Marketplace", norwegian: "Marked"
         ))

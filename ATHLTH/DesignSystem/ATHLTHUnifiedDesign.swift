@@ -52,3 +52,50 @@ struct ATHLTHUnifiedCard<Content: View>: View {
         )
     }
 }
+
+
+// Default ATHLTH chrome for secondary screens that would otherwise inherit
+// iOS system-gray grouped forms and bright-blue accents. Core Train/Insight
+// cards retain their own premium layouts, and semantic metric colors remain.
+struct ATHLTHBrandedFormChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .scrollContentBackground(.hidden)
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+            .tint(ATHLTHPlanDesign.accentInk)
+            .environment(\.defaultMinListRowHeight, 50)
+    }
+}
+
+extension View {
+    func athlthBrandedForm() -> some View {
+        modifier(ATHLTHBrandedFormChrome())
+    }
+
+    /// For neutral, undecorated secondary cards. Keeps the same corner
+    /// radius and hairline gold/stone border as Plan and Train.
+    func athlthBrandedCard(
+        radius: CGFloat = ATHLTHPlanDesign.cardRadius
+    ) -> some View {
+        background {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .fill(LinearGradient(
+                    colors: [
+                        ATHLTHTheme.card,
+                        ATHLTHTheme.cardWarm.opacity(0.56)
+                    ],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ))
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: radius, style: .continuous)
+                .stroke(ATHLTHTheme.premiumGold.opacity(0.17), lineWidth: 0.8)
+                .allowsHitTesting(false)
+        }
+        .shadow(
+            color: ATHLTHPlanDesign.accentInk.opacity(0.045),
+            radius: 11, y: 4
+        )
+    }
+}
