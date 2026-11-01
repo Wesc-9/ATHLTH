@@ -2498,7 +2498,8 @@ final class HealthKitManager: ObservableObject {
     private enum ATHLTHChallengeHillGPSPolicy {
         static func hasHillClimbs(
             _ route: [CLLocation],
-            minimumRepetitions: Int
+            minimumRepetitions: Int,
+            minimumClimbMeters: Double
         ) -> Bool {
             let good = route.filter {
                 $0.verticalAccuracy >= 0 &&
@@ -2517,9 +2518,11 @@ final class HealthKitManager: ObservableObject {
                 if delta > 2 { gain += delta }
                 if delta < -2 { descent -= delta }
             }
-            let repeats = max(minimumRepetitions, 1)
-            return gain >= Double(repeats) * 8 &&
-                descent >= Double(max(repeats - 1, 1)) * 5
+            let required = ATHLTHChallengeHillThresholds.required(
+                repetitions: minimumRepetitions,
+                climbPerRepeatMeters: minimumClimbMeters
+            )
+            return gain >= required.gain && descent >= required.descent
         }
     }
 
@@ -2685,7 +2688,8 @@ final class HealthKitManager: ObservableObject {
             if focus == .hills &&
                 !ATHLTHChallengeHillGPSPolicy.hasHillClimbs(
                     route,
-                    minimumRepetitions: rules.runningMinimumRepetitions ?? 1
+                    minimumRepetitions: rules.runningMinimumRepetitions ?? 1,
+                    minimumClimbMeters: rules.hillMinimumClimbMeters ?? 8
                 ) {
                 return challengeEvidenceFailure(
                     result: result,

@@ -3,6 +3,28 @@ import XCTest
 
 final class ChallengeEventCreationRegressionTests:
     XCTestCase {
+    func testAdvancedHillClimbThreshold() {
+        let easy = ATHLTHChallengeHillThresholds.required(
+            repetitions: 3, climbPerRepeatMeters: 5
+        )
+        XCTAssertEqual(easy.gain, 15)
+        XCTAssertEqual(easy.descent, 8)
+        let hard = ATHLTHChallengeHillThresholds.required(
+            repetitions: 4, climbPerRepeatMeters: 20
+        )
+        XCTAssertEqual(hard.gain, 80)
+        XCTAssertEqual(hard.descent, 36)
+    }
+
+    func testInvalidHillRuleUsesConservativeDefault() {
+        let fallback = ATHLTHChallengeHillThresholds.required(
+            repetitions: 0, climbPerRepeatMeters: .nan
+        )
+        XCTAssertEqual(fallback.gain, 8)
+        XCTAssertEqual(fallback.descent, 4.8, accuracy: 0.0001)
+    }
+
+
     func testChallengePreviewShowsCreatorWhenAlone() {
         XCTAssertEqual(
             ATHLTHChallengePreviewPeople.label(

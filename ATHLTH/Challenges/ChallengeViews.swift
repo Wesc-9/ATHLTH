@@ -749,6 +749,9 @@ struct ChallengeCreationView: View {
             _runningMinimumRepetitions = State(
                 initialValue: r.runningMinimumRepetitions ?? 3
             )
+            _hillMinimumClimbMeters = State(
+                initialValue: r.hillMinimumClimbMeters ?? 8
+            )
             _title = State(initialValue: challenge.title)
             _challengeSummary = State(initialValue: r.summary ?? "")
             _selectedCoverArtworkName = State(initialValue:
@@ -843,6 +846,7 @@ struct ChallengeCreationView: View {
     @State private var runningComparison: ATHLTHChallengeRunningComparison = .fastestWork
     @State private var runningTemplateID: UUID?
     @State private var runningMinimumRepetitions = 3
+    @State private var hillMinimumClimbMeters = 8.0
     @State private var showingRunningTemplatePicker = false
     @State private var title = ""
     @State private var challengeSummary = ""
@@ -3506,6 +3510,40 @@ struct ChallengeCreationView: View {
         case .running:
             if runningFocus != .standard {
                 VStack(alignment: .leading, spacing: 12) {
+                    if runningFocus == .hills {
+                        VStack(alignment: .leading, spacing: 9) {
+                            HStack {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Minimum climb per repeat",
+                                    norwegian: "Minste stigning per bakkedrag"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Spacer(minLength: 8)
+                                Text("\(Int(hillMinimumClimbMeters)) m")
+                                    .font(.subheadline.weight(.semibold))
+                                    .monospacedDigit()
+                                    .foregroundStyle(ChallengePlanTheme.gold)
+                            }
+                            Slider(
+                                value: $hillMinimumClimbMeters,
+                                in: 5...40, step: 5
+                            )
+                            .tint(ChallengePlanTheme.gold)
+                            Text(ATHLTHLocalization.choose(
+                                english: "GPS must verify climbing and downhill return. Only uphill work intervals count.",
+                                norwegian: "GPS må bekrefte stigning og retur ned bakken. Bare arbeidsdragene oppover teller."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(
+                            ATHLTHTheme.cardWarm,
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
+                    }
+
                     creationAttemptControls
 
                     Label(
@@ -7213,6 +7251,9 @@ struct ChallengeCreationView: View {
             runningMinimumRepetitions: sport == .running &&
                 runningFocus == .hills
                 ? runningMinimumRepetitions : nil,
+            hillMinimumClimbMeters: sport == .running &&
+                runningFocus == .hills
+                ? hillMinimumClimbMeters : nil,
             runningTemplateSnapshot: sport == .running &&
                 runningFocus != .standard
                 ? selectedRunningTemplate.map {

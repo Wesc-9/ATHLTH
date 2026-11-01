@@ -183,6 +183,22 @@ enum ATHLTHChallengeRunningTemplateTransfer {
     }
 }
 
+/// Configurable terrain checks for hill-repeat challenges.
+enum ATHLTHChallengeHillThresholds {
+    static func required(
+        repetitions: Int,
+        climbPerRepeatMeters: Double
+    ) -> (gain: Double, descent: Double) {
+        let repeats = max(1, repetitions)
+        let climb = climbPerRepeatMeters.isFinite
+            ? min(max(climbPerRepeatMeters, 5), 40) : 8
+        return (
+            gain: Double(repeats) * climb,
+            descent: Double(max(repeats - 1, 1)) * max(4, climb * 0.6)
+        )
+    }
+}
+
 enum ChallengeCreationPolicy {
     static func automaticTitle(
         sport: ATHLTHChallengeSport,
@@ -507,6 +523,8 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     var runningComparison: ATHLTHChallengeRunningComparison? = nil
     var runningTemplateID: UUID? = nil
     var runningMinimumRepetitions: Int? = nil
+    /// Nil keeps historic GPS thresholds unchanged.
+    var hillMinimumClimbMeters: Double? = nil
     /// Portable, explicitly shared workout prescription. Never includes
     /// local route IDs, Spotify data, or private coach notes.
     var runningTemplateSnapshot: RunningWorkoutTemplate? = nil
