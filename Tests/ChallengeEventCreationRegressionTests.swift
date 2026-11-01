@@ -3,6 +3,34 @@ import XCTest
 
 final class ChallengeEventCreationRegressionTests:
     XCTestCase {
+    func testChallengePreviewShowsCreatorWhenAlone() {
+        XCTAssertEqual(
+            ATHLTHChallengePreviewPeople.label(
+                creatorName: "Stian", invitedNames: []
+            ),
+            "1 · Stian"
+        )
+    }
+
+    func testChallengePreviewShowsTwoNamesAndTotalCount() {
+        XCTAssertEqual(
+            ATHLTHChallengePreviewPeople.label(
+                creatorName: "Stian", invitedNames: ["Malin"]
+            ),
+            "2 · Stian + Malin"
+        )
+    }
+
+    func testChallengePreviewShowsOnlyCountForLargerGroups() {
+        XCTAssertEqual(
+            ATHLTHChallengePreviewPeople.label(
+                creatorName: "Stian", invitedNames: ["Malin", "Ola"]
+            ),
+            "3"
+        )
+    }
+
+
     func testChallengeEndReminderIsNorwegianWithUsefulSubtitle() {
         let title = ATHLTHChallengeReminderText.title(
             for: .ending, norwegian: true
