@@ -4087,24 +4087,14 @@ struct ChallengeCreationView: View {
         ) {
             if preselectedFriends.count == 1,
                let recipient = preselectedFriends.first {
-                HStack(spacing: 12) {
-                    SocialAvatar(profile: recipient, size: 38)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(recipient.resolvedName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Direct challenge · one recipient",
-                            norwegian: "Direkte utfordring · én mottaker"
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-                    Spacer()
-                    Image(systemName: "lock.shield.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(ChallengePlanTheme.gold)
-                }
+                ATHLTHDirectParticipantRow(
+                    recipient: recipient,
+                    fallbackTitle: recipient.resolvedName,
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Direct challenge · one recipient",
+                        norwegian: "Direkte utfordring · én mottaker"
+                    )
+                )
             } else {
             Button {
                 showingInvitePicker =
