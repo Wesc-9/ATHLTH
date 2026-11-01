@@ -4577,6 +4577,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             onEditWorkout: { day, workoutIndex in
                 editPreviewWorkout(day, index: workoutIndex)
             },
+            onEditBlock: { day, workoutIndex, blockIndex in
+                editPreviewWorkout(
+                    day, index: workoutIndex, focusedBlockIndex: blockIndex
+                )
+            },
             onAddExercise: { day, workoutIndex, phase in
                 advancedAddDestination = AdvancedAddDestination(
                     day: day, week: selectedPlanWeekIndex, phase: phase,
