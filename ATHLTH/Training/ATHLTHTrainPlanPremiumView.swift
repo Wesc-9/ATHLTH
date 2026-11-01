@@ -694,46 +694,54 @@ struct ATHLTHTrainPlanPremiumView: View {
             }
             Spacer(minLength: 3)
             HStack(spacing: 7) {
-                Menu {
-                    Button {
-                        browsingMyPlans = false
-                    } label: {
-                        Label(tr("Plan overview", "Planoversikt"),
-                              systemImage: browsingMyPlans ? "calendar" : "checkmark.circle.fill")
-                    }
-                    Button {
-                        browsingMyPlans = true
-                    } label: {
-                        Label(tr("My plans", "Mine planer"),
-                              systemImage: browsingMyPlans ? "checkmark.circle.fill" : "square.stack")
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                        browsingMyPlans.toggle()
                     }
                 } label: {
-                    Image(systemName: browsingMyPlans ? "square.stack" : "calendar")
-                        .font(.system(size: 17))
-                        .frame(width: 37, height: 37)
-                        .background(.white.opacity(0.85), in: Circle())
-                }
-                .accessibilityLabel(tr("Choose plan section", "Velg planområde"))
-                Menu {
-                    Button {
-                        showPlanWeekOverview = true
-                    } label: {
-                        Label(tr("Whole week", "Hele uken"),
-                              systemImage: showPlanWeekOverview ? "checkmark.circle.fill" : "calendar")
+                    Label(
+                        browsingMyPlans
+                            ? tr("Plan overview", "Planoversikt")
+                            : tr("My plans", "Mine planer"),
+                        systemImage: browsingMyPlans ? "calendar" : "square.stack"
+                    )
+                    .font(.system(size: 12, weight: .semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 44)
+                    .background(.white.opacity(0.85), in: Capsule())
+                    .overlay {
+                        Capsule().strokeBorder(line.opacity(0.55), lineWidth: 0.6)
                     }
-                    Button {
-                        showPlanWeekOverview = false
-                    } label: {
-                        Label(tr("One day", "Én dag"),
-                              systemImage: !showPlanWeekOverview ? "checkmark.circle.fill" : "calendar.day.timeline.left")
-                    }
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 16))
-                        .frame(width: 37, height: 37)
-                        .background(.white.opacity(0.85), in: Circle())
                 }
-                .accessibilityLabel(tr("Choose plan view", "Velg planvisning"))
+                .accessibilityLabel(
+                    browsingMyPlans
+                        ? tr("Show plan overview", "Vis planoversikt")
+                        : tr("Open My plans", "Åpne Mine planer")
+                )
+                // Week/day view options only apply while an active plan is shown.
+                if session.activePlan != nil && !browsingMyPlans {
+                    Menu {
+                        Button {
+                            showPlanWeekOverview = true
+                        } label: {
+                            Label(tr("Whole week", "Hele uken"),
+                                  systemImage: showPlanWeekOverview ? "checkmark.circle.fill" : "calendar")
+                        }
+                        Button {
+                            showPlanWeekOverview = false
+                        } label: {
+                            Label(tr("One day", "Én dag"),
+                                  systemImage: !showPlanWeekOverview ? "checkmark.circle.fill" : "calendar.day.timeline.left")
+                        }
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.system(size: 16))
+                            .frame(width: 44, height: 44)
+                            .background(.white.opacity(0.85), in: Circle())
+                    }
+                    .accessibilityLabel(tr("Choose plan view", "Velg planvisning"))
+                }
             }
             .foregroundStyle(graphite)
             .buttonStyle(.plain)
