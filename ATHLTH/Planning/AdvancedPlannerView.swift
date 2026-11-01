@@ -6706,18 +6706,28 @@ struct SessionEditorView: View {
         AnyView(editorPartnerSheets)
             .sheet(isPresented: $showingExerciseLibrary) {
                 NavigationStack {
-                    ExerciseLibraryView(
-                        selectionTitle:
-                            ATHLTHLocalization.choose(
-                                english: "Add to Workout",
-                                norwegian: "Legg til i økten"
-                            ),
-                        selectedExerciseCounts: Dictionary(
-                            plannedExercises.compactMap(\.exerciseID).map { ($0, 1) },
-                            uniquingKeysWith: +
-                        )
-                    ) { entry in
-                        addExercise(entry.exercise)
+                    if kind == .running {
+                        ATHLTHRunningExercisePickerView(
+                            userID: session.profile.userID,
+                            phase: exerciseInsertPhase
+                        ) { newBlocks in
+                            appendRunningExerciseBlocks(newBlocks)
+                            showingExerciseLibrary = false
+                        }
+                    } else {
+                        ExerciseLibraryView(
+                            selectionTitle:
+                                ATHLTHLocalization.choose(
+                                    english: "Add to Workout",
+                                    norwegian: "Legg til i økten"
+                                ),
+                            selectedExerciseCounts: Dictionary(
+                                plannedExercises.compactMap(\.exerciseID).map { ($0, 1) },
+                                uniquingKeysWith: +
+                            )
+                        ) { entry in
+                            addExercise(entry.exercise)
+                        }
                     }
                 }
             }
@@ -8033,8 +8043,83 @@ struct SessionEditorView: View {
         }
     }
 
+    /// Entry from a friend's Train Together action is recipient-specific.
+    /// No "Just me", "Others" or alternative people can be selected here.
+    private var lockedTrainingPartnerCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 9) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(ATHLTHPlanDesign.accent)
+                    .frame(width: 3, height: 24)
+                Image(systemName: "person.2.fill")
+                    .foregroundStyle(ATHLTHPlanDesign.accent)
+                Text(ATHLTHLocalization.choose(
+                    english: "Participants", norwegian: "Deltakere"
+                ))
+                .font(.system(size: 20, weight: .semibold, design: .serif))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+            }
+
+            HStack(spacing: 12) {
+                if let directPartnerID,
+                   let friend = social.trainingPartners.first(where: {
+                       $0.userID == directPartnerID
+                   }) {
+                    ATHLTHSocialStatusAvatar(profile: friend, size: 48)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(friend.resolvedName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .lineLimit(2)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Direct training invitation · one recipient",
+                            norwegian: "Direkte treningsinvitasjon · én mottaker"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                } else {
+                    Image(systemName: "person.crop.circle")
+                        .font(.system(size: 30))
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Selected training partner",
+                        norwegian: "Valgt treningspartner"
+                    ))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "lock.shield.fill")
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Recipient locked", norwegian: "Mottaker låst"
+                    ))
+            }
+
+            Toggle(
+                ATHLTHLocalization.choose(
+                    english: "Allow guest to add exercises",
+                    norwegian: "La invitert legge til øvelser"
+                ),
+                isOn: $allowInviteeExercises
+            )
+            .tint(ATHLTHPlanDesign.accent)
+        }
+        .padding(15)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(ATHLTHPlanDesign.surface,
+                    in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius))
+        .overlay {
+            RoundedRectangle(cornerRadius: ATHLTHPlanDesign.cardRadius)
+                .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+        }
+    }
+
     private var partnerPlanningSection: some View {
         Section {
+            if directPartnerID != nil {
+                lockedTrainingPartnerCard
+            } else {
             VStack(alignment: .leading, spacing: 12) {
                 Button {
                     withAnimation(.easeInOut(duration: 0.22)) {
@@ -8100,6 +8185,7 @@ struct SessionEditorView: View {
                 }
             }
             .padding(.vertical, 9)
+            }
         } header: {
             Text(ATHLTHLocalization.choose(
                 english: "Train together",
@@ -9352,6 +9438,20 @@ struct SessionEditorView: View {
               !day.sessions.contains(where: { $0.isExplicitRestDay })
         else { return nil }
         return (plan.id, day.id)
+    }
+
+    /// Add run-only steps to the shared workout timeline, preserving
+    /// interval rounds, effort targets, and independently selected phases.
+    private func appendRunningExerciseBlocks(_ newBlocks: [WorkoutTemplateBlock]) {
+        for block in newBlocks {
+            let position = ATHLTHWorkoutPhasePlacement.insertionIndex(
+                for: block.resolvedPhase, in: workoutBlocks
+            )
+            workoutBlocks.insert(block, at: position)
+        }
+        workoutBlocks = workoutBlocks.enumerated().map { index, block in
+            ATHLTHWorkoutPhasePlacement.renumbered(block, sequence: index + 1)
+        }
     }
 
     private func addExercise(_ exercise: Exercise) {
