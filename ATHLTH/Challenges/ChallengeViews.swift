@@ -3504,6 +3504,21 @@ struct ChallengeCreationView: View {
         some View {
         switch sport {
         case .running:
+            if runningFocus != .standard {
+                VStack(alignment: .leading, spacing: 12) {
+                    creationAttemptControls
+
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Only measured work intervals from the chosen session count.",
+                            norwegian: "Bare målte arbeidsdrag fra den valgte økten teller."
+                        ),
+                        systemImage: "checkmark.shield"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            } else {
             VStack(
                 alignment: .leading,
                 spacing: 14
@@ -3733,6 +3748,7 @@ struct ChallengeCreationView: View {
                     }
                 }
                 .buttonStyle(.plain)
+            }
             }
 
         case .walking:
@@ -8485,7 +8501,7 @@ struct ChallengeDetailView: View {
                                 .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.borderedProminent)
-                            .tint(ATHLTHTheme.vitality)
+                            .tint(ATHLTHTheme.premiumGold)
                             .controlSize(.large)
                         }
 
@@ -9163,7 +9179,7 @@ struct ChallengeDetailView: View {
                         )
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.vitality)
+                    .tint(ATHLTHTheme.premiumGold)
                     .controlSize(.large)
                     .frame(maxWidth: .infinity)
                 }
@@ -10208,7 +10224,7 @@ struct ChallengeDetailView: View {
                     )
                     .font(.title2)
                     .foregroundStyle(
-                        ATHLTHTheme.vitality
+                        ATHLTHTheme.premiumGold
                     )
 
                     VStack(
@@ -10239,7 +10255,7 @@ struct ChallengeDetailView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.vitality)
+                .tint(ATHLTHTheme.premiumGold)
                 .disabled(
                     settings.trainingDeviceProvider !=
                         .appleWatch ||

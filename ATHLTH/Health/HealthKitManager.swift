@@ -2492,6 +2492,37 @@ final class HealthKitManager: ObservableObject {
         return snapshot
     }
 
+    /// Conservative hill check; GPS altitude is noisy, so require several
+    /// good-accuracy samples and both climb and descent. This is independent
+    /// of, and never substitutes for, the recorded ATHLTH work steps.
+    private enum ATHLTHChallengeHillGPSPolicy {
+        static func hasHillClimbs(
+            _ route: [CLLocation],
+            minimumRepetitions: Int
+        ) -> Bool {
+            let good = route.filter {
+                $0.verticalAccuracy >= 0 &&
+                $0.verticalAccuracy <= 20 &&
+                $0.altitude.isFinite
+            }
+            guard good.count >= 5 else { return false }
+
+            var gain = 0.0
+            var descent = 0.0
+            for (previous, next) in zip(good, good.dropFirst()) {
+                guard next.timestamp >= previous.timestamp,
+                      next.timestamp.timeIntervalSince(previous.timestamp) <= 60
+                else { continue }
+                let delta = next.altitude - previous.altitude
+                if delta > 2 { gain += delta }
+                if delta < -2 { descent -= delta }
+            }
+            let repeats = max(minimumRepetitions, 1)
+            return gain >= Double(repeats) * 8 &&
+                descent >= Double(max(repeats - 1, 1)) * 5
+        }
+    }
+
     func challengeRunningEvidence(
         for result: WatchWorkoutResult,
         rules: ATHLTHChallengeRules
@@ -2556,7 +2587,8 @@ final class HealthKitManager: ObservableObject {
         let routeNeeded =
             rules.gpsRequired ||
             rules.route != nil ||
-            rules.scoring == .farthestInTime
+            (rules.scoring == .farthestInTime &&
+             (rules.runningFocus ?? .standard) == .standard)
 
         if routeNeeded &&
             route.count < 2 {
@@ -2647,6 +2679,19 @@ final class HealthKitManager: ObservableObject {
                     duration: selectedDuration,
                     routeMatch: routeMatch,
                     reason: "Completed ATHLTH structured work intervals are required. Warmup and cooldown are not counted."
+                )
+            }
+
+            if focus == .hills &&
+                !ATHLTHChallengeHillGPSPolicy.hasHillClimbs(
+                    route,
+                    minimumRepetitions: rules.runningMinimumRepetitions ?? 1
+                ) {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: routeMatch,
+                    reason: "Not enough GPS-measured climbing and descending for the required hill repeats."
                 )
             }
 
