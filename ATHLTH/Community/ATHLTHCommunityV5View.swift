@@ -159,6 +159,11 @@ struct ATHLTHCommunityV5View: View {
     @State private var showCreateClub = false
     @State private var query = ""
     @State private var clubInterest: CommunityInterest = .all
+    @State private var selectedClubID: UUID?
+    @State private var showAllRecommendedClubs = false
+    @State private var joiningClubID: UUID?
+    @State private var joinNotice = ""
+    @State private var showJoinNotice = false
     @State private var eventInterest: CommunityInterest = .all
     @State private var respondingToInvite: UUID?
     @State private var inviteError: String?
@@ -172,10 +177,14 @@ struct ATHLTHCommunityV5View: View {
         }
     }
 
-    private var myClub: CommunityGroupRecord? {
+    private var myClubs: [CommunityGroupRecord] {
         groups.joinedGroups.sorted {
             $0.name.localizedStandardCompare($1.name) == .orderedAscending
-        }.first
+        }
+    }
+
+    private var myClub: CommunityGroupRecord? {
+        myClubs.first
     }
 
     private var activeDuel: ATHLTHChallenge? {
@@ -265,6 +274,11 @@ struct ATHLTHCommunityV5View: View {
             }
             .sheet(isPresented: $showCreateClub) {
                 CommunityGroupCreateView()
+            }
+            .alert(tr("Club membership", "Klubbmedlemskap"), isPresented: $showJoinNotice) {
+                Button(tr("OK", "OK"), role: .cancel) {}
+            } message: {
+                Text(joinNotice)
             }
             .task {
                 await refreshContent(force: false)
@@ -404,12 +418,52 @@ struct ATHLTHCommunityV5View: View {
     }
 
     private var clubsPage: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            if let club = myClub {
-                featuredClub(club)
-            } else {
+        let recommendations = matchingPublicClubs.sorted {
+            $0.name.localizedStandardCompare($1.name) == .orderedAscending
+        }
+
+        return VStack(alignment: .leading, spacing: 12) {
+            if myClubs.isEmpty {
                 discoverClubWelcome
+            } else {
+                TabView(selection: $selectedClubID) {
+                    ForEach(myClubs) { club in
+                        NavigationLink {
+                            CommunityGroupDetailView(group: club)
+                        } label: {
+                            featuredClub(club)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(tr(
+                            "Open club details. Swipe to see your other clubs.",
+                            "Åpne klubbdetaljer. Sveip for å se de andre klubbene dine."
+                        ))
+                        .tag(Optional(club.id))
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: 315)
+                .overlay(alignment: .trailing) {
+                    if myClubs.count > 1 {
+                        Button(action: showNextClub) {
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(CommunityReferenceStyle.darkGold)
+                                .frame(width: 36, height: 44)
+                                .background(.regularMaterial, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(tr("Next club", "Neste klubb"))
+                        .padding(.trailing, 6)
+                    }
+                }
+                .onChange(of: myClubs.map(\.id), initial: true) { _, ids in
+                    if selectedClubID.map({ ids.contains($0) }) != true {
+                        selectedClubID = ids.first
+                    }
+                }
             }
+
             HStack(spacing: 9) {
                 Button {
                     tab = .clubs
@@ -417,8 +471,9 @@ struct ATHLTHCommunityV5View: View {
                 } label: {
                     smallAction(
                         title: tr("Find clubs", "Finn klubber"),
-                        subtitle: tr("Search members and clubs", "Søk etter klubber"),
-                        icon: "magnifyingglass"
+                        subtitle: tr("Search clubs", "Søk etter klubber"),
+                        icon: "magnifyingglass",
+                        compact: true
                     )
                 }
                 .buttonStyle(.plain)
@@ -427,10 +482,48 @@ struct ATHLTHCommunityV5View: View {
                     smallAction(
                         title: tr("Create club", "Opprett klubb"),
                         subtitle: tr("Build your community", "Samle treningsvenner"),
-                        icon: "plus"
+                        icon: "plus",
+                        compact: true
                     )
                 }
                 .buttonStyle(.plain)
+            }
+
+            HStack(alignment: .firstTextBaseline) {
+                communitySectionHeading(
+                    tr("Recommended clubs", "Anbefalte klubber"),
+                    icon: "sparkles"
+                )
+                Spacer(minLength: 6)
+                if recommendations.count > 3 {
+                    Button(showAllRecommendedClubs ?
+                        tr("Show less", "Vis færre") : tr("See all", "Se alle")) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            showAllRecommendedClubs.toggle()
+                        }
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(CommunityReferenceStyle.darkGold)
+                }
+            }
+
+            if recommendations.isEmpty {
+                emptyEditorial(
+                    tr("No clubs to recommend yet", "Ingen klubber å anbefale ennå"),
+                    detail: tr(
+                        "Try searching for a club.",
+                        "Prøv å søke etter en klubb."
+                    ),
+                    symbol: "person.3"
+                )
+            } else {
+                LazyVStack(spacing: 7) {
+                    ForEach(Array(recommendations.prefix(
+                        showAllRecommendedClubs ? recommendations.count : 3
+                    ))) { club in
+                        recommendedClubRow(club)
+                    }
+                }
             }
 
             communitySectionHeading(
@@ -438,46 +531,22 @@ struct ATHLTHCommunityV5View: View {
                 icon: "tag"
             )
             interestPicker(selection: $clubInterest, showSocial: false)
-            membersStrip
-
-            HStack(alignment: .firstTextBaseline) {
-                communitySectionHeading(
-                    tr("Recommended clubs", "Anbefalte klubber"),
-                    icon: "sparkles"
-                )
-                Spacer()
-                Button(tr("See all", "Se alle")) {
-                    clubInterest = .all
-                    showSearch = true
-                }
-                .font(.caption.weight(.medium))
-                .foregroundStyle(CommunityReferenceStyle.darkGold)
-            }
-
-            let recommendations = matchingPublicClubs.filter {
-                clubInterest.matchesClub($0)
-            }
-            if recommendations.isEmpty {
-                emptyEditorial(
-                    tr("No clubs in this category yet", "Ingen klubber i denne kategorien ennå"),
-                    detail: tr(
-                        "Try another interest or search for a club.",
-                        "Prøv en annen interesse eller søk etter en klubb."
-                    ),
-                    symbol: "person.3"
-                )
-            } else {
-                LazyVGrid(columns: [
-                    GridItem(.flexible(), spacing: 9),
-                    GridItem(.flexible(), spacing: 9)
-                ], spacing: 10) {
-                    ForEach(Array(recommendations.prefix(6))) { club in
-                        NavigationLink {
-                            CommunityGroupDetailView(group: club)
-                        } label: {
-                            recommendedClub(club)
+            if clubInterest != .all {
+                let filtered = recommendations.filter { clubInterest.matchesClub($0) }
+                if filtered.isEmpty {
+                    emptyEditorial(
+                        tr("No clubs in this category yet", "Ingen klubber i denne kategorien ennå"),
+                        detail: tr(
+                            "Try another interest or search for a club.",
+                            "Prøv en annen interesse eller søk etter en klubb."
+                        ),
+                        symbol: "person.3"
+                    )
+                } else {
+                    LazyVStack(spacing: 7) {
+                        ForEach(filtered) { club in
+                            recommendedClubRow(club)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -711,25 +780,25 @@ struct ATHLTHCommunityV5View: View {
     }
 
     private func smallAction(
-        title: String, subtitle: String, icon: String
+        title: String, subtitle: String, icon: String, compact: Bool = false
     ) -> some View {
-        VStack(spacing: 6) {
+        VStack(spacing: compact ? 4 : 6) {
             Image(systemName: icon)
-                .font(.system(size: 19, weight: .medium))
+                .font(.system(size: compact ? 17 : 19, weight: .medium))
                 .foregroundStyle(CommunityReferenceStyle.darkGold)
-                .frame(width: 38, height: 38)
+                .frame(width: compact ? 31 : 38, height: compact ? 31 : 38)
                 .background(CommunityReferenceStyle.cream, in: Circle())
             Text(title)
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(size: compact ? 11.5 : 12, weight: .semibold))
                 .foregroundStyle(CommunityReferenceStyle.ink)
             Text(subtitle)
-                .font(.system(size: 10))
+                .font(.system(size: compact ? 9 : 10))
                 .foregroundStyle(CommunityReferenceStyle.muted)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
         }
-        .frame(maxWidth: .infinity, minHeight: 97)
-        .padding(8)
+        .frame(maxWidth: .infinity, minHeight: compact ? 77 : 97)
+        .padding(compact ? 6 : 8)
         .communityReferenceCard()
         .accessibilityElement(children: .combine)
     }
@@ -804,7 +873,7 @@ struct ATHLTHCommunityV5View: View {
     }
 
     private func featuredClub(_ club: CommunityGroupRecord) -> some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .topLeading) {
                 ATHLTHArtworkImage(
                     reference: club.headerImageURL ?? club.imageURL,
@@ -812,48 +881,43 @@ struct ATHLTHCommunityV5View: View {
                     maxPixelSize: 1200
                 )
                 .athlthBoundedFill()
-                .frame(height: 133)
+                .frame(height: 118)
                 .frame(maxWidth: .infinity)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 14))
+
                 Label(tr("Your club", "Din klubb"), systemImage: "star.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(CommunityReferenceStyle.darkGold)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 7)
+                    .padding(.horizontal, 11)
+                    .padding(.vertical, 6)
                     .background(.regularMaterial, in: Capsule())
-                    .padding(11)
+                    .padding(10)
             }
-            NavigationLink {
-                CommunityGroupDetailView(group: club)
-            } label: {
-                HStack(spacing: 11) {
-                    ATHLTHArtworkImage(
-                        reference: club.imageURL ?? club.headerImageURL,
-                        fallbackAssetName: "CommunityHero",
-                        maxPixelSize: 450
-                    )
-                    .athlthBoundedFill()
-                    .frame(width: 51, height: 51)
-                    .clipShape(Circle())
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(club.name)
-                            .font(.headline)
-                            .foregroundStyle(CommunityReferenceStyle.ink)
-                            .lineLimit(1)
-                        Text(club.summary.isEmpty ?
-                            tr("Train together. Go further.", "Tren sammen. Kom lenger.") :
-                            club.summary)
-                            .font(.caption)
-                            .foregroundStyle(CommunityReferenceStyle.muted)
-                            .lineLimit(2)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.right")
-                        .foregroundStyle(CommunityReferenceStyle.darkGold)
+
+            HStack(spacing: 10) {
+                ATHLTHArtworkImage(
+                    reference: club.imageURL ?? club.headerImageURL,
+                    fallbackAssetName: "CommunityHero",
+                    maxPixelSize: 450
+                )
+                .athlthBoundedFill()
+                .frame(width: 45, height: 45)
+                .clipShape(Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(club.name)
+                        .font(.headline)
+                        .foregroundStyle(CommunityReferenceStyle.ink)
+                        .lineLimit(1)
+                    Text(club.summary.isEmpty ?
+                        tr("Train together. Go further.", "Tren sammen. Kom lenger.") :
+                        club.summary)
+                        .font(.caption)
+                        .foregroundStyle(CommunityReferenceStyle.muted)
+                        .lineLimit(1)
                 }
+                Spacer(minLength: 32)
             }
-            .buttonStyle(.plain)
 
             HStack(spacing: 0) {
                 clubMetric(groups.members(in: club.id).count,
@@ -863,20 +927,33 @@ struct ATHLTHCommunityV5View: View {
                 clubMetric(groups.events(in: club.id).count,
                            label: tr("Events", "Arrangementer"), icon: "calendar")
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 2)
+
             if !groups.members(in: club.id).isEmpty {
                 memberAvatars(groups.members(in: club.id))
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
-            NavigationLink {
-                CommunityGroupDetailView(group: club)
-            } label: {
-                creamButton(tr("Open club", "Åpne klubb"), symbol: "arrow.right")
+
+            if myClubs.count > 1 {
+                Text("\((myClubs.firstIndex(where: { $0.id == club.id }) ?? 0) + 1) / \(myClubs.count)")
+                    .font(.system(size: 10, weight: .medium))
+                    .monospacedDigit()
+                    .foregroundStyle(CommunityReferenceStyle.muted)
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
-            .buttonStyle(.plain)
         }
-        .padding(12)
+        .padding(11)
         .communityReferenceCard()
+        .contentShape(RoundedRectangle(cornerRadius: 21))
+        .accessibilityLabel(tr("Your club", "Din klubb") + ": " + club.name)
+    }
+
+    private func showNextClub() {
+        guard !myClubs.isEmpty else { return }
+        let index = myClubs.firstIndex { $0.id == selectedClubID } ?? 0
+        withAnimation(.easeInOut(duration: 0.22)) {
+            selectedClubID = myClubs[(index + 1) % myClubs.count].id
+        }
     }
 
     private func clubMetric(_ value: Int, label: String, icon: String) -> some View {
@@ -896,38 +973,71 @@ struct ATHLTHCommunityV5View: View {
         .frame(maxWidth: .infinity)
     }
 
-    private func recommendedClub(_ club: CommunityGroupRecord) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ATHLTHArtworkImage(
-                reference: club.headerImageURL ?? club.imageURL,
-                fallbackAssetName: "GoalAdventure",
-                maxPixelSize: 650
-            )
-            .athlthBoundedFill()
-            .frame(height: 93)
-            .frame(maxWidth: .infinity)
-            .clipped()
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            Text(club.name)
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(CommunityReferenceStyle.ink)
-                .lineLimit(2)
-            Label(club.locationName.isEmpty ?
-                tr("Online club", "Digital klubb") : club.locationName,
-                systemImage: "mappin")
-                .font(.caption2)
-                .foregroundStyle(CommunityReferenceStyle.muted)
-                .lineLimit(1)
-            Text(club.summary)
-                .font(.system(size: 10))
-                .foregroundStyle(CommunityReferenceStyle.muted)
-                .lineLimit(2)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer(minLength: 0)
-            creamButton(tr("Open", "Åpne"), symbol: "arrow.right")
+    private func recommendedClubRow(_ club: CommunityGroupRecord) -> some View {
+        HStack(spacing: 10) {
+            NavigationLink {
+                CommunityGroupDetailView(group: club)
+            } label: {
+                HStack(spacing: 11) {
+                    ATHLTHArtworkImage(
+                        reference: club.imageURL ?? club.headerImageURL,
+                        fallbackAssetName: "GoalAdventure",
+                        maxPixelSize: 450
+                    )
+                    .athlthBoundedFill()
+                    .frame(width: 65, height: 54)
+                    .clipShape(RoundedRectangle(cornerRadius: 11))
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(club.name)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(CommunityReferenceStyle.ink)
+                            .lineLimit(2)
+                        Text(club.locationName.isEmpty ?
+                            tr("Explore this club", "Utforsk klubben") :
+                            club.locationName)
+                            .font(.caption)
+                            .foregroundStyle(CommunityReferenceStyle.muted)
+                            .lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            let pending = groups.pendingJoinRequest(for: club.id) != nil
+            Button {
+                joinRecommendedClub(club)
+            } label: {
+                Group {
+                    if joiningClubID == club.id {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Text(pending ?
+                            tr("Requested", "Forespurt") :
+                            club.joinMode == "approval" ?
+                            tr("Request", "Be om") :
+                            tr("Join", "Bli med"))
+                    }
+                }
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(minWidth: 78, minHeight: 35)
+                .background(
+                    pending ? CommunityReferenceStyle.muted :
+                        CommunityReferenceStyle.gold,
+                    in: Capsule()
+                )
+            }
+            .disabled(pending || joiningClubID != nil)
+            .buttonStyle(.plain)
+            .accessibilityLabel(pending ?
+                tr("Membership requested", "Medlemskap forespurt") :
+                tr("Join", "Bli med") + " " + club.name)
         }
-        .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
-        .padding(10)
+        .padding(9)
         .communityReferenceCard()
     }
 
@@ -1436,14 +1546,6 @@ struct ATHLTHCommunityV5View: View {
                 if groups.members(in: club.id).count > 1 {
                     memberAvatars(groups.members(in: club.id))
                 }
-                NavigationLink {
-                    CommunityGroupDetailView(group: club)
-                } label: {
-                    creamButton(ATHLTHLocalization.choose(
-                        english: "Open club", norwegian: "Åpne klubb"
-                    ), symbol: "rectangle.portrait.and.arrow.right")
-                }
-                .buttonStyle(.plain)
             } else {
                 Image("CommunityHero")
                     .resizable()
@@ -2062,6 +2164,29 @@ struct ATHLTHCommunityV5View: View {
         }
         .padding(12)
         .communityReferenceCard()
+    }
+
+    private func joinRecommendedClub(_ club: CommunityGroupRecord) {
+        guard joiningClubID == nil else { return }
+        joiningClubID = club.id
+        Task {
+            let result = await groups.requestJoin(club)
+            joiningClubID = nil
+            switch result {
+            case "joined":
+                joinNotice = tr("You joined the club.", "Du er nå medlem av klubben.")
+            case "error", "unavailable":
+                joinNotice = groups.errorMessage ??
+                    tr("Could not join the club. Try again.",
+                       "Kunne ikke bli med i klubben. Prøv igjen.")
+            default:
+                joinNotice = tr(
+                    "Your membership request has been sent.",
+                    "Forespørselen om medlemskap er sendt."
+                )
+            }
+            showJoinNotice = true
+        }
     }
 
     private func respond(
