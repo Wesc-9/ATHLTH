@@ -438,11 +438,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar(step == .source || step == .mode || step == .goal ||
-                     step == .approach || step == .week ? .hidden : .visible,
+                     step == .basics || step == .approach ||
+                     step == .week ? .hidden : .visible,
                      for: .navigationBar)
             .toolbar {
                 #if DEBUG
-                if step != .source && step != .mode && step != .goal && step != .approach {
+                if step != .source && step != .mode && step != .goal &&
+                   step != .basics && step != .approach {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { showingPlanDesignLab = true } label: {
                             Image(systemName: "paintpalette")
@@ -452,7 +454,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 }
                 #endif
                 if step != .source && step != .mode && step != .goal &&
-                    step != .approach && step != .week {
+                    step != .basics && step != .approach && step != .week {
                     ToolbarItem(placement: .cancellationAction) {
                         Button(backButtonTitle) {
                             goBack()
@@ -2469,6 +2471,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     weekCount: $weekCount,
                     linkedGoalIDs: $selectedGoalIDs,
                     varyWeekdays: $varyWeekdays,
+                    planningApproach: weekPlanningApproach,
+                    onChooseApproach: { choice in
+                        selectBuildMethod(choice == .guided ? .dayByDay : .weekByWeek)
+                    },
                     selectedDays: selectedDays,
                     goals: goalStore.activeGoals.filter { $0.status == .active },
                     suggestedName: defaultPlanTitle,
@@ -6689,7 +6695,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case .approach:
             return true
         case .basics:
-            return conflictIsResolved
+            return conflictIsResolved &&
+                (mode != .advanced || weekPlanningApproach != nil)
         case .profile:
             return
                 injuryFree ||
@@ -6858,6 +6865,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             Set(goalStore.activeGoals.filter { $0.status == .active }.map(\.id))
         )
         step = ATHLTHPlanJourney.restoredStep(draft.stage, advanced: draft.advanced)
+        // The new advanced setup requires a method. Legacy incomplete drafts
+        // without one return to setup instead of opening an empty week screen.
+        if step == .week && mode == .advanced && weekPlanningApproach == nil {
+            step = .basics
+        }
     }
 
     private func saveResumableDraft() {
