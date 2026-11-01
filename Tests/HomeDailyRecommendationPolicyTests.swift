@@ -7,17 +7,17 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
     func testCompactRecommendationKeepsSameHeightForShortAndLongAdvice() {
         XCTAssertEqual(HomeTodayTwinCardLayout.height, 174)
         let adviceSamples: [HomeDailyRecommendationPolicy.Advice] = [
-            .recommendation(
+            HomeDailyRecommendationPolicy.recommendation(
                 readiness: .ready,
                 hasWorkoutToday: false,
                 trainingLoadRatio: nil
             ),
-            .recommendation(
+            HomeDailyRecommendationPolicy.recommendation(
                 readiness: .unavailable,
                 hasWorkoutToday: true,
                 trainingLoadRatio: nil
             ),
-            .recommendation(
+            HomeDailyRecommendationPolicy.recommendation(
                 readiness: .balanced,
                 hasWorkoutToday: true,
                 trainingLoadRatio: 1.85,
