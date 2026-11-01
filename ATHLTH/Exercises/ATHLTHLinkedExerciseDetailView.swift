@@ -17,7 +17,20 @@ struct ATHLTHLinkedExerciseDetailView: View {
     @State private var imported = false
 
     private var matched: ExerciseLibraryEntry? {
-        ATHLTHExerciseReferenceResolver.resolve(block, in: library.allExercises)
+        if originalCreatorID != nil || originalExerciseID != nil {
+            // Received exercises are identified by immutable origin UUID,
+            // never by a matching title. Several distinct personal exercises
+            // are intentionally allowed to have the same visible name.
+            guard let sourceID = originalExerciseID ?? block.exerciseID else {
+                return nil
+            }
+            return library.customExercises.first {
+                $0.exercise.sharedSourceExerciseID == sourceID
+            }
+        }
+        return ATHLTHExerciseReferenceResolver.resolve(
+            block, in: library.allExercises
+        )
     }
 
     private var previewSnapshot: ExerciseSnapshot {
