@@ -53,8 +53,16 @@ enum ATHLTHCoachRouteIntent {
             brief.startMode = .nearby
         }
         if lower.contains("tur-retur") || lower.contains("samme vei tilbake") ||
-            lower.contains("out and back") {
-            brief.isLoop = false
+            lower.contains("out and back") || lower.contains("a-b-a") ||
+            lower.contains("a–b–a") {
+            brief.routeShape = .outAndBack
+        } else if lower.contains("rundløype") || lower.contains("rundtur") ||
+                    lower.contains("loop") {
+            brief.routeShape = .loop
+        } else if lower.contains("én vei") || lower.contains("en vei") ||
+                    lower.contains("a-b") || lower.contains("a–b") ||
+                    lower.contains("one way") {
+            brief.routeShape = .oneWay
         }
         return brief
     }
