@@ -338,7 +338,8 @@ struct ATHLTHInsightsSleepStagesCard: View {
                             if stage.1 > 0 {
                                 RoundedRectangle(cornerRadius: 4)
                                     .fill(stage.2)
-                                    .frame(width: max(0, (geo.size.width - 6) * stage.1 / total))
+                                    .frame(width: max(CGFloat.zero,
+                                        (geo.size.width - 6) * CGFloat(stage.1 / total)))
                             }
                         }
                     }
