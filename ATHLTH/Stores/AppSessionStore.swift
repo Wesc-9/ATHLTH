@@ -4945,6 +4945,22 @@ final class AppSessionStore: ObservableObject {
         migrateLegacyTrainingPlanIfNeeded()
         refreshActivePlanForToday()
         persistAccountContent()
+
+        // Index previously saved main workouts once on upgrade, including
+        // personal sessions and all calendar plans. Later edits use the
+        // normal save-time hooks; app launches do not rescan the library.
+        let indexKey = AccountLocalStorage.key(
+            "workoutMainSectionsIndexedV1", userID: userID
+        )
+        if !defaults.bool(forKey: indexKey) {
+            let planWorkouts = ([activePlan].compactMap { $0 } + scheduledPlans)
+                .flatMap(\.weeks).flatMap(\.days).flatMap(\.sessions)
+            ATHLTHWorkoutMainSectionLibrary.captureAll(
+                planWorkouts + savedWorkoutTemplates + standalonePlannedSessions,
+                userID: userID
+            )
+            defaults.set(true, forKey: indexKey)
+        }
     }
 
     private func persistActivePlan() {
