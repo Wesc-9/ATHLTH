@@ -58,7 +58,9 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
         XCTAssertThrowsError(try ATHLTHShareDraftFactory.exercise(
             builtIn, ownerID: ownerID
         ))
-        let draft = try ATHLTHShareDraftFactory.exercise(mine, ownerID: ownerID)
+        let draft = try ATHLTHShareDraftFactory.exercise(
+            mine, ownerID: ownerID, savedExercises: library.customExercises
+        )
         XCTAssertEqual(draft.kind, .exercise)
         XCTAssertEqual(draft.sourceObjectID, mine.id)
     }
@@ -90,7 +92,7 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
     }
 
     @MainActor
-    func testForwardedExerciseKeepsOriginalCreator() throws {
+    func testReceivedExerciseRetainsOriginalAuthorButIsNotSelfCreated() throws {
         let receiver = UUID()
         let creator = UUID()
         let library = ExerciseLibraryStore()
@@ -117,17 +119,16 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
         let local = try XCTUnwrap(library.customExercises.first {
             $0.id == imported.id
         })
-        let forward = try ATHLTHShareDraftFactory.exercise(
-            local, ownerID: receiver, creatorUsername: "middleman"
-        )
-        let payload = try JSONDecoder().decode(
-            ATHLTHSharedExerciseAttachment.self,
-            from: Data(forward.payload.utf8)
-        )
-        XCTAssertEqual(payload.originalCreatorID, creator)
-        XCTAssertEqual(payload.originalCreatorUsername, "originalauthor")
-        XCTAssertEqual(payload.originalExerciseID, sourceID)
-        XCTAssertEqual(forward.sourceOwnerID, creator)
+        XCTAssertFalse(ATHLTHPersonalExerciseSharing.isEligible(
+            local, ownerID: receiver
+        ))
+        XCTAssertThrowsError(try ATHLTHShareDraftFactory.exercise(
+            local, ownerID: receiver, creatorUsername: "middleman",
+            savedExercises: library.customExercises
+        ))
+        XCTAssertEqual(local.exercise.originalCreatorID, creator)
+        XCTAssertEqual(local.exercise.originalCreatorUsername, "originalauthor")
+        XCTAssertEqual(local.exercise.originalExerciseID, sourceID)
     }
 
     @MainActor
@@ -155,6 +156,78 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
     }
 
     @MainActor
+    func testWorkoutSharingRejectsDraftAndReceivedCopy() throws {
+        let owner = UUID()
+        let workout = PlannedSession(
+            id: UUID(), title: "My saved workout", kind: .strength,
+            scheduledStart: nil, durationMinutes: 35,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil
+        )
+        XCTAssertThrowsError(try ATHLTHShareDraftFactory.workout(
+            workout, library: [], ownerID: owner
+        ))
+        XCTAssertEqual(try ATHLTHShareDraftFactory.workout(
+            workout, library: [], ownerID: owner,
+            savedWorkouts: [workout]
+        ).sourceObjectID, workout.id)
+        var received = workout
+        received.sharedSourceSessionID = UUID()
+        received.sharedSourceOwnerID = UUID()
+        XCTAssertFalse(ATHLTHPersonalSharePolicy.workout(received))
+        XCTAssertThrowsError(try ATHLTHShareDraftFactory.workout(
+            received, library: [], ownerID: owner,
+            savedWorkouts: [received]
+        ))
+    }
+
+    @MainActor
+    func testPlanShareRejectsNotSavedAndCatalogTemplates() throws {
+        let owner = UUID()
+        var plan = TrainingPlan(
+            id: UUID(), ownerID: owner, title: "Self-made plan",
+            summary: "Strength", visibility: .privateOnly,
+            version: 1, weeks: [], tags: [],
+            createdAt: Date(), updatedAt: Date()
+        )
+        XCTAssertThrowsError(try ATHLTHShareDraftFactory.plan(
+            plan, library: [], ownerID: owner
+        ))
+        XCTAssertEqual(try ATHLTHShareDraftFactory.plan(
+            plan, library: [], ownerID: owner, savedPlans: [plan]
+        ).sourceObjectID, plan.id)
+        plan.tags = ["catalog:template"]
+        XCTAssertFalse(ATHLTHPersonalSharePolicy.plan(plan, ownerID: owner))
+        XCTAssertThrowsError(try ATHLTHShareDraftFactory.plan(
+            plan, library: [], ownerID: owner, savedPlans: [plan]
+        ))
+        plan.tags = []
+        plan.sharedSourcePlanID = UUID()
+        XCTAssertFalse(ATHLTHPersonalSharePolicy.plan(plan, ownerID: owner))
+        XCTAssertFalse(ATHLTHPersonalSharePolicy.plan(plan, ownerID: UUID()))
+    }
+
+    @MainActor
+    func testOnlySavedPersonalRoutesAppearInSharePicker() {
+        let owner = UUID()
+        let created = TrainingRoute(
+            id: UUID(), ownerID: owner, title: "My route",
+            visibility: .privateOnly, coordinates: [],
+            distanceKilometers: 0, elevationGainMeters: nil,
+            importedFilename: nil, createdAt: Date()
+        )
+        var received = created
+        received.sharedSourceRouteID = UUID()
+        received.routeSource = "shared"
+        XCTAssertTrue(ATHLTHPersonalSharePolicy.route(created, ownerID: owner))
+        XCTAssertFalse(ATHLTHPersonalSharePolicy.route(received, ownerID: owner))
+        XCTAssertFalse(ATHLTHPersonalSharePolicy.route(created, ownerID: UUID()))
+        XCTAssertEqual(ATHLTHPersonalSharePolicy.savedRoutes(
+            [created, received, created], ownerID: owner
+        ).map(\.id), [created.id])
+    }
+
+    @MainActor
     func testSharedWorkoutStripsPrivateCalendarAndInvitationData() throws {
         let owner = UUID()
         var workout = PlannedSession(
@@ -169,7 +242,7 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
         workout.recoveryAdjustedAt = Date()
         workout.gearIDs = [UUID()]
         let draft = try ATHLTHShareDraftFactory.workout(
-            workout, library: [], ownerID: owner
+            workout, library: [], ownerID: owner, savedWorkouts: [workout]
         )
         let saved = try JSONDecoder().decode(
             PlannedSession.self, from: Data(draft.payload.utf8)
@@ -211,7 +284,7 @@ final class ATHLTHDirectTrainingShareTests: XCTestCase {
         plan.startDate = Date()
         plan.endDate = Date()
         let draft = try ATHLTHShareDraftFactory.plan(
-            plan, library: [], ownerID: owner
+            plan, library: [], ownerID: owner, savedPlans: [plan]
         )
         let copy = try JSONDecoder().decode(
             TrainingPlan.self, from: Data(draft.payload.utf8)
