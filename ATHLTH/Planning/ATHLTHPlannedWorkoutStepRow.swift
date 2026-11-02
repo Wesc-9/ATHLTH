@@ -186,4 +186,3 @@ struct ATHLTHPlannedWorkoutStepRow: View {
             }
         }
     }
-}
