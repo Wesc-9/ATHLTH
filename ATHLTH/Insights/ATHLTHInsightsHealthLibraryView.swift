@@ -24,14 +24,8 @@ struct ATHLTHInsightsHealthLibraryView: View {
                 }
                 .padding(.bottom, 5)
 
-                ForEach(ATHLTHInsightHealthArea.allCases.filter { area in
-                    searchText.isEmpty ||
-                    area.title.localizedCaseInsensitiveContains(searchText) ||
-                    ATHLTHInsightHealthMetric.allCases.contains {
-                        $0.area == area &&
-                        $0.title.localizedCaseInsensitiveContains(searchText)
-                    }
-                }) { area in
+                if searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    ForEach(ATHLTHInsightHealthArea.allCases) { area in
                     NavigationLink {
                         ATHLTHInsightsHealthAreaView(area: area)
                     } label: {
@@ -60,6 +54,41 @@ struct ATHLTHInsightsHealthLibraryView: View {
                         .athlthInsightsSurface()
                     }
                     .buttonStyle(.plain)
+                    }
+                } else {
+                    let matches = ATHLTHInsightHealthMetric.allCases.filter {
+                        $0.title.localizedCaseInsensitiveContains(searchText) ||
+                        $0.area.title.localizedCaseInsensitiveContains(searchText)
+                    }
+                    ForEach(matches) { metric in
+                        NavigationLink {
+                            ATHLTHInsightsHealthMetricDetailView(metric: metric)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: metric.icon)
+                                    .foregroundStyle(ATHLTHInsightsStyle.accent)
+                                    .frame(width: 32, height: 32)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(metric.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHInsightsStyle.ink)
+                                    Text(metric.area.title)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHInsightsStyle.muted)
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+                            }
+                            .padding(14)
+                            .athlthInsightsSurface()
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if matches.isEmpty {
+                        ContentUnavailableView.search(text: searchText)
+                    }
                 }
 
                 Text(ATHLTHLocalization.choose(
@@ -180,7 +209,7 @@ struct ATHLTHInsightsHealthAreaView: View {
     }
 }
 
-/// Tap-through history is loaded on demand, avoiding 22 HealthKit queries
+/// Tap-through history is loaded on demand, avoiding dozens of HealthKit queries
 /// whenever Insight's main page opens.
 struct ATHLTHInsightsHealthMetricDetailView: View {
     let metric: ATHLTHInsightHealthMetric
