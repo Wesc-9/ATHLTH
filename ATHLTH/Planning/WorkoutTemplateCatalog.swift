@@ -3388,6 +3388,7 @@ struct WorkoutTemplateBuilderView: View {
     private let planCopyDays: [ATHLTHPlanCopyDay]
     private let onCopyToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, [Int], ATHLTHWorkoutPlannerExtras) -> Bool)?
     private let initialDraftSignature: String
+    private let initialSourceTitle: String
     /// Present from advanced plan creation to edit a specific weekday
     /// without creating an unwanted shared workout template.
     private let onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool, ATHLTHWorkoutPlannerExtras) -> Bool)?
@@ -3468,6 +3469,7 @@ struct WorkoutTemplateBuilderView: View {
         self.initialDraftSignature = initialTitle + "|" + originalBlocks +
             "|" + (initialRouteID?.uuidString ?? "") +
             "|" + String(initialDurationOverrideMinutes ?? -1)
+        self.initialSourceTitle = initialTitle
         self.onSaveToPlan = onSaveToPlan
         self.onAddStandalone = onAddStandalone
         self.onValidateSave = onValidateSave
@@ -3485,6 +3487,13 @@ struct WorkoutTemplateBuilderView: View {
         let spotifyAutoplayOnStart: Bool?
         let pendingCopyDayIDs: [Int]?
         let updatedAt: Date
+        // Optional additions keep previously saved drafts decodable.
+        let sourceTitle: String?
+        let sourceTemplateID: UUID?
+        let visiblePhases: [WorkoutPhaseKind]?
+        let selectedPhase: WorkoutPhaseKind?
+        let studioAdvanced: Bool?
+        let studioDate: Date?
     }
 
     private var draftStorageKey: String {
@@ -3495,7 +3504,16 @@ struct WorkoutTemplateBuilderView: View {
     private func restoreWorkoutDraft() {
         guard let data = UserDefaults.standard.data(forKey: draftStorageKey),
               let stored = try? JSONDecoder().decode(StoredWorkoutDraft.self, from: data),
-              stored.signature == initialDraftSignature else { return }
+              ATHLTHWorkoutDraftRecoveryPolicy.accepts(
+                  storedSignature: stored.signature,
+                  currentSignature: initialDraftSignature,
+                  context: draftContext,
+                  storedSourceTitle: stored.sourceTitle,
+                  currentSourceTitle: initialSourceTitle,
+                  storedSourceID: stored.sourceTemplateID,
+                  currentSourceID: sourceTemplateID,
+                  savedAt: stored.updatedAt
+              ) else { return }
         title = stored.title
         blocks = stored.blocks
         selectedRouteID = stored.routeID
@@ -3507,6 +3525,15 @@ struct WorkoutTemplateBuilderView: View {
         durationInputText = (stored.manualMinutes ??
             ATHLTHWorkoutDurationEstimator.minutes(for: stored.blocks)).map(String.init) ?? ""
         pendingCopyDayIDs = Set(stored.pendingCopyDayIDs ?? [])
+        if let visible = stored.visiblePhases {
+            studioVisiblePhases = Set(visible)
+        } else {
+            // Restore old snapshots without inventing new empty categories.
+            studioVisiblePhases = Set(stored.blocks.map(\.resolvedPhase))
+        }
+        selectedPhase = stored.selectedPhase ?? selectedPhase
+        studioAdvanced = stored.studioAdvanced ?? studioAdvanced
+        studioBasicDate = stored.studioDate ?? studioBasicDate
         collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
         draftRestored = true
         draftNotice = true
@@ -3525,7 +3552,15 @@ struct WorkoutTemplateBuilderView: View {
             spotifyPlaylist: selectedSpotifyPlaylist,
             spotifyAutoplayOnStart: spotifyAutoplayOnStart,
             pendingCopyDayIDs: Array(pendingCopyDayIDs).sorted(),
-            updatedAt: Date()
+            updatedAt: Date(),
+            sourceTitle: initialSourceTitle,
+            sourceTemplateID: sourceTemplateID,
+            visiblePhases: WorkoutPhaseKind.allCases.filter {
+                studioVisiblePhases.contains($0)
+            },
+            selectedPhase: selectedPhase,
+            studioAdvanced: studioAdvanced,
+            studioDate: studioBasicDate
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: draftStorageKey)
@@ -4182,6 +4217,10 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
                 draftActive = true
+                // Save the opened source immediately, including an imported
+                // workout with no subsequent user edits before app suspension.
+                // Never overwrite an existing snapshot until restore finishes.
+                persistWorkoutDraft()
                 if openFocusedStepEditor, let focused = expandedBlockIndex {
                     // The parent opens this workout for one tapped plan row.
                     // Present its real step editor after the workout sheet has
@@ -4240,6 +4279,10 @@ struct WorkoutTemplateBuilderView: View {
                 persistWorkoutDraft()
             }
             .onChange(of: pendingCopyDayIDs) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioVisiblePhases) { _, _ in persistWorkoutDraft() }
+            .onChange(of: selectedPhase) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioAdvanced) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicDate) { _, _ in persistWorkoutDraft() }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { persistWorkoutDraft() }
             }
@@ -5776,6 +5819,9 @@ struct WorkoutTemplateBuilderView: View {
             studioBasicOwnedBlockIDs.formUnion(copied.map(\.editorDragID))
         }
         resequence()
+        // Flush immediately after importing a library recipe; the user may
+        // close the app before the next SwiftUI onChange/scene callback.
+        persistWorkoutDraft()
     }
 
     private func saveToMyWorkouts(asNew: Bool = false) {
