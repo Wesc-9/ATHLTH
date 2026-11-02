@@ -2032,7 +2032,10 @@ struct ATHLTHHomeView: View {
             hasWorkoutToday: scheduled != nil,
             trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio,
             plannedActivity: activity,
-            plannedWorkoutTitle: scheduled?.workout.title
+            plannedWorkoutTitle: scheduled?.workout.title,
+            trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(
+                workouts: health.workouts
+            )
         )
     }
 
