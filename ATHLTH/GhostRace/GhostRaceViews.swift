@@ -1795,13 +1795,15 @@ struct GhostRaceHubView: View {
                 pendingReplayRun = workout
             } label: {
                 HStack(spacing: 11) {
-                    Image(systemName: featured
-                        ? "flag.checkered" : "figure.run")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 44, height: 44)
-                    .background(ATHLTHTheme.accentSoft,
-                                in: RoundedRectangle(cornerRadius: 13))
+                    GhostReplayRouteThumbnail(
+                        workoutID: workout.id,
+                        ownerID: session.profile.userID,
+                        height: featured ? 96 : 80
+                    )
+                    .frame(
+                        width: featured ? 112 : 96,
+                        height: featured ? 96 : 80
+                    )
 
                     VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 6) {
