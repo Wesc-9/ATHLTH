@@ -222,7 +222,13 @@ final class ATHLTHExerciseReferencesTests: XCTestCase {
             source, ownerID: recipient, sourceExerciseID: secondSourceID
         ))
         XCTAssertNotEqual(first.id, second.id)
-        XCTAssertNotEqual(first.canonicalName, second.canonicalName)
+        // Different source exercises keep distinct identities even when
+        // their user-visible names are intentionally identical.
+        XCTAssertEqual(first.canonicalName, second.canonicalName)
+        XCTAssertNotEqual(
+            first.exercise.sharedSourceExerciseID,
+            second.exercise.sharedSourceExerciseID
+        )
         var incoming = block("Cable Row")
         incoming.exerciseID = secondSourceID
         incoming.exerciseSnapshot = source
