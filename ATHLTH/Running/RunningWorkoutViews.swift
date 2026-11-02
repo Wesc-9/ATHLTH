@@ -613,7 +613,15 @@ struct RunningWorkoutBuilderView: View {
         NavigationStack {
             Form {
                 Section("Workout") {
-                    TextField("Title", text: $title)
+                    TextField(
+                        ATHLTHLocalization.choose(english: "Title", norwegian: "Navn"),
+                        text: $title
+                    )
+                    .onChange(of: title) { _, updated in
+                        if updated.count > ATHLTHLibraryName.maximumWorkoutCharacters {
+                            title = String(updated.prefix(ATHLTHLibraryName.maximumWorkoutCharacters))
+                        }
+                    }
 
                     Picker("Type", selection: $type) {
                         ForEach(RunningWorkoutType.allCases) { type in
@@ -682,7 +690,8 @@ struct RunningWorkoutBuilderView: View {
                         library.save(
                             RunningWorkoutTemplate(
                                 id: UUID(),
-                                title: title.trimmingCharacters(in: .whitespacesAndNewlines),
+                                title: String(title.trimmingCharacters(in: .whitespacesAndNewlines)
+                                    .prefix(ATHLTHLibraryName.maximumWorkoutCharacters)),
                                 type: type,
                                 summary: summary.trimmingCharacters(in: .whitespacesAndNewlines),
                                 blocks: blocks,
