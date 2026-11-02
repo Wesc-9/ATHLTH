@@ -7700,7 +7700,9 @@ struct MessageSharePicker: View {
                     shareRow(
                         icon: workout.kind.systemImage,
                         title: workout.title,
-                        subtitle: workoutSubtitle(workout)
+                        subtitle: workoutSubtitle(workout),
+                        favoriteKind: .workout,
+                        favoriteID: workout.id
                     ) {
                         do {
                             onSelect(try ATHLTHShareDraftFactory.workout(
@@ -7720,7 +7722,9 @@ struct MessageSharePicker: View {
                     shareRow(
                         icon: "figure.run",
                         title: workout.title,
-                        subtitle: workout.summary
+                        subtitle: workout.summary,
+                        favoriteKind: .workout,
+                        favoriteID: workout.id
                     ) {
                         shareRunningTemplate(workout)
                     }
@@ -7761,7 +7765,9 @@ struct MessageSharePicker: View {
                         subtitle: (exercise.exercise.activityCategory ?? .strength).title +
                             " · " + ATHLTHLocalization.choose(
                                 english: "My Exercises", norwegian: "Mine øvelser"
-                            )
+                            ),
+                        favoriteKind: .exercise,
+                        favoriteID: exercise.id
                     ) {
                         do {
                             onSelect(try ATHLTHShareDraftFactory.exercise(
@@ -7799,7 +7805,9 @@ struct MessageSharePicker: View {
                     shareRow(
                         icon: "calendar",
                         title: plan.title,
-                        subtitle: "\(plan.weeks.count) weeks · version \(plan.version)"
+                        subtitle: "\(plan.weeks.count) weeks · version \(plan.version)",
+                        favoriteKind: .plan,
+                        favoriteID: plan.id
                     ) {
                         do {
                             onSelect(try ATHLTHShareDraftFactory.plan(
@@ -7828,7 +7836,9 @@ struct MessageSharePicker: View {
                     shareRow(
                         icon: "figure.run",
                         title: workout.title,
-                        subtitle: workout.summary
+                        subtitle: workout.summary,
+                        favoriteKind: .workout,
+                        favoriteID: workout.id
                     ) {
                         shareRunningTemplate(workout)
                     }
@@ -7850,7 +7860,9 @@ struct MessageSharePicker: View {
                         icon: "map.fill",
                         title: route.title,
                         subtitle: routeSubtitle(route),
-                        routePreview: safeRoute
+                        routePreview: safeRoute,
+                        favoriteKind: .route,
+                        favoriteID: route.id
                     ) {
                         guard ATHLTHPersonalSharePolicy.route(
                             route, ownerID: session.profile.userID
@@ -8085,102 +8097,79 @@ struct MessageSharePicker: View {
         return Array(coordinates[startIndex...endIndex])
     }
 
+    /// A favorite star is a sibling of Share, never a nested button.
     private func shareRow(
         icon: String,
         title: String,
         subtitle: String,
         routePreview: TrainingRoute? = nil,
+        favoriteKind: LibraryFavoriteKind? = nil,
+        favoriteID: UUID? = nil,
         action: @escaping () -> Void
     ) -> some View {
-        Button(
-            action: action
-        ) {
-            HStack(spacing: 13) {
-                if let routePreview {
-                    RouteMapSnapshotThumbnail(route: routePreview, height: 64)
-                        .frame(width: 84, height: 64)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    Image(systemName: icon)
-                        .font(.system(size: 16, weight: .semibold))
+        HStack(spacing: 5) {
+            Button(action: action) {
+                HStack(spacing: 11) {
+                    if let routePreview {
+                        RouteMapSnapshotThumbnail(route: routePreview, height: 64)
+                            .frame(width: 84, height: 64)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                    } else {
+                        Image(systemName: icon)
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                            .frame(width: 46, height: 52)
+                            .background(
+                                ATHLTHTheme.premiumGoldSoft,
+                                in: RoundedRectangle(cornerRadius: 13)
+                            )
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                        Text(subtitle)
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHTheme.mutedText)
+                            .multilineTextAlignment(.leading)
+                            .lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    Image(systemName: "paperplane.fill")
                         .foregroundStyle(ATHLTHTheme.premiumGold)
-                        .frame(width: 46, height: 52)
-                        .background(ATHLTHTheme.premiumGoldSoft,
-                                    in: RoundedRectangle(cornerRadius: 13))
                 }
-
-                VStack(
-                    alignment: .leading,
-                    spacing: 3
-                ) {
-                    Text(title)
-                        .font(
-                            .subheadline
-                                .weight(
-                                    .semibold
-                                )
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .primaryText
-                        )
-                    Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                        .lineLimit(2)
-                }
-
-                Spacer()
-
-                Image(
-                    systemName:
-                        "paperplane.fill"
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .premiumGold
-                )
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(13)
-            .frame(
-                maxWidth: .infinity,
-                alignment: .leading
-            )
-            .background(
-                LinearGradient(
-                    colors: [
-                        Color.white
-                            .opacity(0.95),
-                        ATHLTHTheme
-                            .cardWarm
-                            .opacity(0.72)
-                    ],
-                    startPoint:
-                        .topLeading,
-                    endPoint:
-                        .bottomTrailing
-                ),
-                in: RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
-                )
-            )
-            .overlay {
-                RoundedRectangle(
-                    cornerRadius: 20,
-                    style: .continuous
-                )
-                .stroke(
-                    Color.white
-                        .opacity(0.9),
-                    lineWidth: 0.8
+            .buttonStyle(.plain)
+
+            if let favoriteKind, let favoriteID {
+                LibraryFavoriteButton(
+                    kind: favoriteKind,
+                    itemID: favoriteID.uuidString,
+                    title: title,
+                    subtitle: subtitle,
+                    icon: icon
                 )
             }
         }
-        .buttonStyle(.plain)
+        .padding(11)
+        .background(
+            LinearGradient(
+                colors: [Color.white.opacity(0.95), ATHLTHTheme.cardWarm.opacity(0.72)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 20)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .stroke(Color.white.opacity(0.9), lineWidth: 0.8)
+        }
     }
 
     private func createDraft<T: Encodable>(
