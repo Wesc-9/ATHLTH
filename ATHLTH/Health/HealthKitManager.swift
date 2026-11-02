@@ -248,7 +248,7 @@ final class HealthKitManager: ObservableObject {
     // Tracks the newest permission set ATHLTH has explicitly requested.
     // Never use this value alone as the connection state: an app update or
     // a newly added Health type must not disconnect an existing Health setup.
-    private let currentAuthorizationVersion = 3
+    private let currentAuthorizationVersion = 4
 
     static func hasPersistedAuthorizationMarker(
         legacyRequested: Bool,
@@ -685,6 +685,15 @@ final class HealthKitManager: ObservableObject {
             }
         }
 
+        // Health Insights may show more measurements than the workout engine.
+        // Request read-only access; values are fetched on demand, not imported.
+        for metric in ATHLTHInsightHealthMetric.allCases {
+            guard let identifier = metric.query?.identifier,
+                  let type = HKObjectType.quantityType(forIdentifier: identifier)
+            else { continue }
+            types.insert(type)
+        }
+
         if let sleep = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
             types.insert(sleep)
         }
@@ -897,7 +906,21 @@ final class HealthKitManager: ObservableObject {
     private func startBackgroundObservers() {
         guard observerQueries.isEmpty else { return }
 
-        let sampleTypes = readTypes.compactMap { $0 as? HKSampleType }
+        // Only observe core workout/recovery sources. Observing every
+        // Insights-only nutrient, clinical and hearing quantity would create
+        // unnecessary wakeups and refresh work.
+        var observedTypes = Set<HKSampleType>()
+        observedTypes.insert(HKObjectType.workoutType())
+        observedTypes.insert(HKSeriesType.workoutRoute())
+        for identifier in trainingQuantityIdentifiers {
+            if let type = HKObjectType.quantityType(forIdentifier: identifier) {
+                observedTypes.insert(type)
+            }
+        }
+        if let sleepType = HKObjectType.categoryType(forIdentifier: .sleepAnalysis) {
+            observedTypes.insert(sleepType)
+        }
+        let sampleTypes = observedTypes
 
         for type in sampleTypes {
             let query = HKObserverQuery(sampleType: type, predicate: nil) {
@@ -1815,7 +1838,7 @@ final class HealthKitManager: ObservableObject {
         return measurements.compactMap { day, raw in
             let value = raw * query.multiplier
             guard raw.isFinite, value.isFinite,
-                  value >= 0 else { return nil }
+                  value >= 0 || metric == .wristTemperature else { return nil }
             return ATHLTHInsightHealthDay(date: day, value: value)
         }
         .sorted { $0.date < $1.date }
