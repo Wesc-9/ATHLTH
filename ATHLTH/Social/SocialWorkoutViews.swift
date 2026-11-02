@@ -14,7 +14,8 @@ struct WorkoutFriendPicker: View {
     @State private var searchText = ""
     @State private var remotePartners: [SocialProfileCard] = []
 
-    private let maximumPartners = 5
+    var maximumPartners = 5
+    var invitationTitle: String? = nil
 
     private var highlightedPartners: [SocialProfileCard] {
         let chosen = social.resolvedQuickTrainPartners(selectedFriendIDs)
@@ -55,7 +56,7 @@ struct WorkoutFriendPicker: View {
                     Image(systemName: "person.2")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.accent)
-                    Text(ATHLTHLocalization.choose(
+                    Text(invitationTitle ?? ATHLTHLocalization.choose(
                         english: "Training partner (optional)",
                         norwegian: "Treningspartner (valgfritt)"
                     ))
@@ -261,8 +262,8 @@ struct WorkoutFriendPicker: View {
                         ))
                     } footer: {
                         Text(ATHLTHLocalization.choose(
-                            english: "Choose up to five athletes. New contacts receive a message request with the workout invitation.",
-                            norwegian: "Velg opptil fem personer. Nye kontakter får meldingsforespørsel med øktinvitasjonen."
+                            english: "Choose up to \(maximumPartners) athletes. New contacts receive a message request.",
+                            norwegian: "Velg opptil \(maximumPartners) personer. Nye kontakter får en meldingsforespørsel."
                         ))
                     }
                 }

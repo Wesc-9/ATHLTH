@@ -2669,7 +2669,13 @@ struct TrainTogetherPostCreateView:
         AppSessionStore
     @EnvironmentObject private var marketplace:
         TrainTogetherMarketplaceStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var messaging: MessagingStore
 
+    @State private var selectedInviteeIDs: Set<UUID> = []
+    @State private var isPublishing = false
+    @State private var publishWarning: String?
+    @State private var publishedSuccessfully = false
     @State private var selectedSourceID:
         UUID?
     /// The same structured workout prepared by SessionEditorView.
@@ -2763,56 +2769,34 @@ struct TrainTogetherPostCreateView:
 
     var body: some View {
         ScrollView {
-            VStack(
-                alignment: .leading,
-                spacing: 18
-            ) {
-                introCard
-
+            VStack(alignment: .leading, spacing: 18) {
                 createSectionHeader(
                     ATHLTHLocalization.choose(
-                        english:
-                            "Use a real workout",
-                        norwegian:
-                            "Bruk en faktisk økt"
+                        english: "Train Together settings",
+                        norwegian: "Tren sammen-valg"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Choose how you will train and who can join.",
+                        norwegian: "Velg hvordan dere trener og hvem som kan bli med."
                     )
                 )
-
-                sourceCard
-
-                if preparedWorkout != nil {
-                    createSectionHeader(
-                        ATHLTHLocalization.choose(
-                            english: "Train Together options",
-                            norwegian: "Train Together-valg"
-                        ),
-                        subtitle: ATHLTHLocalization.choose(
-                            english: "Only meetup and participation differ from personal planning.",
-                            norwegian: "Kun oppmøte og deltakelse kommer i tillegg til øktplanen."
-                        )
-                    )
+                if preparedWorkout == nil {
+                    sourceCard
+                } else {
                     socialWorkoutCard
-
-                if participationMode ==
-                    .physical {
-                    createSectionHeader(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Private meetup",
-                            norwegian:
-                                "Privat møtested"
-                        ),
-                        subtitle:
+                    if participationMode == .physical {
+                        createSectionHeader(
                             ATHLTHLocalization.choose(
-                                english:
-                                    "Choose an address from Apple Maps. Exact meetup details are only shown to accepted participants.",
-                                norwegian:
-                                    "Velg en adresse fra Apple Maps. Nøyaktig møtested vises bare til godkjente deltakere."
+                                english: "Meeting point",
+                                norwegian: "Møtested"
+                            ),
+                            subtitle: ATHLTHLocalization.choose(
+                                english: "Exact meetup details are shown only to accepted participants.",
+                                norwegian: "Nøyaktig møtested vises bare til godkjente deltakere."
                             )
-                    )
-
-                    meetupCard
-                }
+                        )
+                        meetupCard
+                    }
                 }
             }
             .padding(16)
@@ -2829,7 +2813,7 @@ struct TrainTogetherPostCreateView:
                 english:
                     "Create Train Together",
                 norwegian:
-                    "Opprett Train Together"
+                    "Opprett fellesøkt"
             )
         )
         .navigationBarTitleDisplayMode(
@@ -2873,9 +2857,29 @@ struct TrainTogetherPostCreateView:
                 .fontWeight(.semibold)
                 .disabled(
                     !canPublish ||
-                    marketplace.isWorking
+                    marketplace.isWorking ||
+                    isPublishing ||
+                    publishedSuccessfully
                 )
             }
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Workout published",
+                norwegian: "Økten er publisert"
+            ),
+            isPresented: Binding(
+                get: { publishWarning != nil },
+                set: { if !$0 { publishWarning = nil } }
+            )
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Done", norwegian: "Ferdig"
+            )) {
+                dismiss()
+            }
+        } message: {
+            Text(publishWarning ?? "")
         }
         .sheet(isPresented: $showingSharedWorkoutEditor) {
             SessionEditorView(
@@ -2948,194 +2952,22 @@ struct TrainTogetherPostCreateView:
         }
     }
 
-    private var introCard:
-        some View {
-        ATHLTHTrainTogetherSurface {
-            HStack(
-                alignment: .top,
-                spacing: 14
-            ) {
-                VStack(
-                    alignment: .leading,
-                    spacing: 7
-                ) {
-                    Text(
-                        "TRAIN TOGETHER"
-                    )
-                    .font(
-                        .caption
-                            .weight(.bold)
-                    )
-                    .tracking(1.7)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .vitality
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "One workout. Your people.",
-                            norwegian:
-                                "Én økt. Dine folk."
-                        )
-                    )
-                    .font(
-                        .title2
-                            .weight(.bold)
-                    )
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Set up the workout like Ghost: clear, structured and ready to share. Training details stay attached when someone joins.",
-                            norwegian:
-                                "Sett opp økten som i Ghost: ryddig, strukturert og klar til å dele. Treningsdetaljene følger med når noen blir med."
-                        )
-                    )
-                    .font(.subheadline)
-                    .foregroundStyle(
-                        ATHLTHTheme
-                            .mutedText
-                    )
-                    .fixedSize(
-                        horizontal: false,
-                        vertical: true
-                    )
-                }
-
-                Spacer()
-
-                Image(
-                    systemName:
-                        "person.2.wave.2.fill"
-                )
-                .font(
-                    .system(
-                        size: 25,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .vitality
-                )
-                .frame(
-                    width: 54,
-                    height: 54
-                )
-                .background(
-                    ATHLTHTheme
-                        .vitalitySoft,
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 17,
-                            style:
-                                .continuous
-                        )
-                )
-            }
-        }
-    }
-
-    // Keep the source selector in a small independent view-builder.
-    // A local if-let inside the original huge Train Together body triggers
-    // a Swift 6/Xcode 27 type-checker assertion on the simulator.
-    @ViewBuilder
+    /// The already prepared workout is the source; never ask to select it again.
     private var sourceCard: some View {
-        if let workout = preparedWorkout {
-            preparedWorkoutCard(workout)
-        } else {
-            ATHLTHTrainTogetherWorkoutSourceCard(
-                context: ATHLTHLocalization.choose(
-                    english: "Build your workout in the shared planner. Then choose how and where to train together.",
-                    norwegian: "Bygg økten i den felles planleggeren. Velg deretter hvordan og hvor dere trener sammen."
-                ),
-                onCreateNew: {
-                    selectedSourceID = nil
-                    workoutToEdit = nil
-                    showingSharedWorkoutEditor = true
-                },
-                onUsePlanned: {
-                    showingPlannedWorkoutPicker = true
-                }
-            )
-        }
-    }
-
-    private func preparedWorkoutCard(_ workout: PlannedSession) -> some View {
-        ATHLTHTrainTogetherSurface {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 11) {
-                    Image(systemName: workout.kind.systemImage)
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        .frame(width: 46, height: 46)
-                        .background(ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 14))
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "PLANNED WORKOUT",
-                            norwegian: "PLANLAGT ØKT"
-                        ))
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.2)
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                        Text(workout.title)
-                            .font(.headline)
-                        Text(workout.kind.title)
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-                    Spacer()
-                }
-                if let time = workout.scheduledStart {
-                    Label(
-                        time.formatted(date: .abbreviated, time: .shortened),
-                        systemImage: "calendar"
-                    )
-                    .font(.caption)
-                }
-                if let duration = workout.durationMinutes {
-                    Label("\(duration) min", systemImage: "clock")
-                        .font(.caption)
-                }
-                if !workout.exercises.isEmpty {
-                    Text(ATHLTHLocalization.format(
-                        english: "%d exercises",
-                        norwegian: "%d øvelser",
-                        workout.exercises.count
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                }
-
-                Button {
-                    workoutToEdit = workout
-                    showingSharedWorkoutEditor = true
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Edit workout", norwegian: "Rediger økt"
-                    ), systemImage: "square.and.pencil")
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.accentDeep)
-
-                Button {
-                    preparedWorkout = nil
-                    workoutToEdit = nil
-                    selectedSourceID = nil
-                } label: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Choose another workout",
-                        norwegian: "Velg en annen økt"
-                    ))
-                    .font(.caption.weight(.semibold))
-                }
-                .buttonStyle(.plain)
+        ATHLTHTrainTogetherWorkoutSourceCard(
+            context: ATHLTHLocalization.choose(
+                english: "Choose or build a workout before inviting participants.",
+                norwegian: "Velg eller bygg en økt før du inviterer deltakere."
+            ),
+            onCreateNew: {
+                selectedSourceID = nil
+                workoutToEdit = nil
+                showingSharedWorkoutEditor = true
+            },
+            onUsePlanned: {
+                showingPlannedWorkoutPicker = true
             }
-        }
+        )
     }
 
     private var workoutCard:
@@ -3707,73 +3539,104 @@ struct TrainTogetherPostCreateView:
         }
     }
 
-    private var socialWorkoutCard:
-        some View {
+    private var socialWorkoutCard: some View {
         ATHLTHTrainTogetherSurface {
-            VStack(
-                alignment: .leading,
-                spacing: 16
-            ) {
-                WorkoutSocialModePicker(
-                    mode:
-                        $participationMode
-                )
-
+            VStack(alignment: .leading, spacing: 15) {
+                WorkoutSocialModePicker(mode: $participationMode)
                 createDivider
 
-                HStack(spacing: 12) {
-                    createIcon(
-                        "person.badge.plus"
-                    )
+                Text(ATHLTHLocalization.choose(
+                    english: "WHO CAN JOIN?",
+                    norwegian: "HVEM KAN BLI MED?"
+                ))
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
 
-                    VStack(
-                        alignment: .leading,
-                        spacing: 2
-                    ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Who can join?",
-                                norwegian:
-                                    "Hvem kan bli med?"
-                            )
-                        )
-
-                        Text(
-                            joinPolicy
-                                .subtitle
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .mutedText
-                        )
-                        .lineLimit(2)
-                    }
-
-                    Spacer()
-
-                    Picker(
-                        "",
-                        selection:
-                            $joinPolicy
-                    ) {
-                        ForEach(
-                            TrainTogetherJoinPolicy
-                                .allCases
-                        ) { policy in
-                            Text(
-                                policy.title
-                            )
-                            .tag(policy)
+                ForEach(TrainTogetherJoinPolicy.allCases) { policy in
+                    Button {
+                        joinPolicy = policy
+                        if policy == .open {
+                            selectedInviteeIDs.removeAll()
                         }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: policy == .open
+                                ? "person.3.fill" : "person.badge.plus")
+                                .font(.system(size: 17, weight: .semibold))
+                                .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                                .frame(width: 36, height: 36)
+                                .background(ATHLTHTrainTogetherDesign.accentSoft,
+                                            in: RoundedRectangle(cornerRadius: 12))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(policy.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+                                Text(policy.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            Spacer(minLength: 6)
+                            Image(systemName: joinPolicy == policy
+                                ? "checkmark.circle.fill" : "circle")
+                                .font(.system(size: 19))
+                                .foregroundStyle(joinPolicy == policy
+                                    ? ATHLTHTrainTogetherDesign.accent
+                                    : ATHLTHTrainTogetherDesign.secondary)
+                        }
+                        .padding(12)
+                        .frame(maxWidth: .infinity, minHeight: 68)
+                        .background(
+                            joinPolicy == policy
+                                ? ATHLTHTrainTogetherDesign.accentSoft.opacity(0.45)
+                                : ATHLTHTrainTogetherDesign.surface,
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
                     }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .tint(
-                        ATHLTHTheme
-                            .primaryText
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(joinPolicy == policy ? [.isSelected] : [])
+                }
+
+                createDivider
+                HStack(spacing: 10) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Available spots", norwegian: "Ledige plasser"
+                        ), systemImage: "person.2.fill"
                     )
+                    .font(.subheadline.weight(.medium))
+                    Spacer()
+                    Text("\(maxGuests)")
+                        .font(.subheadline.weight(.semibold))
+                        .monospacedDigit()
+                    Stepper(
+                        ATHLTHLocalization.choose(
+                            english: "Available spots", norwegian: "Ledige plasser"
+                        ),
+                        value: $maxGuests,
+                        in: max(1, selectedInviteeIDs.count)...15
+                    )
+                    .labelsHidden()
+                    .fixedSize()
+                }
+                .frame(minHeight: 44)
+
+                if joinPolicy != .open {
+                    createDivider
+                    WorkoutFriendPicker(
+                        selectedFriendIDs: $selectedInviteeIDs,
+                        maximumPartners: maxGuests,
+                        invitationTitle: ATHLTHLocalization.choose(
+                            english: "Invite participants",
+                            norwegian: "Inviter deltakere"
+                        )
+                    )
+                    Text(ATHLTHLocalization.choose(
+                        english: "Selected people receive an invitation in Messages after publishing, and may request to join.",
+                        norwegian: "Valgte personer får invitasjon i Meldinger ved publisering, og kan be om å bli med."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
                 }
             }
         }
@@ -4109,6 +3972,8 @@ struct TrainTogetherPostCreateView:
 
         return
             preparedWorkout != nil &&
+            (joinPolicy == .open || !selectedInviteeIDs.isEmpty) &&
+            selectedInviteeIDs.count <= maxGuests &&
             !cleanTitle.isEmpty &&
             (
                 participationMode ==
@@ -4485,13 +4350,49 @@ struct TrainTogetherPostCreateView:
                 )
                 : nil
 
-        Task {
-            if await marketplace
-                .publish(
-                    post: post,
-                    meetup: meetup
-                ) {
+        guard !isPublishing, !publishedSuccessfully else { return }
+        let recipients = joinPolicy == .open
+            ? []
+            : social.resolvedQuickTrainPartners(selectedInviteeIDs)
+        isPublishing = true
+        Task { @MainActor in
+            let published = await marketplace.publish(post: post, meetup: meetup)
+            guard published else {
+                isPublishing = false
+                return
+            }
+            publishedSuccessfully = true
+
+            var failedInvitations = 0
+            for person in recipients {
+                do {
+                    let conversationID = try await messaging.openConversation(
+                        with: person.userID
+                    )
+                    let invitation = ATHLTHLocalization.choose(
+                        english: "Train Together invitation: \(cleanTitle), \(scheduledStart.formatted(date: .abbreviated, time: .shortened)). Find this session in Community → Train Together and request to join.",
+                        norwegian: "Invitasjon til Tren sammen: \(cleanTitle), \(scheduledStart.formatted(date: .abbreviated, time: .shortened)). Finn økten i Fellesskap → Tren sammen og be om å bli med."
+                    )
+                    if !(await messaging.send(
+                        to: person.userID,
+                        conversationID: conversationID,
+                        body: invitation
+                    )) {
+                        failedInvitations += 1
+                    }
+                } catch {
+                    failedInvitations += 1
+                }
+            }
+            isPublishing = false
+            if failedInvitations == 0 {
                 dismiss()
+            } else {
+                publishWarning = ATHLTHLocalization.format(
+                    english: "The workout was published, but %d invitations could not be sent. Send the remaining invitations through Messages.",
+                    norwegian: "Økten er publisert, men %d invitasjoner kunne ikke sendes. Send de resterende invitasjonene via Meldinger.",
+                    failedInvitations
+                )
             }
         }
     }
