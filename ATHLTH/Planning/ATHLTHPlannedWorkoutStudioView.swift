@@ -22,7 +22,9 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onEdit: (UUID) -> Void
     let onMove: (UUID, WorkoutPhaseKind, UUID?) -> Void
     let onRemove: (UUID) -> Void
+    let onRemovePhase: (WorkoutPhaseKind) -> Void
 
+    @State private var phasePendingDeletion: WorkoutPhaseKind?
     @State private var collapsedPhases: Set<WorkoutPhaseKind> = []
     @State private var draggingID: UUID?
     @State private var dragPoint: CGPoint = .zero
@@ -45,8 +47,9 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     private func presentationPhase(for block: WorkoutTemplateBlock) -> WorkoutPhaseKind {
         // Recovery steps remain inside the selected work phase unless the
         // athlete explicitly added a standalone recovery section.
-        block.resolvedPhase == .recovery && !visiblePhases.contains(.recovery)
-            ? .main : block.resolvedPhase
+        ATHLTHWorkoutPhaseDeletionPolicy.presentedPhase(
+            for: block, visiblePhases: visiblePhases
+        )
     }
 
     private var routeAsWholeWorkout: WorkoutTemplateBlock? {
@@ -143,6 +146,37 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         }
         .animation(.easeInOut(duration: 0.18), value: visiblePhases)
         .coordinateSpace(name: "athlthWorkoutStudio")
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Delete workout section?",
+                norwegian: "Slette hele kategorien?"
+            ),
+            isPresented: Binding(
+                get: { phasePendingDeletion != nil },
+                set: { if !$0 { phasePendingDeletion = nil } }
+            )
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Delete section", norwegian: "Slett kategori"
+            ), role: .destructive) {
+                if let phase = phasePendingDeletion {
+                    onRemovePhase(phase)
+                }
+                phasePendingDeletion = nil
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {
+                phasePendingDeletion = nil
+            }
+        } message: {
+            let count = phasePendingDeletion.map { entries(in: $0).count } ?? 0
+            Text(ATHLTHLocalization.format(
+                english: "All %d workout steps in this section will also be deleted. This cannot be undone.",
+                norwegian: "Alle %d deløkter i kategorien slettes også. Dette kan ikke angres.",
+                count
+            ))
+        }
         // The floating copy follows the finger independently of the rows
         // changing places. The original keeps its layout slot during dragging.
         .overlay(alignment: .topLeading) {
@@ -260,14 +294,17 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 .frame(minHeight: 44)
 
                 Menu {
-                    Button {
-                        visiblePhases.remove(phase)
+                    Button(role: .destructive) {
+                        if rows.isEmpty {
+                            onRemovePhase(phase)
+                        } else {
+                            phasePendingDeletion = phase
+                        }
                     } label: {
                         Label(ATHLTHLocalization.choose(
-                            english: "Hide empty section", norwegian: "Skjul tom del"
-                        ), systemImage: "eye.slash")
+                            english: "Delete section", norwegian: "Slett kategori"
+                        ), systemImage: "trash")
                     }
-                    .disabled(!rows.isEmpty)
                 } label: {
                     Image(systemName: "ellipsis")
                         .foregroundStyle(ink)
