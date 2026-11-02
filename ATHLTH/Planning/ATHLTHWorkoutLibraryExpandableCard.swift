@@ -40,7 +40,7 @@ struct ATHLTHWorkoutLibraryExpandableCard<Accessory: View>: View {
                             .frame(width: 30, height: 35)
 
                         VStack(alignment: .leading, spacing: 5) {
-                            Text(workout.title)
+                            Text(ATHLTHLibraryName.workoutCard(workout.title, grid: false))
                                 .font(.headline)
                                 .foregroundStyle(ATHLTHPlanDesign.ink)
                                 .multilineTextAlignment(.leading)
