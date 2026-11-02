@@ -7,7 +7,7 @@ import UserNotifications
 @MainActor
 enum ATHLTHDailyCheckInReminderScheduler {
     static let identifierPrefix = "insights.daily-check-in."
-    static let defaultMinuteOfDay = 12 * 60
+    nonisolated static let defaultMinuteOfDay = 12 * 60
     static let horizonDays = 7
 
     nonisolated static func normalizedMinuteOfDay(_ minuteOfDay: Int) -> Int {
