@@ -138,4 +138,19 @@ final class ATHLTHWorkoutDraftRecoveryPolicyTests: XCTestCase {
             19
         )
     }
+
+    func testPreMigrationNamedWorkoutDraftRecoversAfterNewBlockIDs() {
+        XCTAssertTrue(ATHLTHWorkoutDraftRecoveryPolicy.accepts(
+            storedSignature: "30/30 – 20 drag|old-generated-ids|duration",
+            currentSignature: "30/30 – 20 drag|fresh-generated-ids|duration",
+            context: "shared-template",
+            storedSourceTitle: nil,
+            currentSourceTitle: "30/30 – 20 drag",
+            storedSourceID: nil,
+            currentSourceID: nil,
+            savedAt: now.addingTimeInterval(-600),
+            now: now
+        ))
+    }
+
 }
