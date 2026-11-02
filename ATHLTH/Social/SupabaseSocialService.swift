@@ -1433,10 +1433,40 @@ final class SupabaseSocialService: Sendable {
                 }
 
                 if !newInvitations.isEmpty {
-                    try await client
-                        .from("social_challenge_participants")
-                        .insert(newInvitations)
-                        .execute()
+                    do {
+                        try await client
+                            .from("social_challenge_participants")
+                            .insert(newInvitations)
+                            .execute()
+                    } catch {
+                        // Two challenge sync tasks may read the same empty
+                        // snapshot, then race to insert the same participant.
+                        // Treat that as success ONLY when every invite is
+                        // demonstrably present for this challenge/user. Do
+                        // not upsert here: accepting/declining is owned by
+                        // the invited athlete, and must not be reset.
+                        let description = error.localizedDescription
+                        let duplicate = description.contains(
+                            "social_challenge_participants_pkey"
+                        ) || description.contains(
+                            "social_challenge_participants_challenge_id_user_id_key"
+                        )
+                        guard duplicate else { throw error }
+                        let afterConflict: [BackendChallengeParticipant] =
+                            try await client
+                                .from("social_challenge_participants")
+                                .select()
+                                .eq("challenge_id", value: challenge.id)
+                                .limit(200)
+                                .execute()
+                                .value
+                        guard newInvitations.allSatisfy({ invite in
+                            afterConflict.contains { existing in
+                                existing.challengeID == challenge.id &&
+                                existing.userID == invite.userID
+                            }
+                        }) else { throw error }
+                    }
                 }
 
                 // Only the creator can withdraw an invitation that the
