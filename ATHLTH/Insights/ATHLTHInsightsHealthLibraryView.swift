@@ -218,8 +218,15 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
     @State private var values: [ATHLTHInsightHealthDay] = []
     @State private var loading = false
     @State private var attempted = false
+    @State private var recoveryFullHistory: [ATHLTHInsightHealthDay] = []
+    @State private var recoveryHistoryLoaded = false
 
-    private var latest: Double? { values.last?.value ?? metric.currentValue(in: health) }
+    private var latest: Double? {
+        let lastRecorded = metric == .heartRateRecovery
+            ? recoveryFullHistory.last?.value
+            : values.last?.value
+        return lastRecorded ?? metric.currentValue(in: health)
+    }
 
     var body: some View {
         ScrollView {
@@ -235,6 +242,24 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                         .font(.system(size: 32, weight: .semibold, design: .rounded))
                         .foregroundStyle(ATHLTHInsightsStyle.ink)
                         .accessibilityLabel(metric.title + ": " + metric.formatted(latest))
+                    if metric == .heartRateRecovery,
+                       let recent = recoveryFullHistory.last {
+                        Text(
+                            recent.date.formatted(date: .abbreviated, time: .omitted) +
+                            " · " +
+                            (recent.isEstimated
+                                ? ATHLTHLocalization.choose(
+                                    english: "Calculated from recorded pulse",
+                                    norwegian: "Beregnet fra registrert puls"
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "Recorded in Apple Health",
+                                    norwegian: "Registrert i Apple Helse"
+                                  ))
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHInsightsStyle.muted)
+                    }
                 }
                 .padding(18)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -267,10 +292,17 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                                 norwegian: "Ingen målinger tilgjengelig"
                             ),
                             systemImage: "waveform.path.ecg",
-                            description: Text(ATHLTHLocalization.choose(
-                                english: "This device may not record this metric, or Apple Health has no readable samples for this period.",
-                                norwegian: "Enheten registrerer kanskje ikke målingen, eller Apple Health har ingen lesbare data i denne perioden."
-                            ))
+                            description: Text(
+                                metric == .heartRateRecovery
+                                ? ATHLTHLocalization.choose(
+                                    english: "A recorded recovery reading or pulse measurements at workout end and about one minute later are needed. Check Apple Health permissions and try a recorded workout.",
+                                    norwegian: "Vi trenger registrert pulsfall eller pulsmålinger ved øktslutt og omtrent ett minutt senere. Kontroller Helse-tillatelser og prøv en registrert treningsøkt."
+                                  )
+                                : ATHLTHLocalization.choose(
+                                    english: "This device may not record this metric, or Apple Health has no readable samples for this period.",
+                                    norwegian: "Enheten registrerer kanskje ikke målingen, eller Apple Health har ingen lesbare data i denne perioden."
+                                  )
+                            )
                         )
                         .frame(minHeight: 165)
                     } else {
@@ -318,6 +350,15 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                 .padding(16)
                 .athlthInsightsSurface()
 
+                if metric == .heartRateRecovery {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Apple Health's native value uses the exercise peak. When unavailable, ATHLTH calculates a separate one-minute drop from actual pulse near the workout end and about 60 seconds later. Calculated readings are marked and may differ. Missing readings are never estimated.",
+                        norwegian: "Apples registrerte pulsfall måles fra treningens høyeste puls. Når det mangler, kan ATHLTH beregne et eget ettminutts pulsfall fra faktisk puls ved øktslutt og omtrent 60 sekunder senere. Beregnede verdier merkes og kan avvike. Manglende pulsmålinger gjettes aldri."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+                }
+
                 if metric.area == .sleep && metric != .sleepDuration {
                     Text(ATHLTHLocalization.choose(
                         english: "Sleep stages currently reflect the most recent recorded main sleep session, not estimated earlier nights.",
@@ -345,9 +386,28 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
         .task(id: period) {
             loading = true
             attempted = true
-            let result = await health.insightDailyValues(for: metric, days: period)
-            guard !Task.isCancelled else { return }
-            values = result
+
+            if metric == .heartRateRecovery {
+                if !recoveryHistoryLoaded {
+                    let history = await health.insightDailyValues(
+                        for: .heartRateRecovery, days: 180
+                    )
+                    guard !Task.isCancelled else { return }
+                    recoveryFullHistory = history
+                    recoveryHistoryLoaded = true
+                }
+                let start = Calendar.current.date(
+                    byAdding: .day, value: -(period - 1),
+                    to: Calendar.current.startOfDay(for: Date())
+                ) ?? Date().addingTimeInterval(-Double(period) * 86_400)
+                values = recoveryFullHistory.filter { $0.date >= start }
+            } else {
+                let result = await health.insightDailyValues(
+                    for: metric, days: period
+                )
+                guard !Task.isCancelled else { return }
+                values = result
+            }
             loading = false
         }
     }
