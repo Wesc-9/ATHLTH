@@ -269,9 +269,10 @@ struct RunningWorkoutLibraryView: View {
                     .background(ATHLTHPlanDesign.selectedSurface, in: RoundedRectangle(cornerRadius: 13))
 
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(workout.title)
+                    Text(ATHLTHLibraryName.workoutCard(workout.title, grid: false))
                         .font(.headline)
                         .foregroundStyle(.primary)
+                        .accessibilityLabel(workout.title)
 
                     Text(workout.type.title)
                         .font(.caption)
