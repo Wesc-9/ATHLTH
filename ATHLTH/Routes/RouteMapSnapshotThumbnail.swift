@@ -89,6 +89,33 @@ enum RouteMapSnapshotCache {
         }
     }
 
+    static func image(
+        for coordinates: [CLLocationCoordinate2D],
+        size: CGSize,
+        requestID: String
+    ) async -> UIImage? {
+        let key = requestID as NSString
+        if let cached = images.object(forKey: key) { return cached }
+        guard coordinates.count >= 2 else { return nil }
+        let currentGeneration = generation
+        let options = MKMapSnapshotter.Options()
+        options.region = region(for: coordinates)
+        options.size = size
+        options.scale = UIScreen.main.scale
+        options.mapType = .standard
+        options.showsBuildings = false
+        options.pointOfInterestFilter = .excludingAll
+        do {
+            let snapshot = try await MKMapSnapshotter(options: options).start()
+            guard !Task.isCancelled else { return nil }
+            let rendered = drawRoute(coordinates, on: snapshot, size: size)
+            if currentGeneration == generation {
+                images.setObject(rendered, forKey: key)
+            }
+            return rendered
+        } catch { return nil }
+    }
+
     private static func region(
         for coordinates:
             [CLLocationCoordinate2D]
