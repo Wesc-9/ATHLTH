@@ -168,23 +168,26 @@ final class TrainTogetherMarketplaceStore:
         defer { isWorking = false }
 
         do {
-            try await client
-                .from(
-                    "train_together_posts"
-                )
-                .insert(post)
-                .execute()
+            // Publish the workout and any private meetup details in one
+            // PostgreSQL transaction. A rejected meetup must not leave an
+            // apparently failed workout visible to other athletes.
+            let includesMeetup = meetup.map {
+                $0.meetingName != nil ||
+                $0.meetingAddress != nil ||
+                $0.meetingDetails != nil ||
+                $0.meetingLatitude != nil ||
+                $0.meetingLongitude != nil
+            } ?? false
 
-            if let meetup,
-               meetup.meetingName != nil ||
-                meetup.meetingDetails != nil {
-                try await client
-                    .from(
-                        "train_together_post_meetups"
+            try await client
+                .rpc(
+                    "publish_train_together_post",
+                    params: TrainTogetherPublishParams(
+                        post: post,
+                        meetup: includesMeetup ? meetup : nil
                     )
-                    .insert(meetup)
-                    .execute()
-            }
+                )
+                .execute()
 
             await refresh()
             return true
@@ -409,6 +412,18 @@ final class TrainTogetherMarketplaceStore:
             $0.requesterID == userID &&
             $0.state == .accepted
         }
+    }
+}
+
+/// The RPC runs as the signed-in athlete (SECURITY INVOKER) and
+/// preserves the existing RLS ownership checks on both tables.
+private struct TrainTogetherPublishParams: Encodable {
+    let post: TrainTogetherPostWrite
+    let meetup: TrainTogetherMeetupWrite?
+
+    enum CodingKeys: String, CodingKey {
+        case post = "p_post"
+        case meetup = "p_meetup"
     }
 }
 

@@ -200,6 +200,9 @@ final class ExerciseLibraryStore: ObservableObject {
         let equipment: String?
     }
     private var cachedSearchText: [UUID: String] = [:]
+    // The translated name is stable until the translation revision changes.
+    // Cache it once instead of re-normalizing it for every typed character.
+    private var cachedTranslatedSearchNames: [UUID: String] = [:]
     // Alphabet keys are resolved once per catalog/translation revision,
     // rather than inside SwiftUI body on every unrelated state update.
     private var cachedAlphabetSortKeys: [UUID: String] = [:]
@@ -698,6 +701,7 @@ final class ExerciseLibraryStore: ObservableObject {
         cachedBodyParts = nil
         cachedEquipmentOptions = nil
         cachedSearchText = [:]
+        cachedTranslatedSearchNames = [:]
         cachedAlphabetSortKeys = [:]
         lastSearchRequest = nil
         lastSearchTranslationRevision = -1
@@ -824,6 +828,7 @@ final class ExerciseLibraryStore: ObservableObject {
         let translationRevision = NorwegianExerciseAutoTranslation.shared.revision
         if lastSearchTranslationRevision != translationRevision {
             cachedAlphabetSortKeys = [:]
+            cachedTranslatedSearchNames = [:]
         }
         if lastSearchRequest == request &&
            lastSearchTranslationRevision == translationRevision {
@@ -887,14 +892,20 @@ final class ExerciseLibraryStore: ObservableObject {
                     cachedSearchText[entry.id] = haystack
                 }
 
-                let liveNorwegianName = (
-                    NorwegianExerciseAutoTranslation.shared.translated(entry.name) ?? ""
-                )
-                .folding(
-                    options: [.diacriticInsensitive, .caseInsensitive],
-                    locale: Locale(identifier: "nb_NO")
-                )
-                .lowercased()
+                let liveNorwegianName: String
+                if let cached = cachedTranslatedSearchNames[entry.id] {
+                    liveNorwegianName = cached
+                } else {
+                    liveNorwegianName = (
+                        NorwegianExerciseAutoTranslation.shared.translated(entry.name) ?? ""
+                    )
+                    .folding(
+                        options: [.diacriticInsensitive, .caseInsensitive],
+                        locale: Locale(identifier: "nb_NO")
+                    )
+                    .lowercased()
+                    cachedTranslatedSearchNames[entry.id] = liveNorwegianName
+                }
                 matchesText = queryTokens.allSatisfy {
                     haystack.contains($0) || liveNorwegianName.contains($0)
                 }
