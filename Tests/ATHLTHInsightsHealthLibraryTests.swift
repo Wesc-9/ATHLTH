@@ -39,7 +39,11 @@ final class ATHLTHInsightsHealthLibraryTests: XCTestCase {
         for metric in ATHLTHInsightHealthMetric.allCases {
             XCTAssertEqual(metric.formatted(nil), "—")
             XCTAssertEqual(metric.formatted(.nan), "—")
-            XCTAssertEqual(metric.formatted(-1), "—")
+            if metric == .wristTemperature {
+                XCTAssertNotEqual(metric.formatted(-1), "—")
+            } else {
+                XCTAssertEqual(metric.formatted(-1), "—")
+            }
         }
     }
 
@@ -82,13 +86,13 @@ final class ATHLTHInsightsHealthLibraryTests: XCTestCase {
             .walkingRunningDistance, .exerciseMinutes, .dietaryProtein,
             .dietaryWater, .flightsClimbed, .insulinDelivery
         ] {
-            XCTAssertTrue(metric.cumulative, "\\(metric.id) should use a daily sum")
+            XCTAssertTrue(metric.cumulative, "\(metric.id) should use a daily sum")
         }
         for metric in [
             ATHLTHInsightHealthMetric.bloodGlucose,
             .bloodPressureSystolic, .walkingSteadiness, .runningPower
         ] {
-            XCTAssertFalse(metric.cumulative, "\\(metric.id) should not use a daily sum")
+            XCTAssertFalse(metric.cumulative, "\(metric.id) should not use a daily sum")
         }
     }
 
