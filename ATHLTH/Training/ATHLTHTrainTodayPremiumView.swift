@@ -115,24 +115,28 @@ struct ATHLTHTrainTodayPremiumView: View {
 
             remainingTodaySection
             quickTrainSection
+
+            // Ghost Race is a primary shortcut, shown before the active goal.
+            // Keep its existing card styling and launch action unchanged.
+            ghostRaceSection
+                .frame(maxWidth: .infinity)
+
             todayGoalAndFocus
 
-            DisclosureGroup {
-                VStack(alignment: .leading, spacing: 16) {
-                    if primaryWorkout != nil {
-                        suggestedWorkoutSection
-                    }
-                    ghostRaceSection
+            // Hide an empty disclosure when no additional workout is available.
+            if primaryWorkout != nil {
+                DisclosureGroup {
+                    suggestedWorkoutSection
+                        .padding(.top, 12)
+                } label: {
+                    Label(tr("More training options", "Flere treningsmuligheter"),
+                          systemImage: "sparkles")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ink)
+                        .frame(minHeight: 48)
                 }
-                .padding(.top, 12)
-            } label: {
-                Label(tr("More training options", "Flere treningsmuligheter"),
-                      systemImage: "sparkles")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(ink)
-                    .frame(minHeight: 48)
+                .tint(champagne)
             }
-            .tint(champagne)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .task {
