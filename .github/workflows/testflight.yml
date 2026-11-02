@@ -40,6 +40,7 @@ on:
       - release/v2.0.6
       - release/v2.0.7
       - release/v2.0.8
+      - release/v2.0.9
     paths:
       - .github/testflight-trigger
 
