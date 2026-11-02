@@ -313,5 +313,8 @@ enum ATHLTHInsightHealthMetric: String, CaseIterable, Identifiable {
 struct ATHLTHInsightHealthDay: Identifiable, Equatable {
     let date: Date
     let value: Double
+    /// True only for a calculated recovery drop based on real pulse samples.
+    /// Native Apple Health recovery readings keep the default false value.
+    var isEstimated: Bool = false
     var id: Date { date }
 }
