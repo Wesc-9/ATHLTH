@@ -7250,6 +7250,7 @@ struct MessageSharePicker: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
 
     let onSelect: (MessageShareDraft) -> Void
     let allowedKinds: [MessageShareKind]
@@ -7258,6 +7259,7 @@ struct MessageSharePicker: View {
     @State private var exerciseCategory: ATHLTHExerciseActivity?
     @State private var workoutActivity: WorkoutKind?
     @State private var routeDistance: ATHLTHRouteShareDistanceFilter?
+    @State private var favoritesOnly = false
     @State private var shareError: String?
 
     private var isExerciseOnly: Bool {
@@ -7284,6 +7286,10 @@ struct MessageSharePicker: View {
         isExerciseOnly || isWorkoutSharing || isPlanOnly || isRouteOnly
     }
 
+    private func allowsFavorite(_ kind: LibraryFavoriteKind, id: UUID) -> Bool {
+        !favoritesOnly || favorites.isFavorite(kind, itemID: id.uuidString)
+    }
+
     private var eligibleExercises: [ExerciseLibraryEntry] {
         exerciseLibrary.customExercises.filter {
             ATHLTHPersonalExerciseSharing.isEligible(
@@ -7294,8 +7300,9 @@ struct MessageSharePicker: View {
 
     private var filteredExercises: [ExerciseLibraryEntry] {
         eligibleExercises.filter { entry in
-            guard let exerciseCategory else { return true }
-            return (entry.exercise.activityCategory ?? .strength) == exerciseCategory
+            allowsFavorite(.exercise, id: entry.id) &&
+            (exerciseCategory == nil ||
+             (entry.exercise.activityCategory ?? .strength) == exerciseCategory)
         }
     }
 
@@ -7497,6 +7504,9 @@ struct MessageSharePicker: View {
                     }
                 }
             }
+            .task(id: session.profile.userID) {
+                await favorites.refresh()
+            }
             .alert(
                 ATHLTHLocalization.choose(
                     english:
@@ -7530,13 +7540,15 @@ struct MessageSharePicker: View {
     private var exerciseActivityFilters: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                favoritesFilterChip
                 exerciseFilterChip(
                     title: ATHLTHLocalization.choose(
                         english: "All", norwegian: "Alle"
                     ),
                     symbol: "square.grid.2x2",
-                    selected: exerciseCategory == nil
+                    selected: !favoritesOnly && exerciseCategory == nil
                 ) {
+                    favoritesOnly = false
                     exerciseCategory = nil
                 }
                 ForEach(ATHLTHExerciseActivity.allCases) { category in
@@ -7545,6 +7557,7 @@ struct MessageSharePicker: View {
                         symbol: category.systemImage,
                         selected: exerciseCategory == category
                     ) {
+                        favoritesOnly = false
                         exerciseCategory = category
                     }
                 }
@@ -7555,13 +7568,15 @@ struct MessageSharePicker: View {
     private var workoutActivityFilters: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                favoritesFilterChip
                 exerciseFilterChip(
                     title: ATHLTHLocalization.choose(
                         english: "All", norwegian: "Alle"
                     ),
                     symbol: "square.grid.2x2",
-                    selected: workoutActivity == nil
+                    selected: !favoritesOnly && workoutActivity == nil
                 ) {
+                    favoritesOnly = false
                     workoutActivity = nil
                 }
                 ForEach(WorkoutKind.allCases) { kind in
@@ -7570,6 +7585,7 @@ struct MessageSharePicker: View {
                         symbol: kind.systemImage,
                         selected: workoutActivity == kind
                     ) {
+                        favoritesOnly = false
                         workoutActivity = kind
                     }
                 }
@@ -7580,11 +7596,13 @@ struct MessageSharePicker: View {
     private var routeDistanceFilters: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
+                favoritesFilterChip
                 exerciseFilterChip(
                     title: ATHLTHLocalization.choose(english: "All", norwegian: "Alle"),
                     symbol: "square.grid.2x2",
-                    selected: routeDistance == nil
+                    selected: !favoritesOnly && routeDistance == nil
                 ) {
+                    favoritesOnly = false
                     routeDistance = nil
                 }
                 ForEach(ATHLTHRouteShareDistanceFilter.allCases) { distance in
@@ -7593,10 +7611,26 @@ struct MessageSharePicker: View {
                         symbol: "point.topleft.down.to.point.bottomright.curvepath",
                         selected: routeDistance == distance
                     ) {
+                        favoritesOnly = false
                         routeDistance = distance
                     }
                 }
             }
+        }
+    }
+
+    private var favoritesFilterChip: some View {
+        exerciseFilterChip(
+            title: ATHLTHLocalization.choose(
+                english: "Favorites", norwegian: "Favoritter"
+            ),
+            symbol: "star.fill",
+            selected: favoritesOnly
+        ) {
+            favoritesOnly = true
+            exerciseCategory = nil
+            workoutActivity = nil
+            routeDistance = nil
         }
     }
 
@@ -7642,7 +7676,7 @@ struct MessageSharePicker: View {
     private var shareContent: some View {
         switch selectedKind {
         case .workout:
-            let workouts = isWorkoutSharing ? filteredWorkouts : shareableWorkouts
+            let workouts = isWorkoutSharing || favoritesOnly ? filteredWorkouts : shareableWorkouts
             let runningTemplates = isWorkoutSharing ? filteredRunningTemplates : []
             if workouts.isEmpty && runningTemplates.isEmpty {
                 ContentUnavailableView(
@@ -7782,7 +7816,7 @@ struct MessageSharePicker: View {
             }
 
         case .runningWorkout:
-            let workouts = shareableRunningTemplates
+            let workouts = favoritesOnly ? filteredRunningTemplates : shareableRunningTemplates
             if workouts.isEmpty {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(english: "No custom running workouts", norwegian: "Ingen lagrede løpeøkter"),
@@ -7882,7 +7916,10 @@ struct MessageSharePicker: View {
     private var filteredRoutes: [TrainingRoute] {
         ATHLTHPersonalSharePolicy.savedRoutes(
             session.savedRoutes, ownerID: session.profile.userID
-        ).filter { routeDistance?.matches($0.distanceKilometers) ?? true }
+        ).filter {
+            allowsFavorite(.route, id: $0.id) &&
+            (routeDistance?.matches($0.distanceKilometers) ?? true)
+        }
     }
 
     private var shareablePlans: [TrainingPlan] {
@@ -7894,6 +7931,7 @@ struct MessageSharePicker: View {
 
     private var filteredPlans: [TrainingPlan] {
         shareablePlans.filter { plan in
+            guard allowsFavorite(.plan, id: plan.id) else { return false }
             guard let workoutActivity else { return true }
             let sessionKinds = plan.weeks
                 .flatMap(\.days).flatMap(\.sessions).map(\.kind)
@@ -7913,7 +7951,8 @@ struct MessageSharePicker: View {
 
     private var filteredWorkouts: [PlannedSession] {
         shareableWorkouts.filter {
-            workoutActivity == nil || $0.kind == workoutActivity
+            allowsFavorite(.workout, id: $0.id) &&
+            (workoutActivity == nil || $0.kind == workoutActivity)
         }
     }
 
@@ -7925,7 +7964,8 @@ struct MessageSharePicker: View {
 
     private var filteredRunningTemplates: [RunningWorkoutTemplate] {
         shareableRunningTemplates.filter {
-            workoutActivity == nil || workoutActivity == .running
+            allowsFavorite(.workout, id: $0.id) &&
+            (workoutActivity == nil || workoutActivity == .running)
         }
     }
 
