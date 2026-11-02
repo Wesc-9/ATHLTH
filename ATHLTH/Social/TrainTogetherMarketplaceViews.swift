@@ -2771,18 +2771,32 @@ struct TrainTogetherPostCreateView:
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
                 createSectionHeader(
-                    ATHLTHLocalization.choose(
-                        english: "Train Together settings",
-                        norwegian: "Tren sammen-valg"
-                    ),
-                    subtitle: ATHLTHLocalization.choose(
-                        english: "Choose how you will train and who can join.",
-                        norwegian: "Velg hvordan dere trener og hvem som kan bli med."
-                    )
+                    preparedWorkout == nil
+                        ? ATHLTHLocalization.choose(
+                            english: "Choose a workout",
+                            norwegian: "Velg treningsøkt"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Train Together",
+                            norwegian: "Tren sammen"
+                        ),
+                    subtitle: preparedWorkout == nil
+                        ? ATHLTHLocalization.choose(
+                            english: "Build or choose a workout to invite people to.",
+                            norwegian: "Bygg eller velg en økt før du inviterer deltakere."
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Invite participants to the workout you have already created.",
+                            norwegian: "Inviter deltakere til økten du allerede har laget."
+                        )
                 )
                 if preparedWorkout == nil {
+                    // Community entry point: no workout exists yet.
                     sourceCard
                 } else {
+                    if let preparedWorkout {
+                        preparedWorkoutSummary(preparedWorkout)
+                    }
                     socialWorkoutCard
                     if participationMode == .physical {
                         createSectionHeader(
@@ -2948,6 +2962,56 @@ struct TrainTogetherPostCreateView:
                     showingMeetingSearch =
                         false
                 }
+            }
+        }
+    }
+
+    /// Show the current draft as a read-only source. Changes to invitation
+    /// settings must not replace exercises, intervals, route or coaching data.
+    private func preparedWorkoutSummary(_ workout: PlannedSession) -> some View {
+        ATHLTHTrainTogetherSurface {
+            HStack(spacing: 12) {
+                Image(systemName: workout.kind.systemImage)
+                    .font(.system(size: 21, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                    .frame(width: 43, height: 43)
+                    .background(
+                        ATHLTHTrainTogetherDesign.accentSoft,
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "THIS WORKOUT",
+                        norwegian: "DENNE ØKTEN"
+                    ))
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+
+                    Text(workout.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.ink)
+                        .lineLimit(2)
+
+                    HStack(spacing: 6) {
+                        Text(workout.kind.title)
+                        if let duration = workout.durationMinutes, duration > 0 {
+                            Text("·")
+                            Text("\(duration) min")
+                        }
+                        let stepCount = workout.resolvedWorkoutBlocks.count
+                        if stepCount > 0 {
+                            Text("·")
+                            Text(ATHLTHLocalization.format(
+                                english: "%d steps",
+                                norwegian: "%d deløkter",
+                                stepCount
+                            ))
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+                }
+                Spacer(minLength: 0)
             }
         }
     }
