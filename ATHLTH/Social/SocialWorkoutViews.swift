@@ -95,9 +95,13 @@ struct WorkoutFriendPicker: View {
                             selectedFriendIDs.removeAll()
                         } label: {
                             partnerTile(
-                                title: ATHLTHLocalization.choose(
-                                    english: "Just me", norwegian: "Bare meg"
-                                ),
+                                title: invitationTitle == nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Just me", norwegian: "Bare meg"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "None", norwegian: "Ingen"
+                                    ),
                                 systemImage: "person.fill",
                                 selected: selectedFriendIDs.isEmpty
                             )
@@ -183,10 +187,15 @@ struct WorkoutFriendPicker: View {
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
             } else if !selectedFriendIDs.isEmpty {
-                Text(ATHLTHLocalization.choose(
-                    english: "Mutual friends join a live lobby. New contacts receive a workout invitation in a message request.",
-                    norwegian: "Gjensidige venner inviteres til lobbyen. Nye kontakter får øktinvitasjonen i en meldingsforespørsel."
-                ))
+                Text(invitationTitle == nil
+                    ? ATHLTHLocalization.choose(
+                        english: "Mutual friends join a live lobby. New contacts receive a workout invitation in a message request.",
+                        norwegian: "Gjensidige venner inviteres til lobbyen. Nye kontakter får øktinvitasjonen i en meldingsforespørsel."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Selected athletes will be invited in Messages when the workout is published.",
+                        norwegian: "Valgte personer får invitasjon i Meldinger når økten publiseres."
+                    ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
             }
@@ -204,9 +213,13 @@ struct WorkoutFriendPicker: View {
                                     .font(.title3)
                                     .frame(width: 45, height: 45)
                                     .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Just me", norwegian: "Bare meg"
-                                ))
+                                Text(invitationTitle == nil
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Just me", norwegian: "Bare meg"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "None", norwegian: "Ingen"
+                                    ))
                                 .font(.subheadline.weight(.semibold))
                                 Spacer()
                                 if selectedFriendIDs.isEmpty {
