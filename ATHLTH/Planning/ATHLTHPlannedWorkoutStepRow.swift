@@ -1,8 +1,7 @@
 import SwiftUI
 
-/// A workout step with a dedicated drag handle and a reliable options menu.
-/// Editing and deletion are separate actions: horizontal scrolling never
-/// reveals an offscreen button or interferes with the workout's timeline.
+/// A workout step with a separate reorder grip, persistent swipe-to-delete,
+/// and an independent options menu. Swiping never changes the step order.
 struct ATHLTHPlannedWorkoutStepRow: View {
     let block: WorkoutTemplateBlock
     let position: Int
@@ -13,7 +12,41 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     let onMoveBy: (Int) -> Void
     let onBeginDrag: () -> NSItemProvider
 
+    @State private var isDeleteRevealed = false
+    @State private var horizontalDrag: CGFloat = 0
+
+    private let deleteWidth: CGFloat = 76
     private var isPause: Bool { block.isRestOrActiveRecovery }
+
+    // The settled offset comes from retained state, rather than the gesture
+    // translation. Releasing the finger never closes an exposed delete action.
+    private var stepOffset: CGFloat {
+        let base: CGFloat = isDeleteRevealed ? -deleteWidth : 0
+        return min(0, max(-deleteWidth, base + horizontalDrag))
+    }
+
+    private var swipeGesture: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                guard abs(value.translation.width) >
+                      abs(value.translation.height) * 1.15 else { return }
+                horizontalDrag = value.translation.width
+            }
+            .onEnded { value in
+                let horizontal = abs(value.translation.width) >
+                    abs(value.translation.height) * 1.15
+                withAnimation(.easeOut(duration: 0.18)) {
+                    if horizontal {
+                        if value.translation.width < -34 {
+                            isDeleteRevealed = true
+                        } else if value.translation.width > 34 {
+                            isDeleteRevealed = false
+                        }
+                    }
+                    horizontalDrag = 0
+                }
+            }
+    }
 
     var body: some View {
         HStack(spacing: 4) {
@@ -37,8 +70,25 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                     if canMoveDown { onMoveBy(1) }
                 }
 
-            HStack(spacing: 0) {
-                Button(action: onEdit) {
+            ZStack(alignment: .trailing) {
+                Button(role: .destructive) {
+                    onDelete()
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Delete step", norwegian: "Slett deløkt"
+                    ), systemImage: "trash")
+                    .labelStyle(.iconOnly)
+                    .font(.body)
+                    .foregroundStyle(.white)
+                    .frame(width: deleteWidth, height: 49)
+                    .background(Color.red, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
+                .allowsHitTesting(isDeleteRevealed)
+                .accessibilityHidden(!isDeleteRevealed)
+
+                HStack(spacing: 0) {
+                    Button(action: onEdit) {
                     HStack(spacing: 8) {
                         Text("\(position)")
                             .font(.caption.weight(.semibold))
@@ -73,12 +123,12 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint(ATHLTHLocalization.choose(
-                    english: "Edit step details; use the options menu to delete",
-                    norwegian: "Rediger deløkten. Bruk menyen med tre prikker for å slette."
-                ))
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Edit step details. Swipe left or use options to delete.",
+                        norwegian: "Rediger deløkten. Sveip til venstre eller bruk menyen for å slette."
+                    ))
 
-                Menu {
+                    Menu {
                     Button(action: onEdit) {
                         Label(ATHLTHLocalization.choose(
                             english: "Edit step", norwegian: "Rediger deløkt"
@@ -99,15 +149,20 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                     .foregroundStyle(ATHLTHTrainDesign.ink)
                     .frame(width: 44, height: 49)
                     .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                .background(
+                    isPause ? ATHLTHPlanDesign.warmSurface.opacity(0.56)
+                        : ATHLTHPlanDesign.canvas,
+                    in: RoundedRectangle(cornerRadius: 12)
+                )
+                .offset(x: stepOffset)
+                .contentShape(Rectangle())
+                .simultaneousGesture(swipeGesture)
             }
-            .background(
-                isPause ? ATHLTHPlanDesign.warmSurface.opacity(0.56)
-                    : ATHLTHPlanDesign.canvas,
-                in: RoundedRectangle(cornerRadius: 12)
-            )
             .frame(maxWidth: .infinity, minHeight: 49)
+            .clipped()
         }
     }
 }
