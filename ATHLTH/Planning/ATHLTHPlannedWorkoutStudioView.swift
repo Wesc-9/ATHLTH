@@ -1,5 +1,4 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 /// The single Plan-specific presentation for the unified workout recipe.
 /// No parallel workout model: every row is a real editable WorkoutTemplateBlock.
@@ -26,6 +25,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     @State private var collapsedPhases: Set<WorkoutPhaseKind> = []
     @State private var draggingID: UUID?
+    @State private var dragPoint: CGPoint = .zero
+    @State private var dragFingerOffsetY: CGFloat = 0
+    @State private var rowFrames: [UUID: CGRect] = [:]
+    @State private var phaseFrames: [WorkoutPhaseKind: CGRect] = [:]
 
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
@@ -139,6 +142,36 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             }
         }
         .animation(.easeInOut(duration: 0.18), value: visiblePhases)
+        .coordinateSpace(name: "athlthWorkoutStudio")
+        // The floating copy follows the finger independently of the rows
+        // changing places. The original keeps its layout slot during dragging.
+        .overlay(alignment: .topLeading) {
+            if let draggingID,
+               let block = blocks.first(where: { $0.editorDragID == draggingID }),
+               let frame = rowFrames[draggingID] {
+                ATHLTHPlannedWorkoutStepRow(
+                    block: block,
+                    position: (entries(in: presentationPhase(for: block))
+                        .firstIndex(where: { $0.editorDragID == draggingID }) ?? 0) + 1,
+                    canMoveUp: false,
+                    canMoveDown: false,
+                    onEdit: {},
+                    onDelete: {},
+                    onMoveBy: { _ in },
+                    onReorderMove: { _ in },
+                    onReorderEnd: {}
+                )
+                .frame(width: frame.width, height: frame.height)
+                .background(ATHLTHPlanDesign.surface,
+                            in: RoundedRectangle(cornerRadius: 13))
+                .scaleEffect(1.035)
+                .shadow(color: .black.opacity(0.19), radius: 12, y: 7)
+                .position(x: frame.midX, y: dragPoint.y - dragFingerOffsetY)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+                .zIndex(100)
+            }
+        }
     }
 
     private var addSectionMenu: some View {
@@ -239,9 +272,6 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 }
             }
             .padding(.horizontal, 10)
-            .onDrop(of: [UTType.plainText], isTargeted: nil) { _ in
-                moveDragged(to: phase, before: nil)
-            }
 
             if expanded {
                 if rows.isEmpty {
@@ -275,6 +305,14 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 )
         }
         .shadow(color: bronze.opacity(0.055), radius: 10, y: 5)
+        .zIndex(draggingID.map { id in
+            entries(in: phase).contains { $0.editorDragID == id }
+        } == true ? 5 : 0)
+        .onGeometryChange(for: CGRect.self) { geometry in
+            geometry.frame(in: .named("athlthWorkoutStudio"))
+        } action: { _, frame in
+            if phaseFrames[phase] != frame { phaseFrames[phase] = frame }
+        }
     }
 
     private func stepRow(
@@ -295,25 +333,90 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 guard rows.indices.contains(destination) else { return }
                 onMove(block.editorDragID, phase, rows[destination].editorDragID)
             },
-            onBeginDrag: {
-                draggingID = block.editorDragID
-                return NSItemProvider(object: block.editorDragID.uuidString as NSString)
-            }
+            onReorderMove: { point in
+                liveReorder(block.editorDragID, finger: point)
+            },
+            onReorderEnd: endLiveReorder
         )
-        .onDrop(of: [UTType.plainText], isTargeted: nil) { _ in
-            moveDragged(to: phase, before: block.editorDragID)
+        .onGeometryChange(for: CGRect.self) { geometry in
+            geometry.frame(in: .named("athlthWorkoutStudio"))
+        } action: { _, frame in
+            if rowFrames[block.editorDragID] != frame {
+                rowFrames[block.editorDragID] = frame
+            }
+        }
+        .opacity(draggingID == block.editorDragID ? 0.13 : 1)
+    }
+
+    private func liveReorder(_ id: UUID, finger: CGPoint) {
+        guard let item = blocks.first(where: { $0.editorDragID == id }) else { return }
+        if draggingID == nil {
+            guard let startFrame = rowFrames[id] else { return }
+            dragFingerOffsetY = finger.y - startFrame.midY
+            draggingID = id
+        }
+        guard draggingID == id else { return }
+        dragPoint = finger
+        let centerY = finger.y - dragFingerOffsetY
+        let currentPhase = presentationPhase(for: item)
+
+        // Moving across sections uses the same authoritative move callback
+        // as the workout editor. Empty phases are also valid destinations.
+        if let destination = phases.first(where: { phase in
+            guard let frame = phaseFrames[phase] else { return false }
+            return centerY >= frame.minY + 10 && centerY <= frame.maxY - 10
+        }), destination != currentPhase {
+            withAnimation(.interactiveSpring(response: 0.24, dampingFraction: 0.86)) {
+                visiblePhases.insert(destination)
+                collapsedPhases.remove(destination)
+                selectedPhase = destination
+                onMove(id, destination, nil)
+            }
+            return
+        }
+
+        let rows = entries(in: currentPhase)
+        guard let currentIndex = rows.firstIndex(where: {
+            $0.editorDragID == id
+        }) else { return }
+
+        // Each time the floating row's center passes a neighbor's midpoint,
+        // reorder the underlying timeline immediately. All other rows
+        // animate into their new positions while the copy follows the finger.
+        if currentIndex + 1 < rows.count {
+            let below = rows.dropFirst(currentIndex + 1)
+            if let crossed = below.last(where: { other in
+                guard let frame = rowFrames[other.editorDragID] else {
+                    return false
+                }
+                return centerY >= frame.midY
+            }) {
+                withAnimation(.interactiveSpring(response: 0.24, dampingFraction: 0.86)) {
+                    onMove(id, currentPhase, crossed.editorDragID)
+                }
+                return
+            }
+        }
+
+        if currentIndex > 0 {
+            let above = rows.prefix(currentIndex)
+            if let crossed = above.first(where: { other in
+                guard let frame = rowFrames[other.editorDragID] else {
+                    return false
+                }
+                return centerY <= frame.midY
+            }) {
+                withAnimation(.interactiveSpring(response: 0.24, dampingFraction: 0.86)) {
+                    onMove(id, currentPhase, crossed.editorDragID)
+                }
+            }
         }
     }
 
-    private func moveDragged(
-        to phase: WorkoutPhaseKind, before targetID: UUID?
-    ) -> Bool {
-        guard let draggingID, draggingID != targetID else { return false }
-        visiblePhases.insert(phase)
-        selectedPhase = phase
-        onMove(draggingID, phase, targetID)
-        self.draggingID = nil
-        return true
+    private func endLiveReorder() {
+        withAnimation(.easeOut(duration: 0.16)) {
+            draggingID = nil
+        }
     }
 
     private func addContentMenu(_ phase: WorkoutPhaseKind) -> some View {

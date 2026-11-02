@@ -10,13 +10,30 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     let onEdit: () -> Void
     let onDelete: () -> Void
     let onMoveBy: (Int) -> Void
-    let onBeginDrag: () -> NSItemProvider
+    let onReorderMove: (CGPoint) -> Void
+    let onReorderEnd: () -> Void
 
     @State private var isDeleteRevealed = false
     @State private var horizontalDrag: CGFloat = 0
 
     private let deleteWidth: CGFloat = 76
     private var isPause: Bool { block.isRestOrActiveRecovery }
+
+    // A local, long-press-driven gesture avoids iOS system drag-and-drop's
+    // green plus badge and keeps the whole card attached to the finger.
+    private var reorderGesture: some Gesture {
+        LongPressGesture(minimumDuration: 0.28)
+            .sequenced(before: DragGesture(
+                minimumDistance: 0,
+                coordinateSpace: .named("athlthWorkoutStudio")
+            ))
+            .onChanged { gesture in
+                if case .second(true, let drag?) = gesture {
+                    onReorderMove(drag.location)
+                }
+            }
+            .onEnded { _ in onReorderEnd() }
+    }
 
     // The settled offset comes from retained state, rather than the gesture
     // translation. Releasing the finger never closes an exposed delete action.
@@ -55,7 +72,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                 .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.42))
                 .frame(width: 27, height: 49)
                 .contentShape(Rectangle())
-                .onDrag(onBeginDrag)
+                .gesture(reorderGesture)
                 .accessibilityLabel(ATHLTHLocalization.choose(
                     english: "Drag to reorder step", norwegian: "Dra for å flytte deløkten"
                 ))
