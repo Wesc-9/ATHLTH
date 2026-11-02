@@ -1,7 +1,7 @@
 import Foundation
 
-/// Personalized, conservative suggestions derived from known plan + Health
-/// signals only. Never rewrites a user's plan or infers injury/medical status.
+/// Training suggestions grounded in recorded activity and available Health signals.
+/// Readiness is not proof of fitness. No plan changes or inferred medical status.
 enum HomeDailyRecommendationPolicy {
     enum Readiness: Equatable {
         case ready, balanced, takeItEasy, recover, unavailable
@@ -19,19 +19,88 @@ enum HomeDailyRecommendationPolicy {
         case planned
         case easyWalk(minutes: Int)
         case easyRun(minutes: Int)
+        case progressiveRun(minutes: Int)
+        case tempoRun(minutes: Int)
 
         var kind: WorkoutKind? {
             switch self {
             case .planned: return nil
             case .easyWalk: return .walking
-            case .easyRun: return .running
+            case .easyRun, .progressiveRun, .tempoRun: return .running
             }
         }
         var durationMinutes: Int? {
             switch self {
             case .planned: return nil
-            case .easyWalk(let minutes), .easyRun(let minutes): return minutes
+            case .easyWalk(let minutes), .easyRun(let minutes),
+                 .progressiveRun(let minutes), .tempoRun(let minutes):
+                return minutes
             }
+        }
+    }
+
+
+    /// A training-history signal, not a fitness diagnosis. Missing workouts
+    /// mean that we cannot justify prescribing harder running.
+    struct TrainingHistory: Equatable {
+        let sessionsLast28Days: Int
+        let runsLast28Days: Int
+        let mostRecentRunDaysAgo: Int?
+        let averageRecentRunMinutes: Int?
+
+        static let empty = TrainingHistory(
+            sessionsLast28Days: 0,
+            runsLast28Days: 0,
+            mostRecentRunDaysAgo: nil,
+            averageRecentRunMinutes: nil
+        )
+
+        static func from(
+            workouts: [WorkoutSummary],
+            now: Date = Date(),
+            calendar: Calendar = .current
+        ) -> TrainingHistory {
+            let start = calendar.date(
+                byAdding: .day, value: -28,
+                to: calendar.startOfDay(for: now)
+            ) ?? now.addingTimeInterval(-28 * 86_400)
+            let recent = workouts.filter {
+                $0.startDate >= start &&
+                $0.startDate <= now &&
+                $0.duration.isFinite &&
+                $0.duration >= 5 * 60
+            }
+            let runs = recent.filter { $0.activity == .running }
+            let lastRun = runs.map(\.startDate).max()
+            let daysAgo = lastRun.map {
+                max(0, calendar.dateComponents(
+                    [.day],
+                    from: calendar.startOfDay(for: $0),
+                    to: calendar.startOfDay(for: now)
+                ).day ?? 28)
+            }
+            let average = runs.isEmpty ? nil : Int(
+                (runs.reduce(0) { $0 + $1.duration } /
+                 Double(runs.count) / 60).rounded()
+            )
+            return TrainingHistory(
+                sessionsLast28Days: recent.count,
+                runsLast28Days: runs.count,
+                mostRecentRunDaysAgo: daysAgo,
+                averageRecentRunMinutes: average
+            )
+        }
+
+        var hasRecentRunningExperience: Bool {
+            runsLast28Days >= 1 &&
+            (mostRecentRunDaysAgo ?? 100) <= 14 &&
+            (averageRecentRunMinutes ?? 0) >= 20
+        }
+
+        var supportsControlledTempo: Bool {
+            runsLast28Days >= 3 &&
+            (mostRecentRunDaysAgo ?? 100) <= 10 &&
+            (averageRecentRunMinutes ?? 0) >= 30
         }
     }
 
@@ -73,7 +142,8 @@ enum HomeDailyRecommendationPolicy {
         hasWorkoutToday: Bool,
         trainingLoadRatio: Double?,
         plannedActivity: PlannedActivity? = nil,
-        plannedWorkoutTitle: String? = nil
+        plannedWorkoutTitle: String? = nil,
+        trainingHistory: TrainingHistory = .empty
     ) -> Advice {
         func tr(_ en: String, _ no: String) -> String {
             ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -104,6 +174,13 @@ enum HomeDailyRecommendationPolicy {
             )
         } else if hasWorkoutToday, plannedWorkoutTitle != nil {
             suggestedWorkout = .planned
+        } else if readiness == .ready, trainingHistory.supportsControlledTempo {
+            // A good readiness score alone never triggers tempo. Require
+            // repeated recent running and a modest historic duration.
+            suggestedWorkout = .tempoRun(minutes: 35)
+        } else if (readiness == .ready || readiness == .balanced),
+                  trainingHistory.hasRecentRunningExperience {
+            suggestedWorkout = .progressiveRun(minutes: 30)
         } else if readiness == .ready {
             suggestedWorkout = .easyRun(minutes: 25)
         } else {
@@ -131,14 +208,32 @@ enum HomeDailyRecommendationPolicy {
             }
             switch readiness {
             case .ready:
+                if suggestedWorkout == .tempoRun(minutes: 35) {
+                    return tr(
+                        "Recovery looks good and recent runs show a running base. A controlled tempo session can give you a little more challenge.",
+                        "Gode restitusjonssignaler og flere løpeøkter gir grunnlag for litt mer intensitet. Prøv en kontrollert tempoøkt."
+                    )
+                }
+                if case .progressiveRun = suggestedWorkout {
+                    return tr(
+                        "Your recovery looks good. You have some recent running behind you, so you can gradually raise the pace today.",
+                        "Restitusjonen ser god ut. Du har løpt nylig, så i dag kan du øke tempoet gradvis uten å gå rett på hardøkter."
+                    )
+                }
                 return tr(
-                    "Available recovery measurements look positive today. Check how your body feels during the warm-up.",
-                    "Tilgjengelige restitusjonsmålinger ser gode ut i dag. Kjenn etter hvordan kroppen føles under oppvarmingen."
+                    "Recovery looks positive, but recent running history is limited. Start easy and build up when your body responds well.",
+                    "Restitusjonen ser god ut, men vi har begrenset løpegrunnlag. Bygg deg gradvis opp og kjenn etter under oppvarmingen."
                 )
             case .balanced:
+                if case .progressiveRun = suggestedWorkout {
+                    return tr(
+                        "Readiness is balanced, and your recent runs support some variation. Start easy and finish a little faster if it feels right.",
+                        "Dagsformen er balansert, og du har løpt nylig. Start rolig og øk litt mot slutten hvis kroppen svarer bra."
+                    )
+                }
                 return tr(
-                    "Recovery measurements look balanced. Moderate activity may fit well today.",
-                    "Restitusjonsmålingene ser balanserte ut. Moderat aktivitet kan passe fint i dag."
+                    "Recovery looks balanced. Maintain your routine with manageable effort today.",
+                    "Restitusjonen ser balansert ut. Hold treningsrytmen i gang med en overkommelig økt i dag."
                 )
             case .unavailable:
                 return tr(
@@ -174,8 +269,26 @@ enum HomeDailyRecommendationPolicy {
                 "Easy run · \(minutes) min", "Rolig løpetur · \(minutes) min"
             )
             suggestedDetail = tr(
-                "Comfortable pace without hard intervals.",
-                "Behagelig tempo uten harde intervaller."
+                "Conversational pace; evaluate after the warm-up.",
+                "Pratefart; vurder dagsformen etter oppvarming."
+            )
+        case .progressiveRun(let minutes):
+            suggestedTitle = tr(
+                "Progressive run · \(minutes) min",
+                "Progressiv løpetur · \(minutes) min"
+            )
+            suggestedDetail = tr(
+                "8 min easy · 17 min steady · 5 min easy (RPE 5).",
+                "8 min rolig · 17 min jevnt · 5 min rolig (RPE 5)."
+            )
+        case .tempoRun(let minutes):
+            suggestedTitle = tr(
+                "Controlled tempo · \(minutes) min",
+                "Kontrollert tempo · \(minutes) min"
+            )
+            suggestedDetail = tr(
+                "8 min easy · 3 × 5 min tempo · 8 min cool-down.",
+                "8 min rolig · 3 × 5 min tempo · 8 min nedjogg."
             )
         }
 
@@ -260,7 +373,10 @@ enum HomeDailyRecommendationPolicy {
                          "Prøv 20–30 min gange eller rolig løping."),
                 source: tr("Based on readiness", "Basert på dagsform"),
                 symbol: "sparkles",
-                destination: .training
+                destination: .training,
+                evidence: (ratio ?? 1) < 0.85 &&
+                    trainingHistory.hasRecentRunningExperience
+                    ? loadEvidence : nil
             )
         case .balanced:
             return makeAdvice(
