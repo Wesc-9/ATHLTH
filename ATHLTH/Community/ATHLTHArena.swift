@@ -820,6 +820,7 @@ struct ATHLTHArenaHomeView: View {
     @State private var showingMoreArena = false
 
     var body: some View {
+        GeometryReader { viewport in
         ScrollView {
             VStack(alignment: .leading, spacing: 19) {
                 introduction
@@ -855,13 +856,20 @@ struct ATHLTHArenaHomeView: View {
                 ATHLTHArenaLiveDuelsSection(hideWhenInactive: true)
                 moreArenaSection
             }
-            .padding(.horizontal, 16)
             .padding(.top, 12)
             .padding(.bottom, 35)
-            .frame(maxWidth: 760)
+            // 16pt edge insets on either side, even on narrow iPhones.
+            // Use a definite width so photo/NavigationLink intrinsic sizes
+            // cannot make the vertical ScrollView horizontally overflow.
+            .frame(
+                width: min(max(viewport.size.width - 32, 0), 728),
+                alignment: .leading
+            )
+            .padding(.horizontal, 16)
             .frame(maxWidth: .infinity)
         }
         .scrollIndicators(.hidden)
+        }
         .background(ATHLTHArenaLightStyle.canvasBackground)
         .environment(\.colorScheme, .light)
         .navigationTitle("Arena")
@@ -1141,9 +1149,13 @@ struct ATHLTHArenaHomeView: View {
             .frame(height: 148)
 
             ZStack(alignment: .topLeading) {
-                ATHLTHArenaEditorialPhoto(scene: .stadium)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipped()
+                // scaledToFill images otherwise contribute their natural,
+                // very wide size to the parent and displace every Arena card.
+                GeometryReader { hero in
+                    ATHLTHArenaEditorialPhoto(scene: .stadium)
+                        .frame(width: hero.size.width, height: hero.size.height)
+                        .clipped()
+                }
 
                 LinearGradient(
                     colors: [
@@ -1241,6 +1253,7 @@ struct ATHLTHArenaHomeView: View {
                 }
                 .padding(19)
             }
+            .frame(maxWidth: .infinity)
             .frame(height: 253)
             .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
             .overlay {
@@ -1252,48 +1265,62 @@ struct ATHLTHArenaHomeView: View {
         }
     }
 
+    /// Equal-width shortcuts respect the available card width. They must
+    /// not use their intrinsic navigation-label width to stretch Arena.
     private var quickAccess: some View {
-        HStack(spacing: 8) {
-            NavigationLink {
-                GhostFriendRaceHubView()
-            } label: {
-                quickTile("Live Ghost", symbol: "bolt.fill")
+        GeometryReader { viewport in
+            let tileWidth = max(0, (viewport.size.width - 24) / 4)
+            HStack(spacing: 8) {
+                NavigationLink {
+                    GhostFriendRaceHubView()
+                } label: {
+                    quickTile("Live Ghost", symbol: "bolt.fill")
+                }
+                .buttonStyle(.plain)
+                .frame(width: tileWidth)
+
+                NavigationLink {
+                    ATHLTHArenaSingleChallengesView()
+                } label: {
+                    quickTile(
+                        ATHLTHLocalization.choose(
+                            english: "Challenges", norwegian: "Dueller"
+                        ),
+                        symbol: "flag.checkered"
+                    )
+                }
+                .buttonStyle(.plain)
+                .frame(width: tileWidth)
+
+                NavigationLink {
+                    ATHLTHArenaSeasonsDestination()
+                } label: {
+                    quickTile(
+                        ATHLTHLocalization.choose(
+                            english: "Seasons", norwegian: "Sesonger"
+                        ),
+                        symbol: "chart.bar.fill"
+                    )
+                }
+                .buttonStyle(.plain)
+                .frame(width: tileWidth)
+
+                Button {
+                    creationMode = .teamRelay
+                } label: {
+                    quickTile(
+                        ATHLTHLocalization.choose(
+                            english: "Team Arena", norwegian: "Lag Arena"
+                        ),
+                        symbol: "person.3.fill"
+                    )
+                }
+                .buttonStyle(.plain)
+                .frame(width: tileWidth)
             }
-            .buttonStyle(.plain)
-            NavigationLink {
-                ATHLTHArenaSingleChallengesView()
-            } label: {
-                quickTile(
-                    ATHLTHLocalization.choose(
-                        english: "Challenges", norwegian: "Dueller"
-                    ),
-                    symbol: "flag.checkered"
-                )
-            }
-            .buttonStyle(.plain)
-            NavigationLink {
-                ATHLTHArenaSeasonsDestination()
-            } label: {
-                quickTile(
-                    ATHLTHLocalization.choose(
-                        english: "Seasons", norwegian: "Sesonger"
-                    ),
-                    symbol: "chart.bar.fill"
-                )
-            }
-            .buttonStyle(.plain)
-            Button {
-                creationMode = .teamRelay
-            } label: {
-                quickTile(
-                    ATHLTHLocalization.choose(
-                        english: "Team Arena", norwegian: "Lag Arena"
-                    ),
-                    symbol: "person.3.fill"
-                )
-            }
-            .buttonStyle(.plain)
+            .frame(width: viewport.size.width, alignment: .leading)
         }
+        .frame(height: 87)
     }
 
     private func quickTile(_ title: String, symbol: String) -> some View {
