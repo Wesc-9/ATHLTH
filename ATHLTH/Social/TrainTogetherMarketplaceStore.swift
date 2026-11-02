@@ -35,10 +35,13 @@ final class TrainTogetherMarketplaceStore:
     private let client =
         SupabaseEnvironment.client
     private var lastSuccessfulRefresh: Date?
+    private var refreshNeededAfterCurrentLoad = false
 
     /// A lightweight caller can share the existing Marketplace refresh logic
     /// without repeatedly fetching public posts on every Community appearance.
     func refreshIfStale(maxAge: TimeInterval = 120) async {
+        // An in-flight read already satisfies a passive screen appearance.
+        guard !isLoading else { return }
         if let lastSuccessfulRefresh,
            Date().timeIntervalSince(lastSuccessfulRefresh) < maxAge {
             return
@@ -48,12 +51,23 @@ final class TrainTogetherMarketplaceStore:
 
     func refresh() async {
         guard !isLoading else {
+            // A publish/join may finish while an older read is still running.
+            // Queue one fresh read rather than losing the post-write refresh.
+            refreshNeededAfterCurrentLoad = true
             return
         }
 
         isLoading = true
         refreshErrorMessage = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            if refreshNeededAfterCurrentLoad {
+                refreshNeededAfterCurrentLoad = false
+                Task { [weak self] in
+                    await self?.refresh()
+                }
+            }
+        }
 
         do {
             let lowerBound =

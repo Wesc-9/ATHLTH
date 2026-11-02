@@ -208,7 +208,20 @@ final class ExerciseLibraryStore: ObservableObject {
     private var cachedAlphabetSortKeys: [UUID: String] = [:]
     private var lastSearchRequest: SearchRequest?
     private var lastSearchTranslationRevision = -1
+    private var lastSearchLanguageIsNorwegian: Bool?
     private var lastSearchResults: [ExerciseLibraryEntry] = []
+
+    // The user may change the app language without changing the translation
+    // dataset revision. Cached display names and result order must follow.
+    private func synchronizeSearchLanguage() {
+        let isNorwegian = ATHLTHLocalization.isNorwegian
+        guard lastSearchLanguageIsNorwegian != isNorwegian else { return }
+        lastSearchLanguageIsNorwegian = isNorwegian
+        cachedAlphabetSortKeys = [:]
+        cachedTranslatedSearchNames = [:]
+        lastSearchRequest = nil
+        lastSearchResults = []
+    }
 
     init() {
         // Prefer a valid persisted snapshot; fall back to the bundled offline catalog.
@@ -705,6 +718,7 @@ final class ExerciseLibraryStore: ObservableObject {
         cachedAlphabetSortKeys = [:]
         lastSearchRequest = nil
         lastSearchTranslationRevision = -1
+        lastSearchLanguageIsNorwegian = nil
         lastSearchResults = []
     }
 
@@ -773,6 +787,7 @@ final class ExerciseLibraryStore: ObservableObject {
     func alphabetized(
         _ entries: [ExerciseLibraryEntry]
     ) -> [ExerciseLibraryEntry] {
+        synchronizeSearchLanguage()
         guard entries.count > 1 else { return entries }
         let locale = ATHLTHExerciseAlphabet.locale
         for entry in entries where cachedAlphabetSortKeys[entry.id] == nil {
@@ -796,6 +811,7 @@ final class ExerciseLibraryStore: ObservableObject {
     func alphabetIndexTargets(
         for entries: [ExerciseLibraryEntry]
     ) -> [String: UUID] {
+        synchronizeSearchLanguage()
         var result: [String: UUID] = [:]
         for entry in entries {
             let name: String
@@ -818,6 +834,7 @@ final class ExerciseLibraryStore: ObservableObject {
         bodyPart: String? = nil,
         equipment: String? = nil
     ) -> [ExerciseLibraryEntry] {
+        synchronizeSearchLanguage()
         let cleanQuery = query
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .folding(options: [.diacriticInsensitive, .caseInsensitive],
