@@ -647,8 +647,21 @@ struct ATHLTHTrainWorkoutBuilderView: View {
 
     private func restoreLocalDraft() {
         guard let data = UserDefaults.standard.data(forKey: localDraftKey),
-              let saved = try? JSONDecoder().decode(StoredWorkoutEditorDraft.self, from: data),
-              saved.version == expectedPlanVersion else { return }
+              let saved = try? JSONDecoder().decode(StoredWorkoutEditorDraft.self, from: data)
+        else { return }
+        // This key already includes the athlete, plan, day and workout ID.
+        // Plan versions may advance on background refresh without changing
+        // this editor's identity; preserve the athlete's pending work.
+        let hasWorkoutContent =
+            !saved.workout.title.isEmpty ||
+            !ATHLTHUnifiedWorkout.editorBlocks(from: saved.workout).isEmpty ||
+            !(saved.workout.notes ?? "").isEmpty
+        guard saved.version == expectedPlanVersion ||
+              ATHLTHWorkoutDraftRecoveryPolicy.canRestorePlanDraft(
+                  storedVersion: saved.version,
+                  currentVersion: expectedPlanVersion,
+                  hasActualWorkout: hasWorkoutContent
+              ) else { return }
         draft = saved.workout
         scheduled = saved.scheduled
         clockTime = saved.startTime
@@ -716,6 +729,9 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                 guard !localDraftReady else { return }
                 restoreLocalDraft()
                 localDraftReady = true
+                // Preserve an opened editor even if the app is terminated
+                // before a subsequent change or scene-phase callback.
+                persistLocalDraft()
                 if (initialQuickAdd != nil || initialFocusedBlockIndex != nil) &&
                     !didLaunchQuickComposer {
                     didLaunchQuickComposer = true
@@ -869,6 +885,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                         nextDraft.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
                         draft = nextDraft
                         durationWasEditedManually = wasManual
+                        persistLocalDraft()
                         return true
                     }
                 )
@@ -907,6 +924,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     draft.runningWorkouts = template.runningWorkouts
                     draft.spotifyPlaylist = template.spotifyPlaylist
                     draft.spotifyAutoplayOnStart = template.spotifyAutoplayOnStart
+                    persistLocalDraft()
                     showSharedWorkoutTemplates = false
                 }
             }
@@ -917,6 +935,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                             draft.runningWorkout = template
                             draft.runningWorkouts = [template]
                             draft.title = template.title
+                            persistLocalDraft()
                             showRunningTemplates = false
                         } label: {
                             VStack(alignment: .leading, spacing: 4) {
