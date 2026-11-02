@@ -1494,9 +1494,10 @@ struct WorkoutTemplateLibraryView: View {
                                             .frame(width: 36, height: 36)
                                             .background(ATHLTHTheme.accentSoft, in: Circle())
                                         VStack(alignment: .leading, spacing: 3) {
-                                            Text(workout.title)
+                                            Text(ATHLTHLibraryName.workoutCard(workout.title, grid: false))
                                                 .font(.subheadline.weight(.semibold))
                                                 .foregroundStyle(ATHLTHPlanDesign.ink)
+                                                .accessibilityLabel(workout.title)
                                             Text(workout.kind.title)
                                                 .font(.caption)
                                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -1554,8 +1555,9 @@ struct WorkoutTemplateLibraryView: View {
                                 } else {
                                 HStack(spacing: 10) {
                                     Image(systemName: workout.kind.systemImage)
-                                    Text(workout.title)
+                                    Text(ATHLTHLibraryName.workoutCard(workout.title, grid: false))
                                         .font(.subheadline.weight(.semibold))
+                                        .accessibilityLabel(workout.title)
                                     Spacer()
                                     Image(systemName: "plus.circle.fill")
                                 }
@@ -2202,10 +2204,11 @@ struct WorkoutTemplateLibraryView: View {
                 .frame(width: 44, height: 44)
                 .background(ATHLTHTheme.accentSoft,
                             in: RoundedRectangle(cornerRadius: 13))
-            Text(title)
+            Text(ATHLTHLibraryName.workoutCard(title, grid: true))
                 .font(.subheadline.weight(.semibold))
-                .lineLimit(3)
+                .lineLimit(2)
                 .truncationMode(.tail)
+                .accessibilityLabel(title)
                 .multilineTextAlignment(.leading)
                 .foregroundStyle(ATHLTHPlanDesign.ink)
             Text(subtitle)
@@ -2241,11 +2244,12 @@ struct WorkoutTemplateLibraryView: View {
                     .tracking(1.4)
                     .foregroundStyle(workoutTint(entry))
 
-                Text(entry.title)
+                Text(ATHLTHLibraryName.workoutCard(entry.title, grid: false))
                     .font(.headline)
                     .foregroundStyle(
                         ATHLTHTheme.primaryText
                     )
+                    .accessibilityLabel(entry.title)
                     .multilineTextAlignment(.leading)
 
                 Text(entry.summary)
@@ -2331,9 +2335,10 @@ struct WorkoutTemplateLibraryView: View {
                     .tracking(1.4)
                     .foregroundStyle(ATHLTHTheme.vitality)
 
-                Text(workout.title)
+                Text(ATHLTHLibraryName.workoutCard(workout.title, grid: false))
                     .font(.headline)
                     .foregroundStyle(ATHLTHTheme.primaryText)
+                    .accessibilityLabel(workout.title)
                     .multilineTextAlignment(.leading)
 
                 Text(workout.summary)
