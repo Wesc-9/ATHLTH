@@ -2025,28 +2025,10 @@ if session.currentRole.canAccessControlCenter {
     }
 
     private var notificationSummary: String {
-        switch notifications.authorizationStatus {
-        case .authorized, .provisional, .ephemeral:
-            return ATHLTHLocalization.choose(
-                english: "System notifications allowed · choose what ATHLTH sends",
-                norwegian: "Systemvarsler tillatt · velg hva ATHLTH skal sende"
-            )
-        case .denied:
-            return ATHLTHLocalization.choose(
-                english: "System notifications are disabled in iOS Settings",
-                norwegian: "Systemvarsler er deaktivert i iOS-innstillinger"
-            )
-        case .notDetermined:
-            return ATHLTHLocalization.choose(
-                english: "System notification permission has not been requested",
-                norwegian: "Tillatelse til systemvarsler er ikke forespurt"
-            )
-        @unknown default:
-            return ATHLTHLocalization.choose(
-                english: "Review notification preferences",
-                norwegian: "Se gjennom varslingsinnstillingene"
-            )
-        }
+        ATHLTHLocalization.choose(
+            english: "Reminders, workouts and community",
+            norwegian: "Påminnelser, trening og fellesskap"
+        )
     }
 
     private var healthSyncHasIssue: Bool {
@@ -3867,169 +3849,131 @@ private struct ATHLTHNotificationSettingsView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
-    @ObservedObject private var push =
-        APNsPushManager.shared
+    @ObservedObject private var push = APNsPushManager.shared
 
     var body: some View {
         Form {
-            Section("System permission") {
-                LabeledContent("iOS notifications", value: authorizationTitle)
-
-                switch notifications.authorizationStatus {
-                case .notDetermined:
-                    Button("Allow Notifications") {
-                        Task {
-                            await notifications.requestSystemNotificationPermission()
-                        }
-                    }
-                case .denied:
-                    Button("Open iOS Notification Settings") {
-                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
-                            openURL(url)
-                        }
-                    }
-                default:
-                    EmptyView()
-                }
-            }
-
-            Section(
-                ATHLTHLocalization.choose(
-                    english: "Push status",
-                    norwegian: "Push-status"
-                )
-            ) {
-                LabeledContent(
+            Section {
+                Toggle(
                     ATHLTHLocalization.choose(
-                        english: "APNs token",
-                        norwegian: "APNs-token"
+                        english: "Daily check-in",
+                        norwegian: "Daglig innsjekk"
                     ),
-                    value:
-                        push.hasDeviceToken
-                            ? ATHLTHLocalization.choose(
-                                english: "Received",
-                                norwegian: "Mottatt"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Missing",
-                                norwegian: "Mangler"
-                            )
+                    isOn: $settings.dailyCheckInRemindersEnabled
                 )
 
-                LabeledContent(
-                    ATHLTHLocalization.choose(
-                        english: "iOS registration",
-                        norwegian: "iOS-registrering"
-                    ),
-                    value:
-                        push.isSystemRegistered
-                            ? ATHLTHLocalization.choose(
-                                english: "Registered",
-                                norwegian: "Registrert"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Not registered",
-                                norwegian: "Ikke registrert"
-                            )
-                )
-
-                LabeledContent(
-                    ATHLTHLocalization.choose(
-                        english: "ATHLTH backend",
-                        norwegian: "ATHLTH-backend"
-                    ),
-                    value:
-                        push.isRegisteredWithBackend
-                            ? ATHLTHLocalization.choose(
-                                english: "Registered",
-                                norwegian: "Registrert"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Missing",
-                                norwegian: "Mangler"
-                            )
-                )
-
-                LabeledContent(
-                    ATHLTHLocalization.choose(
-                        english: "APNs environment",
-                        norwegian: "APNs-miljø"
-                    ),
-                    value: push.environmentLabel
-                )
-
-                if let error =
-                        push.lastRegistrationError,
-                   !error.isEmpty {
-                    Text(error)
-                        .font(.caption)
-                        .foregroundStyle(.red)
-                }
-
-                Button(
-                    ATHLTHLocalization.choose(
-                        english: "Repair push registration",
-                        norwegian: "Reparer push-registrering"
-                    )
-                ) {
-                    Task {
-                        await push
-                            .repairRegistrationIfAuthorized()
-                        await push
-                            .refreshBackendRegistrationStatus()
-                    }
-                }
-            }
-
-            Section(ATHLTHLocalization.choose(
-                english: "Daily Insights check-in", norwegian: "Daglig innsjekk")) {
-                Toggle(isOn: $settings.dailyCheckInRemindersEnabled) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Daily check-in reminder",
-                            norwegian: "Daglig påminnelse om innsjekk"))
-                        Text(ATHLTHLocalization.choose(
-                            english: "One reminder in Activity plus a local iPhone notification at 09:00 if you have not checked in. Turn off here at any time.",
-                            norwegian: "Én påminnelse i Aktivitet og et lokalt iPhone-varsel kl. 09.00 hvis du ikke har sjekket inn. Kan slås av her."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                if settings.dailyCheckInRemindersEnabled {
+                // Permission is only surfaced when the user needs to act.
+                // Keep APNs registration/repair running independently.
+                if hasEnabledAlerts {
                     if notifications.authorizationStatus == .notDetermined {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Enable iPhone notifications",
-                            norwegian: "Aktiver iPhone-varsler"
-                        )) {
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Enable iPhone notifications",
+                                norwegian: "Aktiver iPhone-varsler"
+                            )
+                        ) {
                             Task {
                                 await notifications.requestSystemNotificationPermission()
                             }
                         }
                     } else if notifications.authorizationStatus == .denied {
-                        Text(ATHLTHLocalization.choose(
-                            english: "iPhone notifications are disabled for ATHLTH in iOS Settings. The reminder will still appear in Activity.",
-                            norwegian: "iPhone-varsler for ATHLTH er deaktivert i iOS-innstillinger. Påminnelsen vises fortsatt i Aktivitet."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Enable notifications in iOS Settings",
+                                norwegian: "Aktiver varsler i iOS-innstillinger"
+                            )
+                        ) {
+                            if let url = URL(
+                                string: UIApplication.openNotificationSettingsURLString
+                            ) {
+                                openURL(url)
+                            }
+                        }
                     }
                 }
+            } header: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Reminders",
+                        norwegian: "Påminnelser"
+                    )
+                )
+            } footer: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "A reminder at 09:00 if you have not checked in. The reminder can also appear in Activity.",
+                        norwegian: "Påminnelse kl. 09.00 hvis du ikke har sjekket inn. Den kan også vises i Aktivitet."
+                    )
+                )
             }
 
-            Section("ATHLTH alerts") {
-                Toggle("Workout updates", isOn: $settings.workoutRemindersEnabled)
-                Toggle("Friend activity", isOn: $settings.friendActivityNotificationsEnabled)
-                Toggle("Challenges", isOn: $settings.challengeNotificationsEnabled)
-                Toggle("Messages", isOn: $settings.messageNotificationsEnabled)
-                Toggle("Mentions", isOn: $settings.mentionNotificationsEnabled)
+            Section(
+                ATHLTHLocalization.choose(
+                    english: "Training",
+                    norwegian: "Trening"
+                )
+            ) {
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Workout updates",
+                        norwegian: "Øktoppdateringer"
+                    ),
+                    isOn: $settings.workoutRemindersEnabled
+                )
+            }
 
-                Text("These switches control system alerts. Events can still appear in the ATHLTH notification center so you do not lose your activity history.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            Section {
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Friend activity",
+                        norwegian: "Venneaktivitet"
+                    ),
+                    isOn: $settings.friendActivityNotificationsEnabled
+                )
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Challenges",
+                        norwegian: "Utfordringer"
+                    ),
+                    isOn: $settings.challengeNotificationsEnabled
+                )
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Messages",
+                        norwegian: "Meldinger"
+                    ),
+                    isOn: $settings.messageNotificationsEnabled
+                )
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Mentions",
+                        norwegian: "Omtaler"
+                    ),
+                    isOn: $settings.mentionNotificationsEnabled
+                )
+            } header: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Community",
+                        norwegian: "Fellesskap"
+                    )
+                )
+            } footer: {
+                Text(
+                    ATHLTHLocalization.choose(
+                        english: "Choose which alerts appear on your iPhone. Activity remains available in ATHLTH.",
+                        norwegian: "Velg hvilke varsler du får på iPhone. Aktiviteten er fortsatt tilgjengelig i ATHLTH."
+                    )
+                )
             }
         }
         .athlthBrandedForm()
-        .navigationTitle("Notifications")
+        .navigationTitle(
+            ATHLTHLocalization.choose(
+                english: "Notifications",
+                norwegian: "Varsler"
+            )
+        )
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: notifications.authorizationStatus) { _, _ in
             notifications.reconcileDailyCheckIn(
@@ -4041,10 +3985,8 @@ private struct ATHLTHNotificationSettingsView: View {
         .task {
             await notifications.refreshAuthorizationStatus()
             await notifications.reconcileSystemPreferences()
-            await push
-                .repairRegistrationIfAuthorized()
-            await push
-                .refreshBackendRegistrationStatus()
+            await push.repairRegistrationIfAuthorized()
+            await push.refreshBackendRegistrationStatus()
         }
         .onChange(of: settings.challengeNotificationsEnabled) { _, _ in
             Task {
@@ -4053,38 +3995,12 @@ private struct ATHLTHNotificationSettingsView: View {
         }
     }
 
-    private var authorizationTitle: String {
-        switch notifications.authorizationStatus {
-        case .notDetermined:
-            return ATHLTHLocalization.choose(
-                english: "Not requested",
-                norwegian: "Ikke forespurt"
-            )
-        case .denied:
-            return ATHLTHLocalization.choose(
-                english: "Disabled",
-                norwegian: "Deaktivert"
-            )
-        case .authorized:
-            return ATHLTHLocalization.choose(
-                english: "Allowed",
-                norwegian: "Tillatt"
-            )
-        case .provisional:
-            return ATHLTHLocalization.choose(
-                english: "Provisional",
-                norwegian: "Midlertidig tillatt"
-            )
-        case .ephemeral:
-            return ATHLTHLocalization.choose(
-                english: "Temporary",
-                norwegian: "Midlertidig"
-            )
-        @unknown default:
-            return ATHLTHLocalization.choose(
-                english: "Unknown",
-                norwegian: "Ukjent"
-            )
-        }
+    private var hasEnabledAlerts: Bool {
+        settings.dailyCheckInRemindersEnabled ||
+        settings.workoutRemindersEnabled ||
+        settings.friendActivityNotificationsEnabled ||
+        settings.challengeNotificationsEnabled ||
+        settings.messageNotificationsEnabled ||
+        settings.mentionNotificationsEnabled
     }
 }
