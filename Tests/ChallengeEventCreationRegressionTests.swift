@@ -39,7 +39,7 @@ final class ChallengeEventCreationRegressionTests:
             ATHLTHChallengePreviewPeople.label(
                 creatorName: "Stian", invitedNames: ["Malin"]
             ),
-            "2 · Stian + Malin"
+            "2 · Stian vs Malin"
         )
     }
 
@@ -149,6 +149,47 @@ final class ChallengeEventCreationRegressionTests:
         XCTAssertFalse(
             resolved.hasPrefix(" ")
         )
+    }
+
+    func testDuelAutomaticTitleUsesUsernamesInsteadOfDisplayNames() {
+        let result = ChallengeCreationPolicy.resolvedTitle(
+            "",
+            sport: .running,
+            scoring: .fastestDistance,
+            creatorName: "Stian Johansen",
+            invitedNames: ["Stian Test"],
+            creatorUsername: "stianj",
+            invitedUsernames: ["stian_test"]
+        )
+        XCTAssertEqual(result, "stianj vs stian_test")
+        XCTAssertFalse(result.contains("Raskest"))
+        XCTAssertFalse(result.contains("Johansen"))
+    }
+
+    func testManualChallengeTitleStillOverridesUsernameFormat() {
+        let result = ChallengeCreationPolicy.resolvedTitle(
+            "  Morgenløp  ",
+            sport: .running,
+            scoring: .fastestDistance,
+            creatorName: "Fullt navn",
+            invitedNames: ["Testnavn"],
+            creatorUsername: "runner1",
+            invitedUsernames: ["runner2"]
+        )
+        XCTAssertEqual(result, "Morgenløp")
+    }
+
+    func testChallengeTitleFallsBackWhenUsernameNotSet() {
+        let result = ChallengeCreationPolicy.resolvedTitle(
+            " ",
+            sport: .running,
+            scoring: .fastestDistance,
+            creatorName: "Løper 1",
+            invitedNames: ["Løper 2"],
+            creatorUsername: "",
+            invitedUsernames: [nil]
+        )
+        XCTAssertEqual(result, "Løper 1 vs Løper 2")
     }
 
     func testPublicChallengeDoesNotRequireDirectInvite() {
