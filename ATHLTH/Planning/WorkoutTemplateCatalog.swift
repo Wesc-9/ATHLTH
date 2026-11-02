@@ -745,17 +745,17 @@ struct WorkoutTemplateLibraryView: View {
     @State private var selectedRunningType: RunningWorkoutType?
     @State private var selectedRunningDuration:
         ATHLTHWorkoutDiscoveryFilter.Duration = .any
-    @State private var selectedDiscoverySort: DiscoverySort = .recommended
+    @State private var selectedDiscoverySort: DiscoverySort = .alphabetical
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var libraryViewWidth: CGFloat = 390
 
     private enum DiscoverySort: String, CaseIterable, Identifiable {
-        case recommended, shortest, longest
+        case alphabetical, shortest, longest
         var id: String { rawValue }
         var title: String {
             switch self {
-            case .recommended: return ATHLTHLocalization.choose(
-                english: "Default order", norwegian: "Standard"
+            case .alphabetical: return ATHLTHLocalization.choose(
+                english: "Alphabetical (A–Z)", norwegian: "Alfabetisk (A–Å)"
             )
             case .shortest: return ATHLTHLocalization.choose(
                 english: "Shortest first", norwegian: "Kortest først"
@@ -948,7 +948,7 @@ struct WorkoutTemplateLibraryView: View {
     private func clearStrengthFilters() {
         selectedStrengthMuscles.removeAll()
         selectedWorkoutLevel = "all"
-        selectedDiscoverySort = .recommended
+        selectedDiscoverySort = .alphabetical
     }
 
     private var discoveryFilter: ATHLTHWorkoutDiscoveryFilter {
@@ -966,23 +966,43 @@ struct WorkoutTemplateLibraryView: View {
         !selectedStrengthMuscles.isEmpty ||
         selectedRunningType != nil ||
         selectedRunningDuration != .any ||
-        selectedDiscoverySort != .recommended ||
+        selectedDiscoverySort != .alphabetical ||
         (initialCategory == .strength && selectedWorkoutLevel != "all")
     }
 
+    /// Apply the same Norwegian A–Å order to saved, scheduled, catalog and
+    /// running workouts. Duration modes retain alphabetical tie-breaking.
     private func discoverySorted<T>(
-        _ items: [T], durationMinutes: (T) -> Double?
+        _ items: [T],
+        title: (T) -> String,
+        durationMinutes: (T) -> Double?
     ) -> [T] {
+        let alphabetized = items.sorted {
+            title($0).compare(
+                title($1),
+                options: [.caseInsensitive, .numeric],
+                locale: ATHLTHExerciseAlphabet.locale
+            ) == .orderedAscending
+        }
         guard initialCategory != nil,
-              selectedDiscoverySort != .recommended else { return items }
-        return items.enumerated().sorted { lhs, rhs in
-            let a = durationMinutes(lhs.element)
-            let b = durationMinutes(rhs.element)
-            guard let a else { return false }
-            guard let b else { return true }
-            if a == b { return lhs.offset < rhs.offset }
-            return selectedDiscoverySort == .shortest ? a < b : a > b
-        }.map { $0.element }
+              selectedDiscoverySort != .alphabetical else {
+            return alphabetized
+        }
+        return alphabetized.enumerated().sorted { lhs, rhs in
+            let left = durationMinutes(lhs.element)
+            let right = durationMinutes(rhs.element)
+            switch (left, right) {
+            case (nil, nil):
+                return lhs.offset < rhs.offset
+            case (nil, _):
+                return false
+            case (_, nil):
+                return true
+            case (let a?, let b?):
+                if a == b { return lhs.offset < rhs.offset }
+                return selectedDiscoverySort == .shortest ? a < b : a > b
+            }
+        }.map(\.element)
     }
 
     private func focusName(_ focus: String) -> String {
@@ -1053,7 +1073,7 @@ struct WorkoutTemplateLibraryView: View {
             )
             return favoriteMatches && searchMatches
         }
-        return discoverySorted(matching) {
+        return discoverySorted(matching, title: { $0.title }) {
             $0.estimatedDurationSeconds.map { $0 / 60 }
         }
     }
@@ -1088,7 +1108,7 @@ struct WorkoutTemplateLibraryView: View {
                 favoriteMatches &&
                 searchMatches && muscleMatches && levelMatches(entry)
         }
-        return discoverySorted(matching) {
+        return discoverySorted(matching, title: { $0.title }) {
             $0.estimatedDurationMinutes.map(Double.init)
         }
     }
@@ -1123,7 +1143,7 @@ struct WorkoutTemplateLibraryView: View {
                 clean, texts: [workout.title, workout.notes ?? ""]
             ) && matchesCategory
         }
-        return discoverySorted(matching) {
+        return discoverySorted(matching, title: { $0.title }) {
             $0.durationMinutes.map(Double.init)
         }
     }
@@ -1171,12 +1191,38 @@ struct WorkoutTemplateLibraryView: View {
             ($0.scheduledStart ?? .distantPast) >
             ($1.scheduledStart ?? .distantPast)
         }
-        return discoverySorted(matching) {
+        return discoverySorted(matching, title: { $0.title }) {
             $0.durationMinutes.map(Double.init)
         }
     }
 
+    /// First visible item for each letter, respecting active search and
+    /// workout filters. IDs are the stable row IDs used by ScrollViewReader.
+    private var workoutAlphabetTargets: [String: UUID] {
+        var targets: [String: UUID] = [:]
+        func register(_ title: String, id: UUID) {
+            let letter = ATHLTHExerciseAlphabet.letter(for: title)
+            if targets[letter] == nil { targets[letter] = id }
+        }
+        if onSelectPlanned != nil {
+            for workout in filteredScheduledWorkouts.prefix(50) {
+                register(workout.title, id: workout.id)
+            }
+            for workout in filteredSavedWorkouts {
+                register(workout.title, id: workout.id)
+            }
+        }
+        for entry in filteredEntries {
+            register(entry.title, id: entry.id)
+        }
+        for workout in filteredRunningTemplates {
+            register(workout.title, id: workout.id)
+        }
+        return targets
+    }
+
     var body: some View {
+        ScrollViewReader { proxy in
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 // Run library filters are enough context; keep hero cards elsewhere.
@@ -1412,6 +1458,7 @@ struct WorkoutTemplateLibraryView: View {
                     .font(.headline)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(filteredScheduledWorkouts.prefix(50)) { workout in
+                        Group {
                         if initialCategory != nil && displayMode == .list {
                             ATHLTHWorkoutLibraryExpandableCard(
                                 workout: workout,
@@ -1433,6 +1480,13 @@ struct WorkoutTemplateLibraryView: View {
                                     onSelectPlanned?(workout)
                                 }
                             } label: {
+                                if displayMode == .grid {
+                                    workoutGridCard(
+                                        title: workout.title,
+                                        subtitle: workout.kind.title,
+                                        symbol: workout.kind.systemImage
+                                    )
+                                } else {
                                 VStack(alignment: .leading, spacing: 10) {
                                     HStack(spacing: 12) {
                                         Image(systemName: workout.kind.systemImage)
@@ -1454,9 +1508,12 @@ struct WorkoutTemplateLibraryView: View {
                                 }
                                 .padding(14)
                                 .background(.white, in: RoundedRectangle(cornerRadius: 17))
+                                }
                             }
                             .buttonStyle(.plain)
                         }
+                                            }
+                        .id(workout.id)
                     }
                     }
                 }
@@ -1466,6 +1523,7 @@ struct WorkoutTemplateLibraryView: View {
                         .font(.headline)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(filteredSavedWorkouts) { workout in
+                        Group {
                         if initialCategory != nil && displayMode == .list {
                             ATHLTHWorkoutLibraryExpandableCard(
                                 workout: workout,
@@ -1487,6 +1545,13 @@ struct WorkoutTemplateLibraryView: View {
                                     onSelectPlanned?(workout)
                                 }
                             } label: {
+                                if displayMode == .grid {
+                                    workoutGridCard(
+                                        title: workout.title,
+                                        subtitle: workout.kind.title,
+                                        symbol: workout.kind.systemImage
+                                    )
+                                } else {
                                 HStack(spacing: 10) {
                                     Image(systemName: workout.kind.systemImage)
                                     Text(workout.title)
@@ -1497,9 +1562,12 @@ struct WorkoutTemplateLibraryView: View {
                                 .foregroundStyle(ATHLTHPlanDesign.ink)
                                 .padding(15)
                                 .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                                }
                             }
                             .buttonStyle(.plain)
                         }
+                                            }
+                        .id(workout.id)
                     }
                     }
                 }
@@ -1527,7 +1595,7 @@ struct WorkoutTemplateLibraryView: View {
                                 selectedRunningType = nil
                                 selectedRunningDuration = .any
                                 selectedWorkoutLevel = "all"
-                                selectedDiscoverySort = .recommended
+                                selectedDiscoverySort = .alphabetical
                             }
                             .buttonStyle(.borderedProminent)
                             .tint(ATHLTHTheme.accentDeep)
@@ -1537,6 +1605,7 @@ struct WorkoutTemplateLibraryView: View {
                 } else {
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
                     ForEach(filteredEntries) { entry in
+                        Group {
                         if initialCategory != nil && displayMode == .list,
                            onSelectPlanned != nil {
                             ATHLTHWorkoutLibraryExpandableCard(
@@ -1618,9 +1687,12 @@ struct WorkoutTemplateLibraryView: View {
                             .padding(12)
                         }
                         }
+                                            }
+                        .id(entry.id)
                     }
 
                     ForEach(filteredRunningTemplates) { workout in
+                        Group {
                         if initialCategory != nil && displayMode == .list,
                            onSelectPlanned != nil {
                             ATHLTHWorkoutLibraryExpandableCard(
@@ -1702,13 +1774,27 @@ struct WorkoutTemplateLibraryView: View {
                             .padding(12)
                         }
                         }
+                                            }
+                        .id(workout.id)
                     }
                     }
                 }
             }
-            .padding(18)
+            .padding(.leading, 18)
+            .padding(.trailing, initialCategory == nil ? 18 : 42)
+            .padding(.vertical, 18)
             .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
+        }
+        .overlay(alignment: .trailing) {
+            if initialCategory != nil && !workoutAlphabetTargets.isEmpty {
+                ATHLTHExerciseAlphabetIndex(targets: workoutAlphabetTargets) { target in
+                    withAnimation(.easeInOut(duration: 0.22)) {
+                        proxy.scrollTo(target, anchor: .top)
+                    }
+                }
+                .padding(.trailing, 6)
+            }
         }
         .background(
             ATHLTHPremiumCanvas(
@@ -1869,6 +1955,7 @@ struct WorkoutTemplateLibraryView: View {
                 favoriteRefresh
             )
         }
+        }
     }
 
     /// Extra strength filters stay on one small toolbar; muscle selection
@@ -1971,7 +2058,7 @@ struct WorkoutTemplateLibraryView: View {
                         selectedRunningType = nil
                         selectedRunningDuration = .any
                         selectedWorkoutLevel = "all"
-                        selectedDiscoverySort = .recommended
+                        selectedDiscoverySort = .alphabetical
                     }
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -2073,8 +2160,9 @@ struct WorkoutTemplateLibraryView: View {
         ATHLTHLibraryGridColumns.make(
             mode: displayMode,
             width: libraryViewWidth,
-            reservedHorizontalSpace: 36,
-            accessibilityText: dynamicTypeSize.isAccessibilitySize
+            reservedHorizontalSpace: initialCategory == nil ? 36 : 60,
+            accessibilityText: dynamicTypeSize.isAccessibilitySize,
+            preferredMinimumCardWidth: 145
         )
     }
 
@@ -2116,7 +2204,9 @@ struct WorkoutTemplateLibraryView: View {
                             in: RoundedRectangle(cornerRadius: 13))
             Text(title)
                 .font(.subheadline.weight(.semibold))
-                .lineLimit(2)
+                .lineLimit(3)
+                .truncationMode(.tail)
+                .multilineTextAlignment(.leading)
                 .foregroundStyle(ATHLTHPlanDesign.ink)
             Text(subtitle)
                 .font(.caption)
