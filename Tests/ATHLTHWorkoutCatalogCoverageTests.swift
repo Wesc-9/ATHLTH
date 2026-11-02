@@ -57,4 +57,59 @@ final class ATHLTHWorkoutCatalogCoverageTests: XCTestCase {
         let second = ATHLTHCuratedStrengthWorkouts.entries.map(\.id)
         XCTAssertEqual(first, second)
     }
+
+    @MainActor
+    func testEveryExistingBuiltInRunningWorkoutHasVisiblePreviewSteps() {
+        for source in RunningWorkoutLibraryStore.builtInTemplates {
+            let workout = source.plannedSession()
+            let steps = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+            XCTAssertFalse(steps.isEmpty, source.title)
+            XCTAssertEqual(
+                steps.map(\.sequence),
+                Array(1...steps.count),
+                "Step order must remain chronological: \(source.title)"
+            )
+            XCTAssertEqual(
+                steps.count,
+                source.recipePreviewBlocks.count,
+                "Workout preview must include actual running reps and rests: \(source.title)"
+            )
+        }
+    }
+
+    @MainActor
+    func testThirtyThirtyTwentyRepsShowsWarmupNineteenPausesAndCooldown() throws {
+        let source = try XCTUnwrap(
+            RunningWorkoutLibraryStore.builtInTemplates.first {
+                $0.title == "30/30 – 20 drag"
+            }
+        )
+        let workout = source.plannedSession()
+        // This is the exact source that previously showed an empty preview,
+        // even though the template already contained a complete interval recipe.
+        XCTAssertTrue(workout.resolvedWorkoutBlocks.isEmpty)
+        let steps = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+        XCTAssertEqual(steps.count, 41)
+        XCTAssertEqual(steps.first?.resolvedPhase, .warmup)
+        XCTAssertEqual(steps.last?.resolvedPhase, .cooldown)
+        let rests = steps.filter { $0.title == "Pause" || $0.title == "Recovery" }
+        XCTAssertEqual(rests.count, 19)
+        XCTAssertEqual(
+            steps.filter { $0.title.contains("30 sek raskt") }.count, 20
+        )
+        XCTAssertFalse(steps[steps.count - 2].title == "Pause")
+        let seconds = steps.compactMap(\.durationSeconds).reduce(0, +)
+        XCTAssertEqual(seconds, 2_490, accuracy: 0.001)
+        XCTAssertEqual(source.blocks.count, 3, "Source template must stay unchanged")
+    }
+
+    @MainActor
+    func testAllCurrentCatalogRecipesAlsoShowOriginalExerciseSteps() {
+        for entry in WorkoutTemplateCatalogEntry.bundledCatalog {
+            let workout = entry.plannedSession()
+            let steps = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+            XCTAssertEqual(steps, entry.blocks, entry.slug)
+        }
+    }
+
 }
