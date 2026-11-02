@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// ScrollView-compatible native-feeling swipe to reveal Delete.
-/// Drag begins on the separate grip, so horizontal swipes never reorder steps.
+/// A workout step with a dedicated drag handle and a reliable options menu.
+/// Editing and deletion are separate actions: horizontal scrolling never
+/// reveals an offscreen button or interferes with the workout's timeline.
 struct ATHLTHPlannedWorkoutStepRow: View {
     let block: WorkoutTemplateBlock
     let position: Int
@@ -12,15 +13,6 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     let onMoveBy: (Int) -> Void
     let onBeginDrag: () -> NSItemProvider
 
-    @State private var deleteRevealed = false
-    @State private var swipeTranslation: CGFloat = 0
-
-    private let deleteWidth: CGFloat = 72
-    private var rowOffset: CGFloat {
-        max(-deleteWidth, min(0,
-            (deleteRevealed ? -deleteWidth : 0) + swipeTranslation
-        ))
-    }
     private var isPause: Bool { block.isRestOrActiveRecovery }
 
     var body: some View {
@@ -45,31 +37,8 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                     if canMoveDown { onMoveBy(1) }
                 }
 
-            ZStack(alignment: .trailing) {
-                Button(role: .destructive) {
-                    deleteRevealed = false
-                    onDelete()
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Delete step", norwegian: "Slett deløkt"
-                    ), systemImage: "trash")
-                    .labelStyle(.iconOnly)
-                    .font(.body)
-                    .foregroundStyle(.white)
-                    .frame(width: deleteWidth, height: 49)
-                    .background(Color.red.opacity(0.88),
-                                in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                .accessibilityHidden(!deleteRevealed)
-
-                Button {
-                    if deleteRevealed {
-                        withAnimation(.easeOut(duration: 0.18)) { deleteRevealed = false }
-                    } else {
-                        onEdit()
-                    }
-                } label: {
+            HStack(spacing: 0) {
+                Button(action: onEdit) {
                     HStack(spacing: 8) {
                         Text("\(position)")
                             .font(.caption.weight(.semibold))
@@ -97,51 +66,48 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHTrainDesign.bronze)
                             .frame(minWidth: 26)
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(.secondary)
                     }
-                    .padding(.horizontal, 9)
-                    .frame(minHeight: 49)
-                    .background(
-                        isPause ? ATHLTHPlanDesign.warmSurface.opacity(0.56)
-                            : ATHLTHPlanDesign.canvas,
-                        in: RoundedRectangle(cornerRadius: 12)
-                    )
-                    .contentShape(RoundedRectangle(cornerRadius: 12))
+                    .padding(.leading, 9)
+                    .padding(.trailing, 4)
+                    .frame(maxWidth: .infinity, minHeight: 49)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .offset(x: rowOffset)
                 .accessibilityHint(ATHLTHLocalization.choose(
-                    english: "Edit details; swipe left for Delete",
-                    norwegian: "Rediger detaljer. Sveip mot venstre for å slette."
+                    english: "Edit step details; use the options menu to delete",
+                    norwegian: "Rediger deløkten. Bruk menyen med tre prikker for å slette."
                 ))
-                .accessibilityAction(named: Text(ATHLTHLocalization.choose(
-                    english: "Delete step", norwegian: "Slett deløkt"
-                )), onDelete)
+
+                Menu {
+                    Button(action: onEdit) {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Edit step", norwegian: "Rediger deløkt"
+                        ), systemImage: "pencil")
+                    }
+                    Divider()
+                    Button(role: .destructive, action: onDelete) {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Delete step", norwegian: "Slett deløkt"
+                        ), systemImage: "trash")
+                    }
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Step options", norwegian: "Alternativer for deløkt"
+                    ), systemImage: "ellipsis")
+                    .labelStyle(.iconOnly)
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .frame(width: 44, height: 49)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
-            .frame(maxWidth: .infinity, minHeight: 49)
-            .clipped()
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 15)
-                    .onChanged { value in
-                        guard abs(value.translation.width) >
-                              abs(value.translation.height) * 1.2 else { return }
-                        swipeTranslation = value.translation.width
-                    }
-                    .onEnded { value in
-                        let horizontal = abs(value.translation.width) >
-                            abs(value.translation.height) * 1.2
-                        withAnimation(.easeOut(duration: 0.18)) {
-                            if horizontal {
-                                deleteRevealed = deleteRevealed
-                                    ? value.translation.width < 35
-                                    : value.translation.width < -38
-                            }
-                            swipeTranslation = 0
-                        }
-                    }
+            .background(
+                isPause ? ATHLTHPlanDesign.warmSurface.opacity(0.56)
+                    : ATHLTHPlanDesign.canvas,
+                in: RoundedRectangle(cornerRadius: 12)
             )
+            .frame(maxWidth: .infinity, minHeight: 49)
         }
     }
 }
