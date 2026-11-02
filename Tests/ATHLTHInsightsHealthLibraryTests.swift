@@ -203,4 +203,45 @@ final class ATHLTHInsightsHealthLibraryTests: XCTestCase {
         XCTAssertTrue(calculated.isEstimated)
     }
 
+
+    func testTrainingSignalsUseOnlyRealRecentMeasurements() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let recent = calendar.date(
+            byAdding: .day, value: -3, to: calendar.startOfDay(for: now)
+        )!
+        let older = calendar.date(
+            byAdding: .day, value: -40, to: calendar.startOfDay(for: now)
+        )!
+        let future = calendar.date(
+            byAdding: .day, value: 1, to: calendar.startOfDay(for: now)
+        )!
+        let readings = [
+            ATHLTHInsightHealthDay(date: older, value: 270),
+            ATHLTHInsightHealthDay(date: recent, value: 255),
+            ATHLTHInsightHealthDay(date: future, value: 280)
+        ]
+        let actual = ATHLTHInsightsTrainingSignalPolicy.latest(
+            in: readings, now: now, calendar: calendar
+        )
+        XCTAssertEqual(actual?.date, recent)
+        XCTAssertEqual(actual?.value, 255)
+    }
+
+    func testTrainingSignalMissingOrInvalidReadingsNeverBecomeScores() {
+        let calendar = Calendar(identifier: .gregorian)
+        let now = Date(timeIntervalSince1970: 1_790_000_000)
+        let today = calendar.startOfDay(for: now)
+        XCTAssertNil(ATHLTHInsightsTrainingSignalPolicy.latest(
+            in: [], now: now, calendar: calendar
+        ))
+        XCTAssertNil(ATHLTHInsightsTrainingSignalPolicy.latest(
+            in: [
+                ATHLTHInsightHealthDay(date: today, value: 0),
+                ATHLTHInsightHealthDay(date: today, value: .nan)
+            ],
+            now: now, calendar: calendar
+        ))
+    }
+
 }
