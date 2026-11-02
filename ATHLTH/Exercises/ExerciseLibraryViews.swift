@@ -1169,10 +1169,11 @@ struct ExerciseLibraryView: View {
         VStack(alignment: .leading, spacing: 8) {
             ExerciseArtwork(entry: entry, size: 64)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(library.localizedExerciseName(entry))
+            Text(ATHLTHLibraryName.exerciseCard(library.localizedExerciseName(entry), grid: true))
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ATHLTHPlanDesign.ink)
                 .lineLimit(2)
+                .accessibilityLabel(library.localizedExerciseName(entry))
                 .multilineTextAlignment(.leading)
             Text(entry.bodyPart.map(library.localizedBodyPartTitle)
                 ?? entry.category ?? "")
@@ -1203,10 +1204,11 @@ struct ExerciseLibraryView: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 6) {
-                    Text(library.localizedExerciseName(entry))
+                    Text(ATHLTHLibraryName.exerciseCard(library.localizedExerciseName(entry), grid: false))
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(2)
+                        .accessibilityLabel(library.localizedExerciseName(entry))
 
                     if entry.source == .custom {
                         Text(ATHLTHLocalization.choose(
