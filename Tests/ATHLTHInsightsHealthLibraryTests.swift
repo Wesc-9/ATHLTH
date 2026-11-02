@@ -4,8 +4,9 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHInsightsHealthLibraryTests: XCTestCase {
-    func testSixHealthAreasAndEveryMetricHasAGroup() {
-        XCTAssertEqual(ATHLTHInsightHealthArea.allCases.count, 6)
+    func testExpandedHealthAreasAndEveryMetricHasAGroup() {
+        XCTAssertEqual(ATHLTHInsightHealthArea.allCases.count, 11)
+        XCTAssertEqual(ATHLTHInsightHealthMetric.allCases.count, 74)
         XCTAssertEqual(
             Set(ATHLTHInsightHealthMetric.allCases.map(\.id)).count,
             ATHLTHInsightHealthMetric.allCases.count
@@ -57,4 +58,43 @@ final class ATHLTHInsightsHealthLibraryTests: XCTestCase {
         XCTAssertEqual(ATHLTHInsightHealthMetric.vo2Max.area, .fitness)
         XCTAssertEqual(ATHLTHInsightHealthMetric.respiratoryRate.area, .vitalSigns)
     }
+
+    func testNewMeasurementsUseRealHealthKitTypes() {
+        let expected: [ATHLTHInsightHealthMetric: HKQuantityTypeIdentifier] = [
+            .bloodPressureSystolic: .bloodPressureSystolic,
+            .bloodPressureDiastolic: .bloodPressureDiastolic,
+            .bloodGlucose: .bloodGlucose,
+            .runningPower: .runningPower,
+            .cyclingPower: .cyclingPower,
+            .walkingSteadiness: .appleWalkingSteadiness,
+            .daylightMinutes: .timeInDaylight,
+            .dietaryWater: .dietaryWater,
+            .headphoneAudioExposure: .headphoneAudioExposure
+        ]
+        for (metric, identifier) in expected {
+            XCTAssertEqual(metric.query?.identifier, identifier)
+        }
+    }
+
+    func testDailyTotalsAndMeasurementsAreNotMixed() {
+        for metric in [
+            ATHLTHInsightHealthMetric.activeEnergy,
+            .walkingRunningDistance, .exerciseMinutes, .dietaryProtein,
+            .dietaryWater, .flightsClimbed, .insulinDelivery
+        ] {
+            XCTAssertTrue(metric.cumulative, "\\(metric.id) should use a daily sum")
+        }
+        for metric in [
+            ATHLTHInsightHealthMetric.bloodGlucose,
+            .bloodPressureSystolic, .walkingSteadiness, .runningPower
+        ] {
+            XCTAssertFalse(metric.cumulative, "\\(metric.id) should not use a daily sum")
+        }
+    }
+
+    func testSignedWristTemperatureDeviationsRemainVisible() {
+        XCTAssertNotEqual(ATHLTHInsightHealthMetric.wristTemperature.formatted(-0.3), "—")
+        XCTAssertEqual(ATHLTHInsightHealthMetric.bodyTemperature.formatted(-1), "—")
+    }
+
 }
