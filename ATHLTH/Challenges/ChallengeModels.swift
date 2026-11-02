@@ -230,34 +230,52 @@ enum ChallengeCreationPolicy {
         scoring: ATHLTHChallengeScoring,
         creatorName: String,
         invitedNames: [String],
+        creatorUsername: String? = nil,
+        invitedUsernames: [String?] = [],
         scoringTitle: String? = nil
     ) -> String {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        // A manually entered title must never be overwritten.
         guard clean.isEmpty else { return String(clean.prefix(100)) }
 
-        func shortName(_ raw: String) -> String {
-            let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            return String((trimmed.isEmpty ? "ATHLTH" : trimmed).prefix(20))
+        func participantHandle(_ username: String?, fallback: String) -> String {
+            let username = (username ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+            let fallbackName = fallback.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            let resolved = username.isEmpty ? fallbackName : username
+            return String((resolved.isEmpty ? "ATHLTH" : resolved).prefix(40))
         }
 
-        let people: String
-        switch invitedNames.count {
-        case 0:
-            people = shortName(creatorName)
-        case 1:
-            people = shortName(creatorName) + " · " + shortName(invitedNames[0])
-        case 2:
-            people = shortName(creatorName) + " · " +
-                invitedNames.map(shortName).joined(separator: " · ")
-        default:
-            people = shortName(creatorName) + " + " +
-                String(invitedNames.count)
+        let creator = participantHandle(
+            creatorUsername, fallback: creatorName
+        )
+        let opponents = invitedNames.enumerated().map { index, fallback in
+            participantHandle(
+                invitedUsernames.indices.contains(index)
+                    ? invitedUsernames[index] : nil,
+                fallback: fallback
+            )
         }
-        let titlePart = (scoringTitle ?? automaticTitle(
+        // Keep sport and scoring on the separate preview badges. A direct
+        // challenge is named ONLY by the two actual athlete usernames.
+        if opponents.count == 1 {
+            return String("\(creator) vs \(opponents[0])".prefix(100))
+        }
+        if !opponents.isEmpty {
+            let rest = opponents.count == 2
+                ? opponents.joined(separator: ", ")
+                : "\(opponents[0]) +\(opponents.count - 1)"
+            return String("\(creator) vs \(rest)".prefix(100))
+        }
+
+        // Public challenges may have no challenger yet.
+        let activity = (scoringTitle ?? automaticTitle(
             sport: sport, scoring: scoring
         )).replacingOccurrences(of: " · ", with: " • ")
-        return String((titlePart + " • " +
-            people.replacingOccurrences(of: " · ", with: " • ")).prefix(120))
+        return String("\(activity) • \(creator)".prefix(100))
     }
 
     static func requiresDirectInvite(
