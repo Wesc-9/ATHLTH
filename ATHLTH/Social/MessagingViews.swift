@@ -7256,10 +7256,27 @@ struct MessageSharePicker: View {
 
     @State private var selectedKind: MessageShareKind
     @State private var exerciseCategory: ATHLTHExerciseActivity?
+    @State private var workoutActivity: WorkoutKind?
     @State private var shareError: String?
 
     private var isExerciseOnly: Bool {
         allowedKinds.count == 1 && allowedKinds[0] == .exercise
+    }
+
+    // The friend-to-friend workout flow includes both saved sessions and
+    // saved running templates; these share one activity filter without
+    // changing either attachment type.
+    private var isWorkoutSharing: Bool {
+        allowedKinds.contains(.workout) &&
+        allowedKinds.allSatisfy { $0 == .workout || $0 == .runningWorkout }
+    }
+
+    private var isPlanOnly: Bool {
+        allowedKinds.count == 1 && allowedKinds[0] == .trainingPlan
+    }
+
+    private var usesActivityFilters: Bool {
+        isExerciseOnly || isWorkoutSharing || isPlanOnly
     }
 
     private var eligibleExercises: [ExerciseLibraryEntry] {
@@ -7283,6 +7300,16 @@ struct MessageSharePicker: View {
                 english: "Share exercise", norwegian: "Del øvelse"
             )
         }
+        if isWorkoutSharing {
+            return ATHLTHLocalization.choose(
+                english: "Share workout", norwegian: "Del treningsøkt"
+            )
+        }
+        if isPlanOnly {
+            return ATHLTHLocalization.choose(
+                english: "Share training plan", norwegian: "Del treningsplan"
+            )
+        }
         return ATHLTHLocalization.choose(
             english: "Share content", norwegian: "Del innhold"
         )
@@ -7292,6 +7319,16 @@ struct MessageSharePicker: View {
         if isExerciseOnly {
             return ATHLTHLocalization.choose(
                 english: "Exercise sharing", norwegian: "Øvelsesdeling"
+            )
+        }
+        if isWorkoutSharing {
+            return ATHLTHLocalization.choose(
+                english: "Workout sharing", norwegian: "Øktdeling"
+            )
+        }
+        if isPlanOnly {
+            return ATHLTHLocalization.choose(
+                english: "Training plan sharing", norwegian: "Plandeling"
             )
         }
         return ATHLTHLocalization.choose(
@@ -7324,10 +7361,15 @@ struct MessageSharePicker: View {
                         alignment: .leading,
                         spacing: 16
                     ) {
-                        // Title now sits beside Done in the sheet's top bar.
-                        // The content starts immediately with its filters.
-                        if isExerciseOnly {
-                            exerciseActivityFilters
+                        // Titles sit next to Done; single-purpose share
+                        // screens use genuine activity filters, not a lone
+                        // redundant content-kind chip.
+                        if usesActivityFilters {
+                            if isExerciseOnly {
+                                exerciseActivityFilters
+                            } else {
+                                workoutActivityFilters
+                            }
                         } else {
                         ScrollView(
                             .horizontal,
@@ -7497,6 +7539,48 @@ struct MessageSharePicker: View {
         }
     }
 
+    private var workoutActivityFilters: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                exerciseFilterChip(
+                    title: ATHLTHLocalization.choose(
+                        english: "All", norwegian: "Alle"
+                    ),
+                    symbol: "square.grid.2x2",
+                    selected: workoutActivity == nil
+                ) {
+                    workoutActivity = nil
+                }
+                ForEach(WorkoutKind.allCases) { kind in
+                    exerciseFilterChip(
+                        title: shareWorkoutActivityTitle(kind),
+                        symbol: kind.systemImage,
+                        selected: workoutActivity == kind
+                    ) {
+                        workoutActivity = kind
+                    }
+                }
+            }
+        }
+    }
+
+    private func shareWorkoutActivityTitle(_ kind: WorkoutKind) -> String {
+        switch kind {
+        case .running:
+            return ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        case .walking:
+            return ATHLTHLocalization.choose(english: "Walking", norwegian: "Gåing")
+        case .strength:
+            return ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke")
+        case .mobility:
+            return ATHLTHLocalization.choose(english: "Mobility", norwegian: "Mobilitet")
+        case .recovery:
+            return ATHLTHLocalization.choose(english: "Recovery", norwegian: "Restitusjon")
+        case .custom:
+            return ATHLTHLocalization.choose(english: "Other", norwegian: "Annet")
+        }
+    }
+
     private func exerciseFilterChip(
         title: String,
         symbol: String,
@@ -7522,12 +7606,24 @@ struct MessageSharePicker: View {
     private var shareContent: some View {
         switch selectedKind {
         case .workout:
-            let workouts = shareableWorkouts
-            if workouts.isEmpty {
+            let workouts = isWorkoutSharing ? filteredWorkouts : shareableWorkouts
+            let runningTemplates = isWorkoutSharing ? filteredRunningTemplates : []
+            if workouts.isEmpty && runningTemplates.isEmpty {
                 ContentUnavailableView(
-                    ATHLTHLocalization.choose(english: "No saved workouts", norwegian: "Ingen lagrede økter"),
-                    systemImage: "dumbbell",
-                    description: Text(ATHLTHLocalization.choose(english: "Create and save your own workout first.", norwegian: "Opprett og lagre din egen treningsøkt først."))
+                    isWorkoutSharing && workoutActivity != nil &&
+                        (!shareableWorkouts.isEmpty || !shareableRunningTemplates.isEmpty)
+                        ? ATHLTHLocalization.choose(
+                            english: "No workouts in this activity",
+                            norwegian: "Ingen treningsøkter i denne aktiviteten"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "No saved workouts", norwegian: "Ingen lagrede økter"
+                        ),
+                    systemImage: workoutActivity?.systemImage ?? "dumbbell",
+                    description: Text(ATHLTHLocalization.choose(
+                        english: "Choose another activity, or create and save a workout first.",
+                        norwegian: "Velg en annen aktivitet, eller opprett og lagre en treningsøkt først."
+                    ))
                 )
             } else {
                 ForEach(workouts) { workout in
@@ -7546,6 +7642,17 @@ struct MessageSharePicker: View {
                         } catch {
                             shareError = error.localizedDescription
                         }
+                    }
+                }
+                // These are a different persisted model, but belong in the
+                // same running category and keep their existing safe payload.
+                ForEach(runningTemplates) { workout in
+                    shareRow(
+                        icon: "figure.run",
+                        title: workout.title,
+                        subtitle: workout.summary
+                    ) {
+                        shareRunningTemplate(workout)
                     }
                 }
             }
@@ -7600,12 +7707,22 @@ struct MessageSharePicker: View {
             }
 
         case .trainingPlan:
-            let plans = shareablePlans
+            let plans = isPlanOnly ? filteredPlans : shareablePlans
             if plans.isEmpty {
                 ContentUnavailableView(
-                    ATHLTHLocalization.choose(english: "No training plans", norwegian: "Ingen treningsplaner"),
-                    systemImage: "calendar",
-                    description: Text(ATHLTHLocalization.choose(english: "Create and save your own plan first.", norwegian: "Opprett og lagre din egen treningsplan først."))
+                    isPlanOnly && workoutActivity != nil && !shareablePlans.isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "No training plans in this activity",
+                            norwegian: "Ingen treningsplaner i denne aktiviteten"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "No training plans", norwegian: "Ingen treningsplaner"
+                        ),
+                    systemImage: workoutActivity?.systemImage ?? "calendar",
+                    description: Text(ATHLTHLocalization.choose(
+                        english: "Choose another activity, or create and save your own plan first.",
+                        norwegian: "Velg en annen aktivitet, eller opprett og lagre din egen treningsplan først."
+                    ))
                 )
             } else {
                 ForEach(plans) { plan in
@@ -7629,9 +7746,7 @@ struct MessageSharePicker: View {
             }
 
         case .runningWorkout:
-            let workouts = runningLibrary.customTemplates.filter {
-                ATHLTHPersonalSharePolicy.runningWorkout($0)
-            }
+            let workouts = shareableRunningTemplates
             if workouts.isEmpty {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(english: "No custom running workouts", norwegian: "Ingen lagrede løpeøkter"),
@@ -7645,22 +7760,7 @@ struct MessageSharePicker: View {
                         title: workout.title,
                         subtitle: workout.summary
                     ) {
-                        guard ATHLTHPersonalSharePolicy.runningWorkout(workout),
-                              runningLibrary.customTemplates.contains(where: {
-                                  $0.id == workout.id &&
-                                  ATHLTHPersonalSharePolicy.runningWorkout($0)
-                              }) else {
-                            shareError = ATHLTHDirectShareError.onlySavedPersonalContent.localizedDescription
-                            return
-                        }
-                        createDraft(
-                            kind: .runningWorkout,
-                            title: workout.title,
-                            subtitle: workout.summary,
-                            snapshot: workout,
-                            sourceObjectID: workout.sharedSourceWorkoutID ?? workout.id,
-                            sourceOwnerID: workout.sharedSourceOwnerID ?? session.profile.userID
-                        )
+                        shareRunningTemplate(workout)
                     }
                 }
             }
@@ -7751,8 +7851,59 @@ struct MessageSharePicker: View {
         )
     }
 
+    private var filteredPlans: [TrainingPlan] {
+        shareablePlans.filter { plan in
+            guard let workoutActivity else { return true }
+            let sessionKinds = plan.weeks
+                .flatMap(\.days).flatMap(\.sessions).map(\.kind)
+            // Plans may contain more than one sport, and can appear in
+            // multiple filters. Never guess from a plan's free-text title.
+            if !sessionKinds.isEmpty {
+                return sessionKinds.contains(workoutActivity)
+            }
+            return plan.builderProfile?.simpleWorkoutKinds?.contains(workoutActivity)
+                ?? false
+        }
+    }
+
     private var shareableWorkouts: [PlannedSession] {
         ATHLTHPersonalSharePolicy.savedWorkouts(session.savedWorkoutTemplates)
+    }
+
+    private var filteredWorkouts: [PlannedSession] {
+        shareableWorkouts.filter {
+            workoutActivity == nil || $0.kind == workoutActivity
+        }
+    }
+
+    private var shareableRunningTemplates: [RunningWorkoutTemplate] {
+        runningLibrary.customTemplates.filter {
+            ATHLTHPersonalSharePolicy.runningWorkout($0)
+        }
+    }
+
+    private var filteredRunningTemplates: [RunningWorkoutTemplate] {
+        shareableRunningTemplates.filter {
+            workoutActivity == nil || workoutActivity == .running
+        }
+    }
+
+    private func shareRunningTemplate(_ workout: RunningWorkoutTemplate) {
+        guard ATHLTHPersonalSharePolicy.runningWorkout(workout),
+              runningLibrary.customTemplates.contains(where: {
+                  $0.id == workout.id && ATHLTHPersonalSharePolicy.runningWorkout($0)
+              }) else {
+            shareError = ATHLTHDirectShareError.onlySavedPersonalContent.localizedDescription
+            return
+        }
+        createDraft(
+            kind: .runningWorkout,
+            title: workout.title,
+            subtitle: workout.summary,
+            snapshot: workout,
+            sourceObjectID: workout.sharedSourceWorkoutID ?? workout.id,
+            sourceOwnerID: workout.sharedSourceOwnerID ?? session.profile.userID
+        )
     }
 
     private func workoutSubtitle(_ workout: PlannedSession) -> String {
