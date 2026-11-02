@@ -227,4 +227,135 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
         XCTAssertNotNil(advice.evidence)
     }
 
+
+    private func trainingHistory(
+        runs: Int,
+        lastRunDaysAgo: Int?,
+        averageMinutes: Int?
+    ) -> HomeDailyRecommendationPolicy.TrainingHistory {
+        .init(
+            sessionsLast28Days: runs,
+            runsLast28Days: runs,
+            mostRecentRunDaysAgo: lastRunDaysAgo,
+            averageRecentRunMinutes: averageMinutes
+        )
+    }
+
+    func testReadyWithRepeatedRecentRunsSuggestsControlledTempo() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .ready,
+            hasWorkoutToday: false,
+            trainingLoadRatio: 0.58,
+            trainingHistory: trainingHistory(
+                runs: 4, lastRunDaysAgo: 3, averageMinutes: 36
+            )
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .tempoRun(minutes: 35))
+        XCTAssertTrue(advice.dayDescription.localizedCaseInsensitiveContains(
+            ATHLTHLocalization.choose(
+                english: "tempo", norwegian: "tempoøkt"
+            )
+        ))
+        let workout = HomeDailyRecommendationSessionFactory.make(advice: advice)
+        XCTAssertEqual(workout?.kind, .running)
+        XCTAssertEqual(workout?.durationMinutes, 35)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.count, 7)
+        XCTAssertEqual(
+            workout?.resolvedWorkoutBlocks
+                .compactMap(\.durationSeconds).reduce(0, +),
+            2_100
+        )
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.first?.resolvedPhase, .warmup)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.last?.resolvedPhase, .cooldown)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks[1].targetEffortRPE, 6)
+    }
+
+    func testReadyWithSomeRecentRunningSuggestsGradualProgression() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .ready,
+            hasWorkoutToday: false,
+            trainingLoadRatio: 0.35,
+            trainingHistory: trainingHistory(
+                runs: 1, lastRunDaysAgo: 6, averageMinutes: 28
+            )
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .progressiveRun(minutes: 30))
+        let workout = HomeDailyRecommendationSessionFactory.make(advice: advice)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.count, 3)
+        XCTAssertEqual(
+            workout?.resolvedWorkoutBlocks
+                .compactMap(\.durationSeconds).reduce(0, +),
+            1_800
+        )
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks[1].targetEffortRPE, 5)
+    }
+
+    func testReadyWithStaleRunningHistoryDoesNotEscalate() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .ready,
+            hasWorkoutToday: false,
+            trainingLoadRatio: 0.1,
+            trainingHistory: trainingHistory(
+                runs: 5, lastRunDaysAgo: 21, averageMinutes: 45
+            )
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .easyRun(minutes: 25))
+    }
+
+    func testBalancedReadinessCanRecommendSteadyProgression() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .balanced,
+            hasWorkoutToday: false,
+            trainingLoadRatio: 0.8,
+            trainingHistory: trainingHistory(
+                runs: 2, lastRunDaysAgo: 4, averageMinutes: 34
+            )
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .progressiveRun(minutes: 30))
+    }
+
+    func testPoorReadinessAndExcessiveLoadOverrideRunningHistory() {
+        let prior = trainingHistory(
+            runs: 6, lastRunDaysAgo: 1, averageMinutes: 45
+        )
+        for readiness in [
+            HomeDailyRecommendationPolicy.Readiness.recover,
+            .takeItEasy
+        ] {
+            let advice = HomeDailyRecommendationPolicy.recommendation(
+                readiness: readiness,
+                hasWorkoutToday: false,
+                trainingLoadRatio: 0.7,
+                trainingHistory: prior
+            )
+            if case .easyWalk = advice.suggestedWorkout {
+                // Keep active recovery only.
+            } else {
+                XCTFail("Poor readiness must not suggest a tempo run.")
+            }
+        }
+        let over = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .ready,
+            hasWorkoutToday: false,
+            trainingLoadRatio: 1.7,
+            trainingHistory: prior
+        )
+        XCTAssertEqual(over.suggestedWorkout, .easyWalk(minutes: 20))
+    }
+
+    func testExistingPlannedWorkoutKeepsPriorityWhenHealthy() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .ready,
+            hasWorkoutToday: true,
+            trainingLoadRatio: 0.5,
+            plannedActivity: .strength,
+            plannedWorkoutTitle: "Min egen styrkeøkt",
+            trainingHistory: trainingHistory(
+                runs: 5, lastRunDaysAgo: 1, averageMinutes: 40
+            )
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .planned)
+        XCTAssertNil(HomeDailyRecommendationSessionFactory.make(advice: advice))
+    }
+
 }
