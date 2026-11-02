@@ -1912,6 +1912,103 @@ final class HealthKitManager: ObservableObject {
         return days.values.sorted { $0.date < $1.date }
     }
 
+    /// Same-session running measurements, not independent daily averages.
+    /// External workouts obey ATHLTH's existing Inbox approval policy.
+    /// The query is intentionally on-demand and bounded to recent workouts.
+    func insightRunningPerformanceSessions(
+        days: Int = 90
+    ) async -> [ATHLTHInsightsRunPerformanceSession] {
+        guard integrationEnabled, healthDataAvailable else { return [] }
+
+        let window = min(max(days, 30), 180)
+        let now = Date()
+        let start = Calendar.current.date(
+            byAdding: .day, value: -window, to: now
+        ) ?? now.addingTimeInterval(-Double(window) * 86_400)
+
+        let workouts: [HKWorkout]
+        do {
+            workouts = try await fetchWorkouts(
+                startDate: start, endDate: now
+            )
+        } catch {
+            return []
+        }
+        let recentRuns = workouts
+            .filter {
+                $0.workoutActivityType == .running &&
+                    $0.duration.isFinite &&
+                    (5 * 60...3 * 3_600).contains($0.duration)
+            }
+            .sorted { $0.endDate > $1.endDate }
+            .prefix(24)
+
+        var result: [ATHLTHInsightsRunPerformanceSession] = []
+        let runningSpeedUnit = HKUnit.meter().unitDivided(by: .second())
+
+        for workout in recentRuns {
+            if Task.isCancelled { break }
+
+            // Keep the original HKWorkout as the common association key.
+            // Reuse the existing statistics-first queries with workout
+            // predicate fallback, which also works for older imported runs.
+            async let heartTask = fetchHeartRateStats(for: workout)
+            async let powerTask = workoutQuantity(
+                identifier: .runningPower,
+                unit: .watt(),
+                option: .discreteAverage,
+                workout: workout
+            )
+            async let speedTask = workoutQuantity(
+                identifier: .runningSpeed,
+                unit: runningSpeedUnit,
+                option: .discreteAverage,
+                workout: workout
+            )
+
+            let heart = (try? await heartTask) ?? (nil, nil)
+            let recordedPower = try? await powerTask
+            let recordedSpeed = try? await speedTask
+
+            let averageHeart = heart.0.flatMap {
+                $0.isFinite && (35...245).contains($0) ? $0 : nil
+            }
+            let averagePower = recordedPower.flatMap {
+                $0.isFinite && (30...1500).contains($0) ? $0 : nil
+            }
+
+            let validSpeed = recordedSpeed.flatMap { value -> Double? in
+                let kph = value * 3.6
+                return kph.isFinite && (3...30).contains(kph) ? kph : nil
+            }
+
+            // Distance / elapsed workout duration is a real, separately
+            // labelled calculation. Never pretend it is recorded speed.
+            let durationMinutes = workout.duration / 60
+            let distanceMeters = workout.totalDistance?.doubleValue(
+                for: .meter()
+            )
+            let calculatedSpeed = distanceMeters.flatMap { distance -> Double? in
+                guard distance.isFinite, distance > 0,
+                      workout.duration > 0 else { return nil }
+                let kph = distance / workout.duration * 3.6
+                return kph.isFinite && (3...30).contains(kph) ? kph : nil
+            }
+            let speed = validSpeed ?? calculatedSpeed
+
+            result.append(ATHLTHInsightsRunPerformanceSession(
+                id: workout.uuid,
+                endDate: workout.endDate,
+                durationMinutes: durationMinutes,
+                averageHeartRateBPM: averageHeart,
+                averageRunningPowerWatts: averagePower,
+                averageSpeedKPH: speed,
+                speedFromDistance: validSpeed == nil && calculatedSpeed != nil
+            ))
+        }
+        return result.sorted { $0.endDate > $1.endDate }
+    }
+
     /// Read only the requested metric and period after the user opens it.
     /// Bounded HealthKit statistics preserve Apple's source de-duplication.
     /// Missing authorization or missing measurements returns an empty series.
