@@ -89,66 +89,72 @@ struct ATHLTHPlannedWorkoutStepRow: View {
 
                 HStack(spacing: 0) {
                     Button(action: onEdit) {
-                    HStack(spacing: 8) {
-                        Text("\(position)")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(isPause ? .secondary : ATHLTHTrainDesign.bronze)
-                            .frame(width: 21)
-                        Image(systemName: isPause ? "pause.fill" : block.kind.systemImage)
-                            .font(.system(size: 15))
-                            .foregroundStyle(isPause ? .secondary : ATHLTHTrainDesign.ink)
-                            .frame(width: 23)
-                        Text(isPause
-                            ? ATHLTHLocalization.choose(english: "Recovery", norwegian: "Pause")
-                            : ATHLTHWorkoutNameSuggestion.displayStepTitle(block))
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ATHLTHTrainDesign.ink)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.85)
-                        Spacer(minLength: 0)
-                        Text(block.durationSeconds.map { "\(Int($0 / 60)) min" }
-                            ?? block.distanceMeters.map { "\(Int($0)) m" } ?? "–")
-                            .font(.caption.weight(.medium))
-                            .foregroundStyle(ATHLTHTrainDesign.ink)
-                            .lineLimit(1)
-                        Text(block.targetHeartRateZone.map { "Z\($0)" }
-                            ?? (isPause ? "Pause" : "–"))
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ATHLTHTrainDesign.bronze)
-                            .frame(minWidth: 26)
+                        HStack(spacing: 8) {
+                            Text("\(position)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(
+                                    isPause ? .secondary : ATHLTHTrainDesign.bronze
+                                )
+                                .frame(width: 21)
+                            Image(systemName: isPause ? "pause.fill" : block.kind.systemImage)
+                                .font(.system(size: 15))
+                                .foregroundStyle(
+                                    isPause ? .secondary : ATHLTHTrainDesign.ink
+                                )
+                                .frame(width: 23)
+                            Text(isPause
+                                ? ATHLTHLocalization.choose(
+                                    english: "Recovery", norwegian: "Pause"
+                                )
+                                : ATHLTHWorkoutNameSuggestion.displayStepTitle(block))
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(ATHLTHTrainDesign.ink)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                            Spacer(minLength: 0)
+                            Text(block.durationSeconds.map { "\(Int($0 / 60)) min" }
+                                ?? block.distanceMeters.map { "\(Int($0)) m" } ?? "–")
+                                .font(.caption.weight(.medium))
+                                .foregroundStyle(ATHLTHTrainDesign.ink)
+                                .lineLimit(1)
+                            Text(block.targetHeartRateZone.map { "Z\($0)" }
+                                ?? (isPause ? "Pause" : "–"))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTrainDesign.bronze)
+                                .frame(minWidth: 26)
+                        }
+                        .padding(.leading, 9)
+                        .padding(.trailing, 4)
+                        .frame(maxWidth: .infinity, minHeight: 49)
+                        .contentShape(Rectangle())
                     }
-                    .padding(.leading, 9)
-                    .padding(.trailing, 4)
-                    .frame(maxWidth: .infinity, minHeight: 49)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+                    .buttonStyle(.plain)
                     .accessibilityHint(ATHLTHLocalization.choose(
                         english: "Edit step details. Swipe left or use options to delete.",
                         norwegian: "Rediger deløkten. Sveip til venstre eller bruk menyen for å slette."
                     ))
 
                     Menu {
-                    Button(action: onEdit) {
+                        Button(action: onEdit) {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Edit step", norwegian: "Rediger deløkt"
+                            ), systemImage: "pencil")
+                        }
+                        Divider()
+                        Button(role: .destructive, action: onDelete) {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Delete step", norwegian: "Slett deløkt"
+                            ), systemImage: "trash")
+                        }
+                    } label: {
                         Label(ATHLTHLocalization.choose(
-                            english: "Edit step", norwegian: "Rediger deløkt"
-                        ), systemImage: "pencil")
-                    }
-                    Divider()
-                    Button(role: .destructive, action: onDelete) {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Delete step", norwegian: "Slett deløkt"
-                        ), systemImage: "trash")
-                    }
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Step options", norwegian: "Alternativer for deløkt"
-                    ), systemImage: "ellipsis")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-                    .frame(width: 44, height: 49)
-                    .contentShape(Rectangle())
+                            english: "Step options", norwegian: "Alternativer for deløkt"
+                        ), systemImage: "ellipsis")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .frame(width: 44, height: 49)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                 }
