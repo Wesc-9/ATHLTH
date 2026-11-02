@@ -701,7 +701,7 @@ enum ATHLTHChallengePreviewPeople {
                 ? ATHLTHLocalization.choose(english: "Athlete", norwegian: "Utøver")
                 : clean).prefix(22))
         }
-        return "\(total) · " + names.joined(separator: " + ")
+        return "\(total) · " + names.joined(separator: " vs ")
     }
 }
 
@@ -1675,8 +1675,8 @@ struct ChallengeCreationView: View {
 
                 Label(
                     ATHLTHChallengePreviewPeople.label(
-                        creatorName: session.profile.displayName,
-                        invitedNames: invitees.map(\.displayName)
+                        creatorName: creatorHandle,
+                        invitedNames: invitedHandles
                     ),
                     systemImage: "person.2.fill"
                 )
@@ -6913,6 +6913,22 @@ struct ChallengeCreationView: View {
             )
     }
 
+    /// Names used on this preview are usernames, not public display names.
+    /// Fall back only for profiles that have no usable username yet.
+    private var creatorHandle: String {
+        let handle = session.profile.username
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return handle.isEmpty ? session.profile.displayName : handle
+    }
+
+    private var invitedHandles: [String] {
+        invitees.map { participant in
+            let handle = (participant.username ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            return handle.isEmpty ? participant.displayName : handle
+        }
+    }
+
     private var resolvedTitle: String {
         ChallengeCreationPolicy.resolvedTitle(
             title,
@@ -6920,6 +6936,8 @@ struct ChallengeCreationView: View {
             scoring: effectiveScoring,
             creatorName: session.profile.displayName,
             invitedNames: invitees.map(\.displayName),
+            creatorUsername: session.profile.username,
+            invitedUsernames: invitees.map(\.username),
             scoringTitle: sport == .running && runningFocus != .standard
                 ? sport.title + " • " + runningComparison.title
                 : nil
