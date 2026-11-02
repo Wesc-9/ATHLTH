@@ -3998,7 +3998,10 @@ struct WorkoutTemplateBuilderView: View {
                 case .planWithFriend:
                     NavigationStack {
                         TrainTogetherPostCreateView(
-                            initialWorkout: blocks.isEmpty ? nil : workoutSnapshot()
+                            // The athlete is already editing this workout.
+                            // Forward its full draft even before a timeline block
+                            // has been added; never restart the source picker.
+                            initialWorkout: workoutSnapshot()
                         )
                     }
                 case .spotify:
