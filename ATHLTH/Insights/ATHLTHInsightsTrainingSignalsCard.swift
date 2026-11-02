@@ -77,6 +77,42 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
             }
             .buttonStyle(.plain)
 
+            NavigationLink {
+                ATHLTHInsightsRunningPerformanceView()
+            } label: {
+                HStack(spacing: 11) {
+                    Image(systemName: "chart.xyaxis.line")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
+                        .frame(width: 37, height: 37)
+                        .background(
+                            ATHLTHInsightsStyle.accent.opacity(0.10),
+                            in: RoundedRectangle(cornerRadius: 11)
+                        )
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(tr("Compare running workouts", "Sammenlign løpeøkter"))
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHInsightsStyle.ink)
+                        Text(tr(
+                            "Pulse · power · speed from the same run",
+                            "Puls · watt · hastighet fra samme økt"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHInsightsStyle.muted)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHInsightsStyle.accent)
+                }
+                .padding(12)
+                .background(
+                    ATHLTHInsightsStyle.canvas,
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+            }
+            .buttonStyle(.plain)
+
             Divider().overlay(ATHLTHInsightsStyle.track)
 
             sectionHeading(
