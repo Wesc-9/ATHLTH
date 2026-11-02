@@ -48,7 +48,9 @@ final class ChallengeEventCreationRegressionTests:
             ATHLTHChallengePreviewPeople.label(
                 creatorName: "stian", invitedNames: ["malin", "ola"]
             ),
-            "stian vs malin vs ola"
+            "stian, malin, ola " + ATHLTHLocalization.choose(
+                english: "and others", norwegian: "og flere"
+            )
         )
     }
 
@@ -58,8 +60,8 @@ final class ChallengeEventCreationRegressionTests:
                 creatorName: "stian",
                 invitedNames: ["malin", "ola", "kari", "per"]
             ),
-            "stian vs malin vs ola · " + ATHLTHLocalization.choose(
-                english: "and others", norwegian: "med flere"
+            "stian, malin, ola " + ATHLTHLocalization.choose(
+                english: "and others", norwegian: "og flere"
             )
         )
     }
