@@ -3752,15 +3752,7 @@ struct WorkoutTemplateBuilderView: View {
             onSpotify: { selectedWorkoutExtra = .spotify },
             onHeartRateAndPace: { selectedWorkoutExtra = .heartRateAndPace },
             onAudioCoach: { selectedWorkoutExtra = .audioCoach },
-            onGhostRace: { selectedWorkoutExtra = .ghostRace },
-            onChooseRoute: {
-                studioRoutePhase = selectedPhase
-                showingStudioRoutePicker = true
-            },
-            onCreateRoute: {
-                studioRoutePhase = selectedPhase
-                showingStudioRouteBuilder = true
-            }
+            onGhostRace: { selectedWorkoutExtra = .ghostRace }
         )
     }
 

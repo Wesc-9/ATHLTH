@@ -9,8 +9,6 @@ struct ATHLTHWorkoutExtrasMenu: View {
     let onHeartRateAndPace: () -> Void
     let onAudioCoach: () -> Void
     let onGhostRace: () -> Void
-    let onChooseRoute: () -> Void
-    let onCreateRoute: () -> Void
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -38,18 +36,6 @@ struct ATHLTHWorkoutExtrasMenu: View {
             Button(action: onGhostRace) {
                 Label("Ghost Race", systemImage: "figure.run")
             }
-            Menu {
-                Button(action: onChooseRoute) {
-                    Label(tr("Choose saved route", "Velg lagret rute"),
-                          systemImage: "map")
-                }
-                Button(action: onCreateRoute) {
-                    Label(tr("Create route", "Lag rute"),
-                          systemImage: "point.topleft.down.to.point.bottomright.curvepath")
-                }
-            } label: {
-                Label(tr("Route", "Rute"), systemImage: "map.fill")
-            }
         } label: {
             Image(systemName: "gearshape")
                 .font(.system(size: 17, weight: .medium))
@@ -60,8 +46,8 @@ struct ATHLTHWorkoutExtrasMenu: View {
         }
         .accessibilityLabel(tr("Workout options", "Øktinnstillinger"))
         .accessibilityHint(tr(
-            "Opens workout integrations and route actions",
-            "Åpner innstillinger og rutevalg for økten"
+            "Opens workout integration settings",
+            "Åpner innstillinger for øktintegrasjoner"
         ))
     }
 }
