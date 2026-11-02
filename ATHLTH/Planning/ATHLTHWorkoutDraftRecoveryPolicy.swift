@@ -36,7 +36,13 @@ enum ATHLTHWorkoutDraftRecoveryPolicy {
         if let storedSourceTitle {
             return storedSourceTitle == currentSourceTitle
         }
-        return currentSourceTitle.isEmpty && currentSourceID == nil
+        // v1 drafts did not store the source title separately. Its old
+        // signature begins with the original title followed by '|'.
+        // Allow an older personal draft to survive this app update.
+        if !currentSourceTitle.isEmpty {
+            return storedSignature.hasPrefix(currentSourceTitle + "|")
+        }
+        return currentSourceID == nil
     }
 
     /// The plan/day/workout key already identifies the source of truth.
