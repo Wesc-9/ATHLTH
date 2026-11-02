@@ -149,7 +149,7 @@ struct ATHLTHInsightsView: View {
     }
     private var trainingSection: some View {
         Group {
-            trainingHealthAreas
+            ATHLTHInsightsTrainingSignalsCard()
             ATHLTHInsightsMuscleCard(summary: muscleSummary)
             trainingRhythmCard
             ATHLTHInsightsReferenceDistributionCard(
@@ -167,68 +167,6 @@ struct ATHLTHInsightsView: View {
             }
             whatIfCard
         }
-    }
-
-    private var trainingHealthAreas: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            Text(tr("Training & health", "Trening og helse"))
-                .font(.system(size: 21, weight: .regular, design: .serif))
-                .foregroundStyle(ATHLTHInsightsStyle.ink)
-
-            ForEach([
-                ATHLTHInsightHealthArea.fitness,
-                .recovery,
-                .movement
-            ]) { area in
-                NavigationLink {
-                    ATHLTHInsightsHealthAreaView(area: area)
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: area.icon)
-                            .font(.title3)
-                            .foregroundStyle(ATHLTHInsightsStyle.accent)
-                            .frame(width: 39, height: 39)
-                            .background(ATHLTHInsightsStyle.accent.opacity(0.10),
-                                        in: RoundedRectangle(cornerRadius: 12))
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(area.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHInsightsStyle.ink)
-                            Text(area.detail)
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHInsightsStyle.muted)
-                        }
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.right")
-                            .font(.caption2.weight(.semibold))
-                            .foregroundStyle(ATHLTHInsightsStyle.muted)
-                    }
-                    .padding(12)
-                    .background(ATHLTHInsightsStyle.canvas,
-                                in: RoundedRectangle(cornerRadius: 15))
-                }
-                .buttonStyle(.plain)
-            }
-
-            HStack(spacing: 10) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("VO₂ maks")
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHInsightsStyle.muted)
-                    Text(ATHLTHInsightHealthMetric.vo2Max.formatted(
-                        health.training.vo2Max
-                    ))
-                    .font(.headline)
-                    .foregroundStyle(ATHLTHInsightsStyle.ink)
-                }
-                Spacer()
-                Text(tr("From Apple Health", "Fra Apple Health"))
-                    .font(.caption2)
-                    .foregroundStyle(ATHLTHInsightsStyle.muted)
-            }
-        }
-        .padding(16)
-        .athlthInsightsSurface()
     }
 
     /// All observations are compared locally. No health data is sent to
