@@ -7862,7 +7862,8 @@ struct MessageSharePicker: View {
                         subtitle: routeSubtitle(route),
                         routePreview: safeRoute,
                         favoriteKind: .route,
-                        favoriteID: route.id
+                        favoriteID: route.id,
+                        favoriteSubtitle: String(format: "%.2f km", route.distanceKilometers)
                     ) {
                         guard ATHLTHPersonalSharePolicy.route(
                             route, ownerID: session.profile.userID
@@ -7873,6 +7874,16 @@ struct MessageSharePicker: View {
                             )
                         }) else {
                             shareError = ATHLTHDirectShareError.onlySavedPersonalContent.localizedDescription
+                            return
+                        }
+                        // Never transmit an untrimmed start/end coordinate
+                        // when the athlete has enabled endpoint protection.
+                        if settings.hideRouteStartAndEnd &&
+                           safeRoute.coordinates == route.coordinates {
+                            shareError = ATHLTHLocalization.choose(
+                                english: "This route is too short to hide its start and end safely.",
+                                norwegian: "Denne ruten kan ikke deles med skjult start og slutt på en trygg måte."
+                            )
                             return
                         }
                         createDraft(
@@ -8105,6 +8116,7 @@ struct MessageSharePicker: View {
         routePreview: TrainingRoute? = nil,
         favoriteKind: LibraryFavoriteKind? = nil,
         favoriteID: UUID? = nil,
+        favoriteSubtitle: String? = nil,
         action: @escaping () -> Void
     ) -> some View {
         HStack(spacing: 5) {
@@ -8152,7 +8164,7 @@ struct MessageSharePicker: View {
                     kind: favoriteKind,
                     itemID: favoriteID.uuidString,
                     title: title,
-                    subtitle: subtitle,
+                    subtitle: favoriteSubtitle ?? subtitle,
                     icon: icon
                 )
             }
