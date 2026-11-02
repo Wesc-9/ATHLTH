@@ -65,7 +65,7 @@ final class ATHLTHPlannedRoutePreviewPolicyTests: XCTestCase {
         let a = run("Route", meters: 7_500)
         let b = run("Extra", meters: 1_200)
         XCTAssertEqual(
-            ATHLTHPlannedRoutePreviewPolicy.distanceKilometers(for: [a, b]),
+            ATHLTHPlannedRoutePreviewPolicy.distanceKilometers(for: [a, b]) ?? 0,
             8.7, accuracy: 0.000001
         )
         XCTAssertNil(
