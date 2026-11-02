@@ -701,9 +701,9 @@ enum ATHLTHChallengePreviewPeople {
                 .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
             return String((clean.isEmpty ? fallback : clean).prefix(22))
         }
-        // Two-person challenges are duels; three or more use a
-        // compact group caption with the first three usernames.
-        if names.count < 3 {
+        // Up to three participants are shown as an explicit versus line.
+        // For larger groups, keep only three usernames plus an overflow label.
+        if names.count <= 3 {
             return names.joined(separator: " vs ")
         }
         return names.prefix(3).joined(separator: ", ") + " " +
