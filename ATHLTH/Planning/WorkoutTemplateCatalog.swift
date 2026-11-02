@@ -4451,6 +4451,33 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
                 resequence()
+            },
+            onRemovePhase: { phase in
+                // Delete the entire visible category and its underlying
+                // execution steps. A hidden recovery phase can be displayed
+                // inside Hoveddel; those steps must be removed with it.
+                let routeTitle = session.savedRoutes.first {
+                    $0.id == selectedRouteID
+                }?.title
+                let remaining = ATHLTHWorkoutPhaseDeletionPolicy.removing(
+                    phase, from: blocks, visiblePhases: studioVisiblePhases
+                )
+                blocks = remaining
+                selectedRouteID = ATHLTHPlannedRoutePreviewPolicy.activeRouteID(
+                    selectedRouteID: selectedRouteID,
+                    routeTitle: routeTitle,
+                    blocks: remaining
+                )
+                studioBasicOwnedBlockIDs.formIntersection(
+                    Set(remaining.map(\.editorDragID))
+                )
+                studioVisiblePhases.remove(phase)
+                if selectedPhase == phase {
+                    selectedPhase = studioVisiblePhases.first ??
+                        remaining.first?.resolvedPhase ?? .main
+                }
+                // Deleting a category does not remove another category
+                // or implicitly recreate the one just removed.
             }
         )
     }
