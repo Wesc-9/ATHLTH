@@ -2,6 +2,29 @@ import XCTest
 @testable import ATHLTH
 
 final class SimpleExerciseMuscleFilterTests: XCTestCase {
+    func testLibrarySegmentedTabsHaveStableDistinctIndices() {
+        XCTAssertEqual(
+            ExerciseLibrarySection.allCases.map(\.segmentedIndex),
+            [0, 1, 2]
+        )
+        for section in ExerciseLibrarySection.allCases {
+            XCTAssertEqual(
+                ExerciseLibrarySection.section(
+                    forSegmentedIndex: section.segmentedIndex
+                ),
+                section
+            )
+        }
+        XCTAssertEqual(
+            ExerciseLibrarySection.section(forSegmentedIndex: -1),
+            .library
+        )
+        XCTAssertEqual(
+            ExerciseLibrarySection.section(forSegmentedIndex: 999),
+            .library
+        )
+    }
+
     @MainActor
     func testOnlyNineMajorGroupsShown() {
         let library = ExerciseLibraryStore()

@@ -13,6 +13,24 @@ enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
 
     var id: String { rawValue }
 
+    // The segmented control exposes all three sections. An explicit mapping
+    // keeps Marketplace reachable without tying its identity to array order.
+    var segmentedIndex: Int {
+        switch self {
+        case .library: 0
+        case .mine: 1
+        case .marketplace: 2
+        }
+    }
+
+    static func section(forSegmentedIndex index: Int) -> Self {
+        switch index {
+        case 1: .mine
+        case 2: .marketplace
+        default: .library
+        }
+    }
+
     var title: String {
         switch self {
         case .library:
@@ -145,22 +163,21 @@ struct ExerciseLibraryView: View {
         Binding<Int> {
         Binding(
             get: {
-                selectedSection == .mine
-                    ? 1
-                    : 0
+                selectedSection.segmentedIndex
             },
             set: { index in
-                selectedSection =
-                    index == 1
-                        ? .mine
-                        : .library
+                selectedSection = ExerciseLibrarySection.section(
+                    forSegmentedIndex: index
+                )
             }
         )
     }
 
     var body: some View {
         // Reuse one filtered/sorted list for empty state, rows and alphabet targets.
-        let entries = displayedResults
+        // Marketplace has its own remote catalog. Do not filter/sort the
+        // entire on-device exercise library while that tab is selected.
+        let entries = selectedSection == .marketplace ? [] : displayedResults
         return VStack(spacing: 0) {
             if source == nil {
                 ATHLTHPremiumSegmentedControl(
