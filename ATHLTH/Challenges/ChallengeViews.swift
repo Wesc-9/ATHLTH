@@ -688,20 +688,24 @@ private enum ChallengeCreationSelectionSheet:
 }
 
 
-/// Participant caption for the challenge preview. Single and direct
-/// challenges show names; larger groups stay compact and show only count.
+/// Participant caption: show actual usernames rather than full names.
+/// Direct duels use "user1 vs user2". Groups show up to three names and
+/// then "med flere" / "and others" without overflowing the preview card.
 enum ATHLTHChallengePreviewPeople {
     static func label(creatorName: String, invitedNames: [String]) -> String {
-        let total = 1 + invitedNames.count
-        guard total <= 2 else { return String(total) }
-        let creator = creatorName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let names = ([creator] + invitedNames).map { raw -> String in
+        let fallback = ATHLTHLocalization.choose(
+            english: "Athlete", norwegian: "Utøver"
+        )
+        let names = ([creatorName] + invitedNames).map { raw -> String in
             let clean = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-            return String((clean.isEmpty
-                ? ATHLTHLocalization.choose(english: "Athlete", norwegian: "Utøver")
-                : clean).prefix(22))
+                .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
+            return String((clean.isEmpty ? fallback : clean).prefix(22))
         }
-        return "\(total) · " + names.joined(separator: " vs ")
+        let visible = names.prefix(3).joined(separator: " vs ")
+        guard names.count > 3 else { return visible }
+        return visible + " · " + ATHLTHLocalization.choose(
+            english: "and others", norwegian: "med flere"
+        )
     }
 }
 
@@ -1682,8 +1686,9 @@ struct ChallengeCreationView: View {
                 )
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.95))
-                .lineLimit(1)
-                .minimumScaleFactor(0.76)
+                .lineLimit(2)
+                .minimumScaleFactor(0.78)
+                .fixedSize(horizontal: false, vertical: true)
             }
             .padding(14)
             .padding(.trailing, 48)
