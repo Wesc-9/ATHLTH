@@ -224,6 +224,9 @@ enum ChallengeCreationPolicy {
             : String(clean.prefix(60))
     }
 
+    /// A challenge's title describes the activity/rules, never the athletes.
+    /// Athlete usernames belong in the separate participant caption.
+    /// The participant parameters are retained for existing call sites.
     static func resolvedTitle(
         _ title: String,
         sport: ATHLTHChallengeSport,
@@ -235,47 +238,12 @@ enum ChallengeCreationPolicy {
         scoringTitle: String? = nil
     ) -> String {
         let clean = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        // A manually entered title must never be overwritten.
         guard clean.isEmpty else { return String(clean.prefix(100)) }
 
-        func participantHandle(_ username: String?, fallback: String) -> String {
-            let username = (username ?? "")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-                .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
-            let fallbackName = fallback.trimmingCharacters(
-                in: .whitespacesAndNewlines
-            )
-            let resolved = username.isEmpty ? fallbackName : username
-            return String((resolved.isEmpty ? "ATHLTH" : resolved).prefix(40))
-        }
-
-        let creator = participantHandle(
-            creatorUsername, fallback: creatorName
-        )
-        let opponents = invitedNames.enumerated().map { index, fallback in
-            participantHandle(
-                invitedUsernames.indices.contains(index)
-                    ? invitedUsernames[index] : nil,
-                fallback: fallback
-            )
-        }
-        // Keep sport and scoring on the separate preview badges. A direct
-        // challenge is named ONLY by the two actual athlete usernames.
-        if opponents.count == 1 {
-            return String("\(creator) vs \(opponents[0])".prefix(100))
-        }
-        if !opponents.isEmpty {
-            let rest = opponents.count == 2
-                ? opponents.joined(separator: ", ")
-                : "\(opponents[0]) +\(opponents.count - 1)"
-            return String("\(creator) vs \(rest)".prefix(100))
-        }
-
-        // Public challenges may have no challenger yet.
-        let activity = (scoringTitle ?? automaticTitle(
-            sport: sport, scoring: scoring
-        )).replacingOccurrences(of: " · ", with: " • ")
-        return String("\(activity) • \(creator)".prefix(100))
+        let activityAndScoring = (
+            scoringTitle ?? automaticTitle(sport: sport, scoring: scoring)
+        ).replacingOccurrences(of: " · ", with: " • ")
+        return String(activityAndScoring.prefix(100))
     }
 
     static func requiresDirectInvite(
