@@ -5746,11 +5746,17 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func appendSavedWorkout(_ workout: PlannedSession) {
-        let source = workout.resolvedWorkoutBlocks
+        // Read either current workoutBlocks or the legacy running/strength
+        // recipe; an older library workout must never insert zero exercises.
+        let source = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
         guard !source.isEmpty else { return }
         if isPlannedWorkout && !studioAdvanced && initialActivity == .running {
             removeBasicOwnedBlocks()
         }
+        // A full workout inserted into an empty builder keeps the source
+        // warm-up, main and cool-down. In an existing recipe, the athlete's
+        // selected destination phase is honored as before.
+        let importingWholeWorkout = blocks.isEmpty
         var newGroups: [UUID: UUID] = [:]
         let insertAt = ATHLTHWorkoutPhasePlacement.insertionIndex(
             for: selectedPhase, in: blocks
@@ -5758,7 +5764,7 @@ struct WorkoutTemplateBuilderView: View {
         let copied = source.map { original -> WorkoutTemplateBlock in
             var copy = original
             copy.editorDragID = UUID()
-            copy.phase = selectedPhase
+            copy.phase = importingWholeWorkout ? original.resolvedPhase : selectedPhase
             if let id = original.groupID {
                 if newGroups[id] == nil { newGroups[id] = UUID() }
                 copy.groupID = newGroups[id]
