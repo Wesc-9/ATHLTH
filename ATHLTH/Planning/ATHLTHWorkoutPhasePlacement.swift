@@ -116,6 +116,56 @@ enum ATHLTHWorkoutPhasePlacement {
 }
 
 
+/// Removes a whole visible workout category and all of its actual workout
+/// steps. Presentation can show legacy recovery steps inside Hoveddel when
+/// there is no separate Pause category; deleting Hoveddel must remove those
+/// rows too, otherwise they would reappear after the next render or save.
+enum ATHLTHWorkoutPhaseDeletionPolicy {
+    static func presentedPhase(
+        for block: WorkoutTemplateBlock,
+        visiblePhases: Set<WorkoutPhaseKind>
+    ) -> WorkoutPhaseKind {
+        block.resolvedPhase == .recovery && !visiblePhases.contains(.recovery)
+            ? .main : block.resolvedPhase
+    }
+
+    static func removing(
+        _ phase: WorkoutPhaseKind,
+        from blocks: [WorkoutTemplateBlock],
+        visiblePhases: Set<WorkoutPhaseKind>
+    ) -> [WorkoutTemplateBlock] {
+        var remaining = blocks.filter {
+            presentedPhase(for: $0, visiblePhases: visiblePhases) != phase
+        }
+
+        // If removing a category leaves a single member of a previous
+        // superset / interval group, it is no longer a valid grouped set.
+        let groupSizes = Dictionary(
+            grouping: remaining.compactMap { item -> (UUID, UUID)? in
+                guard let groupID = item.groupID else { return nil }
+                return (groupID, item.editorDragID)
+            },
+            by: { $0.0 }
+        ).mapValues(\.count)
+
+        for i in remaining.indices {
+            if let groupID = remaining[i].groupID,
+               (groupSizes[groupID] ?? 0) < 2 {
+                remaining[i].groupID = nil
+                remaining[i].groupKind = nil
+                remaining[i].groupRounds = nil
+            }
+        }
+
+        return remaining.enumerated().map {
+            ATHLTHWorkoutPhasePlacement.renumbered(
+                $0.element, sequence: $0.offset + 1
+            )
+        }
+    }
+}
+
+
 // MARK: - Chronological presentation of workout phases
 
 /// UI-only grouping. The persisted block array already defines playback
