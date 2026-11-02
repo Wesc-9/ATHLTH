@@ -7,8 +7,22 @@ import UserNotifications
 @MainActor
 enum ATHLTHDailyCheckInReminderScheduler {
     static let identifierPrefix = "insights.daily-check-in."
-    static let reminderHour = 9
+    static let defaultMinuteOfDay = 12 * 60
     static let horizonDays = 7
+
+    static func normalizedMinuteOfDay(_ minuteOfDay: Int) -> Int {
+        min(max(minuteOfDay, 0), 23 * 60 + 59)
+    }
+
+    /// Keep the in-app daily event key unchanged; a time-specific identifier
+    /// lets a changed preference replace a queued iOS reminder immediately.
+    static func reminderKey(
+        accountID: UUID, date: Date,
+        minuteOfDay: Int, calendar: Calendar = .current
+    ) -> String {
+        eventKey(accountID: accountID, date: date, calendar: calendar) +
+            String(format: ".%04d", normalizedMinuteOfDay(minuteOfDay))
+    }
 
     static func eventKey(
         accountID: UUID, date: Date, calendar: Calendar = .current
@@ -25,40 +39,61 @@ enum ATHLTHDailyCheckInReminderScheduler {
     static func datesToSchedule(
         enabled: Bool, completedToday: Bool,
         accountID: UUID, now: Date,
+        minuteOfDay: Int = defaultMinuteOfDay,
         calendar: Calendar = .current
     ) -> [(key: String, date: Date)] {
         guard enabled else { return [] }
+        let time = normalizedMinuteOfDay(minuteOfDay)
+        let hour = time / 60
+        let minute = time % 60
         let today = calendar.startOfDay(for: now)
         var result: [(key: String, date: Date)] = []
         for offset in 0..<horizonDays {
             guard let day = calendar.date(byAdding: .day, value: offset, to: today),
-                  let fire = calendar.date(bySettingHour: reminderHour, minute: 0,
+                  let fire = calendar.date(bySettingHour: hour, minute: minute,
                                            second: 0, of: day)
             else { continue }
             if offset == 0 && completedToday { continue }
             // Do not create overdue system alerts when the app is opened
             // after the scheduled time. The in-app reminder still appears.
             guard fire > now else { continue }
-            result.append((key: eventKey(accountID: accountID, date: day,
-                                         calendar: calendar), date: fire))
+            result.append((key: reminderKey(
+                accountID: accountID, date: day,
+                minuteOfDay: time, calendar: calendar
+            ), date: fire))
         }
         return result
     }
 
     static func reconcile(
         enabled: Bool, accountID: UUID, completedToday: Bool,
-        now: Date = Date(), calendar: Calendar = .current
+        now: Date = Date(),
+        minuteOfDay: Int = defaultMinuteOfDay,
+        calendar: Calendar = .current
     ) async {
         let center = UNUserNotificationCenter.current()
-        let wanted = datesToSchedule(enabled: enabled,
-                                     completedToday: completedToday,
-                                     accountID: accountID,
-                                     now: now, calendar: calendar)
+        let delivered = await center.deliveredNotifications()
+        let todayKey = eventKey(
+            accountID: accountID, date: now, calendar: calendar
+        )
+        // A reminder already delivered today should not be sent again when
+        // the athlete changes the preferred time after that delivery.
+        let deliveredToday = delivered.contains {
+            let key = $0.request.identifier
+            return key == todayKey || key.hasPrefix(todayKey + ".")
+        }
+        let wanted = datesToSchedule(
+            enabled: enabled, completedToday: completedToday || deliveredToday,
+            accountID: accountID, now: now,
+            minuteOfDay: minuteOfDay, calendar: calendar
+        )
         let wantedIDs = Set(wanted.map(\.key))
         let pending = await center.pendingNotificationRequests()
         let owned = pending.map(\.identifier).filter {
             $0.hasPrefix(identifierPrefix)
         }
+        // Legacy 09:00 identifiers and previous custom times are removed
+        // because they are absent from the new time-specific wanted IDs.
         let obsolete = owned.filter { !wantedIDs.contains($0) }
         if !obsolete.isEmpty {
             center.removePendingNotificationRequests(withIdentifiers: obsolete)
@@ -66,13 +101,10 @@ enum ATHLTHDailyCheckInReminderScheduler {
 
         // Remove stale delivered reminders on opt-out, account changes and
         // after completing today's check-in. Do not dismiss unrelated alerts.
-        let delivered = await center.deliveredNotifications()
-        let currentKey = eventKey(accountID: accountID, date: now,
-                                  calendar: calendar)
         let expiredDelivered = delivered.map { $0.request.identifier }.filter {
             $0.hasPrefix(identifierPrefix) &&
                 (!enabled || !$0.hasPrefix(identifierPrefix + accountID.uuidString + ".") ||
-                 $0 != currentKey || completedToday)
+                 !($0 == todayKey || $0.hasPrefix(todayKey + ".")) || completedToday)
         }
         if !expiredDelivered.isEmpty {
             center.removeDeliveredNotifications(withIdentifiers: expiredDelivered)
@@ -99,7 +131,9 @@ enum ATHLTHDailyCheckInReminderScheduler {
             content.userInfo = [
                 "athlth_kind": "daily_check_in",
                 "athlthCheckInAccountID": accountID.uuidString,
-                "athlthEventKey": reminder.key
+                "athlthEventKey": eventKey(
+                    accountID: accountID, date: reminder.date, calendar: calendar
+                )
             ]
             let dateComponents = calendar.dateComponents(
                 [.year, .month, .day, .hour, .minute], from: reminder.date

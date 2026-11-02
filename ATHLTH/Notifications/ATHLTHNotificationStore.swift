@@ -85,10 +85,14 @@ enum ATHLTHDailyCheckInReminderPolicy {
     static func shouldShow(
         enabled: Bool, completed: Bool,
         issuedToday: Bool, now: Date,
+        minuteOfDay: Int = ATHLTHDailyCheckInReminderScheduler.defaultMinuteOfDay,
         calendar: Calendar = .current
     ) -> Bool {
-        enabled && !completed && !issuedToday &&
-            calendar.component(.hour, from: now) >= 8
+        let parts = calendar.dateComponents([.hour, .minute], from: now)
+        let currentMinuteOfDay = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+        return enabled && !completed && !issuedToday &&
+            currentMinuteOfDay >=
+                ATHLTHDailyCheckInReminderScheduler.normalizedMinuteOfDay(minuteOfDay)
     }
 }
 
@@ -336,6 +340,9 @@ final class ATHLTHNotificationStore: ObservableObject {
         calendar: Calendar = .current,
         defaults: UserDefaults = .standard
     ) {
+        let reminderMinuteOfDay = defaults.object(
+            forKey: "settings.dailyCheckInReminderMinuteOfDay"
+        ) as? Int ?? ATHLTHDailyCheckInReminderScheduler.defaultMinuteOfDay
         let prefix = "insights.daily-check-in."
         let day = calendar.dateComponents([.year, .month, .day], from: now)
         let dateKey = String(format: "%04d-%02d-%02d",
@@ -359,6 +366,7 @@ final class ATHLTHNotificationStore: ObservableObject {
                 accountID: accountID,
                 completedToday: completed,
                 now: now,
+                minuteOfDay: reminderMinuteOfDay,
                 calendar: calendar
             )
         }
@@ -368,7 +376,8 @@ final class ATHLTHNotificationStore: ObservableObject {
             enabled: enabled, completed: completed,
             issuedToday: defaults.string(forKey: issuedKey) == dateKey ||
                 items.contains(where: { $0.eventKey == eventKey }),
-            now: now, calendar: calendar
+            now: now, minuteOfDay: reminderMinuteOfDay,
+            calendar: calendar
         ) else { return }
 
         add(ATHLTHNotificationDraft(

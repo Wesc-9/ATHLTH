@@ -3862,6 +3862,19 @@ private struct ATHLTHNotificationSettingsView: View {
                     isOn: $settings.dailyCheckInRemindersEnabled
                 )
 
+                if settings.dailyCheckInRemindersEnabled {
+                    DatePicker(
+                        ATHLTHLocalization.choose(
+                            english: "Reminder time",
+                            norwegian: "Klokkeslett"
+                        ),
+                        selection: $settings.dailyCheckInReminderTime,
+                        displayedComponents: .hourAndMinute
+                    )
+                    .datePickerStyle(.compact)
+                    .tint(ATHLTHTheme.premiumGold)
+                }
+
                 // Permission is only surfaced when the user needs to act.
                 // Keep APNs registration/repair running independently.
                 if hasEnabledAlerts {
@@ -3901,8 +3914,8 @@ private struct ATHLTHNotificationSettingsView: View {
             } footer: {
                 Text(
                     ATHLTHLocalization.choose(
-                        english: "A reminder at 09:00 if you have not checked in. The reminder can also appear in Activity.",
-                        norwegian: "Påminnelse kl. 09.00 hvis du ikke har sjekket inn. Den kan også vises i Aktivitet."
+                        english: "A daily reminder at your chosen local time if you have not checked in. It can also appear in Activity.",
+                        norwegian: "Daglig påminnelse på valgt klokkeslett hvis du ikke har sjekket inn. Den kan også vises i Aktivitet."
                     )
                 )
             }
@@ -3976,14 +3989,17 @@ private struct ATHLTHNotificationSettingsView: View {
         )
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: notifications.authorizationStatus) { _, _ in
-            notifications.reconcileDailyCheckIn(
-                enabled: settings.dailyCheckInRemindersEnabled,
-                accountID: session.profile.userID,
-                completed: RecoverySorenessStore().hasTodayCheckIn
-            )
+            reconcileDailyReminder()
+        }
+        .onChange(of: settings.dailyCheckInRemindersEnabled) { _, _ in
+            reconcileDailyReminder()
+        }
+        .onChange(of: settings.dailyCheckInReminderMinuteOfDay) { _, _ in
+            reconcileDailyReminder()
         }
         .task {
             await notifications.refreshAuthorizationStatus()
+            reconcileDailyReminder()
             await notifications.reconcileSystemPreferences()
             await push.repairRegistrationIfAuthorized()
             await push.refreshBackendRegistrationStatus()
@@ -3993,6 +4009,14 @@ private struct ATHLTHNotificationSettingsView: View {
                 await notifications.reconcileSystemPreferences()
             }
         }
+    }
+
+    private func reconcileDailyReminder() {
+        notifications.reconcileDailyCheckIn(
+            enabled: settings.dailyCheckInRemindersEnabled,
+            accountID: session.profile.userID,
+            completed: RecoverySorenessStore().hasTodayCheckIn
+        )
     }
 
     private var hasEnabledAlerts: Bool {

@@ -578,6 +578,26 @@ final class AppSettingsStore: ObservableObject {
     @Published var ghostRaceLiveConnectionAlerts: Bool { didSet { persist() } }
 
     @Published var dailyCheckInRemindersEnabled: Bool { didSet { persist() } }
+    /// Minutes after local midnight; unlike Date this survives travel and DST.
+    @Published var dailyCheckInReminderMinuteOfDay: Int { didSet { persist() } }
+
+    var dailyCheckInReminderTime: Date {
+        get {
+            let minuteOfDay = ATHLTHDailyCheckInReminderScheduler.normalizedMinuteOfDay(
+                dailyCheckInReminderMinuteOfDay
+            )
+            return Calendar.current.date(
+                bySettingHour: minuteOfDay / 60,
+                minute: minuteOfDay % 60,
+                second: 0,
+                of: Date()
+            ) ?? Date()
+        }
+        set {
+            let parts = Calendar.current.dateComponents([.hour, .minute], from: newValue)
+            dailyCheckInReminderMinuteOfDay = (parts.hour ?? 12) * 60 + (parts.minute ?? 0)
+        }
+    }
     @Published var workoutRemindersEnabled: Bool { didSet { persist() } }
     @Published var friendActivityNotificationsEnabled: Bool { didSet { persist() } }
     @Published var challengeNotificationsEnabled: Bool { didSet { persist() } }
@@ -1060,6 +1080,11 @@ final class AppSettingsStore: ObservableObject {
 
         dailyCheckInRemindersEnabled = defaults.object(
             forKey: "settings.dailyCheckInReminders") as? Bool ?? true
+        dailyCheckInReminderMinuteOfDay =
+            ATHLTHDailyCheckInReminderScheduler.normalizedMinuteOfDay(
+                defaults.object(forKey: "settings.dailyCheckInReminderMinuteOfDay")
+                    as? Int ?? ATHLTHDailyCheckInReminderScheduler.defaultMinuteOfDay
+            )
         workoutRemindersEnabled = defaults.object(forKey: "settings.workoutReminders") as? Bool ?? true
         friendActivityNotificationsEnabled = defaults.object(forKey: "settings.friendActivityNotifications") as? Bool ?? true
         challengeNotificationsEnabled = defaults.object(forKey: "settings.challengeNotifications") as? Bool ?? true
@@ -1388,6 +1413,8 @@ final class AppSettingsStore: ObservableObject {
 
         defaults.set(dailyCheckInRemindersEnabled,
                      forKey: "settings.dailyCheckInReminders")
+        defaults.set(dailyCheckInReminderMinuteOfDay,
+                     forKey: "settings.dailyCheckInReminderMinuteOfDay")
         defaults.set(workoutRemindersEnabled, forKey: "settings.workoutReminders")
         defaults.set(friendActivityNotificationsEnabled, forKey: "settings.friendActivityNotifications")
         defaults.set(challengeNotificationsEnabled, forKey: "settings.challengeNotifications")

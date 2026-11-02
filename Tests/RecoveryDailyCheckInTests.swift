@@ -6,7 +6,7 @@ final class RecoveryDailyCheckInTests: XCTestCase {
     func testDailyReminderIsDisabledWhenSwitchedOffOrCompleted() {
         let calendar = Calendar(identifier: .gregorian)
         let date = calendar.date(from: DateComponents(
-            year: 2026, month: 10, day: 21, hour: 9))!
+            year: 2026, month: 10, day: 21, hour: 12))!
         XCTAssertTrue(ATHLTHDailyCheckInReminderPolicy.shouldShow(
             enabled: true, completed: false, issuedToday: false,
             now: date, calendar: calendar))
@@ -136,7 +136,7 @@ final class RecoveryDailyCheckInTests: XCTestCase {
             accountID: account, now: now, calendar: calendar
         )
         XCTAssertEqual(expected.count, 7)
-        XCTAssertEqual(calendar.component(.hour, from: expected[0].date), 9)
+        XCTAssertEqual(calendar.component(.hour, from: expected[0].date), 12)
         XCTAssertTrue(expected.allSatisfy {
             $0.key.hasPrefix("insights.daily-check-in." + account.uuidString)
         })
@@ -154,7 +154,7 @@ final class RecoveryDailyCheckInTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Europe/Oslo")!
         let now = calendar.date(from: DateComponents(
-            year: 2026, month: 10, day: 28, hour: 10))!
+            year: 2026, month: 10, day: 28, hour: 13))!
         let account = UUID()
         let future = ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
             enabled: true, completedToday: false, accountID: account,
@@ -167,6 +167,68 @@ final class RecoveryDailyCheckInTests: XCTestCase {
         XCTAssertTrue(ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
             enabled: false, completedToday: false, accountID: account,
             now: now, calendar: calendar
+        ).isEmpty)
+    }
+
+    func testInAppReminderWaitsUntilChosenTime() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Oslo")!
+        let justBeforeNoon = calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 3, hour: 11, minute: 59
+        ))!
+        let noon = calendar.date(byAdding: .minute, value: 1, to: justBeforeNoon)!
+        XCTAssertFalse(ATHLTHDailyCheckInReminderPolicy.shouldShow(
+            enabled: true, completed: false, issuedToday: false,
+            now: justBeforeNoon, calendar: calendar
+        ))
+        XCTAssertTrue(ATHLTHDailyCheckInReminderPolicy.shouldShow(
+            enabled: true, completed: false, issuedToday: false,
+            now: noon, calendar: calendar
+        ))
+        XCTAssertFalse(ATHLTHDailyCheckInReminderPolicy.shouldShow(
+            enabled: true, completed: false, issuedToday: false,
+            now: noon, minuteOfDay: 15 * 60 + 30, calendar: calendar
+        ))
+    }
+
+    @MainActor
+    func testCustomTimeIsScheduledAndPreviousTimeKeyIsReplaced() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "Europe/Oslo")!
+        let now = calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 3, hour: 11
+        ))!
+        let account = UUID()
+        let standard = ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
+            enabled: true, completedToday: false,
+            accountID: account, now: now, calendar: calendar
+        )
+        let custom = ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
+            enabled: true, completedToday: false, accountID: account,
+            now: now, minuteOfDay: 15 * 60 + 30, calendar: calendar
+        )
+        XCTAssertEqual(custom.count, 7)
+        XCTAssertEqual(calendar.component(.hour, from: custom[0].date), 15)
+        XCTAssertEqual(calendar.component(.minute, from: custom[0].date), 30)
+        XCTAssertNotEqual(standard[0].key, custom[0].key)
+        XCTAssertEqual(
+            ATHLTHDailyCheckInReminderScheduler.eventKey(
+                accountID: account, date: now, calendar: calendar
+            ),
+            String(custom[0].key.dropLast(5))
+        )
+        let morning = ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
+            enabled: true, completedToday: false, accountID: account,
+            now: now, minuteOfDay: 9 * 60 + 15, calendar: calendar
+        )
+        XCTAssertEqual(morning.count, 6)
+        XCTAssertFalse(morning.contains {
+            calendar.isDate($0.date, inSameDayAs: now)
+        })
+        XCTAssertTrue(ATHLTHDailyCheckInReminderScheduler.datesToSchedule(
+            enabled: false, completedToday: false,
+            accountID: account, now: now,
+            minuteOfDay: 15 * 60 + 30, calendar: calendar
         ).isEmpty)
     }
 
