@@ -10,7 +10,7 @@ enum ATHLTHDailyCheckInReminderScheduler {
     static let defaultMinuteOfDay = 12 * 60
     static let horizonDays = 7
 
-    static func normalizedMinuteOfDay(_ minuteOfDay: Int) -> Int {
+    nonisolated static func normalizedMinuteOfDay(_ minuteOfDay: Int) -> Int {
         min(max(minuteOfDay, 0), 23 * 60 + 59)
     }
 
