@@ -411,3 +411,57 @@ struct RouteMapSnapshotThumbnail: View {
     }
 
 }
+
+struct GhostReplayRouteThumbnail: View {
+    @EnvironmentObject private var health: HealthKitManager
+    let workoutID: UUID
+    let ownerID: UUID
+    var height: CGFloat = 86
+
+    @State private var image: UIImage?
+    @State private var resolvedID: String?
+    @State private var loading = true
+
+    var body: some View {
+        GeometryReader { proxy in
+            let width = proxy.size.width
+            let size = CGSize(width: max(width, 1), height: height)
+            let key = [
+                "replay-map-v1", ownerID.uuidString, workoutID.uuidString,
+                String(Int(width.rounded())), String(Int(height.rounded()))
+            ].joined(separator: "|")
+            ZStack {
+                ATHLTHTheme.surfaceStone
+                if resolvedID == key, let image {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else if loading {
+                    ProgressView().controlSize(.small)
+                } else {
+                    Image(systemName: "map")
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+            }
+            .frame(width: width, height: height)
+            .clipShape(RoundedRectangle(cornerRadius: 14))
+            .task(id: key) {
+                guard width > 20 else { return }
+                image = nil
+                resolvedID = nil
+                loading = true
+                let locations = await health.workoutRoute(for: workoutID)
+                guard !Task.isCancelled else { return }
+                let result = await RouteMapSnapshotCache.image(
+                    for: locations.map(\.coordinate),
+                    size: size,
+                    requestID: key
+                )
+                guard !Task.isCancelled else { return }
+                image = result
+                resolvedID = key
+                loading = false
+            }
+        }
+        .frame(height: height)
+        .accessibilityHidden(true)
+    }
+}
