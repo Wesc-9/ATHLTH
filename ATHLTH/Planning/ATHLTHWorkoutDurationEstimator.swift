@@ -4,7 +4,29 @@ import Foundation
 /// Includes expanded interval rounds and between-set rests. A partial or
 /// unbounded prescription must not appear as a complete workout duration.
 enum ATHLTHWorkoutDurationEstimator {
+    /// Exact-target estimate remains strict for recorded/executed workouts.
     static func minutes(for blocks: [WorkoutTemplateBlock]) -> Int? {
+        calculateMinutes(for: blocks, fallbackPace: false)
+    }
+
+    /// Preview-only estimate when a distance-based run or walk lacks a
+    /// personal pace target. These are assumptions, not measured performance:
+    /// 6:00 min/km for running and 12:00 min/km for walking.
+    static func previewMinutes(
+        for blocks: [WorkoutTemplateBlock],
+        defaultActivity: WorkoutCardioActivity = .running
+    ) -> Int? {
+        calculateMinutes(
+            for: blocks, fallbackPace: true,
+            defaultActivity: defaultActivity
+        )
+    }
+
+    private static func calculateMinutes(
+        for blocks: [WorkoutTemplateBlock],
+        fallbackPace: Bool,
+        defaultActivity: WorkoutCardioActivity = .running
+    ) -> Int? {
         guard !blocks.isEmpty else { return nil }
         let steps = blocks.expandedForExecution()
         guard !steps.isEmpty, steps.count <= 1_000 else { return nil }
@@ -30,12 +52,18 @@ enum ATHLTHWorkoutDurationEstimator {
                 if let time = block.durationSeconds, time.isFinite, time > 0 {
                     seconds += time
                 } else if let meters = block.distanceMeters,
-                          let pace = block.targetPaceSecondsPerKilometer,
-                          meters.isFinite, pace.isFinite,
-                          meters > 0, pace > 0 {
+                          meters.isFinite, meters > 0 {
+                    let pace = block.targetPaceSecondsPerKilometer ??
+                        (fallbackPace
+                            ? (block.cardioActivity ?? defaultActivity) == .walking
+                                ? 720.0 : 360.0
+                            : nil)
+                    guard let pace, pace.isFinite, pace > 0 else {
+                        return nil
+                    }
                     seconds += meters / 1_000 * pace
                 } else {
-                    // Unknown distance or pace is NOT a known time target.
+                    // Open-ended distance/time is never given a fake estimate.
                     return nil
                 }
             case .rest:

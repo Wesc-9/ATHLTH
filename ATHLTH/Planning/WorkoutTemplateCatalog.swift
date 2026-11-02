@@ -3713,7 +3713,29 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var knownDurationMinutes: Int? {
-        ATHLTHWorkoutDurationEstimator.minutes(for: blocks)
+        if isPlannedWorkout {
+            return ATHLTHWorkoutDurationEstimator.previewMinutes(
+                for: blocks,
+                defaultActivity: initialActivity == .walking ? .walking : .running
+            )
+        }
+        return ATHLTHWorkoutDurationEstimator.minutes(for: blocks)
+    }
+
+    private var activeRouteID: UUID? {
+        guard let selectedRouteID else { return nil }
+        let routeTitle = session.savedRoutes.first {
+            $0.id == selectedRouteID
+        }?.title
+        return ATHLTHPlannedRoutePreviewPolicy.activeRouteID(
+            selectedRouteID: selectedRouteID,
+            routeTitle: routeTitle,
+            blocks: blocks
+        )
+    }
+
+    private var activeRoute: TrainingRoute? {
+        session.savedRoutes.first { $0.id == activeRouteID }
     }
 
     private var resolvedDurationMinutes: Int? {
@@ -3841,7 +3863,7 @@ struct WorkoutTemplateBuilderView: View {
                                 activity: initialActivity,
                                 blocks: blocks,
                                 durationMinutes: resolvedDurationMinutes,
-                                route: session.savedRoutes.first { $0.id == selectedRouteID },
+                                route: activeRoute,
                                 plannedDate: plannedDate,
                                 onDateChanged: onScheduledTimeChanged
                             )
@@ -4195,7 +4217,23 @@ struct WorkoutTemplateBuilderView: View {
                 savedToMyWorkouts = false
                 persistWorkoutDraft()
             }
-            .onChange(of: selectedRouteID) { _, _ in persistWorkoutDraft() }
+            .onChange(of: selectedRouteID) { oldValue, newValue in
+                if let oldValue, newValue == nil {
+                    let routeTitle = session.savedRoutes.first {
+                        $0.id == oldValue
+                    }?.title
+                    // A route deselected from the picker must not leave
+                    // its distance-only step behind.
+                    blocks.removeAll { block in
+                        block.kind == .run &&
+                            (block.routeID == oldValue ||
+                             (block.routeID == nil && routeTitle != nil &&
+                              block.title == routeTitle))
+                    }
+                    resequence()
+                }
+                persistWorkoutDraft()
+            }
             .onChange(of: selectedWorkoutGearIDs) { _, _ in
                 if draftActive { gearSelectionTouched = true }
                 persistWorkoutDraft()
@@ -4324,7 +4362,7 @@ struct WorkoutTemplateBuilderView: View {
             selectedPhase: $selectedPhase,
             advanced: studioAdvanced,
             activity: initialActivity,
-            hasSelectedRoute: selectedRouteID != nil,
+            hasSelectedRoute: activeRouteID != nil,
             onAddRun: { phase in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
@@ -4398,7 +4436,16 @@ struct WorkoutTemplateBuilderView: View {
                 guard let index = blocks.firstIndex(where: {
                     $0.editorDragID == id
                 }) else { return }
-                let groupID = blocks[index].groupID
+                let removed = blocks[index]
+                let groupID = removed.groupID
+                let previousTitle = session.savedRoutes.first {
+                    $0.id == selectedRouteID
+                }?.title
+                selectedRouteID =
+                    ATHLTHPlannedRoutePreviewPolicy.selectedRouteIDAfterDeleting(
+                        removed, selectedRouteID: selectedRouteID,
+                        routeTitle: previousTitle
+                    )
                 blocks.remove(at: index)
                 if let groupID,
                    blocks.filter({ $0.groupID == groupID }).count < 2 {
@@ -6109,7 +6156,7 @@ struct WorkoutTemplateBuilderView: View {
             activity: initialActivity,
             blocks: blocks,
             durationMinutes: resolvedDurationMinutes,
-            routeTitle: session.savedRoutes.first { $0.id == selectedRouteID }?.title
+            routeTitle: activeRoute?.title
         )
         let fallbackTitle = isPlannedWorkout && studioAdvanced
             ? suggestedAdvancedTitle : suggestedBasicTitle
@@ -6123,7 +6170,7 @@ struct WorkoutTemplateBuilderView: View {
             durationMinutes: resolvedDurationMinutes,
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
-            routeID: hasOutdoorCardio ? selectedRouteID : nil,
+            routeID: hasOutdoorCardio ? activeRouteID : nil,
             exercises: [],
             notes: nil
         )
@@ -6166,7 +6213,7 @@ struct WorkoutTemplateBuilderView: View {
             }
         } else if let onSaveToPlan {
             guard onSaveToPlan(
-                cleanTitle, blocks, hasOutdoorCardio ? selectedRouteID : nil,
+                cleanTitle, blocks, hasOutdoorCardio ? activeRouteID : nil,
                 resolvedDurationMinutes, manualDurationMinutes != nil, extras
             ) else {
                 actionNotice = tr("Cannot save this workout yet",
@@ -6175,7 +6222,7 @@ struct WorkoutTemplateBuilderView: View {
             }
             if !pendingCopyDayIDs.isEmpty, let onCopyToPlan {
                 guard onCopyToPlan(
-                    cleanTitle, blocks, hasOutdoorCardio ? selectedRouteID : nil,
+                    cleanTitle, blocks, hasOutdoorCardio ? activeRouteID : nil,
                     resolvedDurationMinutes, Array(pendingCopyDayIDs).sorted(), extras
                 ) else {
                     actionNotice = tr("Workout saved; check copy destinations",

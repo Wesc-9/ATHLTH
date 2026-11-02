@@ -27,6 +27,46 @@ final class ATHLTHWorkoutDurationEstimatorTests: XCTestCase {
         )
     }
 
+    func testPlannedDistanceIncludesWarmupAndDefaultsByActivity() {
+        var warmup = block(.run, "Warmup", seconds: 600)
+        warmup.phase = .warmup
+        var route = block(.run, "Route")
+        route.distanceMeters = 7_500
+
+        // Strict scheduling remains nil when no pace has been specified.
+        XCTAssertNil(ATHLTHWorkoutDurationEstimator.minutes(for: [warmup, route]))
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewMinutes(for: [warmup, route]),
+            55
+        )
+
+        route.cardioActivity = .walking
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewMinutes(for: [warmup, route]),
+            100
+        )
+        route.targetPaceSecondsPerKilometer = 600
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewMinutes(for: [warmup, route]),
+            85
+        )
+    }
+
+    func testPlannedWalkingFallbackRespectsWorkoutCategory() {
+        var route = block(.run, "Walking route")
+        route.distanceMeters = 5_000
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewMinutes(
+                for: [route], defaultActivity: .walking
+            ), 60
+        )
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewMinutes(
+                for: [route], defaultActivity: .running
+            ), 30
+        )
+    }
+
     func testUnknownRunningPaceDoesNotPretendToBeAccurate() {
         var run = block(.run, "Five kilometers")
         run.distanceMeters = 5_000

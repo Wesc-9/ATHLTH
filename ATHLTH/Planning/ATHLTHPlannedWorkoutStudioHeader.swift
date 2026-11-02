@@ -36,9 +36,10 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     private let bronze = ATHLTHTrainDesign.bronze
 
     private var distanceText: String {
-        let kilometers = route?.distanceKilometers ??
-            (blocks.compactMap(\.distanceMeters).reduce(0, +) / 1_000)
-        return kilometers > 0 ? String(format: "~ %.1f km", kilometers) : "–"
+        guard let kilometers = ATHLTHPlannedRoutePreviewPolicy.distanceKilometers(
+            for: blocks
+        ) else { return "–" }
+        return String(format: "~ %.1f km", kilometers)
     }
 
     private var zoneText: String {

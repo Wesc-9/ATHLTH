@@ -217,8 +217,10 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     private func phaseCard(_ phase: WorkoutPhaseKind) -> some View {
         let rows = entries(in: phase)
         let expanded = advanced && !collapsedPhases.contains(phase)
-        let totalSeconds = rows.expandedForExecution()
-            .compactMap(\.durationSeconds).reduce(0, +)
+        let estimatedMinutes = ATHLTHWorkoutDurationEstimator.previewMinutes(
+            for: rows,
+            defaultActivity: activity == .walking ? .walking : .running
+        )
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 11) {
                 Image(systemName: "line.3.horizontal")
@@ -243,8 +245,9 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         Text("\(rows.count) " +
                             ATHLTHLocalization.choose(
                                 english: "steps", norwegian: "deløkter"
-                            ) + (totalSeconds > 0
-                                ? " · \(Int(totalSeconds / 60)) min" : ""))
+                            ) + (estimatedMinutes.map {
+                                " · ~\($0) min"
+                            } ?? ""))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
