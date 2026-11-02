@@ -120,4 +120,87 @@ final class ATHLTHInsightsHealthLibraryTests: XCTestCase {
         XCTAssertFalse(areas.contains { $0.rawValue == "hearing" })
     }
 
+
+    func testHeartRateRecoveryFallbackUsesTwoRealMeasurements() {
+        let end = Date(timeIntervalSinceReferenceDate: 1_000_000)
+        let readings = [
+            ATHLTHHeartRateRecoveryCalculator.Reading(
+                date: end.addingTimeInterval(-5),
+                bpm: 154,
+                sourceIdentifier: "com.apple.health.watch"
+            ),
+            ATHLTHHeartRateRecoveryCalculator.Reading(
+                date: end.addingTimeInterval(62),
+                bpm: 112,
+                sourceIdentifier: "com.apple.health.watch"
+            )
+        ]
+        XCTAssertEqual(
+            ATHLTHHeartRateRecoveryCalculator.dropAfterOneMinute(
+                workoutEnd: end, readings: readings
+            ),
+            42
+        )
+    }
+
+    func testHeartRateRecoveryNeverInventsMissingPostWorkoutPulse() {
+        let end = Date(timeIntervalSinceReferenceDate: 1_000_000)
+        let readings = [
+            ATHLTHHeartRateRecoveryCalculator.Reading(
+                date: end.addingTimeInterval(-2),
+                bpm: 153,
+                sourceIdentifier: "watch"
+            ),
+            ATHLTHHeartRateRecoveryCalculator.Reading(
+                date: end.addingTimeInterval(20),
+                bpm: 142,
+                sourceIdentifier: "watch"
+            )
+        ]
+        XCTAssertNil(
+            ATHLTHHeartRateRecoveryCalculator.dropAfterOneMinute(
+                workoutEnd: end, readings: readings
+            )
+        )
+    }
+
+    func testHeartRateRecoveryDoesNotMixSourcesOrInventNegativeDrop() {
+        let end = Date(timeIntervalSinceReferenceDate: 1_000_000)
+        let base = ATHLTHHeartRateRecoveryCalculator.Reading(
+            date: end.addingTimeInterval(-3),
+            bpm: 150,
+            sourceIdentifier: "watch-one"
+        )
+        let other = ATHLTHHeartRateRecoveryCalculator.Reading(
+            date: end.addingTimeInterval(62),
+            bpm: 102,
+            sourceIdentifier: "watch-two"
+        )
+        XCTAssertNil(
+            ATHLTHHeartRateRecoveryCalculator.dropAfterOneMinute(
+                workoutEnd: end, readings: [base, other]
+            )
+        )
+        let higher = ATHLTHHeartRateRecoveryCalculator.Reading(
+            date: end.addingTimeInterval(60),
+            bpm: 160,
+            sourceIdentifier: "watch-one"
+        )
+        XCTAssertNil(
+            ATHLTHHeartRateRecoveryCalculator.dropAfterOneMinute(
+                workoutEnd: end, readings: [base, higher]
+            )
+        )
+    }
+
+    func testRecoveryHistoryMarksCalculatedReadings() {
+        let day = Date(timeIntervalSinceReferenceDate: 1_000_000)
+        let native = ATHLTHInsightHealthDay(date: day, value: 31)
+        let calculated = ATHLTHInsightHealthDay(
+            date: day, value: 34, isEstimated: true
+        )
+        XCTAssertFalse(native.isEstimated)
+        XCTAssertTrue(calculated.isEstimated)
+    }
+
 }
