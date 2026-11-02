@@ -408,6 +408,9 @@ struct ATHLTHCommunityV5View: View {
     private var overview: some View {
         VStack(spacing: 12) {
             weeklyChallengeSection
+            // Keep Train Together discoverable without adding a fifth tab
+            // or duplicating the existing marketplace and creation flows.
+            trainTogetherOverviewCard
             twoColumns {
                 joinedClubCard
                 arenaDuelCard
@@ -418,6 +421,67 @@ struct ATHLTHCommunityV5View: View {
                 invitationBanner(invitation)
             }
         }
+    }
+
+    /// Compact shortcut between the weekly challenge and the club / Arena
+    /// cards. The existing marketplace owns discovery and creation state.
+    private var trainTogetherOverviewCard: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack(spacing: 11) {
+                Image(systemName: "figure.run")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(CommunityReferenceStyle.darkGold)
+                    .frame(width: 38, height: 38)
+                    .background(
+                        CommunityReferenceStyle.cream,
+                        in: RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    )
+                    .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tr("Train Together", "Tren sammen"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(CommunityReferenceStyle.ink)
+                    Text(tr(
+                        "Find a shared workout or invite other athletes.",
+                        "Finn en fellesøkt eller inviter andre til å trene."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(CommunityReferenceStyle.muted)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+            }
+
+            HStack(spacing: 9) {
+                NavigationLink {
+                    TrainTogetherMarketplaceView()
+                } label: {
+                    Label(tr("Find workouts", "Finn økter"), systemImage: "magnifyingglass")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(CommunityReferenceStyle.darkGold)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .background(CommunityReferenceStyle.cream, in: Capsule())
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    TrainTogetherMarketplaceView(initialCreationMode: .physical)
+                } label: {
+                    Label(tr("Create workout", "Opprett økt"), systemImage: "plus")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 42)
+                        .background(
+                            CommunityReferenceStyle.darkGold,
+                            in: Capsule()
+                        )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(13)
+        .communityReferenceCard()
     }
 
     // The weekly challenge lives once, at the top of Overview.
