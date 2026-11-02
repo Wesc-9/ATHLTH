@@ -308,7 +308,7 @@ struct RouteMapSnapshotThumbnail: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let size = CGSize(width: max(proxy.size.width, 220), height: height)
+            let size = CGSize(width: max(proxy.size.width, 88), height: height)
             let requestID = RouteMapSnapshotIdentity.key(
                 route: route, size: size, scale: UIScreen.main.scale
             )

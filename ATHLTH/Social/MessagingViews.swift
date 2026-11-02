@@ -7257,6 +7257,7 @@ struct MessageSharePicker: View {
     @State private var selectedKind: MessageShareKind
     @State private var exerciseCategory: ATHLTHExerciseActivity?
     @State private var workoutActivity: WorkoutKind?
+    @State private var routeDistance: ATHLTHRouteShareDistanceFilter?
     @State private var shareError: String?
 
     private var isExerciseOnly: Bool {
@@ -7275,8 +7276,12 @@ struct MessageSharePicker: View {
         allowedKinds.count == 1 && allowedKinds[0] == .trainingPlan
     }
 
+    private var isRouteOnly: Bool {
+        allowedKinds.count == 1 && allowedKinds[0] == .route
+    }
+
     private var usesActivityFilters: Bool {
-        isExerciseOnly || isWorkoutSharing || isPlanOnly
+        isExerciseOnly || isWorkoutSharing || isPlanOnly || isRouteOnly
     }
 
     private var eligibleExercises: [ExerciseLibraryEntry] {
@@ -7300,6 +7305,9 @@ struct MessageSharePicker: View {
                 english: "Share exercise", norwegian: "Del øvelse"
             )
         }
+        if isRouteOnly {
+            return ATHLTHLocalization.choose(english: "Share route", norwegian: "Del rute")
+        }
         if isWorkoutSharing {
             return ATHLTHLocalization.choose(
                 english: "Share workout", norwegian: "Del treningsøkt"
@@ -7320,6 +7328,9 @@ struct MessageSharePicker: View {
             return ATHLTHLocalization.choose(
                 english: "Exercise sharing", norwegian: "Øvelsesdeling"
             )
+        }
+        if isRouteOnly {
+            return ATHLTHLocalization.choose(english: "Route sharing", norwegian: "Rutedeling")
         }
         if isWorkoutSharing {
             return ATHLTHLocalization.choose(
@@ -7367,6 +7378,8 @@ struct MessageSharePicker: View {
                         if usesActivityFilters {
                             if isExerciseOnly {
                                 exerciseActivityFilters
+                            } else if isRouteOnly {
+                                routeDistanceFilters
                             } else {
                                 workoutActivityFilters
                             }
@@ -7558,6 +7571,29 @@ struct MessageSharePicker: View {
                         selected: workoutActivity == kind
                     ) {
                         workoutActivity = kind
+                    }
+                }
+            }
+        }
+    }
+
+    private var routeDistanceFilters: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                exerciseFilterChip(
+                    title: ATHLTHLocalization.choose(english: "All", norwegian: "Alle"),
+                    symbol: "square.grid.2x2",
+                    selected: routeDistance == nil
+                ) {
+                    routeDistance = nil
+                }
+                ForEach(ATHLTHRouteShareDistanceFilter.allCases) { distance in
+                    exerciseFilterChip(
+                        title: distance.title,
+                        symbol: "point.topleft.down.to.point.bottomright.curvepath",
+                        selected: routeDistance == distance
+                    ) {
+                        routeDistance = distance
                     }
                 }
             }
@@ -7766,9 +7802,7 @@ struct MessageSharePicker: View {
             }
 
         case .route:
-            let routes = ATHLTHPersonalSharePolicy.savedRoutes(
-                session.savedRoutes, ownerID: session.profile.userID
-            )
+            let routes = filteredRoutes
             if routes.isEmpty {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(english: "No saved routes", norwegian: "Ingen lagrede ruter"),
@@ -7781,7 +7815,8 @@ struct MessageSharePicker: View {
                     shareRow(
                         icon: "map.fill",
                         title: route.title,
-                        subtitle: routeSubtitle(safeRoute)
+                        subtitle: routeSubtitle(route),
+                        routePreview: safeRoute
                     ) {
                         guard ATHLTHPersonalSharePolicy.route(
                             route, ownerID: session.profile.userID
@@ -7797,7 +7832,7 @@ struct MessageSharePicker: View {
                         createDraft(
                             kind: .route,
                             title: route.title,
-                            subtitle: routeSubtitle(safeRoute),
+                            subtitle: String(format: "%.2f km", safeRoute.distanceKilometers),
                             snapshot: safeRoute,
                             sourceObjectID: route.sharedSourceRouteID ?? route.id,
                             sourceOwnerID: route.sharedSourceOwnerID ?? route.ownerID
@@ -7842,6 +7877,12 @@ struct MessageSharePicker: View {
                 ($0.state == .creator || $0.state == .accepted)
             }
         }
+    }
+
+    private var filteredRoutes: [TrainingRoute] {
+        ATHLTHPersonalSharePolicy.savedRoutes(
+            session.savedRoutes, ownerID: session.profile.userID
+        ).filter { routeDistance?.matches($0.distanceKilometers) ?? true }
     }
 
     private var shareablePlans: [TrainingPlan] {
@@ -7918,24 +7959,27 @@ struct MessageSharePicker: View {
     }
 
     private func routeSubtitle(_ route: TrainingRoute) -> String {
-        var value = String(format: "%.2f km", route.distanceKilometers)
-        if settings.hideRouteStartAndEnd {
-            value += " · start/end hidden"
-        }
-        return value
+        // Display the original starting place only on the owner's picker.
+        // The attachment still receives the privacy-sanitized route.
+        let start = route.startName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let label = start?.isEmpty == false ? start! :
+            ATHLTHLocalization.choose(
+                english: "Start not specified", norwegian: "Startsted ikke angitt"
+            )
+        return String(format: "%.2f km", route.distanceKilometers) + " · " + label
     }
 
     private func privacySafeRoute(_ route: TrainingRoute) -> TrainingRoute {
-        guard settings.hideRouteStartAndEnd,
-              route.coordinates.count > 4
-        else {
-            return route
-        }
+        guard settings.hideRouteStartAndEnd else { return route }
+        var copy = route
+        // Never export named endpoints when privacy settings hide them.
+        copy.startName = nil
+        copy.endName = nil
+        guard route.coordinates.count > 4 else { return copy }
 
         let trimmed = trimRoute(route.coordinates, bufferMeters: 250)
-        guard trimmed.count >= 2 else { return route }
+        guard trimmed.count >= 2 else { return copy }
 
-        var copy = route
         copy.coordinates = trimmed.enumerated().map { index, point in
             RouteCoordinate(
                 latitude: point.latitude,
@@ -7945,8 +7989,6 @@ struct MessageSharePicker: View {
             )
         }
         copy.distanceKilometers = routeDistanceKilometers(copy.coordinates)
-        copy.startName = nil
-        copy.endName = nil
         return copy
     }
 
@@ -8007,37 +8049,25 @@ struct MessageSharePicker: View {
         icon: String,
         title: String,
         subtitle: String,
+        routePreview: TrainingRoute? = nil,
         action: @escaping () -> Void
     ) -> some View {
         Button(
             action: action
         ) {
             HStack(spacing: 13) {
-                Image(
-                    systemName: icon
-                )
-                .font(
-                    .system(
-                        size: 16,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .premiumGold
-                )
-                .frame(
-                    width: 42,
-                    height: 42
-                )
-                .background(
-                    ATHLTHTheme
-                        .premiumGoldSoft,
-                    in: RoundedRectangle(
-                        cornerRadius: 13,
-                        style: .continuous
-                    )
-                )
+                if let routePreview {
+                    RouteMapSnapshotThumbnail(route: routePreview, height: 64)
+                        .frame(width: 84, height: 64)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                } else {
+                    Image(systemName: icon)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
+                        .frame(width: 46, height: 52)
+                        .background(ATHLTHTheme.premiumGoldSoft,
+                                    in: RoundedRectangle(cornerRadius: 13))
+                }
 
                 VStack(
                     alignment: .leading,
