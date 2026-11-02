@@ -23,12 +23,12 @@ enum ATHLTHInsightHealthArea: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
-        case .sleep: "moon.stars.fill"
-        case .vitalSigns: "waveform.path.ecg"
-        case .fitness: "heart.fill"
-        case .recovery: "heart.text.square"
-        case .movement: "figure.run"
-        case .body: "scalemass"
+        case .sleep: return "moon.stars.fill"
+        case .vitalSigns: return "waveform.path.ecg"
+        case .fitness: return "heart.fill"
+        case .recovery: return "heart.text.square"
+        case .movement: return "figure.run"
+        case .body: return "scalemass"
         case .activity: return "figure.walk.motion"
         case .mobility: return "figure.walk"
         case .nutrition: return "drop.fill"
