@@ -136,8 +136,32 @@ if "case overview, training, development" not in sections:
     fail("Insights must contain Overview, Training and Development")
 if "case overview, health, training, development" in sections:
     fail("The redundant Body & Health top-level section has returned")
-if "ATHLTHInsightReferenceMetric" not in cards:
-    fail("Underlying health reference metrics must remain available")
+# The old ATHLTHInsightReferenceMetric model and ReferenceSignal/Load/Time
+# cards were retired. Verify the real HealthKit library and training signals
+# instead of keeping dead presentation code solely to satisfy CI.
+health_metrics = Path("ATHLTH/Insights/ATHLTHInsightHealthMetric.swift").read_text()
+health_library = Path("ATHLTH/Insights/ATHLTHInsightsHealthLibraryView.swift").read_text()
+training_signals = Path("ATHLTH/Insights/ATHLTHInsightsTrainingSignalsCard.swift").read_text()
+for symbol, source in (
+    ("enum ATHLTHInsightHealthMetric", health_metrics),
+    ("struct ATHLTHInsightsHealthMetricDetailView", health_library),
+    ("struct ATHLTHInsightsTrainingSignalsCard", training_signals),
+    ("ATHLTHInsightsTrainingSignalsCard(", insights),
+    ("ATHLTHInsightsHealthLibraryEntry(", insights),
+    ("ATHLTHInsightsReferenceDistributionCard(", insights),
+    ("ATHLTHInsightsDailyCheckInCard(", insights),
+):
+    if symbol not in source:
+        fail(f"An active Insights data route or view is missing: {symbol}")
+for obsolete in (
+    "ATHLTHInsightReferenceMetric",
+    "ATHLTHInsightsReferenceSignalCard",
+    "ATHLTHInsightsReferenceLoadCard",
+    "ATHLTHInsightsReferenceTimeCard",
+    "ATHLTHInsightsTrainingWeekCard",
+):
+    if obsolete in cards + sections:
+        fail(f"Retired Insights component has returned: {obsolete}")
 for token in (
     "RecoveryTrendSnapshot", "ATHLTHInsightsTrainingDay",
     "RecoveryTrainingLoadSummary", "RecoverySorenessStore",
