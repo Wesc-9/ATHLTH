@@ -9,7 +9,11 @@ struct ATHLTHWorkoutContentsPreview: View {
     var maximumVisibleBlocks: Int? = 3
 
     private var blocks: [WorkoutTemplateBlock] {
-        workout.resolvedWorkoutBlocks
+        // Historical running templates and strength plans can still store
+        // exercises in runningWorkout(s) or PlannedExercise rather than
+        // workoutBlocks. Use the same non-destructive projection as the
+        // workout editor; never show an empty card for a valid old recipe.
+        ATHLTHUnifiedWorkout.editorBlocks(from: workout)
     }
 
     private var visible: [WorkoutTemplateBlock] {
@@ -37,8 +41,8 @@ struct ATHLTHWorkoutContentsPreview: View {
 
             if visible.isEmpty {
                 Text(ATHLTHLocalization.choose(
-                    english: "No exercises or steps in this workout yet. Add them in the shared workout builder.",
-                    norwegian: "Ingen øvelser eller øktdeler lagt inn ennå. Legg dem til i den felles øktbyggeren."
+                    english: "No detailed steps are saved for this workout. You can add them in the workout builder.",
+                    norwegian: "Denne økten har ingen lagrede deløkter. Du kan legge dem til i øktbyggeren."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
