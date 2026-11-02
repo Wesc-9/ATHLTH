@@ -2191,7 +2191,28 @@ struct CustomExerciseEditorView: View {
                 }
 
                 Section("Exercise") {
-                    TextField("Name", text: $name)
+                    TextField(
+                        ATHLTHLocalization.choose(english: "Name", norwegian: "Navn"),
+                        text: $name
+                    )
+                    .onChange(of: name) { _, updated in
+                        if updated.count > ATHLTHLibraryName.maximumCustomExerciseCharacters {
+                            name = String(updated.prefix(
+                                ATHLTHLibraryName.maximumCustomExerciseCharacters
+                            ))
+                        }
+                    }
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Maximum 40 characters",
+                            norwegian: "Maks 40 tegn"
+                        ))
+                        Spacer()
+                        Text("\(name.count)/\(ATHLTHLibraryName.maximumCustomExerciseCharacters)")
+                            .monospacedDigit()
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     Picker(ATHLTHLocalization.choose(
                         english: "Activity", norwegian: "Aktivitet"
                     ), selection: $activityCategory) {
@@ -2575,10 +2596,20 @@ struct CustomExerciseEditorView: View {
 
     private func saveExercise() {
         do {
+            let savedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !savedName.isEmpty,
+                  savedName.count <= ATHLTHLibraryName.maximumCustomExerciseCharacters
+            else {
+                studioError = ATHLTHLocalization.choose(
+                    english: "Enter an exercise name of up to 40 characters.",
+                    norwegian: "Skriv et øvelsesnavn på maks 40 tegn."
+                )
+                return
+            }
             // Only the shipped library's names are reserved. Two athletes
             // may independently create custom exercises with identical names.
             guard !ATHLTHExerciseNamePolicy.collidesWithCatalog(
-                name, library: library
+                savedName, library: library
             ) else {
                 studioError = ATHLTHLocalization.choose(
                     english: "The name is already used by a library exercise. Please choose another name.",
@@ -2589,7 +2620,7 @@ struct CustomExerciseEditorView: View {
             let video = previewVideoURL
             if let editing {
                 var updated = editing.exercise
-                updated.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+                updated.name = savedName
                 updated.instructions = splitLines(instructions)
                 updated.primaryMuscles = selectedMuscleValues(primaryMuscles)
                 updated.secondaryMuscles = selectedMuscleValues(secondaryMuscles)
@@ -2617,7 +2648,7 @@ struct CustomExerciseEditorView: View {
             } else {
                 let created = library.createCustomExercise(
                     ownerID: session.profile.userID,
-                    name: name,
+                    name: savedName,
                     instructions: splitLines(instructions),
                     primaryMuscles: selectedMuscleValues(primaryMuscles),
                     secondaryMuscles: selectedMuscleValues(secondaryMuscles),
@@ -2658,7 +2689,9 @@ struct CustomExerciseEditorView: View {
             let secondary = Set(ExerciseMuscleGroup.allCases.filter {
                 suggestion.secondaryMuscles.contains($0.rawValue) && !primary.contains($0)
             })
-            name = String(suggestion.name.prefix(90))
+            name = String(suggestion.name.prefix(
+                ATHLTHLibraryName.maximumCustomExerciseCharacters
+            ))
             primaryMuscles = primary
             secondaryMuscles = secondary
             equipment = suggestion.equipment.joined(separator: ", ")
