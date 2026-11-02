@@ -5,6 +5,7 @@ import Charts
 /// Cards are native views; the sample source remains local Apple Health.
 struct ATHLTHInsightsHealthLibraryView: View {
     @EnvironmentObject private var health: HealthKitManager
+    @State private var searchText = ""
 
     var body: some View {
         ScrollView {
@@ -23,7 +24,14 @@ struct ATHLTHInsightsHealthLibraryView: View {
                 }
                 .padding(.bottom, 5)
 
-                ForEach(ATHLTHInsightHealthArea.allCases) { area in
+                ForEach(ATHLTHInsightHealthArea.allCases.filter { area in
+                    searchText.isEmpty ||
+                    area.title.localizedCaseInsensitiveContains(searchText) ||
+                    ATHLTHInsightHealthMetric.allCases.contains {
+                        $0.area == area &&
+                        $0.title.localizedCaseInsensitiveContains(searchText)
+                    }
+                }) { area in
                     NavigationLink {
                         ATHLTHInsightsHealthAreaView(area: area)
                     } label: {
@@ -70,6 +78,13 @@ struct ATHLTHInsightsHealthLibraryView: View {
         .navigationTitle(ATHLTHLocalization.choose(english: "Health", norwegian: "Helse"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.visible, for: .navigationBar)
+        .searchable(
+            text: $searchText,
+            prompt: ATHLTHLocalization.choose(
+                english: "Search health measurements",
+                norwegian: "Søk i helsemålinger"
+            )
+        )
     }
 }
 
@@ -231,7 +246,7 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                         .frame(minHeight: 165)
                     } else {
                         Chart(values) { item in
-                            if metric == .steps {
+                            if metric.cumulative {
                                 BarMark(
                                     x: .value("Dag", item.date),
                                     y: .value("Verdi", item.value)
