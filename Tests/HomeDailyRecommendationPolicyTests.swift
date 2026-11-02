@@ -358,4 +358,36 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
         XCTAssertNil(HomeDailyRecommendationSessionFactory.make(advice: advice))
     }
 
+
+    func testAlreadyCompletedWorkoutAvoidsSecondDemandingSession() {
+        var history = trainingHistory(
+            runs: 4, lastRunDaysAgo: 0, averageMinutes: 38
+        )
+        history.hasCompletedWorkoutToday = true
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .ready,
+            hasWorkoutToday: false,
+            trainingLoadRatio: 0.6,
+            trainingHistory: history
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .easyWalk(minutes: 20))
+        XCTAssertTrue(advice.dayDescription.localizedCaseInsensitiveContains(
+            ATHLTHLocalization.choose(
+                english: "already completed", norwegian: "allerede trent"
+            )
+        ))
+    }
+
+    func testTempoRequiresAtLeastOneRecoveryDaySinceLastRun() {
+        let advice = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .ready,
+            hasWorkoutToday: false,
+            trainingLoadRatio: 0.8,
+            trainingHistory: trainingHistory(
+                runs: 4, lastRunDaysAgo: 1, averageMinutes: 40
+            )
+        )
+        XCTAssertEqual(advice.suggestedWorkout, .progressiveRun(minutes: 30))
+    }
+
 }
