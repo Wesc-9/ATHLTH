@@ -47,6 +47,7 @@ enum HomeDailyRecommendationPolicy {
         let runsLast28Days: Int
         let mostRecentRunDaysAgo: Int?
         let averageRecentRunMinutes: Int?
+        var hasCompletedWorkoutToday: Bool = false
 
         static let empty = TrainingHistory(
             sessionsLast28Days: 0,
@@ -87,7 +88,10 @@ enum HomeDailyRecommendationPolicy {
                 sessionsLast28Days: recent.count,
                 runsLast28Days: runs.count,
                 mostRecentRunDaysAgo: daysAgo,
-                averageRecentRunMinutes: average
+                averageRecentRunMinutes: average,
+                hasCompletedWorkoutToday: recent.contains {
+                    calendar.isDate($0.startDate, inSameDayAs: now)
+                }
             )
         }
 
@@ -99,7 +103,7 @@ enum HomeDailyRecommendationPolicy {
 
         var supportsControlledTempo: Bool {
             runsLast28Days >= 3 &&
-            (mostRecentRunDaysAgo ?? 100) <= 10 &&
+            (2...10).contains(mostRecentRunDaysAgo ?? 100) &&
             (averageRecentRunMinutes ?? 0) >= 30
         }
     }
@@ -174,6 +178,10 @@ enum HomeDailyRecommendationPolicy {
             )
         } else if hasWorkoutToday, plannedWorkoutTitle != nil {
             suggestedWorkout = .planned
+        } else if trainingHistory.hasCompletedWorkoutToday {
+            // A readiness score must not prescribe a second demanding
+            // session on a day with an already completed workout.
+            suggestedWorkout = .easyWalk(minutes: 20)
         } else if readiness == .ready, trainingHistory.supportsControlledTempo {
             // A good readiness score alone never triggers tempo. Require
             // repeated recent running and a modest historic duration.
@@ -204,6 +212,19 @@ enum HomeDailyRecommendationPolicy {
                 return tr(
                     "Your recent training minutes are above your usual level. A lighter day can help balance the load.",
                     "Du har trent mer enn ditt vanlige nivå i det siste. En roligere dag kan balansere belastningen."
+                )
+            }
+            if trainingHistory.hasCompletedWorkoutToday,
+               suggestedWorkout != .planned {
+                return tr(
+                    "You already completed a workout today. Leave room for recovery before the next demanding session.",
+                    "Du har allerede trent i dag. Gi kroppen tid til å hente seg inn før neste krevende økt."
+                )
+            }
+            if suggestedWorkout == .planned {
+                return tr(
+                    "Today's planned workout is ready. Use your recovery indicators and warm-up to adjust the effort.",
+                    "Dagens planlagte økt ligger klar. Bruk restitusjonsmålingene og oppvarmingen til å tilpasse innsatsen."
                 )
             }
             switch readiness {
