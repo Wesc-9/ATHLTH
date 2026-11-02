@@ -1502,25 +1502,40 @@ struct ATHLTHTrainTodayPremiumView: View {
                     .allowsHitTesting(false)
             }
         } else {
+            // Without an active goal, keep the invitation compact. The taller
+            // progress card above is reserved for an actual active goal.
             NavigationLink {
                 GoalsHubView()
             } label: {
-                VStack(alignment: .leading, spacing: 11) {
-                    Label(tr("Active goal", "Aktivt mål"), systemImage: "target")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(champagne)
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack(spacing: 8) {
+                        Label(tr("Active goal", "Aktivt mål"), systemImage: "target")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(champagne)
+                        Spacer(minLength: 8)
+                        Image(systemName: "arrow.up.right")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(champagne)
+                            .accessibilityHidden(true)
+                    }
                     Text(tr("Choose a goal", "Velg et mål"))
                         .font(.system(.title3, design: .serif))
                         .foregroundStyle(ink)
-                    Image(systemName: "arrow.up.right")
-                        .foregroundStyle(champagne)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .frame(maxWidth: .infinity, minHeight: 174, alignment: .topLeading)
-                .padding(15)
+                .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+                .padding(.horizontal, 15)
+                .padding(.vertical, 10)
                 .background(
                     Color.white.opacity(0.95),
                     in: RoundedRectangle(cornerRadius: 20, style: .continuous)
                 )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .strokeBorder(hairline.opacity(0.43), lineWidth: 0.7)
+                        .allowsHitTesting(false)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
             }
             .buttonStyle(.plain)
         }
