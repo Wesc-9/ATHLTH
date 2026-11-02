@@ -4,6 +4,7 @@ import SwiftUI
 /// Reused for planned workouts and saved structured workouts.
 struct ATHLTHPlannedRunStepEditor: View {
     @Binding var block: WorkoutTemplateBlock
+    var routeDistanceMeters: Double? = nil
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -37,6 +38,7 @@ struct ATHLTHPlannedRunStepEditor: View {
         Binding(
             get: { block.durationSeconds != nil },
             set: { value in
+                guard routeDistanceMeters == nil else { return }
                 if value {
                     block.durationSeconds = block.durationSeconds ?? 600
                     block.distanceMeters = nil
@@ -46,6 +48,18 @@ struct ATHLTHPlannedRunStepEditor: View {
                 }
             }
         )
+    }
+
+    static func readOnlyRouteDistance(_ meters: Double) -> String {
+        guard meters.isFinite, meters > 0 else { return "–" }
+        if meters >= 1_000 {
+            return (meters / 1_000).formatted(
+                .number.precision(.fractionLength(0...2))
+            ) + " km"
+        }
+        return meters.formatted(
+            .number.precision(.fractionLength(0))
+        ) + " m"
     }
 
     private var indoors: Binding<Bool> {
@@ -94,23 +108,38 @@ struct ATHLTHPlannedRunStepEditor: View {
                 Text(tr("STEP GOAL", "MÅL FOR DELØKTEN"))
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
-                Picker(tr("Goal", "Mål"), selection: timed) {
-                    Text(tr("Distance", "Distanse")).tag(false)
-                    Text(tr("Time", "Tid")).tag(true)
-                }
-                .pickerStyle(.segmented)
-                if block.durationSeconds != nil {
-                    ATHLTHPlannedDurationEditor(durationSeconds: $block.durationSeconds)
-                } else {
-                    Stepper(
-                        value: Binding(
-                            get: { block.distanceMeters ?? 1_000 },
-                            set: { block.distanceMeters = $0 }
-                        ),
-                        in: 1...100_000, step: 100
-                    ) {
-                        Text("\(Int(block.distanceMeters ?? 1_000)) m")
+                if let routeDistanceMeters {
+                    HStack(spacing: 12) {
+                        Text(tr("Distance", "Distanse"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Spacer()
+                        Text(Self.readOnlyRouteDistance(routeDistanceMeters))
                             .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
+                            .accessibilityLabel(tr("Route distance", "Rutedistanse") +
+                                ": " + Self.readOnlyRouteDistance(routeDistanceMeters))
+                    }
+                    .frame(minHeight: 44)
+                } else {
+                    Picker(tr("Goal", "Mål"), selection: timed) {
+                        Text(tr("Distance", "Distanse")).tag(false)
+                        Text(tr("Time", "Tid")).tag(true)
+                    }
+                    .pickerStyle(.segmented)
+                    if block.durationSeconds != nil {
+                        ATHLTHPlannedDurationEditor(durationSeconds: $block.durationSeconds)
+                    } else {
+                        Stepper(
+                            value: Binding(
+                                get: { block.distanceMeters ?? 1_000 },
+                                set: { block.distanceMeters = $0 }
+                            ),
+                            in: 1...100_000, step: 100
+                        ) {
+                            Text("\(Int(block.distanceMeters ?? 1_000)) m")
+                                .font(.subheadline.weight(.medium))
+                        }
                     }
                 }
             }

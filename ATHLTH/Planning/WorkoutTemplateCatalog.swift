@@ -125,6 +125,9 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     var title: String
     var exerciseSlug: String?
     var distanceMeters: Double?
+    /// Attached route when this run step represents a saved route.
+    /// Optional for backwards compatibility with existing workout recipes.
+    var routeID: UUID? = nil
     var repetitions: Int?
     var durationSeconds: TimeInterval?
     var targetWeightKilograms: Double?
@@ -175,6 +178,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.title == rhs.title &&
         lhs.exerciseSlug == rhs.exerciseSlug &&
         lhs.distanceMeters == rhs.distanceMeters &&
+        lhs.routeID == rhs.routeID &&
         lhs.repetitions == rhs.repetitions &&
         lhs.durationSeconds == rhs.durationSeconds &&
         lhs.targetWeightKilograms == rhs.targetWeightKilograms &&
@@ -207,6 +211,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(title)
         hasher.combine(exerciseSlug)
         hasher.combine(distanceMeters)
+        hasher.combine(routeID)
         hasher.combine(repetitions)
         hasher.combine(durationSeconds)
         hasher.combine(targetWeightKilograms)
@@ -247,6 +252,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case title
         case exerciseSlug = "exercise_slug"
         case distanceMeters = "distance_meters"
+        case routeID = "route_id"
         case repetitions
         case durationSeconds = "duration_seconds"
         case targetWeightKilograms = "target_weight_kg"
@@ -4035,6 +4041,7 @@ struct WorkoutTemplateBuilderView: View {
                                 if original.kind != adapted.kind {
                                     blocks[liveIndex] = adapted
                                 }
+                                updateRouteStepIfNeeded(original.editorDragID)
                             }
                         } else {
                             ContentUnavailableView(
@@ -4428,7 +4435,8 @@ struct WorkoutTemplateBuilderView: View {
         let previousRoute = session.savedRoutes.first { $0.id == selectedRouteID }
         let existingRouteBlockIndex = previousRoute.flatMap { previous in
             blocks.firstIndex(where: {
-                $0.title == previous.title && $0.kind == .run
+                $0.kind == .run &&
+                ($0.routeID == previous.id || $0.title == previous.title)
             })
         }
         // A route can be the entire workout with no mandatory phase header.
@@ -4441,6 +4449,7 @@ struct WorkoutTemplateBuilderView: View {
             blocks[existingRouteBlockIndex].title = route.title
             blocks[existingRouteBlockIndex].distanceMeters =
                 route.distanceKilometers * 1_000
+            blocks[existingRouteBlockIndex].routeID = route.id
             blocks[existingRouteBlockIndex].phase = phase
             blocks[existingRouteBlockIndex].durationSeconds = nil
             resequence()
@@ -4455,6 +4464,7 @@ struct WorkoutTemplateBuilderView: View {
             notes: nil, phase: phase
         )
         routeRun.cardioActivity = initialActivity == .walking ? .walking : .running
+        routeRun.routeID = route.id
         routeRun.isIndoor = false
         insertBlock(routeRun, toGroup: nil)
         if isPlannedWorkout && !studioAdvanced &&
@@ -5104,6 +5114,9 @@ struct WorkoutTemplateBuilderView: View {
                 blockDetails(index)
                     .padding(.horizontal, 4)
                     .padding(.bottom, 4)
+                    .onAppear {
+                        updateRouteStepIfNeeded(blocks[index].editorDragID)
+                    }
             }
         }
         .padding(nested ? 5 : 13)
@@ -5171,6 +5184,44 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
+    private func routeForRunBlock(_ index: Int) -> TrainingRoute? {
+        guard blocks.indices.contains(index), blocks[index].kind == .run,
+              blocks[index].isIndoor != true else { return nil }
+        let block = blocks[index]
+        if let routeID = block.routeID {
+            return session.savedRoutes.first { $0.id == routeID }
+        }
+        guard let selectedRouteID,
+              let selectedRoute = session.savedRoutes.first(where: {
+                  $0.id == selectedRouteID
+              }) else { return nil }
+        // Old saved workouts did not store the per-step route link.
+        // Use the original route title first, or a single outdoor
+        // distance step if there is no ambiguity.
+        if block.title == selectedRoute.title { return selectedRoute }
+        let eligible = blocks.filter {
+            $0.kind == .run && $0.isIndoor != true &&
+            ($0.distanceMeters ?? 0) > 0 && $0.routeID == nil
+        }
+        return eligible.count == 1 &&
+            eligible[0].editorDragID == block.editorDragID
+                ? selectedRoute : nil
+    }
+
+    private func updateRouteStepIfNeeded(_ id: UUID) {
+        guard let index = blocks.firstIndex(where: { $0.editorDragID == id }),
+              let route = routeForRunBlock(index),
+              route.distanceKilometers.isFinite,
+              route.distanceKilometers > 0 else { return }
+        let distance = route.distanceKilometers * 1_000
+        guard blocks[index].routeID != route.id ||
+              blocks[index].distanceMeters != distance ||
+              blocks[index].durationSeconds != nil else { return }
+        blocks[index].routeID = route.id
+        blocks[index].distanceMeters = distance
+        blocks[index].durationSeconds = nil
+    }
+
     @ViewBuilder
     private func blockDetails(_ index: Int) -> some View {
         let block = blocks[index]
@@ -5194,7 +5245,13 @@ struct WorkoutTemplateBuilderView: View {
         }
         switch block.kind {
             case .run:
-                ATHLTHPlannedRunStepEditor(block: $blocks[index])
+                ATHLTHPlannedRunStepEditor(
+                    block: $blocks[index],
+                    routeDistanceMeters: routeForRunBlock(index).flatMap { route in
+                        route.distanceKilometers.isFinite && route.distanceKilometers > 0
+                            ? route.distanceKilometers * 1_000 : nil
+                    }
+                )
                 if !isPlannedWorkout && blocks[index].isIndoor != true {
                     routeSection
                 }

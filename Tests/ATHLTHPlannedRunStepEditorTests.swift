@@ -2,6 +2,41 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHPlannedRunStepEditorTests: XCTestCase {
+    func testReadOnlyRouteDistanceShowsActualRouteLength() {
+        XCTAssertEqual(ATHLTHPlannedRunStepEditor.readOnlyRouteDistance(7_250),
+                       "7" + Locale.current.decimalSeparator! + "25 km")
+        XCTAssertEqual(ATHLTHPlannedRunStepEditor.readOnlyRouteDistance(450), "450 m")
+    }
+
+    func testOptionalRouteIDSurvivesExistingWorkoutSerialization() throws {
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Selected route",
+            exerciseSlug: nil, distanceMeters: 7_250, repetitions: nil,
+            durationSeconds: nil, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .main
+        )
+        XCTAssertNil(block.routeID)
+        let routeID = UUID()
+        block.routeID = routeID
+        let saved = try JSONEncoder().encode(block)
+        let restored = try JSONDecoder().decode(WorkoutTemplateBlock.self, from: saved)
+        XCTAssertEqual(restored.routeID, routeID)
+        XCTAssertEqual(restored.distanceMeters, 7_250)
+    }
+
+    func testLegacyRunBlockWithoutRouteStillDecodes() throws {
+        let old = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Free running",
+            exerciseSlug: nil, distanceMeters: 1_000, repetitions: nil,
+            durationSeconds: nil, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .main
+        )
+        let decoded = try JSONDecoder().decode(
+            WorkoutTemplateBlock.self, from: JSONEncoder().encode(old)
+        )
+        XCTAssertNil(decoded.routeID)
+    }
+
     func testTreadmillSpeedAndPaceUseSameStoredTarget() {
         XCTAssertEqual(ATHLTHPlannedTreadmillTargets.pace(forSpeed: 12), 300)
         XCTAssertEqual(ATHLTHPlannedTreadmillTargets.speed(forPace: 300), 12)
