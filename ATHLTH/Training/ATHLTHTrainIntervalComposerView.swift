@@ -253,6 +253,11 @@ struct ATHLTHTrainIntervalComposerView: View {
             .buttonStyle(.plain)
 
             TextField(tr("Workout title", "Navn på løpeøkten"), text: $name)
+                .onChange(of: name) { _, updated in
+                    if updated.count > ATHLTHLibraryName.maximumWorkoutCharacters {
+                        name = String(updated.prefix(ATHLTHLibraryName.maximumWorkoutCharacters))
+                    }
+                }
                 .padding(14)
                 .background(.white, in: RoundedRectangle(cornerRadius: 12))
         }
@@ -917,7 +922,8 @@ struct ATHLTHTrainIntervalComposerView: View {
         }
         var result = RunningWorkoutTemplate(
             id: initial?.isBuiltIn == false ? (initial?.id ?? UUID()) : UUID(),
-            title: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            title: String(name.trimmingCharacters(in: .whitespacesAndNewlines)
+                .prefix(ATHLTHLibraryName.maximumWorkoutCharacters)),
             type: initial?.type ?? .intervals,
             summary: tr("Advanced structured running session",
                         "Detaljert strukturert løpeøkt"),
