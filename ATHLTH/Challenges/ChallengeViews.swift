@@ -701,11 +701,15 @@ enum ATHLTHChallengePreviewPeople {
                 .trimmingCharacters(in: CharacterSet(charactersIn: "@"))
             return String((clean.isEmpty ? fallback : clean).prefix(22))
         }
-        let visible = names.prefix(3).joined(separator: " vs ")
-        guard names.count > 3 else { return visible }
-        return visible + " · " + ATHLTHLocalization.choose(
-            english: "and others", norwegian: "med flere"
-        )
+        // Two-person challenges are duels; three or more use a
+        // compact group caption with the first three usernames.
+        if names.count < 3 {
+            return names.joined(separator: " vs ")
+        }
+        return names.prefix(3).joined(separator: ", ") + " " +
+            ATHLTHLocalization.choose(
+                english: "and others", norwegian: "og flere"
+            )
     }
 }
 
