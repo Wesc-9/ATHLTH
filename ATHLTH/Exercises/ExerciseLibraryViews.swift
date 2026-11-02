@@ -2001,6 +2001,7 @@ struct CustomExerciseEditorView: View {
         self.editing = editing
         self.onSaved = onSaved
         _name = State(initialValue: editing?.exercise.name ?? "")
+        _activityCategory = State(initialValue: editing?.exercise.activityCategory ?? .strength)
         _primaryMuscles = State(initialValue: Set(
             ExerciseMuscleGroup.allCases.filter {
                 editing?.exercise.primaryMuscles.contains($0.rawValue) ?? false
@@ -2032,6 +2033,7 @@ struct CustomExerciseEditorView: View {
     @EnvironmentObject private var subscriptionStore: SubscriptionStore
 
     @State private var name = ""
+    @State private var activityCategory: ATHLTHExerciseActivity = .strength
     @State private var primaryMuscles:
         Set<ExerciseMuscleGroup> = []
     @State private var secondaryMuscles:
@@ -2171,6 +2173,14 @@ struct CustomExerciseEditorView: View {
 
                 Section("Exercise") {
                     TextField("Name", text: $name)
+                    Picker(ATHLTHLocalization.choose(
+                        english: "Activity", norwegian: "Aktivitet"
+                    ), selection: $activityCategory) {
+                        ForEach(ATHLTHExerciseActivity.allCases) { category in
+                            Label(category.title, systemImage: category.systemImage)
+                                .tag(category)
+                        }
+                    }
 
                     Menu {
                         ForEach(
@@ -2565,6 +2575,7 @@ struct CustomExerciseEditorView: View {
                 updated.primaryMuscles = selectedMuscleValues(primaryMuscles)
                 updated.secondaryMuscles = selectedMuscleValues(secondaryMuscles)
                 updated.equipment = splitCSV(equipment)
+                updated.activityCategory = activityCategory
                 updated.isVisibleOutsideOwnerLibrary = shareable
                 updated.videoURL = video
                 if updated.originalCreatorID == nil &&
@@ -2595,7 +2606,8 @@ struct CustomExerciseEditorView: View {
                     isVisibleOutsideOwnerLibrary: shareable,
                     imageData: selectedImageData,
                     videoURL: video,
-                    creatorUsername: session.profile.username
+                    creatorUsername: session.profile.username,
+                    activityCategory: activityCategory
                 )
                 onSaved?(created)
             }

@@ -7255,7 +7255,49 @@ struct MessageSharePicker: View {
     let allowedKinds: [MessageShareKind]
 
     @State private var selectedKind: MessageShareKind
+    @State private var exerciseCategory: ATHLTHExerciseActivity?
     @State private var shareError: String?
+
+    private var isExerciseOnly: Bool {
+        allowedKinds.count == 1 && allowedKinds[0] == .exercise
+    }
+
+    private var eligibleExercises: [ExerciseLibraryEntry] {
+        exerciseLibrary.customExercises.filter {
+            ATHLTHPersonalExerciseSharing.isEligible(
+                $0, ownerID: session.profile.userID
+            )
+        }
+    }
+
+    private var filteredExercises: [ExerciseLibraryEntry] {
+        eligibleExercises.filter { entry in
+            guard let exerciseCategory else { return true }
+            return (entry.exercise.activityCategory ?? .strength) == exerciseCategory
+        }
+    }
+
+    private var shareTitle: String {
+        if isExerciseOnly {
+            return ATHLTHLocalization.choose(
+                english: "Share exercise", norwegian: "Del øvelse"
+            )
+        }
+        return ATHLTHLocalization.choose(
+            english: "Share content", norwegian: "Del innhold"
+        )
+    }
+
+    private var shareEyebrow: String {
+        if isExerciseOnly {
+            return ATHLTHLocalization.choose(
+                english: "Exercise sharing", norwegian: "Øvelsesdeling"
+            )
+        }
+        return ATHLTHLocalization.choose(
+            english: "Sharing", norwegian: "Deling"
+        )
+    }
 
     init(
         allowedKinds: [MessageShareKind] = MessageShareKind.allCases,
@@ -7282,17 +7324,11 @@ struct MessageSharePicker: View {
                         alignment: .leading,
                         spacing: 16
                     ) {
-                        ATHLTHMessagingCompactHeader(
-                            eyebrow: ATHLTHLocalization.choose(
-                                english: "Share", norwegian: "Del"
-                            ),
-                            title: ATHLTHLocalization.choose(
-                                english: "Share with athlete",
-                                norwegian: "Del med utøver"
-                            ),
-                            symbol: "square.and.arrow.up"
-                        )
-
+                        // Title now sits beside Done in the sheet's top bar.
+                        // The content starts immediately with its filters.
+                        if isExerciseOnly {
+                            exerciseActivityFilters
+                        } else {
                         ScrollView(
                             .horizontal,
                             showsIndicators: false
@@ -7345,6 +7381,7 @@ struct MessageSharePicker: View {
                                 }
                             }
                         }
+                        }
 
                         LazyVStack(
                             spacing: 10
@@ -7377,6 +7414,20 @@ struct MessageSharePicker: View {
                 for: .navigationBar
             )
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text(shareEyebrow.uppercased())
+                            .font(.system(size: 9, weight: .bold, design: .rounded))
+                            .tracking(1.4)
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                        Text(shareTitle)
+                            .font(.system(size: 24, weight: .semibold, design: .serif))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.78)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
                 ToolbarItem(
                     placement:
                         .topBarTrailing
@@ -7421,6 +7472,52 @@ struct MessageSharePicker: View {
         }
     }
 
+    private var exerciseActivityFilters: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                exerciseFilterChip(
+                    title: ATHLTHLocalization.choose(
+                        english: "All", norwegian: "Alle"
+                    ),
+                    symbol: "square.grid.2x2",
+                    selected: exerciseCategory == nil
+                ) {
+                    exerciseCategory = nil
+                }
+                ForEach(ATHLTHExerciseActivity.allCases) { category in
+                    exerciseFilterChip(
+                        title: category.title,
+                        symbol: category.systemImage,
+                        selected: exerciseCategory == category
+                    ) {
+                        exerciseCategory = category
+                    }
+                }
+            }
+        }
+    }
+
+    private func exerciseFilterChip(
+        title: String,
+        symbol: String,
+        selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(selected ? Color.white : ATHLTHTheme.primaryText)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 37)
+                .background(
+                    selected ? ATHLTHTheme.premiumGold : Color.white.opacity(0.7),
+                    in: Capsule()
+                )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
     @ViewBuilder
     private var shareContent: some View {
         switch selectedKind {
@@ -7454,12 +7551,8 @@ struct MessageSharePicker: View {
             }
 
         case .exercise:
-            let exercises = exerciseLibrary.customExercises.filter {
-                ATHLTHPersonalExerciseSharing.isEligible(
-                    $0, ownerID: session.profile.userID
-                )
-            }
-            if exercises.isEmpty {
+            let exercises = filteredExercises
+            if eligibleExercises.isEmpty {
                 ContentUnavailableView(
                     ATHLTHLocalization.choose(
                         english: "No personal exercises yet",
@@ -7471,15 +7564,27 @@ struct MessageSharePicker: View {
                         norwegian: "Opprett en øvelse i Mine øvelser for å dele den. Øvelser fra biblioteket har alle allerede."
                     ))
                 )
+            } else if exercises.isEmpty {
+                ContentUnavailableView(
+                    ATHLTHLocalization.choose(
+                        english: "No exercises in this activity",
+                        norwegian: "Ingen øvelser i denne aktiviteten"
+                    ),
+                    systemImage: exerciseCategory?.systemImage ?? "dumbbell",
+                    description: Text(ATHLTHLocalization.choose(
+                        english: "Try another category or set the activity on an exercise in My Exercises.",
+                        norwegian: "Prøv en annen kategori, eller endre aktivitet på øvelsen under Mine øvelser."
+                    ))
+                )
             } else {
                 ForEach(exercises) { exercise in
                     shareRow(
-                        icon: "dumbbell.fill",
+                        icon: (exercise.exercise.activityCategory ?? .strength).systemImage,
                         title: exerciseLibrary.localizedExerciseName(exercise),
-                        subtitle: ATHLTHLocalization.choose(
-                            english: "My Exercises",
-                            norwegian: "Mine øvelser"
-                        )
+                        subtitle: (exercise.exercise.activityCategory ?? .strength).title +
+                            " · " + ATHLTHLocalization.choose(
+                                english: "My Exercises", norwegian: "Mine øvelser"
+                            )
                     ) {
                         do {
                             onSelect(try ATHLTHShareDraftFactory.exercise(

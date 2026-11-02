@@ -319,6 +319,9 @@ struct Exercise: Identifiable, Codable, Hashable {
     var imageURL: URL?
     var isVisibleOutsideOwnerLibrary: Bool
     var videoURL: URL? = nil
+    /// Optional to keep existing saved exercises decodable. Legacy custom
+    /// exercises are shown under Strength until explicitly recategorized.
+    var activityCategory: ATHLTHExerciseActivity? = nil
     /// A private import may retain the source UUID as provenance, not as a
     /// shared ownership or edit permission. Missing for legacy exercises.
     var sharedSourceExerciseID: UUID? = nil
