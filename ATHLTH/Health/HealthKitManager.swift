@@ -1775,6 +1775,143 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    /// Read Apple's native Cardio Recovery measurement first. On days
+    /// without a native reading, use a measured-only fallback near the end
+    /// of completed HealthKit workouts. No synthetic heart-rate values and
+    /// no upload of observations are involved.
+    private func insightHeartRateRecoveryDays(
+        startDate: Date,
+        endDate: Date
+    ) async -> [ATHLTHInsightHealthDay] {
+        let calendar = Calendar.current
+        let native = (try? await dailyAverageQuantities(
+            identifier: .heartRateRecoveryOneMinute,
+            unit: .count(),
+            startDate: startDate,
+            endDate: endDate
+        )) ?? [:]
+
+        var days: [Date: ATHLTHInsightHealthDay] = [:]
+        for (day, value) in native
+            where value.isFinite && (1...120).contains(value) {
+            days[day] = ATHLTHInsightHealthDay(
+                date: day, value: value
+            )
+        }
+
+        guard !Task.isCancelled else {
+            return days.values.sorted { $0.date < $1.date }
+        }
+
+        // Use all workouts recorded in Apple Health, including workouts
+        // awaiting ATHLTH Inbox approval. This is read-only health history;
+        // it does not import or publish any external workout.
+        let workouts = (try? await fetchRawWorkouts(
+            startDate: startDate, endDate: endDate
+        )) ?? []
+
+        let eligible = workouts
+            .filter { workout in
+                let day = calendar.startOfDay(for: workout.endDate)
+                guard days[day] == nil,
+                      workout.duration >= 180,
+                      workout.endDate.addingTimeInterval(90) <= endDate
+                else { return false }
+
+                // Another workout beginning immediately after the first
+                // makes a true passive one-minute recovery ambiguous.
+                return !workouts.contains { other in
+                    other.uuid != workout.uuid &&
+                    other.startDate > workout.endDate &&
+                    other.startDate < workout.endDate.addingTimeInterval(90)
+                }
+            }
+            .sorted { $0.endDate > $1.endDate }
+
+        var fallbackByDay: [Date: [Double]] = [:]
+        let heartUnit = HKUnit.count().unitDivided(by: .minute())
+        guard let sampleType = HKObjectType.quantityType(
+            forIdentifier: .heartRate
+        ) else {
+            return days.values.sorted { $0.date < $1.date }
+        }
+
+        // Query only short, workout-end windows, in bounded batches.
+        // Never load months of continuous heart-rate history.
+        for offset in stride(from: 0, to: eligible.count, by: 20) {
+            guard !Task.isCancelled else { break }
+            let chunk = Array(eligible[offset..<min(offset + 20, eligible.count)])
+            let predicates: [NSPredicate] = chunk.map { workout in
+                HKQuery.predicateForSamples(
+                    withStart: workout.endDate.addingTimeInterval(-30),
+                    end: workout.endDate.addingTimeInterval(90),
+                    options: .strictStartDate
+                )
+            }
+            let windowPredicate = NSCompoundPredicate(
+                orPredicateWithSubpredicates: predicates
+            )
+
+            let samples: [HKQuantitySample]
+            do {
+                samples = try await withCheckedThrowingContinuation {
+                    (continuation: CheckedContinuation<[HKQuantitySample], Error>) in
+                    let query = HKSampleQuery(
+                        sampleType: sampleType,
+                        predicate: windowPredicate,
+                        limit: HKObjectQueryNoLimit,
+                        sortDescriptors: nil
+                    ) { _, objects, error in
+                        if let error {
+                            continuation.resume(throwing: error)
+                        } else {
+                            continuation.resume(
+                                returning: (objects as? [HKQuantitySample]) ?? []
+                            )
+                        }
+                    }
+                    healthStore.execute(query)
+                }
+            } catch {
+                // A denied or failed query is missing data, never zero.
+                continue
+            }
+
+            let readings = samples.compactMap {
+                sample -> ATHLTHHeartRateRecoveryCalculator.Reading? in
+                let bpm = sample.quantity.doubleValue(for: heartUnit)
+                guard bpm.isFinite else { return nil }
+                return ATHLTHHeartRateRecoveryCalculator.Reading(
+                    date: sample.startDate,
+                    bpm: bpm,
+                    sourceIdentifier: sample.sourceRevision.source.bundleIdentifier
+                )
+            }
+            for workout in chunk {
+                let window = readings.filter {
+                    $0.date >= workout.endDate.addingTimeInterval(-30) &&
+                    $0.date <= workout.endDate.addingTimeInterval(90)
+                }
+                guard let drop =
+                    ATHLTHHeartRateRecoveryCalculator.dropAfterOneMinute(
+                        workoutEnd: workout.endDate, readings: window
+                    )
+                else { continue }
+                let day = calendar.startOfDay(for: workout.endDate)
+                fallbackByDay[day, default: []].append(drop)
+            }
+        }
+
+        for (day, drops) in fallbackByDay where days[day] == nil {
+            guard !drops.isEmpty else { continue }
+            let average = drops.reduce(0, +) / Double(drops.count)
+            days[day] = ATHLTHInsightHealthDay(
+                date: day, value: average, isEstimated: true
+            )
+        }
+        return days.values.sorted { $0.date < $1.date }
+    }
+
     /// Read only the requested metric and period after the user opens it.
     /// Bounded HealthKit statistics preserve Apple's source de-duplication.
     /// Missing authorization or missing measurements returns an empty series.
@@ -1813,6 +1950,12 @@ final class HealthKitManager: ObservableObject {
             return [ATHLTHInsightHealthDay(
                 date: calendar.startOfDay(for: sleepEnd), value: value
             )]
+        }
+
+        if metric == .heartRateRecovery {
+            return await insightHeartRateRecoveryDays(
+                startDate: start, endDate: now
+            )
         }
 
         guard let query = metric.query else { return [] }
