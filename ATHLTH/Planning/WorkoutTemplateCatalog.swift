@@ -3273,6 +3273,45 @@ private enum ATHLTHWorkoutExtraDestination: String, Identifiable {
     var id: String { rawValue }
 }
 
+/// The sheet's selection is the authoritative presentation state.
+/// A restored workout draft may regenerate each block's ephemeral drag ID,
+/// so retain the initial recipe position/content as a safe fallback.
+struct ATHLTHWorkoutStudioStepEditorSelection: Identifiable {
+    let id: UUID
+    private let originalIndex: Int
+    private let originalBlock: WorkoutTemplateBlock
+
+    init?(blockID: UUID, blocks: [WorkoutTemplateBlock]) {
+        guard let index = blocks.firstIndex(where: {
+            $0.editorDragID == blockID
+        }) else { return nil }
+        id = blockID
+        originalIndex = index
+        originalBlock = blocks[index]
+    }
+
+    func index(in blocks: [WorkoutTemplateBlock]) -> Int? {
+        if let index = blocks.firstIndex(where: { $0.editorDragID == id }) {
+            return index
+        }
+        // Restoring a persisted draft regenerates editorDragID. Match the
+        // same recipe before considering a row with the same sequence/kind.
+        if blocks.indices.contains(originalIndex),
+           blocks[originalIndex] == originalBlock {
+            return originalIndex
+        }
+        if let index = blocks.firstIndex(of: originalBlock) {
+            return index
+        }
+        if blocks.indices.contains(originalIndex),
+           blocks[originalIndex].sequence == originalBlock.sequence,
+           blocks[originalIndex].kind == originalBlock.kind {
+            return originalIndex
+        }
+        return nil
+    }
+}
+
 struct WorkoutTemplateBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -3307,13 +3346,12 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingSavedWorkoutPicker = false
     @State private var showingStudioRoutePicker = false
     @State private var showingStudioRouteBuilder = false
-    @State private var showingStudioStepEditor = false
+    @State private var studioStepEditorSelection: ATHLTHWorkoutStudioStepEditorSelection?
     @State private var selectedWorkoutExtra: ATHLTHWorkoutExtraDestination?
     @State private var selectedWorkoutGearIDs: Set<UUID> = []
     @State private var gearSelectionTouched = false
     @State private var selectedSpotifyPlaylist: SpotifyPlaylistReference?
     @State private var spotifyAutoplayOnStart: Bool?
-    @State private var studioEditedStepID: UUID?
     @State private var studioRoutePhase: WorkoutPhaseKind = .main
     @State private var studioVisiblePhases: Set<WorkoutPhaseKind> = []
     @State private var studioAdvanced = true
@@ -3974,13 +4012,10 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
             }
-            .sheet(isPresented: $showingStudioStepEditor) {
+            .sheet(item: $studioStepEditorSelection) { selection in
                 NavigationStack {
                     ScrollView {
-                        if let id = studioEditedStepID,
-                           let index = blocks.firstIndex(where: {
-                               $0.editorDragID == id
-                           }) {
+                        if let index = selection.index(in: blocks) {
                             VStack(alignment: .leading, spacing: 15) {
                                 Text(ATHLTHWorkoutNameSuggestion.displayStepTitle(blocks[index]))
                                     .font(.title2.weight(.semibold))
@@ -3989,12 +4024,27 @@ struct WorkoutTemplateBuilderView: View {
                             }
                             .padding(18)
                             .onAppear {
-                                let original = blocks[index]
+                                // The selection always identifies an existing
+                                // step; the editor receives live bindings so
+                                // changes are reflected in the underlying plan.
+                                guard let liveIndex = selection.index(in: blocks) else {
+                                    return
+                                }
+                                let original = blocks[liveIndex]
                                 let adapted = ATHLTHRunningLibraryExerciseAdapter.adapt(original)
                                 if original.kind != adapted.kind {
-                                    blocks[index] = adapted
+                                    blocks[liveIndex] = adapted
                                 }
                             }
+                        } else {
+                            ContentUnavailableView(
+                                tr("Step unavailable", "Deløkten er ikke tilgjengelig"),
+                                systemImage: "exclamationmark.triangle",
+                                description: Text(tr(
+                                    "Return to the workout and select the step again.",
+                                    "Gå tilbake til økten og velg deløkten på nytt."
+                                ))
+                            )
                         }
                     }
                     .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
@@ -4003,7 +4053,7 @@ struct WorkoutTemplateBuilderView: View {
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
                             Button(tr("Done", "Ferdig")) {
-                                showingStudioStepEditor = false
+                                studioStepEditorSelection = nil
                             }
                         }
                     }
@@ -4115,8 +4165,7 @@ struct WorkoutTemplateBuilderView: View {
                     Task { @MainActor in
                         await Task.yield()
                         guard blocks.indices.contains(focused) else { return }
-                        studioEditedStepID = blocks[focused].editorDragID
-                        showingStudioStepEditor = true
+                        openStudioStepEditor(blockID: blocks[focused].editorDragID)
                     }
                 }
                 // Apply one explicitly requested block after the draft is
@@ -4333,8 +4382,7 @@ struct WorkoutTemplateBuilderView: View {
                 showingStudioRouteBuilder = true
             },
             onEdit: { id in
-                studioEditedStepID = id
-                showingStudioStepEditor = true
+                openStudioStepEditor(blockID: id)
             },
             onMove: { id, phase, targetID in
                 moveStudioBlock(id, to: phase, before: targetID)
@@ -4355,6 +4403,13 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 resequence()
             }
+        )
+    }
+
+    private func openStudioStepEditor(blockID: UUID) {
+        // Do not present an empty sheet while a workout/draft is initializing.
+        studioStepEditorSelection = ATHLTHWorkoutStudioStepEditorSelection(
+            blockID: blockID, blocks: blocks
         )
     }
 
