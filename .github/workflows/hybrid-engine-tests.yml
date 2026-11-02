@@ -15,6 +15,7 @@ on:
       - release/v2.0.5
       - release/v2.0.6
       - release/v2.0.7
+      - release/v2.0.8
     paths:
       - .github/workflows/hybrid-engine-tests.yml
       - ATHLTH/Planning/ATHLTHPlannedWorkoutTypePickerView.swift
