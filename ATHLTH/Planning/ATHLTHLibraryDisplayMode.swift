@@ -78,11 +78,14 @@ enum ATHLTHLibraryGridColumns {
         width: CGFloat,
         reservedHorizontalSpace: CGFloat = 0,
         spacing: CGFloat = 10,
-        accessibilityText: Bool = false
+        accessibilityText: Bool = false,
+        preferredMinimumCardWidth: CGFloat = 0
     ) -> [GridItem] {
         guard mode == .grid else { return [GridItem(.flexible())] }
         let usable = max(0, width - reservedHorizontalSpace)
-        let minimumCardWidth: CGFloat = accessibilityText ? 160 : 104
+        let minimumCardWidth: CGFloat = max(
+            accessibilityText ? 160 : 104, preferredMinimumCardWidth
+        )
         let threeFit = usable >= 3 * minimumCardWidth + 2 * spacing
         let twoFit = usable >= 2 * minimumCardWidth + spacing
         let count = accessibilityText ? (twoFit ? 2 : 1) :
