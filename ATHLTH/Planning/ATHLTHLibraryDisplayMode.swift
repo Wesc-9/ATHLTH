@@ -93,3 +93,54 @@ enum ATHLTHLibraryGridColumns {
         return (0..<count).map { _ in GridItem(.flexible(), spacing: spacing) }
     }
 }
+
+
+/// Card-only naming policy. Keep source names unchanged for training records,
+/// workout reuse, search, synchronization and full accessibility labels.
+enum ATHLTHLibraryName {
+    static let maximumCustomExerciseCharacters = 40
+    static let maximumWorkoutCharacters = 48
+    static let gridCharacters = 24
+    static let listCharacters = 40
+
+    /// Human-edited aliases for legacy library labels. The originals remain
+    /// intact in persisted workouts and are still visible in their details.
+    static func conciseWorkoutName(_ original: String) -> String {
+        switch original.trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased(with: Locale(identifier: "nb_NO")) {
+        case "half-cooper vo2-maks test":
+            return "Half-Cooper VO2-test"
+        case "terrreng fart", "terreng fart":
+            return "Terrengfart"
+        case "kritisk fart test":
+            return "Kritisk fart-test"
+        default:
+            return original
+        }
+    }
+
+    /// Limit the *visible* label, not the underlying model or exercise ID.
+    /// Character-based slicing avoids splitting emoji/combined Unicode text.
+    static func shortLabel(_ original: String, maximumCharacters: Int) -> String {
+        guard maximumCharacters > 1, original.count > maximumCharacters else {
+            return original
+        }
+        let prefix = String(original.prefix(maximumCharacters - 1))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return prefix + "…"
+    }
+
+    static func workoutCard(_ original: String, grid: Bool) -> String {
+        shortLabel(
+            conciseWorkoutName(original),
+            maximumCharacters: grid ? gridCharacters : listCharacters
+        )
+    }
+
+    static func exerciseCard(_ original: String, grid: Bool) -> String {
+        shortLabel(
+            original,
+            maximumCharacters: grid ? gridCharacters : listCharacters
+        )
+    }
+}
