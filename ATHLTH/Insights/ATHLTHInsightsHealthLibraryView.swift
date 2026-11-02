@@ -307,7 +307,18 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                         .frame(minHeight: 165)
                     } else {
                         Chart(values) { item in
-                            if metric.cumulative {
+                            if metric == .heartRateRecovery {
+                                BarMark(
+                                    x: .value("Dag", item.date),
+                                    y: .value("Pulsfall", item.value)
+                                )
+                                .foregroundStyle(
+                                    item.isEstimated
+                                        ? ATHLTHInsightsStyle.muted.opacity(0.65)
+                                        : ATHLTHInsightsStyle.accent
+                                )
+                                .cornerRadius(3)
+                            } else if metric.cumulative {
                                 BarMark(
                                     x: .value("Dag", item.date),
                                     y: .value("Verdi", item.value)
@@ -345,6 +356,32 @@ struct ATHLTHInsightsHealthMetricDetailView: View {
                         ))
                         .font(.caption)
                         .foregroundStyle(ATHLTHInsightsStyle.muted)
+                        if metric == .heartRateRecovery {
+                            HStack(spacing: 14) {
+                                Label {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Apple Health",
+                                        norwegian: "Apple Helse"
+                                    ))
+                                } icon: {
+                                    Circle()
+                                        .fill(ATHLTHInsightsStyle.accent)
+                                        .frame(width: 8, height: 8)
+                                }
+                                Label {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Calculated",
+                                        norwegian: "Beregnet"
+                                    ))
+                                } icon: {
+                                    Circle()
+                                        .fill(ATHLTHInsightsStyle.muted.opacity(0.65))
+                                        .frame(width: 8, height: 8)
+                                }
+                            }
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHInsightsStyle.muted)
+                        }
                     }
                 }
                 .padding(16)
