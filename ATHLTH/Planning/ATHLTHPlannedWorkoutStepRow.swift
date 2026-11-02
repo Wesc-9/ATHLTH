@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// A workout step with a separate reorder grip, persistent swipe-to-delete,
-/// and an independent options menu. Swiping never changes the step order.
+/// A workout step with a separate reorder grip and a clean full-swipe delete.
+/// There is no persistent red delete tray or always-visible delete control.
+/// A normal tap edits; the more menu remains accessible. Swiping never reorders.
 struct ATHLTHPlannedWorkoutStepRow: View {
     let block: WorkoutTemplateBlock
     let position: Int
@@ -13,10 +14,22 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     let onReorderMove: (CGPoint) -> Void
     let onReorderEnd: () -> Void
 
-    @State private var isDeleteRevealed = false
     @State private var horizontalDrag: CGFloat = 0
+    @State private var measuredRowWidth: CGFloat = 320
 
-    private let deleteWidth: CGFloat = 76
+    /// Require a deliberate leftward gesture across most of the row,
+    /// rather than exposing a red destructive button on a small swipe.
+    static func shouldDeleteSwipe(
+        horizontal: CGFloat,
+        vertical: CGFloat,
+        rowWidth: CGFloat
+    ) -> Bool {
+        guard horizontal < 0, abs(horizontal) > abs(vertical) * 1.35 else {
+            return false
+        }
+        let threshold = max(150, min(270, rowWidth * 0.62))
+        return abs(horizontal) >= threshold
+    }
     private var isPause: Bool { block.isRestOrActiveRecovery }
 
     // A local, long-press-driven gesture avoids iOS system drag-and-drop's
@@ -35,32 +48,29 @@ struct ATHLTHPlannedWorkoutStepRow: View {
             .onEnded { _ in onReorderEnd() }
     }
 
-    // The settled offset comes from retained state, rather than the gesture
-    // translation. Releasing the finger never closes an exposed delete action.
-    private var stepOffset: CGFloat {
-        let base: CGFloat = isDeleteRevealed ? -deleteWidth : 0
-        return min(0, max(-deleteWidth, base + horizontalDrag))
+    // Subtle movement confirms the gesture without exposing a red tray.
+    private var swipeOffset: CGFloat {
+        max(-55, min(0, horizontalDrag * 0.30))
     }
 
     private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 16)
+        DragGesture(minimumDistance: 18)
             .onChanged { value in
                 guard abs(value.translation.width) >
-                      abs(value.translation.height) * 1.15 else { return }
-                horizontalDrag = value.translation.width
+                      abs(value.translation.height) * 1.35 else { return }
+                horizontalDrag = min(0, value.translation.width)
             }
             .onEnded { value in
-                let horizontal = abs(value.translation.width) >
-                    abs(value.translation.height) * 1.15
-                withAnimation(.easeOut(duration: 0.18)) {
-                    if horizontal {
-                        if value.translation.width < -34 {
-                            isDeleteRevealed = true
-                        } else if value.translation.width > 34 {
-                            isDeleteRevealed = false
-                        }
-                    }
+                let delete = Self.shouldDeleteSwipe(
+                    horizontal: value.translation.width,
+                    vertical: value.translation.height,
+                    rowWidth: measuredRowWidth
+                )
+                withAnimation(.easeOut(duration: 0.16)) {
                     horizontalDrag = 0
+                }
+                if delete {
+                    onDelete()
                 }
             }
     }
@@ -87,24 +97,7 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                     if canMoveDown { onMoveBy(1) }
                 }
 
-            ZStack(alignment: .trailing) {
-                Button(role: .destructive) {
-                    onDelete()
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Delete step", norwegian: "Slett deløkt"
-                    ), systemImage: "trash")
-                    .labelStyle(.iconOnly)
-                    .font(.body)
-                    .foregroundStyle(.white)
-                    .frame(width: deleteWidth, height: 49)
-                    .background(Color.red, in: RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.plain)
-                .allowsHitTesting(isDeleteRevealed)
-                .accessibilityHidden(!isDeleteRevealed)
-
-                HStack(spacing: 0) {
+            HStack(spacing: 0) {
                     Button(action: onEdit) {
                         HStack(spacing: 8) {
                             Text("\(position)")
@@ -147,8 +140,8 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityHint(ATHLTHLocalization.choose(
-                        english: "Edit step details. Swipe left or use options to delete.",
-                        norwegian: "Rediger deløkten. Sveip til venstre eller bruk menyen for å slette."
+                        english: "Edit step details. Swipe fully left to delete, or use options.",
+                        norwegian: "Rediger deløkten. Sveip helt til venstre for å slette, eller bruk menyen."
                     ))
 
                     Menu {
@@ -180,12 +173,17 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                         : ATHLTHPlanDesign.canvas,
                     in: RoundedRectangle(cornerRadius: 12)
                 )
-                .offset(x: stepOffset)
+                .offset(x: swipeOffset)
                 .contentShape(Rectangle())
                 .simultaneousGesture(swipeGesture)
             }
             .frame(maxWidth: .infinity, minHeight: 49)
             .clipped()
+            .onGeometryChange(for: CGFloat.self) { geometry in
+                geometry.size.width
+            } action: { _, width in
+                if width > 0 { measuredRowWidth = width }
+            }
         }
     }
 }
