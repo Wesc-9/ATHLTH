@@ -44,6 +44,47 @@ final class ATHLTHPlannedRunStepEditorTests: XCTestCase {
         XCTAssertEqual(ATHLTHPlannedTreadmillTargets.speed(forPace: 0), 25)
     }
 
+    func testOutdoorAndIndoorRunUseIdenticalSpeedToPaceTargets() {
+        // Switching the editor's display between km/t and min/km must not
+        // change the stored target or the estimated training distance.
+        let speedKmH = 12.0
+        let pace = ATHLTHPlannedTreadmillTargets.pace(forSpeed: speedKmH)
+        XCTAssertEqual(pace, 300, accuracy: 0.0001)
+        XCTAssertEqual(
+            ATHLTHPlannedTreadmillTargets.speed(forPace: pace),
+            speedKmH, accuracy: 0.0001
+        )
+
+        var outdoor = WorkoutTemplateBlock(
+            sequence: 1, kind: .run, title: "Outdoor running",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 1_200, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .main
+        )
+        outdoor.cardioActivity = .running
+        outdoor.targetPaceSecondsPerKilometer = pace
+        var indoor = outdoor
+        indoor.title = "Indoor running"
+        indoor.isIndoor = true
+        var treadmill = indoor
+        treadmill.treadmillInclinePercent = 1.0
+
+        for run in [outdoor, indoor, treadmill] {
+            XCTAssertEqual(
+                ATHLTHPlannedWorkoutMetrics.estimatedDistanceKilometers(
+                    for: [run]
+                ) ?? -1,
+                4.0, accuracy: 0.0001
+            )
+            XCTAssertEqual(
+                ATHLTHPlannedWorkoutMetrics.commonPaceSecondsPerKilometer(
+                    for: [run]
+                ),
+                300
+            )
+        }
+    }
+
     func testRunBlockSupportsIndoorTreadmillMetadataInExistingModel() throws {
         var block = WorkoutTemplateBlock(
             sequence: 1, kind: .run, title: "Løping",
