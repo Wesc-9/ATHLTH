@@ -713,7 +713,28 @@ enum ATHLTHChallengePreviewPeople {
     }
 }
 
+/// Local, per-account unfinished challenge. Saving the selected running
+/// template prevents a background/foreground round trip from resetting the
+/// entire interval challenge composer.
+struct ATHLTHChallengeCreationDraft: Codable {
+    var title: String
+    var summary: String
+    var sport: ATHLTHChallengeSport
+    var scoring: ATHLTHChallengeScoring
+    var runningFocus: ATHLTHChallengeRunningFocus
+    var runningComparison: ATHLTHChallengeRunningComparison
+    var runningTemplateID: UUID?
+    var runningVenue: ATHLTHChallengeRunningVenue
+    var invited: [ChallengeParticipant]
+    var startsAt: Date
+    var endsAt: Date
+    var hasEnd: Bool
+    var coverArtwork: String
+    var allowMultipleAttempts: Bool
+}
+
 struct ChallengeCreationView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var challenges: ChallengeStore
     @EnvironmentObject private var session: AppSessionStore
@@ -859,6 +880,9 @@ struct ChallengeCreationView: View {
     @State private var hillMinimumClimbMeters = 8.0
     @State private var showingRunningTemplatePicker = false
     @State private var showingCustomRunningBuilder = false
+    @State private var recoveredDraftSport: ATHLTHChallengeSport?
+    @State private var recoveredDraftFocus: ATHLTHChallengeRunningFocus?
+    @State private var completedOrCancelledDraft = false
     @State private var title = ""
     @State private var challengeSummary = ""
     @State private var selectedCoverArtworkName = "GoalRunning"
@@ -978,6 +1002,8 @@ struct ChallengeCreationView: View {
                             norwegian: "Avbryt"
                         )
                     ) {
+                        completedOrCancelledDraft = true
+                        removeCreationDraft()
                         dismiss()
                     }
                     .foregroundStyle(
@@ -1081,6 +1107,7 @@ struct ChallengeCreationView: View {
                 .background(.ultraThinMaterial)
             }
             .task {
+                restoreCreationDraftIfAvailable()
                 if social.mutualFollows.isEmpty {
                     await social.refresh()
                 }
@@ -1116,7 +1143,21 @@ struct ChallengeCreationView: View {
                     }
                 }
             }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { saveCreationDraft() }
+            }
+            .onDisappear {
+                saveCreationDraft()
+            }
+            .onChange(of: runningTemplateID) { _, _ in
+                saveCreationDraft()
+            }
             .onChange(of: runningFocus) { _, focus in
+                if recoveredDraftFocus == focus {
+                    recoveredDraftFocus = nil
+                    return
+                }
+                recoveredDraftFocus = nil
                 if focus != .standard {
                     runningTemplateID = nil
                     usesSpecificRoute = false
@@ -1153,6 +1194,11 @@ struct ChallengeCreationView: View {
                     ? .fastestDistance : .farthestInTime
             }
             .onChange(of: sport) { _, newSport in
+                if recoveredDraftSport == newSport {
+                    recoveredDraftSport = nil
+                    return
+                }
+                recoveredDraftSport = nil
                 if !coverWasManuallySelected &&
                     selectedCoverImageData == nil {
                     selectedCoverArtworkName =
@@ -7120,6 +7166,66 @@ struct ChallengeCreationView: View {
         }
     }
 
+    private var creationDraftKey: String {
+        "athlth.challenge.composer.v2." + session.profile.userID.uuidString
+    }
+
+    private var canPersistCreationDraft: Bool {
+        changeProposalFor == nil &&
+        preselectedFriends.isEmpty &&
+        preselectedRouteID == nil &&
+        preselectedDistanceKm == nil &&
+        preselectedSport == nil
+    }
+
+    private func saveCreationDraft() {
+        guard canPersistCreationDraft, !completedOrCancelledDraft else { return }
+        let data = ATHLTHChallengeCreationDraft(
+            title: title, summary: challengeSummary,
+            sport: sport, scoring: scoring,
+            runningFocus: runningFocus,
+            runningComparison: runningComparison,
+            runningTemplateID: runningTemplateID,
+            runningVenue: intervalRunVenue,
+            invited: invitees, startsAt: startsAt,
+            endsAt: endsAt, hasEnd: hasEnd,
+            coverArtwork: selectedCoverArtworkName,
+            allowMultipleAttempts: allowMultipleAttempts
+        )
+        guard let encoded = try? JSONEncoder().encode(data) else { return }
+        UserDefaults.standard.set(encoded, forKey: creationDraftKey)
+    }
+
+    private func restoreCreationDraftIfAvailable() {
+        guard canPersistCreationDraft,
+              let data = UserDefaults.standard.data(forKey: creationDraftKey),
+              let draft = try? JSONDecoder().decode(
+                  ATHLTHChallengeCreationDraft.self, from: data
+              ) else { return }
+        // Only restore a selected workout that still exists in the
+        // current account's library. Never silently pick another workout.
+        recoveredDraftSport = draft.sport
+        recoveredDraftFocus = draft.runningFocus
+        title = draft.title
+        challengeSummary = draft.summary
+        sport = draft.sport
+        scoring = draft.scoring
+        runningFocus = draft.runningFocus
+        runningComparison = draft.runningComparison
+        intervalRunVenue = draft.runningVenue
+        runningTemplateID = draft.runningTemplateID
+        invitees = draft.invited
+        startsAt = draft.startsAt
+        endsAt = draft.endsAt
+        hasEnd = draft.hasEnd
+        selectedCoverArtworkName = draft.coverArtwork
+        allowMultipleAttempts = draft.allowMultipleAttempts
+    }
+
+    private func removeCreationDraft() {
+        UserDefaults.standard.removeObject(forKey: creationDraftKey)
+    }
+
     @MainActor
     private func createChallenge() async {
         creatingChallenge = true
@@ -7454,7 +7560,8 @@ struct ChallengeCreationView: View {
         )
 
         // Never auto-post the challenge or its rules to Community.
-
+        completedOrCancelledDraft = true
+        removeCreationDraft()
         dismiss()
     }
 
