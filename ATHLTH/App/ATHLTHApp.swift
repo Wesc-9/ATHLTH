@@ -218,6 +218,16 @@ private struct ATHLTHSceneRootView: View {
             ATHLTHAliveController.reconcile(
                 isForeground: scenePhase == .active && signedIn
             )
+            if !signedIn {
+                // Competition names and scheduled reminders are private
+                // to the signed-in account, even on a shared iPhone.
+                tournamentCalendar.reset()
+                Task {
+                    await ATHLTHTournamentExerciseReminderScheduler.reconcile(
+                        items: [], accountID: appSession.profile.userID
+                    )
+                }
+            }
         }
     }
 
