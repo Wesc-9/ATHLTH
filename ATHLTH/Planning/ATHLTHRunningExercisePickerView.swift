@@ -66,7 +66,9 @@ struct ATHLTHRunningExercisePickerView: View {
                                 ) {
                                     // Older saved intervals can still be compact
                                     // groups. Display their real executable steps.
-                                    onSelect(set.blocksForReuse().expandedForExecution())
+                                    onSelect(ATHLTHIntervalRecipeEditing.forEditing(
+                                        set.blocksForReuse()
+                                    ))
                                     dismiss()
                                 }
                                 .contextMenu {
