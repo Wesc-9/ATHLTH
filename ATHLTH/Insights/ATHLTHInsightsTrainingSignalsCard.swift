@@ -90,6 +90,15 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
         return durationLabel(trainingLoad.acuteMinutes)
     }
 
+    private var relativeLoadText: String {
+        guard health.hasRequestedAuthorization, health.healthDataAvailable,
+              let ratio = trainingLoad.ratio,
+              ratio.isFinite else { return "—" }
+        return ratio.formatted(
+            .number.precision(.fractionLength(2))
+        ) + "×"
+    }
+
     private var signalsRefreshKey: String {
         "\(health.lastSuccessfulRefreshAt?.timeIntervalSince1970 ?? 0):" +
             "\(session.profile.maximumHeartRateBPM ?? 0)"
@@ -216,7 +225,7 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
                     Text(tr("Weekly volume", "Ukesbelastning"))
                         .font(.caption)
                         .foregroundStyle(ATHLTHInsightsStyle.muted)
-                    Text(primaryLoadText)
+                    Text(relativeLoadText)
                         .font(.system(size: 30, weight: .medium, design: .serif))
                         .monospacedDigit()
                         .foregroundStyle(ATHLTHInsightsStyle.ink)
@@ -276,8 +285,8 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
                 )
             }
             Text(tr(
-                "Load here means recorded workout minutes, not an invented AU score. A day without a workout is not necessarily a recovery day.",
-                "Belastning betyr registrerte treningsminutter, ikke en beregnet AU-score. En dag uten økt er ikke nødvendigvis en hviledag."
+                "The primary value is recorded weekly workout time relative to your four-week average—not an arbitrary training-load score. A day without a workout is not necessarily a recovery day.",
+                "Hovedtallet viser ukens treningsminutter relativt til fireukerssnittet, ikke en kunstig belastningsscore. En dag uten økt er ikke nødvendigvis en hviledag."
             ))
             .font(.caption2)
             .foregroundStyle(ATHLTHInsightsStyle.muted)
