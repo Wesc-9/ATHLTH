@@ -10,6 +10,7 @@ struct HomeActivityRunDetailView: View {
     @EnvironmentObject private var watch: AppleWatchConnectionStore
 
     let workout: SocialPublishableWorkout
+    let onRequestRemoveFromATHLTH: (() -> Void)?
 
     @State private var detail: WorkoutDetail?
     @State private var routeAnalysis: HomeActivityRunRouteAnalysis
@@ -24,6 +25,8 @@ struct HomeActivityRunDetailView: View {
     @State private var linkedRouteAttempts: [RouteAttemptRecord] = []
     @State private var isLoadingRouteResult = false
     @State private var showingResultShare = false
+    @State private var showingRunActionsSheet = false
+    @State private var pendingRunAction: HomeActivityRunAction?
     @State private var showingFullscreenMap = false
     @State private var showingSaveRouteConfirmation = false
     @State private var savedRouteMessage: String?
@@ -32,9 +35,11 @@ struct HomeActivityRunDetailView: View {
     init(
         workout: SocialPublishableWorkout,
         initialDetail: WorkoutDetail?,
-        initialAIInsight: WorkoutAIInsight?
+        initialAIInsight: WorkoutAIInsight?,
+        onRequestRemoveFromATHLTH: (() -> Void)? = nil
     ) {
         self.workout = workout
+        self.onRequestRemoveFromATHLTH = onRequestRemoveFromATHLTH
         _detail = State(
             initialValue: initialDetail
         )
@@ -309,42 +314,21 @@ struct HomeActivityRunDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        showingResultShare = true
-                    } label: {
-                        Label(tr("Share result", "Del resultat"),
-                              systemImage: "square.and.arrow.up")
-                    }
-                    if !isIndoorActivity && routeCoordinates.count >= 2 {
-                        Button {
-                            showingFullscreenMap = true
-                        } label: {
-                            Label(tr("Open route map", "Åpne rutekart"),
-                                  systemImage: "map")
-                        }
-                    }
-                    if let existing = linkedRoute ?? savedRecordedRoute {
-                        Button {
-                            routeToOpen = existing
-                        } label: {
-                            Label(tr("Open saved route / Ghost", "Åpne lagret rute / Ghost"),
-                                  systemImage: "figure.run.circle")
-                        }
-                    } else if !isIndoorActivity && routeCoordinates.count >= 2 {
-                        Button {
-                            showingSaveRouteConfirmation = true
-                        } label: {
-                            Label(tr("Save as private route", "Lagre som privat rute"),
-                                  systemImage: "bookmark")
-                        }
-                    }
+                Button {
+                    showingRunActionsSheet = true
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .frame(width: 42, height: 42)
+                        .contentShape(Circle())
                 }
-                .accessibilityLabel(tr("More workout actions", "Flere økthandlinger"))
+                .buttonStyle(.plain)
+                .accessibilityLabel(tr("Workout actions", "Økthandlinger"))
+                .accessibilityHint(tr(
+                    "Open sharing, route and workout options",
+                    "Åpner deling, rute og valg for økten"
+                ))
             }
         }
         .task(id: workout.id) {
@@ -359,6 +343,15 @@ struct HomeActivityRunDetailView: View {
             completedIntervalHistory = ATHLTHRunningPerformanceHistory.load(
                 userID: session.profile.userID
             )
+        }
+        .sheet(
+            isPresented: $showingRunActionsSheet,
+            onDismiss: performPendingRunAction
+        ) {
+            HomeActivityRunActionsSheet(actions: availableRunActions) { action in
+                pendingRunAction = action
+                showingRunActionsSheet = false
+            }
         }
         .sheet(isPresented: $showingResultShare) {
             ATHLTHRunningResultShareSheet(
@@ -410,6 +403,34 @@ struct HomeActivityRunDetailView: View {
                         }
                     }
             }
+        }
+    }
+
+    private var availableRunActions: [HomeActivityRunAction] {
+        HomeActivityRunAction.available(
+            isIndoor: isIndoorActivity,
+            hasRecordedGPS: routeCoordinates.count >= 2,
+            hasSavedRoute: linkedRoute != nil || savedRecordedRoute != nil,
+            canRemoveFromATHLTH: onRequestRemoveFromATHLTH != nil
+        )
+    }
+
+    /// Present a second sheet or deletion confirmation after the actions
+    /// panel has dismissed, avoiding simultaneous modal presentations.
+    private func performPendingRunAction() {
+        guard let action = pendingRunAction else { return }
+        pendingRunAction = nil
+        switch action {
+        case .share:
+            showingResultShare = true
+        case .openMap:
+            showingFullscreenMap = true
+        case .openSavedRoute:
+            routeToOpen = linkedRoute ?? savedRecordedRoute
+        case .savePrivateRoute:
+            showingSaveRouteConfirmation = true
+        case .removeFromATHLTH:
+            onRequestRemoveFromATHLTH?()
         }
     }
 

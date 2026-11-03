@@ -5748,7 +5748,10 @@ private struct HomePersonalActivityDestination:
                     workout: workout,
                     initialDetail: nil,
                     initialAIInsight:
-                        nil
+                        nil,
+                    onRequestRemoveFromATHLTH: {
+                        showingDeleteConfirmation = true
+                    }
                 )
 
             case .strength:
@@ -5765,7 +5768,12 @@ private struct HomePersonalActivityDestination:
             }
         }
         .toolbar {
-            ToolbarItem(
+            // The running detail owns the unified menu, including removal.
+            // Strength and other activity screens retain their own action.
+            if workout.activity != .running &&
+                workout.activity != .walking &&
+                workout.activity != .hiking {
+                ToolbarItem(
                 placement:
                     .topBarTrailing
             ) {
@@ -5801,6 +5809,7 @@ private struct HomePersonalActivityDestination:
                             "Valg for økten"
                     )
                 )
+            }
             }
         }
         .confirmationDialog(
