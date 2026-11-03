@@ -577,6 +577,7 @@ struct PlannedWorkoutLobbyView: View {
         }
         .scrollIndicators(.hidden)
         .background(ATHLTHTrainTogetherDesign.canvas.ignoresSafeArea())
+        .tint(ATHLTHTrainTogetherDesign.accent)
         .navigationTitle(ATHLTHLocalization.choose(
             english: "Workout lobby", norwegian: "Øktlobby"
         ))
@@ -649,7 +650,7 @@ struct PlannedWorkoutLobbyView: View {
                             .frame(maxWidth: .infinity, minHeight: 52)
                         }
                         .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accentDeep)
+                        .tint(ATHLTHTrainTogetherDesign.accent)
                         .disabled(
                             openingReadyLobby || !canLaunchWorkout ||
                             (social.coordinatedLobbySessionID != nil &&
@@ -688,6 +689,7 @@ struct PlannedWorkoutLobbyView: View {
                             .frame(maxWidth: .infinity, minHeight: 48)
                         }
                         .buttonStyle(.bordered)
+                        .tint(ATHLTHTrainTogetherDesign.accent)
                         .disabled(
                             openingReadyLobby || persistedWorkout == nil ||
                             social.coordinatedLobbySessionID != nil
@@ -707,6 +709,7 @@ struct PlannedWorkoutLobbyView: View {
                             .frame(maxWidth: .infinity, minHeight: 48)
                         }
                         .buttonStyle(.bordered)
+                        .tint(ATHLTHTrainTogetherDesign.accent)
                         .disabled(
                             openingReadyLobby ||
                             persistedWorkout == nil ||
@@ -804,11 +807,11 @@ struct PlannedWorkoutLobbyView: View {
                 ), systemImage: "person.2.fill")
                 .font(.caption.weight(.bold))
                 .tracking(1.1)
-                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
                 Spacer()
                 Image(systemName: "person.2.circle.fill")
                     .font(.system(size: 34))
-                    .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.8))
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent.opacity(0.8))
             }
             Text(workout.title)
                 .font(.system(size: 27, weight: .semibold, design: .serif))
@@ -849,7 +852,7 @@ struct PlannedWorkoutLobbyView: View {
                             norwegian: "Åpne møtested i Kart"
                         ), destination: url)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
                     }
                 }
             }
@@ -900,7 +903,7 @@ struct PlannedWorkoutLobbyView: View {
                         english: "Organizer", norwegian: "Arrangør"
                     ),
                     icon: "star.circle.fill",
-                    tint: ATHLTHTheme.accentDeep
+                    tint: ATHLTHTrainTogetherDesign.accent
                 )
 
                 ForEach(invitedAthletes) { athlete in
@@ -952,7 +955,7 @@ struct PlannedWorkoutLobbyView: View {
         HStack(spacing: 12) {
             Image(systemName: "person.crop.circle.fill")
                 .font(.system(size: 34))
-                .foregroundStyle(ATHLTHTheme.accentDeep.opacity(0.75))
+                .foregroundStyle(ATHLTHTrainTogetherDesign.accent.opacity(0.75))
                 .frame(width: 42, height: 42)
                 .background(Color.white.opacity(0.6), in: Circle())
             VStack(alignment: .leading, spacing: 4) {
@@ -978,7 +981,7 @@ struct PlannedWorkoutLobbyView: View {
         case .accepted:
             return (ATHLTHLocalization.choose(
                 english: "Accepted", norwegian: "Godtatt"),
-                "checkmark.circle.fill", ATHLTHTheme.vitality)
+                "checkmark.circle.fill", ATHLTHTheme.premiumGold)
         case .declined:
             return (ATHLTHLocalization.choose(
                 english: "Declined", norwegian: "Avslått"),
@@ -987,7 +990,7 @@ struct PlannedWorkoutLobbyView: View {
             return (ATHLTHLocalization.choose(
                 english: "Invited · awaiting reply",
                 norwegian: "Invitert · venter på svar"),
-                "clock", ATHLTHTheme.accentDeep)
+                "clock", ATHLTHTrainTogetherDesign.accent)
         }
     }
 
