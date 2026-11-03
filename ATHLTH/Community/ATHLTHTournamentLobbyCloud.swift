@@ -101,7 +101,9 @@ struct ATHLTHTournamentExerciseCompletionRemote: Decodable {
     let matchExerciseID: UUID
     let userID: UUID
     let submittedAt: Date
+    let reviewStatus: String
     enum CodingKeys: String, CodingKey {
+        case reviewStatus = "review_status"
         case matchExerciseID = "match_exercise_id"
         case userID = "user_id"
         case submittedAt = "submitted_at"
@@ -155,6 +157,12 @@ private struct ATHLTHTournamentExerciseAttemptParams: Encodable {
         try values.encode(p_evidence_note,forKey: .p_evidence_note)
         try values.encode(p_source_workout,forKey: .p_source_workout)
     }
+}
+
+private struct ATHLTHTournamentReviewExerciseParams: Encodable {
+    let p_match_exercise: UUID
+    let p_athlete: UUID
+    let p_approve: Bool
 }
 
 struct ATHLTHTournamentLobbyCloudService {
@@ -318,12 +326,24 @@ struct ATHLTHTournamentLobbyCloudService {
             let end = min(start + 150,slotIDs.count)
             let batch: [ATHLTHTournamentExerciseCompletionRemote] = try await client
               .from("athlth_tournament_exercise_completions")
-              .select("match_exercise_id,user_id,submitted_at")
+              .select("match_exercise_id,user_id,submitted_at,review_status")
               .in("match_exercise_id",values: Array(slotIDs[start..<end]))
               .limit(1000).execute().value
             all.append(contentsOf: batch)
         }
         return all
+    }
+
+    func reviewExercise(slotID: UUID,
+                        athleteID: UUID,
+                        approve: Bool) async throws {
+        try await client.rpc("athlth_tournament_review_exercise",
+            params: ATHLTHTournamentReviewExerciseParams(
+                p_match_exercise: slotID,
+                p_athlete: athleteID,
+                p_approve: approve
+            )
+        ).execute()
     }
 
     func completeExercise(slotID: UUID,evidence: String) async throws {
