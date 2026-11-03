@@ -3611,6 +3611,19 @@ final class AppSessionStore: ObservableObject {
                   let sourceID = existing.sharedSourceSessionID
             else { continue }
 
+            // A direct organizer update/cancellation (v6) supersedes older
+            // proposal approvals (v5), including on repeated inbox refreshes.
+            if messages.contains(where: {
+                $0.attachmentKind == .workout &&
+                $0.shareVersion == 6 &&
+                $0.senderID == ownerID &&
+                $0.recipientID == profile.userID &&
+                $0.sourceObjectID == sourceID &&
+                $0.sourceOwnerID == ownerID
+            }) {
+                continue
+            }
+
             let revision = decisions
                 .filter {
                     $0.senderID == ownerID &&
