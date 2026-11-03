@@ -44,6 +44,13 @@ struct ATHLTHTournamentRuleProposalRemote: Decodable, Identifiable {
     let allowedActivities: [ATHLTHTournamentActivity]
     let cadenceDays: Int
     let completionHours: Int
+    let rotationMode: ATHLTHTournamentRotationMode
+    let restWeekdays: [Int]
+    let proofMode: ATHLTHTournamentProofMode
+    let winPoints: Int
+    let drawPoints: Int
+    let publicResults: Bool
+    let allowExtensions: Bool
     let createdAt: Date
     enum CodingKeys: String, CodingKey {
         case id
@@ -52,6 +59,13 @@ struct ATHLTHTournamentRuleProposalRemote: Decodable, Identifiable {
         case allowedActivities = "allowed_activities"
         case cadenceDays = "cadence_days"
         case completionHours = "completion_hours"
+        case rotationMode = "rotation_mode"
+        case restWeekdays = "rest_weekdays"
+        case proofMode = "proof_mode"
+        case winPoints = "win_points"
+        case drawPoints = "draw_points"
+        case publicResults = "public_results"
+        case allowExtensions = "allow_extensions"
         case createdAt = "created_at"
     }
 }
@@ -70,6 +84,13 @@ private struct ATHLTHTournamentProposeRulesParams: Encodable {
     let p_allowed_activities: [String]
     let p_cadence_days: Int
     let p_completion_hours: Int
+    let p_rotation_mode: String
+    let p_rest_weekdays: [Int]
+    let p_proof_mode: String
+    let p_win_points: Int
+    let p_draw_points: Int
+    let p_public_results: Bool
+    let p_allow_extensions: Bool
 }
 
 private struct ATHLTHTournamentVoteRulesParams: Encodable {
@@ -337,7 +358,7 @@ struct ATHLTHTournamentLobbyCloudService {
     func ruleProposals(tournamentID: UUID) async throws
       -> [ATHLTHTournamentRuleProposalRemote] {
         try await client.from("athlth_tournament_rule_proposals")
-            .select("id,tournament_id,proposer_id,allowed_activities,cadence_days,completion_hours,created_at")
+            .select("id,tournament_id,proposer_id,allowed_activities,cadence_days,completion_hours,rotation_mode,rest_weekdays,proof_mode,win_points,draw_points,public_results,allow_extensions,created_at")
             .eq("tournament_id",value: tournamentID)
             .order("created_at")
             .limit(16).execute().value
@@ -355,14 +376,28 @@ struct ATHLTHTournamentLobbyCloudService {
         tournamentID: UUID,
         activities: [ATHLTHTournamentActivity],
         cadenceDays: Int,
-        completionHours: Int
+        completionHours: Int,
+        rotation: ATHLTHTournamentRotationMode,
+        restDays: [Int],
+        proof: ATHLTHTournamentProofMode,
+        winPoints: Int,
+        drawPoints: Int,
+        publicResults: Bool,
+        allowExtensions: Bool
     ) async throws {
-        try await client.rpc("athlth_tournament_propose_rules",
+        try await client.rpc("athlth_tournament_propose_all_rules",
             params: ATHLTHTournamentProposeRulesParams(
                 p_tournament: tournamentID,
                 p_allowed_activities: activities.map(\.rawValue),
                 p_cadence_days: cadenceDays,
-                p_completion_hours: completionHours
+                p_completion_hours: completionHours,
+                p_rotation_mode: rotation.rawValue,
+                p_rest_weekdays: restDays,
+                p_proof_mode: proof.rawValue,
+                p_win_points: winPoints,
+                p_draw_points: drawPoints,
+                p_public_results: publicResults,
+                p_allow_extensions: allowExtensions
             )
         ).execute()
     }
@@ -397,6 +432,15 @@ struct ATHLTHTournamentLobbyCloudService {
     func extendBallot(tournamentID: UUID) async throws {
         try await client.rpc(
             "athlth_tournament_extend_ballot",
+            params: ATHLTHTournamentIDParamsPublic(
+                p_tournament: tournamentID
+            )
+        ).execute()
+    }
+
+    func acceptFinalRules(tournamentID: UUID) async throws {
+        try await client.rpc(
+            "athlth_tournament_acknowledge_rules",
             params: ATHLTHTournamentIDParamsPublic(
                 p_tournament: tournamentID
             )
