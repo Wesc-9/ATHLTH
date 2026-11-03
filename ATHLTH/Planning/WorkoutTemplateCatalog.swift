@@ -4045,6 +4045,7 @@ struct WorkoutTemplateBuilderView: View {
                 persistWorkoutDraft()
             }
             .onChange(of: selectedRouteID) { oldValue, newValue in
+                savedToMyWorkouts = false
                 if let oldValue, newValue == nil {
                     let routeTitle = session.savedRoutes.first {
                         $0.id == oldValue
@@ -4063,12 +4064,23 @@ struct WorkoutTemplateBuilderView: View {
             }
             .onChange(of: selectedWorkoutGearIDs) { _, _ in
                 if draftActive { gearSelectionTouched = true }
+                savedToMyWorkouts = false
                 persistWorkoutDraft()
             }
-            .onChange(of: gearSelectionTouched) { _, _ in persistWorkoutDraft() }
-            .onChange(of: selectedSpotifyPlaylist) { _, _ in persistWorkoutDraft() }
-            .onChange(of: spotifyAutoplayOnStart) { _, _ in persistWorkoutDraft() }
+            .onChange(of: gearSelectionTouched) { _, _ in
+                savedToMyWorkouts = false
+                persistWorkoutDraft()
+            }
+            .onChange(of: selectedSpotifyPlaylist) { _, _ in
+                savedToMyWorkouts = false
+                persistWorkoutDraft()
+            }
+            .onChange(of: spotifyAutoplayOnStart) { _, _ in
+                savedToMyWorkouts = false
+                persistWorkoutDraft()
+            }
             .onChange(of: manualDurationMinutes) { _, _ in
+                savedToMyWorkouts = false
                 persistWorkoutDraft()
             }
             .onChange(of: pendingCopyDayIDs) { _, _ in persistWorkoutDraft() }
