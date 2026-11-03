@@ -382,10 +382,14 @@ struct TrainTogetherCreatorLobbyView: View {
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .mutedText
-                )
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
+                if let arrival = participant.arrivalStatus,
+                   participant.workoutFinishedAt == nil {
+                    Label(arrival.label, systemImage: arrival.symbol)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                }
             }
 
             Spacer()
