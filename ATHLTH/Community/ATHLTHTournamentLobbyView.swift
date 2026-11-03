@@ -131,12 +131,21 @@ struct ATHLTHTournamentLobbyView: View {
             }
         }
         .task(id: tab) {
-            guard tab == .chat else { return }
             while !Task.isCancelled {
-                if let updated = try? await cloud.messages(tournamentID: tournament.id) {
-                    messages = updated
+                if tab == .chat {
+                    if let updated = try? await cloud.messages(
+                        tournamentID: tournament.id
+                    ) {
+                        messages = updated
+                    }
+                } else {
+                    // Ready state and automatic ballot completion may change
+                    // on another device; refresh the official participant and
+                    // tournament records without requiring a manual reload.
+                    await onChange()
+                    await reload()
                 }
-                try? await Task.sleep(for: .seconds(10))
+                try? await Task.sleep(for: .seconds(15))
             }
         }
         .sheet(item: $replacementSelection) { selected in
@@ -319,9 +328,8 @@ struct ATHLTHTournamentLobbyView: View {
                         }
                         if isOwner && person.userID != userID &&
                            person.removedAt == nil &&
-                           tournament.status == "inviting" ||
-                           (isOwner && person.userID != userID &&
-                            person.removedAt == nil && tournament.status == "active") {
+                           (tournament.status == "inviting" ||
+                            tournament.status == "active") {
                             Menu {
                                 Button("Erstatt deltaker",systemImage: "person.crop.circle.badge.plus") {
                                     replacementSelection = .init(
@@ -521,6 +529,35 @@ struct ATHLTHTournamentLobbyView: View {
                 Text("\(myVotes.count) av \(tournament.exerciseCount) stemmer brukt")
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+
+            if isOwner && tournament.exerciseMode == .vote &&
+               tournament.status == "inviting" && !finalized &&
+               Date() >= (tournament.votesCloseAt ?? .distantFuture) &&
+               candidates.count < tournament.exerciseCount {
+                VStack(alignment: .leading, spacing: 9) {
+                    Label("For få øvelsesforslag til å fullføre avstemningen.",
+                          systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                    Button("Åpne forslag og avstemning på nytt") {
+                        Task {
+                            await perform {
+                                try await cloud.extendBallot(
+                                    tournamentID: tournament.id
+                                )
+                                await onChange()
+                            }
+                        }
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    Text("Forslagsfristen forlenges med 24 timer og stemmefristen med 48 timer. Gamle stemmer nullstilles for å gi alle kandidatene lik sjanse.")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                .padding(15)
+                .background(ATHLTHArenaV3Style.panel())
             }
 
             if isOwner && tournament.status == "inviting" && !finalized {
