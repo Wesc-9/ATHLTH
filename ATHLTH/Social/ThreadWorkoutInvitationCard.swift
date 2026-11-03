@@ -742,6 +742,16 @@ struct PlannedWorkoutLobbyView: View {
     ) async {
         guard isOrganizer, !isPublishingLifecycle,
               let current = persistedWorkout else { return }
+        if let lobbyID = matchingReadyLobbyID,
+           social.workoutParticipants.contains(where: {
+               $0.sessionID == lobbyID && $0.workoutStartedAt != nil
+           }) {
+            lifecycleError = ATHLTHLocalization.choose(
+                english: "The shared workout has already started.",
+                norwegian: "Fellesøkten er allerede startet."
+            )
+            return
+        }
         if kind == .updated {
             guard let revision,
                   revision.id == sourceWorkoutID,
@@ -806,6 +816,11 @@ struct PlannedWorkoutLobbyView: View {
                     return
                 }
             }
+            // An old ready lobby must never outlive changed meeting details.
+            if let lobbyID = matchingReadyLobbyID {
+                await social.cancelActiveWorkout(sessionID: lobbyID)
+            }
+
             if kind == .cancelled {
                 session.removeStandalonePlannedSession(current.id)
             } else if let revision {
