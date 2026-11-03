@@ -598,7 +598,8 @@ struct ATHLTHTournamentLiveDetailView: View {
                         .font(.caption2)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
-                if isOwner && current.status == "active" &&
+                if isOwner && current.allowExtensions &&
+                   current.status == "active" &&
                    match.awayID != nil && match.status != "confirmed" &&
                    deadline < Date().addingTimeInterval(22 * 86_400) {
                     Button {
@@ -642,7 +643,8 @@ struct ATHLTHTournamentLiveDetailView: View {
                     .disabled(busy)
                 }
             }
-            if isOwner && current.status == "active" &&
+            if isOwner && current.allowExtensions &&
+               current.status == "active" &&
                !match.isWarmup && match.awayID != nil &&
                match.status != "confirmed" {
                 Button {
