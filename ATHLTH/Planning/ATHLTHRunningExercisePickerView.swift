@@ -47,7 +47,8 @@ struct ATHLTHRunningExercisePickerView: View {
                                 selectionRow(
                                     title: preset.title,
                                     detail: preset.detail,
-                                    symbol: "figure.run"
+                                    symbol: preset == .treadmill
+                                        ? "figure.run.treadmill" : "figure.run"
                                 ) {
                                     onSelect(preset.blocks(in: phase))
                                     dismiss()
@@ -63,7 +64,9 @@ struct ATHLTHRunningExercisePickerView: View {
                                     ),
                                     symbol: "bookmark.fill"
                                 ) {
-                                    onSelect(set.blocksForReuse())
+                                    // Older saved intervals can still be compact
+                                    // groups. Display their real executable steps.
+                                    onSelect(set.blocksForReuse().expandedForExecution())
                                     dismiss()
                                 }
                                 .contextMenu {
