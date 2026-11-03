@@ -70,30 +70,8 @@ struct ATHLTHTournamentAdvancedRulesSection: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.ink)
                     HStack(spacing: 5) {
-                        ForEach(1...7,id: \.self) { weekday in
-                            Button {
-                                if restDays.contains(weekday) {
-                                    restDays.remove(weekday)
-                                } else if restDays.count < 6 {
-                                    restDays.insert(weekday)
-                                }
-                            } label: {
-                                Text(dayNames[weekday - 1])
-                                    .font(.system(size: 11,weight: .semibold))
-                                    .frame(maxWidth: .infinity,minHeight: 40)
-                                    .foregroundStyle(restDays.contains(weekday)
-                                                     ? .white : ATHLTHArenaV3Style.ink)
-                                    .background(
-                                        restDays.contains(weekday)
-                                          ? ATHLTHArenaV3Style.ink
-                                          : ATHLTHArenaV3Style.panel(),
-                                        in: RoundedRectangle(cornerRadius: 11)
-                                    )
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(dayNames[weekday - 1] +
-                                (restDays.contains(weekday)
-                                 ? " hviledag" : " treningsdag"))
+                        ForEach(1...7, id: \.self) { weekday in
+                            restDayButton(weekday)
                         }
                     }
                     Text("Øvelser flyttes til neste tilgjengelige treningsdag. Ingen resultater avgjøres automatisk på hviledager.")
@@ -166,4 +144,35 @@ struct ATHLTHTournamentAdvancedRulesSection: View {
             }
         }
     }
+    private func restDayButton(_ weekday: Int) -> some View {
+        let selected = restDays.contains(weekday)
+        return Button {
+            if selected {
+                restDays.remove(weekday)
+            } else if restDays.count < 6 {
+                restDays.insert(weekday)
+            }
+        } label: {
+            Text(dayNames[weekday - 1])
+                .font(.system(size: 11, weight: .semibold))
+                .frame(maxWidth: .infinity, minHeight: 40)
+                .foregroundStyle(
+                    selected ? Color.white : ATHLTHArenaV3Style.ink
+                )
+                .background {
+                    if selected {
+                        RoundedRectangle(cornerRadius: 11)
+                            .fill(ATHLTHArenaV3Style.ink)
+                    } else {
+                        ATHLTHArenaV3Style.panel()
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            dayNames[weekday - 1] +
+                (selected ? " hviledag" : " treningsdag")
+        )
+    }
+
 }
