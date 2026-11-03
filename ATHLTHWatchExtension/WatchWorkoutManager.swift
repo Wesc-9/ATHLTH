@@ -7060,6 +7060,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 plannedRoute?.title
         )
 
+        result.petSegments = WatchRouteStore.shared.completedPetSegments()
         if kind == .running || kind == .walking {
             result.recordedRunningMinutes = recordedStructuredRunMinutes
         }
@@ -7083,6 +7084,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         sendToPhone(result)
+        WatchRouteStore.shared.clearCompletedPetSelection()
 
         if audioCoachConfiguration.enabled,
            audioCoachConfiguration
