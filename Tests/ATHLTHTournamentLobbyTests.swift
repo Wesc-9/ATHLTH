@@ -29,6 +29,68 @@ final class ATHLTHTournamentLobbyTests: XCTestCase {
         )
     }
 
+    func testSportPermissionsAndTimingPersist() throws {
+        let base = sampleDraft()
+        var changed = base
+        changed.allowedActivities = [.running,.strength,.cycling]
+        changed.rulesAuthority = .group
+        changed.cadenceDays = 2
+        changed.completionHours = 48
+        let data = try JSONEncoder().encode(changed)
+        let decoded = try JSONDecoder().decode(
+            ATHLTHTournamentDraft.self, from: data
+        )
+        XCTAssertEqual(Set(decoded.allowedActivities),
+                       Set([.running,.strength,.cycling]))
+        XCTAssertEqual(decoded.rulesAuthority,.group)
+        XCTAssertEqual(decoded.cadenceDays,2)
+        XCTAssertEqual(decoded.completionHours,48)
+        XCTAssertEqual(ATHLTHTournamentCadence.title(for: 1),"Hver dag")
+        XCTAssertEqual(ATHLTHTournamentCadence.title(for: 14),"Annenhver uke")
+        XCTAssertEqual(ATHLTHTournamentCadence.window(48),"2 dager")
+    }
+
+    func testOldDraftGetsConservativeSportAndScheduleDefaults() throws {
+        let draft = sampleDraft()
+        let data = try JSONEncoder().encode(draft)
+        var legacy = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: data) as? [String: Any]
+        )
+        for field in ["allowedActivities","rulesAuthority",
+                      "cadenceDays","completionHours"] {
+            legacy.removeValue(forKey: field)
+        }
+        let encoded = try JSONSerialization.data(withJSONObject: legacy)
+        let decoded = try JSONDecoder().decode(
+            ATHLTHTournamentDraft.self, from: encoded
+        )
+        XCTAssertEqual(decoded.allowedActivities,[.strength])
+        XCTAssertEqual(decoded.rulesAuthority,.owner)
+        XCTAssertEqual(decoded.cadenceDays,7)
+        XCTAssertEqual(decoded.completionHours,48)
+    }
+
+    func testPresetExerciseUsesTypedIDInsteadOfAbsentCatalogID() throws {
+        let preset = UUID()
+        let row: [String: Any] = [
+            "id": UUID().uuidString,
+            "tournament_id": UUID().uuidString,
+            "exercise_id": NSNull(),
+            "activity_template_id": preset.uuidString,
+            "suggested_by": UUID().uuidString,
+            "created_at": "2026-11-03T10:00:00Z",
+            "selected_position": NSNull()
+        ]
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let decoded = try decoder.decode(
+            ATHLTHTournamentExerciseCandidateRemote.self,
+            from: JSONSerialization.data(withJSONObject: row)
+        )
+        XCTAssertNil(decoded.exerciseID)
+        XCTAssertEqual(decoded.lookupID,preset)
+    }
+
     func testVotedExerciseRulesPersistAcrossAppRestart() throws {
         let original = sampleDraft()
         let data = try JSONEncoder().encode(original)
