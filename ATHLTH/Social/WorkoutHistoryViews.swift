@@ -313,6 +313,7 @@ struct WorkoutHistoryDetailView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
@@ -361,6 +362,7 @@ struct WorkoutHistoryDetailView: View {
 
                 metricGrid
                 workoutGearCard
+                ATHLTHWorkoutPetHistoryCard(workout: workout)
 
                 ATHLTHUnifiedCard {
                     HStack {
@@ -984,6 +986,7 @@ struct PostWorkoutReviewView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
@@ -1010,6 +1013,7 @@ struct PostWorkoutReviewView: View {
     @State private var effort = 5.0
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var selectedGearIDs: Set<UUID> = []
+    @State private var selectedPetIDs: Set<UUID> = []
     @State private var saving = false
     @State private var alreadyPublished = false
     @State private var replayContext: WorkoutAIInsightContext?
@@ -1095,6 +1099,7 @@ struct PostWorkoutReviewView: View {
                             selectedGearIDs: $selectedGearIDs,
                             activity: workout.activity
                         )
+                        ATHLTHWorkoutPetSelectionCard(selectedPetIDs: $selectedPetIDs)
 
                         compactTrainTogetherButton
                     }
@@ -4403,6 +4408,8 @@ struct PostWorkoutReviewView: View {
         selectedGearIDs = gear.gearIDs(
             for: workout.id
         )
+        if pets.pets.isEmpty { await pets.refresh() }
+        selectedPetIDs = pets.petIDs(for: workout.id)
 
         if let activity = await social.workoutActivity(for: workout.id) {
             alreadyPublished = true
@@ -4436,6 +4443,8 @@ struct PostWorkoutReviewView: View {
                 from: gear
             )
         }
+        let petsSaved = await pets.savePetUsage(
+            for: workout, petIDs: selectedPetIDs)
 
         let reviewSaved = await social.saveWorkoutReview(
             workout,
@@ -4451,6 +4460,7 @@ struct PostWorkoutReviewView: View {
             await uploadSelectedPhotos()
 
         if gearSaved &&
+            petsSaved &&
             reviewSaved &&
             mediaSaved {
             dismiss()
