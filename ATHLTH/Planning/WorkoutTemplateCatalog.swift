@@ -4592,7 +4592,7 @@ struct WorkoutTemplateBuilderView: View {
                     $0.groupID.map { !existingGroups.contains($0) } == true
                 })?.groupID,
                    let individual = ATHLTHIntervalGroupEditing.individualSteps(
-                    in: blocks, groupID: id
+                    in: blocks, groupID: id, keepingEditableGroup: true
                    ) {
                     blocks = individual
                 }
@@ -4684,6 +4684,29 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 // Deleting a category does not remove another category
                 // or implicitly recreate the one just removed.
+            },
+            onUpdateIntervalGroup: { id, rounds, finalRecovery in
+                if let updated = ATHLTHIntervalRecipeEditing.changing(
+                    blocks, groupID: id, rounds: rounds,
+                    finalRecovery: finalRecovery
+                ) {
+                    blocks = updated
+                    persistWorkoutDraft()
+                }
+            },
+            onCopyIntervalTargets: { id in
+                if let updated = ATHLTHIntervalRecipeEditing.copyingFirstEffortTargets(
+                    in: blocks, groupID: id
+                ) {
+                    blocks = updated
+                    persistWorkoutDraft()
+                }
+            },
+            onUngroupIntervals: { id in
+                blocks = ATHLTHIntervalRecipeEditing.ungrouping(
+                    blocks, groupID: id
+                )
+                persistWorkoutDraft()
             }
         )
     }
