@@ -21,6 +21,73 @@ final class ATHLTHPlanJourneyTests: XCTestCase {
         XCTAssertEqual(ATHLTHPlanJourney.sequence(advanced: false).first, .mode)
     }
 
+    func testClosingAndReopeningComposerReturnsToSavedStage() throws {
+        let suite = "ATHLTHPlanJourney.Reopen.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHPlanJourney.\(UUID().uuidString)", isDirectory: true)
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let drafts = ATHLTHPlanCreationDraftStore(
+            defaults: defaults, directoryURL: folder
+        )
+        let userID = UUID()
+        let first = TrainProgramCreationLaunch.reopenOrCreate(
+            userID: userID, store: drafts
+        )
+        XCTAssertFalse(first.resumesDraft)
+        let savedID = try XCTUnwrap(first.draftID)
+
+        let checkpoint = ATHLTHPlanCreationDraft(
+            title: "Running program", weekCount: 8,
+            startDate: Date().addingTimeInterval(86_400),
+            advanced: true, source: "scratch", stage: "basics",
+            preferredDayIndexes: [1, 3, 5], planningApproach: "guided"
+        )
+        drafts.save(checkpoint, userID: userID, draftID: savedID)
+        let reopened = TrainProgramCreationLaunch.reopenOrCreate(
+            userID: userID, store: drafts
+        )
+        XCTAssertTrue(reopened.resumesDraft)
+        XCTAssertEqual(reopened.draftID, savedID)
+        XCTAssertEqual(drafts.load(userID: userID, draftID: savedID)?.stage, "basics")
+        XCTAssertEqual(
+            ATHLTHPlanJourney.restoredStep(checkpoint.stage, advanced: true),
+            .basics
+        )
+        XCTAssertEqual(drafts.load(userID: userID, draftID: savedID)?.weekCount, 8)
+        XCTAssertEqual(drafts.load(userID: userID, draftID: savedID)?.preferredDayIndexes, [1, 3, 5])
+
+        // Completing/deleting this plan must release its pending pointer.
+        XCTAssertTrue(drafts.deleteDraft(userID: userID, draftID: savedID))
+        XCTAssertNil(drafts.recentDraftID(userID: userID))
+        let next = TrainProgramCreationLaunch.reopenOrCreate(
+            userID: userID, store: drafts
+        )
+        XCTAssertFalse(next.resumesDraft)
+        XCTAssertNotEqual(next.draftID, savedID)
+    }
+
+    func testResumePointerNeverLoadsAnotherAccountsDraft() throws {
+        let suite = "ATHLTHPlanJourney.Account.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let drafts = ATHLTHPlanCreationDraftStore(defaults: defaults)
+        let firstUser = UUID()
+        let secondUser = UUID()
+        let first = TrainProgramCreationLaunch.reopenOrCreate(
+            userID: firstUser, store: drafts
+        )
+        let second = TrainProgramCreationLaunch.reopenOrCreate(
+            userID: secondUser, store: drafts
+        )
+        XCTAssertNotEqual(first.draftID, second.draftID)
+        XCTAssertEqual(drafts.recentDraftID(userID: firstUser), first.draftID)
+        XCTAssertEqual(drafts.recentDraftID(userID: secondUser), second.draftID)
+    }
+
     func testSimpleStartsWithModeAndSkipsAdvancedQuestions() {
         let stages = ATHLTHPlanJourney.sequence(advanced: false)
         XCTAssertEqual(stages, [.mode, .goal, .basics])

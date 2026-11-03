@@ -230,6 +230,27 @@ struct ATHLTHPlanCreationDraftStore {
         "athlth.planWizardDraft.v1.\(userID.uuidString)"
     }
 
+    // The Train tab remembers the one draft opened from its Create Plan
+    // entry point. Store only a per-account UUID, never personal plan data.
+    private func recentDraftKey(userID: UUID) -> String {
+        "athlth.planWizardRecentDraft.v1.\(userID.uuidString)"
+    }
+
+    func recentDraftID(userID: UUID) -> UUID? {
+        guard let value = defaults.string(forKey: recentDraftKey(userID: userID))
+        else { return nil }
+        return UUID(uuidString: value)
+    }
+
+    func setRecentDraftID(_ draftID: UUID?, userID: UUID) {
+        let key = recentDraftKey(userID: userID)
+        if let draftID {
+            defaults.set(draftID.uuidString, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     private func editingKey(userID: UUID, draftID: UUID?) -> String {
         let prefix = "athlth.planWizardEditing.v1.\(userID.uuidString)"
         return draftID.map { prefix + "." + $0.uuidString } ?? prefix
@@ -350,6 +371,10 @@ struct ATHLTHPlanCreationDraftStore {
             defaults.removeObject(forKey: legacyKey(userID: userID))
         }
         setEditing(false, userID: userID, draftID: draftID)
+        // Creating or deleting this draft releases the auto-resume pointer.
+        if let draftID, recentDraftID(userID: userID) == draftID {
+            setRecentDraftID(nil, userID: userID)
+        }
         return true
     }
 

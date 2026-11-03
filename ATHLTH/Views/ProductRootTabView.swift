@@ -5295,6 +5295,21 @@ struct TrainProgramCreationLaunch: Identifiable {
     static var continueDraft: Self {
         Self(resumesDraft: true, draftID: nil)
     }
+
+    /// Returning to Create Plan reopens its last unfinished checkpoint.
+    /// An explicitly new plan still gets an independent UUID via fresh.
+    static func reopenOrCreate(
+        userID: UUID,
+        store: ATHLTHPlanCreationDraftStore
+    ) -> Self {
+        if let recent = store.recentDraftID(userID: userID),
+           store.load(userID: userID, draftID: recent) != nil {
+            return Self(resumesDraft: true, draftID: recent)
+        }
+        let launch = Self.fresh
+        store.setRecentDraftID(launch.draftID, userID: userID)
+        return launch
+    }
 }
 
 private struct PlannedWorkoutSelection: Identifiable {
@@ -6584,10 +6599,14 @@ struct ATHLTHTrainView: View {
         ))
     }
 
-    /// A new plan always opens step one. Saved drafts remain available
-    /// from the Plan workspace and have independent on-device checkpoints.
+    /// Reopen the same unfinished plan after closing the composer. Finished
+    /// and explicitly deleted drafts are never resurrected; the next tap
+    /// starts a genuinely independent plan.
     private func beginFreshTrainingPlan() {
-        trainProgramCreationLaunch = .fresh
+        trainProgramCreationLaunch = TrainProgramCreationLaunch.reopenOrCreate(
+            userID: session.profile.userID,
+            store: ATHLTHPlanCreationDraftStore()
+        )
     }
 
     /// Only *completed* sessions from the last month may steer the

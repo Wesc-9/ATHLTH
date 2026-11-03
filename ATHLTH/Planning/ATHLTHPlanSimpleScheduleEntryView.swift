@@ -75,18 +75,13 @@ struct ATHLTHPlanSetupFields: View {
         VStack(alignment: .leading, spacing: 11) {
             if advanced {
                 advancedIntro
-                planningApproachCard
             } else {
                 hero
             }
             nameCard
-            if !advanced {
-                goalsCard
-                daysCard
-                startCard
-            } else {
-                daysCard
-                goalsCard
+            if advanced {
+                // Date and duration belong with plan identity at the top.
+                // Keep the adaptive two-column layout on standard phones.
                 if typeSize.isAccessibilitySize {
                     VStack(spacing: 10) { startCard; durationCard }
                 } else {
@@ -95,6 +90,15 @@ struct ATHLTHPlanSetupFields: View {
                         durationCard
                     }
                 }
+                daysCard
+                goalsCard
+                // Choose day-by-day or weekly editing last, immediately
+                // before Next leads into the actual week editor.
+                planningApproachCard
+            } else {
+                goalsCard
+                daysCard
+                startCard
             }
         }
         .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
@@ -117,8 +121,8 @@ struct ATHLTHPlanSetupFields: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
             Text(tr(
-                "Choose how to plan, then set your training days and goals.",
-                "Velg oppsett, treningsdager og mål. Du kan justere alt senere."
+                "Choose your dates, training days and goals, then how to build each week.",
+                "Velg datoer, treningsdager og mål, og deretter hvordan du vil planlegge."
             ))
             .font(.subheadline)
             .foregroundStyle(muted)

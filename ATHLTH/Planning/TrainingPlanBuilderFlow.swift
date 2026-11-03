@@ -554,6 +554,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             startDate = Calendar.current.startOfDay(for: .now)
         }
         .onDisappear {
+            // Persist the actual last visible wizard stage even if the
+            // athlete closes the sheet without changing another field.
+            saveResumableDraft()
             // A normal dismissal exits the editing session, while locking
             // the phone leaves it recoverable after an OS process eviction.
             if scenePhase == .active {
