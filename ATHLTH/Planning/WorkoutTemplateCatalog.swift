@@ -3461,6 +3461,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var studioBasicOwnedBlockIDs: Set<UUID> = []
     @State private var studioBasicWorkoutTitle: String?
     @State private var showingCopyPicker = false
+    @State private var showingWorkoutReview = false
     @State private var pendingExerciseChoice: WorkoutBlockGroupKind?
     @State private var pendingSavedWorkoutPicker = false
     @State private var pendingStandaloneExercise = false
@@ -3950,6 +3951,14 @@ struct WorkoutTemplateBuilderView: View {
     var body: some View {
         NavigationStack {
             editorWithDraftLifecycle
+        }
+        .sheet(isPresented: $showingWorkoutReview) {
+            ATHLTHWorkoutReviewSheet(
+                title: workoutSnapshot().title,
+                blocks: blocks,
+                routeTitle: activeRoute?.title,
+                fallbackDurationMinutes: resolvedDurationMinutes
+            )
         }
     }
 
@@ -6070,6 +6079,22 @@ struct WorkoutTemplateBuilderView: View {
 
     private var saveBar: some View {
         VStack(spacing: 8) {
+            if !blocks.isEmpty {
+                Button {
+                    showingWorkoutReview = true
+                } label: {
+                    Label(tr("Review workout", "Se gjennom økten"),
+                          systemImage: "eye")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(studioAccent)
+                        .frame(maxWidth: .infinity, minHeight: 30)
+                }
+                .accessibilityHint(tr(
+                    "Read-only preview of every step before saving",
+                    "Forhåndsvis alle deløktene før lagring"
+                ))
+            }
+
             // Saving a reusable library copy is a separate action from
             // committing this scheduled workout and continuing in the plan.
             if isPlannedWorkout && !blocks.isEmpty {
