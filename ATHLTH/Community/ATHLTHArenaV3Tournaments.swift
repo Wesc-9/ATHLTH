@@ -219,11 +219,6 @@ struct ATHLTHTournamentCreator: View {
             groupSize: groupSize,
             qualifiersPerGroup: qualifiersPerGroup,
             participants: athletes,
-            exerciseMode: exerciseMode,
-            exerciseCount: exerciseCount,
-            proposalsCloseAt: exerciseMode == .vote ? proposalsCloseAt : nil,
-            votesCloseAt: exerciseMode == .vote ? votesCloseAt : nil,
-            approvePlayerChanges: approvePlayerChanges,
             warmupRounds: warmupRounds.enumerated().map { index, round in
                 var copy = round
                 let clean = round.title.trimmingCharacters(
@@ -234,7 +229,12 @@ struct ATHLTHTournamentCreator: View {
                         .prefix(60)
                 )
                 return copy
-            }
+            },
+            exerciseMode: exerciseMode,
+            exerciseCount: exerciseCount,
+            proposalsCloseAt: exerciseMode == .vote ? proposalsCloseAt : nil,
+            votesCloseAt: exerciseMode == .vote ? votesCloseAt : nil,
+            approvePlayerChanges: approvePlayerChanges
         )
     }
 
