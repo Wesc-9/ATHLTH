@@ -1952,6 +1952,7 @@ final class HealthKitManager: ObservableObject {
             ), samples.count >= 2 else { continue }
 
             var workoutCoverage = 0.0
+            var workoutZones = Array(repeating: 0.0, count: 5)
             for index in samples.indices {
                 let sample = samples[index]
                 let date = sample.startDate
@@ -1973,10 +1974,15 @@ final class HealthKitManager: ObservableObject {
                     fraction >= boundaries[3] ? 3 :
                     fraction >= boundaries[2] ? 2 :
                     fraction >= boundaries[1] ? 1 : 0
-                seconds[zone] += duration
+                workoutZones[zone] += duration
                 workoutCoverage += duration
             }
-            if workoutCoverage >= 60 { includedWorkouts += 1 }
+            if workoutCoverage >= 60 {
+                includedWorkouts += 1
+                for zone in 0..<5 {
+                    seconds[zone] += workoutZones[zone]
+                }
+            }
         }
 
         guard seconds.reduce(0, +) >= 120 else { return nil }
