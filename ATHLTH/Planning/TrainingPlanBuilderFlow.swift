@@ -130,6 +130,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     // Planlegg økt -> Avansert; no parallel strength configuration flow.
     @State private var studioInitialQuickAdd: String?
     @State private var studioInitialPhase: WorkoutPhaseKind?
+    // Keep an open content picker across temporary scene deactivation.
+    @State private var suspendedAdvancedAddDestination: AdvancedAddDestination?
     @State private var addingExtraWorkout = false
     @State private var editingWorkoutIndex = 0
     @State private var editingFocusedBlockIndex: Int?
@@ -545,6 +547,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         case "studio": composingAdvancedDay = selection
                         case "library": selectingLibraryDay = selection
                         case "day": editingWeekDay = selection
+                        case "exercise", "workout", "stretching":
+                            if let kind = ATHLTHAdvancedPlanAddContentView.Kind(
+                                rawValue: unfinished.editorKind ?? ""
+                            ) {
+                                advancedAddDestination = AdvancedAddDestination(
+                                    day: day,
+                                    week: unfinished.selectedPlanWeekIndex ?? guidedCurrentWeek,
+                                    phase: WorkoutPhaseKind(
+                                        rawValue: unfinished.editorPhase ?? ""
+                                    ) ?? .main,
+                                    kind: kind,
+                                    workoutIndex: unfinished.editorWorkoutIndex ?? 0
+                                )
+                            }
                         default: break
                         }
                     }
@@ -647,7 +663,26 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .onChange(of: composingAdvancedDay) { _, _ in saveResumableDraft() }
         .onChange(of: selectingLibraryDay) { _, _ in saveResumableDraft() }
         .onChange(of: scenePhase) { _, phase in
-            if phase != .active { saveResumableDraft() }
+            if phase != .active {
+                // UIKit may dismiss a presented sheet when the phone locks.
+                // Hold the destination independently from the sheet binding.
+                if let destination = advancedAddDestination {
+                    suspendedAdvancedAddDestination = destination
+                }
+                saveResumableDraft()
+            } else if let destination = suspendedAdvancedAddDestination {
+                Task { @MainActor in
+                    await Task.yield()
+                    guard step == .week, !completedPlanCreation else {
+                        suspendedAdvancedAddDestination = nil
+                        return
+                    }
+                    if advancedAddDestination == nil {
+                        advancedAddDestination = destination
+                    }
+                    suspendedAdvancedAddDestination = nil
+                }
+            }
         }
         .onChange(
             of: sessionsPerWeek
@@ -7016,12 +7051,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             firstGuidedWeekDecisionMade: firstGuidedWeekDecisionMade,
             selectedPlanWeekIndex: selectedPlanWeekIndex,
             editorDay: mode == .advanced
-                ? (composingAdvancedDay?.id ?? selectingLibraryDay?.id ?? editingWeekDay?.id)
+                ? (advancedAddDestination?.day ?? composingAdvancedDay?.id ??
+                   selectingLibraryDay?.id ?? editingWeekDay?.id)
                 : nil,
             editorKind: mode != .advanced ? nil
-                : composingAdvancedDay != nil ? "studio"
-                : selectingLibraryDay != nil ? "library"
-                : editingWeekDay != nil ? "day" : nil,
+                : advancedAddDestination?.kind.rawValue
+                ?? (composingAdvancedDay != nil ? "studio"
+                    : selectingLibraryDay != nil ? "library"
+                    : editingWeekDay != nil ? "day" : nil),
+            editorPhase: advancedAddDestination?.phase.rawValue,
+            editorWorkoutIndex: advancedAddDestination?.workoutIndex,
             simpleMinutes: simpleMinutes,
             simpleActivityKinds: simpleActivities.map(\.rawValue).sorted()
         )

@@ -44,6 +44,8 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var selectedPlanWeekIndex: Int? = nil
     var editorDay: Int? = nil
     var editorKind: String? = nil
+    var editorPhase: String? = nil
+    var editorWorkoutIndex: Int? = nil
     var simpleMinutes: Int? = nil
     var simpleActivityKinds: [String]? = nil
     var savedAt: Date
@@ -77,6 +79,8 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         selectedPlanWeekIndex: Int? = nil,
         editorDay: Int? = nil,
         editorKind: String? = nil,
+        editorPhase: String? = nil,
+        editorWorkoutIndex: Int? = nil,
         simpleMinutes: Int? = nil,
         simpleActivityKinds: [String]? = nil,
         savedAt: Date = Date()
@@ -115,8 +119,11 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.editorDay = advanced && editorKind != nil ? editorDay.flatMap {
             (1...7).contains($0) ? $0 : nil
         } : nil
-        self.editorKind = advanced && ["day", "studio", "library"].contains(editorKind ?? "")
-            ? editorKind : nil
+        self.editorKind = advanced && [
+            "day", "studio", "library", "exercise", "workout", "stretching"
+        ].contains(editorKind ?? "") ? editorKind : nil
+        self.editorPhase = editorPhase.flatMap(WorkoutPhaseKind.init(rawValue:))?.rawValue
+        self.editorWorkoutIndex = editorWorkoutIndex.map { min(max($0, 0), 20) }
         self.simpleMinutes = simpleMinutes.map { min(max($0, 5), 180) }
         self.simpleActivityKinds = simpleActivityKinds?.filter {
             ["running", "walking", "strength"].contains($0)

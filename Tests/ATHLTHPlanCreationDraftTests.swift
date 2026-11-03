@@ -274,6 +274,40 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
     }
 
 
+    func testAdvancedContentPickerRestoresExactTypeAndPhase() throws {
+        let draft = ATHLTHPlanCreationDraft(
+            title: "Four weeks", weekCount: 4, startDate: Date(),
+            advanced: true, source: "scratch", stage: "week",
+            planningApproach: "guided", guidedDayCursor: 3,
+            selectedPlanWeekIndex: 1, editorDay: 5,
+            editorKind: "stretching", editorPhase: "cooldown",
+            editorWorkoutIndex: 2
+        )
+        let copy = try JSONDecoder().decode(
+            ATHLTHPlanCreationDraft.self, from: JSONEncoder().encode(draft)
+        )
+        XCTAssertEqual(copy.stage, "week")
+        XCTAssertEqual(copy.editorKind, "stretching")
+        XCTAssertEqual(copy.editorDay, 5)
+        XCTAssertEqual(copy.editorPhase, "cooldown")
+        XCTAssertEqual(copy.editorWorkoutIndex, 2)
+        XCTAssertEqual(copy.selectedPlanWeekIndex, 1)
+        XCTAssertEqual(copy.guidedDayCursor, 3)
+    }
+
+    func testInvalidAdvancedPickerMetadataCannotCorruptCheckpoint() {
+        let draft = ATHLTHPlanCreationDraft(
+            title: "Stretching", weekCount: 4, startDate: Date(),
+            advanced: true, source: "scratch", stage: "week",
+            editorDay: 30, editorKind: "undefined",
+            editorPhase: "undefined", editorWorkoutIndex: 1000
+        )
+        XCTAssertNil(draft.editorDay)
+        XCTAssertNil(draft.editorKind)
+        XCTAssertNil(draft.editorPhase)
+        XCTAssertEqual(draft.editorWorkoutIndex, 20)
+    }
+
     func testAdvancedScheduleCheckpointPreservesOnlyStructuralPreferences() throws {
         let prefs = ATHLTHPlanCreationDraft(
             title: "Hybrid plan",
