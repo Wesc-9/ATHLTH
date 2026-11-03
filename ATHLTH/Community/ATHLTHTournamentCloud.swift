@@ -15,12 +15,24 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let winPoints: Int
     let drawPoints: Int
     let status: String
+    let exerciseMode: ATHLTHTournamentExerciseMode
+    let exerciseCount: Int
+    let proposalsCloseAt: Date?
+    let votesCloseAt: Date?
+    let approvePlayerChanges: Bool
+    let exerciseSelectionFinalizedAt: Date?
     let createdAt: Date
     let startedAt: Date?
     let completedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, title, format, status
+        case exerciseMode = "exercise_mode"
+        case exerciseCount = "exercise_count"
+        case proposalsCloseAt = "proposals_close_at"
+        case votesCloseAt = "votes_close_at"
+        case approvePlayerChanges = "approve_player_changes"
+        case exerciseSelectionFinalizedAt = "exercise_selection_finalized_at"
         case ownerID = "owner_id"
         case clubID = "club_id"
         case seasonID = "season_id"
@@ -41,6 +53,10 @@ struct ATHLTHTournamentRemoteEntry: Decodable, Identifiable {
     let response: String
     let respondedAt: Date?
     let groupIndex: Int?
+    let isReady: Bool
+    let readyAt: Date?
+    let removedAt: Date?
+    let replacedBy: UUID?
     var id: UUID { userID }
 
     enum CodingKeys: String, CodingKey {
@@ -49,6 +65,10 @@ struct ATHLTHTournamentRemoteEntry: Decodable, Identifiable {
         case userID = "user_id"
         case respondedAt = "responded_at"
         case groupIndex = "group_index"
+        case isReady = "is_ready"
+        case readyAt = "ready_at"
+        case removedAt = "removed_at"
+        case replacedBy = "replaced_by"
     }
 }
 
@@ -163,6 +183,45 @@ private struct ATHLTHTournamentCreateParams: Encodable {
     }
 }
 
+private struct ATHLTHTournamentConfiguredCreateParams: Encodable {
+    let p_title: String
+    let p_format: String
+    let p_club: UUID?
+    let p_season: UUID?
+    let p_group_size: Int
+    let p_qualifiers: Int
+    let p_invitees: [UUID]
+    let p_warmup_titles: [String]
+    let p_exercise_mode: String
+    let p_exercise_count: Int
+    let p_proposals_close: String?
+    let p_votes_close: String?
+    let p_approve_player_changes: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case p_title,p_format,p_club,p_season,p_group_size,p_qualifiers,
+             p_invitees,p_warmup_titles,p_exercise_mode,p_exercise_count,
+             p_proposals_close,p_votes_close,p_approve_player_changes
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var keyed = encoder.container(keyedBy: CodingKeys.self)
+        try keyed.encode(p_title,forKey: .p_title)
+        try keyed.encode(p_format,forKey: .p_format)
+        try keyed.encode(p_club,forKey: .p_club)
+        try keyed.encode(p_season,forKey: .p_season)
+        try keyed.encode(p_group_size,forKey: .p_group_size)
+        try keyed.encode(p_qualifiers,forKey: .p_qualifiers)
+        try keyed.encode(p_invitees,forKey: .p_invitees)
+        try keyed.encode(p_warmup_titles,forKey: .p_warmup_titles)
+        try keyed.encode(p_exercise_mode,forKey: .p_exercise_mode)
+        try keyed.encode(p_exercise_count,forKey: .p_exercise_count)
+        try keyed.encode(p_proposals_close,forKey: .p_proposals_close)
+        try keyed.encode(p_votes_close,forKey: .p_votes_close)
+        try keyed.encode(p_approve_player_changes,forKey: .p_approve_player_changes)
+    }
+}
+
 private struct ATHLTHTournamentSeasonParams: Encodable {
     let p_season: UUID
 }
@@ -236,9 +295,10 @@ struct ATHLTHTournamentCloudService {
             qualifiersPerGroup: draft.qualifiersPerGroup
         )
         let targets = draft.participants.filter { $0.id != draft.ownerID }
+        let timestamp = ISO8601DateFormatter()
         return try await client.rpc(
-            "athlth_tournament_create",
-            params: ATHLTHTournamentCreateParams(
+            "athlth_tournament_create_configured",
+            params: ATHLTHTournamentConfiguredCreateParams(
                 p_title: draft.title,
                 p_format: draft.format.rawValue,
                 p_club: draft.clubID,
@@ -246,7 +306,16 @@ struct ATHLTHTournamentCloudService {
                 p_group_size: draft.groupSize,
                 p_qualifiers: draft.qualifiersPerGroup,
                 p_invitees: targets.map(\.id),
-                p_warmup_titles: draft.warmupRounds.map(\.title)
+                p_warmup_titles: draft.warmupRounds.map(\.title),
+                p_exercise_mode: draft.exerciseMode.rawValue,
+                p_exercise_count: draft.exerciseCount,
+                p_proposals_close: draft.proposalsCloseAt.map {
+                    timestamp.string(from: $0)
+                },
+                p_votes_close: draft.votesCloseAt.map {
+                    timestamp.string(from: $0)
+                },
+                p_approve_player_changes: draft.approvePlayerChanges
             )
         ).execute().value
     }
