@@ -32,6 +32,10 @@ struct ATHLTHTournamentCreator: View {
     @State private var title = ""
     @State private var groupSize = 4
     @State private var qualifiersPerGroup = 2
+    @State private var warmupRounds: [ATHLTHTournamentWarmupRound] = []
+    @State private var selectedSeasonID: UUID?
+    @State private var clubSeasons: [ATHLTHArenaClubSeason] = []
+    @State private var showingSeasonCreation = false
     @State private var inviteSource: ATHLTHTournamentInviteSource = .friends
     @State private var chosenIDs: Set<UUID> = []
     @State private var chosenNames: [UUID: String] = [:]
@@ -44,6 +48,11 @@ struct ATHLTHTournamentCreator: View {
     @State private var busy = false
 
     private let directory = ATHLTHArenaClubDirectory()
+    private let seasonCloud = ATHLTHArenaCloudService()
+
+    private var activeClubID: UUID? {
+        fixedClubID ?? (inviteSource == .club ? selectedClubID : nil)
+    }
 
     init(
         preset: ATHLTHTournamentFormat,
@@ -84,8 +93,10 @@ struct ATHLTHTournamentCreator: View {
                 VStack(alignment: .leading, spacing: 22) {
                     titleSection
                     formatSection
+                    warmupSection
                     if format == .groups { groupsSection }
                     inviteSection
+                    if activeClubID != nil { seasonSection }
                     preview
                     Text("Utkastet lagres privat. Ingen invitasjoner sendes før konkurransen kan publiseres med godkjenning fra deltakerne.")
                         .font(.caption)
@@ -112,13 +123,24 @@ struct ATHLTHTournamentCreator: View {
                 Button {
                     let draft = ATHLTHTournamentDraft(
                         ownerID: session.profile.userID,
-                        clubID: inviteSource == .club ? selectedClubID : fixedClubID,
+                        clubID: activeClubID,
+                        seasonID: activeClubID == nil ? nil : selectedSeasonID,
                         title: String(title.trimmingCharacters(
                             in: .whitespacesAndNewlines).prefix(80)),
                         format: format,
                         groupSize: groupSize,
                         qualifiersPerGroup: qualifiersPerGroup,
-                        participants: athletes
+                        participants: athletes,
+                        warmupRounds: warmupRounds.enumerated().map { index, round in
+                            var named = round
+                            let trimmed = round.title.trimmingCharacters(
+                                in: .whitespacesAndNewlines
+                            )
+                            named.title = String(
+                                (trimmed.isEmpty ? "Oppvarmingsrunde \(index + 1)" : trimmed).prefix(60)
+                            )
+                            return named
+                        }
                     )
                     onSave(draft)
                     dismiss()
@@ -138,14 +160,29 @@ struct ATHLTHTournamentCreator: View {
         }
         .environment(\.colorScheme, .light)
         .task {
-            guard fixedClubID == nil else {
-                await loadClub(fixedClubID!)
-                return
-            }
+            if let fixedClubID { await loadClub(fixedClubID) }
             do {
                 clubs = try await directory.manageableClubs()
             } catch {
                 errorMessage = "Kunne ikke laste klubbene."
+            }
+        }
+        .task(id: activeClubID) {
+            if let clubID = activeClubID {
+                await loadSeasons(for: clubID)
+            } else {
+                selectedSeasonID = nil
+                clubSeasons = []
+            }
+        }
+        .sheet(isPresented: $showingSeasonCreation) {
+            if let clubID = activeClubID {
+                ATHLTHArenaSeasonCreateView(
+                    clubs: clubs.filter { $0.id == clubID },
+                    preselectedClubID: clubID
+                ) {
+                    Task { await loadSeasons(for: clubID) }
+                }
             }
         }
         .task(id: search) {
@@ -233,6 +270,100 @@ struct ATHLTHTournamentCreator: View {
             Text("Gruppene fordeles automatisk. Sluttspill og tabell følger konkurransen.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
+        }
+        .padding(15)
+        .background(ATHLTHArenaV3Style.panel())
+    }
+
+    private var warmupSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                sectionTitle("Oppvarmingsrunder")
+                Spacer()
+                Text("Valgfritt")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+
+            Text("Legg til prøverunder før konkurransen starter. Disse gir ingen poeng, endrer ikke tabellen og kan aldri slå ut en deltaker.")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            ForEach($warmupRounds) { $round in
+                HStack(spacing: 10) {
+                    Image(systemName: "figure.run")
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    TextField("Navn på oppvarmingsrunde", text: $round.title)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    Button(role: .destructive) {
+                        warmupRounds.removeAll { $0.id == round.id }
+                    } label: {
+                        Image(systemName: "xmark.circle")
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            .frame(width: 30, height: 36)
+                    }
+                    .accessibilityLabel("Fjern oppvarmingsrunde")
+                }
+                .padding(11)
+                .background(ATHLTHArenaV3Style.cream,
+                            in: RoundedRectangle(cornerRadius: 13))
+            }
+
+            if warmupRounds.count < 12 {
+                Button {
+                    warmupRounds.append(
+                        ATHLTHTournamentWarmupRound(
+                            title: "Oppvarmingsrunde \(warmupRounds.count + 1)"
+                        )
+                    )
+                } label: {
+                    Label("Legg til oppvarmingsrunde", systemImage: "plus.circle")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(15)
+        .background(ATHLTHArenaV3Style.panel())
+    }
+
+    private var seasonSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                sectionTitle("Klubbsesong")
+                Spacer()
+                if clubs.contains(where: { $0.id == activeClubID }) {
+                    Button {
+                        showingSeasonCreation = true
+                    } label: {
+                        Label("Ny", systemImage: "plus")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            Text("En sesong kan samle flere ligaer og cuper. Du kan også legge konkurransen utenfor en sesong.")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            Picker("Sesong", selection: $selectedSeasonID) {
+                Text("Uten sesong").tag(nil as UUID?)
+                ForEach(clubSeasons) { season in
+                    Text(season.title).tag(season.id as UUID?)
+                }
+            }
+            .pickerStyle(.menu)
+            .tint(ATHLTHArenaV3Style.ink)
+
+            if let chosen = clubSeasons.first(where: { $0.id == selectedSeasonID }) {
+                Text("\(ATHLTHArenaSeasonDate.label(chosen.startsOn)) – \(ATHLTHArenaSeasonDate.label(chosen.endsOn))")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
         }
         .padding(15)
         .background(ATHLTHArenaV3Style.panel())
@@ -370,6 +501,17 @@ struct ATHLTHTournamentCreator: View {
                 : "\(ATHLTHTournamentStructure.groups(athletes, size: groupSize).count) grupper")
                 .font(.headline)
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
+            if !warmupRounds.isEmpty {
+                Label("\(warmupRounds.count) oppvarmingsrunder · 0 poeng · ingen utslag",
+                      systemImage: "figure.run")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+            }
+            if let season = clubSeasons.first(where: { $0.id == selectedSeasonID }) {
+                Label(season.title, systemImage: "calendar")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+            }
             Text("Oppsettet er et utkast. Tabellen og kampene får ikke resultater før de er registrert og godkjent.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
@@ -383,6 +525,23 @@ struct ATHLTHTournamentCreator: View {
         Text(title)
             .font(.system(size: 21, weight: .regular, design: .serif))
             .foregroundStyle(ATHLTHArenaV3Style.ink)
+    }
+
+    @MainActor
+    private func loadSeasons(for clubID: UUID) async {
+        do {
+            let allSeasons = try await seasonCloud.loadClubSeasons()
+            guard activeClubID == clubID else { return }
+            clubSeasons = allSeasons.filter { $0.clubID == clubID }
+                .sorted { $0.startsOn > $1.startsOn }
+            if let selectedSeasonID,
+               !clubSeasons.contains(where: { $0.id == selectedSeasonID }) {
+                self.selectedSeasonID = nil
+            }
+        } catch {
+            guard activeClubID == clubID else { return }
+            errorMessage = "Kunne ikke hente klubbens sesonger."
+        }
     }
 
     @MainActor
