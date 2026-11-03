@@ -835,6 +835,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var groups: CommunityGroupStore
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var tournamentCalendar: ATHLTHTournamentCalendarStore
     @EnvironmentObject private var gear: ProfileGearStore
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
@@ -1420,6 +1421,10 @@ struct ATHLTHHomeView: View {
                     )
                     showingGettingStartedPopup = true
                 }
+            }
+            .task(id: "\(isActive)-\(session.profile.userID.uuidString)-arena") {
+                guard isActive, !session.previewModeEnabled else { return }
+                _ = await tournamentCalendar.refresh(for: session.profile.userID)
             }
             .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
@@ -2157,12 +2162,17 @@ struct ATHLTHHomeView: View {
             homeTodayCommunityEvents
         let clubEvents =
             homeTodayGroupEvents
-
+        let tournamentItems = tournamentCalendar.events(on: Date())
+        // Keep the compact tile the same height while reserving an Arena
+        // slot whenever the athlete has a scheduled competition exercise.
+        let visibleWorkoutCount = tournamentItems.isEmpty
+            ? min(todayWorkouts.count, 2)
+            : min(todayWorkouts.count, 1)
+        let visibleTournamentCount = min(
+            tournamentItems.count, max(0, 2 - visibleWorkoutCount)
+        )
         let availableAfterPlan =
-            max(
-                2 - todayWorkouts.count,
-                0
-            )
+            max(2 - visibleWorkoutCount - visibleTournamentCount, 0)
         let visiblePersonalCount =
             min(
                 personalEvents.count,
@@ -2226,9 +2236,10 @@ struct ATHLTHHomeView: View {
 
             if !todayWorkouts.isEmpty ||
                 !personalEvents.isEmpty ||
-                !clubEvents.isEmpty {
+                !clubEvents.isEmpty ||
+                !tournamentItems.isEmpty {
                 VStack(spacing: 7) {
-                    ForEach(Array(todayWorkouts.prefix(2))) { workout in
+                    ForEach(Array(todayWorkouts.prefix(visibleWorkoutCount))) { workout in
                         Button {
                             if let planID =
                                 HomeWeeklyProgressCalendar.containingPlanID(
@@ -2251,6 +2262,27 @@ struct ATHLTHHomeView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                    }
+
+                    ForEach(Array(
+                        tournamentItems.prefix(visibleTournamentCount)
+                    )) { item in
+                        if let tournament = tournamentCalendar.tournament(
+                            for: item.tournamentID
+                        ) {
+                            NavigationLink {
+                                ATHLTHTournamentLiveDetailView(tournament: tournament)
+                            } label: {
+                                homeCompactCalendarRow(
+                                    time: item.relevantDate(on: Date()),
+                                    title: item.isDeadline(on: Date())
+                                        ? "Frist · \(item.exerciseTitle)"
+                                        : item.exerciseTitle,
+                                    icon: "trophy"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
 
                     ForEach(
@@ -2503,11 +2535,12 @@ struct ATHLTHHomeView: View {
         )
         let personalEvents = homeTodayCommunityEvents
         let clubEvents = homeTodayGroupEvents
+        let tournamentItems = tournamentCalendar.events(on: Date())
 
         return NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 11) {
-                    if workouts.isEmpty &&
+                    if workouts.isEmpty && tournamentItems.isEmpty &&
                        personalEvents.isEmpty && clubEvents.isEmpty {
                         ContentUnavailableView(
                             ATHLTHLocalization.choose(
@@ -2546,6 +2579,32 @@ struct ATHLTHHomeView: View {
                                 )
                         }
                         .buttonStyle(.plain)
+                    }
+
+                    ForEach(tournamentItems) { item in
+                        if let tournament = tournamentCalendar.tournament(
+                            for: item.tournamentID
+                        ) {
+                            NavigationLink {
+                                ATHLTHTournamentLiveDetailView(tournament: tournament)
+                            } label: {
+                                homeCalendarEventRow(
+                                    time: item.relevantDate(on: Date()) ?? item.opensAt,
+                                    title: item.exerciseTitle,
+                                    systemImage: "trophy",
+                                    detail: "\(item.tournamentTitle) · Frist " +
+                                        item.deadlineAt.formatted(
+                                            date: .abbreviated, time: .shortened
+                                        )
+                                )
+                                .padding(13)
+                                .background(
+                                    ATHLTHPlanDesign.surface,
+                                    in: RoundedRectangle(cornerRadius: 16)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
 
                     ForEach(personalEvents) { event in
