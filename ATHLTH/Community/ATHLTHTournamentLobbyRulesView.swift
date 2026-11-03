@@ -89,9 +89,34 @@ struct ATHLTHTournamentLobbyRulesView: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
-                Text(tournament.publicResults
-                     ? "Resultattabellen er offentlig · Lobbychat er privat"
-                     : "Resultater kun for deltakere")
+                VStack(alignment: .leading, spacing: 7) {
+                    Label(
+                        "Dokumentasjon: motstanderen godkjenner resultatet",
+                        systemImage: "checkmark.shield"
+                    )
+                    Label(
+                        "Uteblivelse: walkover ved én manglende innsending",
+                        systemImage: "clock.badge.exclamationmark"
+                    )
+                    Label(
+                        "Begge uteblir: saken markeres omstridt; ingen tilfeldig vinner",
+                        systemImage: "person.2.slash"
+                    )
+                    Label(
+                        tournament.allowExtensions
+                            ? "Fristutsettelser tillatt før endelig resultat"
+                            : "Ingen fristutsettelser",
+                        systemImage: "calendar.badge.clock"
+                    )
+                    Label(
+                        tournament.publicResults
+                            ? "Resultattabellen er offentlig · Lobbychat er privat"
+                            : "Resultater kun for deltakere",
+                        systemImage: "eye"
+                    )
+                }
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
 
