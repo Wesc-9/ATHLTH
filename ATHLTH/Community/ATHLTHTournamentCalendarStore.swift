@@ -28,6 +28,16 @@ struct ATHLTHTournamentCalendarItem: Identifiable, Hashable {
             !calendar.isDate(opensAt, inSameDayAs: day)
     }
 
+    /// An exercise with a 48-hour completion window also belongs to the
+    /// intervening day. It does not gain a fabricated calendar start time.
+    func isOngoing(on day: Date, calendar: Calendar = .current) -> Bool {
+        guard let interval = calendar.dateInterval(of: .day, for: day) else {
+            return false
+        }
+        return opensAt < interval.end && deadlineAt >= interval.start &&
+            relevantDate(on: day, calendar: calendar) == nil
+    }
+
     var readableTitle: String { "\(exerciseTitle) · \(tournamentTitle)" }
 }
 
@@ -157,11 +167,17 @@ final class ATHLTHTournamentCalendarStore: ObservableObject {
     }
 
     func events(on date: Date) -> [ATHLTHTournamentCalendarItem] {
-        items.filter { $0.relevantDate(on: date) != nil }
-            .sorted {
-                ($0.relevantDate(on: date) ?? $0.opensAt) <
-                ($1.relevantDate(on: date) ?? $1.opensAt)
-            }
+        items.filter {
+            $0.relevantDate(on: date) != nil || $0.isOngoing(on: date)
+        }
+        .sorted {
+            // Exact openings and deadlines precede ongoing windows.
+            let left = $0.relevantDate(on: date)
+            let right = $1.relevantDate(on: date)
+            if left == nil { return false }
+            if right == nil { return true }
+            return left! < right!
+        }
     }
 }
 
