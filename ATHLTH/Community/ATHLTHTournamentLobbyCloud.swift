@@ -227,6 +227,15 @@ struct ATHLTHTournamentLobbyCloudService {
         ).execute()
     }
 
+    func extendBallot(tournamentID: UUID) async throws {
+        try await client.rpc(
+            "athlth_tournament_extend_ballot",
+            params: ATHLTHTournamentIDParamsPublic(
+                p_tournament: tournamentID
+            )
+        ).execute()
+    }
+
     func ready(tournamentID: UUID, value: Bool) async throws {
         try await client.rpc("athlth_tournament_set_ready",
           params: ATHLTHTournamentReadyParams(
