@@ -96,12 +96,19 @@ struct ATHLTHWorkoutReviewSheet: View {
                                           ? "pause.fill" : item.kind.systemImage)
                                         .foregroundStyle(ATHLTHTrainDesign.bronze)
                                         .frame(width: 24)
-                                    Text(item.isActiveRecovery
-                                         ? tr("Active jogging recovery", "Aktiv joggepause")
-                                         : item.kind == .rest
-                                             ? tr("Recovery", "Pause") : item.title)
-                                        .font(.subheadline)
-                                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(item.isActiveRecovery
+                                             ? tr("Active jogging recovery", "Aktiv joggepause")
+                                             : item.kind == .rest
+                                                 ? tr("Recovery", "Pause") : item.title)
+                                            .font(.subheadline)
+                                            .foregroundStyle(ATHLTHTrainDesign.ink)
+                                        if let targets = item.targetText {
+                                            Text(targets)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
                                     Spacer(minLength: 3)
                                     Text(item.durationSeconds.map {
                                         ATHLTHWorkoutDurationEstimator.conciseDuration($0)
