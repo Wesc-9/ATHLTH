@@ -662,6 +662,23 @@ final class AppleCalendarSyncStore: ObservableObject {
         var duplicateEvents:
             [EKEvent] = []
 
+        for event in existingEvents {
+            guard let key = managedKey(from: event)
+            else {
+                continue
+            }
+
+            if existingByKey[key] == nil {
+                existingByKey[key] = event
+            } else {
+                duplicateEvents.append(event)
+            }
+        }
+
+        var activeKeys = Set<String>()
+        var syncedWorkouts = 0
+        var tentativeEvents = 0
+
         // Scheduled competition exercises belong to the same user-managed
         // ATHLTH calendar. Stable marker keys update both opening and deadline
         // entries without duplicates, while avoiding multi-day busy blocks.
@@ -696,23 +713,6 @@ final class AppleCalendarSyncStore: ObservableObject {
                 try eventStore.save(cutoffEvent, span: .thisEvent, commit: false)
             }
         }
-
-        for event in existingEvents {
-            guard let key = managedKey(from: event)
-            else {
-                continue
-            }
-
-            if existingByKey[key] == nil {
-                existingByKey[key] = event
-            } else {
-                duplicateEvents.append(event)
-            }
-        }
-
-        var activeKeys = Set<String>()
-        var syncedWorkouts = 0
-        var tentativeEvents = 0
 
         var syncedPlanIDs = Set<UUID>()
         let plans = (snapshot.plan.map { [$0] } ?? []) +
