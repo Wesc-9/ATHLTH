@@ -45,6 +45,11 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var todayWorkout: WatchTodayWorkoutTransfer?
     @Published private(set) var todayWorkouts: [WatchTodayWorkoutTransfer] = []
     @Published private(set) var preparedWorkout: WatchPreparedWorkoutTransfer?
+    @Published private(set) var petCatalog: [WatchPetIdentity] = []
+    @Published private(set) var selectedPetIDs: Set<UUID> = []
+    private var petOwnerID: UUID?
+    private var petSegments: [WatchPetParticipationSegment] = []
+    private let petCatalogDefaultsKey = "athlth.watch.pet-catalog.v1"
     @Published private(set) var spotifyPlaybackState =
         WatchSpotifyPlaybackState.unavailable
 
@@ -66,7 +71,108 @@ final class WatchRouteStore: NSObject, ObservableObject {
         loadTodayWorkout()
         loadTodayWorkouts()
         loadPreparedWorkout()
+        restorePetCatalog()
         activateConnectivity()
+    }
+
+    private func restorePetCatalog() {
+        guard let data = UserDefaults.standard.data(forKey: petCatalogDefaultsKey),
+              let catalog = try? JSONDecoder().decode(WatchPetCatalogTransfer.self, from: data)
+        else { return }
+        petOwnerID = catalog.ownerID
+        petCatalog = catalog.pets
+        selectedPetIDs = Set(catalog.selectedPetIDs).intersection(Set(catalog.pets.map(\.id)))
+        petSegments = selectedPetIDs.map {
+            WatchPetParticipationSegment(
+                petID: $0, enteredAt: nil, exitedAt: nil,
+                enteredMeters: nil, exitedMeters: nil)
+        }
+    }
+
+    private func applyPetCatalog(_ catalog: WatchPetCatalogTransfer) {
+        if let previous = petOwnerID, previous != catalog.ownerID {
+            petSegments = []
+            selectedPetIDs = []
+        }
+        petOwnerID = catalog.ownerID
+        petCatalog = catalog.pets
+        let available = Set(catalog.pets.map(\.id))
+        if !WatchWorkoutManager.shared.isActive {
+            selectedPetIDs = Set(catalog.selectedPetIDs).intersection(available)
+            petSegments = selectedPetIDs.map {
+                WatchPetParticipationSegment(
+                    petID: $0, enteredAt: nil, exitedAt: nil,
+                    enteredMeters: nil, exitedMeters: nil)
+            }
+        } else {
+            selectedPetIDs.formIntersection(available)
+        }
+        persistPetCatalog()
+    }
+
+    private func persistPetCatalog() {
+        guard let ownerID = petOwnerID else { return }
+        let snapshot = WatchPetCatalogTransfer(
+            ownerID: ownerID, pets: petCatalog,
+            selectedPetIDs: Array(selectedPetIDs), updatedAt: Date())
+        if let bytes = try? JSONEncoder().encode(snapshot) {
+            UserDefaults.standard.set(bytes, forKey: petCatalogDefaultsKey)
+        }
+    }
+
+    func setSelectedPetIDs(_ ids: Set<UUID>, distanceMeters: Double? = nil) {
+        let selected = ids.intersection(Set(petCatalog.map(\.id)))
+        let isRecording = WatchWorkoutManager.shared.isActive
+        let now = Date()
+        if isRecording {
+            let existing = selectedPetIDs
+            for i in petSegments.indices where
+                petSegments[i].exitedAt == nil &&
+                existing.subtracting(selected).contains(petSegments[i].petID) {
+                petSegments[i].exitedAt = now
+                petSegments[i].exitedMeters = distanceMeters
+            }
+            for id in selected.subtracting(existing) {
+                petSegments.append(WatchPetParticipationSegment(
+                    petID: id, enteredAt: now, exitedAt: nil,
+                    enteredMeters: distanceMeters, exitedMeters: nil))
+            }
+        } else {
+            petSegments = selected.map {
+                WatchPetParticipationSegment(
+                    petID: $0, enteredAt: nil, exitedAt: nil,
+                    enteredMeters: nil, exitedMeters: nil)
+            }
+        }
+        selectedPetIDs = selected
+        persistPetCatalog()
+        guard let ownerID = petOwnerID,
+              WCSession.isSupported(),
+              WCSession.default.activationState == .activated else { return }
+        let transfer = WatchPetSelectionTransfer(
+            ownerID: ownerID, selectedPetIDs: Array(selected),
+            segments: petSegments, updatedAt: now, workoutStartedAt: nil)
+        guard let data = try? JSONEncoder().encode(transfer) else { return }
+        let payload: [String: Any] = [
+            WatchTransferMetadataKey.kind: WatchTransferKind.petSelection.rawValue,
+            WatchTransferMetadataKey.payload: data,
+            WatchTransferMetadataKey.sentAt: now.timeIntervalSince1970
+        ]
+        // Durable path handles an offline iPhone; fast path updates live.
+        WCSession.default.transferUserInfo(payload)
+        if WCSession.default.isReachable {
+            WCSession.default.sendMessage(payload, replyHandler: nil, errorHandler: nil)
+        }
+    }
+
+    func completedPetSegments() -> [WatchPetParticipationSegment] {
+        petSegments
+    }
+
+    func clearCompletedPetSelection() {
+        selectedPetIDs = []
+        petSegments = []
+        persistPetCatalog()
     }
 
     func route(with id: UUID) -> WatchRouteTransfer? {
@@ -566,6 +672,12 @@ final class WatchRouteStore: NSObject, ObservableObject {
             WatchWorkoutManager.shared
                 .configureStrengthSession(snapshot)
 
+        case .petCatalog:
+            guard let catalog = try? JSONDecoder().decode(
+                WatchPetCatalogTransfer.self, from: data
+            ) else { return }
+            applyPetCatalog(catalog)
+
         case .spotifyPlaybackState:
             guard let playbackState = try? JSONDecoder().decode(
                 WatchSpotifyPlaybackState.self,
@@ -605,6 +717,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
                 )
 
         case .route,
+             .petSelection,
              .aiCoachConversationRequest,
              .workoutResult,
              .workoutActivityQuery,
@@ -962,6 +1075,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
            transferKind == .liveSurfaceContext ||
            transferKind == .todayWorkout ||
            transferKind == .strengthSnapshot ||
+           transferKind == .petCatalog ||
            transferKind == .workoutActivityState ||
            transferKind == .spotifyPlaybackState ||
            transferKind == .homeAssistantConfiguration {
