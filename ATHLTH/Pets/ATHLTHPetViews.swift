@@ -1,6 +1,7 @@
 import PhotosUI
 import SwiftUI
 import UIKit
+import Supabase
 
 private enum ATHLTHPetStyle {
     static let ink = ATHLTHTheme.primaryText
@@ -638,6 +639,91 @@ struct ATHLTHWorkoutPetHistoryCard: View {
                     }
                 }
             }
+        }
+    }
+}
+
+ 
+/// Only opt-in public companions appear on other people's ATHLTH profiles.
+/// Workout history and private animal details are never fetched here.
+struct ATHLTHPublicPetProfileSection: View {
+    let userID: UUID
+    @State private var publicPets: [ATHLTHPet] = []
+    @State private var photoURLs: [UUID: URL] = [:]
+
+    var body: some View {
+        Group {
+            if !publicPets.isEmpty {
+            ATHLTHCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Companions", norwegian: "Turkamerater"),
+                        systemImage: "pawprint.fill")
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                    ForEach(publicPets) { pet in
+                        HStack(spacing: 11) {
+                            ZStack {
+                                RoundedRectangle(cornerRadius: 13)
+                                    .fill(ATHLTHTheme.accentSoft)
+                                if let url = photoURLs[pet.id] {
+                                    AsyncImage(url: url) { phase in
+                                        if let image = phase.image {
+                                            image.resizable().scaledToFill()
+                                        } else {
+                                            Image(systemName: "pawprint.fill")
+                                                .foregroundStyle(ATHLTHTheme.premiumGold)
+                                        }
+                                    }
+                                } else {
+                                    Image(systemName: "pawprint.fill")
+                                        .foregroundStyle(ATHLTHTheme.premiumGold)
+                                }
+                            }
+                            .frame(width: 48, height: 48)
+                            .clipShape(RoundedRectangle(cornerRadius: 13))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(pet.name)
+                                    .font(.subheadline.weight(.semibold))
+                                Text([pet.breed, pet.speciesName]
+                                    .compactMap { $0 }.joined(separator: " · "))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        if pet.id != publicPets.last?.id { Divider() }
+                    }
+                }
+            }
+            }
+        }
+        .task(id: userID) { await load() }
+    }
+
+    private func load() async {
+        do {
+            let rows: [ATHLTHPet] = try await SupabaseEnvironment.client
+                .from("profile_pets")
+                .select().eq("user_id", value: userID)
+                .eq("is_public", value: true)
+                .eq("show_on_profile", value: true)
+                .execute().value
+            publicPets = rows
+            var URLs: [UUID: URL] = [:]
+            for pet in rows {
+                guard let path = pet.photoPath,
+                      let URL = try? await SupabaseEnvironment.client.storage
+                        .from("pet-photos")
+                        .createSignedURL(path: path, expiresIn: 3600)
+                else { continue }
+                URLs[pet.id] = URL
+            }
+            photoURLs = URLs
+        } catch {
+            // Pet sharing is optional and must never block another profile.
+            publicPets = []
+            photoURLs = [:]
         }
     }
 }
