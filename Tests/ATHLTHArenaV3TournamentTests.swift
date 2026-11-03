@@ -46,6 +46,76 @@ final class ATHLTHArenaV3TournamentTests: XCTestCase {
         XCTAssertNotNil(decoded[1].clubID)
     }
 
+    func testPracticeRoundsNeverScoreOrEliminateInAnyFormat() {
+        let practice = ATHLTHTournamentWarmupRound(title: "Prøverunde")
+        XCTAssertFalse(practice.countsForPoints)
+        XCTAssertFalse(practice.countsForAdvancement)
+        XCTAssertFalse(practice.mayEliminate)
+
+        for format in ATHLTHTournamentFormat.allCases {
+            let draft = ATHLTHTournamentDraft(
+                ownerID: UUID(), clubID: nil,
+                title: "Test", format: format,
+                groupSize: 4, qualifiersPerGroup: 2,
+                participants: athletes(["A", "B"]),
+                warmupRounds: [practice]
+            )
+            XCTAssertEqual(draft.warmupRounds.count, 1)
+            XCTAssertFalse(draft.warmupRounds[0].countsForPoints)
+            XCTAssertFalse(draft.warmupRounds[0].mayEliminate)
+        }
+    }
+
+    func testSeasonLinkedDraftSurvivesEncoding() throws {
+        let clubID = UUID()
+        let seasonID = UUID()
+        let practice = ATHLTHTournamentWarmupRound(title: "Første testløp")
+        let draft = ATHLTHTournamentDraft(
+            ownerID: UUID(), clubID: clubID, seasonID: seasonID,
+            title: "Klubbliga", format: .groups,
+            groupSize: 4, qualifiersPerGroup: 2,
+            participants: athletes(["A", "B", "C", "D"]),
+            warmupRounds: [practice]
+        )
+        let restored = try JSONDecoder().decode(
+            ATHLTHTournamentDraft.self,
+            from: JSONEncoder().encode(draft)
+        )
+        XCTAssertEqual(restored.clubID, clubID)
+        XCTAssertEqual(restored.seasonID, seasonID)
+        XCTAssertEqual(restored.warmupRounds.map(\.title), ["Første testløp"])
+    }
+
+    func testOldTournamentDraftWithoutSeasonOrWarmupsStillDecodes() throws {
+        let original = ATHLTHTournamentDraft(
+            ownerID: UUID(), clubID: UUID(), title: "Gammel cup",
+            format: .cup, groupSize: 4, qualifiersPerGroup: 2,
+            participants: athletes(["A", "B"])
+        )
+        var payload = try XCTUnwrap(
+            JSONSerialization.jsonObject(with: JSONEncoder().encode(original))
+                as? [String: Any]
+        )
+        payload.removeValue(forKey: "seasonID")
+        payload.removeValue(forKey: "warmupRounds")
+        let oldData = try JSONSerialization.data(withJSONObject: payload)
+        let decoded = try JSONDecoder().decode(ATHLTHTournamentDraft.self,
+                                               from: oldData)
+        XCTAssertNil(decoded.seasonID)
+        XCTAssertTrue(decoded.warmupRounds.isEmpty)
+        XCTAssertEqual(decoded.id, original.id)
+    }
+
+    func testPersonalTournamentCannotClaimClubSeason() {
+        let draft = ATHLTHTournamentDraft(
+            ownerID: UUID(), clubID: nil, seasonID: UUID(),
+            title: "Åpen cup", format: .cup,
+            groupSize: 4, qualifiersPerGroup: 2,
+            participants: athletes(["A", "B"])
+        )
+        XCTAssertNil(draft.seasonID)
+    }
+
     func testTreadmillCorrectionBoundsInclusive() {
         let measured = 2000.0
         XCTAssertTrue(ATHLTHChallengeTreadmillReviewPolicy.withinMargin(
