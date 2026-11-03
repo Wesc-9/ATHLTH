@@ -1809,7 +1809,13 @@ struct AppRootView: View {
             Task { await syncPushPreferences() }
         }
         .onChange(of: settings.challengeNotificationsEnabled) { _, _ in
-            Task { await syncPushPreferences() }
+            Task {
+                await syncPushPreferences()
+                await ATHLTHTournamentExerciseReminderScheduler.reconcile(
+                    items: appSession.signedIn ? tournamentCalendar.items : [],
+                    accountID: appSession.profile.userID
+                )
+            }
         }
         .onChange(of: settings.messageNotificationsEnabled) { _, _ in
             Task { await syncPushPreferences() }
