@@ -18,8 +18,8 @@ struct ATHLTHWorkoutTargetsQuickSheet: View {
                         tr("Add a step first", "Legg til en deløkt først"),
                         systemImage: "heart.text.square",
                         description: Text(tr(
-                            "Then select it here to set a heart rate zone, effort or target pace.",
-                            "Velg deløkten her etterpå for å angi pulssone, anstrengelse eller måltempo."
+                            "Then select it here to set a heart-rate zone or target pace / speed.",
+                            "Velg deløkten her etterpå for å angi pulssone eller måltempo / hastighet."
                         ))
                     )
                 } else {
