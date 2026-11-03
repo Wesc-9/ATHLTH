@@ -1066,7 +1066,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         AnyView(weekStep)
                     }
                 }
-            )))
+            ))
+            .id(mode == .advanced ? (weekPlanningApproach?.rawValue ?? "no-layout") : "simple"))
         case .review:
             AnyView(wizardScroll(AnyView(reviewStep)))
         }
@@ -1483,10 +1484,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             case .dayByDay:
                 prefersAIPlanBuild = false
                 if weekPlanningApproach != .guided {
+                    // The two layouts edit the SAME dated plan. Returning to
+                    // daily planning must not discard the last day or week.
                     weekPlanningApproach = .guided
-                    guidedDayCursor = 0
-                    firstGuidedWeekDecisionMade = false
-                    repeatWeekCount = max(1, weekCount - 1)
+                    guidedDayCursor = min(guidedDayCursor, max(0, weekCount * 7 - 1))
+                    repeatWeekCount = max(1, repeatWeekCount)
                 }
             case .weekByWeek:
                 prefersAIPlanBuild = false
@@ -4748,6 +4750,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selectedPlanWeekIndex = week
                 for day in 1...7 { setRestDay(day) }
                 selectedPlanWeekIndex = current
+            },
+            onSwitchToDayView: {
+                selectedAdvancedWeekDay = nil
+                selectBuildMethod(.dayByDay)
+                saveResumableDraft()
             }
         )
     }

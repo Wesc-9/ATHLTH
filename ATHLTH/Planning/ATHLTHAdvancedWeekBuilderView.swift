@@ -37,6 +37,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     let onQuick: (Int, String) -> Void
     let onCopyWeek: (Int, [Int], Bool) -> Void
     let onMakeRecoveryWeek: (Int) -> Void
+    let onSwitchToDayView: () -> Void
 
     @State private var showingStructure = false
     @State private var showingQuickActions = false
@@ -144,6 +145,19 @@ struct ATHLTHAdvancedWeekBuilderView: View {
 
     private var overview: some View {
         VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(tr("WEEK-BY-WEEK PLAN", "UKE-FOR-UKE-PLAN"))
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.5)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                Spacer()
+                Button(action: onSwitchToDayView) {
+                    Text(tr("Switch to daily plan", "Bytt til dagsplan"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(gold)
+                }
+                .buttonStyle(.plain)
+            }
             scenicHeader
             HStack {
                 Button { selectedWeek = max(0, selectedWeek - 1) } label: {

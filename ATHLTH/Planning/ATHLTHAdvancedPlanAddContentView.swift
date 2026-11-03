@@ -94,11 +94,16 @@ struct ATHLTHAdvancedPlanAddContentView: View {
         NavigationStack {
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 15) {
-                    Picker(tr("Content", "Innhold"), selection: $kind) {
-                        Text(tr("Exercises", "Øvelser")).tag(Kind.exercise)
-                        Text(tr("Workouts", "Treningsøkter")).tag(Kind.workout)
+                    // Workout selection stays workout-only. Exercise
+                    // insertion now uses the existing Workout Studio engine,
+                    // so there is no outdated second exercise catalog here.
+                    if initialKind == .exercise {
+                        Picker(tr("Content", "Innhold"), selection: $kind) {
+                            Text(tr("Exercises", "Øvelser")).tag(Kind.exercise)
+                            Text(tr("Workouts", "Treningsøkter")).tag(Kind.workout)
+                        }
+                        .pickerStyle(.segmented)
                     }
-                    .pickerStyle(.segmented)
                     Text(kind == .exercise
                          ? tr("Choose an exercise, then set your sets and rest.",
                               "Velg en øvelse, og tilpass sett og pauser.")
