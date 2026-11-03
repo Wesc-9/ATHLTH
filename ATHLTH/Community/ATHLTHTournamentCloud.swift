@@ -130,6 +130,24 @@ private struct ATHLTHTournamentConfirmParams: Encodable {
     let p_confirm: Bool
 }
 
+private struct ATHLTHTournamentProfile: Decodable {
+    let userID: UUID
+    let username: String?
+    let displayName: String?
+
+    enum CodingKeys: String, CodingKey {
+        case username
+        case userID = "user_id"
+        case displayName = "display_name"
+    }
+
+    var preferredName: String {
+        let handle = username?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return (handle?.isEmpty == false) ? handle! :
+            (displayName?.isEmpty == false ? displayName! : "Utøver")
+    }
+}
+
 private struct ATHLTHTournamentInvitationID: Decodable {
     let tournamentID: UUID
     enum CodingKeys: String, CodingKey {
@@ -223,6 +241,19 @@ struct ATHLTHTournamentCloudService {
             offset += pageSize
         } while offset < 10_000
         return list
+    }
+
+    func athleteNames(for IDs: Set<UUID>) async throws -> [UUID: String] {
+        guard !IDs.isEmpty else { return [:] }
+        let records: [ATHLTHTournamentProfile] = try await client
+            .from("social_profile_cards")
+            .select("user_id,username,display_name")
+            .in("user_id", values: Array(IDs))
+            .limit(150)
+            .execute().value
+        return Dictionary(uniqueKeysWithValues:
+            records.map { ($0.userID, $0.preferredName) }
+        )
     }
 
     func respond(tournamentID: UUID, accept: Bool) async throws {
