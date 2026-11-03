@@ -222,6 +222,32 @@ final class ATHLTHWorkoutPhasePlacementTests: XCTestCase {
         XCTAssertNil(remaining.first?.groupKind)
     }
 
+    func testRouteIdentitySurvivesResequencingAndMoving() {
+        let routeID = UUID()
+        var run = block("Run saved route", phase: .main)
+        run.routeID = routeID
+        run.distanceMeters = 7_000
+        run.durationSeconds = nil
+        let numbered = ATHLTHWorkoutPhasePlacement.renumbered(
+            run, sequence: 17
+        )
+        XCTAssertEqual(numbered.routeID, routeID)
+        XCTAssertEqual(numbered.distanceMeters, 7_000)
+        let moved = ATHLTHWorkoutPhasePlacement.relocatingSelection(
+            at: 0, to: .cooldown, in: [numbered]
+        )
+        XCTAssertEqual(moved.first?.routeID, routeID)
+    }
+
+    func testActiveJoggingRecoveriesAreNotCountedAsAdditionalEfforts() {
+        let blocks = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        XCTAssertEqual(blocks.count, 8)
+        let section = ATHLTHWorkoutTimelinePresentation.sections(for: blocks)
+        XCTAssertEqual(section.count, 1)
+        XCTAssertEqual(section[0].activityCount, 4)
+        XCTAssertEqual(blocks.filter(\.isActiveRecovery).count, 4)
+    }
+
     func testOnlyDeliberateFullLeftSwipeDeletesStep() {
         XCTAssertTrue(ATHLTHPlannedWorkoutStepRow.shouldDeleteSwipe(
             horizontal: -225, vertical: 9, rowWidth: 340
