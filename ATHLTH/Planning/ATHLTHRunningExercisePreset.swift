@@ -52,24 +52,27 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
         case .easy:
             return [Self.run(title: title, seconds: 1_200, effort: 3, phase: phase)]
         case .strides:
-            return Self.intervals(title: title, work: 20, recovery: 60, rounds: 6,
-                                  effort: 7, phase: phase)
+            return Self.intervals(work: 20, recovery: 60, rounds: 6,
+                                  effort: 7, phase: phase,
+                                  workName: tr("Stride", "Stigningsløp"))
         case .threshold:
             return [Self.run(title: title, seconds: 1_200, effort: 7, phase: phase)]
         case .hills:
-            var result = Self.intervals(title: title, work: 45, recovery: 90,
-                                        rounds: 8, effort: 8, phase: phase)
-            result[1].title = tr("Jog down the hill", "Jogg rolig ned bakken")
-            return result
+            return Self.intervals(work: 45, recovery: 90, rounds: 8,
+                                  effort: 8, phase: phase,
+                                  workName: tr("Hill effort", "Bakkedrag"),
+                                  recoveryName: tr("Jog down the hill", "Jogg rolig ned bakken"))
         case .fourByFour:
-            return Self.intervals(title: title, work: 240, recovery: 180,
+            return Self.intervals(work: 240, recovery: 180,
                                   rounds: 4, effort: 8, phase: phase)
         case .shortIntervals:
-            return Self.intervals(title: title, work: 30, recovery: 90,
-                                  rounds: 10, effort: 9, phase: phase)
+            return Self.intervals(work: 30, recovery: 90,
+                                  rounds: 10, effort: 9, phase: phase,
+                                  workName: tr("Sprint", "Sprint"))
         case .fartlek:
-            return Self.intervals(title: title, work: 60, recovery: 60,
-                                  rounds: 10, effort: 7, phase: phase)
+            return Self.intervals(work: 60, recovery: 60,
+                                  rounds: 10, effort: 7, phase: phase,
+                                  workName: tr("Fast effort", "Hurtig drag"))
         case .sixMinuteTest:
             return [Self.run(title: title, seconds: 360, effort: 9, phase: phase)]
         case .cooldown:
@@ -90,23 +93,35 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
         return block
     }
 
+    /// Library presets are inserted as actual, independently editable steps.
+    /// Unlike a manually created interval group, the editor must show every
+    /// effort and every recovery, including the final requested pause.
     private static func intervals(
-        title: String, work: TimeInterval, recovery: TimeInterval,
-        rounds: Int, effort: Int, phase: WorkoutPhaseKind
+        work: TimeInterval, recovery: TimeInterval,
+        rounds: Int, effort: Int, phase: WorkoutPhaseKind,
+        workName: String? = nil, recoveryName: String? = nil
     ) -> [WorkoutTemplateBlock] {
-        let id = UUID()
-        var running = run(title: title, seconds: work, effort: effort, phase: phase)
-        running.groupID = id
-        running.groupKind = .intervals
-        running.groupRounds = rounds
+        let count = min(max(rounds, 1), 20)
+        let effortLabel = workName ?? tr("Effort", "Drag")
+        let recoveryLabel = recoveryName ?? tr("Recovery", "Pause")
+        var steps: [WorkoutTemplateBlock] = []
+        steps.reserveCapacity(count * 2)
 
-        var easy = run(title: tr("Active recovery", "Aktiv joggepause"),
-                       seconds: recovery, effort: 2, phase: phase)
-        easy.kind = .rest
-        easy.groupID = id
-        easy.groupKind = .intervals
-        easy.groupRounds = rounds
-        return [running, easy]
+        for round in 1...count {
+            let running = run(
+                title: "\(effortLabel) \(round)", seconds: work,
+                effort: effort, phase: phase
+            )
+            steps.append(running)
+
+            var pause = run(
+                title: "\(recoveryLabel) \(round)", seconds: recovery,
+                effort: 2, phase: phase
+            )
+            pause.kind = .rest
+            steps.append(pause)
+        }
+        return steps
     }
 
     private func tr(_ english: String, _ norwegian: String) -> String {
