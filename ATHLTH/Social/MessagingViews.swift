@@ -3708,6 +3708,9 @@ struct DirectMessageThreadView: View {
                                 agreedWorkout: latestAgreedWorkout(
                                     for: message, in: messages
                                 ),
+                                lifecycleUpdate: latestWorkoutLifecycle(
+                                    for: message, in: messages
+                                ),
                                 workoutChangeDecision: workoutChangeDecision(
                                     for: message, in: messages
                                 ),
@@ -5352,6 +5355,32 @@ struct DirectMessageThreadView: View {
             .first { $0.proposalID == proposal.id }
     }
 
+    /// Only the original organizer may update or cancel an invitation.
+    private func latestWorkoutLifecycle(
+        for invitation: DirectMessageRecord,
+        in messages: [DirectMessageRecord]
+    ) -> WorkoutInviteLifecycleUpdate? {
+        guard invitation.attachmentKind == .workout,
+              invitation.shareVersion == 2,
+              let sourceID = invitation.sourceObjectID else { return nil }
+        return messages
+            .filter {
+                $0.attachmentKind == .workout &&
+                $0.shareVersion == 6 &&
+                $0.sourceObjectID == sourceID &&
+                $0.sourceOwnerID == invitation.senderID &&
+                $0.senderID == invitation.senderID
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+            .compactMap {
+                $0.decodeSnapshot(WorkoutInviteLifecycleUpdate.self)
+            }
+            .first {
+                $0.sourceWorkoutID == sourceID &&
+                $0.organizerID == invitation.senderID
+            }
+    }
+
     private func latestAgreedWorkout(
         for invitation: DirectMessageRecord,
         in messages: [DirectMessageRecord]
@@ -5612,7 +5641,17 @@ struct DirectMessageThreadView: View {
               let sourceID = invitation.sourceObjectID
         else { return }
 
-        let workout = latestAgreedWorkout(
+        let lifecycle = latestWorkoutLifecycle(
+            for: invitation, in: messaging.messages(in: conversationID)
+        )
+        guard lifecycle?.kind != .cancelled else {
+            plannedInviteError = ATHLTHLocalization.choose(
+                english: "The organizer cancelled this workout.",
+                norwegian: "Arrangøren har avlyst denne økten."
+            )
+            return
+        }
+        let workout = lifecycle?.updatedWorkout ?? latestAgreedWorkout(
             for: invitation, in: messaging.messages(in: conversationID)
         ) ?? originalWorkout
         respondingToPlannedInviteID = invitation.id
@@ -6645,6 +6684,7 @@ private struct MessageBubble: View {
     let respondingToInvite: Bool
     let onRespondToInvite: (Bool) -> Void
     let agreedWorkout: PlannedSession?
+    let lifecycleUpdate: WorkoutInviteLifecycleUpdate?
     let workoutChangeDecision: WorkoutChangeDecision?
     let reviewingWorkoutChange: Bool
     let onProposeWorkoutChange: () -> Void
@@ -6943,11 +6983,34 @@ private struct MessageBubble: View {
                     .padding(14)
                     .background(.ultraThinMaterial,
                                 in: RoundedRectangle(cornerRadius: 16))
+                } else if message.attachmentKind == .workout &&
+                           message.shareVersion == 6,
+                           let lifecycle = message.decodeSnapshot(
+                                WorkoutInviteLifecycleUpdate.self
+                           ) {
+                    Label(
+                        lifecycle.kind == .cancelled
+                            ? ATHLTHLocalization.choose(
+                                english: "Group workout cancelled",
+                                norwegian: "Fellesøkten er avlyst"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Group workout updated",
+                                norwegian: "Fellesøkten er oppdatert"
+                            ),
+                        systemImage: lifecycle.kind == .cancelled
+                            ? "xmark.circle.fill" : "calendar.badge.clock"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                    .padding(14)
+                    .athlthTrainTogetherCard(radius: 15)
                 } else if isPlannedInvitation,
                           let workout = message.decodeSnapshot(PlannedSession.self) {
                     ThreadWorkoutInvitationCard(
-                        workout: agreedWorkout ?? workout,
+                        workout: lifecycleUpdate?.updatedWorkout ?? agreedWorkout ?? workout,
                         response: inviteResponse,
+                        lifecycleUpdate: lifecycleUpdate,
                         isMine: isMine,
                         isResponding: respondingToInvite,
                         onAccept: { onRespondToInvite(true) },
