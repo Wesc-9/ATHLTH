@@ -3719,6 +3719,32 @@ final class AppSessionStore: ObservableObject {
         }
     }
 
+    /// Targeted reconciliation also finds organizer updates older than the
+    /// general inbox's rolling recent-message limit.
+    func refreshRemoteSharedWorkoutUpdates() async {
+        let cutoff = Date().addingTimeInterval(-86_400)
+        let sourceIDs = Array(Set(
+            standalonePlannedSessions.compactMap { item -> UUID? in
+                guard item.sharedSourceOwnerID != nil,
+                      let sourceID = item.sharedSourceSessionID,
+                      (item.scheduledStart ?? .distantPast) >= cutoff
+                else { return nil }
+                return sourceID
+            }
+        )).prefix(12)
+        let service = SupabaseMessagingService()
+        for sourceID in sourceIDs {
+            if Task.isCancelled { return }
+            guard let messages =
+                    try? await service.loadPlannedWorkoutInvitationMessages(
+                        sourceWorkoutID: sourceID
+                    )
+            else { continue }
+            syncApprovedSharedWorkouts(from: messages)
+            syncSharedWorkoutLifecycles(from: messages)
+        }
+    }
+
     func updateStandalonePlannedSession(
         _ session: PlannedSession
     ) {
