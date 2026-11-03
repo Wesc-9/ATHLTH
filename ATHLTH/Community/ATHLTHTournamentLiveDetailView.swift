@@ -22,6 +22,7 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var latest: ATHLTHTournamentRemote?
     @State private var entries: [ATHLTHTournamentRemoteEntry] = []
     @State private var matches: [ATHLTHTournamentRemoteMatch] = []
+    @State private var confirmedStandings: [ATHLTHTournamentStandingRemote] = []
     @State private var names: [UUID: String] = [:]
     @State private var selection: ATHLTHTournamentDetailTab = .overview
     @State private var showingMatchReport: ATHLTHTournamentRemoteMatch?
@@ -363,35 +364,13 @@ struct ATHLTHTournamentLiveDetailView: View {
     private func rankingTable(
         for athletes: [ATHLTHTournamentRemoteEntry], groupIndex: Int?
     ) -> some View {
-        let roster = athletes.map {
-            ATHLTHTournamentParticipant(id: $0.userID, username: name($0.userID))
-        }
-        let confirmed = verifiedMatches.compactMap {
-            match -> ATHLTHTournamentFixture? in
-            guard let other = match.awayID,
-                  let home = match.homeScore, let away = match.awayScore,
-                  let reporter = match.proposedBy,
-                  let approver = match.confirmedBy,
-                  let approved = ATHLTHTournamentApprovedResult(
-                    homeScore: home, awayScore: away,
-                    proposedBy: reporter, approvedBy: approver,
-                    approvedAt: match.confirmedAt ?? Date()
-                  )
-            else { return nil }
-            return ATHLTHTournamentFixture(
-                id: match.id, phase: match.phase,
-                round: match.roundNumber,
-                groupIndex: match.groupIndex,
-                homeID: match.homeID, awayID: other,
-                result: approved
-            )
-        }
-        let rank = ATHLTHTournamentEngine.standings(
-            for: roster, fixtures: confirmed,
-            groupIndex: groupIndex,
-            winPoints: current.winPoints,
-            drawPoints: current.drawPoints
-        )
+        // The authoritative qualification order comes from PostgreSQL, not
+        // from an independent client tie-break calculation.
+        let eligible = Set(athletes.map(\.userID))
+        let rank = confirmedStandings
+            .filter { $0.groupIndex == groupIndex && eligible.contains($0.userID) }
+            .sorted { $0.rank < $1.rank }
+
         return VStack(spacing: 10) {
             HStack {
                 Text("#").frame(width: 22, alignment: .leading)
@@ -403,24 +382,34 @@ struct ATHLTHTournamentLiveDetailView: View {
             }
             .font(.caption2.weight(.medium))
             .foregroundStyle(ATHLTHArenaV3Style.secondary)
-            ForEach(Array(rank.enumerated()), id: \.element.id) { index, item in
+
+            if rank.isEmpty {
+                Text("Tabellen vises når deltakerne har godtatt invitasjonene.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            ForEach(rank) { item in
                 HStack(spacing: 7) {
-                    Text("\(index + 1)")
+                    Text("\(item.rank)")
                         .frame(width: 22, alignment: .leading)
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                     Text(item.username)
                         .lineLimit(1)
                     Spacer(minLength: 4)
                     Text("\(item.played)").frame(width: 20)
-                    Text(String(format: "%+.0f", item.difference))
+                    Text(String(format: "%+.1f", item.difference))
                         .frame(width: 36)
+                        .minimumScaleFactor(0.75)
                     Text("\(item.points)")
                         .fontWeight(.semibold)
                         .frame(width: 24)
                 }
                 .font(.subheadline)
                 .foregroundStyle(ATHLTHArenaV3Style.ink)
-                if index < rank.count - 1 { Divider().opacity(0.5) }
+                if item.id != rank.last?.id {
+                    Divider().opacity(0.5)
+                }
             }
         }
         .padding(15)
@@ -570,12 +559,15 @@ struct ATHLTHTournamentLiveDetailView: View {
             async let allTournaments = cloud.visibleTournaments()
             async let participants = cloud.entries(for: current.id)
             async let competitionMatches = cloud.matches(for: current.id)
+            async let officialRankings = cloud.standings(for: current.id)
             let all = try await allTournaments
             let newEntries = try await participants
             let newMatches = try await competitionMatches
+            let updatedRankings = try await officialRankings
             latest = all.first { $0.id == current.id } ?? latest
             entries = newEntries
             matches = newMatches
+            confirmedStandings = updatedRankings
             names = try await cloud.athleteNames(
                 for: Set(newEntries.map(\.userID))
             )
