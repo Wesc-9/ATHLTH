@@ -4033,8 +4033,9 @@ struct WorkoutInviteLaunchSheet: View {
                             .tint(ATHLTHTrainTogetherDesign.accent)
                             .controlSize(.large)
                             .disabled(
-                                captureDevice == .appleWatch &&
-                                !appleWatchSelectable
+                                isUndoingReady ||
+                                (captureDevice == .appleWatch &&
+                                 !appleWatchSelectable)
                             )
                         }
                     } else {
