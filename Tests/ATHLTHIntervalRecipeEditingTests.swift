@@ -2,11 +2,13 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
+    @MainActor
     private func recipe() -> (UUID, [WorkoutTemplateBlock]) {
         let blocks = ATHLTHRunningExercisePreset.thirtyThirty.blocks(in: .main)
         return (blocks[0].groupID!, blocks)
     }
 
+    @MainActor
     func testThirtyThirtyIsOneCollapsibleSequenceButExecutesFortyRealSteps() throws {
         let (id, blocks) = recipe()
         let summary = try XCTUnwrap(ATHLTHIntervalRecipeEditing.summary(
@@ -23,6 +25,7 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         XCTAssertEqual(Set(blocks.map(\.editorDragID)).count, 40)
     }
 
+    @MainActor
     func testRoundCountPreservesExistingEditsAndAddsOnlyNewPairs() throws {
         let original = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
         let id = try XCTUnwrap(original.first?.groupID)
@@ -57,6 +60,7 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         XCTAssertEqual(restored.last?.isRestOrActiveRecovery, true)
     }
 
+    @MainActor
     func testApplyFirstTargetsDoesNotTouchActiveRecoveries() throws {
         let (id, original) = recipe()
         var changed = original
@@ -83,6 +87,7 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         XCTAssertEqual(copied[3].isIndoor, true)
     }
 
+    @MainActor
     func testSavedExplicitGroupReopensAndCompactLegacyExpands() throws {
         let (id, original) = recipe()
         let restored = try JSONDecoder().decode(
@@ -109,6 +114,7 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         XCTAssertTrue(legacy.allSatisfy { $0.groupID == nil })
     }
 
+    @MainActor
     func testTreadmillIntervalsWithActiveRecoveriesKeepIndoorClassification() {
         let (id, original) = recipe()
         var blocks = original
@@ -133,6 +139,7 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         })
     }
 
+    @MainActor
     func testUngroupDoesNotDeleteOrAlterAWorkoutStep() {
         let (id, original) = recipe()
         let plain = ATHLTHIntervalRecipeEditing.ungrouping(
@@ -148,6 +155,7 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         XCTAssertEqual(plain.expandedForExecution().count, 40)
     }
 
+    @MainActor
     func testPlannerDisplaysActualSecondsEvenWhenSchedulingRoundsUp() {
         let steps = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
         XCTAssertEqual(
@@ -167,6 +175,7 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testAllNewRunningLibraryPresetsDoNotSetPerceivedExertion() {
         for preset in ATHLTHRunningExercisePreset.allCases {
             XCTAssertTrue(preset.blocks(in: .main).allSatisfy {
