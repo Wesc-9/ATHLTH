@@ -8710,6 +8710,50 @@ struct ChallengeDetailView: View {
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
 
+                                    if challenge.scoringStartDate == nil {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Waiting for your opponent to accept. Competition workouts cannot be counted yet.",
+                                                norwegian: "Venter på at motstanderen godkjenner. Ingen økter kan registreres som konkurranseresultat ennå."
+                                            ),
+                                            systemImage: "lock.shield"
+                                        )
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(.secondary)
+                                    } else {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "The invitation is accepted. Prepare pace and incline individually before starting.",
+                                                norwegian: "Invitasjonen er godtatt. Velg tempo og stigning individuelt før start."
+                                            ),
+                                            systemImage: "checkmark.shield"
+                                        )
+                                        .font(.caption.weight(.medium))
+                                        .foregroundStyle(ChallengePlanTheme.gold)
+                                    }
+
+                                    NavigationLink {
+                                        RunningWorkoutDetailView(
+                                            workout: runningWorkoutLibrary.allTemplates.first {
+                                                $0.id == sourceTemplate.id
+                                            } ?? sourceTemplate,
+                                            selectionTitle: nil,
+                                            onSelect: nil,
+                                            onStart: nil
+                                        )
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Set up personal pace and incline",
+                                                norwegian: "Tilpass tempo og stigning"
+                                            ),
+                                            systemImage: "slider.horizontal.3"
+                                        )
+                                        .frame(maxWidth: .infinity, minHeight: 44)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .tint(ChallengePlanTheme.gold)
+
                                     if runningWorkoutLibrary.allTemplates.contains(where: {
                                         $0.id == sourceTemplate.id
                                     }) || savedChallengeTemplateID == sourceTemplate.id {
