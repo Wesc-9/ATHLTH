@@ -538,7 +538,7 @@ struct TrainTogetherCreatorLobbyView: View {
                         .frame(height: 52)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.premiumGold)
+                    .tint(ATHLTHTrainTogetherDesign.accent)
                     .disabled(isMarkingReady || isStarting)
                 } else {
                     Label(
@@ -583,7 +583,7 @@ struct TrainTogetherCreatorLobbyView: View {
                     .frame(height: 52)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.premiumGold)
+                .tint(ATHLTHTrainTogetherDesign.accent)
                 .disabled(
                     isStarting ||
                     !everyoneReady ||
