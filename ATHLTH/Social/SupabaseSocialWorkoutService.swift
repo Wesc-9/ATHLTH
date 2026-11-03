@@ -143,6 +143,22 @@ extension SupabaseSocialService {
             .execute()
     }
 
+    /// Only the signed-in participant may publish their voluntary arrival.
+    func setWorkoutArrival(
+        participantID: UUID,
+        status: SocialWorkoutArrivalStatus?
+    ) async throws {
+        guard let userID = currentUserID else {
+            throw SocialServiceError.notAuthenticated
+        }
+        try await client
+            .from("social_workout_participants")
+            .update(WorkoutParticipantArrivalWrite(arrivalStatus: status?.rawValue))
+            .eq("id", value: participantID)
+            .eq("user_id", value: userID)
+            .execute()
+    }
+
     func markWorkoutParticipantStarted(
         participantID: UUID
     ) async throws {
@@ -666,5 +682,23 @@ private struct WorkoutActivityInsert: Encodable {
         case visibility
         case eventKey = "event_key"
         case workoutSessionID = "workout_session_id"
+    }
+}
+
+// Always encode the key, including null when the athlete clears the status.
+private struct WorkoutParticipantArrivalWrite: Encodable {
+    let arrivalStatus: String?
+
+    enum CodingKeys: String, CodingKey {
+        case arrivalStatus = "arrival_status"
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        if let arrivalStatus {
+            try container.encode(arrivalStatus, forKey: .arrivalStatus)
+        } else {
+            try container.encodeNil(forKey: .arrivalStatus)
+        }
     }
 }
