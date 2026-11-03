@@ -575,52 +575,140 @@ struct ATHLTHArenaV3HomeView: View {
 
 /// The same local club drafts are listed at both destinations, without
 /// duplicating tournament records or publishing a competition prematurely.
+/// Club-owned seasons are live records, fetched using the existing
+/// club-season RLS rules. Drafts reference their season without creating
+/// duplicate competition records or awarding any points.
 struct ATHLTHArenaClubTournamentSection: View {
     @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.scenePhase) private var scenePhase
     let clubID: UUID
     let isOrganizer: Bool
+
     @State private var drafts: [ATHLTHTournamentDraft] = []
     @State private var remote: [ATHLTHArenaRemoteSeries] = []
+    @State private var seasons: [ATHLTHArenaClubSeason] = []
+    @State private var manageableClubs: [ATHLTHArenaClubChoice] = []
     @State private var showingCreate = false
+    @State private var showingCreateSeason = false
+    @State private var loadError: String?
+
     private let cloud = ATHLTHArenaCloudService()
+    private let directory = ATHLTHArenaClubDirectory()
+
+    private var canManage: Bool {
+        isOrganizer && manageableClubs.contains { $0.id == clubID }
+    }
+
+    private var orderedSeasons: [ATHLTHArenaClubSeason] {
+        seasons.sorted { $0.startsOn > $1.startsOn }
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 11) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("Cuper og ligaer")
                     .font(.system(size: 22, weight: .regular, design: .serif))
                 Spacer()
-                if isOrganizer {
-                    Button {
-                        showingCreate = true
+                if canManage {
+                    Menu {
+                        Button("Opprett cup eller liga", systemImage: "trophy") {
+                            showingCreate = true
+                        }
+                        Button("Opprett sesong", systemImage: "calendar.badge.plus") {
+                            showingCreateSeason = true
+                        }
                     } label: {
                         Image(systemName: "plus")
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ATHLTHArenaV3Style.gold)
-                            .frame(width: 36, height: 36)
+                            .frame(width: 40, height: 40)
                             .background(ATHLTHArenaV3Style.cream, in: Circle())
                     }
-                    .accessibilityLabel("Opprett klubbkonkurranse")
+                    .accessibilityLabel("Opprett klubbturnering eller sesong")
                 }
             }
             .foregroundStyle(ATHLTHArenaV3Style.ink)
-            if drafts.isEmpty && remote.isEmpty {
-                Text("Klubbens ligaer og cuper vises her.")
-                    .font(.subheadline)
+
+            if let loadError {
+                Text(loadError)
+                    .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
+
+            HStack {
+                Text("Sesonger")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                Spacer()
+                Text("\(seasons.count)")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+            if seasons.isEmpty {
+                Text("Samle ligaer og cuper i én sesong, med egen oversikt og resultathistorikk.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            ForEach(orderedSeasons) { season in
+                NavigationLink {
+                    ATHLTHArenaSeasonDetailView(
+                        season: season,
+                        canManage: canManage
+                    )
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "calendar")
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                            .frame(width: 34, height: 34)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(season.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHArenaV3Style.ink)
+                            Text(ATHLTHArenaSeasonDate.label(season.startsOn) + " – " +
+                                ATHLTHArenaSeasonDate.label(season.endsOn))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                    .padding(12)
+                    .background(ATHLTHArenaV3Style.panel())
+                }
+                .buttonStyle(.plain)
+            }
+
+            Divider().opacity(0.45)
+
+            HStack {
+                Text("Konkurranser")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                Spacer()
+                Text("\(drafts.count + remote.count)")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+            if drafts.isEmpty && remote.isEmpty {
+                Text("Når klubben oppretter en liga eller cup, vises den her og i deltakernes Arena.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
             ForEach(remote) { series in
                 NavigationLink {
                     ATHLTHArenaOnlineDetailView(series: series)
                 } label: {
-                    HStack {
-                        Text(series.title)
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .padding(12)
-                    .foregroundStyle(ATHLTHArenaV3Style.ink)
-                    .background(ATHLTHArenaV3Style.panel())
+                    competitionRow(
+                        title: series.title,
+                        info: series.status == "completed" ? "Fullført" : "Pågår",
+                        symbol: "trophy"
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -628,17 +716,12 @@ struct ATHLTHArenaClubTournamentSection: View {
                 NavigationLink {
                     ATHLTHTournamentDraftDetailView(draft: draft)
                 } label: {
-                    HStack {
-                        Image(systemName: draft.format.symbol)
-                            .foregroundStyle(ATHLTHArenaV3Style.gold)
-                        Text(draft.title)
-                            .lineLimit(1)
-                        Spacer()
-                        Text("Utkast").font(.caption)
-                    }
-                    .foregroundStyle(ATHLTHArenaV3Style.ink)
-                    .padding(13)
-                    .background(ATHLTHArenaV3Style.panel())
+                    let season = seasons.first { $0.id == draft.seasonID }
+                    competitionRow(
+                        title: draft.title,
+                        info: (season?.title ?? "Uten sesong") + " · Utkast",
+                        symbol: draft.format.symbol
+                    )
                 }
                 .buttonStyle(.plain)
             }
@@ -646,21 +729,70 @@ struct ATHLTHArenaClubTournamentSection: View {
         .padding(15)
         .background(ATHLTHArenaV3Style.panel())
         .task(id: clubID) { await reload() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await reload() } }
+        }
         .sheet(isPresented: $showingCreate) {
             ATHLTHTournamentCreator(preset: .league, fixedClubID: clubID) { draft in
                 var all = ATHLTHTournamentDraftStore.load(session.profile.userID)
+                all.removeAll { $0.id == draft.id }
                 all.insert(draft, at: 0)
                 ATHLTHTournamentDraftStore.save(all, owner: session.profile.userID)
                 drafts = all.filter { $0.clubID == clubID }
             }
         }
+        .sheet(isPresented: $showingCreateSeason) {
+            ATHLTHArenaSeasonCreateView(
+                clubs: manageableClubs.filter { $0.id == clubID },
+                preselectedClubID: clubID
+            ) {
+                Task { await reload() }
+            }
+        }
     }
 
-    @MainActor private func reload() async {
+    private func competitionRow(
+        title: String, info: String, symbol: String
+    ) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: symbol)
+                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                .frame(width: 34, height: 34)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    .lineLimit(2)
+                Text(info)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+        }
+        .padding(12)
+        .background(ATHLTHArenaV3Style.panel())
+    }
+
+    @MainActor
+    private func reload() async {
         drafts = ATHLTHTournamentDraftStore.load(session.profile.userID)
             .filter { $0.clubID == clubID }
-        if let series = try? await cloud.loadSeries() {
-            remote = series.filter { $0.clubID == clubID && $0.status != "completed" }
+        do {
+            async let eligibleClubs = directory.manageableClubs()
+            async let seasonRecords = cloud.loadClubSeasons()
+            async let competitions = cloud.loadSeries()
+            let allowed = try await eligibleClubs
+            let allSeasons = try await seasonRecords
+            let allSeries = try await competitions
+            manageableClubs = allowed
+            seasons = allSeasons.filter { $0.clubID == clubID }
+            remote = allSeries.filter { $0.clubID == clubID }
+            loadError = nil
+        } catch {
+            loadError = "Kunne ikke laste alle klubbens sesonger og konkurranser."
         }
     }
 }
