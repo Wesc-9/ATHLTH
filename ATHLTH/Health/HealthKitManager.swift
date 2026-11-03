@@ -1912,6 +1912,81 @@ final class HealthKitManager: ObservableObject {
         return days.values.sorted { $0.date < $1.date }
     }
 
+    /// Recorded heart-rate time by zone for recent accepted workouts.
+    /// The user's configured HRmax is required; missing HR is NOT replaced
+    /// by estimated zone times. Gaps longer than 15 s stay uncounted.
+    func insightHeartRateZoneDistribution(
+        maximumHeartRateBPM: Int?,
+        days: Int = 7
+    ) async -> ATHLTHInsightZoneDistribution? {
+        guard integrationEnabled, healthDataAvailable,
+              hasRequestedAuthorization,
+              !shouldDeferAutomaticHealthWork,
+              let maximumHeartRateBPM,
+              (80...250).contains(maximumHeartRateBPM)
+        else { return nil }
+
+        let now = Date()
+        let calendar = Calendar.current
+        let window = min(max(days, 7), 28)
+        let from = calendar.date(
+            byAdding: .day, value: -(window - 1),
+            to: calendar.startOfDay(for: now)
+        ) ?? now.addingTimeInterval(-Double(window) * 86_400)
+
+        guard let workouts = try? await fetchWorkouts(
+            startDate: from, endDate: now, limit: 80
+        ) else { return nil }
+
+        var seconds = Array(repeating: 0.0, count: 5)
+        var includedWorkouts = 0
+        let unit = HKUnit.count().unitDivided(by: .minute())
+        let maxHR = Double(maximumHeartRateBPM)
+        let boundaries = [0.50, 0.60, 0.70, 0.80, 0.90]
+
+        for workout in workouts.prefix(16) {
+            guard !Task.isCancelled else { return nil }
+            guard workout.duration >= 300 else { continue }
+            guard let samples = try? await fetchHeartRateSamplesForInsight(
+                for: workout
+            ), samples.count >= 2 else { continue }
+
+            var workoutCoverage = 0.0
+            for index in samples.indices {
+                let sample = samples[index]
+                let date = sample.startDate
+                guard date >= workout.startDate, date < workout.endDate else {
+                    continue
+                }
+                let bpm = sample.quantity.doubleValue(for: unit)
+                guard bpm.isFinite, (30...260).contains(bpm) else {
+                    continue
+                }
+                let next = index + 1 < samples.count
+                    ? min(samples[index + 1].startDate, workout.endDate)
+                    : min(date.addingTimeInterval(5), workout.endDate)
+                let duration = min(max(next.timeIntervalSince(date), 0), 15)
+                guard duration > 0 else { continue }
+                let fraction = bpm / maxHR
+                guard fraction >= boundaries[0] else { continue }
+                let zone = fraction >= boundaries[4] ? 4 :
+                    fraction >= boundaries[3] ? 3 :
+                    fraction >= boundaries[2] ? 2 :
+                    fraction >= boundaries[1] ? 1 : 0
+                seconds[zone] += duration
+                workoutCoverage += duration
+            }
+            if workoutCoverage >= 60 { includedWorkouts += 1 }
+        }
+
+        guard seconds.reduce(0, +) >= 120 else { return nil }
+        return ATHLTHInsightZoneDistribution(
+            zoneSeconds: seconds,
+            matchedWorkouts: includedWorkouts,
+            maximumHeartRateBPM: maximumHeartRateBPM
+        )
+    }
+
     /// Same-session running measurements, not independent daily averages.
     /// External workouts obey ATHLTH's existing Inbox approval policy.
     /// The query is intentionally on-demand and bounded to recent workouts.
