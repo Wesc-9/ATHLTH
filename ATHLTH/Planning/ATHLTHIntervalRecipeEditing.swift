@@ -21,7 +21,7 @@ enum ATHLTHIntervalRecipeEditing {
         guard items.first?.groupKind == .intervals,
               items.first?.groupRounds == 1 else { return nil }
         let efforts = items.filter { $0.kind == .run && !$0.isActiveRecovery }
-        guard efforts.count >= 2, efforts.count <= 20 else { return nil }
+        guard efforts.count >= 1, efforts.count <= 20 else { return nil }
         // Respect individually edited targets without ever synthesizing rounds.
         let recovering = items.filter(\.isRestOrActiveRecovery)
         guard recovering.count == efforts.count ||
