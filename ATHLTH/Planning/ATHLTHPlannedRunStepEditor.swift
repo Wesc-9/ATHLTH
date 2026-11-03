@@ -158,22 +158,11 @@ struct ATHLTHPlannedRunStepEditor: View {
                 if block.treadmillInclinePercent != nil {
                     ATHLTHPlannedTreadmillTargetsView(block: $block)
                 } else {
-                    Toggle(tr("Target pace", "Måltempo"),
-                           isOn: Binding(
-                            get: { block.targetPaceSecondsPerKilometer != nil },
-                            set: { block.targetPaceSecondsPerKilometer = $0 ? 330 : nil }
-                           ))
-                        .tint(ATHLTHTrainDesign.bronze)
-                    if block.targetPaceSecondsPerKilometer != nil {
-                        Stepper(value: Binding(
-                            get: { block.targetPaceSecondsPerKilometer ?? 330 },
-                            set: { block.targetPaceSecondsPerKilometer = $0 }
-                        ), in: 60...3_600, step: 5) {
-                            let pace = Int(block.targetPaceSecondsPerKilometer ?? 330)
-                            Text("\(pace / 60):\(String(format: "%02d", pace % 60)) min/km")
-                                .font(.subheadline.weight(.medium))
-                        }
-                    }
+                    ATHLTHPlannedPaceTargetView(
+                        targetPaceSecondsPerKilometer: $block.targetPaceSecondsPerKilometer,
+                        prefersSpeed: false,
+                        defaultPace: 330
+                    )
                 }
             }
             .padding(13)
