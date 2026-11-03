@@ -111,7 +111,17 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         recovery.activityTag = nil
         let legacy = ATHLTHIntervalRecipeEditing.forEditing([compact, recovery])
         XCTAssertEqual(legacy.count, 7)
-        XCTAssertTrue(legacy.allSatisfy { $0.groupID == nil })
+        XCTAssertTrue(legacy.allSatisfy {
+            $0.groupID == compactID &&
+            $0.groupKind == .intervals && $0.groupRounds == 1
+        })
+        let oldSummary = try XCTUnwrap(ATHLTHIntervalRecipeEditing.summary(
+            for: compactID, in: legacy
+        ))
+        XCTAssertEqual(oldSummary.rounds, 4)
+        XCTAssertEqual(oldSummary.recoveryCount, 3)
+        XCTAssertFalse(oldSummary.hasFinalRecovery)
+        XCTAssertEqual(legacy.expandedForExecution().count, 7)
     }
 
     @MainActor
