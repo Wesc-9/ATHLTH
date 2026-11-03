@@ -3077,6 +3077,29 @@ struct ATHLTHHomeView: View {
                     }
         )
 
+        for exercise in tournamentCalendar.items {
+            if homeWeekInterval.contains(exercise.opensAt) {
+                scheduled.append(HomeScheduledCommunityEvent(
+                    id: "arena-open-" + exercise.id.uuidString,
+                    title: exercise.exerciseTitle,
+                    startsAt: exercise.opensAt,
+                    activityType: "arena",
+                    systemImage: "trophy",
+                    detail: exercise.tournamentTitle
+                ))
+            }
+            if homeWeekInterval.contains(exercise.deadlineAt) {
+                scheduled.append(HomeScheduledCommunityEvent(
+                    id: "arena-due-" + exercise.id.uuidString,
+                    title: "Frist · " + exercise.exerciseTitle,
+                    startsAt: exercise.deadlineAt,
+                    activityType: "arena",
+                    systemImage: "clock.badge.exclamationmark",
+                    detail: exercise.tournamentTitle
+                ))
+            }
+        }
+
         return scheduled.sorted {
             $0.startsAt <
                 $1.startsAt
