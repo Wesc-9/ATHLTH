@@ -101,7 +101,7 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
 
     private var signalsRefreshKey: String {
         "\(health.lastSuccessfulRefreshAt?.timeIntervalSince1970 ?? 0):" +
-            "\(session.profile.maximumHeartRateBPM ?? 0)"
+            "\(session.onboardingProfile?.maximumHeartRateBPM ?? 0)"
     }
 
     private var loadExplanation: String {
@@ -621,7 +621,7 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
         }
 
         isLoading = true
-        let hrMax = session.profile.maximumHeartRateBPM
+        let hrMax = session.onboardingProfile?.maximumHeartRateBPM
         async let zoneQuery = health.insightHeartRateZoneDistribution(
             maximumHeartRateBPM: hrMax, days: 7
         )
