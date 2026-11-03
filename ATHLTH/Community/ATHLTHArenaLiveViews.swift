@@ -927,7 +927,7 @@ enum ATHLTHArenaSeasonPresentation {
     }
 }
 
-private enum ATHLTHArenaSeasonDate {
+enum ATHLTHArenaSeasonDate {
     static func sql(_ date: Date) -> String {
         let components = Calendar.current.dateComponents(
             [.year, .month, .day], from: date
