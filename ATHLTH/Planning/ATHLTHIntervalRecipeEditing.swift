@@ -7,6 +7,7 @@ import Foundation
 enum ATHLTHIntervalRecipeEditing {
     struct Summary: Equatable {
         let groupID: UUID
+        let displayName: String
         let rounds: Int
         let hasFinalRecovery: Bool
         let recoveryCount: Int
@@ -37,7 +38,9 @@ enum ATHLTHIntervalRecipeEditing {
             $0.durationSeconds != nil && $0.durationSeconds! >= 0
         }) ? items.reduce(0) { $0 + ($1.durationSeconds ?? 0) } : nil
         return Summary(
-            groupID: groupID, rounds: efforts.count,
+            groupID: groupID,
+            displayName: suggestedName(for: items),
+            rounds: efforts.count,
             hasFinalRecovery: items.last?.isRestOrActiveRecovery == true,
             recoveryCount: recovering.count, exactSeconds: total
         )
@@ -171,6 +174,35 @@ enum ATHLTHIntervalRecipeEditing {
             }
         }
         return renumbered(result)
+    }
+
+    private static func suggestedName(
+        for steps: [WorkoutTemplateBlock]
+    ) -> String {
+        guard let first = steps.first(where: {
+            $0.kind == .run && !$0.isActiveRecovery
+        }) else {
+            return ATHLTHLocalization.choose(
+                english: "Interval sequence", norwegian: "Intervallrekke"
+            )
+        }
+        let easy = steps.first(where: \.isRestOrActiveRecovery)
+        let seconds = Int((first.durationSeconds ?? -1).rounded())
+        let recoverySeconds = Int((easy?.durationSeconds ?? -1).rounded())
+        if seconds == 30 && recoverySeconds == 30 { return "30/30" }
+        if seconds == 45 && recoverySeconds == 15 { return "45/15" }
+        if seconds == 240 && recoverySeconds == 180 { return "4 × 4" }
+        let cleaned = first.title.replacingOccurrences(
+            of: #"\s+\d+$"#, with: "", options: .regularExpression
+        )
+        if ["drag", "effort", "run interval", "løpeintervall"].contains(
+            cleaned.lowercased()
+        ) {
+            return ATHLTHLocalization.choose(
+                english: "Interval sequence", norwegian: "Intervallrekke"
+            )
+        }
+        return cleaned
     }
 
     private static func contiguousRange(
