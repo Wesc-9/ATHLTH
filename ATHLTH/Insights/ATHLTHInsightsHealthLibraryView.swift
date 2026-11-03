@@ -704,7 +704,7 @@ struct ATHLTHInsightsDailyRhythmCard: View {
                     value: exerciseMinutes.map {
                         "\(Int($0.rounded())) min"
                     } ?? "—",
-                    subtitle: tr("recorded in 7 days", "registrert på 7 d")
+                    subtitle: tr("recorded total", "registrert totalt")
                 )
             }
 
@@ -779,6 +779,21 @@ struct ATHLTHInsightsDailyRhythmCard: View {
         }
     }
 
+    private func shortMetricTitle(
+        _ metric: ATHLTHInsightHealthMetric
+    ) -> String {
+        switch metric {
+        case .steps:
+            return tr("Steps", "Skritt")
+        case .daylightMinutes:
+            return tr("Daylight", "Dagslys")
+        case .exerciseMinutes:
+            return tr("Exercise time", "Treningstid")
+        default:
+            return metric.title
+        }
+    }
+
     private func rhythmMetric(
         _ metric: ATHLTHInsightHealthMetric,
         value: String,
@@ -788,7 +803,7 @@ struct ATHLTHInsightsDailyRhythmCard: View {
             ATHLTHInsightsHealthMetricDetailView(metric: metric)
         } label: {
             VStack(alignment: .leading, spacing: 5) {
-                Text(metric.title)
+                Text(shortMetricTitle(metric))
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(ATHLTHInsightsStyle.muted)
                     .lineLimit(1)
