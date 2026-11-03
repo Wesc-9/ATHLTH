@@ -232,7 +232,9 @@ struct ATHLTHTournamentLobbyView: View {
                      : "Øvelser under oppsett")
                     .font(.subheadline.weight(.medium))
                 Spacer()
-                Text("\(selectedCandidates.count)/\(tournament.exerciseCount) valgt")
+                Text(tournament.exerciseMode == .open && !finalized
+                     ? "\(candidates.count) foreslått"
+                     : "\(selectedCandidates.count)/\(tournament.exerciseCount) valgt")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
@@ -575,10 +577,15 @@ struct ATHLTHTournamentLobbyView: View {
                         .frame(maxWidth: .infinity,minHeight: 48)
                         .background(ATHLTHArenaV3Style.ink,in: Capsule())
                 }
-                .disabled(busy || candidates.count<tournament.exerciseCount ||
+                .disabled(busy ||
+                          (tournament.exerciseMode == .open
+                           ? candidates.isEmpty
+                           : candidates.count<tournament.exerciseCount) ||
                           (tournament.exerciseMode == .vote &&
                             Date() < (tournament.votesCloseAt ?? .distantFuture)))
-                .opacity(candidates.count>=tournament.exerciseCount ? 1 : 0.5)
+                .opacity(tournament.exerciseMode == .open
+                         ? (candidates.isEmpty ? 0.5 : 1)
+                         : (candidates.count>=tournament.exerciseCount ? 1 : 0.5))
             }
             if finalized {
                 Label("Øvelsene er låst for denne turneringen.",
