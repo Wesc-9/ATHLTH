@@ -35,6 +35,10 @@ struct ATHLTHTournamentCreator: View {
     @State private var title = ""
     @State private var groupSize = 4
     @State private var qualifiersPerGroup = 2
+    @State private var allowedActivities: Set<ATHLTHTournamentActivity> = []
+    @State private var rulesAuthority: ATHLTHTournamentRulesAuthority = .owner
+    @State private var cadenceDays = 7
+    @State private var completionHours = 48
     @State private var exerciseMode: ATHLTHTournamentExerciseMode = .owner
     @State private var exerciseCount = 4
     @State private var proposalsCloseAt =
@@ -95,7 +99,9 @@ struct ATHLTHTournamentCreator: View {
 
     private var canSave: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
-        athletes.count >= 2 && !busy &&
+        athletes.count >= 2 && !busy && !allowedActivities.isEmpty &&
+        ATHLTHTournamentCadence.options.contains(cadenceDays) &&
+        ATHLTHTournamentCadence.completionHours.contains(completionHours) &&
         (inviteSource != .club || selectedClubID != nil) &&
         (exerciseMode != .vote || (
             proposalsCloseAt > Date().addingTimeInterval(120) &&
@@ -110,6 +116,12 @@ struct ATHLTHTournamentCreator: View {
                 VStack(alignment: .leading, spacing: 22) {
                     titleSection
                     formatSection
+                    ATHLTHTournamentRuleConfigurationSection(
+                        activities: $allowedActivities,
+                        authority: $rulesAuthority,
+                        cadenceDays: $cadenceDays,
+                        completionHours: $completionHours
+                    )
                     exerciseRulesSection
                     warmupSection
                     if format == .groups { groupsSection }
@@ -234,7 +246,13 @@ struct ATHLTHTournamentCreator: View {
             exerciseCount: exerciseCount,
             proposalsCloseAt: exerciseMode == .vote ? proposalsCloseAt : nil,
             votesCloseAt: exerciseMode == .vote ? votesCloseAt : nil,
-            approvePlayerChanges: approvePlayerChanges
+            approvePlayerChanges: approvePlayerChanges,
+            allowedActivities: allowedActivities.sorted {
+                $0.rawValue < $1.rawValue
+            },
+            rulesAuthority: rulesAuthority,
+            cadenceDays: cadenceDays,
+            completionHours: completionHours
         )
     }
 
