@@ -14,12 +14,13 @@ enum ATHLTHWorkoutContentSummary {
                 .map { $0.exerciseSlug ?? $0.title }
         )
         let runs = executed.filter {
-            $0.kind == .run && $0.cardioActivity != .walking
+            $0.kind == .run && $0.cardioActivity != .walking &&
+                !$0.isActiveRecovery
         }.count
         let walks = executed.filter {
             $0.kind == .run && $0.cardioActivity == .walking
         }.count
-        let pauses = executed.filter { $0.kind == .rest }.count
+        let pauses = executed.filter { $0.isRestOrActiveRecovery }.count
         let cycling = executed.filter {
             $0.kind == .note && $0.activityTag == "cycling"
         }.count
