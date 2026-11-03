@@ -68,6 +68,8 @@ struct ATHLTHTournamentRemoteMatch: Decodable, Identifiable {
     let confirmedBy: UUID?
     let confirmedAt: Date?
     let evidenceNote: String
+    let scheduledAt: Date?
+    let deadlineAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, phase, status
@@ -83,6 +85,8 @@ struct ATHLTHTournamentRemoteMatch: Decodable, Identifiable {
         case confirmedBy = "confirmed_by"
         case confirmedAt = "confirmed_at"
         case evidenceNote = "evidence_note"
+        case scheduledAt = "scheduled_at"
+        case deadlineAt = "deadline_at"
     }
 
     var isVerified: Bool { status == "confirmed" }
@@ -182,6 +186,11 @@ private struct ATHLTHTournamentProposalParams: Encodable {
     let p_home_score: Double
     let p_away_score: Double
     let p_evidence: String
+}
+
+private struct ATHLTHTournamentDeadlineParams: Encodable {
+    let p_match: UUID
+    let p_deadline: String
 }
 
 private struct ATHLTHTournamentConfirmParams: Encodable {
@@ -407,6 +416,16 @@ struct ATHLTHTournamentCloudService {
                 p_home_score: homeScore,
                 p_away_score: awayScore,
                 p_evidence: String(evidence.prefix(400))
+            )
+        ).execute()
+    }
+
+    func extendDeadline(matchID: UUID, until date: Date) async throws {
+        let stamp = ISO8601DateFormatter().string(from: date)
+        try await client.rpc(
+            "athlth_tournament_extend_deadline",
+            params: ATHLTHTournamentDeadlineParams(
+                p_match: matchID, p_deadline: stamp
             )
         ).execute()
     }
