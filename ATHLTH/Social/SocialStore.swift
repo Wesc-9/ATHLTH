@@ -1397,6 +1397,38 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    /// Share only an opt-in arrival label; never access precise location.
+    @discardableResult
+    func setCurrentWorkoutArrival(
+        sessionID: UUID,
+        status: SocialWorkoutArrivalStatus?
+    ) async -> Bool {
+        do {
+            try await refreshWorkoutLobby(sessionID: sessionID)
+            guard let currentUserID,
+                  let workoutSession = workoutSessions.first(where: {
+                      $0.id == sessionID
+                  }),
+                  workoutSession.status == .active,
+                  workoutSession.invitePayload?.resolvedParticipationMode == .physical,
+                  let participant = workoutParticipants.first(where: {
+                      $0.sessionID == sessionID && $0.userID == currentUserID
+                  }),
+                  (participant.state == .creator || participant.state == .accepted),
+                  participant.workoutStartedAt == nil
+            else { return false }
+
+            try await service.setWorkoutArrival(
+                participantID: participant.id, status: status
+            )
+            try await refreshWorkoutLobby(sessionID: sessionID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
+        }
+    }
+
     @discardableResult
     func scheduleCoordinatedWorkoutStart(
         sessionID: UUID,
