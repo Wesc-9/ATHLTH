@@ -7167,15 +7167,24 @@ struct ChallengeCreationView: View {
     }
 
     private var creationDraftKey: String {
-        "athlth.challenge.composer.v2." + session.profile.userID.uuidString
+        // Scope recovery to the owner AND the entry point. A challenge
+        // started from a friend's profile must restore that same friend,
+        // without overwriting a separate challenge created elsewhere.
+        let friends = preselectedFriends.map { $0.userID.uuidString }
+            .sorted().joined(separator: "_")
+        let route = preselectedRouteID?.uuidString ?? "none"
+        let sport = preselectedSport?.rawValue ?? "any"
+        let distance = preselectedDistanceKm.map { String(Int($0 * 1_000)) }
+            ?? "none"
+        return [
+            "athlth.challenge.composer.v2",
+            session.profile.userID.uuidString, friends,
+            route, sport, distance
+        ].joined(separator: ".")
     }
 
     private var canPersistCreationDraft: Bool {
-        changeProposalFor == nil &&
-        preselectedFriends.isEmpty &&
-        preselectedRouteID == nil &&
-        preselectedDistanceKm == nil &&
-        preselectedSport == nil
+        changeProposalFor == nil
     }
 
     private func saveCreationDraft() {
