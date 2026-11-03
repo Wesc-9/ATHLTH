@@ -1,5 +1,6 @@
 import Foundation
 import Supabase
+import SwiftUI
 
 /// Scheduled, score-eligible tournament exercises for the signed-in athlete.
 /// One item per physical exercise; Home shows either the opening or the
@@ -33,6 +34,7 @@ struct ATHLTHTournamentCalendarItem: Identifiable, Hashable {
 @MainActor
 final class ATHLTHTournamentCalendarStore: ObservableObject {
     @Published private(set) var items: [ATHLTHTournamentCalendarItem] = []
+    @Published private(set) var tournaments: [UUID: ATHLTHTournamentRemote] = [:]
     @Published private(set) var accountID: UUID?
     @Published private(set) var lastRefreshedAt: Date?
     @Published private(set) var errorMessage: String?
@@ -43,6 +45,7 @@ final class ATHLTHTournamentCalendarStore: ObservableObject {
 
     func reset() {
         items = []
+        tournaments = [:]
         accountID = nil
         lastRefreshedAt = nil
         errorMessage = nil
@@ -65,6 +68,7 @@ final class ATHLTHTournamentCalendarStore: ObservableObject {
         do {
             let ids = try await tournamentCloud.myTournamentIDs(userID: userID)
             if ids.isEmpty {
+                tournaments = [:]
                 items = []
                 lastRefreshedAt = Date()
                 errorMessage = nil
@@ -128,6 +132,9 @@ final class ATHLTHTournamentCalendarStore: ObservableObject {
                 }
             }
 
+            tournaments = Dictionary(uniqueKeysWithValues:
+                active.map { ($0.id, $0) }
+            )
             items = Array(Dictionary(grouping: newItems, by: \.id)
                 .compactMap { $0.value.first }
                 .sorted {
@@ -143,6 +150,10 @@ final class ATHLTHTournamentCalendarStore: ObservableObject {
             errorMessage = error.localizedDescription
             return false
         }
+    }
+
+    func tournament(for id: UUID) -> ATHLTHTournamentRemote? {
+        tournaments[id]
     }
 
     func events(on date: Date) -> [ATHLTHTournamentCalendarItem] {
