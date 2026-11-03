@@ -86,8 +86,11 @@ struct ATHLTHCompletedRunningPerformance: Identifiable, Codable, Hashable {
               fullyStructured || hasMeasuredMinutes else { return nil }
         id = watch.id
         workoutID = watch.structuredWorkoutSourceID
-        title = watch.structuredWorkoutTitle ??
-            (watch.kind == .walking ? "Gåtur" : "Løpeøkt")
+        let fallbackTitle = watch.kind == .walking ? "Gåtur" : "Løpeøkt"
+        title = ATHLTHRunningResultPresentation.titleForRun(
+            watch.structuredWorkoutTitle ?? fallbackTitle,
+            fallback: fallbackTitle
+        )
         completedAt = watch.endedAt
         source = "Apple Watch"
         steps = recorded

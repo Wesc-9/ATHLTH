@@ -22,6 +22,7 @@ final class ATHLTHCompletedRunningPerformanceTests: XCTestCase {
         let performance = ATHLTHCompletedRunningPerformance(watch: watch)
         XCTAssertNotNil(performance)
         if let performance {
+            XCTAssertEqual(performance.title, "Løpeøkt")
             XCTAssertFalse(ATHLTHRunningResultPresentation.hasDetailedPhases(performance))
         }
         XCTAssertEqual(

@@ -1076,7 +1076,7 @@ struct HomeActivityRunDetailView: View {
                     tr("No GPS route", "Ingen GPS-rute"),
                     systemImage: "map",
                     description: Text(
-                        tr("Route details appear when this workout contains GPS data.", "Rutedetaljer vises når økten inneholder GPS-data.")
+                        tr("The map appears when this workout contains GPS data.", "Kartet vises når økten inneholder GPS-data.")
                     )
                 )
                 .frame(
