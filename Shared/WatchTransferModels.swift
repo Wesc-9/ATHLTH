@@ -1496,6 +1496,8 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     // instead of depending on WatchConnectivity delivery order.
     var strengthSnapshot: WatchStrengthSessionSnapshot? = nil
     var strengthCommands: [WatchStrengthCommand]? = nil
+    // Authoritative Watch-side pet participation, including offline sessions.
+    var petSegments: [WatchPetParticipationSegment]? = nil
 }
 
 enum WatchWorkoutMirrorState: String, Codable, Hashable {
@@ -1901,6 +1903,36 @@ struct WatchWorkoutActivityState: Codable, Hashable {
     }
 }
 
+// Pet identities contain only the minimum fields Watch needs. Photos,
+ // birth dates and weights never travel over WatchConnectivity.
+struct WatchPetIdentity: Codable, Hashable, Identifiable {
+    let id: UUID
+    let name: String
+}
+
+struct WatchPetParticipationSegment: Codable, Hashable {
+    let petID: UUID
+    var enteredAt: Date?
+    var exitedAt: Date?
+    var enteredMeters: Double?
+    var exitedMeters: Double?
+}
+
+struct WatchPetCatalogTransfer: Codable, Hashable {
+    let ownerID: UUID
+    let pets: [WatchPetIdentity]
+    let selectedPetIDs: [UUID]
+    let updatedAt: Date
+}
+
+struct WatchPetSelectionTransfer: Codable, Hashable {
+    let ownerID: UUID
+    let selectedPetIDs: [UUID]
+    let segments: [WatchPetParticipationSegment]
+    let updatedAt: Date
+    let workoutStartedAt: Date?
+}
+
 enum WatchTransferKind: String {
     case route
     case workoutResult
@@ -1918,6 +1950,8 @@ enum WatchTransferKind: String {
     case liveSurfaceContext
     case todayWorkout
     case todayWorkoutRequest
+    case petCatalog
+    case petSelection
     case strengthSnapshot
     case strengthCommand
     case spotifyCommand
