@@ -688,11 +688,10 @@ struct TrainTogetherCreatorLobbyView: View {
                         systemImage: "figure.run"
                     )
                     .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                    .frame(maxWidth: .infinity, minHeight: 38)
                 }
-                .buttonStyle(.bordered)
-                .tint(ATHLTHTheme.premiumGold)
+                .buttonStyle(.plain)
                 .disabled(isStarting || session?.invitePayload == nil)
 
                 if let startError {
