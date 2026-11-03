@@ -1118,8 +1118,10 @@ struct ChallengeCreationView: View {
                     runningTemplateID = nil
                     usesSpecificRoute = false
                     selectedRouteID = nil
-                    runningComparison = .fastestWork
-                    scoring = .fastestDistance
+                    runningComparison = focus == .intervals
+                        ? .mostWorkDistance : .fastestWork
+                    scoring = focus == .intervals
+                        ? .farthestInTime : .fastestDistance
                     gpsRequired = focus == .hills
                     allowTreadmill = false
                 } else {
@@ -1128,6 +1130,12 @@ struct ChallengeCreationView: View {
             }
             .onChange(of: runningComparison) { _, comparison in
                 guard runningFocus != .standard else { return }
+                if runningFocus == .intervals &&
+                   comparison != .mostWorkDistance {
+                    runningComparison = .mostWorkDistance
+                    scoring = .farthestInTime
+                    return
+                }
                 scoring = comparison == .fastestWork
                     ? .fastestDistance : .farthestInTime
             }
@@ -3005,11 +3013,27 @@ struct ChallengeCreationView: View {
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(ChallengePlanTheme.ink)
 
-            challengeSegmentedRow(
-                items: ATHLTHChallengeRunningComparison.allCases,
-                selected: $runningComparison,
-                label: { $0.title }
-            )
+            if runningFocus == .intervals {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Winner: longest recorded work distance",
+                        norwegian: "Vinner: lengst målt distanse i dragene"
+                    ),
+                    systemImage: "ruler"
+                )
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ChallengePlanTheme.ink)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(ATHLTHTheme.cardWarm,
+                            in: RoundedRectangle(cornerRadius: 14))
+            } else {
+                challengeSegmentedRow(
+                    items: ATHLTHChallengeRunningComparison.allCases,
+                    selected: $runningComparison,
+                    label: { $0.title }
+                )
+            }
 
             Button {
                 showingRunningTemplatePicker = true
@@ -6901,6 +6925,7 @@ struct ChallengeCreationView: View {
 
     private var effectiveScoring: ATHLTHChallengeScoring {
         if sport == .running && runningFocus != .standard {
+            if runningFocus == .intervals { return .farthestInTime }
             return runningComparison == .fastestWork
                 ? .fastestDistance : .farthestInTime
         }
@@ -7259,7 +7284,8 @@ struct ChallengeCreationView: View {
             runningFocus: sport == .running && runningFocus != .standard
                 ? runningFocus : nil,
             runningComparison: sport == .running && runningFocus != .standard
-                ? runningComparison : nil,
+                ? (runningFocus == .intervals ? .mostWorkDistance : runningComparison)
+                : nil,
             runningTemplateID: sport == .running && runningFocus != .standard
                 ? runningTemplateID : nil,
             runningMinimumRepetitions: sport == .running &&
