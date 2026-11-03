@@ -27,7 +27,10 @@ struct ATHLTHTournamentCreator: View {
     let preset: ATHLTHTournamentFormat
     let fixedClubID: UUID?
     let onSave: (ATHLTHTournamentDraft) -> Void
+    let onPublished: ((UUID) -> Void)?
+    private let tournamentCloud = ATHLTHTournamentCloudService()
 
+    @State private var publishing = false
     @State private var format: ATHLTHTournamentFormat
     @State private var title = ""
     @State private var groupSize = 4
@@ -57,11 +60,13 @@ struct ATHLTHTournamentCreator: View {
     init(
         preset: ATHLTHTournamentFormat,
         fixedClubID: UUID?,
+        onPublished: ((UUID) -> Void)? = nil,
         onSave: @escaping (ATHLTHTournamentDraft) -> Void
     ) {
         self.preset = preset
         self.fixedClubID = fixedClubID
         self.onSave = onSave
+        self.onPublished = onPublished
         _format = State(initialValue: preset)
         _selectedClubID = State(initialValue: fixedClubID)
         _inviteSource = State(initialValue: fixedClubID == nil ? .friends : .club)
@@ -98,7 +103,7 @@ struct ATHLTHTournamentCreator: View {
                     inviteSection
                     if activeClubID != nil { seasonSection }
                     preview
-                    Text("Utkastet lagres privat. Ingen invitasjoner sendes før konkurransen kan publiseres med godkjenning fra deltakerne.")
+                    Text("Du kan lagre et privat utkast eller publisere invitasjoner. Ingen konkurranse starter før alle har svart og arrangøren starter den.")
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -120,41 +125,35 @@ struct ATHLTHTournamentCreator: View {
                 }
             }
             .safeAreaInset(edge: .bottom) {
-                Button {
-                    let draft = ATHLTHTournamentDraft(
-                        ownerID: session.profile.userID,
-                        clubID: activeClubID,
-                        seasonID: activeClubID == nil ? nil : selectedSeasonID,
-                        title: String(title.trimmingCharacters(
-                            in: .whitespacesAndNewlines).prefix(80)),
-                        format: format,
-                        groupSize: groupSize,
-                        qualifiersPerGroup: qualifiersPerGroup,
-                        participants: athletes,
-                        warmupRounds: warmupRounds.enumerated().map { index, round in
-                            var named = round
-                            let trimmed = round.title.trimmingCharacters(
-                                in: .whitespacesAndNewlines
-                            )
-                            named.title = String(
-                                (trimmed.isEmpty ? "Oppvarmingsrunde \(index + 1)" : trimmed).prefix(60)
-                            )
-                            return named
+                VStack(spacing: 9) {
+                    Button {
+                        Task { await publishTournament() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            if publishing { ProgressView().tint(.white) }
+                            Text(publishing ? "Publiserer…" : "Publiser og inviter")
                         }
-                    )
-                    onSave(draft)
-                    dismiss()
-                } label: {
-                    Text("Lagre konkurranseoppsett")
                         .font(.headline)
-                        .frame(maxWidth: .infinity, minHeight: 53)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 52)
+                        .background(ATHLTHArenaV3Style.ink, in: Capsule())
+                    }
+                    .disabled(!canSave || publishing)
+                    .opacity(canSave ? 1 : 0.5)
+
+                    Button {
+                        onSave(makeDraft())
+                        dismiss()
+                    } label: {
+                        Text("Lagre som utkast")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ATHLTHArenaV3Style.ink)
+                            .frame(maxWidth: .infinity, minHeight: 35)
+                    }
+                    .disabled(!canSave || publishing)
                 }
-                .foregroundStyle(.white)
-                .background(canSave ? ATHLTHArenaV3Style.ink : ATHLTHArenaV3Style.secondary,
-                            in: Capsule())
-                .disabled(!canSave)
                 .padding(.horizontal, 18)
-                .padding(.vertical, 12)
+                .padding(.vertical, 10)
                 .background(.regularMaterial)
             }
         }
@@ -193,6 +192,45 @@ struct ATHLTHTournamentCreator: View {
             let result = await social.searchQuickTrainPartners(search)
             guard !Task.isCancelled else { return }
             discovered = result
+        }
+    }
+
+    private func makeDraft() -> ATHLTHTournamentDraft {
+        ATHLTHTournamentDraft(
+            ownerID: session.profile.userID,
+            clubID: activeClubID,
+            seasonID: activeClubID == nil ? nil : selectedSeasonID,
+            title: String(title.trimmingCharacters(
+                in: .whitespacesAndNewlines).prefix(80)),
+            format: format,
+            groupSize: groupSize,
+            qualifiersPerGroup: qualifiersPerGroup,
+            participants: athletes,
+            warmupRounds: warmupRounds.enumerated().map { index, round in
+                var copy = round
+                let clean = round.title.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                copy.title = String(
+                    (clean.isEmpty ? "Oppvarmingsrunde \(index + 1)" : clean)
+                        .prefix(60)
+                )
+                return copy
+            }
+        )
+    }
+
+    @MainActor
+    private func publishTournament() async {
+        guard canSave, !publishing else { return }
+        publishing = true
+        defer { publishing = false }
+        do {
+            let publishedID = try await tournamentCloud.create(from: makeDraft())
+            onPublished?(publishedID)
+            dismiss()
+        } catch {
+            errorMessage = "Kunne ikke publisere: " + error.localizedDescription
         }
     }
 
