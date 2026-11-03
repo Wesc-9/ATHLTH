@@ -5,7 +5,7 @@ import SwiftUI
 struct ThreadWorkoutInvitationCard: View {
     let workout: PlannedSession
     let response: PlannedWorkoutInviteResponse?
-    let lifecycleUpdate: WorkoutInviteLifecycleUpdate? = nil
+    let lifecycleUpdate: WorkoutInviteLifecycleUpdate?
     let isMine: Bool
     let isResponding: Bool
     let onAccept: () -> Void
