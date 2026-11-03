@@ -3875,6 +3875,34 @@ struct WorkoutInviteLaunchSheet: View {
     @State private var isChangingArrival = false
     @State private var confirmingIndependentStart = false
     @State private var chatPartner: SocialProfileCard?
+    @State private var isUndoingReady = false
+    @State private var readyWaitTask: Task<Void, Never>?
+
+    private var ownParticipant: SocialWorkoutParticipantRecord? {
+        social.workoutParticipants.first {
+            $0.sessionID == invite.session.id &&
+            $0.userID == social.currentUserID
+        } ?? invite.participant
+    }
+
+    private var resolvedSession: SocialWorkoutSessionRecord {
+        social.workoutSessions.first {
+            $0.id == invite.session.id
+        } ?? invite.session
+    }
+
+    private var isReady: Bool {
+        ownParticipant?.isReady == true
+    }
+
+    private var canUndoReady: Bool {
+        isReady &&
+        resolvedSession.status == .active &&
+        resolvedSession.resolvedWorkoutPhase == .planned &&
+        resolvedSession.coordinatedStartAt == nil &&
+        resolvedSession.invitePayload?.startIndependently != true &&
+        ownParticipant?.workoutStartedAt == nil
+    }
 
     private var appleWatchSelectable: Bool {
         ATHLTHDeviceRole.isIPad ||
@@ -3921,51 +3949,71 @@ struct WorkoutInviteLaunchSheet: View {
 
                         lobbyStatusCard
 
-                        Button {
-                            readyAndWait(
-                                copiedWorkout
-                            )
-                        } label: {
-                            HStack(spacing: 9) {
-                                if isStarting {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Image(
-                                        systemName:
-                                            captureDevice ==
-                                                .appleWatch
-                                            ? "applewatch"
-                                            : "iphone"
-                                    )
-                                }
+                        if isReady {
+                            HStack(spacing: 10) {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "You are ready",
+                                        norwegian: "Du er klar"
+                                    ),
+                                    systemImage: "checkmark.circle.fill"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
 
-                                Text(
-                                    startButtonTitle
-                                )
-                                .font(
-                                    .headline.weight(
-                                        .semibold
-                                    )
-                                )
+                                Spacer(minLength: 0)
+
+                                if canUndoReady {
+                                    Button {
+                                        undoReady()
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Undo Ready",
+                                                norwegian: "Angre klar"
+                                            ),
+                                            systemImage: "arrow.uturn.backward"
+                                        )
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                                        .padding(.horizontal, 12)
+                                        .frame(minHeight: 38)
+                                        .background(
+                                            ATHLTHTrainTogetherDesign.accentSoft,
+                                            in: Capsule()
+                                        )
+                                    }
+                                    .buttonStyle(.plain)
+                                    .disabled(isUndoingReady)
+                                }
                             }
-                            .frame(
-                                maxWidth: .infinity
+                            .padding(.vertical, 8)
+                        } else {
+                            Button {
+                                readyAndWait(copiedWorkout)
+                            } label: {
+                                HStack(spacing: 9) {
+                                    if isStarting {
+                                        ProgressView().tint(.white)
+                                    } else {
+                                        Image(
+                                            systemName: captureDevice == .appleWatch
+                                                ? "applewatch" : "iphone"
+                                        )
+                                    }
+                                    Text(startButtonTitle)
+                                        .font(.headline.weight(.semibold))
+                                }
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .controlSize(.large)
+                            .tint(ATHLTHTrainTogetherDesign.accent)
+                            .disabled(
+                                isStarting || isUndoingReady ||
+                                (captureDevice == .appleWatch && !appleWatchSelectable)
                             )
                         }
-                        .buttonStyle(
-                            .borderedProminent
-                        )
-                        .controlSize(.large)
-                        .tint(ATHLTHTrainTogetherDesign.accent)
-                        .disabled(
-                            isStarting ||
-                            (
-                                captureDevice ==
-                                    .appleWatch &&
-                                !appleWatchSelectable
-                            )
-                        )
 
                         if independentStartEnabled {
                             Button {
@@ -4044,12 +4092,11 @@ struct WorkoutInviteLaunchSheet: View {
                                 ? .destructive
                                 : nil
                     ) {
-                        if isStarting {
+                        if canUndoReady {
+                            undoReady()
+                        } else if isStarting {
                             Task {
-                                await social
-                                    .declineWorkoutInvite(
-                                        invite
-                                    )
+                                await social.declineWorkoutInvite(invite)
                                 dismiss()
                             }
                         } else {
@@ -4057,19 +4104,17 @@ struct WorkoutInviteLaunchSheet: View {
                         }
                     } label: {
                         Text(
-                            isStarting
+                            canUndoReady
                                 ? ATHLTHLocalization.choose(
-                                    english:
-                                        "Leave",
-                                    norwegian:
-                                        "Forlat"
+                                    english: "Undo Ready", norwegian: "Angre klar"
                                 )
-                                : ATHLTHLocalization.choose(
-                                    english:
-                                        "Not now",
-                                    norwegian:
-                                        "Ikke nå"
-                                )
+                                : isStarting
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Leave", norwegian: "Forlat"
+                                    )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Not now", norwegian: "Ikke nå"
+                                    )
                         )
                     }
                 }
@@ -4100,7 +4145,7 @@ struct WorkoutInviteLaunchSheet: View {
             ), role: .cancel) {}
         }
         .interactiveDismissDisabled(
-            isStarting
+            isStarting || isUndoingReady
         )
         .fullScreenCover(
             isPresented:
@@ -4653,42 +4698,84 @@ struct WorkoutInviteLaunchSheet: View {
         }
     }
 
-    private func readyAndWait(
-        _ workout: PlannedSession
-    ) {
-        guard !isStarting else { return }
-
-        isStarting = true
+    /// Keep the invitation accepted while returning to the waiting state.
+    /// Do not cancel the local start waiter until the server confirms undo.
+    private func undoReady() {
+        guard canUndoReady, !isUndoingReady else { return }
+        isUndoingReady = true
         launchError = nil
 
         Task { @MainActor in
+            let undone = await social.unmarkCurrentUserReady(
+                sessionID: invite.session.id
+            )
+            if undone {
+                readyWaitTask?.cancel()
+                readyWaitTask = nil
+                isStarting = false
+            } else {
+                launchError = social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not undo Ready.",
+                        norwegian: "Kunne ikke angre Klar."
+                    )
+            }
+            isUndoingReady = false
+        }
+    }
+
+    private func readyAndWait(_ workout: PlannedSession) {
+        guard !isStarting, !isUndoingReady else { return }
+
+        isStarting = true
+        launchError = nil
+        readyWaitTask = Task { @MainActor in
             guard await social.markCurrentUserReady(
                 sessionID: invite.session.id,
                 captureDevice: captureDevice
             ) else {
-                launchError =
-                    social.errorMessage ??
-                    ATHLTHLocalization.choose(
-                        english: "Could not mark you as ready.",
-                        norwegian: "Kunne ikke markere deg som klar."
-                    )
+                if !Task.isCancelled {
+                    launchError = social.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not mark you as ready.",
+                            norwegian: "Kunne ikke markere deg som klar."
+                        )
+                }
                 isStarting = false
+                readyWaitTask = nil
                 return
             }
 
-            guard await social.waitForCoordinatedWorkoutStart(
+            guard !Task.isCancelled else {
+                isStarting = false
+                readyWaitTask = nil
+                return
+            }
+
+            let started = await social.waitForCoordinatedWorkoutStart(
                 sessionID: invite.session.id
-            ) else {
-                launchError =
-                    social.errorMessage ??
+            )
+
+            // Undo cancels the waiting task. Never start a local workout from
+            // an old, cancelled waiter even when a network response was late.
+            guard !Task.isCancelled else {
+                isStarting = false
+                readyWaitTask = nil
+                return
+            }
+
+            if !started {
+                launchError = social.errorMessage ??
                     ATHLTHLocalization.choose(
                         english: "The shared workout was cancelled.",
                         norwegian: "Fellesøkten ble avbrutt."
                     )
                 isStarting = false
+                readyWaitTask = nil
                 return
             }
 
+            readyWaitTask = nil
             isStarting = false
             start(workout)
         }
