@@ -3682,21 +3682,23 @@ final class AppSessionStore: ObservableObject {
 
         for existing in standalonePlannedSessions {
             guard let ownerID = existing.sharedSourceOwnerID,
-                  let sourceID = existing.sharedSourceSessionID,
-                  let latest = events
-                      .filter {
-                          $0.senderID == ownerID &&
-                          $0.sourceOwnerID == ownerID &&
-                          $0.sourceObjectID == sourceID
-                      }
-                      .compactMap({
-                          $0.decodeSnapshot(WorkoutInviteLifecycleUpdate.self)
-                      })
-                      .first(where: {
-                          $0.organizerID == ownerID &&
-                          $0.sourceWorkoutID == sourceID
-                      })
+                  let sourceID = existing.sharedSourceSessionID
             else { continue }
+
+            let latest = events
+                .filter { event in
+                    event.senderID == ownerID &&
+                    event.sourceOwnerID == ownerID &&
+                    event.sourceObjectID == sourceID
+                }
+                .compactMap { event in
+                    event.decodeSnapshot(WorkoutInviteLifecycleUpdate.self)
+                }
+                .first { update in
+                    update.organizerID == ownerID &&
+                    update.sourceWorkoutID == sourceID
+                }
+            guard let latest else { continue }
 
             switch latest.kind {
             case .cancelled:
