@@ -358,7 +358,7 @@ struct ATHLTHTournamentCloudService {
         let targets = draft.participants.filter { $0.id != draft.ownerID }
         let timestamp = ISO8601DateFormatter()
         return try await client.rpc(
-            "athlth_tournament_create_full_rules",
+            "athlth_tournament_create_accepted_rules",
             params: ATHLTHTournamentConfiguredCreateParams(
                 p_title: draft.title,
                 p_format: draft.format.rawValue,
