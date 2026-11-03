@@ -21,13 +21,6 @@ struct ATHLTHPlannedIntensityEditor: View {
         )
     }
 
-    private var effort: Binding<Int> {
-        Binding(
-            get: { block.targetEffortRPE ?? 0 },
-            set: { block.targetEffortRPE = (1...10).contains($0) ? $0 : nil }
-        )
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
             Text(tr("PLANNED INTENSITY", "PLANLAGT INTENSITET"))
@@ -58,33 +51,9 @@ struct ATHLTHPlannedIntensityEditor: View {
             }
             .frame(minHeight: 49)
 
-            Divider()
-
-            HStack(spacing: 10) {
-                Image(systemName: "gauge.with.dots.needle.50percent")
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(tr("Perceived effort", "Opplevd anstrengelse"))
-                        .font(.subheadline.weight(.semibold))
-                    Text(tr("Scale 1–10 (RPE)", "Skala 1–10 (RPE)"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Picker(tr("Perceived effort", "Anstrengelse"), selection: effort) {
-                    Text(tr("None", "Ingen")).tag(0)
-                    ForEach(1...10, id: \.self) { value in
-                        Text("RPE \(value)/10").tag(value)
-                    }
-                }
-                .pickerStyle(.menu)
-                .tint(ATHLTHTrainDesign.bronze)
-            }
-            .frame(minHeight: 49)
-
             Text(tr(
-                "Planned targets only, not measured pulse or exertion.",
-                "Planlagte mål, ikke målt puls eller anstrengelse."
+                "Planned heart-rate target, not a live measurement.",
+                "Planlagt pulssone, ikke en målt pulsverdi."
             ))
             .font(.caption)
             .foregroundStyle(.secondary)
