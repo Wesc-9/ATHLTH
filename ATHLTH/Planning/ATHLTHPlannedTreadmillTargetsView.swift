@@ -3,31 +3,8 @@ import SwiftUI
 /// Treadmill-only planned targets. These do not remotely control a machine.
 struct ATHLTHPlannedTreadmillTargetsView: View {
     @Binding var block: WorkoutTemplateBlock
-    @State private var showSpeed = true
-
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
-    }
-
-    private var speed: Binding<Double> {
-        Binding(
-            get: {
-                ATHLTHPlannedTreadmillTargets.speed(
-                    forPace: block.targetPaceSecondsPerKilometer ?? 360
-                )
-            },
-            set: { value in
-                block.targetPaceSecondsPerKilometer =
-                    ATHLTHPlannedTreadmillTargets.pace(forSpeed: value)
-            }
-        )
-    }
-
-    private var pace: Binding<Double> {
-        Binding(
-            get: { block.targetPaceSecondsPerKilometer ?? 360 },
-            set: { block.targetPaceSecondsPerKilometer = min(max($0, 144), 3_600) }
-        )
     }
 
     var body: some View {
@@ -37,39 +14,11 @@ struct ATHLTHPlannedTreadmillTargetsView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ATHLTHTrainDesign.ink)
 
-            Toggle(tr("Target speed", "Målhastighet"), isOn: Binding(
-                get: { block.targetPaceSecondsPerKilometer != nil },
-                set: { block.targetPaceSecondsPerKilometer = $0 ? 360 : nil }
-            ))
-            .tint(ATHLTHTrainDesign.bronze)
-            if block.targetPaceSecondsPerKilometer != nil {
-                Picker(tr("Speed display", "Hastighetsvisning"), selection: $showSpeed) {
-                    Text(tr("km/h", "km/t")).tag(true)
-                    Text("min/km").tag(false)
-                }
-                .pickerStyle(.segmented)
-                if showSpeed {
-                    Stepper(value: speed, in: 1...25, step: 0.1) {
-                        HStack {
-                            Text(tr("Speed", "Hastighet"))
-                            Spacer()
-                            Text(speed.wrappedValue.formatted(
-                                .number.precision(.fractionLength(1))) + " km/t")
-                                .fontWeight(.semibold)
-                        }
-                    }
-                } else {
-                    Stepper(value: pace, in: 144...3_600, step: 5) {
-                        let seconds = Int(pace.wrappedValue)
-                        HStack {
-                            Text(tr("Pace", "Tempo"))
-                            Spacer()
-                            Text("\(seconds / 60):\(String(format: "%02d", seconds % 60)) min/km")
-                                .fontWeight(.semibold)
-                        }
-                    }
-                }
-            }
+            ATHLTHPlannedPaceTargetView(
+                targetPaceSecondsPerKilometer: $block.targetPaceSecondsPerKilometer,
+                prefersSpeed: true,
+                defaultPace: 360
+            )
             Stepper(value: Binding(
                 get: { block.treadmillInclinePercent ?? 0 },
                 set: { block.treadmillInclinePercent = min(max($0, 0), 20) }
