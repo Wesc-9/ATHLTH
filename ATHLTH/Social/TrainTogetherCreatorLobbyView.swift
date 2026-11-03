@@ -390,25 +390,14 @@ struct TrainTogetherCreatorLobbyView: View {
 
             Spacer()
 
-            Text(
-                participant.isReady
-                    ? ATHLTHLocalization.choose(
-                        english: "READY",
-                        norwegian: "KLAR"
-                    )
-                    : ATHLTHLocalization.choose(
-                        english: "WAITING",
-                        norwegian: "VENTER"
-                    )
-            )
+            Text(participantHeadline(participant))
             .font(
                 .caption2.weight(.bold)
             )
             .foregroundStyle(
-                participant.isReady
-                    ? ATHLTHTheme.premiumGold
-                    : ATHLTHTheme
-                        .mutedText
+                participant.isReady || participant.isTraining
+                    ? ATHLTHTrainTogetherDesign.accent
+                    : ATHLTHTheme.mutedText
             )
 
             if participant.userID !=
@@ -417,6 +406,32 @@ struct TrainTogetherCreatorLobbyView: View {
                participant.state == .invited ||
                     participant.state == .accepted {
                 Menu {
+                    if let profile = social.profile(for: participant.userID) {
+                        Button {
+                            chatPartner = profile
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Message", norwegian: "Send melding"
+                                ),
+                                systemImage: "bubble.left"
+                            )
+                        }
+                    }
+                    if !participant.isReady {
+                        Button {
+                            Task { await sendReminder(to: participant) }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Send reminder", norwegian: "Send påminnelse"
+                                ),
+                                systemImage: "bell"
+                            )
+                        }
+                        .disabled(!canRemind(participant))
+                    }
+                    Divider()
                     Button(
                         role: .destructive
                     ) {
@@ -546,6 +561,10 @@ struct TrainTogetherCreatorLobbyView: View {
                     Spacer(minLength: 0)
                 }
 
+                if session?.invitePayload?.resolvedParticipationMode == .physical {
+                    arrivalControls
+                }
+
                 if !creatorReady {
                     VStack(alignment: .leading, spacing: 7) {
                         Text(ATHLTHLocalization.choose(
@@ -655,38 +674,7 @@ struct TrainTogetherCreatorLobbyView: View {
                 )
 
                 Button {
-                    guard !isStarting else { return }
-                    isStarting = true
-                    startError = nil
-                    Task {
-                        var isReady = creatorReady
-                        if !isReady {
-                            isReady = await social.markCurrentUserReady(
-                                sessionID: sessionID,
-                                captureDevice: selectedCaptureDevice
-                            )
-                        }
-                        guard isReady else {
-                            startError = social.errorMessage ??
-                                ATHLTHLocalization.choose(
-                                    english: "Could not mark you ready.",
-                                    norwegian: "Kunne ikke markere deg som klar."
-                                )
-                            isStarting = false
-                            return
-                        }
-                        let started = await social.enableIndependentWorkoutStart(
-                            sessionID: sessionID
-                        )
-                        if !started {
-                            startError = social.errorMessage ??
-                                ATHLTHLocalization.choose(
-                                    english: "Could not start the workout.",
-                                    norwegian: "Kunne ikke starte økten."
-                                )
-                        }
-                        isStarting = false
-                    }
+                    confirmingIndependentStart = true
                 } label: {
                     Label(
                         ATHLTHLocalization.choose(
@@ -720,9 +708,7 @@ struct TrainTogetherCreatorLobbyView: View {
                 Divider()
 
                 Button(role: .destructive) {
-                    Task {
-                        await social.cancelActiveWorkout(sessionID: sessionID)
-                    }
+                    confirmingCancellation = true
                 } label: {
                     Text(ATHLTHLocalization.choose(
                         english: "Cancel invitation",
@@ -731,6 +717,175 @@ struct TrainTogetherCreatorLobbyView: View {
                     .font(.subheadline.weight(.semibold))
                 }
             }
+        }
+    }
+
+    private func participantHeadline(_ person: SocialWorkoutParticipantRecord) -> String {
+        if person.launchFailedAt != nil {
+            return ATHLTHLocalization.choose(english: "FAILED", norwegian: "FEIL")
+        }
+        if person.workoutFinishedAt != nil {
+            return ATHLTHLocalization.choose(english: "DONE", norwegian: "FERDIG")
+        }
+        if person.workoutStartedAt != nil {
+            return ATHLTHLocalization.choose(english: "TRAINING", norwegian: "TRENER")
+        }
+        if person.isReady {
+            return ATHLTHLocalization.choose(english: "READY", norwegian: "KLAR")
+        }
+        switch person.state {
+        case .creator:
+            return ATHLTHLocalization.choose(english: "PREPARING", norwegian: "GJØR SEG KLAR")
+        case .accepted:
+            return ATHLTHLocalization.choose(english: "ACCEPTED", norwegian: "GODTATT")
+        case .invited:
+            return ATHLTHLocalization.choose(english: "INVITED", norwegian: "INVITERT")
+        case .declined:
+            return ATHLTHLocalization.choose(english: "DECLINED", norwegian: "AVSLÅTT")
+        }
+    }
+
+    private var ownArrival: SocialWorkoutArrivalStatus? {
+        participants.first { $0.userID == social.currentUserID }?.arrivalStatus
+    }
+
+    private var arrivalControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(ATHLTHLocalization.choose(
+                english: "Before meeting up", norwegian: "Før dere møtes"
+            ))
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+
+            HStack(spacing: 8) {
+                ForEach(SocialWorkoutArrivalStatus.allCases, id: \.self) { status in
+                    let selected = ownArrival == status
+                    Button {
+                        guard !isChangingArrival else { return }
+                        isChangingArrival = true
+                        Task {
+                            let newStatus: SocialWorkoutArrivalStatus? =
+                                selected ? nil : status
+                            let didUpdate = await social.setCurrentWorkoutArrival(
+                                sessionID: sessionID, status: newStatus
+                            )
+                            if !didUpdate {
+                                startError = social.errorMessage ??
+                                    ATHLTHLocalization.choose(
+                                        english: "Could not update arrival status.",
+                                        norwegian: "Kunne ikke oppdatere ankomststatus."
+                                    )
+                            }
+                            isChangingArrival = false
+                        }
+                    } label: {
+                        Label(status.label, systemImage: status.symbol)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(
+                                selected
+                                    ? ATHLTHTrainTogetherDesign.accent
+                                    : ATHLTHTrainTogetherDesign.secondary
+                            )
+                            .frame(maxWidth: .infinity, minHeight: 37)
+                            .background(
+                                selected
+                                    ? ATHLTHTrainTogetherDesign.accentSoft
+                                    : ATHLTHTrainTogetherDesign.surface,
+                                in: Capsule()
+                            )
+                            .overlay {
+                                Capsule().stroke(
+                                    ATHLTHTrainTogetherDesign.outline, lineWidth: 0.8
+                                )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isChangingArrival || isStarting)
+                    .accessibilityAddTraits(selected ? [.isSelected] : [])
+                }
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Only a status label is shared; never your location.",
+                norwegian: "Kun statusen deles – aldri posisjonen din."
+            ))
+            .font(.caption2)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+    }
+
+    private func canRemind(_ person: SocialWorkoutParticipantRecord) -> Bool {
+        guard !reminderInFlight.contains(person.id),
+              person.userID != social.currentUserID,
+              person.workoutStartedAt == nil, !person.isReady
+        else { return false }
+        let key = "athlth.trainTogether.reminder.\(sessionID).\(person.userID)"
+        guard let last = UserDefaults.standard.object(forKey: key) as? Date else {
+            return true
+        }
+        return Date().timeIntervalSince(last) >= 900
+    }
+
+    @MainActor
+    private func sendReminder(to person: SocialWorkoutParticipantRecord) async {
+        guard canRemind(person) else { return }
+        reminderInFlight.insert(person.id)
+        defer { reminderInFlight.remove(person.id) }
+        do {
+            let chat = try await messaging.openConversation(with: person.userID)
+            let workoutTitle = session?.title ?? "ATHLTH"
+            let note = ATHLTHLocalization.choose(
+                english: "Reminder: \(workoutTitle) is waiting for your response or ready status in ATHLTH.",
+                norwegian: "Påminnelse: \(workoutTitle) venter på svar eller klarmelding i ATHLTH."
+            )
+            if await messaging.send(
+                to: person.userID,
+                conversationID: chat,
+                body: note
+            ) {
+                let key = "athlth.trainTogether.reminder.\(sessionID).\(person.userID)"
+                UserDefaults.standard.set(Date(), forKey: key)
+            } else {
+                startError = messaging.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not send reminder.",
+                        norwegian: "Kunne ikke sende påminnelse."
+                    )
+            }
+        } catch {
+            startError = error.localizedDescription
+        }
+    }
+
+    private func startAloneAfterConfirmation() {
+        guard !isStarting else { return }
+        isStarting = true
+        startError = nil
+        Task {
+            var isReady = creatorReady
+            if !isReady {
+                isReady = await social.markCurrentUserReady(
+                    sessionID: sessionID, captureDevice: selectedCaptureDevice
+                )
+            }
+            guard isReady else {
+                startError = social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not mark you ready.",
+                        norwegian: "Kunne ikke markere deg som klar."
+                    )
+                isStarting = false
+                return
+            }
+            let started = await social.enableIndependentWorkoutStart(sessionID: sessionID)
+            if !started {
+                startError = social.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not start the workout.",
+                        norwegian: "Kunne ikke starte økten."
+                    )
+            }
+            isStarting = false
         }
     }
 
