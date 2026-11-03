@@ -186,7 +186,10 @@ enum ATHLTHChallengeRunningWorkPolicy {
 /// but never serializes account-owned route, coaching or Spotify settings.
 enum ATHLTHChallengeRunningTemplateTransfer {
     static func portable(_ source: RunningWorkoutTemplate) -> RunningWorkoutTemplate {
-        var copy = source
+        // A competition shares interval durations and repetition structure,
+        // never the creator's chosen pace or treadmill incline. Each athlete
+        // personalizes those targets before starting the shared workout.
+        var copy = ATHLTHRunningLibraryDefaults.unpersonalized(source)
         copy.routeID = nil
         copy.coachBrief = nil
         copy.intervalGhostPaceSecondsPerKilometer = nil
