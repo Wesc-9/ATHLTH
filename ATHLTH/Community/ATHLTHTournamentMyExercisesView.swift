@@ -90,7 +90,7 @@ struct ATHLTHTournamentMyExercisesView: View {
             ATHLTHTournamentExerciseEvidenceSheet(
                 exerciseName: candidates.first(where: {
                     $0.id == slot.candidateID
-                }).flatMap { exerciseNames[$0.exerciseID] } ?? "Øvelse",
+                }).flatMap { exerciseNames[$0.lookupID] } ?? "Øvelse",
                 deadline: slot.deadlineAt
             ) { note in
                 try await cloud.completeExercise(
