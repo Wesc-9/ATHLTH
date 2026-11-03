@@ -159,6 +159,11 @@ private struct ATHLTHTournamentExerciseAttemptParams: Encodable {
     }
 }
 
+private struct ATHLTHTournamentExerciseDeadlineParams: Encodable {
+    let p_match_exercise: UUID
+    let p_deadline: String
+}
+
 private struct ATHLTHTournamentReviewExerciseParams: Encodable {
     let p_match_exercise: UUID
     let p_athlete: UUID
@@ -341,6 +346,18 @@ struct ATHLTHTournamentLobbyCloudService {
             all.append(contentsOf: batch)
         }
         return all
+    }
+
+    func setExerciseDeadline(
+        slotID: UUID, deadline: Date
+    ) async throws {
+        try await client.rpc(
+            "athlth_tournament_set_exercise_deadline",
+            params: ATHLTHTournamentExerciseDeadlineParams(
+                p_match_exercise: slotID,
+                p_deadline: ISO8601DateFormatter().string(from: deadline)
+            )
+        ).execute()
     }
 
     func reviewExercise(slotID: UUID,
