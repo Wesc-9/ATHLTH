@@ -19,7 +19,16 @@ enum ATHLTHWorkoutNameSuggestion {
         }
         let hasCycle = blocks.contains { $0.activityTag == "cycling" }
         let isHybrid = [hasRun, hasWalk, hasStrength, hasCycle].filter { $0 }.count > 1
-        let isInterval = blocks.contains { $0.groupKind == .intervals }
+        // Library presets are now explicit effort/recovery rows instead of
+        // compact repeat groups; keep the automatic "Interval workout" name.
+        let hasExplicitIntervals = blocks.indices.contains { index in
+            index + 2 < blocks.count &&
+            blocks[index].kind == .run &&
+            blocks[index + 1].kind == .rest &&
+            blocks[index + 2].kind == .run
+        }
+        let isInterval = blocks.contains { $0.groupKind == .intervals } ||
+            hasExplicitIntervals
         let isTreadmill = blocks.contains {
             $0.kind == .run && $0.treadmillInclinePercent != nil
         }
