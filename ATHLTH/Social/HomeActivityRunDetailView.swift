@@ -12,6 +12,7 @@ struct HomeActivityRunDetailView: View {
     let workout: SocialPublishableWorkout
 
     @State private var detail: WorkoutDetail?
+    @State private var routeAnalysis: HomeActivityRunRouteAnalysis
     @State private var measuredPulse: [ATHLTHRunningHeartRatePoint] = []
     @State private var completedIntervalHistory: [ATHLTHCompletedRunningPerformance] = []
     @State private var aiInsight: WorkoutAIInsight?
@@ -37,6 +38,11 @@ struct HomeActivityRunDetailView: View {
         _detail = State(
             initialValue: initialDetail
         )
+        _routeAnalysis = State(initialValue: HomeActivityRunRouteAnalysis(
+            detail: initialDetail,
+            reportedDistanceMeters: workout.distanceMeters,
+            workoutDuration: workout.duration
+        ))
         _hasResolvedDetail = State(initialValue: initialDetail != nil)
         _aiInsight = State(
             initialValue: initialAIInsight
@@ -62,6 +68,13 @@ struct HomeActivityRunDetailView: View {
         }.first { $0.healthWorkoutUUID == workout.id }
     }
 
+    private var displayedInterval: ATHLTHCompletedRunningPerformance? {
+        guard let result = structuredIntervalResult,
+              ATHLTHRunningResultPresentation.hasDetailedPhases(result)
+        else { return nil }
+        return result
+    }
+
     private var isTreadmillWorkout: Bool {
         workout.activity == .running && workout.isIndoor == true
     }
@@ -74,117 +87,18 @@ struct HomeActivityRunDetailView: View {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 
-    private var route: [CLLocation] {
-        let source = detail?.route ?? []
-        let accurate =
-            source
-                .filter {
-                    $0.coordinate.latitude.isFinite &&
-                    $0.coordinate.longitude.isFinite &&
-                    (
-                        $0.horizontalAccuracy < 0 ||
-                        $0.horizontalAccuracy <= 65
-                    )
-                }
-                .sorted {
-                    $0.timestamp < $1.timestamp
-                }
-
-        if accurate.count >= 2 {
-            return accurate
-        }
-
-        return source
-            .filter {
-                $0.coordinate.latitude.isFinite &&
-                $0.coordinate.longitude.isFinite
-            }
-            .sorted {
-                $0.timestamp < $1.timestamp
-            }
-    }
-
-    private var routeCoordinates:
-        [CLLocationCoordinate2D] {
-        route.map(\.coordinate)
-    }
-
-    private var paceSegments:
-        [HomeActivityPaceSegment] {
-        HomeActivityPaceSegmentBuilder.make(
-            from: route
-        )
-    }
-
-    private var paceBounds:
-        (fast: Double, slow: Double) {
-        let values =
-            paceSegments
-                .map(
-                    \.paceSecondsPerKilometer
-                )
-                .filter(\.isFinite)
-                .sorted()
-
-        guard values.count >= 2 else {
-            let fallback =
-                values.first ??
-                averagePaceSeconds ??
-                360
-            return (
-                max(fallback * 0.92, 1),
-                fallback * 1.08
-            )
-        }
-
-        let last = values.count - 1
-        let fastIndex =
-            min(
-                max(
-                    Int(
-                        (
-                            Double(last) *
-                            0.15
-                        )
-                        .rounded()
-                    ),
-                    0
-                ),
-                last
-            )
-        let slowIndex =
-            min(
-                max(
-                    Int(
-                        (
-                            Double(last) *
-                            0.85
-                        )
-                        .rounded()
-                    ),
-                    0
-                ),
-                last
-            )
-
-        let fast = values[fastIndex]
-        let slow =
-            max(
-                values[slowIndex],
-                fast + 1
-            )
-
-        return (fast, slow)
-    }
-
+    // Derived GPS geometry is cached once per HealthKit detail instead of
+    // re-sorting the trace and reconstructing hundreds of map segments
+    // on every SwiftUI state update.
+    private var route: [CLLocation] { routeAnalysis.locations }
+    private var routeCoordinates: [CLLocationCoordinate2D] { routeAnalysis.coordinates }
+    private var paceSegments: [HomeActivityPaceSegment] { routeAnalysis.segments }
+    private var paceBounds: (fast: Double, slow: Double) { routeAnalysis.paceBounds }
     private var verifiedSplits: [ATHLTHRunningResultInsights.KilometerSplit] {
-        ATHLTHRunningResultInsights.kilometerSplits(
-            from: route, reportedDistanceMeters: workout.distanceMeters
-        )
+        routeAnalysis.splits
     }
-
     private var elevationProfile: [ATHLTHRunningResultInsights.ElevationPoint] {
-        ATHLTHRunningResultInsights.elevationProfile(from: route)
+        routeAnalysis.elevation
     }
 
     private var recordedRouteSource: String {
@@ -332,10 +246,10 @@ struct HomeActivityRunDetailView: View {
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 16) {
+            LazyVStack(spacing: 16) {
                 summaryCard
 
-                if let intervals = structuredIntervalResult {
+                if let intervals = displayedInterval {
                     ATHLTHIntervalResultSummaryCard(
                         performance: intervals,
                         athleteMaximumBPM: session.onboardingProfile?.maximumHeartRateBPM.map(Double.init),
@@ -382,7 +296,6 @@ struct HomeActivityRunDetailView: View {
 
                 if !isIndoorActivity {
                     if linkedRoute != nil { routeResultCard }
-                    routeFactsCard
                 }
 
                 coachCard
@@ -507,7 +420,7 @@ struct HomeActivityRunDetailView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack(alignment: .top, spacing: 10) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("ATHLTH  /  " + (structuredIntervalResult == nil
+                        Text("ATHLTH  /  " + (displayedInterval == nil
                             ? tr("RUNNING", "LØPING")
                             : tr("INTERVAL RUN", "INTERVALLØKT")))
                             .font(.caption2.weight(.bold))
@@ -528,8 +441,10 @@ struct HomeActivityRunDetailView: View {
                         .background(ATHLTHPlanDesign.selectedSurface, in: Capsule())
                 }
 
-                if let interval = structuredIntervalResult {
-                    Text(interval.title)
+                if let interval = displayedInterval {
+                    Text(ATHLTHRunningResultPresentation.titleForRun(
+                        interval.title, fallback: tr("Interval run", "Intervalløkt")
+                    ))
                         .font(.system(size: 28, weight: .semibold, design: .serif))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                         .fixedSize(horizontal: false, vertical: true)
@@ -1248,41 +1163,6 @@ struct HomeActivityRunDetailView: View {
         }
     }
 
-    @ViewBuilder
-    private var routeFactsCard: some View {
-        if highestPointText != "—" ||
-           maxHeartRateText != "—" ||
-           runningPowerText != "—" {
-            ATHLTHPlanSurface {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(tr("Route measurements", "Rutedetaljer"))
-                        .font(.system(size: 21, weight: .semibold, design: .serif))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                    LazyVGrid(columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ], spacing: 10) {
-                        if highestPointText != "—" {
-                            routeFact(icon: "mountain.2",
-                                      label: tr("Highest point", "Høyeste punkt"),
-                                      value: highestPointText)
-                        }
-                        if maxHeartRateText != "—" {
-                            routeFact(icon: "heart.fill",
-                                      label: tr("Max heart rate", "Makspuls"),
-                                      value: maxHeartRateText)
-                        }
-                        if runningPowerText != "—" {
-                            routeFact(icon: "bolt.fill",
-                                      label: tr("Average power", "Snitteffekt"),
-                                      value: runningPowerText)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     private var coachCard: some View {
         ATHLTHPlanSurface {
             VStack(
@@ -1373,24 +1253,33 @@ struct HomeActivityRunDetailView: View {
 
     @MainActor
     private func loadDetailAndCoach() async {
+        // Fetch the heart-rate timeline independently of the route detail.
+        async let pulse = health.runningHeartRateTimeline(for: workout.id)
         if detail == nil {
             isLoadingDetail = true
-            detail =
-                await health.workoutDetail(
-                    for: workout.id
-                )
+            let loaded = await health.workoutDetail(for: workout.id)
+            routeAnalysis = HomeActivityRunRouteAnalysis(
+                detail: loaded,
+                reportedDistanceMeters: workout.distanceMeters,
+                workoutDuration: workout.duration
+            )
+            detail = loaded
             isLoadingDetail = false
         }
         hasResolvedDetail = true
+        measuredPulse = await pulse
 
-        measuredPulse = await health.runningHeartRateTimeline(
-            for: workout.id
-        )
+        // Supabase route ranking must not delay the Coach response (or
+        // vice versa). Both start after the locally useful metrics load.
+        async let routeLookup: Void = loadRouteResultIfNeededForOutdoorWorkout()
+        async let coachLookup: Void = loadCoachInsightIfNeeded()
+        _ = await (routeLookup, coachLookup)
+    }
 
-        if !isIndoorActivity {
-            await loadRouteResultIfNeeded()
-        }
-        await loadCoachInsightIfNeeded()
+    @MainActor
+    private func loadRouteResultIfNeededForOutdoorWorkout() async {
+        guard !isIndoorActivity else { return }
+        await loadRouteResultIfNeeded()
     }
 
     @MainActor
@@ -1647,126 +1536,9 @@ struct HomeActivityRunDetailView: View {
         )
     }
 
-    private var routeRegion:
-        MKCoordinateRegion {
-        guard let first =
-                routeCoordinates.first
-        else {
-            return MKCoordinateRegion(
-                center:
-                    CLLocationCoordinate2D(
-                        latitude: 0,
-                        longitude: 0
-                    ),
-                span:
-                    MKCoordinateSpan(
-                        latitudeDelta: 0.05,
-                        longitudeDelta: 0.05
-                    )
-            )
-        }
+    private var routeRegion: MKCoordinateRegion { routeAnalysis.region }
 
-        var minLatitude =
-            first.latitude
-        var maxLatitude =
-            first.latitude
-        var minLongitude =
-            first.longitude
-        var maxLongitude =
-            first.longitude
-
-        for coordinate in
-            routeCoordinates.dropFirst() {
-            minLatitude =
-                min(
-                    minLatitude,
-                    coordinate.latitude
-                )
-            maxLatitude =
-                max(
-                    maxLatitude,
-                    coordinate.latitude
-                )
-            minLongitude =
-                min(
-                    minLongitude,
-                    coordinate.longitude
-                )
-            maxLongitude =
-                max(
-                    maxLongitude,
-                    coordinate.longitude
-                )
-        }
-
-        let latitudeDelta =
-            max(
-                (
-                    maxLatitude -
-                    minLatitude
-                ) * 1.35,
-                0.006
-            )
-        let longitudeDelta =
-            max(
-                (
-                    maxLongitude -
-                    minLongitude
-                ) * 1.35,
-                0.006
-            )
-
-        return MKCoordinateRegion(
-            center:
-                CLLocationCoordinate2D(
-                    latitude:
-                        (
-                            minLatitude +
-                            maxLatitude
-                        ) / 2,
-                    longitude:
-                        (
-                            minLongitude +
-                            maxLongitude
-                        ) / 2
-                ),
-            span:
-                MKCoordinateSpan(
-                    latitudeDelta:
-                        latitudeDelta,
-                    longitudeDelta:
-                        longitudeDelta
-                )
-        )
-    }
-
-    private var elevationGainMeters: Double {
-        guard route.count >= 2 else {
-            return 0
-        }
-
-        var gain = 0.0
-
-        for index in 1..<route.count {
-            let delta =
-                route[index].altitude -
-                route[index - 1].altitude
-
-            if delta > 0,
-               delta < 50 {
-                gain += delta
-            }
-        }
-
-        return gain
-    }
-
-    private var highestAltitudeMeters: Double? {
-        route
-            .map(\.altitude)
-            .filter(\.isFinite)
-            .max()
-    }
+    private var elevationGainMeters: Double { routeAnalysis.elevationGainMeters }
 
     private var averagePaceSeconds: Double? {
         guard let distance = workout.distanceMeters else {
@@ -1900,17 +1672,6 @@ struct HomeActivityRunDetailView: View {
             "\(Int(elevationGainMeters.rounded())) m"
     }
 
-    private var highestPointText: String {
-        guard let value =
-                highestAltitudeMeters,
-              value.isFinite
-        else {
-            return "—"
-        }
-
-        return "\(Int(value.rounded())) m"
-    }
-
     private var activeEnergyText: String {
         guard let value =
                 workout
@@ -1984,6 +1745,92 @@ struct HomeActivityRunDetailView: View {
             minutes,
             seconds
         )
+    }
+}
+
+/// A once-per-detail GPS projection. Neither opening a menu nor receiving a
+/// Coach/leaderboard response should reprocess the same route.
+private struct HomeActivityRunRouteAnalysis {
+    let locations: [CLLocation]
+    let coordinates: [CLLocationCoordinate2D]
+    let segments: [HomeActivityPaceSegment]
+    let paceBounds: (fast: Double, slow: Double)
+    let splits: [ATHLTHRunningResultInsights.KilometerSplit]
+    let elevation: [ATHLTHRunningResultInsights.ElevationPoint]
+    let elevationGainMeters: Double
+    let region: MKCoordinateRegion
+
+    init(detail: WorkoutDetail?, reportedDistanceMeters: Double?, workoutDuration: Double) {
+        let source = detail?.route ?? []
+        let valid = source.filter {
+            $0.coordinate.latitude.isFinite && $0.coordinate.longitude.isFinite
+        }
+        let accurate = valid.filter {
+            $0.horizontalAccuracy < 0 || $0.horizontalAccuracy <= 65
+        }.sorted { $0.timestamp < $1.timestamp }
+        let cleaned = accurate.count >= 2
+            ? accurate : valid.sorted { $0.timestamp < $1.timestamp }
+
+        locations = cleaned
+        coordinates = cleaned.map(\.coordinate)
+        segments = HomeActivityPaceSegmentBuilder.make(from: cleaned)
+        splits = ATHLTHRunningResultInsights.kilometerSplits(
+            from: cleaned, reportedDistanceMeters: reportedDistanceMeters
+        )
+        elevation = ATHLTHRunningResultInsights.elevationProfile(from: cleaned)
+        let paces = segments.map(\.paceSecondsPerKilometer)
+            .filter(\.isFinite).sorted()
+        if paces.count >= 2 {
+            let last = paces.count - 1
+            let fast = paces[Int((Double(last) * 0.15).rounded())]
+            let slow = paces[Int((Double(last) * 0.85).rounded())]
+            paceBounds = (fast, max(slow, fast + 1))
+        } else {
+            let average = reportedDistanceMeters.flatMap {
+                ATHLTHRunningPace.average(
+                    elapsedSeconds: workoutDuration, distanceMeters: $0
+                )
+            }
+            let fallback = paces.first ?? average ?? 360
+            paceBounds = (max(fallback * 0.92, 1), fallback * 1.08)
+        }
+
+        var gain = 0.0
+        if cleaned.count >= 2 {
+            for i in 1..<cleaned.count {
+                let delta = cleaned[i].altitude - cleaned[i - 1].altitude
+                if delta > 0, delta < 50 { gain += delta }
+            }
+        }
+        elevationGainMeters = gain
+
+        if let first = coordinates.first {
+            var minLat = first.latitude
+            var maxLat = first.latitude
+            var minLon = first.longitude
+            var maxLon = first.longitude
+            for coordinate in coordinates.dropFirst() {
+                minLat = min(minLat, coordinate.latitude)
+                maxLat = max(maxLat, coordinate.latitude)
+                minLon = min(minLon, coordinate.longitude)
+                maxLon = max(maxLon, coordinate.longitude)
+            }
+            region = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(
+                    latitude: (minLat + maxLat) / 2,
+                    longitude: (minLon + maxLon) / 2
+                ),
+                span: MKCoordinateSpan(
+                    latitudeDelta: max((maxLat - minLat) * 1.35, 0.006),
+                    longitudeDelta: max((maxLon - minLon) * 1.35, 0.006)
+                )
+            )
+        } else {
+            region = MKCoordinateRegion(
+                center: CLLocationCoordinate2D(latitude: 0, longitude: 0),
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            )
+        }
     }
 }
 

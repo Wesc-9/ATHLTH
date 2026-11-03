@@ -221,8 +221,12 @@ struct ATHLTHIntervalResultSummaryCard: View {
         ATHLTHPlanSurface {
             VStack(alignment: .leading, spacing: 15) {
                 HStack {
-                    Label(tr("MAIN SECTION", "HOVEDDEL"),
-                          systemImage: "figure.run.circle.fill")
+                    Label(
+                        work.count > 1
+                            ? tr("INTERVAL DETAILS", "INTERVALLDETALJER")
+                            : tr("WORKOUT PHASES", "ØKTDELER"),
+                        systemImage: "figure.run.circle.fill"
+                    )
                         .font(.caption.weight(.bold))
                         .tracking(1.1)
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -231,18 +235,6 @@ struct ATHLTHIntervalResultSummaryCard: View {
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
-                Text(performance.title)
-                    .font(.system(size: 24, weight: .semibold, design: .serif))
-                    .foregroundStyle(ATHLTHPlanDesign.ink)
-                HStack(spacing: 8) {
-                    Label("\(work.count) " + tr("completed efforts", "fullførte drag"),
-                          systemImage: "checkmark.seal.fill")
-                    Text("·")
-                    Text(performance.source)
-                    Spacer(minLength: 0)
-                }
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
 
                 HStack(alignment: .top, spacing: 12) {
                     headline(tr("AVERAGE SPEED", "SNITTHASTIGHET"),

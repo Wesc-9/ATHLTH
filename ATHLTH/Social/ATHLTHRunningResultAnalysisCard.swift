@@ -58,14 +58,6 @@ struct ATHLTHRunningResultAnalysisCard: View {
                 "flame"
             ))
         }
-        if let heartRate = maxHeartRateBPM, heartRate.isFinite,
-           heartRate > 0, values.count < 3 {
-            values.append((
-                tr("Peak heart rate", "Høyeste puls"),
-                "\(Int(heartRate.rounded())) bpm",
-                "heart"
-            ))
-        }
         return Array(values.prefix(3))
     }
 
@@ -187,6 +179,8 @@ struct ATHLTHRunningResultAnalysisCard: View {
             }
 
             if elevation.count >= 5 {
+                let lowest = elevation.map(\.altitudeMeters).min() ?? 0
+                let highest = elevation.map(\.altitudeMeters).max() ?? 0
                 ATHLTHPlanSurface {
                     VStack(alignment: .leading, spacing: 11) {
                         Text(tr("Elevation profile", "Høydeprofil"))
@@ -199,7 +193,7 @@ struct ATHLTHRunningResultAnalysisCard: View {
                         Chart(elevation) { point in
                             AreaMark(
                                 x: .value("km", point.distanceKilometers),
-                                yStart: .value("Base", elevation.map(\.altitudeMeters).min() ?? 0),
+                                yStart: .value("Base", lowest),
                                 yEnd: .value("m", point.altitudeMeters)
                             )
                             .foregroundStyle(ATHLTHPlanDesign.accent.opacity(0.13))
@@ -214,9 +208,9 @@ struct ATHLTHRunningResultAnalysisCard: View {
                         .chartXAxisLabel("km")
                         .frame(height: 160)
                         HStack {
-                            Text(tr("Lowest", "Laveste") + ": \(Int((elevation.map(\.altitudeMeters).min() ?? 0).rounded())) m")
+                            Text(tr("Lowest", "Laveste") + ": \(Int(lowest.rounded())) m")
                             Spacer()
-                            Text(tr("Highest", "Høyeste") + ": \(Int((elevation.map(\.altitudeMeters).max() ?? 0).rounded())) m")
+                            Text(tr("Highest", "Høyeste") + ": \(Int(highest.rounded())) m")
                         }
                         .font(.caption)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)

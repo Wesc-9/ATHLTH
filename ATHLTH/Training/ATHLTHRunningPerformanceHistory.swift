@@ -204,3 +204,35 @@ enum ATHLTHRunningPerformanceHistory {
         ATHLTHTrainingDataChangeSignal.post(userID: userID)
     }
 }
+
+/// Post-run presentation rules. Watch may publish one recorded running step
+/// for a normal unstructured run; that is not an interval session.
+enum ATHLTHRunningResultPresentation {
+    static func hasDetailedPhases(_ performance: ATHLTHCompletedRunningPerformance) -> Bool {
+        let recorded = performance.steps.filter {
+            $0.activeSeconds.isFinite && $0.activeSeconds >= 10
+        }
+        guard recorded.count > 1 else { return false }
+        if performance.workSteps.count > 1 { return true }
+        return recorded.contains {
+            ["warmup", "cooldown", "recovery", "rest"].contains(
+                ($0.phase ?? "main").lowercased()
+            )
+        }
+    }
+
+    /// Legacy watch titles can describe a different workout category, while
+    /// HealthKit's activity is running. Never label a run as strength training.
+    static func titleForRun(_ title: String, fallback: String) -> String {
+        let normalized = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let strengthOnly: Set<String> = [
+            "styrke", "styrkeøkt", "styrketrening",
+            "strength", "strength training", "strength workout",
+            "functional strength training", "tradisjonell styrketrening"
+        ]
+        guard !normalized.isEmpty,
+              !strengthOnly.contains(normalized.lowercased())
+        else { return fallback }
+        return normalized
+    }
+}

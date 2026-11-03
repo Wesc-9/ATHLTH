@@ -3,6 +3,54 @@ import XCTest
 @testable import ATHLTH
 
 final class ATHLTHCompletedRunningPerformanceTests: XCTestCase {
+    func testSingleRecordedWatchEffortDoesNotBecomeAnIntervalCard() {
+        let phase = ATHLTHRecordedRunningStep(
+            index: 0, title: "Run", phase: "main",
+            activeSeconds: 1_800, distanceMeters: 5_000,
+            isUserReported: false, targetPaceSecondsPerKilometer: nil
+        )
+        let now = Date()
+        var watch = WatchWorkoutResult(
+            id: UUID(), kind: .running, healthKitWorkoutUUID: UUID(),
+            startedAt: now.addingTimeInterval(-1_800), endedAt: now,
+            duration: 1_800, activeCalories: 200, distanceMeters: 5_000,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 50
+        )
+        watch.structuredWorkoutFullyCompleted = true
+        watch.structuredWorkoutTitle = "Styrke"
+        watch.recordedRunningSteps = [phase]
+        let performance = ATHLTHCompletedRunningPerformance(watch: watch)
+        XCTAssertNotNil(performance)
+        if let performance {
+            XCTAssertFalse(ATHLTHRunningResultPresentation.hasDetailedPhases(performance))
+        }
+        XCTAssertEqual(
+            ATHLTHRunningResultPresentation.titleForRun("Styrke", fallback: "Løpeøkt"),
+            "Løpeøkt"
+        )
+        XCTAssertEqual(
+            ATHLTHRunningResultPresentation.titleForRun("Bakkedrag", fallback: "Løpeøkt"),
+            "Bakkedrag"
+        )
+    }
+
+    func testWarmupAndEffortStillQualifyForPhaseDetails() {
+        let now = Date()
+        var watch = WatchWorkoutResult(
+            id: UUID(), kind: .running, healthKitWorkoutUUID: UUID(),
+            startedAt: now.addingTimeInterval(-600), endedAt: now,
+            duration: 600, activeCalories: 80, distanceMeters: 1_500,
+            averageHeartRate: nil, maxHeartRate: nil, routePointCount: 20
+        )
+        watch.structuredWorkoutFullyCompleted = true
+        watch.recordedRunningSteps = [sample(0, phase: "warmup"), sample(1)]
+        let performance = ATHLTHCompletedRunningPerformance(watch: watch)
+        XCTAssertNotNil(performance)
+        if let performance {
+            XCTAssertTrue(ATHLTHRunningResultPresentation.hasDetailedPhases(performance))
+        }
+    }
+
     private func sample(_ index: Int, phase: String = "main",
                         meters: Double = 800) -> ATHLTHRecordedRunningStep {
         ATHLTHRecordedRunningStep(
