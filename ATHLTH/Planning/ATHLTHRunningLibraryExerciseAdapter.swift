@@ -8,12 +8,30 @@ enum ATHLTHRunningLibraryExerciseAdapter {
         guard source.kind == .exercise, source.groupID == nil else { return source }
         let normalized = source.title.trimmingCharacters(in: .whitespacesAndNewlines)
             .lowercased()
-        guard normalized == "running" || normalized == "løping" else { return source }
+        let isTreadmill = [
+            "treadmill", "treadmill running", "treadmill run",
+            "running on a treadmill", "running (treadmill)",
+            "løping på tredemølle", "løp på tredemølle", "tredemølle"
+        ].contains(normalized)
+        let isRunning = [
+            "running", "run", "løping", "løp", "jogging", "jogg"
+        ].contains(normalized)
+        guard isRunning || isTreadmill else { return source }
 
         var block = source
         block.kind = .run
         block.cardioActivity = .running
-        block.title = ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        block.title = isTreadmill
+            ? ATHLTHLocalization.choose(
+                english: "Treadmill running", norwegian: "Løping på tredemølle"
+            )
+            : ATHLTHLocalization.choose(english: "Running", norwegian: "Løping")
+        if isTreadmill {
+            block.isIndoor = true
+            block.treadmillInclinePercent = block.treadmillInclinePercent ?? 0
+            block.targetPaceSecondsPerKilometer =
+                block.targetPaceSecondsPerKilometer ?? 360
+        }
         block.setCount = nil
         block.restBetweenSetsSeconds = nil
         block.repetitions = nil
