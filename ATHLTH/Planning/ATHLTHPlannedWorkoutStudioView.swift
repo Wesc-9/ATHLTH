@@ -238,7 +238,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             }
         } label: {
             Label(ATHLTHLocalization.choose(
-                english: "Add section", norwegian: "Legg til del"
+                english: "Add category", norwegian: "Legg til kategori"
             ), systemImage: "plus.circle.fill")
             .font(.subheadline.weight(.semibold))
             .foregroundStyle(.white)
