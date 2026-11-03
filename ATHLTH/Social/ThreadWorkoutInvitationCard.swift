@@ -447,6 +447,8 @@ struct ThreadWorkoutInvitationCard: View {
 // The calendar lobby deliberately reads status from invitation messages.
 // The planned workout belongs to its creator, regardless of the response.
 struct PlannedWorkoutLobbyView: View {
+    @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
@@ -461,6 +463,12 @@ struct PlannedWorkoutLobbyView: View {
     @State private var loadError: String?
     @State private var openingReadyLobby = false
     @State private var launchError: String?
+    @State private var lifecycleError: String?
+    @State private var isPublishingLifecycle = false
+    @State private var showingWorkoutEditor = false
+    @State private var confirmingCancelWorkout = false
+    @State private var chatPartner: SocialProfileCard?
+    @State private var reminderInFlight: Set<UUID> = []
 
     private let service = SupabaseMessagingService()
 
@@ -563,6 +571,9 @@ struct PlannedWorkoutLobbyView: View {
                 workoutCard
                 participantsCard
                 startOptionsCard
+                if isOrganizer {
+                    organizerActions
+                }
                 Text(ATHLTHLocalization.choose(
                     english: "Your workout is in your calendar whether friends accept, decline or do not respond. You can train on your own.",
                     norwegian: "Økten ligger i kalenderen din uansett om venner godtar, avslår eller ikke svarer. Du kan gjennomføre økten alene."
@@ -582,6 +593,45 @@ struct PlannedWorkoutLobbyView: View {
             english: "Workout lobby", norwegian: "Øktlobby"
         ))
         .navigationBarTitleDisplayMode(.inline)
+        .tint(ATHLTHTrainTogetherDesign.accent)
+        .sheet(item: $chatPartner) { profile in
+            NavigationStack {
+                DirectMessageThreadView(friend: profile)
+            }
+        }
+        .sheet(isPresented: $showingWorkoutEditor) {
+            SessionEditorView(
+                standaloneDate: workout.scheduledStart ?? Date(),
+                initialSourceWorkout: persistedWorkout ?? workout,
+                preserveSourceID: true,
+                onPreparedWorkout: { revised in
+                    Task { await publishLifecycle(.updated, revision: revised) }
+                }
+            )
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Cancel this planned group workout?",
+                norwegian: "Avlyse den planlagte fellesøkten?"
+            ),
+            isPresented: $confirmingCancelWorkout,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel workout for everyone",
+                norwegian: "Avlys for alle"
+            ), role: .destructive) {
+                Task { await publishLifecycle(.cancelled, revision: nil) }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Keep workout", norwegian: "Behold økten"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Participants will be notified and their ATHLTH calendar copies removed.",
+                norwegian: "Deltakerne varsles, og ATHLTH-økten fjernes fra kalenderen deres."
+            ))
+        }
         .task(id: sourceWorkoutID) {
             await refresh()
             if workout.invitedPartnerID != nil &&
@@ -612,6 +662,138 @@ struct PlannedWorkoutLobbyView: View {
     /// A planned invitation is not an active recording. The shared
     /// ready lobby is created only when the organizer explicitly opens it.
     /// This reuses the app's server-authorized ready and 3-2-1 workflow.
+    private var organizerActions: some View {
+        ATHLTHTrainTogetherSurface {
+            HStack(spacing: 9) {
+                Button {
+                    showingWorkoutEditor = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Edit group workout", norwegian: "Endre fellesøkt"
+                        ),
+                        systemImage: "square.and.pencil"
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTrainTogetherDesign.accent)
+                .disabled(isPublishingLifecycle)
+
+                Button {
+                    confirmingCancelWorkout = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avlys"
+                        ),
+                        systemImage: "xmark.circle"
+                    )
+                    .frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(.red)
+                .disabled(isPublishingLifecycle)
+            }
+
+            if isPublishingLifecycle {
+                ProgressView(ATHLTHLocalization.choose(
+                    english: "Notifying participants…",
+                    norwegian: "Varsler deltakerne…"
+                ))
+                .font(.caption)
+            }
+            if let lifecycleError {
+                Label(lifecycleError, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
+        }
+    }
+
+    @MainActor
+    private func publishLifecycle(
+        _ kind: WorkoutInviteLifecycleUpdate.Kind,
+        revision: PlannedSession?
+    ) async {
+        guard isOrganizer, !isPublishingLifecycle,
+              let current = persistedWorkout else { return }
+        if kind == .updated {
+            guard let revision,
+                  revision.id == sourceWorkoutID,
+                  revision.scheduledStart != nil else {
+                lifecycleError = ATHLTHLocalization.choose(
+                    english: "A valid scheduled workout is required.",
+                    norwegian: "Økten må ha en gyldig planlagt starttid."
+                )
+                return
+            }
+        }
+        isPublishingLifecycle = true
+        defer { isPublishingLifecycle = false }
+        lifecycleError = nil
+        let change = WorkoutInviteLifecycleUpdate(
+            sourceWorkoutID: sourceWorkoutID,
+            organizerID: organizerID,
+            kind: kind,
+            updatedWorkout: kind == .updated ? revision : nil,
+            occurredAt: Date()
+        )
+        do {
+            let attachment = try MessageShareDraft(
+                kind: .workout,
+                title: current.title,
+                subtitle: kind == .cancelled
+                    ? ATHLTHLocalization.choose(
+                        english: "Workout cancelled", norwegian: "Økt avlyst"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Workout updated", norwegian: "Økt oppdatert"
+                    ),
+                snapshot: change,
+                sourceObjectID: sourceWorkoutID,
+                sourceOwnerID: organizerID,
+                shareVersion: 6
+            )
+            for invited in invitedAthletes {
+                let conversationID = try await messaging.openConversation(
+                    with: invited.id
+                )
+                let text = kind == .cancelled
+                    ? ATHLTHLocalization.choose(
+                        english: "Our planned workout has been cancelled.",
+                        norwegian: "Den planlagte fellesøkten er avlyst."
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Our planned workout was updated. Check the new details in ATHLTH.",
+                        norwegian: "Fellesøkten er oppdatert. Se de nye detaljene i ATHLTH."
+                    )
+                guard await messaging.send(
+                    to: invited.id,
+                    conversationID: conversationID,
+                    body: text,
+                    attachment: attachment
+                ) else {
+                    lifecycleError = messaging.errorMessage ??
+                        ATHLTHLocalization.choose(
+                            english: "Could not notify everyone. Try again.",
+                            norwegian: "Kunne ikke varsle alle. Prøv igjen."
+                        )
+                    return
+                }
+            }
+            if kind == .cancelled {
+                session.removeStandalonePlannedSession(current.id)
+            } else if let revision {
+                session.updateStandalonePlannedSession(revision)
+            }
+            showingWorkoutEditor = false
+            dismiss()
+        } catch {
+            lifecycleError = error.localizedDescription
+        }
+    }
+
     private var startOptionsCard: some View {
         ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 13) {
@@ -673,7 +855,9 @@ struct PlannedWorkoutLobbyView: View {
                     .foregroundStyle(ATHLTHTheme.mutedText)
                 }
 
-                if canLaunchWorkout {
+                if canLaunchWorkout &&
+                    !(isOrganizer && workout.trainTogetherMode == .physical &&
+                      inviteeForReadyLobby != nil) {
                     HStack(spacing: 9) {
                         Button {
                             startIndependently(using: .iPhone)
@@ -842,17 +1026,46 @@ struct PlannedWorkoutLobbyView: View {
                 if let minutes = workout.durationMinutes {
                     Label("\(minutes) min", systemImage: "clock")
                 }
-                if let meeting = workout.meetingPoint,
-                   workout.trainTogetherMode == .physical {
-                    Label(meeting.name, systemImage: "mappin.and.ellipse")
-                    if let url = URL(string:
-                        "https://maps.apple.com/?ll=\(meeting.latitude),\(meeting.longitude)") {
-                        Link(ATHLTHLocalization.choose(
-                            english: "Open meeting point in Maps",
-                            norwegian: "Åpne møtested i Kart"
-                        ), destination: url)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                if workout.trainTogetherMode == .physical {
+                    if let meeting = workout.meetingPoint {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label(meeting.name, systemImage: "mappin.and.ellipse")
+                                .font(.subheadline.weight(.semibold))
+                            if !meeting.address.isEmpty {
+                                Text(meeting.address)
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+                            }
+                            if let url = URL(string:
+                                "https://maps.apple.com/?ll=\(meeting.latitude),\(meeting.longitude)") {
+                                Link(destination: url) {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Directions in Maps",
+                                            norwegian: "Veibeskrivelse i Kart"
+                                        ),
+                                        systemImage: "arrow.triangle.turn.up.right.diamond"
+                                    )
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                                }
+                            }
+                        }
+                        .padding(12)
+                        .background(
+                            ATHLTHTrainTogetherDesign.accentSoft.opacity(0.45),
+                            in: RoundedRectangle(cornerRadius: 15)
+                        )
+                    } else {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Meeting point not yet specified",
+                                norwegian: "Møtested er ikke oppgitt ennå"
+                            ),
+                            systemImage: "mappin.slash"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
                     }
                 }
             }
