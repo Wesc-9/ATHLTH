@@ -33,6 +33,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         let clubChallenges: [CommunityGroupChallengeRecord]
         let clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord]
         let challenges: [ATHLTHChallenge]
+        let tournamentExercises: [ATHLTHTournamentCalendarItem]
         let currentUserID: UUID?
     }
 
@@ -217,6 +218,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         clubChallenges: [CommunityGroupChallengeRecord] = [],
         clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge] = [],
+        tournamentExercises: [ATHLTHTournamentCalendarItem] = [],
         currentUserID: UUID? = nil
     ) async {
         errorMessage = nil
@@ -245,6 +247,7 @@ final class AppleCalendarSyncStore: ObservableObject {
                 clubChallenges: clubChallenges,
                 clubChallengeParticipations: clubChallengeParticipations,
                 challenges: challenges,
+                tournamentExercises: tournamentExercises,
                 currentUserID: currentUserID
             )
         } catch {
@@ -382,6 +385,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         clubChallenges: [CommunityGroupChallengeRecord] = [],
         clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge] = [],
+        tournamentExercises: [ATHLTHTournamentCalendarItem] = [],
         currentUserID: UUID? = nil
     ) async {
         guard isEnabled else {
@@ -420,6 +424,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         clubChallenges: [CommunityGroupChallengeRecord] = [],
         clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge] = [],
+        tournamentExercises: [ATHLTHTournamentCalendarItem] = [],
         currentUserID: UUID? = nil
     ) async {
         let snapshot = CalendarSyncSnapshot(
