@@ -161,18 +161,20 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                     Image(systemName: runningLocationSymbol)
                         .accessibilityHidden(true)
                     Text(runningLocationText)
-                    if runningLocation == .treadmill {
-                        if let treadmillSpeedText {
-                            Text("·")
-                            Text(treadmillSpeedText)
-                        } else if ATHLTHPlannedWorkoutMetrics.hasVariablePace(
-                            for: blocks
-                        ) {
-                            Text("·")
-                            Text(ATHLTHLocalization.choose(
-                                english: "Variable speed", norwegian: "Varierende hastighet"
-                            ))
-                        }
+                    // Show both representations of the same pace target
+                    // for running outdoors, indoors and on treadmills.
+                    if let treadmillSpeedText {
+                        Text("·")
+                        Text(treadmillSpeedText)
+                        Text("·")
+                        Text(paceText + " min/km")
+                    } else if ATHLTHPlannedWorkoutMetrics.hasVariablePace(
+                        for: blocks
+                    ) {
+                        Text("·")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Variable pace", norwegian: "Varierende tempo"
+                        ))
                     } else if runningLocation == .outdoor && route != nil {
                         Text("·")
                         Text(ATHLTHLocalization.choose(
