@@ -4132,16 +4132,14 @@ struct WorkoutInviteLaunchSheet: View {
                     )
                     .font(.title3)
                     .foregroundStyle(
-                        ATHLTHTheme.accent
+                        ATHLTHTrainTogetherDesign.accent
                     )
                     .frame(
                         width: 48,
                         height: 48
                     )
                     .background(
-                        ATHLTHTheme
-                            .accent
-                            .opacity(0.10),
+                        ATHLTHTrainTogetherDesign.accentSoft,
                         in: Circle()
                     )
                 }
