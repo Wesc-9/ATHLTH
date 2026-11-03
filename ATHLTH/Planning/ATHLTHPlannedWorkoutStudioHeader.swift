@@ -36,6 +36,15 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
 
+    private var plannedDurationText: String {
+        if let seconds = ATHLTHWorkoutDurationEstimator.previewSeconds(
+            for: blocks, defaultActivity: activity == .walking ? .walking : .running
+        ) {
+            return "~ " + ATHLTHWorkoutDurationEstimator.conciseDuration(seconds)
+        }
+        return durationMinutes.map { "~ \($0) min" } ?? "–"
+    }
+
     private var distanceText: String {
         guard let kilometers = ATHLTHPlannedWorkoutMetrics.estimatedDistanceKilometers(
             for: blocks
@@ -96,7 +105,9 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     private var zoneText: String {
         let zones = blocks.compactMap(\.targetHeartRateZone)
         guard let lowest = zones.min(), let highest = zones.max() else { return "–" }
-        return lowest == highest ? "Z\(lowest)" : "Z\(lowest)–Z\(highest)"
+        let letter = ATHLTHLocalization.isNorwegian ? "S" : "Z"
+        return lowest == highest ? "\(letter)\(lowest)" :
+            "\(letter)\(lowest)–\(letter)\(highest)"
     }
 
     private var inclineText: String {
@@ -193,7 +204,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
             HStack(spacing: 0) {
                 metric("clock", ATHLTHLocalization.choose(
                     english: "Duration", norwegian: "Varighet"
-                ), durationMinutes.map { "~ \($0) min" } ?? "–")
+                ), plannedDurationText)
                 metric("point.topleft.down.to.point.bottomright.curvepath",
                        ATHLTHLocalization.choose(
                             english: "Distance", norwegian: "Distanse"
