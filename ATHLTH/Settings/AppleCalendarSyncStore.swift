@@ -410,6 +410,7 @@ final class AppleCalendarSyncStore: ObservableObject {
             clubChallenges: clubChallenges,
             clubChallengeParticipations: clubChallengeParticipations,
             challenges: challenges,
+            tournamentExercises: tournamentExercises,
             currentUserID: currentUserID
         )
     }
@@ -437,6 +438,7 @@ final class AppleCalendarSyncStore: ObservableObject {
             clubChallenges: clubChallenges,
             clubChallengeParticipations: clubChallengeParticipations,
             challenges: challenges,
+            tournamentExercises: tournamentExercises,
             currentUserID: currentUserID
         )
 
@@ -487,6 +489,8 @@ final class AppleCalendarSyncStore: ObservableObject {
                     pendingSnapshot.clubChallengeParticipations,
                 challenges:
                     pendingSnapshot.challenges,
+                tournamentExercises:
+                    pendingSnapshot.tournamentExercises,
                 currentUserID:
                     pendingSnapshot.currentUserID
             )
@@ -657,6 +661,31 @@ final class AppleCalendarSyncStore: ObservableObject {
             [String: EKEvent] = [:]
         var duplicateEvents:
             [EKEvent] = []
+
+        // Scheduled competition exercises belong to the same user-managed
+        // ATHLTH calendar. Stable marker keys update both opening and deadline
+        // entries without duplicates, while avoiding multi-day busy blocks.
+        if snapshot.currentUserID != nil {
+            let now = Date()
+            for item in snapshot.tournamentExercises where item.deadlineAt >= now {
+                if item.opensAt >= now.addingTimeInterval(-3_600) {
+                    let key = managedKey(type: "tournament-exercise", id: item.id)
+                    activeKeys.insert(key)
+                    let event = existingByKey[key] ?? EKEvent(eventStore: eventStore)
+                    configure(event, tournamentExercise: item,
+                              isDeadline: false, calendar: calendar)
+                    try eventStore.save(event, span: .thisEvent, commit: false)
+                    syncedWorkouts += 1
+                }
+                let cutoffKey = managedKey(type: "tournament-deadline", id: item.id)
+                activeKeys.insert(cutoffKey)
+                let cutoffEvent = existingByKey[cutoffKey] ??
+                    EKEvent(eventStore: eventStore)
+                configure(cutoffEvent, tournamentExercise: item,
+                          isDeadline: true, calendar: calendar)
+                try eventStore.save(cutoffEvent, span: .thisEvent, commit: false)
+            }
+        }
 
         for event in existingEvents {
             guard let key = managedKey(from: event)
@@ -928,6 +957,46 @@ final class AppleCalendarSyncStore: ObservableObject {
             tentative: tentativeEvents,
             total: activeKeys.count
         )
+    }
+
+    private func configure(
+        _ event: EKEvent,
+        tournamentExercise item: ATHLTHTournamentCalendarItem,
+        isDeadline: Bool,
+        calendar: EKCalendar
+    ) {
+        resetManagedEvent(event)
+        event.alarms = nil
+        event.calendar = calendar
+        if isDeadline {
+            event.title = "Frist · \(item.exerciseTitle)"
+            event.startDate = item.deadlineAt.addingTimeInterval(-900)
+            event.endDate = item.deadlineAt
+            event.availability = .free
+            event.addAlarm(EKAlarm(relativeOffset: -3_600))
+        } else {
+            event.title = "ATHLTH Arena · \(item.exerciseTitle)"
+            event.startDate = item.opensAt
+            event.endDate = min(
+                item.deadlineAt, item.opensAt.addingTimeInterval(3_600)
+            )
+            event.availability = .busy
+        }
+        event.isAllDay = false
+        event.notes = [
+            "ATHLTH · Arena",
+            "Turnering: \(item.tournamentTitle)",
+            "Øvelse \(item.exerciseNumber)",
+            "Åpner: \(item.opensAt.formatted(date: .abbreviated, time: .shortened))",
+            "Siste frist: \(item.deadlineAt.formatted(date: .abbreviated, time: .shortened))",
+            "Åpne ATHLTH → Arena for å registrere gjennomføring.",
+            "",
+            "Synced from ATHLTH",
+            managedMarker(
+                type: isDeadline ? "tournament-deadline" : "tournament-exercise",
+                id: item.id
+            )
+        ].joined(separator: "\n")
     }
 
     private func configure(
