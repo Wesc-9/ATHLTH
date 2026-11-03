@@ -142,6 +142,7 @@ struct ATHLTHInsightsView: View {
         Group {
             readinessOverviewCard
             ATHLTHInsightsDailyRhythmCard()
+            ATHLTHInsightsMuscleCard(summary: muscleSummary)
             ATHLTHInsightsSleepStagesCard()
             personalInsightsHighlights
             ATHLTHInsightsHealthLibraryEntry()
@@ -149,12 +150,9 @@ struct ATHLTHInsightsView: View {
     }
     private var trainingSection: some View {
         Group {
-            ATHLTHInsightsTrainingSignalsCard()
-            ATHLTHInsightsMuscleCard(summary: muscleSummary)
-            trainingRhythmCard
-            ATHLTHInsightsReferenceDistributionCard(
-                load: recoverySnapshot.trainingLoad,
-                sessionCount: trainingDays.reduce(0) { $0 + $1.sessions }
+            ATHLTHInsightsTrainingSignalsCard(
+                trainingLoad: recoverySnapshot.trainingLoad,
+                trainingDays: trainingDays
             )
         }
     }
