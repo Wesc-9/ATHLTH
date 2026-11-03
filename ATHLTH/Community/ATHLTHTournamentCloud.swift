@@ -1,0 +1,271 @@
+import Foundation
+import Supabase
+
+/// Server-owned competitions, separate from the legacy private draft store.
+/// A fixture has no winner until the opponent independently approves it.
+struct ATHLTHTournamentRemote: Decodable, Identifiable {
+    let id: UUID
+    let ownerID: UUID
+    let clubID: UUID?
+    let seasonID: UUID?
+    let title: String
+    let format: ATHLTHTournamentFormat
+    let groupSize: Int
+    let qualifiersPerGroup: Int
+    let winPoints: Int
+    let drawPoints: Int
+    let status: String
+    let createdAt: Date
+    let startedAt: Date?
+    let completedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, format, status
+        case ownerID = "owner_id"
+        case clubID = "club_id"
+        case seasonID = "season_id"
+        case groupSize = "group_size"
+        case qualifiersPerGroup = "qualifiers_per_group"
+        case winPoints = "win_points"
+        case drawPoints = "draw_points"
+        case createdAt = "created_at"
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
+    }
+}
+
+struct ATHLTHTournamentRemoteEntry: Decodable, Identifiable {
+    let tournamentID: UUID
+    let userID: UUID
+    let seed: Int
+    let response: String
+    let respondedAt: Date?
+    let groupIndex: Int?
+    var id: UUID { userID }
+
+    enum CodingKeys: String, CodingKey {
+        case seed, response
+        case tournamentID = "tournament_id"
+        case userID = "user_id"
+        case respondedAt = "responded_at"
+        case groupIndex = "group_index"
+    }
+}
+
+struct ATHLTHTournamentRemoteMatch: Decodable, Identifiable {
+    let id: UUID
+    let tournamentID: UUID
+    let phase: ATHLTHTournamentPhase
+    let roundNumber: Int
+    let groupIndex: Int?
+    let slotIndex: Int
+    let homeID: UUID
+    let awayID: UUID?
+    let homeScore: Double?
+    let awayScore: Double?
+    let status: String
+    let proposedBy: UUID?
+    let confirmedBy: UUID?
+    let confirmedAt: Date?
+    let evidenceNote: String
+
+    enum CodingKeys: String, CodingKey {
+        case id, phase, status
+        case tournamentID = "tournament_id"
+        case roundNumber = "round_number"
+        case groupIndex = "group_index"
+        case slotIndex = "slot_index"
+        case homeID = "home_id"
+        case awayID = "away_id"
+        case homeScore = "home_score"
+        case awayScore = "away_score"
+        case proposedBy = "proposed_by"
+        case confirmedBy = "confirmed_by"
+        case confirmedAt = "confirmed_at"
+        case evidenceNote = "evidence_note"
+    }
+
+    var isVerified: Bool { status == "confirmed" }
+    var isWarmup: Bool { phase == .warmup }
+    var isBye: Bool { awayID == nil }
+    var winnerID: UUID? {
+        guard isVerified else { return nil }
+        guard let awayID else { return homeID }
+        guard let homeScore, let awayScore, homeScore != awayScore else {
+            return nil
+        }
+        return homeScore > awayScore ? homeID : awayID
+    }
+}
+
+private struct ATHLTHTournamentCreateParams: Encodable {
+    let p_title: String
+    let p_format: String
+    let p_club: UUID?
+    let p_season: UUID?
+    let p_group_size: Int
+    let p_qualifiers: Int
+    let p_invitees: [UUID]
+    let p_warmup_titles: [String]
+}
+
+private struct ATHLTHTournamentIDParams: Encodable {
+    let p_tournament: UUID
+}
+
+private struct ATHLTHTournamentRespondParams: Encodable {
+    let p_tournament: UUID
+    let p_accept: Bool
+}
+
+private struct ATHLTHTournamentProposalParams: Encodable {
+    let p_match: UUID
+    let p_home_score: Double
+    let p_away_score: Double
+    let p_evidence: String
+}
+
+private struct ATHLTHTournamentConfirmParams: Encodable {
+    let p_match: UUID
+    let p_confirm: Bool
+}
+
+private struct ATHLTHTournamentInvitationID: Decodable {
+    let tournamentID: UUID
+    enum CodingKeys: String, CodingKey {
+        case tournamentID = "tournament_id"
+    }
+}
+
+struct ATHLTHTournamentCloudService {
+    private let client = SupabaseEnvironment.client
+
+    func create(from draft: ATHLTHTournamentDraft) async throws -> UUID {
+        guard draft.participants.count >= 2 else {
+            throw ATHLTHTournamentEngineError.tooFewParticipants
+        }
+        try ATHLTHTournamentEngine.validate(
+            draft.participants,
+            groupSize: draft.groupSize,
+            qualifiersPerGroup: draft.qualifiersPerGroup
+        )
+        let targets = draft.participants.filter { $0.id != draft.ownerID }
+        return try await client.rpc(
+            "athlth_tournament_create",
+            params: ATHLTHTournamentCreateParams(
+                p_title: draft.title,
+                p_format: draft.format.rawValue,
+                p_club: draft.clubID,
+                p_season: draft.seasonID,
+                p_group_size: draft.groupSize,
+                p_qualifiers: draft.qualifiersPerGroup,
+                p_invitees: targets.map(\.id),
+                p_warmup_titles: draft.warmupRounds.map(\.title)
+            )
+        ).execute().value
+    }
+
+    func visibleTournaments() async throws -> [ATHLTHTournamentRemote] {
+        var list: [ATHLTHTournamentRemote] = []
+        let pageSize = 200
+        var offset = 0
+        repeat {
+            let page: [ATHLTHTournamentRemote] = try await client
+                .from("athlth_tournaments")
+                .select()
+                .order("created_at", ascending: false)
+                .range(from: offset, to: offset + pageSize - 1)
+                .execute().value
+            list += page
+            if page.count < pageSize { break }
+            offset += pageSize
+        } while offset < 5_000
+        return list
+    }
+
+    func pendingInvitationIDs(userID: UUID) async throws -> Set<UUID> {
+        let pending: [ATHLTHTournamentInvitationID] = try await client
+            .from("athlth_tournament_entries")
+            .select("tournament_id")
+            .eq("user_id", value: userID)
+            .eq("response", value: "invited")
+            .limit(500)
+            .execute().value
+        return Set(pending.map(\.tournamentID))
+    }
+
+    func entries(for tournamentID: UUID) async throws
+        -> [ATHLTHTournamentRemoteEntry] {
+        return try await client.from("athlth_tournament_entries")
+            .select()
+            .eq("tournament_id", value: tournamentID)
+            .order("seed")
+            .limit(128)
+            .execute().value
+    }
+
+    func matches(for tournamentID: UUID) async throws
+        -> [ATHLTHTournamentRemoteMatch] {
+        var list: [ATHLTHTournamentRemoteMatch] = []
+        let pageSize = 500
+        var offset = 0
+        repeat {
+            let page: [ATHLTHTournamentRemoteMatch] = try await client
+                .from("athlth_tournament_matches")
+                .select()
+                .eq("tournament_id", value: tournamentID)
+                .order("round_number")
+                .order("slot_index")
+                .range(from: offset, to: offset + pageSize - 1)
+                .execute().value
+            list += page
+            if page.count < pageSize { break }
+            offset += pageSize
+        } while offset < 10_000
+        return list
+    }
+
+    func respond(tournamentID: UUID, accept: Bool) async throws {
+        try await client.rpc(
+            "athlth_tournament_respond",
+            params: ATHLTHTournamentRespondParams(
+                p_tournament: tournamentID, p_accept: accept
+            )
+        ).execute()
+    }
+
+    func start(tournamentID: UUID) async throws {
+        try await client.rpc(
+            "athlth_tournament_start",
+            params: ATHLTHTournamentIDParams(p_tournament: tournamentID)
+        ).execute()
+    }
+
+    func propose(
+        matchID: UUID, homeScore: Double, awayScore: Double,
+        evidence: String
+    ) async throws {
+        guard homeScore.isFinite, awayScore.isFinite,
+              homeScore >= 0, awayScore >= 0 else {
+            throw ATHLTHTournamentEngineError.invalidApprovers
+        }
+        try await client.rpc(
+            "athlth_tournament_propose_result",
+            params: ATHLTHTournamentProposalParams(
+                p_match: matchID,
+                p_home_score: homeScore,
+                p_away_score: awayScore,
+                p_evidence: String(evidence.prefix(400))
+            )
+        ).execute()
+    }
+
+    func confirm(matchID: UUID, approved: Bool) async throws {
+        try await client.rpc(
+            "athlth_tournament_confirm_result",
+            params: ATHLTHTournamentConfirmParams(
+                p_match: matchID, p_confirm: approved
+            )
+        ).execute()
+    }
+}
