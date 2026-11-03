@@ -396,7 +396,16 @@ struct ATHLTHArenaV3HomeView: View {
                         }
                         ForEach(tournaments) { draft in
                             NavigationLink {
-                                ATHLTHTournamentDraftDetailView(draft: draft)
+                                ATHLTHTournamentDraftDetailView(
+                                    draft: draft,
+                                    onPublished: { _ in
+                                        tournaments.removeAll { $0.id == draft.id }
+                                        ATHLTHTournamentDraftStore.save(
+                                            tournaments, owner: session.profile.userID
+                                        )
+                                        Task { await reload() }
+                                    }
+                                )
                             } label: {
                                 competitionRow(
                                     title: draft.title,
@@ -644,6 +653,7 @@ struct ATHLTHArenaClubTournamentSection: View {
 
     @State private var drafts: [ATHLTHTournamentDraft] = []
     @State private var remote: [ATHLTHArenaRemoteSeries] = []
+    @State private var officialTournaments: [ATHLTHTournamentRemote] = []
     @State private var seasons: [ATHLTHArenaClubSeason] = []
     @State private var manageableClubs: [ATHLTHArenaClubChoice] = []
     @State private var showingCreate = false
@@ -651,6 +661,7 @@ struct ATHLTHArenaClubTournamentSection: View {
     @State private var loadError: String?
 
     private let cloud = ATHLTHArenaCloudService()
+    private let tournamentCloud = ATHLTHTournamentCloudService()
     private let directory = ATHLTHArenaClubDirectory()
 
     private var canManage: Bool {
@@ -747,17 +758,33 @@ struct ATHLTHArenaClubTournamentSection: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHArenaV3Style.ink)
                 Spacer()
-                Text("\(drafts.count + remote.count)")
+                Text("\(drafts.count + remote.count + officialTournaments.count)")
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
-            if drafts.isEmpty && remote.isEmpty {
+            if drafts.isEmpty && remote.isEmpty && officialTournaments.isEmpty {
                 Text("Når klubben oppretter en liga eller cup, vises den her og i deltakernes Arena.")
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
 
+            ForEach(officialTournaments.sorted {
+                $0.createdAt > $1.createdAt
+            }) { tournament in
+                NavigationLink {
+                    ATHLTHTournamentLiveDetailView(tournament: tournament)
+                } label: {
+                    competitionRow(
+                        title: tournament.title,
+                        info: tournament.format.title + " · " +
+                            (tournament.status == "completed" ? "Fullført" :
+                             tournament.status == "active" ? "Pågår" : "Invitasjoner"),
+                        symbol: tournament.format.symbol
+                    )
+                }
+                .buttonStyle(.plain)
+            }
             ForEach(remote) { series in
                 NavigationLink {
                     ATHLTHArenaOnlineDetailView(series: series)
@@ -772,7 +799,19 @@ struct ATHLTHArenaClubTournamentSection: View {
             }
             ForEach(drafts) { draft in
                 NavigationLink {
-                    ATHLTHTournamentDraftDetailView(draft: draft)
+                    ATHLTHTournamentDraftDetailView(
+                        draft: draft,
+                        onPublished: { _ in
+                            var all = ATHLTHTournamentDraftStore.load(
+                                session.profile.userID
+                            )
+                            all.removeAll { $0.id == draft.id }
+                            ATHLTHTournamentDraftStore.save(
+                                all, owner: session.profile.userID
+                            )
+                            Task { await reload() }
+                        }
+                    )
                 } label: {
                     let season = seasons.first { $0.id == draft.seasonID }
                     competitionRow(
@@ -791,7 +830,10 @@ struct ATHLTHArenaClubTournamentSection: View {
             if phase == .active { Task { await reload() } }
         }
         .sheet(isPresented: $showingCreate) {
-            ATHLTHTournamentCreator(preset: .league, fixedClubID: clubID) { draft in
+            ATHLTHTournamentCreator(
+                preset: .league, fixedClubID: clubID,
+                onPublished: { _ in Task { await reload() } }
+            ) { draft in
                 var all = ATHLTHTournamentDraftStore.load(session.profile.userID)
                 all.removeAll { $0.id == draft.id }
                 all.insert(draft, at: 0)
@@ -842,12 +884,15 @@ struct ATHLTHArenaClubTournamentSection: View {
             async let eligibleClubs = directory.manageableClubs()
             async let seasonRecords = cloud.loadClubSeasons()
             async let competitions = cloud.loadSeries()
+            async let tournaments = tournamentCloud.visibleTournaments()
             let allowed = try await eligibleClubs
             let allSeasons = try await seasonRecords
             let allSeries = try await competitions
+            let allTournaments = try await tournaments
             manageableClubs = allowed
             seasons = allSeasons.filter { $0.clubID == clubID }
             remote = allSeries.filter { $0.clubID == clubID }
+            officialTournaments = allTournaments.filter { $0.clubID == clubID }
             loadError = nil
         } catch {
             loadError = "Kunne ikke laste alle klubbens sesonger og konkurranser."
