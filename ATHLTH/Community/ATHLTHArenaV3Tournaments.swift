@@ -336,23 +336,33 @@ struct ATHLTHTournamentCreator: View {
                 .buttonStyle(.plain)
             }
 
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Antall øvelser")
-                        .font(.subheadline.weight(.medium))
-                    Text("Velg mellom 1 og 12")
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            if exerciseMode == .open {
+                Label("Alle øvelsene deltakerne legger til blir med – det er ingen fast grense på fire.",
+                      systemImage: "person.3.sequence")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    .padding(14)
+                    .frame(maxWidth: .infinity,alignment: .leading)
+                    .background(ATHLTHArenaV3Style.panel())
+            } else {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Antall øvelser")
+                            .font(.subheadline.weight(.medium))
+                        Text("Velg mellom 1 og 12")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                    Spacer()
+                    Stepper(value: $exerciseCount, in: 1...12) {
+                        Text("\(exerciseCount)")
+                            .font(.headline.monospacedDigit())
+                    }
+                    .fixedSize()
                 }
-                Spacer()
-                Stepper(value: $exerciseCount, in: 1...12) {
-                    Text("\(exerciseCount)")
-                        .font(.headline.monospacedDigit())
-                }
-                .fixedSize()
+                .padding(14)
+                .background(ATHLTHArenaV3Style.panel())
             }
-            .padding(14)
-            .background(ATHLTHArenaV3Style.panel())
 
             if exerciseMode == .vote {
                 VStack(spacing: 12) {
