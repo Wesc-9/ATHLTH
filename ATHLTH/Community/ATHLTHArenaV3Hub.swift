@@ -121,7 +121,7 @@ private enum ATHLTHArenaV3Filter: String, CaseIterable, Identifiable {
     }
 }
 
-private enum ATHLTHArenaV3Style {
+enum ATHLTHArenaV3Style {
     static let ink = Color(red: 0.075, green: 0.080, blue: 0.10)
     static let secondary = Color(red: 0.46, green: 0.46, blue: 0.49)
     static let gold = Color(red: 0.49, green: 0.35, blue: 0.20)
