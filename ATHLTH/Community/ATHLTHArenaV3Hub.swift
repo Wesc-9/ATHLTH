@@ -91,6 +91,34 @@ enum ATHLTHTournamentCadence {
     }
 }
 
+enum ATHLTHTournamentRotationMode: String, Codable, CaseIterable, Identifiable {
+    case all, sequence, shuffle
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .all: return "Samme øvelser hver runde"
+        case .sequence: return "Én ny øvelse per runde"
+        case .shuffle: return "Tilfeldig uten gjentakelser"
+        }
+    }
+    var detail: String {
+        switch self {
+        case .all: return "Alle godkjente øvelser inngår i hver runde."
+        case .sequence: return "Neste øvelse følger den fastsatte listen."
+        case .shuffle: return "Trekningen lagres. En øvelse gjentas først når alle har vært brukt."
+        }
+    }
+}
+
+enum ATHLTHTournamentProofMode: String, Codable, CaseIterable, Identifiable {
+    case opponent, verified
+    var id: String { rawValue }
+    var title: String {
+        self == .opponent ? "Motstanderen godkjenner" :
+          "Verifisert treningsøkt"
+    }
+}
+
 enum ATHLTHTournamentExerciseMode: String, Codable, CaseIterable, Identifiable {
     case owner, open, vote
     var id: String { rawValue }
@@ -150,6 +178,13 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
     var rulesAuthority: ATHLTHTournamentRulesAuthority
     var cadenceDays: Int
     var completionHours: Int
+    var rotationMode: ATHLTHTournamentRotationMode
+    var restWeekdays: [Int]
+    var proofMode: ATHLTHTournamentProofMode
+    var publicResults: Bool
+    var allowExtensions: Bool
+    var winPoints: Int
+    var drawPoints: Int
     var createdAt: Date
 
     init(
@@ -172,6 +207,13 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         rulesAuthority: ATHLTHTournamentRulesAuthority = .owner,
         cadenceDays: Int = 7,
         completionHours: Int = 48,
+        rotationMode: ATHLTHTournamentRotationMode = .all,
+        restWeekdays: [Int] = [],
+        proofMode: ATHLTHTournamentProofMode = .opponent,
+        publicResults: Bool = false,
+        allowExtensions: Bool = true,
+        winPoints: Int = 3,
+        drawPoints: Int = 1,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -195,6 +237,15 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         self.rulesAuthority = rulesAuthority
         self.cadenceDays = cadenceDays
         self.completionHours = completionHours
+        self.rotationMode = rotationMode
+        self.restWeekdays = Array(Set(restWeekdays.filter {
+            (1...7).contains($0)
+        })).sorted()
+        self.proofMode = proofMode
+        self.publicResults = publicResults
+        self.allowExtensions = allowExtensions
+        self.winPoints = winPoints
+        self.drawPoints = drawPoints
         self.createdAt = createdAt
     }
 
@@ -203,7 +254,9 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         case qualifiersPerGroup, participants, warmupRounds, createdAt
         case exerciseMode, exerciseCount, proposalsCloseAt, votesCloseAt,
              approvePlayerChanges, allowedActivities, rulesAuthority,
-             cadenceDays, completionHours
+             cadenceDays, completionHours, rotationMode,
+             restWeekdays, proofMode, publicResults, allowExtensions,
+             winPoints, drawPoints
     }
 
     init(from decoder: Decoder) throws {
@@ -243,6 +296,22 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         cadenceDays = try values.decodeIfPresent(Int.self, forKey: .cadenceDays) ?? 7
         completionHours = try values.decodeIfPresent(Int.self,
             forKey: .completionHours) ?? 48
+        rotationMode = try values.decodeIfPresent(
+            ATHLTHTournamentRotationMode.self,forKey: .rotationMode
+        ) ?? .all
+        restWeekdays = try values.decodeIfPresent([Int].self,
+            forKey: .restWeekdays) ?? []
+        proofMode = try values.decodeIfPresent(
+            ATHLTHTournamentProofMode.self,forKey: .proofMode
+        ) ?? .opponent
+        publicResults = try values.decodeIfPresent(Bool.self,
+            forKey: .publicResults) ?? false
+        allowExtensions = try values.decodeIfPresent(Bool.self,
+            forKey: .allowExtensions) ?? true
+        winPoints = try values.decodeIfPresent(Int.self,
+            forKey: .winPoints) ?? 3
+        drawPoints = try values.decodeIfPresent(Int.self,
+            forKey: .drawPoints) ?? 1
         createdAt = try values.decode(Date.self, forKey: .createdAt)
     }
 
@@ -267,6 +336,13 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         try values.encode(rulesAuthority, forKey: .rulesAuthority)
         try values.encode(cadenceDays, forKey: .cadenceDays)
         try values.encode(completionHours, forKey: .completionHours)
+        try values.encode(rotationMode, forKey: .rotationMode)
+        try values.encode(restWeekdays, forKey: .restWeekdays)
+        try values.encode(proofMode, forKey: .proofMode)
+        try values.encode(publicResults, forKey: .publicResults)
+        try values.encode(allowExtensions, forKey: .allowExtensions)
+        try values.encode(winPoints, forKey: .winPoints)
+        try values.encode(drawPoints, forKey: .drawPoints)
         try values.encode(createdAt, forKey: .createdAt)
     }
 }
