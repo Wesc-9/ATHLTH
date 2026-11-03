@@ -1397,6 +1397,55 @@ final class SocialStore: ObservableObject {
         }
     }
 
+    /// Undo Ready without leaving or declining the invitation.
+    /// The backend rejects requests once a shared countdown is scheduled.
+    @discardableResult
+    func unmarkCurrentUserReady(sessionID: UUID) async -> Bool {
+        errorMessage = nil
+
+        do {
+            try await refreshWorkoutLobby(sessionID: sessionID)
+
+            guard let currentUserID,
+                  let workout = workoutSessions.first(where: { $0.id == sessionID }),
+                  workout.status == .active,
+                  workout.resolvedWorkoutPhase == .planned,
+                  workout.coordinatedStartAt == nil,
+                  workout.invitePayload?.startIndependently != true,
+                  let participant = workoutParticipants.first(where: {
+                      $0.sessionID == sessionID && $0.userID == currentUserID
+                  }),
+                  (participant.state == .creator || participant.state == .accepted),
+                  participant.workoutStartedAt == nil
+            else {
+                errorMessage = ATHLTHLocalization.choose(
+                    english: "Ready can only be undone before the shared start.",
+                    norwegian: "Du kan bare angre Klar før fellesstarten."
+                )
+                return false
+            }
+
+            if participant.isReady {
+                try await service.unsetWorkoutReady(sessionID: sessionID)
+            }
+
+            if workout.creatorID == currentUserID {
+                creatorCaptureDevices.removeValue(forKey: sessionID)
+                if creatorIndependentStartRequestedID == sessionID {
+                    creatorIndependentStartRequestedID = nil
+                }
+            }
+            participantIndependentStartRequestedIDs.remove(sessionID)
+
+            try await refreshWorkoutLobby(sessionID: sessionID)
+            return true
+        } catch {
+            errorMessage = error.localizedDescription
+            try? await refreshWorkoutLobby(sessionID: sessionID)
+            return false
+        }
+    }
+
     /// Share only an opt-in arrival label; never access precise location.
     @discardableResult
     func setCurrentWorkoutArrival(
