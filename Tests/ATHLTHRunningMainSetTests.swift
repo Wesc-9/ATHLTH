@@ -19,7 +19,10 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
     func testRunningIntervalPresetsCreateEveryEditableEffortAndPause() {
         let presets: [(ATHLTHRunningExercisePreset, Int)] = [
             (.strides, 6), (.hills, 8), (.fourByFour, 4),
-            (.shortIntervals, 10), (.fartlek, 10)
+            (.thirtyThirty, 20), (.fortyFiveFifteen, 15),
+            (.fiveByThree, 5), (.sixByFourHundred, 6),
+            (.fiveByOneKilometer, 5), (.shortIntervals, 10),
+            (.fartlek, 10)
         ]
         for (preset, rounds) in presets {
             let blocks = preset.blocks(in: .main)
@@ -42,6 +45,64 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
             $0 + ($1.durationSeconds ?? 0)
         }, 28 * 60, accuracy: 0.01)
         XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: fourByFour), 30)
+    }
+
+    @MainActor
+    func testNormalRunningAndTreadmillUseTheCorrectActivityEnvironment() throws {
+        let normal = try XCTUnwrap(
+            ATHLTHRunningExercisePreset.running.blocks(in: .main).first
+        )
+        XCTAssertEqual(normal.kind, .run)
+        XCTAssertEqual(normal.cardioActivity, .running)
+        XCTAssertEqual(normal.durationSeconds, 1_200)
+        XCTAssertNotEqual(normal.isIndoor, true)
+        XCTAssertNil(normal.treadmillInclinePercent)
+
+        let treadmill = try XCTUnwrap(
+            ATHLTHRunningExercisePreset.treadmill.blocks(in: .main).first
+        )
+        XCTAssertEqual(treadmill.kind, .run)
+        XCTAssertEqual(treadmill.cardioActivity, .running)
+        XCTAssertEqual(treadmill.durationSeconds, 1_200)
+        XCTAssertEqual(treadmill.isIndoor, true)
+        XCTAssertEqual(treadmill.treadmillInclinePercent, 0)
+        XCTAssertEqual(treadmill.targetPaceSecondsPerKilometer, 360)
+        XCTAssertEqual(treadmill.resolvedPhase, .main)
+    }
+
+    @MainActor
+    func testThirtyThirtyAndOtherIntervalsKeepExactEffortsAndRecoveries() {
+        let thirty = ATHLTHRunningExercisePreset.thirtyThirty.blocks(in: .main)
+        XCTAssertEqual(thirty.count, 40)
+        XCTAssertEqual(thirty.filter { $0.kind == .run }.count, 20)
+        XCTAssertEqual(thirty.filter { $0.kind == .rest }.count, 20)
+        XCTAssertTrue(thirty.allSatisfy { $0.durationSeconds == 30 })
+        XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: thirty), 20)
+
+        let fortyFive = ATHLTHRunningExercisePreset.fortyFiveFifteen.blocks(in: .main)
+        XCTAssertEqual(fortyFive.count, 30)
+        XCTAssertEqual(fortyFive.filter { $0.kind == .run }.map(\.durationSeconds),
+                       Array(repeating: 45.0, count: 15))
+        XCTAssertEqual(fortyFive.filter { $0.kind == .rest }.map(\.durationSeconds),
+                       Array(repeating: 15.0, count: 15))
+        XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: fortyFive), 15)
+
+        let sixByFourHundred = ATHLTHRunningExercisePreset.sixByFourHundred
+            .blocks(in: .main)
+        XCTAssertEqual(sixByFourHundred.count, 12)
+        XCTAssertTrue(sixByFourHundred.filter { $0.kind == .run }.allSatisfy {
+            $0.distanceMeters == 400 && $0.durationSeconds == nil
+        })
+        XCTAssertTrue(sixByFourHundred.filter { $0.kind == .rest }.allSatisfy {
+            $0.durationSeconds == 90 && $0.distanceMeters == nil
+        })
+
+        let fiveByOneK = ATHLTHRunningExercisePreset.fiveByOneKilometer
+            .blocks(in: .main)
+        XCTAssertEqual(fiveByOneK.count, 10)
+        XCTAssertTrue(fiveByOneK.filter { $0.kind == .run }.allSatisfy {
+            $0.distanceMeters == 1_000 && $0.durationSeconds == nil
+        })
     }
 
     @MainActor
