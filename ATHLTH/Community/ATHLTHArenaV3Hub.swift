@@ -67,7 +67,8 @@ enum ATHLTHTournamentRulesAuthority: String, Codable, CaseIterable, Identifiable
 }
 
 enum ATHLTHTournamentCadence {
-    static let options = [1,2,3,7,14,28]
+    // Any interval from daily to every fourth week, not only presets.
+    static let options = Array(1...28)
     static func title(for days: Int) -> String {
         switch days {
         case 1: return "Hver dag"
@@ -78,7 +79,9 @@ enum ATHLTHTournamentCadence {
         default: return "Hver \(days). dag"
         }
     }
-    static let completionHours = [6,12,24,48,72,168,336]
+    static let completionHours = [
+        6, 12, 18, 24, 36, 48, 72, 96, 120, 168, 240, 336, 672
+    ]
     static func window(_ hours: Int) -> String {
         if hours >= 24 && hours.isMultiple(of: 24) {
             let days = hours / 24
