@@ -44,7 +44,7 @@ struct ATHLTHTournamentMyExercisesView: View {
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
                 }
             }
-            Text("Gjennomfør hver øvelse innen fristen. Hvis motstanderen har registrert gjennomføring og du ikke har det, blir det walkover når fristen går ut.")
+            Text("Hver øvelse må gjennomføres innen fristen. Dokumentasjonen kontrolleres før eventuell walkover, og uavklarte registreringer må behandles.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 .fixedSize(horizontal: false,vertical: true)
@@ -79,8 +79,16 @@ struct ATHLTHTournamentMyExercisesView: View {
                     }
                     ForEach(exercises) { slot in
                         let candidate = candidates.first { $0.id == slot.candidateID }
-                        let recorded = completions.contains {
+                        let ownCompletion = completions.first {
                             $0.matchExerciseID == slot.id && $0.userID == userID
+                        }
+                        let recorded = ownCompletion != nil
+                        let opponentID = match.homeID == userID
+                            ? match.awayID : match.homeID
+                        let unreviewedOpponent = completions.first {
+                            $0.matchExerciseID == slot.id &&
+                            $0.userID == opponentID &&
+                            $0.reviewStatus == "submitted"
                         }
                         HStack(alignment: .center,spacing: 10) {
                             Image(systemName: recorded
@@ -110,7 +118,10 @@ struct ATHLTHTournamentMyExercisesView: View {
                             }
                             Spacer(minLength: 4)
                             if recorded {
-                                Text("Utført")
+                                Text(ownCompletion?.reviewStatus == "approved"
+                                     ? "Godkjent" :
+                                     ownCompletion?.reviewStatus == "disputed"
+                                     ? "Bestridt" : "Til godkjenning")
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(ATHLTHArenaV3Style.gold)
                             } else if match.status != "confirmed" &&
@@ -123,6 +134,31 @@ struct ATHLTHTournamentMyExercisesView: View {
                             }
                         }
                         .padding(.vertical,8)
+                        if let opponent = unreviewedOpponent,
+                           slot.state == "pending" {
+                            VStack(alignment: .leading,spacing: 7) {
+                                Text("Motstanderen har registrert øvelsen.")
+                                    .font(.caption)
+                                HStack(spacing: 15) {
+                                    Button("Godkjenn") {
+                                        Task { await review(slot: slot,
+                                            athleteID: opponent.userID,
+                                            approved: true) }
+                                    }
+                                    Button("Bestrid") {
+                                        Task { await review(slot: slot,
+                                            athleteID: opponent.userID,
+                                            approved: false) }
+                                    }
+                                }
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                            }
+                            .padding(10)
+                            .frame(maxWidth: .infinity,alignment: .leading)
+                            .background(ATHLTHArenaV3Style.cream,
+                                in: RoundedRectangle(cornerRadius: 11))
+                        }
                         Divider().opacity(0.45)
                     }
                 }
@@ -143,6 +179,21 @@ struct ATHLTHTournamentMyExercisesView: View {
                 )
                 await reload()
             }
+        }
+    }
+
+    @MainActor
+    private func review(
+        slot: ATHLTHTournamentMatchExerciseRemote,
+        athleteID: UUID, approved: Bool
+    ) async {
+        do {
+            try await cloud.reviewExercise(
+                slotID: slot.id,athleteID: athleteID,approve: approved
+            )
+            await reload()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
