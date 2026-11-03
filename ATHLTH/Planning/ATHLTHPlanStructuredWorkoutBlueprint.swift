@@ -32,7 +32,8 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
 
     var category: String {
         let hasRun = blocks.contains {
-            $0.kind == .run && $0.cardioActivity != .walking
+            $0.kind == .run && $0.cardioActivity != .walking &&
+                    !$0.isActiveRecovery
         }
         let hasWalking = blocks.contains {
             $0.kind == .run && $0.cardioActivity == .walking
@@ -91,7 +92,7 @@ struct ATHLTHPlanStructuredWorkoutBlueprint: Codable, Hashable {
         workout.kind = kind
         workout.durationMinutes = min(max(durationMinutes, 5), 240)
         workout.routeID = blocks.contains(where: {
-            $0.kind == .run && $0.isIndoor != true
+            $0.kind == .run && !$0.isActiveRecovery && $0.isIndoor != true
         }) ? routeID : nil
         workout.exercises = []
         workout.workoutBlocks = blocks
