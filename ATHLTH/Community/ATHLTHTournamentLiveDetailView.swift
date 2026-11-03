@@ -556,6 +556,35 @@ struct ATHLTHTournamentLiveDetailView: View {
                 }
             }
             .foregroundStyle(ATHLTHArenaV3Style.ink)
+
+            if let deadline = match.deadlineAt, !match.isBye {
+                let overdue = deadline < Date() && match.status != "confirmed"
+                HStack(spacing: 6) {
+                    Image(systemName: overdue ? "clock.badge.exclamationmark" : "calendar")
+                    Text((overdue ? "Frist passert · " : "Frist · ") +
+                         deadline.formatted(date: .abbreviated, time: .omitted))
+                }
+                .font(.caption)
+                .foregroundStyle(overdue ? .orange : ATHLTHArenaV3Style.secondary)
+                if overdue {
+                    Text("Resultatet må fortsatt avklares – ingen blir automatisk slått ut.")
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                if isOwner && current.status == "active" &&
+                   match.awayID != nil && match.status != "confirmed" &&
+                   deadline < Date().addingTimeInterval(22 * 86_400) {
+                    Button {
+                        Task { await extendDeadline(for: match) }
+                    } label: {
+                        Label("Forleng frist", systemImage: "calendar.badge.plus")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    }
+                    .disabled(busy)
+                }
+            }
+
             if current.status == "active", match.awayID != nil,
                match.homeID == userID || match.awayID == userID {
                 if (match.status == "scheduled" || match.status == "disputed") {
@@ -670,6 +699,25 @@ struct ATHLTHTournamentLiveDetailView: View {
             try await cloud.cancelUnstarted(tournamentID: current.id)
             await reload()
         } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor private func extendDeadline(
+        for match: ATHLTHTournamentRemoteMatch
+    ) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            let baseline = max(match.deadlineAt ?? Date(), Date())
+            let newDeadline = baseline.addingTimeInterval(7 * 86_400)
+            try await cloud.extendDeadline(
+                matchID: match.id, until: newDeadline
+            )
+            await reload()
+        } catch {
+            errorMessage = "Kunne ikke forlenge fristen: " +
+                error.localizedDescription
+        }
     }
 
     @MainActor private func confirm(_ id: UUID, _ accepted: Bool) async {
