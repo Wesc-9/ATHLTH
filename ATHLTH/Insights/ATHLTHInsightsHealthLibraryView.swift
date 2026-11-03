@@ -616,14 +616,14 @@ struct ATHLTHInsightsDailyRhythmCard: View {
             let percent = Int(abs(change).rounded())
             if change >= 8 {
                 return tr(
-                    "Average daily steps are up \\(percent)% compared with the previous week.",
-                    "Gjennomsnittlig antall skritt per måledag er opp \\(percent) % fra uken før."
+                    "Average daily steps are up \(percent)% compared with the previous week.",
+                    "Gjennomsnittlig antall skritt per måledag er opp \(percent) % fra uken før."
                 )
             }
             if change <= -8 {
                 return tr(
-                    "Average daily steps are down \\(percent)% compared with the previous week.",
-                    "Gjennomsnittlig antall skritt per måledag er ned \\(percent) % fra uken før."
+                    "Average daily steps are down \(percent)% compared with the previous week.",
+                    "Gjennomsnittlig antall skritt per måledag er ned \(percent) % fra uken før."
                 )
             }
             return tr(
@@ -633,8 +633,8 @@ struct ATHLTHInsightsDailyRhythmCard: View {
         }
         if !recentSteps.isEmpty {
             return tr(
-                "Steps recorded on \\(recentSteps.count) of 7 days. A weekly comparison needs at least four recorded days in each week.",
-                "Skritt registrert på \\(recentSteps.count) av 7 dager. Sammenligning krever minst fire måledager i hver uke."
+                "Steps recorded on \(recentSteps.count) of 7 days. A weekly comparison needs at least four recorded days in each week.",
+                "Skritt registrert på \(recentSteps.count) av 7 dager. Sammenligning krever minst fire måledager i hver uke."
             )
         }
         if daylightAverage != nil || exerciseMinutes != nil {
@@ -695,14 +695,14 @@ struct ATHLTHInsightsDailyRhythmCard: View {
                 rhythmMetric(
                     .daylightMinutes,
                     value: daylightAverage.map {
-                        "\\(Int($0.rounded())) min"
+                        "\(Int($0.rounded())) min"
                     } ?? "—",
                     subtitle: tr("per recorded day", "per måledag")
                 )
                 rhythmMetric(
                     .exerciseMinutes,
                     value: exerciseMinutes.map {
-                        "\\(Int($0.rounded())) min"
+                        "\(Int($0.rounded())) min"
                     } ?? "—",
                     subtitle: tr("recorded in 7 days", "registrert på 7 d")
                 )
@@ -719,7 +719,7 @@ struct ATHLTHInsightsDailyRhythmCard: View {
                         .foregroundStyle(ATHLTHInsightsStyle.muted)
                 }
                 HStack(alignment: .bottom, spacing: 7) {
-                    ForEach(completedDays, id: \\.self) { day in
+                    ForEach(completedDays, id: \.self) { day in
                         let steps = measuredValue(on: day, in: stepsHistory)
                         VStack(spacing: 5) {
                             RoundedRectangle(cornerRadius: 5)
@@ -741,7 +741,7 @@ struct ATHLTHInsightsDailyRhythmCard: View {
                         .accessibilityLabel(
                             day.formatted(date: .abbreviated, time: .omitted)
                             + ": " + (steps.map {
-                                "\\(Int($0.rounded())) " +
+                                "\(Int($0.rounded())) " +
                                     tr("steps", "skritt")
                             } ?? tr("No reading", "Ingen måling"))
                         )
