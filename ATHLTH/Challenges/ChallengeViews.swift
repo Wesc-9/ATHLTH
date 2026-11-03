@@ -1150,6 +1150,12 @@ struct ChallengeCreationView: View {
                 saveCreationDraft()
             }
             .onChange(of: runningTemplateID) { _, _ in
+                if runningFocus == .intervals &&
+                   runningComparison == .completedRepeats &&
+                   !(selectedRunningTemplate?.type == .custom &&
+                     selectedRunningTemplate?.isBuiltIn == false) {
+                    runningComparison = .mostWorkDistance
+                }
                 saveCreationDraft()
             }
             .onChange(of: runningFocus) { _, focus in
