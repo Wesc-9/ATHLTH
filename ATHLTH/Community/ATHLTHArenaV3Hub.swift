@@ -235,12 +235,16 @@ struct ATHLTHArenaV3HomeView: View {
     @State private var tournaments: [ATHLTHTournamentDraft] = []
     @State private var legacyDrafts: [ATHLTHArenaCompetitionDraft] = []
     @State private var remoteSeries: [ATHLTHArenaRemoteSeries] = []
+    @State private var officialTournaments: [ATHLTHTournamentRemote] = []
+    @State private var pendingTournamentIDs: Set<UUID> = []
+    @State private var tournamentError: String?
     @State private var selectedFilter: ATHLTHArenaV3Filter = .active
     @State private var showCreatePicker = false
     @State private var creation: ATHLTHArenaV3CreateAction?
     @State private var loadError: String?
     @State private var loadedID: UUID?
     private let cloud = ATHLTHArenaCloudService()
+    private let tournamentCloud = ATHLTHTournamentCloudService()
 
     private var challengesForUser: [ATHLTHChallenge] {
         challenges.visibleChallenges.filter { c in
@@ -276,6 +280,22 @@ struct ATHLTHArenaV3HomeView: View {
         }
     }
 
+    private var visibleOfficialTournaments: [ATHLTHTournamentRemote] {
+        officialTournaments.filter { item in
+            switch selectedFilter {
+            case .active:
+                return item.status != "completed" &&
+                    item.status != "cancelled" &&
+                    !pendingTournamentIDs.contains(item.id)
+            case .invitations:
+                return item.status == "inviting" &&
+                    pendingTournamentIDs.contains(item.id)
+            case .finished:
+                return item.status == "completed" || item.status == "cancelled"
+            }
+        }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 23) {
@@ -287,7 +307,7 @@ struct ATHLTHArenaV3HomeView: View {
                             .font(.system(size: 25, weight: .semibold, design: .serif))
                             .foregroundStyle(ATHLTHArenaV3Style.ink)
                         Spacer()
-                        Text("\(remoteSeries.count + challengesForUser.count + tournaments.count + legacyDrafts.count)")
+                        Text("\(remoteSeries.count + officialTournaments.count + challengesForUser.count + tournaments.count + legacyDrafts.count)")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(ATHLTHArenaV3Style.secondary)
                             .monospacedDigit()
@@ -300,9 +320,29 @@ struct ATHLTHArenaV3HomeView: View {
                     .pickerStyle(.segmented)
 
                     if visibleChallenges.isEmpty && visibleSeries.isEmpty &&
+                       visibleOfficialTournaments.isEmpty &&
                        (selectedFilter != .active ||
                         (tournaments.isEmpty && legacyDrafts.isEmpty)) {
                         emptyContent
+                    }
+                    ForEach(visibleOfficialTournaments.sorted {
+                        $0.createdAt > $1.createdAt
+                    }) { tournament in
+                        NavigationLink {
+                            ATHLTHTournamentLiveDetailView(tournament: tournament)
+                        } label: {
+                            competitionRow(
+                                title: tournament.title,
+                                caption: tournament.format.title +
+                                    (tournament.clubID == nil ? "" : " · Klubb"),
+                                status: pendingTournamentIDs.contains(tournament.id)
+                                    ? "Svar på invitasjon" :
+                                    tournament.status == "completed" ? "Fullført" :
+                                    tournament.status == "inviting" ? "Invitert" : "Pågår",
+                                symbol: tournament.format.symbol
+                            )
+                        }
+                        .buttonStyle(.plain)
                     }
                     ForEach(visibleChallenges) { challenge in
                         NavigationLink {
@@ -401,6 +441,11 @@ struct ATHLTHArenaV3HomeView: View {
                         .font(.caption)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
                 }
+                if let tournamentError {
+                    Text(tournamentError)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
             }
             .padding(.horizontal, 18)
             .padding(.top, 16)
@@ -428,7 +473,8 @@ struct ATHLTHArenaV3HomeView: View {
             case .league, .cup:
                 ATHLTHTournamentCreator(
                     preset: action == .cup ? .cup : .league,
-                    fixedClubID: nil
+                    fixedClubID: nil,
+                    onPublished: { _ in Task { await reload() } }
                 ) { draft in
                     save(draft)
                 }
@@ -547,6 +593,18 @@ struct ATHLTHArenaV3HomeView: View {
     private func reload() async {
         tournaments = ATHLTHTournamentDraftStore.load(session.profile.userID)
         legacyDrafts = ATHLTHArenaDraftStorage.load(for: session.profile.userID)
+        do {
+            async let official = tournamentCloud.visibleTournaments()
+            async let pending = tournamentCloud.pendingInvitationIDs(
+                userID: session.profile.userID
+            )
+            officialTournaments = try await official
+            pendingTournamentIDs = try await pending
+            tournamentError = nil
+        } catch {
+            tournamentError = "Turneringer kunne ikke oppdateres: " +
+                error.localizedDescription
+        }
         do {
             let loaded = try await cloud.loadSeries()
             remoteSeries = loaded
