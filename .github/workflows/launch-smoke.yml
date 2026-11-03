@@ -39,6 +39,7 @@ on:
       - release/v2.0.7
       - release/v2.0.8
       - release/v2.0.9
+      - release/v2.1.0
     paths:
       - ATHLTH/**/*.swift
       - ATHLTHWidgets/**/*.swift
