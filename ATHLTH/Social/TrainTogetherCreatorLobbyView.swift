@@ -628,15 +628,60 @@ struct TrainTogetherCreatorLobbyView: View {
                     .tint(ATHLTHTrainTogetherDesign.accent)
                     .disabled(isMarkingReady || isStarting)
                 } else {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "You are ready",
-                            norwegian: "Du er klar"
-                        ),
-                        systemImage: "checkmark.circle.fill"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                    HStack(spacing: 12) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "You are ready",
+                                norwegian: "Du er klar"
+                            ),
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+
+                        Spacer(minLength: 0)
+
+                        Button {
+                            guard !isMarkingReady else { return }
+                            isMarkingReady = true
+                            startError = nil
+                            Task {
+                                let undone = await social.unmarkCurrentUserReady(
+                                    sessionID: sessionID
+                                )
+                                if !undone {
+                                    startError = social.errorMessage ??
+                                        ATHLTHLocalization.choose(
+                                            english: "Could not undo Ready.",
+                                            norwegian: "Kunne ikke angre Klar."
+                                        )
+                                }
+                                isMarkingReady = false
+                            }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Undo Ready",
+                                    norwegian: "Angre klar"
+                                ),
+                                systemImage: "arrow.uturn.backward"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 37)
+                            .background(
+                                ATHLTHTrainTogetherDesign.accentSoft,
+                                in: Capsule()
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(
+                            isMarkingReady || isStarting ||
+                            session?.coordinatedStartAt != nil
+                        )
+                    }
+                    .accessibilityElement(children: .contain)
                 }
 
                 Button {
