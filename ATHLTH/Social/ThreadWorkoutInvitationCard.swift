@@ -256,7 +256,7 @@ struct ThreadWorkoutInvitationCard: View {
                     }
                     .disabled(isResponding)
 
-                } else if response?.decision == .accepted {
+                } else if response?.decision == .accepted && lifecycleUpdate?.kind != .cancelled {
                     Label(
                         workout.scheduledStart != nil
                             ? ATHLTHLocalization.choose(
@@ -272,7 +272,7 @@ struct ThreadWorkoutInvitationCard: View {
                     )
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
-                } else if isMine && response == nil {
+                } else if isMine && response == nil && lifecycleUpdate?.kind != .cancelled {
                     Text(workout.scheduledStart != nil
                         ? ATHLTHLocalization.choose(
                             english: "Your own workout stays scheduled whether or not your friend joins.",
