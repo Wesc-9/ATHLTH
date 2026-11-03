@@ -62,6 +62,7 @@ private struct ATHLTHSceneRootView: View {
     @StateObject private var trainingBackups = TrainingBackupStore()
     @StateObject private var phoneWorkout = IPhoneWorkoutStore()
     @StateObject private var profileGear = ProfileGearStore()
+    @StateObject private var pets = ATHLTHPetStore.shared
     @StateObject private var notifications = ATHLTHNotificationStore()
     @StateObject private var workoutCompletion = WorkoutCompletionCoordinator()
     @StateObject private var calendarSync = AppleCalendarSyncStore()
@@ -169,6 +170,7 @@ private struct ATHLTHSceneRootView: View {
                 .environmentObject(trainingBackups)
                 .environmentObject(phoneWorkout)
                 .environmentObject(profileGear)
+                .environmentObject(pets)
                 .environmentObject(notifications)
                 .environmentObject(workoutCompletion)
                 .environmentObject(calendarSync)
@@ -508,6 +510,7 @@ struct AppRootView: View {
     @EnvironmentObject private var trainingBackups: TrainingBackupStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var workoutCompletion: WorkoutCompletionCoordinator
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
@@ -1038,11 +1041,12 @@ struct AppRootView: View {
         async let socialHome: Void = refreshSocialHomeCore()
         async let messages: Void = messaging.refresh()
         async let gearRefresh: Void = gear.refresh()
+        async let petRefresh: Void = pets.refresh()
         async let calendarRefresh: Void = syncCalendarIfAllowed()
 
         _ = await (
             pushToken, pushPreferences, socialHome,
-            messages, gearRefresh, calendarRefresh
+            messages, gearRefresh, petRefresh, calendarRefresh
         )
 
         // Reconcile invitations asynchronously, without blocking Home.
@@ -2700,6 +2704,7 @@ struct AppRootView: View {
             await gear.savePreparedGearUsage(
                 for: publishable
             )
+            await pets.savePreparedPetUsage(for: publishable)
             await communityGroups
                 .recordCompletedWorkout(
                     publishable
@@ -2886,6 +2891,7 @@ struct AppRootView: View {
             await gear.savePreparedGearUsage(
                 for: publishable
             )
+            await pets.savePreparedPetUsage(for: publishable)
             await communityGroups
                 .recordCompletedWorkout(
                     publishable
@@ -3031,6 +3037,7 @@ struct AppRootView: View {
             await gear.savePreparedGearUsage(
                 for: publishable
             )
+            await pets.savePreparedPetUsage(for: publishable)
             await communityGroups
                 .recordCompletedWorkout(
                     publishable
