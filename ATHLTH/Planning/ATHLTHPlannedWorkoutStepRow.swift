@@ -4,6 +4,7 @@ import SwiftUI
 /// There is no persistent red delete tray or always-visible delete control.
 /// A normal tap edits; the more menu remains accessible. Swiping never reorders.
 struct ATHLTHPlannedWorkoutStepRow: View {
+    @Environment(\.locale) private var locale
     let block: WorkoutTemplateBlock
     let position: Int
     let canMoveUp: Bool
@@ -31,6 +32,21 @@ struct ATHLTHPlannedWorkoutStepRow: View {
         return abs(horizontal) >= threshold
     }
     private var isPause: Bool { block.isRestOrActiveRecovery }
+
+    private var paceSummary: String? {
+        guard block.kind == .run,
+              let secondsPerKm = block.targetPaceSecondsPerKilometer,
+              secondsPerKm.isFinite, secondsPerKm > 0 else { return nil }
+        if block.treadmillInclinePercent != nil {
+            let kilometersPerHour = 3_600 / secondsPerKm
+            return kilometersPerHour.formatted(
+                .number.precision(.fractionLength(1)).locale(locale)
+            ) + (ATHLTHLocalization.isNorwegian ? " km/t" : " km/h")
+        }
+        let seconds = Int(secondsPerKm.rounded())
+        let remainder = seconds % 60
+        return "\(seconds / 60):\(remainder < 10 ? "0" : "")\(remainder) min/km"
+    }
 
     // A local, long-press-driven gesture avoids iOS system drag-and-drop's
     // green plus badge and keeps the whole card attached to the finger.
@@ -106,7 +122,11 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                                     isPause ? .secondary : ATHLTHTrainDesign.bronze
                                 )
                                 .frame(width: 21)
-                            Image(systemName: isPause ? "pause.fill" : block.kind.systemImage)
+                            Image(systemName: isPause
+                                  ? "pause.fill"
+                                  : block.kind == .run &&
+                                    block.treadmillInclinePercent != nil
+                                        ? "figure.run.treadmill" : block.kind.systemImage)
                                 .font(.system(size: 15))
                                 .foregroundStyle(
                                     isPause ? .secondary : ATHLTHTrainDesign.ink
@@ -122,11 +142,19 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.85)
                             Spacer(minLength: 0)
-                            Text(block.durationSeconds.map { "\(Int($0 / 60)) min" }
-                                ?? block.distanceMeters.map { "\(Int($0)) m" } ?? "–")
-                                .font(.caption.weight(.medium))
-                                .foregroundStyle(ATHLTHTrainDesign.ink)
-                                .lineLimit(1)
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text(block.durationSeconds.map { "\(Int($0 / 60)) min" }
+                                    ?? block.distanceMeters.map { "\(Int($0)) m" } ?? "–")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                                if let paceSummary {
+                                    Text(paceSummary)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                             Text(block.targetHeartRateZone.map { "Z\($0)" }
                                 ?? (isPause ? "Pause" : "–"))
                                 .font(.caption.weight(.semibold))
