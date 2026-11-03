@@ -92,6 +92,7 @@ enum ATHLTHTournamentStructure {
 
     static func firstCupRound(_ athletes: [ATHLTHTournamentParticipant])
         -> [(String, String)] {
+        guard !athletes.isEmpty else { return [] }
         let size = bracketSize(athletes.count)
         let byes = size - athletes.count
         var matchups: [(String, String)] = []
