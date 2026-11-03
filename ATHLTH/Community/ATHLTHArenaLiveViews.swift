@@ -1147,7 +1147,7 @@ struct ATHLTHArenaSeasonsSection: View {
     }
 }
 
-private struct ATHLTHArenaSeasonCreateView: View {
+struct ATHLTHArenaSeasonCreateView: View {
     @Environment(\.dismiss) private var dismiss
     let clubs: [ATHLTHArenaClubChoice]
     let onCreated: () -> Void
@@ -1161,6 +1161,16 @@ private struct ATHLTHArenaSeasonCreateView: View {
     @State private var saving = false
     @State private var errorMessage: String?
     private let cloud = ATHLTHArenaCloudService()
+
+    init(
+        clubs: [ATHLTHArenaClubChoice],
+        preselectedClubID: UUID? = nil,
+        onCreated: @escaping () -> Void
+    ) {
+        self.clubs = clubs
+        self.onCreated = onCreated
+        _clubID = State(initialValue: preselectedClubID)
+    }
 
     private var valid: Bool {
         let days = Calendar.current.dateComponents(
@@ -1374,7 +1384,7 @@ enum ATHLTHArenaSeasonCompetitionTimeline {
     }
 }
 
-private struct ATHLTHArenaSeasonDetailView: View {
+struct ATHLTHArenaSeasonDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var social: SocialStore
