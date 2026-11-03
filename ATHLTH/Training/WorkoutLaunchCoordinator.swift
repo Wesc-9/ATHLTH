@@ -835,6 +835,7 @@ enum WorkoutLaunchCoordinator {
             gear.prepareNextWorkoutGear(
                 configuration.gearIDs
             )
+            ATHLTHPetStore.shared.prepareNextWorkoutPets(configuration.petIDs)
             phoneWorkout.start(
                 walking: false,
                 route: selectedRoute,
@@ -1032,6 +1033,7 @@ enum WorkoutLaunchCoordinator {
         gear.prepareNextWorkoutGear(
             configuration.gearIDs
         )
+        ATHLTHPetStore.shared.prepareNextWorkoutPets(configuration.petIDs)
 
         watchConnection.sendPreparedWorkout(
             WatchPreparedWorkoutTransfer(
@@ -1135,6 +1137,7 @@ enum WorkoutLaunchCoordinator {
             gear.prepareNextWorkoutGear(
                 configuration.gearIDs
             )
+            ATHLTHPetStore.shared.prepareNextWorkoutPets(configuration.petIDs)
             phoneWorkout.start(
                 walking: true,
                 title:
@@ -1240,6 +1243,7 @@ enum WorkoutLaunchCoordinator {
         gear.prepareNextWorkoutGear(
             configuration.gearIDs
         )
+        ATHLTHPetStore.shared.prepareNextWorkoutPets(configuration.petIDs)
         startQuickSpotifyIfNeeded(
             playlist:
                 configuration.spotifyPlaylist,
