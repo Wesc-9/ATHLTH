@@ -958,6 +958,13 @@ struct ChallengeCreationView: View {
 
     var body: some View {
         NavigationStack {
+            challengeEditorWithSheets
+        }
+    }
+
+    // Split view and modifier inference across separate properties while
+    // preserving the exact presentation, lifecycle, and alert behaviors.
+    private var challengeEditorCore: some View {
             ZStack {
                 ChallengePlanTheme.canvas.ignoresSafeArea()
 
@@ -1106,6 +1113,10 @@ struct ChallengeCreationView: View {
                 }
                 .background(.ultraThinMaterial)
             }
+    }
+
+    private var challengeEditorWithLifecycle: some View {
+        challengeEditorCore
             .task { await prepareChallengeCreation() }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { saveCreationDraft() }
@@ -1360,6 +1371,10 @@ struct ChallengeCreationView: View {
                     )
                 )
             }
+    }
+
+    private var challengeEditorWithSheets: some View {
+        challengeEditorWithLifecycle
             .sheet(
                 isPresented:
                     $showingInvitePicker
@@ -1418,7 +1433,6 @@ struct ChallengeCreationView: View {
             } message: {
                 Text(createError ?? "")
             }
-        }
     }
 
     private var strengthExercisePicker: some View {
