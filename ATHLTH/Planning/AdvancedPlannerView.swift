@@ -9426,6 +9426,17 @@ struct SessionEditorView: View {
     /// Add run-only steps to the shared workout timeline, preserving
     /// interval rounds, effort targets, and independently selected phases.
     private func appendRunningExerciseBlocks(_ newBlocks: [WorkoutTemplateBlock]) {
+        // A treadmill library item must choose the same indoor workout
+        // environment as the dedicated running editor, including no GPS.
+        if newBlocks.contains(where: {
+            $0.kind == .run && $0.isIndoor == true &&
+                $0.treadmillInclinePercent != nil
+        }) {
+            runEnvironment = .treadmill
+            selectedRouteID = nil
+            routeGuardianDraft.enabled = false
+            ghostDraft.enabled = false
+        }
         for block in newBlocks {
             let position = ATHLTHWorkoutPhasePlacement.insertionIndex(
                 for: block.resolvedPhase, in: workoutBlocks
