@@ -395,6 +395,13 @@ struct ATHLTHPetProfileSection: View {
     }
 }
 
+private struct ATHLTHPetMonthlyActivity: Identifiable {
+    let month: Date
+    let meters: Double
+    let outings: Int
+    var id: Date { month }
+}
+
 struct ATHLTHPetDetailView: View {
     @EnvironmentObject private var pets: ATHLTHPetStore
     let petID: UUID
@@ -435,6 +442,49 @@ struct ATHLTHPetDetailView: View {
                         metric(ATHLTHLocalization.choose(english: "Outings", norwegian: "Turer"), value: "\(stats.outings)")
                         metric(ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"), value: String(format: "%.1f km", stats.meters / 1000))
                         metric(ATHLTHLocalization.choose(english: "Active time", norwegian: "Aktiv tid"), value: String(format: "%.1f t", stats.seconds / 3600))
+                    }
+                    ATHLTHCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Activity over time", norwegian: "Aktivitet over tid"),
+                                    systemImage: "chart.bar.xaxis")
+                                    .font(.headline)
+                                Spacer()
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Last 6 months", norwegian: "Siste 6 måneder"))
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
+                            let months = monthlyActivity(for: pet)
+                            let maximum = max(months.map(\.meters).max() ?? 0, 1)
+                            ForEach(months) { item in
+                                VStack(spacing: 5) {
+                                    HStack {
+                                        Text(item.month.formatted(.dateTime.month(.abbreviated)))
+                                            .font(.caption.weight(.medium))
+                                        Spacer()
+                                        Text(String(format: "%.1f km", item.meters / 1000))
+                                            .font(.caption.weight(.semibold))
+                                            .monospacedDigit()
+                                        Text("· \(item.outings)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    ProgressView(value: item.meters, total: maximum)
+                                        .tint(ATHLTHTheme.premiumGold)
+                                }
+                            }
+                            Divider()
+                            HStack {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Longest outing", norwegian: "Lengste tur"))
+                                    .font(.subheadline)
+                                Spacer()
+                                Text(String(format: "%.2f km", stats.longestMeters / 1000))
+                                    .font(.subheadline.weight(.semibold))
+                            }
+                        }
                     }
                     ATHLTHCard {
                         VStack(alignment: .leading, spacing: 11) {
@@ -497,6 +547,23 @@ struct ATHLTHPetDetailView: View {
                 ATHLTHPetEditorView(editing: pet)
                     .environmentObject(pets)
             }
+        }
+    }
+
+    private func monthlyActivity(for pet: ATHLTHPet) -> [ATHLTHPetMonthlyActivity] {
+        let calendar = Calendar.current
+        let thisMonth = calendar.dateInterval(of: .month, for: Date())?.start ?? Date()
+        let records = pets.usage(for: pet)
+        return (0..<6).reversed().compactMap { offset in
+            guard let month = calendar.date(byAdding: .month, value: -offset, to: thisMonth),
+                  let next = calendar.date(byAdding: .month, value: 1, to: month) else {
+                return nil
+            }
+            let outings = records.filter { $0.startedAt >= month && $0.startedAt < next }
+            return ATHLTHPetMonthlyActivity(
+                month: month,
+                meters: outings.reduce(0) { $0 + ($1.distanceMeters ?? 0) },
+                outings: outings.count)
         }
     }
 
