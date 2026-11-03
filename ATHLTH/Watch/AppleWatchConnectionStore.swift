@@ -826,6 +826,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         )
     }
 
+    func sendPetCatalog(_ catalog: WatchPetCatalogTransfer) {
+        // The Watch retains its last trusted catalog while offline.
+        sendWatchPayload(catalog, kind: .petCatalog, durable: true)
+    }
+
     func sendGhostRace(
         _ ghost: WatchGhostRaceTransfer
     ) {
@@ -1480,6 +1485,12 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             return
         }
 
+        // This summary is embedded in the completed result, so selections
+        // made offline reach the same workout even if a live message was lost.
+        if let segments = result.petSegments {
+            ATHLTHPetStore.shared.acceptCompletedWatchPetSegments(segments)
+        }
+
         // A completed Watch result can arrive while AppRoot's view
         // observers are not mounted. Terminate only that Watch session's
         // ActivityKit card and matching widget snapshot immediately.
@@ -1554,6 +1565,15 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
     }
 
     private func receive(_ payload: IncomingWatchPayload) {
+        if payload.kind == WatchTransferKind.petSelection.rawValue {
+            if let data = payload.data,
+               let transfer = try? JSONDecoder().decode(
+                   WatchPetSelectionTransfer.self, from: data),
+               abs(transfer.updatedAt.timeIntervalSinceNow) < 36 * 3600 {
+                ATHLTHPetStore.shared.acceptWatchPetSelection(transfer)
+            }
+            return
+        }
         if payload.kind == WatchTransferKind.aiCoachConversationRequest.rawValue {
             if ATHLTHAIWatchCoachRequestPolicy.accepts(sentAt: payload.sentAt) {
                 latestAIConversationRequestID = UUID()
