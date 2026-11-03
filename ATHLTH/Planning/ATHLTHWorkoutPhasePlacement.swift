@@ -180,7 +180,7 @@ enum ATHLTHWorkoutTimelinePresentation {
         // An interval section with four efforts and three pauses reads (4),
         // while its pause rows remain visible between the efforts.
         var activityCount: Int {
-            let work = blocks.filter { $0.kind != .rest }.count
+            let work = blocks.filter { !$0.isRestOrActiveRecovery }.count
             return work > 0 ? work : blocks.count
         }
     }
