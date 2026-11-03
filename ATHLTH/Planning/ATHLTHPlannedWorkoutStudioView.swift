@@ -377,7 +377,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     }
                 } label: {
                     VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
+                        Text(summary?.displayName ?? ATHLTHLocalization.choose(
                             english: "Interval sequence", norwegian: "Intervallrekke"
                         ))
                         .font(.subheadline.weight(.semibold))
