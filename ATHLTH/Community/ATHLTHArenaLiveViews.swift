@@ -2260,10 +2260,28 @@ struct ATHLTHArenaSeasonDetailView: View {
         defer { loading = false }
         do {
             async let rank = cloud.loadSeasonStandings(seasonID: season.id)
+            async let leagueAndCupPoints = tournamentCloud.clubSeasonScores(
+                seasonID: season.id
+            )
             async let linkRows = cloud.loadSeasonSeriesLinks(seasonID: season.id)
             async let allSeries = cloud.loadSeries()
             async let onlineTournaments = tournamentCloud.visibleTournaments()
-            standings = try await rank
+            let legacyPoints = try await rank
+            let approvedTournamentPoints = try await leagueAndCupPoints
+            var combined: [UUID: ATHLTHArenaSeasonStandingsRow] = [:]
+            for item in legacyPoints {
+                combined[item.userID] = item
+            }
+            for item in approvedTournamentPoints {
+                let earlier = combined[item.userID]
+                combined[item.userID] = ATHLTHArenaSeasonStandingsRow(
+                    userID: item.userID,
+                    points: (earlier?.points ?? 0) + item.points,
+                    competitions: (earlier?.competitions ?? 0) +
+                        item.competitions
+                )
+            }
+            standings = Array(combined.values)
             links = try await linkRows
             competitionOptions = try await allSeries
             // Never announce a final season winner if live tournaments could
