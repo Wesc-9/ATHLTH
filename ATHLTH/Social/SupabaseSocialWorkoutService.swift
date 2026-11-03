@@ -143,6 +143,18 @@ extension SupabaseSocialService {
             .execute()
     }
 
+    /// Server locks the session before clearing readiness, so undo cannot
+    /// race with the host's synchronized countdown RPC.
+    func unsetWorkoutReady(sessionID: UUID) async throws {
+        let _: Bool = try await client
+            .rpc(
+                "unset_social_workout_ready",
+                params: WorkoutSessionIndependentStartParams(sessionID: sessionID)
+            )
+            .execute()
+            .value
+    }
+
     /// Only the signed-in participant may publish their voluntary arrival.
     func setWorkoutArrival(
         participantID: UUID,
