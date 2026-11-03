@@ -23,6 +23,25 @@ final class ATHLTHRunningLibraryExerciseAdapterTests: XCTestCase {
         XCTAssertEqual(converted.exerciseID, original.exerciseID)
         XCTAssertEqual(converted.editorDragID, original.editorDragID)
     }
+    func testTreadmillAndRunningAliasesAreClassifiedCorrectly() {
+        for name in ["Treadmill", "Treadmill running", "Løping på tredemølle"] {
+            let converted = ATHLTHRunningLibraryExerciseAdapter.adapt(libraryStep(name))
+            XCTAssertEqual(converted.kind, .run)
+            XCTAssertEqual(converted.cardioActivity, .running)
+            XCTAssertEqual(converted.isIndoor, true)
+            XCTAssertEqual(converted.treadmillInclinePercent, 0)
+            XCTAssertEqual(converted.targetPaceSecondsPerKilometer, 360)
+            XCTAssertNil(converted.repetitions)
+        }
+
+        for name in ["Running", "Løping", "Jogging", "Jogg"] {
+            let converted = ATHLTHRunningLibraryExerciseAdapter.adapt(libraryStep(name))
+            XCTAssertEqual(converted.kind, .run)
+            XCTAssertEqual(converted.cardioActivity, .running)
+            XCTAssertNil(converted.treadmillInclinePercent)
+            XCTAssertNotEqual(converted.isIndoor, true)
+        }
+    }
 
     func testNeverConvertsStrengthOrGroupedExercises() {
         XCTAssertEqual(ATHLTHRunningLibraryExerciseAdapter.adapt(
