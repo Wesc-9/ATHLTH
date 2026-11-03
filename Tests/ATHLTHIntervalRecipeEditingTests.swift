@@ -78,7 +78,9 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
             XCTAssertEqual(copied[i].isIndoor, true)
         }
         XCTAssertEqual(copied[1].targetPaceSecondsPerKilometer, 510)
-        XCTAssertNil(copied[3].treadmillInclinePercent)
+        XCTAssertNil(copied[3].targetPaceSecondsPerKilometer)
+        XCTAssertEqual(copied[3].treadmillInclinePercent, 1.5)
+        XCTAssertEqual(copied[3].isIndoor, true)
     }
 
     func testSavedExplicitGroupReopensAndCompactLegacyExpands() throws {
@@ -105,6 +107,30 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         let legacy = ATHLTHIntervalRecipeEditing.forEditing([compact, recovery])
         XCTAssertEqual(legacy.count, 7)
         XCTAssertTrue(legacy.allSatisfy { $0.groupID == nil })
+    }
+
+    func testTreadmillIntervalsWithActiveRecoveriesKeepIndoorClassification() {
+        let (id, original) = recipe()
+        var blocks = original
+        blocks[0].isIndoor = true
+        blocks[0].treadmillInclinePercent = 1.0
+        let updated = ATHLTHIntervalRecipeEditing.copyingFirstEffortTargets(
+            in: blocks, groupID: id
+        )!
+        XCTAssertEqual(
+            ATHLTHPlannedWorkoutMetrics.runningLocation(for: updated),
+            .treadmill
+        )
+        let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "30/30 treadmill", kind: .running, durationMinutes: 20,
+            routeID: UUID(), blocks: updated
+        )
+        XCTAssertEqual(blueprint.category, "treadmill")
+        XCTAssertNil(blueprint.applying(to: nil).routeID)
+        XCTAssertEqual(updated.filter(\.isActiveRecovery).count, 20)
+        XCTAssertTrue(updated.filter(\.isActiveRecovery).allSatisfy {
+            $0.isIndoor == true && $0.treadmillInclinePercent == 1.0
+        })
     }
 
     func testUngroupDoesNotDeleteOrAlterAWorkoutStep() {
