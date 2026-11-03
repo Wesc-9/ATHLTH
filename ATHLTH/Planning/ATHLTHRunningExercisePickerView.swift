@@ -59,8 +59,8 @@ struct ATHLTHRunningExercisePickerView: View {
                                 selectionRow(
                                     title: set.title,
                                     detail: ATHLTHLocalization.choose(
-                                        english: "\(set.blocks.count) saved steps",
-                                        norwegian: "\(set.blocks.count) lagrede deløkter"
+                                        english: "\(set.blocks.expandedForExecution().count) saved steps",
+                                        norwegian: "\(set.blocks.expandedForExecution().count) lagrede deløkter"
                                     ),
                                     symbol: "bookmark.fill"
                                 ) {
