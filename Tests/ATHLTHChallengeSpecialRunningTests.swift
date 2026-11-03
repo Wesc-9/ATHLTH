@@ -123,6 +123,25 @@ final class ATHLTHChallengeSpecialRunningTests: XCTestCase {
         XCTAssertEqual(restored.runningVenue, .treadmill)
     }
 
+    func testIntervalDistanceRacesRequireTimeBasedWork() {
+        let now = Date()
+        let timer = RunningWorkoutTemplate(
+            id: UUID(), title: "4 x 4", type: .intervals, summary: "",
+            blocks: [
+                RunningWorkoutBlock(
+                    kind: .work, title: "Four minutes", repetitions: 4,
+                    work: .time(240)
+                )
+            ],
+            routeID: nil, isBuiltIn: false,
+            createdAt: now, updatedAt: now
+        )
+        XCTAssertTrue(ATHLTHChallengeIntervalPolicy.hasFixedWorkDuration(timer))
+        var distance = timer
+        distance.blocks[0].work = .distance(400)
+        XCTAssertFalse(ATHLTHChallengeIntervalPolicy.hasFixedWorkDuration(distance))
+    }
+
     func testSharedIntervalKeepsDurationsButNotCreatorSpeedOrIncline() {
         var target = RunningStepTarget.time(240)
         target.intensity.kind = .pace
