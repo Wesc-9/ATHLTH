@@ -418,6 +418,7 @@ struct RunQuickStartConfiguration {
     let socialMode:
         SocialWorkoutParticipationMode
     let gearIDs: Set<UUID>
+    var petIDs: Set<UUID> = []
     var watchStartMode: WatchWorkoutStartMode = .immediate
     var routeWarmup: ATHLTHRouteWarmupConfiguration = .disabled
     var customWorkoutTitle: String? = nil
@@ -453,6 +454,7 @@ struct WalkQuickStartConfiguration {
     let socialMode:
         SocialWorkoutParticipationMode
     let gearIDs: Set<UUID>
+    var petIDs: Set<UUID> = []
 }
 
 extension RunQuickStartConfiguration {
@@ -1235,6 +1237,7 @@ struct RunQuickStartSheet: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
 
@@ -1255,6 +1258,7 @@ struct RunQuickStartSheet: View {
         SocialWorkoutParticipationMode =
             .physical
     @State private var selectedGearIDs: Set<UUID> = []
+    @State private var selectedPetIDs: Set<UUID> = []
     @State private var captureDevice: WorkoutCaptureDevice
     @State private var watchStartMode: WatchWorkoutStartMode = .immediate
     @State private var environment: RunEnvironment = .outdoor
@@ -1388,6 +1392,8 @@ struct RunQuickStartSheet: View {
                             }
                         }
                     }
+
+                    ATHLTHWorkoutPetSelectionCard(selectedPetIDs: $selectedPetIDs)
 
                     if isAdvancedSetup {
                         VStack(spacing: 12) {
@@ -2497,6 +2503,7 @@ struct RunQuickStartSheet: View {
                 customWorkoutTitle: mode == .structured &&
                     advancedWorkout != nil ? nil : quickWorkoutName
             )
+        configuration.petIDs = selectedPetIDs
         configuration.advancedWorkout = mode == .structured ? advancedWorkout : nil
         configuration.routeWarmup = mode == .route ? routeWarmup : .disabled
         launchInProgress = true
@@ -3040,6 +3047,7 @@ struct WalkQuickStartSheet: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     let trainingDeviceProvider: TrainingDeviceProvider
@@ -3054,6 +3062,7 @@ struct WalkQuickStartSheet: View {
         SocialWorkoutParticipationMode =
             .physical
     @State private var selectedGearIDs: Set<UUID> = []
+    @State private var selectedPetIDs: Set<UUID> = []
     @State private var audioCoachDraft = AudioCoachDraft()
     @State private var didLoadAudioCoachDefaults = false
     @State private var isAdvancedSetup = false
@@ -3132,6 +3141,7 @@ struct WalkQuickStartSheet: View {
                         selectedGearIDs: $selectedGearIDs,
                         activity: .walking
                     )
+                    ATHLTHWorkoutPetSelectionCard(selectedPetIDs: $selectedPetIDs)
 
                     ATHLTHPlanSurface(density: .compact) {
                         VStack(
@@ -3345,7 +3355,7 @@ struct WalkQuickStartSheet: View {
         let friends = social.resolvedQuickTrainPartners(selectedFriendIDs)
 
         launchFailure = nil
-        let configuration = WalkQuickStartConfiguration(
+        var configuration = WalkQuickStartConfiguration(
                 captureDevice: device,
                 audioCoach:
                     isAdvancedSetup &&
@@ -3377,6 +3387,7 @@ struct WalkQuickStartSheet: View {
                     socialMode,
                 gearIDs: selectedGearIDs
             )
+        configuration.petIDs = selectedPetIDs
         launchInProgress = true
         Task { @MainActor in
             let failure = await onStart(configuration)
