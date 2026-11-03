@@ -123,6 +123,37 @@ final class ATHLTHChallengeSpecialRunningTests: XCTestCase {
         XCTAssertEqual(restored.runningVenue, .treadmill)
     }
 
+    func testSharedIntervalKeepsDurationsButNotCreatorSpeedOrIncline() {
+        var target = RunningStepTarget.time(240)
+        target.intensity.kind = .pace
+        target.intensity.paceMinSecondsPerKilometer = 250
+        target.treadmillInclinePercent = 6.5
+        let template = RunningWorkoutTemplate(
+            id: UUID(),
+            title: "4 x 4",
+            type: .intervals,
+            summary: "",
+            blocks: [
+                RunningWorkoutBlock(
+                    kind: .work,
+                    title: "Work",
+                    repetitions: 4,
+                    work: target
+                )
+            ],
+            routeID: nil,
+            isBuiltIn: false,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+        let portable = ATHLTHChallengeRunningTemplateTransfer.portable(template)
+        XCTAssertEqual(portable.id, template.id)
+        XCTAssertEqual(portable.blocks.first?.repetitions, 4)
+        XCTAssertEqual(portable.blocks.first?.work.durationSeconds, 240)
+        XCTAssertNil(portable.blocks.first?.work.intensity.paceMinSecondsPerKilometer)
+        XCTAssertNil(portable.blocks.first?.work.treadmillInclinePercent)
+    }
+
     func testCustomTitleIsNeverOverridden() {
         XCTAssertEqual(
             ChallengeCreationPolicy.resolvedTitle(
