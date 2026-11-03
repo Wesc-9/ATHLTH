@@ -3872,6 +3872,9 @@ struct WorkoutInviteLaunchSheet: View {
     @State private var isStarting = false
     @State private var launchError: String?
     @State private var showingStrengthWorkout = false
+    @State private var isChangingArrival = false
+    @State private var confirmingIndependentStart = false
+    @State private var chatPartner: SocialProfileCard?
 
     private var appleWatchSelectable: Bool {
         ATHLTHDeviceRole.isIPad ||
@@ -3966,14 +3969,7 @@ struct WorkoutInviteLaunchSheet: View {
 
                         if independentStartEnabled {
                             Button {
-                                // Independent start requires this athlete's own
-                                // explicit choice; Ready alone does not start it.
-                                social.requestParticipantIndependentStart(
-                                    sessionID: invite.session.id
-                                )
-                                if !isStarting {
-                                    readyAndWait(copiedWorkout)
-                                }
+                                confirmingIndependentStart = true
                             } label: {
                                 Label(
                                     ATHLTHLocalization.choose(
@@ -3986,6 +3982,7 @@ struct WorkoutInviteLaunchSheet: View {
                                 .frame(maxWidth: .infinity)
                             }
                             .buttonStyle(.bordered)
+                            .tint(ATHLTHTrainTogetherDesign.accent)
                             .controlSize(.large)
                             .disabled(
                                 captureDevice == .appleWatch &&
@@ -4077,6 +4074,30 @@ struct WorkoutInviteLaunchSheet: View {
                     }
                 }
             }
+        }
+        .sheet(item: $chatPartner) { friend in
+            NavigationStack {
+                DirectMessageThreadView(friend: friend)
+            }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Start independently?", norwegian: "Starte alene?"
+            ),
+            isPresented: $confirmingIndependentStart,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Start alone", norwegian: "Start alene"
+            ), role: .destructive) {
+                social.requestParticipantIndependentStart(sessionID: invite.session.id)
+                if !isStarting, let copiedWorkout {
+                    readyAndWait(copiedWorkout)
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Wait for everyone", norwegian: "Vent på alle"
+            ), role: .cancel) {}
         }
         .interactiveDismissDisabled(
             isStarting
@@ -4379,6 +4400,72 @@ struct WorkoutInviteLaunchSheet: View {
         )
     }
 
+    private var ownArrival: SocialWorkoutArrivalStatus? {
+        social.workoutParticipants.first(where: {
+            $0.sessionID == invite.session.id && $0.userID == social.currentUserID
+        })?.arrivalStatus
+    }
+
+    private var arrivalControls: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(ATHLTHLocalization.choose(
+                english: "Before meeting up", norwegian: "Før dere møtes"
+            ))
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
+
+            HStack(spacing: 8) {
+                ForEach(SocialWorkoutArrivalStatus.allCases, id: \.self) { status in
+                    let selected = ownArrival == status
+                    Button {
+                        guard !isChangingArrival else { return }
+                        isChangingArrival = true
+                        Task {
+                            let next: SocialWorkoutArrivalStatus? =
+                                selected ? nil : status
+                            let saved = await social.setCurrentWorkoutArrival(
+                                sessionID: invite.session.id, status: next
+                            )
+                            if !saved {
+                                launchError = social.errorMessage ??
+                                    ATHLTHLocalization.choose(
+                                        english: "Could not update arrival.",
+                                        norwegian: "Kunne ikke oppdatere ankomst."
+                                    )
+                            }
+                            isChangingArrival = false
+                        }
+                    } label: {
+                        Label(status.label, systemImage: status.symbol)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(selected
+                                ? ATHLTHTrainTogetherDesign.accent
+                                : ATHLTHTrainTogetherDesign.secondary)
+                            .frame(maxWidth: .infinity, minHeight: 37)
+                            .background(
+                                selected
+                                    ? ATHLTHTrainTogetherDesign.accentSoft
+                                    : ATHLTHTrainTogetherDesign.surface,
+                                in: Capsule()
+                            )
+                            .overlay {
+                                Capsule().stroke(ATHLTHTrainTogetherDesign.outline,
+                                                 lineWidth: 0.8)
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isChangingArrival || isStarting)
+                }
+            }
+            Text(ATHLTHLocalization.choose(
+                english: "Only your arrival label is shared; never your location.",
+                norwegian: "Kun ankomststatusen deles – aldri posisjonen din."
+            ))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+    }
+
     private var lobbyStatusCard: some View {
         ATHLTHTrainTogetherSurface {
             VStack(alignment: .leading, spacing: 10) {
@@ -4389,6 +4476,34 @@ struct WorkoutInviteLaunchSheet: View {
                     )
                 )
                 .font(.subheadline.weight(.semibold))
+
+                if let organizer = social.profile(for: invite.session.creatorID) {
+                    Button {
+                        chatPartner = organizer
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Message organizer", norwegian: "Meld arrangør"
+                            ),
+                            systemImage: "bubble.left"
+                        )
+                        .font(.caption.weight(.medium))
+                    }
+                    .tint(ATHLTHTrainTogetherDesign.accent)
+                }
+
+                if payload?.resolvedParticipationMode == .physical {
+                    arrivalControls
+                }
+
+                if let scheduled = payload?.workout.scheduledStart {
+                    Label(
+                        scheduled.formatted(date: .abbreviated, time: .shortened),
+                        systemImage: "calendar"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                }
 
                 let participants =
                     social.workoutParticipants
@@ -4404,10 +4519,10 @@ struct WorkoutInviteLaunchSheet: View {
                                 participant.launchFailedAt != nil
                                     ? Color.red
                                     : participant.workoutStartedAt != nil
-                                        ? ATHLTHTheme.accent
+                                        ? ATHLTHTrainTogetherDesign.accent
                                         : participant.readyAt != nil
-                                            ? Color.green
-                                            : Color.orange
+                                            ? ATHLTHTrainTogetherDesign.accent
+                                            : ATHLTHTrainTogetherDesign.accent.opacity(0.60)
                             )
                             .frame(width: 8, height: 8)
 
@@ -4417,7 +4532,11 @@ struct WorkoutInviteLaunchSheet: View {
                         Spacer()
 
                         Text(
-                            participant.launchFailedAt != nil
+                            participant.workoutFinishedAt != nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "Finished", norwegian: "Ferdig"
+                                )
+                                : participant.launchFailedAt != nil
                                 ? ATHLTHLocalization.choose(
                                     english: "Couldn’t start",
                                     norwegian: "Kunne ikke starte"
@@ -4497,7 +4616,7 @@ struct WorkoutInviteLaunchSheet: View {
                                 )
                             )
                             .foregroundStyle(
-                                ATHLTHTheme.accent
+                                ATHLTHTrainTogetherDesign.accent
                             )
 
                             Spacer()
