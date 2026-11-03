@@ -103,6 +103,24 @@ enum ATHLTHChallengeRunningFocus: String, CaseIterable, Identifiable, Codable, H
     }
 }
 
+/// Competition venue for a structured running challenge. This records the
+/// agreed environment, not a sensor-verifiable treadmill incline.
+enum ATHLTHChallengeRunningVenue: String, CaseIterable, Identifiable, Codable, Hashable {
+    case outdoor
+    case indoor
+    case treadmill
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .outdoor: return ATHLTHLocalization.choose(english: "Outdoor", norwegian: "Ute")
+        case .indoor: return ATHLTHLocalization.choose(english: "Indoor", norwegian: "Inne")
+        case .treadmill: return ATHLTHLocalization.choose(english: "Treadmill", norwegian: "Tredemølle")
+        }
+    }
+}
+
 enum ATHLTHChallengeRunningComparison: String, CaseIterable, Identifiable, Codable, Hashable {
     case fastestWork
     case mostWorkDistance
@@ -514,6 +532,13 @@ struct ATHLTHChallengeRules: Codable, Hashable {
     /// Portable, explicitly shared workout prescription. Never includes
     /// local route IDs, Spotify data, or private coach notes.
     var runningTemplateSnapshot: RunningWorkoutTemplate? = nil
+    /// Optional JSON rule preserves decoding of existing challenges.
+    var runningVenueRaw: String? = nil
+
+    var runningVenue: ATHLTHChallengeRunningVenue {
+        ATHLTHChallengeRunningVenue(rawValue: runningVenueRaw ?? "") ?? .outdoor
+    }
+
 
     var startsAt: Date
     var endsAt: Date?
