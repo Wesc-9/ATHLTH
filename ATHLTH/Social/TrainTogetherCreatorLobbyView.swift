@@ -1032,7 +1032,7 @@ struct TrainTogetherCreatorLobbyView: View {
             return .red
         }
         if participant.workoutStartedAt != nil {
-            return ATHLTHTheme.accent
+            return ATHLTHTrainTogetherDesign.accent
         }
         if participant.readyAt != nil {
             return ATHLTHTheme.premiumGold
