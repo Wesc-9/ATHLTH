@@ -8,7 +8,7 @@ enum ATHLTHPlannedWorkoutMetrics {
     }
 
     static func runningLocation(for blocks: [WorkoutTemplateBlock]) -> RunningLocation? {
-        let runs = blocks.filter { $0.kind == .run }
+        let runs = blocks.filter { $0.kind == .run && !$0.isActiveRecovery }
         guard !runs.isEmpty else { return nil }
         if runs.allSatisfy({
             $0.isIndoor == true && $0.treadmillInclinePercent != nil
@@ -64,7 +64,7 @@ enum ATHLTHPlannedWorkoutMetrics {
     static func commonPaceSecondsPerKilometer(
         for blocks: [WorkoutTemplateBlock]
     ) -> Double? {
-        let runs = blocks.filter { $0.kind == .run }
+        let runs = blocks.filter { $0.kind == .run && !$0.isActiveRecovery }
         guard !runs.isEmpty,
               let pace = runs.first?.targetPaceSecondsPerKilometer,
               pace.isFinite, pace > 0,
@@ -78,7 +78,7 @@ enum ATHLTHPlannedWorkoutMetrics {
     }
 
     static func hasVariablePace(for blocks: [WorkoutTemplateBlock]) -> Bool {
-        let targets = blocks.filter { $0.kind == .run }
+        let targets = blocks.filter { $0.kind == .run && !$0.isActiveRecovery }
             .compactMap(\.targetPaceSecondsPerKilometer)
             .filter { $0.isFinite && $0 > 0 }
         guard let first = targets.first else { return false }
