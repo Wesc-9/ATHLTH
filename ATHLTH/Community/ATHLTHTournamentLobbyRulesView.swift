@@ -34,6 +34,10 @@ struct ATHLTHTournamentLobbyRulesView: View {
         votes.first { $0.voterID == session.profile.userID }?.proposalID
     }
     private var rulesLocked: Bool { tournament.rulesConfirmedAt != nil }
+    private var acknowledged: Bool {
+        entries.first { $0.userID == session.profile.userID }?
+            .agreedRuleVersion == tournament.ruleVersion
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 15) {
@@ -70,6 +74,27 @@ struct ATHLTHTournamentLobbyRulesView: View {
                         ATHLTHTournamentCadence.window(tournament.completionHours))
                 }
 
+                Divider().opacity(0.5)
+                HStack(spacing: 12) {
+                    compactValue("Øvelser",
+                        tournament.rotationMode.title)
+                    compactValue("Poeng",
+                        "\(tournament.winPoints) seier · \(tournament.drawPoints) uavgjort")
+                }
+                if !tournament.restWeekdays.isEmpty {
+                    Text("Hviledager: " +
+                         tournament.restWeekdays.map {
+                            ["Man","Tir","Ons","Tor","Fre","Lør","Søn"][$0-1]
+                         }.joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                Text(tournament.publicResults
+                     ? "Resultattabellen er offentlig · Lobbychat er privat"
+                     : "Resultater kun for deltakere")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+
                 if tournament.completionHours > tournament.cadenceDays * 24 {
                     Text("Noen øvelser vil overlappe. Du kan se alle fristene i oppgjørsvisningen.")
                         .font(.caption)
@@ -78,6 +103,43 @@ struct ATHLTHTournamentLobbyRulesView: View {
             }
             .padding(16)
             .background(ATHLTHArenaV3Style.panel())
+
+            if tournament.status == "inviting" && rulesLocked &&
+               tournament.exerciseSelectionFinalizedAt != nil && isAccepted {
+                Button {
+                    Task {
+                        busy=true
+                        defer { busy=false }
+                        do {
+                            try await cloud.acceptFinalRules(
+                                tournamentID: tournament.id
+                            )
+                            await onChange()
+                            errorMessage=nil
+                        } catch {
+                            errorMessage=error.localizedDescription
+                        }
+                    }
+                } label: {
+                    Label(acknowledged
+                          ? "Du har godkjent regelversjon \(tournament.ruleVersion)"
+                          : "Jeg har lest og godkjenner alle reglene",
+                          systemImage: acknowledged
+                              ? "checkmark.seal.fill" : "checkmark.shield")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity,minHeight: 51)
+                        .background(
+                            ATHLTHArenaV3Style.ink,
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
+                }
+                .disabled(acknowledged || busy)
+                .opacity(acknowledged ? 0.75 : 1)
+                Text("Du må godkjenne øvelser, frister, poengberegning og konsekvenser ved uteblivelse før du kan trykke Klar.")
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
 
             if tournament.rulesAuthority == .group && !rulesLocked &&
                tournament.status == "inviting" {
@@ -123,16 +185,19 @@ struct ATHLTHTournamentLobbyRulesView: View {
         }
         .task(id: tournament.id) { await reload() }
         .sheet(isPresented: $showingProposal) {
-            ATHLTHTournamentRuleProposalEditor(
-                initialActivities: Set(tournament.allowedActivities),
-                initialCadence: tournament.cadenceDays,
-                initialCompletion: tournament.completionHours
-            ) { activities, cadence, completion in
+            ATHLTHTournamentRuleProposalEditor(initial: tournament) { choice in
                 try await cloud.proposeRules(
                     tournamentID: tournament.id,
-                    activities: activities,
-                    cadenceDays: cadence,
-                    completionHours: completion
+                    activities: choice.activities,
+                    cadenceDays: choice.cadenceDays,
+                    completionHours: choice.completionHours,
+                    rotation: choice.rotation,
+                    restDays: choice.restDays,
+                    proof: choice.proof,
+                    winPoints: choice.winPoints,
+                    drawPoints: choice.drawPoints,
+                    publicResults: choice.publicResults,
+                    allowExtensions: choice.allowExtensions
                 )
                 await reload()
                 await onChange()
@@ -176,6 +241,16 @@ struct ATHLTHTournamentLobbyRulesView: View {
             }
             .font(.caption.weight(.medium))
             .foregroundStyle(ATHLTHArenaV3Style.ink)
+            Text(proposal.rotationMode.title +
+                 " · \(proposal.winPoints) poeng ved seier")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            if !proposal.restWeekdays.isEmpty {
+                Text("Hviledager: " +
+                     proposal.restWeekdays.map { String($0) }.joined(separator: ", "))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
             if isAccepted {
                 Button {
                     Task { await vote(proposal.id) }
@@ -234,114 +309,104 @@ private struct FlowLayoutActivityBadges: View {
     }
 }
 
+private struct ATHLTHTournamentRuleSelection {
+    let activities: [ATHLTHTournamentActivity]
+    let cadenceDays: Int
+    let completionHours: Int
+    let rotation: ATHLTHTournamentRotationMode
+    let restDays: [Int]
+    let proof: ATHLTHTournamentProofMode
+    let winPoints: Int
+    let drawPoints: Int
+    let publicResults: Bool
+    let allowExtensions: Bool
+}
+
 private struct ATHLTHTournamentRuleProposalEditor: View {
     @Environment(\.dismiss) private var dismiss
     @State private var activities: Set<ATHLTHTournamentActivity>
     @State private var cadenceDays: Int
     @State private var completionHours: Int
-    @State private var busy = false
+    @State private var rotation: ATHLTHTournamentRotationMode
+    @State private var restDays: Set<Int>
+    @State private var proof: ATHLTHTournamentProofMode
+    @State private var winPoints: Int
+    @State private var drawPoints: Int
+    @State private var publicResults: Bool
+    @State private var allowExtensions: Bool
+    @State private var busy=false
     @State private var errorMessage: String?
 
-    let onSubmit: @MainActor ([ATHLTHTournamentActivity], Int, Int) async throws -> Void
+    let onSubmit: @MainActor (ATHLTHTournamentRuleSelection) async throws -> Void
 
-    init(
-        initialActivities: Set<ATHLTHTournamentActivity>,
-        initialCadence: Int,
-        initialCompletion: Int,
-        onSubmit: @escaping @MainActor ([ATHLTHTournamentActivity], Int, Int) async throws -> Void
-    ) {
-        _activities = State(initialValue: initialActivities)
-        _cadenceDays = State(initialValue: initialCadence)
-        _completionHours = State(initialValue: initialCompletion)
-        self.onSubmit = onSubmit
+    init(initial: ATHLTHTournamentRemote,
+         onSubmit: @escaping @MainActor
+            (ATHLTHTournamentRuleSelection) async throws -> Void) {
+        _activities=State(initialValue: Set(initial.allowedActivities))
+        _cadenceDays=State(initialValue: initial.cadenceDays)
+        _completionHours=State(initialValue: initial.completionHours)
+        _rotation=State(initialValue: initial.rotationMode)
+        _restDays=State(initialValue: Set(initial.restWeekdays))
+        _proof=State(initialValue: initial.proofMode)
+        _winPoints=State(initialValue: initial.winPoints)
+        _drawPoints=State(initialValue: initial.drawPoints)
+        _publicResults=State(initialValue: initial.publicResults)
+        _allowExtensions=State(initialValue: initial.allowExtensions)
+        self.onSubmit=onSubmit
     }
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    Text("Mitt forslag")
-                        .font(.system(size: 28, weight: .regular, design: .serif))
-                        .foregroundStyle(ATHLTHArenaV3Style.ink)
-                    Text("Velg aktivitetene, hvor ofte øvelsene skal komme, og hvor lenge de kan utføres.")
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
-
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())],
-                              spacing: 9) {
-                        ForEach(ATHLTHTournamentActivity.allCases) { activity in
-                            Button {
-                                if activities.contains(activity) {
-                                    activities.remove(activity)
-                                } else { activities.insert(activity) }
-                            } label: {
-                                HStack(spacing: 8) {
-                                    Image(systemName: activity.symbol)
-                                        .foregroundStyle(ATHLTHArenaV3Style.gold)
-                                    Text(activity.title)
-                                        .font(.caption.weight(.medium))
-                                    Spacer()
-                                    Image(systemName: activities.contains(activity)
-                                          ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(ATHLTHArenaV3Style.gold)
-                                }
-                                .foregroundStyle(ATHLTHArenaV3Style.ink)
-                                .padding(11)
-                                .background(ATHLTHArenaV3Style.panel())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    HStack {
-                        Text("Ny øvelse")
-                        Spacer()
-                        Picker("Hyppighet", selection: $cadenceDays) {
-                            ForEach(ATHLTHTournamentCadence.options,
-                                    id: \.self) { day in
-                                Text(ATHLTHTournamentCadence.title(for: day)).tag(day)
-                            }
-                        }
-                    }
-                    .padding(15)
-                    .background(ATHLTHArenaV3Style.panel())
-
-                    HStack {
-                        Text("Gjennomføringsfrist")
-                        Spacer()
-                        Picker("Frist", selection: $completionHours) {
-                            ForEach(ATHLTHTournamentCadence.completionHours,
-                                    id: \.self) { duration in
-                                Text(ATHLTHTournamentCadence.window(duration))
-                                    .tag(duration)
-                            }
-                        }
-                    }
-                    .padding(15)
-                    .background(ATHLTHArenaV3Style.panel())
-
+                VStack(alignment: .leading,spacing: 18) {
+                    ATHLTHTournamentRuleConfigurationSection(
+                        activities: $activities,
+                        authority: .constant(.group),
+                        cadenceDays: $cadenceDays,
+                        completionHours: $completionHours
+                    )
+                    ATHLTHTournamentAdvancedRulesSection(
+                        rotation: $rotation,
+                        restDays: $restDays,
+                        winPoints: $winPoints,
+                        drawPoints: $drawPoints,
+                        allowExtensions: $allowExtensions,
+                        publicResults: $publicResults,
+                        proof: $proof
+                    )
                     if let errorMessage {
-                        Text(errorMessage)
-                            .font(.caption)
-                            .foregroundStyle(.red)
+                        Text(errorMessage).font(.caption).foregroundStyle(.red)
                     }
                     Button {
                         Task {
-                            busy = true
-                            defer { busy = false }
+                            busy=true
+                            defer { busy=false }
                             do {
-                                try await onSubmit(Array(activities).sorted {
-                                    $0.rawValue < $1.rawValue
-                                }, cadenceDays, completionHours)
+                                try await onSubmit(ATHLTHTournamentRuleSelection(
+                                    activities: Array(activities).sorted {
+                                        $0.rawValue < $1.rawValue
+                                    },
+                                    cadenceDays: cadenceDays,
+                                    completionHours: completionHours,
+                                    rotation: rotation,
+                                    restDays: Array(restDays).sorted(),
+                                    proof: proof,
+                                    winPoints: winPoints,
+                                    drawPoints: drawPoints,
+                                    publicResults: publicResults,
+                                    allowExtensions: allowExtensions
+                                ))
                                 dismiss()
-                            } catch { errorMessage = error.localizedDescription }
+                            } catch {
+                                errorMessage=error.localizedDescription
+                            }
                         }
                     } label: {
                         Text("Send regelsett til avstemning")
                             .font(.headline)
                             .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity, minHeight: 53)
-                            .background(ATHLTHArenaV3Style.ink, in: Capsule())
+                            .frame(maxWidth: .infinity,minHeight: 54)
+                            .background(ATHLTHArenaV3Style.ink,in: Capsule())
                     }
                     .disabled(activities.isEmpty || busy)
                 }
@@ -356,6 +421,6 @@ private struct ATHLTHTournamentRuleProposalEditor: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.medium,.large])
     }
 }
