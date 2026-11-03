@@ -514,90 +514,331 @@ struct ATHLTHInsightsSleepStagesCard: View {
     }
 }
 
-/// The overview shows useful context, not 22 miniature diagnostic tiles.
-struct ATHLTHInsightsVitalContextCard: View {
-    let snapshot: RecoveryTrendSnapshot
+/// Seven *completed* calendar days of ordinary activity, not a second
+/// readiness card. Only actual Apple Health records are shown; a missing
+/// measurement is distinct from a recorded value of zero.
+struct ATHLTHInsightsDailyRhythmCard: View {
     @EnvironmentObject private var health: HealthKitManager
+    @State private var stepsHistory: [ATHLTHInsightHealthDay] = []
+    @State private var daylightHistory: [ATHLTHInsightHealthDay] = []
+    @State private var exerciseHistory: [ATHLTHInsightHealthDay] = []
+    @State private var isLoading = true
 
-    private func previousAndCurrent(
-        _ value: (RecoveryTrendDay) -> Double?
-    ) -> (previous: Double, recent: Double)? {
-        let days = snapshot.days.suffix(14)
-        let prev = Array(days.dropLast(7)).compactMap(value).filter { $0.isFinite && $0 > 0 }
-        let curr = Array(days.suffix(7)).compactMap(value).filter { $0.isFinite && $0 > 0 }
-        guard prev.count >= 3, curr.count >= 3 else { return nil }
-        return (prev.reduce(0,+)/Double(prev.count),
-                curr.reduce(0,+)/Double(curr.count))
+    private let calendar = Calendar.current
+
+    private func tr(_ english: String, _ norwegian: String) -> String {
+        ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 
-    private var explanation: String {
-        guard let hrv = previousAndCurrent({ $0.hrvMilliseconds }),
-              let resting = previousAndCurrent({ $0.restingHeartRate }) else {
-            return ATHLTHLocalization.choose(
-                english: "Your personal baseline appears after several comparable days of HRV and resting-heart-rate measurements.",
-                norwegian: "Din personlige trend vises når vi har flere sammenlignbare dager med HRV og hvilepuls."
+    private var today: Date {
+        calendar.startOfDay(for: Date())
+    }
+
+    private var completedDays: [Date] {
+        (-7 ... -1).compactMap {
+            calendar.date(byAdding: .day, value: $0, to: today)
+        }
+    }
+
+    private func measuredValue(
+        on day: Date,
+        in history: [ATHLTHInsightHealthDay]
+    ) -> Double? {
+        history.first(where: {
+            calendar.isDate($0.date, inSameDayAs: day) &&
+            $0.value.isFinite && $0.value >= 0
+        })?.value
+    }
+
+    private func measurements(
+        in history: [ATHLTHInsightHealthDay],
+        fromOffset start: Int,
+        throughOffset end: Int
+    ) -> [Double] {
+        (start ... end).compactMap { offset -> Double? in
+            guard let date = calendar.date(
+                byAdding: .day, value: offset, to: today
+            ) else { return nil }
+            return measuredValue(on: date, in: history)
+        }
+    }
+
+    private var recentSteps: [Double] {
+        measurements(in: stepsHistory, fromOffset: -7, throughOffset: -1)
+    }
+
+    private var previousSteps: [Double] {
+        measurements(in: stepsHistory, fromOffset: -14, throughOffset: -8)
+    }
+
+    private func average(_ values: [Double]) -> Double? {
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
+    }
+
+    private var stepsAverage: Double? { average(recentSteps) }
+
+    private var daylightAverage: Double? {
+        average(measurements(
+            in: daylightHistory, fromOffset: -7, throughOffset: -1
+        ))
+    }
+
+    private var exerciseMinutes: Double? {
+        let values = measurements(
+            in: exerciseHistory, fromOffset: -7, throughOffset: -1
+        )
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +)
+    }
+
+    private var stepsChangePercent: Double? {
+        // Avoid making a weekly comparison from one or two isolated days.
+        guard recentSteps.count >= 4, previousSteps.count >= 4,
+              let recent = average(recentSteps),
+              let previous = average(previousSteps),
+              previous > 0
+        else { return nil }
+        return (recent - previous) / previous * 100
+    }
+
+    private var context: String {
+        if !health.hasRequestedAuthorization {
+            return tr(
+                "Connect Apple Health to discover your everyday activity pattern.",
+                "Koble til Apple Helse for å se mønsteret i hverdagsaktiviteten din."
             )
         }
-        if hrv.recent < hrv.previous * 0.92 && resting.recent > resting.previous * 1.04 {
-            return ATHLTHLocalization.choose(
-                english: "HRV is below its recent average while resting heart rate is higher. Watch the pattern over several days rather than judging one reading.",
-                norwegian: "HRV ligger lavere og hvilepulsen høyere enn nylig gjennomsnitt. Følg utviklingen over flere dager fremfor én enkeltmåling."
+        if isLoading {
+            return tr("Reading recorded activity…", "Henter registrert aktivitet …")
+        }
+        if let change = stepsChangePercent {
+            let percent = Int(abs(change).rounded())
+            if change >= 8 {
+                return tr(
+                    "Average daily steps are up \\(percent)% compared with the previous week.",
+                    "Gjennomsnittlig antall skritt per måledag er opp \\(percent) % fra uken før."
+                )
+            }
+            if change <= -8 {
+                return tr(
+                    "Average daily steps are down \\(percent)% compared with the previous week.",
+                    "Gjennomsnittlig antall skritt per måledag er ned \\(percent) % fra uken før."
+                )
+            }
+            return tr(
+                "Average daily steps are broadly similar to the previous week.",
+                "Gjennomsnittlig antall skritt per måledag er omtrent som uken før."
             )
         }
-        return ATHLTHLocalization.choose(
-            english: "Your HRV and resting heart rate can be compared with your own recent measurements. Trends do not provide a diagnosis.",
-            norwegian: "HRV og hvilepuls kan sammenlignes med dine egne tidligere målinger. Trendene er ikke en diagnose."
+        if !recentSteps.isEmpty {
+            return tr(
+                "Steps recorded on \\(recentSteps.count) of 7 days. A weekly comparison needs at least four recorded days in each week.",
+                "Skritt registrert på \\(recentSteps.count) av 7 dager. Sammenligning krever minst fire måledager i hver uke."
+            )
+        }
+        if daylightAverage != nil || exerciseMinutes != nil {
+            return tr(
+                "No recent step data. Other recorded activity is shown without estimating missing days.",
+                "Ingen nyere skrittdata. Annen aktivitet vises uten å beregne manglende dager."
+            )
+        }
+        return tr(
+            "No recorded activity for the last seven completed days.",
+            "Ingen registrert aktivitet de siste sju avsluttede dagene."
         )
     }
 
+    private var highestSteps: Double {
+        max(completedDays.compactMap {
+            measuredValue(on: $0, in: stepsHistory)
+        }.max() ?? 0, 1)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label(ATHLTHLocalization.choose(
-                english: "Your body's signals",
-                norwegian: "Kroppens signaler"
-            ), systemImage: "heart.text.square")
-                .font(.headline)
-                .foregroundStyle(ATHLTHInsightsStyle.ink)
-            HStack(spacing: 8) {
-                stat(.hrv)
-                stat(.restingHeartRate)
-                stat(.respiratoryRate)
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "figure.walk.motion")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(ATHLTHInsightsStyle.accent)
+                    .frame(width: 34, height: 34)
+                    .background(
+                        ATHLTHInsightsStyle.accent.opacity(0.10),
+                        in: RoundedRectangle(cornerRadius: 11)
+                    )
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tr("Everyday rhythm", "Hverdagsrytme"))
+                        .font(.system(size: 20, weight: .medium, design: .serif))
+                        .foregroundStyle(ATHLTHInsightsStyle.ink)
+                    Text(tr(
+                        "Movement, exercise and daylight",
+                        "Bevegelse, trening og dagslys"
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+                }
+                Spacer(minLength: 2)
+                Text(tr("7 days", "7 dager"))
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+                    .padding(.top, 6)
             }
-            Text(explanation)
-                .font(.subheadline)
+
+            HStack(spacing: 8) {
+                rhythmMetric(
+                    .steps,
+                    value: stepsAverage.map {
+                        Int($0.rounded()).formatted()
+                    } ?? "—",
+                    subtitle: tr("per recorded day", "per måledag")
+                )
+                rhythmMetric(
+                    .daylightMinutes,
+                    value: daylightAverage.map {
+                        "\\(Int($0.rounded())) min"
+                    } ?? "—",
+                    subtitle: tr("per recorded day", "per måledag")
+                )
+                rhythmMetric(
+                    .exerciseMinutes,
+                    value: exerciseMinutes.map {
+                        "\\(Int($0.rounded())) min"
+                    } ?? "—",
+                    subtitle: tr("recorded in 7 days", "registrert på 7 d")
+                )
+            }
+
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Text(tr("Steps through the week", "Skritt gjennom uken"))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHInsightsStyle.ink)
+                    Spacer()
+                    Text(tr("Completed days", "Avsluttede dager"))
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHInsightsStyle.muted)
+                }
+                HStack(alignment: .bottom, spacing: 7) {
+                    ForEach(completedDays, id: \\.self) { day in
+                        let steps = measuredValue(on: day, in: stepsHistory)
+                        VStack(spacing: 5) {
+                            RoundedRectangle(cornerRadius: 5)
+                                .fill(steps == nil
+                                      ? ATHLTHInsightsStyle.track
+                                      : ATHLTHInsightsStyle.accent)
+                                .frame(
+                                    height: steps.map {
+                                        max(4, CGFloat($0 / highestSteps) * 45)
+                                    } ?? 4
+                                )
+                                .frame(maxHeight: .infinity, alignment: .bottom)
+                            Text(day.formatted(.dateTime.weekday(.narrow)))
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(ATHLTHInsightsStyle.muted)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel(
+                            day.formatted(date: .abbreviated, time: .omitted)
+                            + ": " + (steps.map {
+                                "\\(Int($0.rounded())) " +
+                                    tr("steps", "skritt")
+                            } ?? tr("No reading", "Ingen måling"))
+                        )
+                    }
+                }
+                .frame(height: 66, alignment: .bottom)
+            }
+            .padding(12)
+            .background(
+                ATHLTHInsightsStyle.canvas,
+                in: RoundedRectangle(cornerRadius: 15)
+            )
+
+            Text(context)
+                .font(.caption)
                 .foregroundStyle(ATHLTHInsightsStyle.muted)
                 .fixedSize(horizontal: false, vertical: true)
+
             NavigationLink {
-                ATHLTHInsightsHealthAreaView(area: .vitalSigns)
+                ATHLTHInsightsHealthAreaView(area: .activity)
             } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "View vital signs", norwegian: "Se kroppens signaler"
-                ), systemImage: "arrow.right")
+                Label(
+                    tr("Explore daily activity", "Utforsk daglig aktivitet"),
+                    systemImage: "arrow.up.right"
+                )
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(ATHLTHInsightsStyle.accent)
             }
+            .buttonStyle(.plain)
         }
         .padding(16)
         .athlthInsightsSurface()
+        .task(id: health.lastSuccessfulRefreshAt) {
+            await loadActivity()
+        }
     }
 
-    private func stat(_ metric: ATHLTHInsightHealthMetric) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            Text(metric.title)
-                .font(.caption2)
-                .foregroundStyle(ATHLTHInsightsStyle.muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Text(metric.formatted(metric.currentValue(in: health)))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(ATHLTHInsightsStyle.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.65)
+    private func rhythmMetric(
+        _ metric: ATHLTHInsightHealthMetric,
+        value: String,
+        subtitle: String
+    ) -> some View {
+        NavigationLink {
+            ATHLTHInsightsHealthMetricDetailView(metric: metric)
+        } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                Text(metric.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.70)
+                Text(value)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.65)
+                Text(subtitle)
+                    .font(.system(size: 9))
+                    .foregroundStyle(ATHLTHInsightsStyle.muted)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+            }
+            .frame(maxWidth: .infinity, minHeight: 63, alignment: .leading)
+            .padding(10)
+            .background(
+                ATHLTHInsightsStyle.canvas,
+                in: RoundedRectangle(cornerRadius: 13)
+            )
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(ATHLTHInsightsStyle.canvas,
-                    in: RoundedRectangle(cornerRadius: 12))
+        .buttonStyle(.plain)
+    }
+
+    @MainActor
+    private func loadActivity() async {
+        guard health.healthDataAvailable,
+              health.hasRequestedAuthorization,
+              !health.shouldDeferAutomaticHealthWork else {
+            stepsHistory = []
+            daylightHistory = []
+            exerciseHistory = []
+            isLoading = false
+            return
+        }
+        isLoading = true
+        // Query in parallel, only while Overview is visible. Fifteen days
+        // include the 14 finished days; today's incomplete data is excluded.
+        async let steps = health.insightDailyValues(for: .steps, days: 15)
+        async let daylight = health.insightDailyValues(for: .daylightMinutes, days: 15)
+        async let exercise = health.insightDailyValues(for: .exerciseMinutes, days: 15)
+        let (recordedSteps, recordedDaylight, recordedExercise) =
+            await (steps, daylight, exercise)
+        guard !Task.isCancelled else { return }
+        stepsHistory = recordedSteps
+        daylightHistory = recordedDaylight
+        exerciseHistory = recordedExercise
+        isLoading = false
     }
 }
 
