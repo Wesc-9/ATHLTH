@@ -21,6 +21,11 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let votesCloseAt: Date?
     let approvePlayerChanges: Bool
     let exerciseSelectionFinalizedAt: Date?
+    let allowedActivities: [ATHLTHTournamentActivity]
+    let rulesAuthority: ATHLTHTournamentRulesAuthority
+    let cadenceDays: Int
+    let completionHours: Int
+    let rulesConfirmedAt: Date?
     let createdAt: Date
     let startedAt: Date?
     let completedAt: Date?
@@ -33,6 +38,11 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
         case votesCloseAt = "votes_close_at"
         case approvePlayerChanges = "approve_player_changes"
         case exerciseSelectionFinalizedAt = "exercise_selection_finalized_at"
+        case allowedActivities = "allowed_activities"
+        case rulesAuthority = "rules_authority"
+        case cadenceDays = "cadence_days"
+        case completionHours = "completion_hours"
+        case rulesConfirmedAt = "rules_confirmed_at"
         case ownerID = "owner_id"
         case clubID = "club_id"
         case seasonID = "season_id"
@@ -197,11 +207,17 @@ private struct ATHLTHTournamentConfiguredCreateParams: Encodable {
     let p_proposals_close: String?
     let p_votes_close: String?
     let p_approve_player_changes: Bool
+    let p_allowed_activities: [String]
+    let p_rules_authority: String
+    let p_cadence_days: Int
+    let p_completion_hours: Int
 
     enum CodingKeys: String, CodingKey {
         case p_title,p_format,p_club,p_season,p_group_size,p_qualifiers,
              p_invitees,p_warmup_titles,p_exercise_mode,p_exercise_count,
-             p_proposals_close,p_votes_close,p_approve_player_changes
+             p_proposals_close,p_votes_close,p_approve_player_changes,
+             p_allowed_activities,p_rules_authority,p_cadence_days,
+             p_completion_hours
     }
 
     func encode(to encoder: Encoder) throws {
@@ -219,6 +235,10 @@ private struct ATHLTHTournamentConfiguredCreateParams: Encodable {
         try keyed.encode(p_proposals_close,forKey: .p_proposals_close)
         try keyed.encode(p_votes_close,forKey: .p_votes_close)
         try keyed.encode(p_approve_player_changes,forKey: .p_approve_player_changes)
+        try keyed.encode(p_allowed_activities,forKey: .p_allowed_activities)
+        try keyed.encode(p_rules_authority,forKey: .p_rules_authority)
+        try keyed.encode(p_cadence_days,forKey: .p_cadence_days)
+        try keyed.encode(p_completion_hours,forKey: .p_completion_hours)
     }
 }
 
@@ -304,7 +324,7 @@ struct ATHLTHTournamentCloudService {
         let targets = draft.participants.filter { $0.id != draft.ownerID }
         let timestamp = ISO8601DateFormatter()
         return try await client.rpc(
-            "athlth_tournament_create_configured",
+            "athlth_tournament_create_with_rules",
             params: ATHLTHTournamentConfiguredCreateParams(
                 p_title: draft.title,
                 p_format: draft.format.rawValue,
@@ -322,7 +342,11 @@ struct ATHLTHTournamentCloudService {
                 p_votes_close: draft.votesCloseAt.map {
                     timestamp.string(from: $0)
                 },
-                p_approve_player_changes: draft.approvePlayerChanges
+                p_approve_player_changes: draft.approvePlayerChanges,
+                p_allowed_activities: draft.allowedActivities.map(\.rawValue),
+                p_rules_authority: draft.rulesAuthority.rawValue,
+                p_cadence_days: draft.cadenceDays,
+                p_completion_hours: draft.completionHours
             )
         ).execute().value
     }
