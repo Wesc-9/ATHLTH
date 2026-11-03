@@ -2755,13 +2755,17 @@ struct ATHLTHHomeView: View {
                 workout.kind
                     .systemImage,
             detail:
-                homeSessionSummary(
-                    workout
-                ),
+                workout.trainTogetherMode == nil
+                    ? homeSessionSummary(workout)
+                    : ATHLTHLocalization.choose(
+                        english: "Train together", norwegian: "Tren sammen"
+                    ) + (homeTrainTogetherPartner(for: workout).map {
+                        " · \($0)"
+                    } ?? ""),
             tint:
-                homeWorkoutTint(
-                    workout.kind
-                )
+                workout.trainTogetherMode == nil
+                    ? homeWorkoutTint(workout.kind)
+                    : ATHLTHTrainDesign.bronze
         )
     }
 
