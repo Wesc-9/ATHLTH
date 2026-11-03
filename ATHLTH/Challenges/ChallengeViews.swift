@@ -8663,6 +8663,7 @@ struct ChallengeDetailView: View {
     @State private var cancellingChallenge = false
     @State private var challengeCancellationError: String?
     @State private var savedChallengeTemplateID: UUID?
+    @State private var treadmillReviewAttempt: ChallengeAttempt?
 
     private var challenge: ATHLTHChallenge? {
         challenges.challenge(id: challengeID)
@@ -9129,6 +9130,11 @@ struct ChallengeDetailView: View {
                             challengeID: challenge.id,
                             participant: currentParticipant
                         )
+                    }
+                }
+                .sheet(item: $treadmillReviewAttempt) { attempt in
+                    ATHLTHChallengeTreadmillReviewView(attempt: attempt) {
+                        await social.refreshChallenges(challengeStore: challenges)
                     }
                 }
                 .sheet(
@@ -11249,6 +11255,28 @@ struct ChallengeDetailView: View {
 
                             Text(attempt.detail)
                                 .font(.caption)
+
+                            if ATHLTHChallengeTreadmillReviewPolicy.mayReview(
+                                attempt,
+                                challenge: challenge,
+                                currentUserID: session.profile.userID
+                            ) {
+                                Button {
+                                    treadmillReviewAttempt = attempt
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "Review treadmill distance",
+                                            norwegian: "Gjennomgå tredemølledistanse"
+                                        ),
+                                        systemImage: "pencil.line"
+                                    )
+                                    .font(.caption.weight(.semibold))
+                                }
+                                .buttonStyle(.plain)
+                                .foregroundStyle(ChallengePlanTheme.gold)
+                                .padding(.top, 5)
+                            }
 
                             if let reason = attempt.ineligibilityReason {
                                 Text(reason)
