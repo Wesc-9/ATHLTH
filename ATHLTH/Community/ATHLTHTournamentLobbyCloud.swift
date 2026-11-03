@@ -4,7 +4,8 @@ import Supabase
 struct ATHLTHTournamentExerciseCandidateRemote: Decodable, Identifiable {
     let id: UUID
     let tournamentID: UUID
-    let exerciseID: UUID
+    let exerciseID: UUID?
+    let activityTemplateID: UUID?
     let suggestedBy: UUID
     let createdAt: Date
     let selectedPosition: Int?
@@ -12,10 +13,72 @@ struct ATHLTHTournamentExerciseCandidateRemote: Decodable, Identifiable {
         case id
         case tournamentID = "tournament_id"
         case exerciseID = "exercise_id"
+        case activityTemplateID = "activity_template_id"
         case suggestedBy = "suggested_by"
         case createdAt = "created_at"
         case selectedPosition = "selected_position"
     }
+    var lookupID: UUID { activityTemplateID ?? exerciseID ?? id }
+}
+
+struct ATHLTHTournamentActivityTemplateRemote: Decodable, Identifiable {
+    let id: UUID
+    let title: String
+    let activityType: ATHLTHTournamentActivity
+    enum CodingKeys: String, CodingKey {
+        case id,title
+        case activityType = "activity_type"
+    }
+}
+
+struct ATHLTHTournamentExerciseSearchResult: Identifiable {
+    let id: UUID
+    let name: String
+    let isActivityTemplate: Bool
+}
+
+struct ATHLTHTournamentRuleProposalRemote: Decodable, Identifiable {
+    let id: UUID
+    let tournamentID: UUID
+    let proposerID: UUID
+    let allowedActivities: [ATHLTHTournamentActivity]
+    let cadenceDays: Int
+    let completionHours: Int
+    let createdAt: Date
+    enum CodingKeys: String, CodingKey {
+        case id
+        case tournamentID = "tournament_id"
+        case proposerID = "proposer_id"
+        case allowedActivities = "allowed_activities"
+        case cadenceDays = "cadence_days"
+        case completionHours = "completion_hours"
+        case createdAt = "created_at"
+    }
+}
+
+struct ATHLTHTournamentRuleVoteRemote: Decodable {
+    let proposalID: UUID
+    let voterID: UUID
+    enum CodingKeys: String, CodingKey {
+        case proposalID = "proposal_id"
+        case voterID = "voter_id"
+    }
+}
+
+private struct ATHLTHTournamentProposeRulesParams: Encodable {
+    let p_tournament: UUID
+    let p_allowed_activities: [String]
+    let p_cadence_days: Int
+    let p_completion_hours: Int
+}
+
+private struct ATHLTHTournamentVoteRulesParams: Encodable {
+    let p_proposal: UUID
+}
+
+private struct ATHLTHTournamentSuggestActivityParams: Encodable {
+    let p_tournament: UUID
+    let p_template: UUID
 }
 
 struct ATHLTHTournamentExerciseVoteRemote: Decodable {
@@ -176,7 +239,7 @@ struct ATHLTHTournamentLobbyCloudService {
     func candidates(tournamentID: UUID) async throws
       -> [ATHLTHTournamentExerciseCandidateRemote] {
         try await client.from("athlth_tournament_exercise_candidates")
-          .select("id,tournament_id,exercise_id,suggested_by,created_at,selected_position")
+          .select("id,tournament_id,exercise_id,activity_template_id,suggested_by,created_at,selected_position")
           .eq("tournament_id", value: tournamentID)
           .order("created_at")
           .limit(500).execute().value
@@ -209,6 +272,103 @@ struct ATHLTHTournamentLobbyCloudService {
           .ilike("name",pattern: "%\(q)%")
           .order("name")
           .limit(30).execute().value
+    }
+
+    func searchCompetitionExercises(
+        _ query: String,
+        allowed: [ATHLTHTournamentActivity]
+    ) async throws -> [ATHLTHTournamentExerciseSearchResult] {
+        let clean = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard clean.count >= 2, !allowed.isEmpty else { return [] }
+
+        let presets: [ATHLTHTournamentActivityTemplateRemote] = try await client
+            .from("athlth_tournament_activity_templates")
+            .select("id,title,activity_type")
+            .in("activity_type", values: allowed.map(\.rawValue))
+            .ilike("title", pattern: "%\(clean)%")
+            .order("title")
+            .limit(40).execute().value
+        var result = presets.map {
+            ATHLTHTournamentExerciseSearchResult(
+                id: $0.id,name: $0.title,isActivityTemplate: true
+            )
+        }
+        if allowed.contains(.strength) {
+            let exercises = try await searchExercises(clean)
+            result += exercises.map {
+                ATHLTHTournamentExerciseSearchResult(
+                    id: $0.id,name: $0.name,isActivityTemplate: false
+                )
+            }
+        }
+        return result
+    }
+
+    func candidateNames(
+        _ candidates: [ATHLTHTournamentExerciseCandidateRemote]
+    ) async throws -> [UUID: String] {
+        let catalogIds = Set(candidates.compactMap(\.exerciseID))
+        let presetIDs = Array(Set(candidates.compactMap(\.activityTemplateID)))
+        var titles = try await exerciseNames(ids: catalogIds)
+        if !presetIDs.isEmpty {
+            let templates: [ATHLTHTournamentActivityTemplateRemote] = try await client
+                .from("athlth_tournament_activity_templates")
+                .select("id,title,activity_type")
+                .in("id",values: presetIDs)
+                .limit(500).execute().value
+            for template in templates {
+                titles[template.id] = template.title
+            }
+        }
+        return titles
+    }
+
+    func suggestTemplate(tournamentID: UUID, templateID: UUID) async throws {
+        try await client.rpc(
+            "athlth_tournament_suggest_activity_template",
+            params: ATHLTHTournamentSuggestActivityParams(
+                p_tournament: tournamentID,p_template: templateID
+            )
+        ).execute()
+    }
+
+    func ruleProposals(tournamentID: UUID) async throws
+      -> [ATHLTHTournamentRuleProposalRemote] {
+        try await client.from("athlth_tournament_rule_proposals")
+            .select("id,tournament_id,proposer_id,allowed_activities,cadence_days,completion_hours,created_at")
+            .eq("tournament_id",value: tournamentID)
+            .order("created_at")
+            .limit(16).execute().value
+    }
+
+    func ruleVotes(tournamentID: UUID) async throws
+      -> [ATHLTHTournamentRuleVoteRemote] {
+        try await client.from("athlth_tournament_rule_votes")
+            .select("proposal_id,voter_id")
+            .eq("tournament_id",value: tournamentID)
+            .limit(128).execute().value
+    }
+
+    func proposeRules(
+        tournamentID: UUID,
+        activities: [ATHLTHTournamentActivity],
+        cadenceDays: Int,
+        completionHours: Int
+    ) async throws {
+        try await client.rpc("athlth_tournament_propose_rules",
+            params: ATHLTHTournamentProposeRulesParams(
+                p_tournament: tournamentID,
+                p_allowed_activities: activities.map(\.rawValue),
+                p_cadence_days: cadenceDays,
+                p_completion_hours: completionHours
+            )
+        ).execute()
+    }
+
+    func voteRules(proposalID: UUID) async throws {
+        try await client.rpc("athlth_tournament_vote_rules",
+            params: ATHLTHTournamentVoteRulesParams(p_proposal: proposalID)
+        ).execute()
     }
 
     func suggest(tournamentID: UUID, exerciseID: UUID) async throws {
