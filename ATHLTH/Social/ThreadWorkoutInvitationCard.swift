@@ -5,6 +5,7 @@ import SwiftUI
 struct ThreadWorkoutInvitationCard: View {
     let workout: PlannedSession
     let response: PlannedWorkoutInviteResponse?
+    let lifecycleUpdate: WorkoutInviteLifecycleUpdate? = nil
     let isMine: Bool
     let isResponding: Bool
     let onAccept: () -> Void
@@ -198,7 +199,29 @@ struct ThreadWorkoutInvitationCard: View {
                     in: RoundedRectangle(cornerRadius: 11)
                 )
 
-                if !isMine && response == nil {
+                if lifecycleUpdate?.kind == .cancelled {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Cancelled by organizer",
+                            norwegian: "Avlyst av arrangøren"
+                        ),
+                        systemImage: "xmark.circle.fill"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                } else if lifecycleUpdate?.kind == .updated {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Updated by organizer",
+                            norwegian: "Oppdatert av arrangøren"
+                        ),
+                        systemImage: "calendar.badge.clock"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                }
+
+                if !isMine && response == nil && lifecycleUpdate?.kind != .cancelled {
                     HStack(spacing: 9) {
                         Button(action: onDecline) {
                             Label(
@@ -266,7 +289,8 @@ struct ThreadWorkoutInvitationCard: View {
 
                 // Acceptance schedules the workout; it does not close the
                 // negotiation window. Guests may suggest changes afterward.
-                if !isMine && response?.decision != .declined {
+                if !isMine && response?.decision != .declined &&
+                    lifecycleUpdate?.kind != .cancelled {
                     Button(action: onProposeChanges) {
                         Label(
                             ATHLTHLocalization.choose(
