@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TrainTogetherCreatorLobbyView: View {
     @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var messaging: MessagingStore
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @StateObject private var companion = SocialWorkoutCompanionStore()
 
@@ -11,6 +12,11 @@ struct TrainTogetherCreatorLobbyView: View {
     @State private var selectedCaptureDevice: WorkoutCaptureDevice = .iPhone
     @State private var didLoadCaptureDevice = false
     @State private var startError: String?
+    @State private var isChangingArrival = false
+    @State private var confirmingIndependentStart = false
+    @State private var confirmingCancellation = false
+    @State private var reminderInFlight: Set<UUID> = []
+    @State private var chatPartner: SocialProfileCard?
 
     private var hasStarted: Bool {
         participants.contains { $0.workoutStartedAt != nil }
@@ -105,6 +111,50 @@ struct TrainTogetherCreatorLobbyView: View {
             .navigationBarTitleDisplayMode(.inline)
             .interactiveDismissDisabled()
         }
+        .sheet(item: $chatPartner) { profile in
+            NavigationStack {
+                DirectMessageThreadView(friend: profile)
+            }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Start without the others?",
+                norwegian: "Starte uten de andre?"
+            ),
+            isPresented: $confirmingIndependentStart,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Start alone", norwegian: "Start alene"
+            ), role: .destructive) {
+                startAloneAfterConfirmation()
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Keep waiting", norwegian: "Fortsett å vente"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Other participants will remain invited. You won't have a shared 3–2–1 start.",
+                norwegian: "De andre beholder invitasjonen, men dere får ikke felles 3–2–1-start."
+            ))
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Cancel the shared start invitation?",
+                norwegian: "Avlyse invitasjonen til fellesstart?"
+            ),
+            isPresented: $confirmingCancellation,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel invitation", norwegian: "Avlys invitasjonen"
+            ), role: .destructive) {
+                Task { await social.cancelActiveWorkout(sessionID: sessionID) }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Keep invitation", norwegian: "Behold invitasjonen"
+            ), role: .cancel) {}
+        }
         .task(id: sessionID) {
             if !didLoadCaptureDevice {
                 selectedCaptureDevice = social.proposedCreatorCaptureDevice(
@@ -190,6 +240,20 @@ struct TrainTogetherCreatorLobbyView: View {
             .font(.subheadline)
             .foregroundStyle(ATHLTHTrainTogetherDesign.secondary)
             .fixedSize(horizontal: false, vertical: true)
+
+            if let plannedStart = session?.invitePayload?.workout.scheduledStart {
+                Label(
+                    plannedStart > Date()
+                        ? plannedStart.formatted(date: .abbreviated, time: .shortened)
+                        : ATHLTHLocalization.choose(
+                            english: "Scheduled time passed · awaiting shared start",
+                            norwegian: "Planlagt tid passert · venter på felles start"
+                        ),
+                    systemImage: "calendar"
+                )
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+            }
         }
         .padding(19)
         .frame(maxWidth: .infinity, alignment: .leading)
