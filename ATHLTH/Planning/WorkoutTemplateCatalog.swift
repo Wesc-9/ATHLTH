@@ -348,9 +348,6 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
                 norwegian: "Pulssone S\(targetHeartRateZone)"
             ))
         }
-        if let targetEffortRPE, (1...10).contains(targetEffortRPE) {
-            parts.append("RPE \(targetEffortRPE)/10")
-        }
         if isIndoor == true, let treadmillInclinePercent,
            treadmillInclinePercent.isFinite,
            (0...20).contains(treadmillInclinePercent) {
@@ -6037,41 +6034,75 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var saveBar: some View {
-        HStack(spacing: 10) {
-            if !isPlannedWorkout {
-            Button {
-                showingBlockPicker = true
-            } label: {
-                Label(tr("Add block", "Legg til blokk"), systemImage: "plus.circle")
+        VStack(spacing: 8) {
+            // Saving a reusable library copy is a separate action from
+            // committing this scheduled workout and continuing in the plan.
+            if isPlannedWorkout && !blocks.isEmpty {
+                Button {
+                    saveToMyWorkouts()
+                    // Keep the builder intact after the library save.
+                    persistWorkoutDraft()
+                } label: {
+                    Label(
+                        savedToMyWorkouts
+                            ? tr("Saved in My Workouts", "Lagret i mine økter")
+                            : savedTemplateID == nil
+                                ? tr("Save workout", "Lagre treningsøkt")
+                                : tr("Update saved workout", "Oppdater lagret økt"),
+                        systemImage: savedToMyWorkouts
+                            ? "checkmark.circle.fill" : "square.and.arrow.down"
+                    )
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(studioInk)
                     .frame(maxWidth: .infinity)
-                    .frame(height: 48)
+                    .frame(height: 44)
                     .background(ATHLTHPlanDesign.surface,
                                 in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius))
                     .overlay {
                         RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius)
                             .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
                     }
-            }
+                    .opacity(canSave && !savedToMyWorkouts ? 1 : 0.55)
+                }
+                .disabled(!canSave || savedToMyWorkouts)
             }
 
-            Button {
-                saveWorkout()
-            } label: {
-                Label(saveButtonTitle ?? (isPlannedWorkout
-                    ? tr("Save and continue", "Lagre og gå videre")
-                    : tr("Save workout", "Lagre treningsøkt")),
-                      systemImage: "checkmark.circle.fill")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 48)
-                    .background(studioAccent,
-                                in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius))
-                    .opacity(canSave ? 1 : 0.48)
+            HStack(spacing: 10) {
+                if !isPlannedWorkout {
+                    Button {
+                        showingBlockPicker = true
+                    } label: {
+                        Label(tr("Add block", "Legg til blokk"),
+                              systemImage: "plus.circle")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(studioInk)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 48)
+                            .background(ATHLTHPlanDesign.surface,
+                                        in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius)
+                                    .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+                            }
+                    }
+                }
+                Button {
+                    saveWorkout()
+                } label: {
+                    Label(saveButtonTitle ?? (isPlannedWorkout
+                        ? tr("Save and continue", "Lagre og gå videre")
+                        : tr("Save workout", "Lagre treningsøkt")),
+                          systemImage: "checkmark.circle.fill")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(studioAccent,
+                                    in: RoundedRectangle(cornerRadius: ATHLTHPlanDesign.fieldRadius))
+                        .opacity(canSave ? 1 : 0.48)
+                }
+                .disabled(!canSave)
             }
-            .disabled(!canSave)
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
