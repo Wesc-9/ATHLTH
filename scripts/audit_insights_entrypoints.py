@@ -111,8 +111,6 @@ for token in (
     "ATHLTHPersonalInsightsView(",
     "ATHLTHInsightsDailyCheckInCard(",
     "ATHLTHInsightsMuscleCard(summary: muscleSummary)",
-    "trainingRhythmCard",
-    "ATHLTHInsightsReferenceDistributionCard(",
     "whatChangedCard",
     "whatIfCard",
     "ATHLTHInsightsWhatIfView(",
@@ -130,8 +128,24 @@ if "ATHLTHInsightsReferenceSignalCard(" in development:
 training = between(insights,
     "private var trainingSection: some View {",
     "private var developmentSection: some View {")
-if training.find("ATHLTHInsightsMuscleCard(") > training.find("trainingRhythmCard"):
-    fail("Muscle balance must be the first training insight")
+overview = between(insights,
+    "private var overviewSection: some View {",
+    "private var trainingSection: some View {")
+if not (
+    overview.index("ATHLTHInsightsMuscleCard(summary: muscleSummary)") <
+    overview.index("ATHLTHInsightsSleepStagesCard()")
+):
+    fail("Muscle balance must appear on Overview above sleep stages")
+if "ATHLTHInsightsMuscleCard(" in training:
+    fail("Muscle balance must not be repeated on Training")
+if "trainingRhythmCard" in training or "ATHLTHInsightsReferenceDistributionCard(" in training:
+    fail("The new Training layout must not show legacy duplicate cards")
+for marker in (
+    "trainingLoad: recoverySnapshot.trainingLoad",
+    "trainingDays: trainingDays",
+):
+    if marker not in training:
+        fail(f"Training data not passed: {marker}")
 if "case overview, training, development" not in sections:
     fail("Insights must contain Overview, Training and Development")
 if "case overview, health, training, development" in sections:
@@ -166,11 +180,30 @@ for symbol, source in (
     ("struct ATHLTHInsightsTrainingSignalsCard", training_signals),
     ("ATHLTHInsightsTrainingSignalsCard(", insights),
     ("ATHLTHInsightsHealthLibraryEntry(", insights),
-    ("ATHLTHInsightsReferenceDistributionCard(", insights),
     ("ATHLTHInsightsDailyCheckInCard(", insights),
 ):
     if symbol not in source:
         fail(f"An active Insights data route or view is missing: {symbol}")
+health_manager = Path("ATHLTH/Health/HealthKitManager.swift").read_text()
+for required in (
+    "struct ATHLTHInsightZoneDistribution",
+    "private var loadCard",
+    "private var qualityCard",
+    "private var responseCard",
+    "private var coachingCard",
+    "ATHLTHInsightsRunComparisonPolicy.closestComparable(",
+    "ATHLTHInsightsHealthMetricDetailView(metric: .heartRateRecovery)",
+):
+    if required not in training_signals:
+        fail(f"Advanced Training signals are incomplete: {required}")
+for required in (
+    "func insightHeartRateZoneDistribution(",
+    "fetchHeartRateSamplesForInsight(",
+    "fetchWorkouts(",
+):
+    if required not in health_manager:
+        fail(f"Measured zone data flow missing: {required}")
+
 for obsolete in (
     "ATHLTHInsightReferenceMetric",
     "ATHLTHInsightsReferenceSignalCard",
