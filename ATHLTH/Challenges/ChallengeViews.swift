@@ -2234,6 +2234,7 @@ struct ChallengeCreationView: View {
                 creationScoringSelectionRow
             }
             .buttonStyle(.plain)
+            .disabled(sport == .running && runningFocus == .intervals)
         }
     }
 
@@ -2257,23 +2258,34 @@ struct ChallengeCreationView: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ChallengePlanTheme.ink)
 
-                Text(scoringSubtitle(effectiveScoring))
+                Text(sport == .running && runningFocus == .intervals
+                    ? ATHLTHLocalization.choose(
+                        english: "Only measured work intervals count, not recovery or warm-up.",
+                        norwegian: "Bare målte arbeidsdrag teller, ikke pauser eller oppvarming."
+                    )
+                    : scoringSubtitle(effectiveScoring))
                     .font(.caption)
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Text(effectiveScoring.title)
+            Text(
+                sport == .running && runningFocus == .intervals
+                    ? runningComparison.title
+                    : effectiveScoring.title
+            )
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(ChallengePlanTheme.ink)
                 .multilineTextAlignment(.trailing)
                 .fixedSize(horizontal: false, vertical: true)
                 .layoutPriority(1)
 
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHTheme.mutedText)
+            if !(sport == .running && runningFocus == .intervals) {
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+            }
         }
         .padding(.vertical, 7)
         .contentShape(Rectangle())
