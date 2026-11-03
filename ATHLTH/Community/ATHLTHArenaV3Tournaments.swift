@@ -562,6 +562,8 @@ struct ATHLTHTournamentCreator: View {
 struct ATHLTHTournamentDraftDetailView: View {
     let draft: ATHLTHTournamentDraft
     @State private var selectedGroup = 0
+    @State private var linkedSeason: ATHLTHArenaClubSeason?
+    private let seasonCloud = ATHLTHArenaCloudService()
 
     private var groups: [[ATHLTHTournamentParticipant]] {
         ATHLTHTournamentStructure.groups(draft.participants, size: draft.groupSize)
@@ -581,6 +583,21 @@ struct ATHLTHTournamentDraftDetailView: View {
                     Text("\(draft.participants.count) deltakere")
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    if let linkedSeason {
+                        NavigationLink {
+                            ATHLTHArenaSeasonDetailView(
+                                season: linkedSeason,
+                                canManage: false
+                            )
+                        } label: {
+                            Label(linkedSeason.title, systemImage: "calendar")
+                                .font(.subheadline.weight(.medium))
+                                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        }
+                    }
+                }
+                if !draft.warmupRounds.isEmpty {
+                    warmupSection
                 }
                 if draft.format == .cup {
                     cupView
@@ -600,6 +617,51 @@ struct ATHLTHTournamentDraftDetailView: View {
         .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
         .navigationTitle("Konkurranse")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: draft.seasonID) {
+            guard let seasonID = draft.seasonID else {
+                linkedSeason = nil
+                return
+            }
+            if let seasons = try? await seasonCloud.loadClubSeasons() {
+                linkedSeason = seasons.first { $0.id == seasonID }
+            }
+        }
+    }
+
+    private var warmupSection: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text("Oppvarmingsrunder")
+                    .font(.system(size: 24, weight: .regular, design: .serif))
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                Spacer()
+                Text("\(draft.warmupRounds.count)")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+            }
+            ForEach(draft.warmupRounds) { round in
+                HStack(spacing: 12) {
+                    Image(systemName: "figure.run")
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    Text(round.title)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    Spacer()
+                    Text("Trening")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                .padding(.vertical, 6)
+            }
+            Label("0 poeng · ingen utslag · teller ikke i tabell eller sesong",
+                  systemImage: "info.circle")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(15)
+        .background(ATHLTHArenaV3Style.panel())
     }
 
     private var groupsView: some View {
