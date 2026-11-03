@@ -98,6 +98,36 @@ struct ATHLTHTournamentRemoteMatch: Decodable, Identifiable {
     }
 }
 
+/// The database is the authoritative source for official rankings and
+/// playoff qualification. The iPhone never reorders tied athletes locally.
+struct ATHLTHTournamentStandingRemote: Decodable, Identifiable {
+    let userID: UUID
+    let username: String
+    let groupIndex: Int?
+    let played: Int
+    let wins: Int
+    let draws: Int
+    let losses: Int
+    let scored: Double
+    let conceded: Double
+    let points: Int
+    let rank: Int
+    var id: UUID { userID }
+    var difference: Double { scored - conceded }
+
+    enum CodingKeys: String, CodingKey {
+        case username, played, wins, draws, losses, scored, conceded
+        case points, rank
+        case userID = "user_id"
+        case groupIndex = "group_index"
+    }
+}
+
+private struct ATHLTHTournamentStandingsParams: Encodable {
+    let p_tournament: UUID
+    let p_group: Int?
+}
+
 private struct ATHLTHTournamentCreateParams: Encodable {
     let p_title: String
     let p_format: String
@@ -219,6 +249,18 @@ struct ATHLTHTournamentCloudService {
             offset += pageSize
         } while offset < 5_000
         return list
+    }
+
+    func standings(for tournamentID: UUID) async throws
+        -> [ATHLTHTournamentStandingRemote] {
+        // Includes league and group-stage scores but never warmup or cup
+        // rounds. Row-level security restricts the returned tournament.
+        return try await client.rpc(
+            "athlth_tournament_standings",
+            params: ATHLTHTournamentStandingsParams(
+                p_tournament: tournamentID, p_group: nil
+            )
+        ).execute().value
     }
 
     func pendingInvitationIDs(userID: UUID) async throws -> Set<UUID> {
