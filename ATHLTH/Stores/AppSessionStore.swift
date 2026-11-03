@@ -3654,6 +3654,58 @@ final class AppSessionStore: ObservableObject {
         }
     }
 
+    /// Reconcile organizer-owned edits and cancellation messages.
+    /// Only exact owner/source matches can alter a recipient's saved copy.
+    func syncSharedWorkoutLifecycles(from messages: [DirectMessageRecord]) {
+        guard !standalonePlannedSessions.isEmpty else { return }
+        let events = messages
+            .filter {
+                $0.attachmentKind == .workout &&
+                $0.shareVersion == 6 &&
+                $0.deletedAt == nil &&
+                $0.recipientID == profile.userID
+            }
+            .sorted { $0.createdAt > $1.createdAt }
+
+        for existing in standalonePlannedSessions {
+            guard let ownerID = existing.sharedSourceOwnerID,
+                  let sourceID = existing.sharedSourceSessionID,
+                  let latest = events
+                      .filter {
+                          $0.senderID == ownerID &&
+                          $0.sourceOwnerID == ownerID &&
+                          $0.sourceObjectID == sourceID
+                      }
+                      .compactMap({
+                          $0.decodeSnapshot(WorkoutInviteLifecycleUpdate.self)
+                      })
+                      .first(where: {
+                          $0.organizerID == ownerID &&
+                          $0.sourceWorkoutID == sourceID
+                      })
+            else { continue }
+
+            switch latest.kind {
+            case .cancelled:
+                removeStandalonePlannedSession(existing.id)
+            case .updated:
+                guard var updated = latest.updatedWorkout,
+                      updated.id == sourceID,
+                      updated.scheduledStart != nil
+                else { continue }
+                updated.sharedSourceOwnerID = ownerID
+                updated.sharedSourceSessionID = sourceID
+                updated.invitedPartnerID = nil
+                updated.gearIDs = existing.gearIDs
+                updated.spotifyPlaylist = existing.spotifyPlaylist
+                updated.spotifyAutoplayOnStart = existing.spotifyAutoplayOnStart
+                if updated != existing {
+                    updateStandalonePlannedSession(updated)
+                }
+            }
+        }
+    }
+
     func updateStandalonePlannedSession(
         _ session: PlannedSession
     ) {
