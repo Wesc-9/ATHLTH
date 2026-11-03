@@ -29,18 +29,25 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
             XCTAssertEqual(blocks.count, rounds * 2, "\(preset)")
             XCTAssertEqual(blocks.expandedForExecution().count, rounds * 2)
             XCTAssertEqual(Set(blocks.map(\.editorDragID)).count, rounds * 2)
+            let group = blocks.first?.groupID
+            XCTAssertNotNil(group)
             XCTAssertTrue(blocks.allSatisfy {
-                $0.groupID == nil && $0.groupKind == nil && $0.groupRounds == nil
+                $0.groupID == group && $0.groupKind == .intervals &&
+                    $0.groupRounds == 1
             })
+            XCTAssertTrue(blocks.allSatisfy { $0.targetEffortRPE == nil })
             for index in blocks.indices {
-                XCTAssertEqual(blocks[index].kind, index.isMultiple(of: 2) ? .run : .rest)
+                XCTAssertEqual(
+                    index.isMultiple(of: 2),
+                    !blocks[index].isRestOrActiveRecovery
+                )
                 XCTAssertEqual(blocks[index].resolvedPhase, .main)
             }
         }
 
         let fourByFour = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
-        XCTAssertEqual(fourByFour.filter { $0.kind == .run }.count, 4)
-        XCTAssertEqual(fourByFour.filter { $0.kind == .rest }.count, 4)
+        XCTAssertEqual(fourByFour.filter { !$0.isRestOrActiveRecovery }.count, 4)
+        XCTAssertEqual(fourByFour.filter(\.isRestOrActiveRecovery).count, 4)
         XCTAssertEqual(fourByFour.reduce(0.0) {
             $0 + ($1.durationSeconds ?? 0)
         }, 28 * 60, accuracy: 0.01)
@@ -74,17 +81,21 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
     func testThirtyThirtyAndOtherIntervalsKeepExactEffortsAndRecoveries() {
         let thirty = ATHLTHRunningExercisePreset.thirtyThirty.blocks(in: .main)
         XCTAssertEqual(thirty.count, 40)
-        XCTAssertEqual(thirty.filter { $0.kind == .run }.count, 20)
-        XCTAssertEqual(thirty.filter { $0.kind == .rest }.count, 20)
+        XCTAssertEqual(thirty.filter { !$0.isRestOrActiveRecovery }.count, 20)
+        XCTAssertEqual(thirty.filter(\.isActiveRecovery).count, 20)
         XCTAssertTrue(thirty.allSatisfy { $0.durationSeconds == 30 })
         XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: thirty), 20)
 
         let fortyFive = ATHLTHRunningExercisePreset.fortyFiveFifteen.blocks(in: .main)
         XCTAssertEqual(fortyFive.count, 30)
-        XCTAssertEqual(fortyFive.filter { $0.kind == .run }.compactMap(\.durationSeconds),
-                       Array(repeating: 45.0, count: 15))
-        XCTAssertEqual(fortyFive.filter { $0.kind == .rest }.compactMap(\.durationSeconds),
-                       Array(repeating: 15.0, count: 15))
+        XCTAssertEqual(
+            fortyFive.filter { !$0.isRestOrActiveRecovery }.compactMap(\.durationSeconds),
+            Array(repeating: 45.0, count: 15)
+        )
+        XCTAssertEqual(
+            fortyFive.filter(\.isActiveRecovery).compactMap(\.durationSeconds),
+            Array(repeating: 15.0, count: 15)
+        )
         XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: fortyFive), 15)
 
         let sixByFourHundred = ATHLTHRunningExercisePreset.sixByFourHundred
@@ -125,15 +136,20 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
             stored.blocks.compactMap(\.durationSeconds),
             Array(repeating: [240.0, 180.0], count: 4).flatMap { $0 }
         )
+        XCTAssertNotNil(stored.blocks.first?.groupID)
         XCTAssertTrue(stored.blocks.allSatisfy {
-            $0.groupID == nil && $0.groupKind == nil && $0.groupRounds == nil
+            $0.groupID == stored.blocks.first?.groupID &&
+                $0.groupKind == .intervals && $0.groupRounds == 1
         })
 
         let first = stored.blocksForReuse()
         let second = stored.blocksForReuse()
-        XCTAssertEqual(first.map(\.kind), Array(repeating: [
-            WorkoutTemplateBlockKind.run, .rest
-        ], count: 4).flatMap { $0 })
+        XCTAssertEqual(first.filter { !$0.isRestOrActiveRecovery }.count, 4)
+        XCTAssertEqual(first.filter(\.isActiveRecovery).count, 4)
+        XCTAssertEqual(
+            ATHLTHIntervalRecipeEditing.forEditing(first).count, 8
+        )
+        XCTAssertNotEqual(first.first?.groupID, second.first?.groupID)
         XCTAssertEqual(first.count, second.count)
         XCTAssertNotEqual(first[0].editorDragID, first[1].editorDragID)
         XCTAssertNotEqual(first[0].editorDragID, second[0].editorDragID)
