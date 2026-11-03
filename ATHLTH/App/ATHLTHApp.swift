@@ -1745,6 +1745,11 @@ struct AppRootView: View {
     private var lifecycleSocialPresenceContent: AnyView {
         AnyView(
             lifecycleSocialCalendarContent
+        .onChange(of: messaging.recentMessages) { _, messages in
+            guard appSession.signedIn else { return }
+            appSession.syncApprovedSharedWorkouts(from: messages)
+            appSession.syncSharedWorkoutLifecycles(from: messages)
+        }
         .onChange(of: appSession.standalonePlannedSessions) { _, _ in
             scheduleHomeAssistantSnapshotSync()
             guard appSession.signedIn else { return }
