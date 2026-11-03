@@ -214,8 +214,7 @@ struct TrainTogetherCreatorLobbyView: View {
                     )
                     .tracking(1.1)
                     .foregroundStyle(
-                        ATHLTHTheme
-                            .vitality
+                        ATHLTHTheme.premiumGold
                     )
 
                     Spacer()
@@ -284,7 +283,7 @@ struct TrainTogetherCreatorLobbyView: View {
                         .font(.system(size: 9, weight: .heavy))
                         .foregroundStyle(.white)
                         .frame(width: 17, height: 17)
-                        .background(ATHLTHTheme.vitality, in: Circle())
+                        .background(ATHLTHTheme.premiumGold, in: Circle())
                         .overlay { Circle().stroke(.white, lineWidth: 2) }
                 }
             }
@@ -343,8 +342,7 @@ struct TrainTogetherCreatorLobbyView: View {
             )
             .foregroundStyle(
                 participant.isReady
-                    ? ATHLTHTheme
-                        .vitality
+                    ? ATHLTHTheme.premiumGold
                     : ATHLTHTheme
                         .mutedText
             )
@@ -414,9 +412,9 @@ struct TrainTogetherCreatorLobbyView: View {
                     HStack(spacing: 12) {
                         Image(systemName: state.workoutKind == "strength"
                             ? "dumbbell.fill" : "figure.run")
-                            .foregroundStyle(ATHLTHTheme.vitality)
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
                             .frame(width: 32, height: 32)
-                            .background(ATHLTHTheme.vitalitySoft,
+                            .background(ATHLTHTheme.premiumGoldSoft,
                                         in: RoundedRectangle(cornerRadius: 9))
                         VStack(alignment: .leading, spacing: 3) {
                             Text(state.displayNameSnapshot)
@@ -460,7 +458,7 @@ struct TrainTogetherCreatorLobbyView: View {
                           ? "checkmark.circle.fill" : "clock")
                         .font(.system(size: 17, weight: .semibold))
                         .foregroundStyle(everyoneReady
-                            ? ATHLTHTheme.vitality
+                            ? ATHLTHTheme.premiumGold
                             : ATHLTHTheme.premiumGold)
 
                     VStack(alignment: .leading, spacing: 3) {
@@ -540,7 +538,7 @@ struct TrainTogetherCreatorLobbyView: View {
                         .frame(height: 52)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.vitality)
+                    .tint(ATHLTHTheme.premiumGold)
                     .disabled(isMarkingReady || isStarting)
                 } else {
                     Label(
@@ -551,7 +549,7 @@ struct TrainTogetherCreatorLobbyView: View {
                         systemImage: "checkmark.circle.fill"
                     )
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTheme.vitality)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
                 }
 
                 Button {
@@ -585,7 +583,7 @@ struct TrainTogetherCreatorLobbyView: View {
                     .frame(height: 52)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(ATHLTHTheme.vitality)
+                .tint(ATHLTHTheme.premiumGold)
                 .disabled(
                     isStarting ||
                     !everyoneReady ||
@@ -638,6 +636,7 @@ struct TrainTogetherCreatorLobbyView: View {
                     .frame(height: 48)
                 }
                 .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.premiumGold)
                 .disabled(isStarting || session?.invitePayload == nil)
 
                 if let startError {
@@ -714,7 +713,7 @@ struct TrainTogetherCreatorLobbyView: View {
                         )
                     )
                     .foregroundStyle(
-                        ATHLTHTheme.accent
+                        ATHLTHTheme.premiumGold
                     )
 
                     Text(
@@ -813,12 +812,12 @@ struct TrainTogetherCreatorLobbyView: View {
             return ATHLTHTheme.accent
         }
         if participant.readyAt != nil {
-            return .green
+            return ATHLTHTheme.premiumGold
         }
         if participant.state == .declined {
             return .secondary
         }
-        return .orange
+        return ATHLTHTheme.premiumGold.opacity(0.68)
     }
 
     private func deviceIcon(
