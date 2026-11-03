@@ -3616,7 +3616,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 Spacer()
                 Button(ATHLTHLocalization.choose(english: "Switch to week view", norwegian: "Bytt til ukeoversikt")) {
                     selectedPlanWeekIndex = guidedCurrentWeek
-                    weekPlanningApproach = .quick
+                    selectedAdvancedWeekDay = nil
+                    // Reuse the same mode transition as the setup selector.
+                    // Switching views must not reset the saved dated workouts.
+                    selectBuildMethod(.weekByWeek)
+                    saveResumableDraft()
                 }
                 .font(.caption.weight(.semibold))
             }
@@ -4098,6 +4102,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             addingExtraWorkout = false
             editingWorkoutIndex = 0
             composingAdvancedDay = WeekDayEditorSelection(id: day)
+        case "restday":
+            setRestDay(day)
+        case "stretching":
+            advancedAddDestination = AdvancedAddDestination(
+                day: day, week: guidedCurrentWeek,
+                phase: .cooldown, kind: .stretching)
         case "rest":
             let key = weekDayKey(day, weekIndex: guidedCurrentWeek)
             if var edit = weekDayEdits[key],
@@ -4724,6 +4734,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             editingWorkoutIndex = 0
             addingExtraWorkout = !previewWorkouts(for: day).isEmpty
             composingAdvancedDay = WeekDayEditorSelection(id: day)
+        case "stretching":
+            advancedAddDestination = AdvancedAddDestination(
+                day: day, week: selectedPlanWeekIndex,
+                phase: .cooldown, kind: .stretching)
         case "rest":
             let key = weekDayKey(day)
             guard var edit = weekDayEdits[key],

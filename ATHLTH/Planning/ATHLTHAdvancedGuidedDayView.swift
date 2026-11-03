@@ -33,7 +33,6 @@ struct ATHLTHAdvancedGuidedDayView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
             header
-            dayStrip
             if isRestDay {
                 restDayCard
             } else if workouts.isEmpty {
@@ -127,35 +126,6 @@ struct ATHLTHAdvancedGuidedDayView: View {
         Calendar.current.date(byAdding: .day,
             value: (weekNumber - 1) * 7 + offset,
             to: Calendar.current.startOfDay(for: startDate)) ?? date
-    }
-
-    private var dayStrip: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<7, id: \.self) { offset in
-                let value = dayDate(offset)
-                let active = dayIndex == offset
-                Button { onSelectDay(offset) } label: {
-                    VStack(spacing: 4) {
-                        Text(value.formatted(.dateTime.weekday(.abbreviated)))
-                            .font(.system(size: 10, weight: active ? .semibold : .medium))
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.74)
-                        Text(value.formatted(.dateTime.day()))
-                            .font(.system(size: 10))
-                        Circle()
-                            .fill(active ? .white : gold.opacity(0.45))
-                            .frame(width: 4, height: 4)
-                    }
-                    .foregroundStyle(active ? .white : ink)
-                    .frame(maxWidth: .infinity, minHeight: 52)
-                    .background(active ? gold : .white.opacity(0.88),
-                                in: RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(value.formatted(.dateTime.weekday(.wide).day().month()))
-                .accessibilityAddTraits(active ? .isSelected : [])
-            }
-        }
     }
 
     private var emptyDayCard: some View {
@@ -356,6 +326,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                     quick("cycling", "bicycle", tr("Cycling", "Sykling"))
                     quick("yoga", "figure.yoga", "Yoga")
                     quick("meditation", "leaf", tr("Meditation", "Meditasjon"))
+                    quick("restday", "moon.stars", tr("Rest day", "Hviledag"))
                 }
             }
             ScrollView(.horizontal, showsIndicators: false) {
@@ -369,7 +340,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                     quick("interval", "waveform.path", tr("Interval", "Intervall"))
                     quick("superset", "link", "Supersett")
                     quick("rest", "pause.fill", tr("Rest", "Pause"))
-                    Button { onAddExercise(.cooldown, 0) } label: {
+                    Button { onQuick("stretching") } label: {
                         Label(tr("Stretching", "Uttøying"), systemImage: "figure.cooldown")
                     }
                 }
@@ -389,7 +360,13 @@ struct ATHLTHAdvancedGuidedDayView: View {
     }
 
     private func quick(_ id: String, _ symbol: String, _ text: String) -> some View {
-        Button { onQuick(id) } label: {
+        Button {
+            if id == "restday" && !workouts.isEmpty {
+                confirmingRestReplacement = true
+            } else {
+                onQuick(id)
+            }
+        } label: {
             Label(text, systemImage: symbol)
                 .font(.system(size: 10, weight: .medium))
                 .foregroundStyle(ink)

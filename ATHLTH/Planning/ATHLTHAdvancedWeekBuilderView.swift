@@ -589,7 +589,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                     quick("interval", "waveform.path", tr("Interval", "Intervall"), weekday)
                     quick("superset", "link", "Supersett", weekday)
                     quick("rest", "pause.fill", tr("Rest", "Pause"), weekday)
-                    Button { onAddExercise(weekday, 0, .cooldown) } label: {
+                    Button { onQuick(weekday, "stretching") } label: {
                         Label(tr("Stretching", "Uttøying"), systemImage: "figure.cooldown")
                     }
                 }
