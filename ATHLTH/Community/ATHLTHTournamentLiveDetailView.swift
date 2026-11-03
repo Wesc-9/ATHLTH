@@ -587,7 +587,15 @@ struct ATHLTHTournamentLiveDetailView: View {
 
             if current.status == "active", match.awayID != nil,
                match.homeID == userID || match.awayID == userID {
-                if (match.status == "scheduled" || match.status == "disputed") {
+                if let opens = match.scheduledAt, opens > Date() {
+                    Label(
+                        "Runden åpner " +
+                        opens.formatted(date: .abbreviated, time: .omitted),
+                        systemImage: "lock.clock"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                } else if match.status == "scheduled" || match.status == "disputed" {
                     Button("Foreslå resultat") { showingMatchReport = match }
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHArenaV3Style.gold)
