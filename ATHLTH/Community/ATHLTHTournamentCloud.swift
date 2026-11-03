@@ -263,6 +263,28 @@ struct ATHLTHTournamentCloudService {
         ).execute().value
     }
 
+    func myTournamentIDs(userID: UUID) async throws -> Set<UUID> {
+        // The club may have competitions visible to members. Arena's "Mine"
+        // tab lists only events where this athlete is actually an entrant,
+        // not every event visible through club membership.
+        var ids = Set<UUID>()
+        let pageSize = 250
+        var offset = 0
+        repeat {
+            let page: [ATHLTHTournamentInvitationID] = try await client
+                .from("athlth_tournament_entries")
+                .select("tournament_id")
+                .eq("user_id", value: userID)
+                .neq("response", value: "declined")
+                .range(from: offset, to: offset + pageSize - 1)
+                .execute().value
+            ids.formUnion(page.map(\.tournamentID))
+            if page.count < pageSize { break }
+            offset += pageSize
+        } while offset < 5_000
+        return ids
+    }
+
     func pendingInvitationIDs(userID: UUID) async throws -> Set<UUID> {
         let pending: [ATHLTHTournamentInvitationID] = try await client
             .from("athlth_tournament_entries")
