@@ -1045,6 +1045,9 @@ struct AppRootView: View {
             messages, gearRefresh, calendarRefresh
         )
 
+        // Reconcile invitations asynchronously, without blocking Home.
+        Task { await appSession.refreshRemoteSharedWorkoutUpdates() }
+
         guard appSession.signedIn else { return }
         if ATHLTHDeviceRole.isIPhone {
             await realtimeSocial.configureOnlinePresence(
@@ -2373,6 +2376,7 @@ struct AppRootView: View {
                 messages,
                 calendarRefresh
             )
+            Task { await appSession.refreshRemoteSharedWorkoutUpdates() }
         }
 
         guard health.hasRequestedAuthorization,
