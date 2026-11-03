@@ -81,9 +81,9 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
 
         let fortyFive = ATHLTHRunningExercisePreset.fortyFiveFifteen.blocks(in: .main)
         XCTAssertEqual(fortyFive.count, 30)
-        XCTAssertEqual(fortyFive.filter { $0.kind == .run }.map(\.durationSeconds),
+        XCTAssertEqual(fortyFive.filter { $0.kind == .run }.compactMap(\.durationSeconds),
                        Array(repeating: 45.0, count: 15))
-        XCTAssertEqual(fortyFive.filter { $0.kind == .rest }.map(\.durationSeconds),
+        XCTAssertEqual(fortyFive.filter { $0.kind == .rest }.compactMap(\.durationSeconds),
                        Array(repeating: 15.0, count: 15))
         XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: fortyFive), 15)
 
