@@ -3,6 +3,7 @@ import SwiftUI
 /// Train-style workout identity and editable schedule in one compact surface.
 /// The timeline remains the source of truth for duration and intensity.
 struct ATHLTHPlannedWorkoutStudioHeader: View {
+    @Environment(\.locale) private var locale
     @Binding var workoutName: String
     let activity: ATHLTHPlannedWorkoutType?
     let blocks: [WorkoutTemplateBlock]
@@ -36,10 +37,60 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     private let bronze = ATHLTHTrainDesign.bronze
 
     private var distanceText: String {
-        guard let kilometers = ATHLTHPlannedRoutePreviewPolicy.distanceKilometers(
+        guard let kilometers = ATHLTHPlannedWorkoutMetrics.estimatedDistanceKilometers(
             for: blocks
         ) else { return "–" }
-        return String(format: "~ %.1f km", kilometers)
+        return "~ " + kilometers.formatted(
+            .number.precision(.fractionLength(1)).locale(locale)
+        ) + " km"
+    }
+
+    private var runningLocation: ATHLTHPlannedWorkoutMetrics.RunningLocation? {
+        ATHLTHPlannedWorkoutMetrics.runningLocation(for: blocks)
+    }
+
+    private var commonPace: Double? {
+        ATHLTHPlannedWorkoutMetrics.commonPaceSecondsPerKilometer(for: blocks)
+    }
+
+    private var paceText: String {
+        guard let commonPace else { return "–" }
+        let rounded = Int(commonPace.rounded())
+        let seconds = rounded % 60
+        return "\(rounded / 60):" + (seconds < 10 ? "0" : "") + "\(seconds)"
+    }
+
+    private var treadmillSpeedText: String? {
+        guard let commonPace else { return nil }
+        let value = 3_600 / commonPace
+        return value.formatted(
+            .number.precision(.fractionLength(1)).locale(locale)
+        ) + (ATHLTHLocalization.isNorwegian ? " km/t" : " km/h")
+    }
+
+    private var runningLocationText: String? {
+        guard let runningLocation else { return nil }
+        switch runningLocation {
+        case .outdoor:
+            return ATHLTHLocalization.choose(english: "Outdoor", norwegian: "Ute")
+        case .indoor:
+            return ATHLTHLocalization.choose(english: "Indoor", norwegian: "Innendørs")
+        case .treadmill:
+            return ATHLTHLocalization.choose(english: "Treadmill", norwegian: "Tredemølle")
+        case .mixed:
+            return ATHLTHLocalization.choose(
+                english: "Indoor + outdoor", norwegian: "Ute + inne"
+            )
+        }
+    }
+
+    private var runningLocationSymbol: String {
+        switch runningLocation {
+        case .treadmill: return "figure.run.treadmill"
+        case .indoor: return "building.2"
+        case .outdoor: return "figure.run"
+        case .mixed, .none: return "figure.mixed.cardio"
+        }
     }
 
     private var zoneText: String {
@@ -49,9 +100,16 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     }
 
     private var inclineText: String {
-        let slopes = blocks.compactMap(\.treadmillInclinePercent)
-        guard let maxSlope = slopes.max() else { return "–" }
-        return String(format: "%.0f %%", maxSlope)
+        guard let range = ATHLTHPlannedWorkoutMetrics.treadmillInclineRange(
+            for: blocks
+        ) else { return "–" }
+        func format(_ value: Double) -> String {
+            value.formatted(.number.precision(.fractionLength(0...1)).locale(locale))
+        }
+        if range.upperBound - range.lowerBound < 0.01 {
+            return format(range.lowerBound) + " %"
+        }
+        return format(range.lowerBound) + "–" + format(range.upperBound) + " %"
     }
 
     var body: some View {
@@ -98,6 +156,38 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
             .background(ATHLTHPlanDesign.canvas,
                         in: RoundedRectangle(cornerRadius: 12))
 
+            if let runningLocationText {
+                HStack(spacing: 6) {
+                    Image(systemName: runningLocationSymbol)
+                        .accessibilityHidden(true)
+                    Text(runningLocationText)
+                    if runningLocation == .treadmill {
+                        if let treadmillSpeedText {
+                            Text("·")
+                            Text(treadmillSpeedText)
+                        } else if ATHLTHPlannedWorkoutMetrics.hasVariablePace(
+                            for: blocks
+                        ) {
+                            Text("·")
+                            Text(ATHLTHLocalization.choose(
+                                english: "Variable speed", norwegian: "Varierende hastighet"
+                            ))
+                        }
+                    } else if runningLocation == .outdoor && route != nil {
+                        Text("·")
+                        Text(ATHLTHLocalization.choose(
+                            english: "Route", norwegian: "Rute"
+                        ))
+                    }
+                    Spacer(minLength: 0)
+                }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(bronze)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+                .accessibilityElement(children: .combine)
+            }
+
             HStack(spacing: 0) {
                 metric("clock", ATHLTHLocalization.choose(
                     english: "Duration", norwegian: "Varighet"
@@ -109,9 +199,21 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                 metric("heart", ATHLTHLocalization.choose(
                     english: "Zone", norwegian: "Sone"
                 ), zoneText)
-                metric("mountain.2", ATHLTHLocalization.choose(
-                    english: "Incline", norwegian: "Stigning"
-                ), inclineText)
+                if runningLocation == .treadmill || blocks.contains(where: {
+                    $0.kind == .run && $0.treadmillInclinePercent != nil
+                }) {
+                    metric("mountain.2", ATHLTHLocalization.choose(
+                        english: "Incline", norwegian: "Stigning"
+                    ), inclineText)
+                } else if runningLocation != nil {
+                    metric("speedometer", ATHLTHLocalization.choose(
+                        english: "Pace (min/km)", norwegian: "Tempo (min/km)"
+                    ), paceText)
+                } else {
+                    metric("mountain.2", ATHLTHLocalization.choose(
+                        english: "Incline", norwegian: "Stigning"
+                    ), inclineText)
+                }
             }
 
             if plannedDate != nil {
