@@ -8,10 +8,20 @@ enum ATHLTHIntervalGroupEditing {
     }
 
     static func individualSteps(
-        in blocks: [WorkoutTemplateBlock], groupID: UUID
+        in blocks: [WorkoutTemplateBlock], groupID: UUID,
+        keepingEditableGroup: Bool = false
     ) -> [WorkoutTemplateBlock]? {
         guard let range = editableRange(in: blocks, groupID: groupID) else { return nil }
-        let expanded = Array(blocks[range]).expandedForExecution()
+        var expanded = Array(blocks[range]).expandedForExecution()
+        if keepingEditableGroup {
+            // A single explicitly stored round groups the UI only. Never
+            // recreate the old repeating two-block execution semantics.
+            for index in expanded.indices {
+                expanded[index].groupID = groupID
+                expanded[index].groupKind = .intervals
+                expanded[index].groupRounds = 1
+            }
+        }
         var result = blocks
         result.replaceSubrange(range, with: expanded)
         return result.enumerated().map { index, block in
