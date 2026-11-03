@@ -753,6 +753,7 @@ struct ChallengeCreationView: View {
             _runningComparison = State(
                 initialValue: r.runningComparison ?? .fastestWork
             )
+            _intervalRunVenue = State(initialValue: r.runningVenue)
             _runningTemplateID = State(initialValue: r.runningTemplateID)
             _runningMinimumRepetitions = State(
                 initialValue: r.runningMinimumRepetitions ?? 3
@@ -852,6 +853,7 @@ struct ChallengeCreationView: View {
     @State private var scoring: ATHLTHChallengeScoring = .fastestDistance
     @State private var runningFocus: ATHLTHChallengeRunningFocus = .standard
     @State private var runningComparison: ATHLTHChallengeRunningComparison = .fastestWork
+    @State private var intervalRunVenue: ATHLTHChallengeRunningVenue = .outdoor
     @State private var runningTemplateID: UUID?
     @State private var runningMinimumRepetitions = 3
     @State private var hillMinimumClimbMeters = 8.0
@@ -1123,11 +1125,18 @@ struct ChallengeCreationView: View {
                         ? .mostWorkDistance : .fastestWork
                     scoring = focus == .intervals
                         ? .farthestInTime : .fastestDistance
-                    gpsRequired = focus == .hills
-                    allowTreadmill = false
+                    gpsRequired = focus == .hills ||
+                        (focus == .intervals && intervalRunVenue == .outdoor)
+                    allowTreadmill = focus == .intervals &&
+                        intervalRunVenue != .outdoor
                 } else {
                     scoring = .fastestDistance
                 }
+            }
+            .onChange(of: intervalRunVenue) { _, venue in
+                guard sport == .running && runningFocus == .intervals else { return }
+                allowTreadmill = venue != .outdoor
+                gpsRequired = venue == .outdoor
             }
             .onChange(of: runningComparison) { _, comparison in
                 guard runningFocus != .standard else { return }
@@ -3015,6 +3024,27 @@ struct ChallengeCreationView: View {
     private var creationSpecialRunningRules: some View {
         VStack(alignment: .leading, spacing: 12) {
             if runningFocus == .intervals {
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Running environment", norwegian: "Hvor løper dere?"
+                    ),
+                    selection: $intervalRunVenue
+                ) {
+                    ForEach(ATHLTHChallengeRunningVenue.allCases) { venue in
+                        Text(venue.title).tag(venue)
+                    }
+                }
+                .pickerStyle(.segmented)
+
+                if intervalRunVenue == .treadmill {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Each athlete chooses speed and target incline before the workout. Incline is a prescribed setting, not verified distance or elevation.",
+                        norwegian: "Hver deltaker velger tempo og ønsket stigning før økten. Stigning er en innstilling, ikke verifisert distanse eller høydemeter."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+
                 Button {
                     showingCustomRunningBuilder = true
                 } label: {
@@ -7265,7 +7295,9 @@ struct ChallengeCreationView: View {
             route: routeSnapshot,
             gpsRequired:
                 sport == .running && runningFocus == .hills
-                    ? true : (usesSpecificRoute ? true : gpsRequired),
+                    ? true : (sport == .running && runningFocus == .intervals
+                        ? intervalRunVenue == .outdoor
+                        : (usesSpecificRoute ? true : gpsRequired)),
             minimumRouteMatchPercent:
                 usesSpecificRoute
                     ? routeMatchPercent
@@ -7308,7 +7340,8 @@ struct ChallengeCreationView: View {
             allowTreadmill:
                 sport == .running &&
                 !usesSpecificRoute
-                    ? allowTreadmill
+                    ? (runningFocus == .intervals
+                        ? intervalRunVenue != .outdoor : allowTreadmill)
                     : nil,
             allowTargetGhost:
                 sport == .running &&
@@ -7363,6 +7396,8 @@ struct ChallengeCreationView: View {
                 ? selectedRunningTemplate.map {
                     ATHLTHChallengeRunningTemplateTransfer.portable($0)
                 } : nil,
+            runningVenueRaw: sport == .running &&
+                runningFocus == .intervals ? intervalRunVenue.rawValue : nil,
             startsAt: startsAt,
             endsAt: hasEnd ? endsAt : nil,
             allowMultipleAttempts: allowMultipleAttempts,
