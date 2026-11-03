@@ -2277,6 +2277,8 @@ struct ATHLTHHomeView: View {
                                     time: item.relevantDate(on: Date()),
                                     title: item.isDeadline(on: Date())
                                         ? "Frist · \(item.exerciseTitle)"
+                                        : item.isOngoing(on: Date())
+                                        ? "Pågår · \(item.exerciseTitle)"
                                         : item.exerciseTitle,
                                     icon: "trophy"
                                 )
@@ -2589,8 +2591,12 @@ struct ATHLTHHomeView: View {
                                 ATHLTHTournamentLiveDetailView(tournament: tournament)
                             } label: {
                                 homeCalendarEventRow(
-                                    time: item.relevantDate(on: Date()) ?? item.opensAt,
-                                    title: item.exerciseTitle,
+                                    time: item.relevantDate(on: Date()),
+                                    title: item.isDeadline(on: Date())
+                                        ? "Frist · \(item.exerciseTitle)"
+                                        : item.isOngoing(on: Date())
+                                        ? "Pågår · \(item.exerciseTitle)"
+                                        : item.exerciseTitle,
                                     systemImage: "trophy",
                                     detail: "\(item.tournamentTitle) · Frist " +
                                         item.deadlineAt.formatted(
