@@ -3998,10 +3998,20 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 // Apply one explicitly requested block after the draft is
                 // restored. Never insert it twice on sheet reappearance.
-                if !isPlannedWorkout, !draftRestored,
+                if !draftRestored,
                    !initialQuickAddConsumed, let initialQuickAdd {
                     initialQuickAddConsumed = true
-                    applyInitialQuickAdd(initialQuickAdd)
+                    if initialQuickAdd == "exercise" && isPlannedWorkout {
+                        // SwiftUI cannot present a nested sheet during the
+                        // same appearance pass as its parent plan editor.
+                        Task { @MainActor in
+                            await Task.yield()
+                            guard draftActive else { return }
+                            openExercisePicker()
+                        }
+                    } else {
+                        applyInitialQuickAdd(initialQuickAdd)
+                    }
                 }
             }
             .onChange(of: blocks) { _, _ in

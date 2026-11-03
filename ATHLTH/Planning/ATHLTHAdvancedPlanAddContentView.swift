@@ -4,7 +4,7 @@ import SwiftUI
 /// Advanced day-by-day builder; all data comes from existing stores.
 struct ATHLTHAdvancedPlanAddContentView: View {
     enum Kind: String, CaseIterable {
-        case exercise, workout
+        case exercise, workout, stretching
     }
     enum Origin: String, CaseIterable {
         case all, favorites, mine, athlth

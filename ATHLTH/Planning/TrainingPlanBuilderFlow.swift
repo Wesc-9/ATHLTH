@@ -126,6 +126,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var editingTrainingPlaceDay: WeekDayEditorSelection?
     @State private var reopenDayAfterPlace: WeekDayEditorSelection?
     @State private var quickStudioOption: QuickDayOption?
+    // Advanced Plan uses the same exercise picker and timeline editor as
+    // Planlegg økt -> Avansert; no parallel strength configuration flow.
+    @State private var studioInitialQuickAdd: String?
+    @State private var studioInitialPhase: WorkoutPhaseKind?
     @State private var addingExtraWorkout = false
     @State private var editingWorkoutIndex = 0
     @State private var editingFocusedBlockIndex: Int?
@@ -745,19 +749,31 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
         }
         .sheet(item: $advancedAddDestination) { destination in
-            ATHLTHAdvancedPlanAddContentView(
-                initialKind: destination.kind,
-                phase: destination.phase,
-                onExercise: { blocks in
+            if destination.kind == .stretching {
+                ATHLTHAdvancedStretchingPickerView(
+                    phase: destination.phase
+                ) { blocks in
                     insertGuidedLibraryExercise(
                         blocks, day: destination.day, week: destination.week,
-                        workoutIndex: destination.workoutIndex)
-                },
-                onWorkout: { workout in
-                    insertGuidedLibraryWorkout(
-                        workout, day: destination.day, week: destination.week)
+                        workoutIndex: destination.workoutIndex
+                    )
+                    advancedAddDestination = nil
                 }
-            )
+            } else {
+                ATHLTHAdvancedPlanAddContentView(
+                    initialKind: destination.kind,
+                    phase: destination.phase,
+                    onExercise: { blocks in
+                        insertGuidedLibraryExercise(
+                            blocks, day: destination.day, week: destination.week,
+                            workoutIndex: destination.workoutIndex)
+                    },
+                    onWorkout: { workout in
+                        insertGuidedLibraryWorkout(
+                            workout, day: destination.day, week: destination.week)
+                    }
+                )
+            }
         }
         .sheet(item: $selectingLibraryDay) { selection in
             ATHLTHPlanWorkoutLibraryPicker { workout in
@@ -768,9 +784,13 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
         .sheet(item: $composingAdvancedDay, onDismiss: {
             quickStudioOption = nil
+            studioInitialQuickAdd = nil
+            studioInitialPhase = nil
             addingExtraWorkout = false
         }) { selection in
             WorkoutTemplateBuilderView(
+                initialQuickAdd: studioInitialQuickAdd,
+                initialPhase: studioInitialPhase,
                 initialTitle: quickStudioOption?.title ??
                     (addingExtraWorkout ? "" : (selectedWorkoutForEditor(day: selection.id)?.title ?? "")),
                 initialBlocks: quickStudioOption.map { quickDaySeed($0) } ??
@@ -3987,9 +4007,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     guidedCurrentWeek * 7 + offset)
             },
             onAddExercise: { phase, workoutIndex in
-                advancedAddDestination = AdvancedAddDestination(
+                openPlanStudioExercise(
                     day: guidedCurrentWeekday, week: guidedCurrentWeek,
-                    phase: phase, kind: .exercise, workoutIndex: workoutIndex)
+                    phase: phase, workoutIndex: workoutIndex
+                )
             },
             onAddWorkout: {
                 advancedAddDestination = AdvancedAddDestination(
@@ -4017,6 +4038,20 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         )
     }
 
+    private func openPlanStudioExercise(
+        day: Int, week: Int, phase: WorkoutPhaseKind, workoutIndex: Int
+    ) {
+        // The advanced workout editor owns reps/sets, pauses, intervals,
+        // phase placement and exercise-library selection in both contexts.
+        selectedPlanWeekIndex = week
+        editingWorkoutIndex = workoutIndex
+        addingExtraWorkout = false
+        quickStudioOption = nil
+        studioInitialPhase = phase
+        studioInitialQuickAdd = "exercise"
+        composingAdvancedDay = WeekDayEditorSelection(id: day)
+    }
+
     private func insertGuidedLibraryExercise(
         _ blocks: [WorkoutTemplateBlock], day: Int, week: Int,
         workoutIndex: Int
@@ -4026,11 +4061,15 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
         let extras = edit.additionalDetailedWorkouts ?? []
         let editingExtra = workoutIndex > 0 && extras.indices.contains(workoutIndex - 1)
+        let stretchingOnly = blocks.allSatisfy { $0.wellnessKind == .stretching }
         var workout = (editingExtra ? extras[workoutIndex - 1] : edit.detailedWorkout) ??
             ATHLTHPlanStructuredWorkoutBlueprint(
-                title: ATHLTHLocalization.choose(
-                    english: "Strength workout", norwegian: "Styrkeøkt"),
-                kind: .strength, durationMinutes: 30, routeID: nil, blocks: [])
+                title: stretchingOnly
+                    ? ATHLTHLocalization.choose(english: "Stretching", norwegian: "Uttøyning")
+                    : ATHLTHLocalization.choose(
+                        english: "Strength workout", norwegian: "Styrkeøkt"),
+                kind: stretchingOnly ? .mobility : .strength,
+                durationMinutes: 30, routeID: nil, blocks: [])
         for block in blocks {
             var next = WorkoutTemplateBlock(
                 sequence: (workout.blocks.map(\.sequence).max() ?? 0) + 1,
@@ -4047,6 +4086,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             next.restBetweenSetsSeconds = block.restBetweenSetsSeconds
             next.exerciseID = block.exerciseID
             next.exerciseSnapshot = block.exerciseSnapshot
+            // Preserve the shared Studio block taxonomy; wellness is not
+            // a strength exercise and must remain runnable after saving.
+            next.wellnessKind = block.wellnessKind
+            next.activityTag = block.activityTag
+            next.cardioActivity = block.cardioActivity
+            next.routeID = block.routeID
             workout.blocks.append(next)
         }
         workout.kind = workoutKind(for: workout.blocks)
@@ -4644,9 +4689,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
             },
             onAddExercise: { day, workoutIndex, phase in
-                advancedAddDestination = AdvancedAddDestination(
-                    day: day, week: selectedPlanWeekIndex, phase: phase,
-                    kind: .exercise, workoutIndex: workoutIndex)
+                openPlanStudioExercise(
+                    day: day, week: selectedPlanWeekIndex,
+                    phase: phase, workoutIndex: workoutIndex
+                )
             },
             onAddWorkout: { day in
                 advancedAddDestination = AdvancedAddDestination(
