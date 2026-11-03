@@ -31,6 +31,32 @@ enum ATHLTHTournamentFormat: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum ATHLTHTournamentExerciseMode: String, Codable, CaseIterable, Identifiable {
+    case owner, open, vote
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .owner: return "Arrangøren velger"
+        case .open: return "Alle kan legge til"
+        case .vote: return "Forslag og avstemning"
+        }
+    }
+    var detail: String {
+        switch self {
+        case .owner: return "Arrangøren setter opp alle øvelsene."
+        case .open: return "Deltakerne fyller opp et felles øvelsesprogram."
+        case .vote: return "Alle foreslår. Hver får like mange stemmer som øvelser som velges."
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .owner: return "person.crop.circle"
+        case .open: return "person.3"
+        case .vote: return "checkmark.seal"
+        }
+    }
+}
+
 /// A practice round is entirely separate from official fixtures. It must
 /// never feed the table, elimination engine, ranking or season points.
 struct ATHLTHTournamentWarmupRound: Codable, Identifiable, Hashable {
@@ -55,6 +81,11 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
     var qualifiersPerGroup: Int
     var participants: [ATHLTHTournamentParticipant]
     var warmupRounds: [ATHLTHTournamentWarmupRound]
+    var exerciseMode: ATHLTHTournamentExerciseMode
+    var exerciseCount: Int
+    var proposalsCloseAt: Date?
+    var votesCloseAt: Date?
+    var approvePlayerChanges: Bool
     var createdAt: Date
 
     init(
@@ -68,6 +99,11 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         qualifiersPerGroup: Int,
         participants: [ATHLTHTournamentParticipant],
         warmupRounds: [ATHLTHTournamentWarmupRound] = [],
+        exerciseMode: ATHLTHTournamentExerciseMode = .owner,
+        exerciseCount: Int = 4,
+        proposalsCloseAt: Date? = nil,
+        votesCloseAt: Date? = nil,
+        approvePlayerChanges: Bool = false,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -80,12 +116,19 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         self.qualifiersPerGroup = qualifiersPerGroup
         self.participants = participants
         self.warmupRounds = Array(warmupRounds.prefix(12))
+        self.exerciseMode = exerciseMode
+        self.exerciseCount = min(12,max(1,exerciseCount))
+        self.proposalsCloseAt = proposalsCloseAt
+        self.votesCloseAt = votesCloseAt
+        self.approvePlayerChanges = approvePlayerChanges
         self.createdAt = createdAt
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, ownerID, clubID, seasonID, title, format, groupSize
         case qualifiersPerGroup, participants, warmupRounds, createdAt
+        case exerciseMode, exerciseCount, proposalsCloseAt, votesCloseAt,
+             approvePlayerChanges
     }
 
     init(from decoder: Decoder) throws {
@@ -104,6 +147,18 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         warmupRounds = Array(try values.decodeIfPresent(
             [ATHLTHTournamentWarmupRound].self, forKey: .warmupRounds
         )?.prefix(12) ?? [])
+        exerciseMode = try values.decodeIfPresent(
+            ATHLTHTournamentExerciseMode.self, forKey: .exerciseMode
+        ) ?? .owner
+        exerciseCount = min(12, max(1, try values.decodeIfPresent(
+            Int.self, forKey: .exerciseCount
+        ) ?? 4))
+        proposalsCloseAt = try values.decodeIfPresent(Date.self,
+            forKey: .proposalsCloseAt)
+        votesCloseAt = try values.decodeIfPresent(Date.self,
+            forKey: .votesCloseAt)
+        approvePlayerChanges = try values.decodeIfPresent(Bool.self,
+            forKey: .approvePlayerChanges) ?? false
         createdAt = try values.decode(Date.self, forKey: .createdAt)
     }
 
@@ -119,6 +174,11 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         try values.encode(qualifiersPerGroup, forKey: .qualifiersPerGroup)
         try values.encode(participants, forKey: .participants)
         try values.encode(warmupRounds, forKey: .warmupRounds)
+        try values.encode(exerciseMode, forKey: .exerciseMode)
+        try values.encode(exerciseCount, forKey: .exerciseCount)
+        try values.encodeIfPresent(proposalsCloseAt, forKey: .proposalsCloseAt)
+        try values.encodeIfPresent(votesCloseAt, forKey: .votesCloseAt)
+        try values.encode(approvePlayerChanges, forKey: .approvePlayerChanges)
         try values.encode(createdAt, forKey: .createdAt)
     }
 }
