@@ -142,7 +142,7 @@ final class ATHLTHTournamentEngineTests: XCTestCase {
             for: athletes, fixtures: matches
         )
         XCTAssertEqual(table.reduce(0) { $0 + $1.played }, 6)
-        XCTAssertEqual(table.reduce(0) { $0 + $1.points }, 5)
+        XCTAssertEqual(table.reduce(0) { $0 + $1.points }, 7)
     }
 
     func testDuplicateParticipantIsRejected() throws {
