@@ -68,6 +68,9 @@ final class ATHLTHTournamentCalendarStore: ObservableObject {
         if accountID != userID {
             reset()
             accountID = userID
+            await ATHLTHTournamentExerciseReminderScheduler.reconcile(
+                items: [], accountID: userID
+            )
         }
         if isRefreshing { return lastRefreshedAt != nil }
         if !force, let lastRefreshedAt,
@@ -82,6 +85,9 @@ final class ATHLTHTournamentCalendarStore: ObservableObject {
                 items = []
                 lastRefreshedAt = Date()
                 errorMessage = nil
+                await ATHLTHTournamentExerciseReminderScheduler.reconcile(
+                    items: [], accountID: userID
+                )
                 return true
             }
             let all = try await tournamentCloud.visibleTournaments()
@@ -155,6 +161,9 @@ final class ATHLTHTournamentCalendarStore: ObservableObject {
                 .prefix(500))
             lastRefreshedAt = Date()
             errorMessage = nil
+            await ATHLTHTournamentExerciseReminderScheduler.reconcile(
+                items: items, accountID: userID
+            )
             return true
         } catch {
             errorMessage = error.localizedDescription
