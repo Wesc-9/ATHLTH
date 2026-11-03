@@ -31,6 +31,63 @@ enum ATHLTHTournamentFormat: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum ATHLTHTournamentActivity: String, Codable, CaseIterable, Identifiable {
+    case running, strength, cycling, walking, swimming, hiking
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .running: return "Løping"
+        case .strength: return "Styrke"
+        case .cycling: return "Sykling"
+        case .walking: return "Gange"
+        case .swimming: return "Svømming"
+        case .hiking: return "Tur"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .running: return "figure.run"
+        case .strength: return "dumbbell"
+        case .cycling: return "bicycle"
+        case .walking: return "figure.walk"
+        case .swimming: return "figure.pool.swim"
+        case .hiking: return "figure.hiking"
+        }
+    }
+}
+
+enum ATHLTHTournamentRulesAuthority: String, Codable, CaseIterable, Identifiable {
+    case owner, group
+    var id: String { rawValue }
+    var title: String { self == .owner ? "Arrangøren bestemmer" : "Hele gruppen bestemmer" }
+    var subtitle: String {
+        self == .owner ? "Reglene er fastsatt ved invitasjon." :
+          "Alle kan foreslå og stemme. Flertallet bestemmer før start."
+    }
+}
+
+enum ATHLTHTournamentCadence {
+    static let options = [1,2,3,7,14,28]
+    static func title(for days: Int) -> String {
+        switch days {
+        case 1: return "Hver dag"
+        case 2: return "Annenhver dag"
+        case 7: return "Hver uke"
+        case 14: return "Annenhver uke"
+        case 28: return "Hver fjerde uke"
+        default: return "Hver \(days). dag"
+        }
+    }
+    static let completionHours = [6,12,24,48,72,168,336]
+    static func window(_ hours: Int) -> String {
+        if hours >= 24 && hours.isMultiple(of: 24) {
+            let days = hours / 24
+            return days == 1 ? "24 timer" : "\(days) dager"
+        }
+        return "\(hours) timer"
+    }
+}
+
 enum ATHLTHTournamentExerciseMode: String, Codable, CaseIterable, Identifiable {
     case owner, open, vote
     var id: String { rawValue }
@@ -86,6 +143,10 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
     var proposalsCloseAt: Date?
     var votesCloseAt: Date?
     var approvePlayerChanges: Bool
+    var allowedActivities: [ATHLTHTournamentActivity]
+    var rulesAuthority: ATHLTHTournamentRulesAuthority
+    var cadenceDays: Int
+    var completionHours: Int
     var createdAt: Date
 
     init(
@@ -104,6 +165,10 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         proposalsCloseAt: Date? = nil,
         votesCloseAt: Date? = nil,
         approvePlayerChanges: Bool = false,
+        allowedActivities: [ATHLTHTournamentActivity] = [.strength],
+        rulesAuthority: ATHLTHTournamentRulesAuthority = .owner,
+        cadenceDays: Int = 7,
+        completionHours: Int = 48,
         createdAt: Date = Date()
     ) {
         self.id = id
@@ -121,6 +186,12 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         self.proposalsCloseAt = proposalsCloseAt
         self.votesCloseAt = votesCloseAt
         self.approvePlayerChanges = approvePlayerChanges
+        self.allowedActivities = Array(Set(allowedActivities)).sorted {
+            $0.rawValue < $1.rawValue
+        }
+        self.rulesAuthority = rulesAuthority
+        self.cadenceDays = cadenceDays
+        self.completionHours = completionHours
         self.createdAt = createdAt
     }
 
@@ -128,7 +199,8 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         case id, ownerID, clubID, seasonID, title, format, groupSize
         case qualifiersPerGroup, participants, warmupRounds, createdAt
         case exerciseMode, exerciseCount, proposalsCloseAt, votesCloseAt,
-             approvePlayerChanges
+             approvePlayerChanges, allowedActivities, rulesAuthority,
+             cadenceDays, completionHours
     }
 
     init(from decoder: Decoder) throws {
@@ -159,6 +231,15 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
             forKey: .votesCloseAt)
         approvePlayerChanges = try values.decodeIfPresent(Bool.self,
             forKey: .approvePlayerChanges) ?? false
+        allowedActivities = try values.decodeIfPresent(
+            [ATHLTHTournamentActivity].self, forKey: .allowedActivities
+        ) ?? [.strength]
+        rulesAuthority = try values.decodeIfPresent(
+            ATHLTHTournamentRulesAuthority.self, forKey: .rulesAuthority
+        ) ?? .owner
+        cadenceDays = try values.decodeIfPresent(Int.self, forKey: .cadenceDays) ?? 7
+        completionHours = try values.decodeIfPresent(Int.self,
+            forKey: .completionHours) ?? 48
         createdAt = try values.decode(Date.self, forKey: .createdAt)
     }
 
@@ -179,6 +260,10 @@ struct ATHLTHTournamentDraft: Codable, Identifiable {
         try values.encodeIfPresent(proposalsCloseAt, forKey: .proposalsCloseAt)
         try values.encodeIfPresent(votesCloseAt, forKey: .votesCloseAt)
         try values.encode(approvePlayerChanges, forKey: .approvePlayerChanges)
+        try values.encode(allowedActivities, forKey: .allowedActivities)
+        try values.encode(rulesAuthority, forKey: .rulesAuthority)
+        try values.encode(cadenceDays, forKey: .cadenceDays)
+        try values.encode(completionHours, forKey: .completionHours)
         try values.encode(createdAt, forKey: .createdAt)
     }
 }
