@@ -33,7 +33,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         let clubChallenges: [CommunityGroupChallengeRecord]
         let clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord]
         let challenges: [ATHLTHChallenge]
-        let tournamentExercises: [ATHLTHTournamentCalendarItem]
+        let tournamentExercises: [ATHLTHTournamentCalendarItem]?
         let currentUserID: UUID?
     }
 
@@ -218,7 +218,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         clubChallenges: [CommunityGroupChallengeRecord] = [],
         clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge] = [],
-        tournamentExercises: [ATHLTHTournamentCalendarItem] = [],
+        tournamentExercises: [ATHLTHTournamentCalendarItem]? = nil,
         currentUserID: UUID? = nil
     ) async {
         errorMessage = nil
@@ -385,7 +385,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         clubChallenges: [CommunityGroupChallengeRecord] = [],
         clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge] = [],
-        tournamentExercises: [ATHLTHTournamentCalendarItem] = [],
+        tournamentExercises: [ATHLTHTournamentCalendarItem]? = nil,
         currentUserID: UUID? = nil
     ) async {
         guard isEnabled else {
@@ -425,7 +425,7 @@ final class AppleCalendarSyncStore: ObservableObject {
         clubChallenges: [CommunityGroupChallengeRecord] = [],
         clubChallengeParticipations: [CommunityGroupChallengeParticipantRecord] = [],
         challenges: [ATHLTHChallenge] = [],
-        tournamentExercises: [ATHLTHTournamentCalendarItem] = [],
+        tournamentExercises: [ATHLTHTournamentCalendarItem]? = nil,
         currentUserID: UUID? = nil
     ) async {
         let snapshot = CalendarSyncSnapshot(
@@ -665,9 +665,19 @@ final class AppleCalendarSyncStore: ObservableObject {
         // Scheduled competition exercises belong to the same user-managed
         // ATHLTH calendar. Stable marker keys update both opening and deadline
         // entries without duplicates, while avoiding multi-day busy blocks.
-        if snapshot.currentUserID != nil {
+        if snapshot.tournamentExercises == nil {
+            // Older Settings callers omit Arena items. Preserve previously
+            // synced tournament keys until the authoritative app-wide sync
+            // supplies an explicit roster snapshot, including explicit [].
+            activeKeys.formUnion(existingByKey.keys.filter {
+                $0.hasPrefix("tournament-exercise:") ||
+                    $0.hasPrefix("tournament-deadline:")
+            })
+        }
+        if snapshot.currentUserID != nil,
+           let tournamentExercises = snapshot.tournamentExercises {
             let now = Date()
-            for item in snapshot.tournamentExercises where item.deadlineAt >= now {
+            for item in tournamentExercises where item.deadlineAt >= now {
                 if item.opensAt >= now.addingTimeInterval(-3_600) {
                     let key = managedKey(type: "tournament-exercise", id: item.id)
                     activeKeys.insert(key)
