@@ -1395,12 +1395,15 @@ struct ATHLTHArenaSeasonDetailView: View {
     @State private var links: [ATHLTHArenaSeasonSeriesLink] = []
     @State private var closeout: ATHLTHArenaSeasonCloseout?
     @State private var competitionOptions: [ATHLTHArenaRemoteSeries] = []
+    @State private var seasonTournaments: [ATHLTHTournamentRemote] = []
+    @State private var tournamentDataLoaded = false
     @State private var clubDisplayNames: [UUID: String] = [:]
     @State private var loading = false
     @State private var adding = false
     @State private var seriesToDetach: ATHLTHArenaRemoteSeries?
     @State private var errorMessage: String?
     private let cloud = ATHLTHArenaCloudService()
+    private let tournamentCloud = ATHLTHTournamentCloudService()
     private let directory = ATHLTHArenaClubDirectory()
 
     /// Tournament drafts are private to their organizer until they can be
@@ -1453,7 +1456,11 @@ struct ATHLTHArenaSeasonDetailView: View {
     }
 
     private var championsAreFinal: Bool {
-        guard let closeout else { return false }
+        guard tournamentDataLoaded,
+              seasonTournaments.allSatisfy({
+                  $0.status == "completed" || $0.status == "cancelled"
+              }),
+              let closeout else { return false }
         return ATHLTHArenaSeasonPresentation.canDeclareChampion(
             phase: seasonPhase,
             linkedCompetitionCount: closeout.linkedCompetitions,
@@ -1508,12 +1515,16 @@ struct ATHLTHArenaSeasonDetailView: View {
     private var activeSeasonCompetitionCount: Int {
         visibleSeasonCompetitions.filter {
             ATHLTHArenaSeasonCompetitionTimeline.phase($0) == .active
+        }.count + seasonTournaments.filter {
+            $0.status == "active" || $0.status == "inviting"
         }.count
     }
 
     private var completedSeasonCompetitionCount: Int {
         visibleSeasonCompetitions.filter {
             ATHLTHArenaSeasonCompetitionTimeline.phase($0) == .completed
+        }.count + seasonTournaments.filter {
+            $0.status == "completed"
         }.count
     }
 
@@ -2006,6 +2017,34 @@ struct ATHLTHArenaSeasonDetailView: View {
                     .foregroundStyle(ATHLTHTheme.accentDeep)
                 }
 
+                ForEach(seasonTournaments.sorted { $0.createdAt > $1.createdAt }) { tournament in
+                    NavigationLink {
+                        ATHLTHTournamentLiveDetailView(tournament: tournament)
+                    } label: {
+                        HStack(spacing: 11) {
+                            Image(systemName: tournament.format.symbol)
+                                .foregroundStyle(ATHLTHArenaV3Style.gold)
+                                .frame(width: 34, height: 34)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(tournament.title)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(tournament.format.title + " · " +
+                                     (tournament.status == "completed" ? "Fullført" :
+                                      tournament.status == "active" ? "Pågår" : "Invitasjoner"))
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        }
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+                        .padding(14)
+                        .background(ATHLTHArenaV3Style.panel())
+                    }
+                    .buttonStyle(.plain)
+                }
                 ForEach(visibleSeasonCompetitions) { item in
                     HStack(spacing: 8) {
                         NavigationLink {
@@ -2223,9 +2262,18 @@ struct ATHLTHArenaSeasonDetailView: View {
             async let rank = cloud.loadSeasonStandings(seasonID: season.id)
             async let linkRows = cloud.loadSeasonSeriesLinks(seasonID: season.id)
             async let allSeries = cloud.loadSeries()
+            async let onlineTournaments = tournamentCloud.visibleTournaments()
             standings = try await rank
             links = try await linkRows
             competitionOptions = try await allSeries
+            // Never announce a final season winner if live tournaments could
+            // not be checked for unresolved matches.
+            if let published = try? await onlineTournaments {
+                seasonTournaments = published.filter { $0.seasonID == season.id }
+                tournamentDataLoaded = true
+            } else {
+                tournamentDataLoaded = false
+            }
             // A failed summary call never hides the approved standings.
             // It only prevents an unverified champion announcement.
             closeout = try? await cloud.loadSeasonCloseout(seasonID: season.id)
