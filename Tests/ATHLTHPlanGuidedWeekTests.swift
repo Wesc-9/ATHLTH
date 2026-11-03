@@ -28,6 +28,21 @@ final class ATHLTHPlanGuidedWeekTests: XCTestCase {
         }
     }
 
+    func testStretchingPickerUsesOnlyFirstPartyStretchingAndSharedBlocks() {
+        let guides = ATHLTHWellnessBlockFactory.stretching
+        XCTAssertFalse(guides.isEmpty)
+        XCTAssertTrue(guides.allSatisfy { $0.category == .stretching })
+        XCTAssertFalse(guides.contains { $0.category == .zen })
+        for guide in guides {
+            let block = ATHLTHWellnessBlockFactory.block(for: guide, phase: .cooldown)
+            XCTAssertEqual(block.kind, .note)
+            XCTAssertEqual(block.wellnessKind, .stretching)
+            XCTAssertEqual(block.phase, .cooldown)
+            XCTAssertGreaterThan(block.durationSeconds ?? 0, 0)
+            XCTAssertNil(block.repetitions)
+        }
+    }
+
     func testGuidedDayRequiresExplicitRestOrValidWorkout() {
         XCTAssertFalse(ATHLTHGuidedPlanDayPolicy.isPlanned(nil))
 

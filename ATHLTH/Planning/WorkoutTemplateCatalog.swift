@@ -6269,16 +6269,10 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func addWellnessGuide(_ guide: ATHLTHWellnessGuide) {
-        var block = WorkoutTemplateBlock(
-            sequence: 0, kind: .note, title: guide.title,
-            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
-            durationSeconds: Double(guide.seconds),
-            targetWeightKilograms: nil, loadNote: nil,
-            notes: guide.instructions,
-            phase: guide.category == .zen ? .recovery : selectedPhase
+        insertBlock(
+            ATHLTHWellnessBlockFactory.block(for: guide, phase: selectedPhase),
+            toGroup: nil
         )
-        block.wellnessKind = guide.category == .zen ? .meditation : .stretching
-        insertBlock(block, toGroup: nil)
     }
 
     private func addRestBlock(toGroup groupID: UUID? = nil) {

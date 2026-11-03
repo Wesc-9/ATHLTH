@@ -9,7 +9,7 @@ struct ATHLTHAdvancedStretchingPickerView: View {
     let onAdd: ([WorkoutTemplateBlock]) -> Void
 
     private var guides: [ATHLTHWellnessGuide] {
-        ATHLTHWellnessGuide.all.filter { $0.category == .stretching }
+        ATHLTHWellnessBlockFactory.stretching
     }
 
     private func tr(_ english: String, _ norwegian: String) -> String {
@@ -41,20 +41,9 @@ struct ATHLTHAdvancedStretchingPickerView: View {
 
                     ForEach(guides) { guide in
                         Button {
-                            var block = WorkoutTemplateBlock(
-                                sequence: 1,
-                                kind: .note,
-                                title: guide.title,
-                                exerciseSlug: nil,
-                                distanceMeters: nil,
-                                repetitions: nil,
-                                durationSeconds: Double(guide.seconds),
-                                targetWeightKilograms: nil,
-                                loadNote: nil,
-                                notes: guide.instructions,
-                                phase: phase
+                            let block = ATHLTHWellnessBlockFactory.block(
+                                for: guide, phase: phase
                             )
-                            block.wellnessKind = .stretching
                             onAdd([block])
                             dismiss()
                         } label: {

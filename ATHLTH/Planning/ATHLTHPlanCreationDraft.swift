@@ -155,15 +155,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
                 where (1...7).contains(day) && original.isValid {
                 var safe = original
                 safe.routeID = nil
-                safe.blocks = original.blocks.compactMap { block in
-                    // Personal health notes and arbitrary note-only blocks are
-                    // not part of a convenience checkpoint.
-                    guard block.kind != .note else { return nil }
-                    var copy = block
-                    copy.notes = nil
-                    copy.loadNote = nil
-                    return copy
-                }
+                safe.blocks = Self.safeCheckpointBlocks(original.blocks)
                 guard safe.isValid else { continue }
                 sanitized[day] = safe
             }
@@ -180,24 +172,14 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
                 if let blueprint = safe.detailedWorkout {
                     var clean = blueprint
                     clean.routeID = nil
-                    clean.blocks = blueprint.blocks.filter { $0.kind != .note }.map {
-                        var block = $0
-                        block.notes = nil
-                        block.loadNote = nil
-                        return block
-                    }
+                    clean.blocks = Self.safeCheckpointBlocks(blueprint.blocks)
                     safe.detailedWorkout = clean.isValid ? clean : nil
                 }
                 if let extras = safe.additionalDetailedWorkouts {
                     safe.additionalDetailedWorkouts = extras.compactMap { extra in
                         var clean = extra
                         clean.routeID = nil
-                        clean.blocks = extra.blocks.filter { $0.kind != .note }.map {
-                            var block = $0
-                            block.notes = nil
-                            block.loadNote = nil
-                            return block
-                        }
+                        clean.blocks = Self.safeCheckpointBlocks(extra.blocks)
                         return clean.isValid ? clean : nil
                     }
                 }
@@ -208,6 +190,25 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
             self.weekDayEdits = nil
         }
         self.savedAt = savedAt
+    }
+
+    /// Preserve first-party structured wellness and cycling blocks, which
+    /// use .note as a transport kind, without persisting private free text.
+    /// Arbitrary note-only blocks still never enter the convenience draft.
+    private static func safeCheckpointBlocks(
+        _ blocks: [WorkoutTemplateBlock]
+    ) -> [WorkoutTemplateBlock] {
+        blocks.compactMap { source in
+            if source.kind == .note &&
+                source.wellnessKind == nil &&
+                source.activityTag != "cycling" {
+                return nil
+            }
+            var copy = source
+            copy.notes = nil
+            copy.loadNote = nil
+            return copy
+        }
     }
 
     func isRestorable(at date: Date = Date()) -> Bool {

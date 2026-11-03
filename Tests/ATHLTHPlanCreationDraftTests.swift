@@ -274,6 +274,34 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
     }
 
 
+    func testTimedStretchingSurvivesSanitizedDraftWithoutStoringInstructions() throws {
+        let guide = try XCTUnwrap(ATHLTHWellnessBlockFactory.stretching.first)
+        let block = ATHLTHWellnessBlockFactory.block(for: guide, phase: .cooldown)
+        let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Uttøyning", kind: .mobility, durationMinutes: 5,
+            routeID: nil, blocks: [block]
+        )
+        XCTAssertTrue(blueprint.isValid)
+
+        let planDraft = ATHLTHPlanCreationDraft(
+            title: "Recovery week", weekCount: 2, startDate: Date(),
+            advanced: true, source: "scratch", stage: "week",
+            structuredWorkoutsByDay: [2: blueprint],
+            weekDayEdits: [3: ATHLTHPlanWeekDayEdit(
+                kind: .mobility, title: "Uttøyning",
+                durationMinutes: 5, detailedWorkout: blueprint
+            )]
+        )
+        let saved = try XCTUnwrap(planDraft.structuredWorkoutsByDay?[2]?.blocks.first)
+        XCTAssertEqual(saved.wellnessKind, .stretching)
+        XCTAssertEqual(saved.phase, .cooldown)
+        XCTAssertNil(saved.notes)
+        let dated = try XCTUnwrap(planDraft.weekDayEdits?[3]?.detailedWorkout)
+        XCTAssertTrue(dated.isValid)
+        XCTAssertEqual(dated.blocks.first?.wellnessKind, .stretching)
+        XCTAssertNil(dated.blocks.first?.notes)
+    }
+
     func testAdvancedContentPickerRestoresExactTypeAndPhase() throws {
         let draft = ATHLTHPlanCreationDraft(
             title: "Four weeks", weekCount: 4, startDate: Date(),

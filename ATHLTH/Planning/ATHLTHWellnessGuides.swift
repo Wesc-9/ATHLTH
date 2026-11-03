@@ -73,6 +73,31 @@ struct ATHLTHWellnessGuide: Identifiable, Hashable {
     ]
 }
 
+
+/// Shared block construction for the plan's stretching picker and the
+/// advanced Workout Studio. A stretch is timed mobility, never a strength set.
+enum ATHLTHWellnessBlockFactory {
+    static func block(
+        for guide: ATHLTHWellnessGuide,
+        phase: WorkoutPhaseKind
+    ) -> WorkoutTemplateBlock {
+        var block = WorkoutTemplateBlock(
+            sequence: 1, kind: .note, title: guide.title,
+            exerciseSlug: nil, distanceMeters: nil,
+            repetitions: nil, durationSeconds: Double(guide.seconds),
+            targetWeightKilograms: nil, loadNote: nil,
+            notes: guide.instructions,
+            phase: guide.category == .zen ? .recovery : phase
+        )
+        block.wellnessKind = guide.category == .zen ? .meditation : .stretching
+        return block
+    }
+
+    static var stretching: [ATHLTHWellnessGuide] {
+        ATHLTHWellnessGuide.all.filter { $0.category == .stretching }
+    }
+}
+
 struct ATHLTHWellnessGuideTimer: View {
     let guide: ATHLTHWellnessGuide
     @State private var remaining = 0
