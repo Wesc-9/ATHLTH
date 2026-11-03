@@ -1106,43 +1106,7 @@ struct ChallengeCreationView: View {
                 }
                 .background(.ultraThinMaterial)
             }
-            .task {
-                restoreCreationDraftIfAvailable()
-                if social.mutualFollows.isEmpty {
-                    await social.refresh()
-                }
-
-                if invitees.isEmpty &&
-                    !preselectedFriends.isEmpty {
-                    let mutualIDs =
-                        Set(
-                            social.mutualFollows
-                                .map(\.userID)
-                        )
-                    let eligibleFriends =
-                        preselectedFriends.filter {
-                            mutualIDs.contains(
-                                $0.userID
-                            )
-                        }
-
-                    invitees =
-                        eligibleFriends.map(
-                            challengeParticipant
-                        )
-
-                    if eligibleFriends.count !=
-                        preselectedFriends.count {
-                        createError =
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Follow each other before sending a challenge.",
-                                norwegian:
-                                    "Dere må følge hverandre før du kan sende en utfordring."
-                            )
-                    }
-                }
-            }
+            .task { await prepareChallengeCreation() }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { saveCreationDraft() }
             }
@@ -7186,6 +7150,27 @@ struct ChallengeCreationView: View {
         case .walking: return "GoalWalking"
         case .strength: return "GoalStrength"
         case .heartRate: return "GoalEndurance"
+        }
+    }
+
+    @MainActor
+    private func prepareChallengeCreation() async {
+        restoreCreationDraftIfAvailable()
+        if social.mutualFollows.isEmpty {
+            await social.refresh()
+        }
+
+        guard invitees.isEmpty, !preselectedFriends.isEmpty else {
+            return
+        }
+        let allowed = Set(social.mutualFollows.map(\.userID))
+        let people = preselectedFriends.filter { allowed.contains($0.userID) }
+        invitees = people.map { challengeParticipant($0) }
+        if people.count != preselectedFriends.count {
+            createError = ATHLTHLocalization.choose(
+                english: "Follow each other before sending a challenge.",
+                norwegian: "Dere må følge hverandre før du kan sende en utfordring."
+            )
         }
     }
 
