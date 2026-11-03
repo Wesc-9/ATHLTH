@@ -1319,6 +1319,28 @@ struct SocialWorkoutSessionRecord: Identifiable, Codable, Hashable {
     }
 }
 
+/// Voluntary arrival status for in-person sessions. Does not use GPS.
+enum SocialWorkoutArrivalStatus: String, CaseIterable, Codable {
+    case onTheWay = "on_the_way"
+    case here = "here"
+
+    var label: String {
+        switch self {
+        case .onTheWay:
+            return ATHLTHLocalization.choose(english: "On my way", norwegian: "På vei")
+        case .here:
+            return ATHLTHLocalization.choose(english: "I'm here", norwegian: "Jeg er her")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .onTheWay: return "figure.walk"
+        case .here: return "mappin.circle.fill"
+        }
+    }
+}
+
 struct SocialWorkoutParticipantRecord: Identifiable, Codable, Hashable {
     let id: UUID
     let sessionID: UUID
@@ -1334,6 +1356,7 @@ struct SocialWorkoutParticipantRecord: Identifiable, Codable, Hashable {
     var workoutStartedAt: Date? = nil
     var workoutFinishedAt: Date? = nil
     var launchFailedAt: Date? = nil
+    var arrivalStatus: SocialWorkoutArrivalStatus? = nil
 
     var isReady: Bool {
         readyAt != nil
@@ -1359,6 +1382,7 @@ struct SocialWorkoutParticipantRecord: Identifiable, Codable, Hashable {
         case workoutStartedAt = "workout_started_at"
         case workoutFinishedAt = "workout_finished_at"
         case launchFailedAt = "launch_failed_at"
+        case arrivalStatus = "arrival_status"
     }
 }
 
