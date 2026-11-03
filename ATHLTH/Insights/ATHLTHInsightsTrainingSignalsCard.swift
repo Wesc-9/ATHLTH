@@ -64,7 +64,8 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
     private var restDays: Int { max(0, trainingDays.count - activeDays) }
 
     private var loadPercent: Double? {
-        guard let reference = trainingLoad.chronicWeeklyAverageMinutes,
+        guard health.hasRequestedAuthorization, health.healthDataAvailable,
+              let reference = trainingLoad.chronicWeeklyAverageMinutes,
               reference > 0 else { return nil }
         return (trainingLoad.acuteMinutes / reference - 1) * 100
     }
@@ -84,10 +85,24 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
     }
 
     private var primaryLoadText: String {
-        durationLabel(trainingLoad.acuteMinutes)
+        guard health.hasRequestedAuthorization,
+              health.healthDataAvailable else { return "—" }
+        return durationLabel(trainingLoad.acuteMinutes)
+    }
+
+    private var signalsRefreshKey: String {
+        "\(health.lastSuccessfulRefreshAt?.timeIntervalSince1970 ?? 0):" +
+            "\(session.profile.maximumHeartRateBPM ?? 0)"
     }
 
     private var loadExplanation: String {
+        guard health.hasRequestedAuthorization,
+              health.healthDataAvailable else {
+            return tr(
+                "Connect Apple Health to view your training load.",
+                "Koble til Apple Helse for å se treningsbelastningen din."
+            )
+        }
         guard let change = loadPercent else {
             return tr(
                 "A four-week comparison will appear after more recorded workouts.",
@@ -186,7 +201,7 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
             responseCard
             coachingCard
         }
-        .task(id: health.lastSuccessfulRefreshAt) {
+        .task(id: signalsRefreshKey) {
             await refreshMeasuredSignals()
         }
     }
@@ -245,13 +260,17 @@ struct ATHLTHInsightsTrainingSignalsCard: View {
                 )
                 miniMetric(
                     tr("Workouts", "Økter"),
-                    value: "\(count)",
+                    value: health.hasRequestedAuthorization &&
+                        health.healthDataAvailable ? "\(count)" : "—",
                     detail: tr("Last 7 days", "Siste 7 dager"),
                     symbol: "figure.run"
                 )
                 miniMetric(
                     tr("No workout", "Uten økt"),
-                    value: "\(restDays)",
+                    value: health.hasRequestedAuthorization &&
+                        health.healthDataAvailable &&
+                        trainingDays.count == 7
+                        ? "\(restDays)" : "—",
                     detail: tr("of 7 days", "av 7 dager"),
                     symbol: "calendar"
                 )
