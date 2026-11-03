@@ -24,6 +24,21 @@ struct WorkoutChangeDecision: Codable, Hashable {
     let approvedWorkout: PlannedSession?
 }
 
+/// Version-6 private workout event: only the organizer may publish it.
+/// Recipients reconcile accepted calendar copies by the original source ID.
+struct WorkoutInviteLifecycleUpdate: Codable, Hashable {
+    enum Kind: String, Codable {
+        case updated
+        case cancelled
+    }
+
+    let sourceWorkoutID: UUID
+    let organizerID: UUID
+    let kind: Kind
+    let updatedWorkout: PlannedSession?
+    let occurredAt: Date
+}
+
 /// Permission attached to the original invitation. Proposals are always
 /// suggestions; only the organizer can apply them to the shared workout.
 enum WorkoutInviteExercisePolicy {
