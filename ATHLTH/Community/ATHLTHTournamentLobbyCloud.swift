@@ -149,6 +149,7 @@ struct ATHLTHTournamentMatchExerciseRemote: Decodable, Identifiable {
     let candidateID: UUID
     let position: Int
     let deadlineAt: Date
+    let scheduledAt: Date
     let state: String
     let winnerID: UUID?
     enum CodingKeys: String, CodingKey {
@@ -156,6 +157,7 @@ struct ATHLTHTournamentMatchExerciseRemote: Decodable, Identifiable {
         case matchID = "match_id"
         case candidateID = "candidate_id"
         case deadlineAt = "deadline_at"
+        case scheduledAt = "scheduled_at"
         case winnerID = "winner_id"
     }
 }
@@ -483,7 +485,7 @@ struct ATHLTHTournamentLobbyCloudService {
             let end = min(start + 150,matchIDs.count)
             let batch: [ATHLTHTournamentMatchExerciseRemote] = try await client
               .from("athlth_tournament_match_exercises")
-              .select("id,match_id,candidate_id,position,deadline_at,state,winner_id")
+              .select("id,match_id,candidate_id,position,scheduled_at,deadline_at,state,winner_id")
               .in("match_id",values: Array(matchIDs[start..<end]))
               .order("position")
               .limit(2500).execute().value
