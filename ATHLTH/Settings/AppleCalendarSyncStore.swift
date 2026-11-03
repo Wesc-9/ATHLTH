@@ -926,6 +926,18 @@ final class AppleCalendarSyncStore: ObservableObject {
             }
         }
 
+        // Keep completed, already-past competition reminders as calendar
+        // history. Future invitations/fixtures withdrawn from the schedule
+        // are still removed by reconciliation below.
+        let nowForHistory = Date()
+        for (key, oldEvent) in existingByKey {
+            guard key.hasPrefix("tournament-exercise:") ||
+                    key.hasPrefix("tournament-deadline:") else { continue }
+            if oldEvent.endDate <= nowForHistory {
+                activeKeys.insert(key)
+            }
+        }
+
         for event in existingEvents {
             guard let key = managedKey(from: event),
                   !activeKeys.contains(key)
