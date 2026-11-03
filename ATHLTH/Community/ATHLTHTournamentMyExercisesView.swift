@@ -98,10 +98,16 @@ struct ATHLTHTournamentMyExercisesView: View {
                                 .foregroundStyle(ATHLTHArenaV3Style.gold)
                             VStack(alignment: .leading,spacing: 4) {
                                 Text(candidate.flatMap {
-                                    exerciseNames[$0.exerciseID]
+                                    exerciseNames[$0.lookupID]
                                 } ?? "Øvelse \(slot.position)")
                                     .font(.subheadline.weight(.medium))
                                     .foregroundStyle(ATHLTHArenaV3Style.ink)
+                                if slot.scheduledAt > Date() {
+                                    Text("Åpner " + slot.scheduledAt.formatted(
+                                        date: .abbreviated,time: .shortened))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                                }
                                 Text("Frist " + slot.deadlineAt.formatted(
                                     date: .abbreviated,time: .shortened))
                                     .font(.caption)
@@ -127,7 +133,7 @@ struct ATHLTHTournamentMyExercisesView: View {
                             } else if match.status != "confirmed" &&
                                       slot.state == "pending" &&
                                       slot.deadlineAt > Date() &&
-                                      (match.scheduledAt ?? .distantPast) <= Date() {
+                                      slot.scheduledAt <= Date() {
                                 Button("Registrer") { reportSlot = slot }
                                     .font(.caption.weight(.semibold))
                                     .foregroundStyle(ATHLTHArenaV3Style.gold)
@@ -210,9 +216,7 @@ struct ATHLTHTournamentMyExercisesView: View {
             let newCandidates = try await selected
             let newSlots = try await exercises
             async let recorded = cloud.completions(slotIDs: newSlots.map(\.id))
-            async let exerciseNamesTask = cloud.exerciseNames(
-                ids: Set(newCandidates.map(\.exerciseID))
-            )
+            async let exerciseNamesTask = cloud.candidateNames(newCandidates)
             candidates = newCandidates
             slots = newSlots
             completions = try await recorded
