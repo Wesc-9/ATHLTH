@@ -1,10 +1,11 @@
 import SwiftUI
 
 private enum ATHLTHTournamentDetailTab: String, CaseIterable, Identifiable {
-    case overview, matches, standings
+    case lobby, overview, matches, standings
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .lobby: return "Lobby"
         case .overview: return "Oversikt"
         case .matches: return "Oppgjør"
         case .standings: return "Tabell"
@@ -24,7 +25,7 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var matches: [ATHLTHTournamentRemoteMatch] = []
     @State private var confirmedStandings: [ATHLTHTournamentStandingRemote] = []
     @State private var names: [UUID: String] = [:]
-    @State private var selection: ATHLTHTournamentDetailTab = .overview
+    @State private var selection: ATHLTHTournamentDetailTab = .lobby
     @State private var showingMatchReport: ATHLTHTournamentRemoteMatch?
     @State private var busy = false
     @State private var loading = true
@@ -76,8 +77,28 @@ struct ATHLTHTournamentLiveDetailView: View {
                         .frame(maxWidth: .infinity, minHeight: 180)
                 } else {
                     switch selection {
+                    case .lobby:
+                        ATHLTHTournamentLobbyView(
+                            tournament: current,
+                            entries: entries,
+                            names: names,
+                            matches: matches
+                        ) {
+                            await reload()
+                        }
                     case .overview: overview
-                    case .matches: allMatchesSection
+                    case .matches:
+                        VStack(alignment: .leading,spacing: 18) {
+                            if current.status == "active",
+                               confirmedEntries.contains(where: { $0.userID == userID }) {
+                                ATHLTHTournamentMyExercisesView(
+                                    tournament: current,
+                                    matches: matches,
+                                    userID: userID
+                                )
+                            }
+                            allMatchesSection
+                        }
                     case .standings: standingsSection
                     }
                 }
