@@ -3943,6 +3943,129 @@ struct WorkoutTemplateBuilderView: View {
 
     var body: some View {
         NavigationStack {
+            editorWithDraftLifecycle
+        }
+    }
+
+    // Separate sheet presentation from draft observers to keep SwiftUI
+    // type checking tractable in Xcode 27, without changing behavior.
+    private var editorWithDraftLifecycle: some View {
+        editorWithPresentation
+            .onAppear {
+                guard !draftActive else { return }
+                restoreWorkoutDraft()
+                if !draftRestored {
+                    collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
+                }
+                if let focused = initialFocusedBlockIndex,
+                   blocks.indices.contains(focused) {
+                    // The Plan card uses the executable interval index, not
+                    // just the compact group's first recipe item. Split only
+                    // when a specific round was selected. This allows editing
+                    // duration, pace, incline and recovery independently.
+                    if let requestedStep = initialFocusedExecutionStepIndex,
+                       let groupID = blocks[focused].groupID,
+                       blocks[focused].groupKind == .intervals,
+                       let individualized = ATHLTHIntervalGroupEditing.individualSteps(
+                           in: blocks, groupID: groupID
+                       ) {
+                        blocks = individualized
+                        let index = min(focused + requestedStep, blocks.count - 1)
+                        expandedBlockIndex = index
+                        selectedPhase = blocks[index].resolvedPhase
+                    } else {
+                        expandedBlockIndex = focused
+                        selectedPhase = blocks[focused].resolvedPhase
+                        if let groupID = blocks[focused].groupID {
+                            collapsedGroupIDs.remove(groupID)
+                        }
+                    }
+                }
+                draftActive = true
+                // Save the opened source immediately, including an imported
+                // workout with no subsequent user edits before app suspension.
+                // Never overwrite an existing snapshot until restore finishes.
+                persistWorkoutDraft()
+                if openFocusedStepEditor, let focused = expandedBlockIndex {
+                    // The parent opens this workout for one tapped plan row.
+                    // Present its real step editor after the workout sheet has
+                    // appeared, so the edit still uses the existing Save-to-Plan flow.
+                    Task { @MainActor in
+                        await Task.yield()
+                        guard blocks.indices.contains(focused) else { return }
+                        openStudioStepEditor(blockID: blocks[focused].editorDragID)
+                    }
+                }
+                // Apply one explicitly requested block after the draft is
+                // restored. Never insert it twice on sheet reappearance.
+                if !isPlannedWorkout, !draftRestored,
+                   !initialQuickAddConsumed, let initialQuickAdd {
+                    initialQuickAddConsumed = true
+                    applyInitialQuickAdd(initialQuickAdd)
+                }
+            }
+            .onChange(of: blocks) { _, _ in
+                // A changed recipe updates the estimate even if the
+                // user previously entered a time. Keep the field editable.
+                manualDurationMinutes = nil
+                durationInputText = knownDurationMinutes.map(String.init) ?? ""
+                savedToMyWorkouts = false
+                persistWorkoutDraft()
+            }
+            .onChange(of: title) { _, _ in
+                savedToMyWorkouts = false
+                persistWorkoutDraft()
+            }
+            .onChange(of: selectedRouteID) { oldValue, newValue in
+                if let oldValue, newValue == nil {
+                    let routeTitle = session.savedRoutes.first {
+                        $0.id == oldValue
+                    }?.title
+                    // A route deselected from the picker must not leave
+                    // its distance-only step behind.
+                    blocks.removeAll { block in
+                        block.kind == .run &&
+                            (block.routeID == oldValue ||
+                             (block.routeID == nil && routeTitle != nil &&
+                              block.title == routeTitle))
+                    }
+                    resequence()
+                }
+                persistWorkoutDraft()
+            }
+            .onChange(of: selectedWorkoutGearIDs) { _, _ in
+                if draftActive { gearSelectionTouched = true }
+                persistWorkoutDraft()
+            }
+            .onChange(of: gearSelectionTouched) { _, _ in persistWorkoutDraft() }
+            .onChange(of: selectedSpotifyPlaylist) { _, _ in persistWorkoutDraft() }
+            .onChange(of: spotifyAutoplayOnStart) { _, _ in persistWorkoutDraft() }
+            .onChange(of: manualDurationMinutes) { _, _ in
+                persistWorkoutDraft()
+            }
+            .onChange(of: pendingCopyDayIDs) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioVisiblePhases) { _, _ in persistWorkoutDraft() }
+            .onChange(of: selectedPhase) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioAdvanced) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicDate) { _, _ in persistWorkoutDraft() }
+            .onChange(of: scenePhase) { _, phase in
+                if phase != .active { persistWorkoutDraft() }
+            }
+            .onDisappear { persistWorkoutDraft() }
+            .onChange(of: showingExercisePicker) { _, showing in
+                if !showing {
+                    exerciseTargetGroupID = nil
+                    pendingNewGroupKind = nil
+                }
+            }
+            .task {
+                if exerciseLibrary.allExercises.isEmpty {
+                    await exerciseLibrary.refresh()
+                }
+            }
+    }
+
+    private var editorWithPresentation: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if isPlannedWorkout {
@@ -4281,119 +4404,6 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 .presentationDetents([.large])
             }
-            .onAppear {
-                guard !draftActive else { return }
-                restoreWorkoutDraft()
-                if !draftRestored {
-                    collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
-                }
-                if let focused = initialFocusedBlockIndex,
-                   blocks.indices.contains(focused) {
-                    // The Plan card uses the executable interval index, not
-                    // just the compact group's first recipe item. Split only
-                    // when a specific round was selected. This allows editing
-                    // duration, pace, incline and recovery independently.
-                    if let requestedStep = initialFocusedExecutionStepIndex,
-                       let groupID = blocks[focused].groupID,
-                       blocks[focused].groupKind == .intervals,
-                       let individualized = ATHLTHIntervalGroupEditing.individualSteps(
-                           in: blocks, groupID: groupID
-                       ) {
-                        blocks = individualized
-                        let index = min(focused + requestedStep, blocks.count - 1)
-                        expandedBlockIndex = index
-                        selectedPhase = blocks[index].resolvedPhase
-                    } else {
-                        expandedBlockIndex = focused
-                        selectedPhase = blocks[focused].resolvedPhase
-                        if let groupID = blocks[focused].groupID {
-                            collapsedGroupIDs.remove(groupID)
-                        }
-                    }
-                }
-                draftActive = true
-                // Save the opened source immediately, including an imported
-                // workout with no subsequent user edits before app suspension.
-                // Never overwrite an existing snapshot until restore finishes.
-                persistWorkoutDraft()
-                if openFocusedStepEditor, let focused = expandedBlockIndex {
-                    // The parent opens this workout for one tapped plan row.
-                    // Present its real step editor after the workout sheet has
-                    // appeared, so the edit still uses the existing Save-to-Plan flow.
-                    Task { @MainActor in
-                        await Task.yield()
-                        guard blocks.indices.contains(focused) else { return }
-                        openStudioStepEditor(blockID: blocks[focused].editorDragID)
-                    }
-                }
-                // Apply one explicitly requested block after the draft is
-                // restored. Never insert it twice on sheet reappearance.
-                if !isPlannedWorkout, !draftRestored,
-                   !initialQuickAddConsumed, let initialQuickAdd {
-                    initialQuickAddConsumed = true
-                    applyInitialQuickAdd(initialQuickAdd)
-                }
-            }
-            .onChange(of: blocks) { _, _ in
-                // A changed recipe updates the estimate even if the
-                // user previously entered a time. Keep the field editable.
-                manualDurationMinutes = nil
-                durationInputText = knownDurationMinutes.map(String.init) ?? ""
-                savedToMyWorkouts = false
-                persistWorkoutDraft()
-            }
-            .onChange(of: title) { _, _ in
-                savedToMyWorkouts = false
-                persistWorkoutDraft()
-            }
-            .onChange(of: selectedRouteID) { oldValue, newValue in
-                if let oldValue, newValue == nil {
-                    let routeTitle = session.savedRoutes.first {
-                        $0.id == oldValue
-                    }?.title
-                    // A route deselected from the picker must not leave
-                    // its distance-only step behind.
-                    blocks.removeAll { block in
-                        block.kind == .run &&
-                            (block.routeID == oldValue ||
-                             (block.routeID == nil && routeTitle != nil &&
-                              block.title == routeTitle))
-                    }
-                    resequence()
-                }
-                persistWorkoutDraft()
-            }
-            .onChange(of: selectedWorkoutGearIDs) { _, _ in
-                if draftActive { gearSelectionTouched = true }
-                persistWorkoutDraft()
-            }
-            .onChange(of: gearSelectionTouched) { _, _ in persistWorkoutDraft() }
-            .onChange(of: selectedSpotifyPlaylist) { _, _ in persistWorkoutDraft() }
-            .onChange(of: spotifyAutoplayOnStart) { _, _ in persistWorkoutDraft() }
-            .onChange(of: manualDurationMinutes) { _, _ in
-                persistWorkoutDraft()
-            }
-            .onChange(of: pendingCopyDayIDs) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioVisiblePhases) { _, _ in persistWorkoutDraft() }
-            .onChange(of: selectedPhase) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioAdvanced) { _, _ in persistWorkoutDraft() }
-            .onChange(of: studioBasicDate) { _, _ in persistWorkoutDraft() }
-            .onChange(of: scenePhase) { _, phase in
-                if phase != .active { persistWorkoutDraft() }
-            }
-            .onDisappear { persistWorkoutDraft() }
-            .onChange(of: showingExercisePicker) { _, showing in
-                if !showing {
-                    exerciseTargetGroupID = nil
-                    pendingNewGroupKind = nil
-                }
-            }
-            .task {
-                if exerciseLibrary.allExercises.isEmpty {
-                    await exerciseLibrary.refresh()
-                }
-            }
-        }
     }
 
     private var workoutOverview: some View {
