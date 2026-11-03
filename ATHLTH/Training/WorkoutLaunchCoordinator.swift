@@ -836,6 +836,9 @@ enum WorkoutLaunchCoordinator {
                 configuration.gearIDs
             )
             ATHLTHPetStore.shared.prepareNextWorkoutPets(configuration.petIDs)
+        if let catalog = ATHLTHPetStore.shared.makeWatchCatalog() {
+            watchConnection.sendPetCatalog(catalog)
+        }
             phoneWorkout.start(
                 walking: false,
                 route: selectedRoute,
@@ -1034,6 +1037,9 @@ enum WorkoutLaunchCoordinator {
             configuration.gearIDs
         )
         ATHLTHPetStore.shared.prepareNextWorkoutPets(configuration.petIDs)
+        if let catalog = ATHLTHPetStore.shared.makeWatchCatalog() {
+            watchConnection.sendPetCatalog(catalog)
+        }
 
         watchConnection.sendPreparedWorkout(
             WatchPreparedWorkoutTransfer(
@@ -1138,6 +1144,9 @@ enum WorkoutLaunchCoordinator {
                 configuration.gearIDs
             )
             ATHLTHPetStore.shared.prepareNextWorkoutPets(configuration.petIDs)
+        if let catalog = ATHLTHPetStore.shared.makeWatchCatalog() {
+            watchConnection.sendPetCatalog(catalog)
+        }
             phoneWorkout.start(
                 walking: true,
                 title:
@@ -1244,6 +1253,9 @@ enum WorkoutLaunchCoordinator {
             configuration.gearIDs
         )
         ATHLTHPetStore.shared.prepareNextWorkoutPets(configuration.petIDs)
+        if let catalog = ATHLTHPetStore.shared.makeWatchCatalog() {
+            watchConnection.sendPetCatalog(catalog)
+        }
         startQuickSpotifyIfNeeded(
             playlist:
                 configuration.spotifyPlaylist,
