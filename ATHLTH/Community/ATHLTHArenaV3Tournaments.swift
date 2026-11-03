@@ -550,7 +550,7 @@ struct ATHLTHTournamentCreator: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(ATHLTHArenaV3Style.gold)
             }
-            Text("Oppsettet er et utkast. Tabellen og kampene får ikke resultater før de er registrert og godkjent.")
+            Text("Oppsettet er et utkast. Trekningen gjøres ved start, og bare godkjente resultater teller.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
         }
@@ -858,7 +858,7 @@ struct ATHLTHTournamentDraftDetailView: View {
                 }
                 .padding(.bottom, 6)
             }
-            Text("Frirunder vises som slike. Ingen vinner er satt før resultatene er godkjent.")
+            Text("Kun en forhåndsvisning. Deltakerne trekkes tilfeldig ved start, og frirunder gir ingen poeng.")
                 .font(.caption)
                 .foregroundStyle(ATHLTHArenaV3Style.secondary)
         }
