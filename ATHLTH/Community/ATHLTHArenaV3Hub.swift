@@ -94,11 +94,22 @@ enum ATHLTHTournamentStructure {
         -> [(String, String)] {
         let size = bracketSize(athletes.count)
         let byes = size - athletes.count
-        var slots: [String] = athletes.map(\.username)
-        slots += Array(repeating: "Frirunde", count: byes)
-        return stride(from: 0, to: size, by: 2).map {
-            (slots[$0], slots[$0 + 1])
+        var matchups: [(String, String)] = []
+        var next = 0
+        for match in 0..<(size / 2) {
+            let first = athletes[next].username
+            next += 1
+            if match < byes {
+                // Spread byes across separate matches. Two byes must never
+                // face each other while real contestants are paired elsewhere.
+                matchups.append((first, "Frirunde"))
+            } else {
+                let second = athletes[next].username
+                next += 1
+                matchups.append((first, second))
+            }
         }
+        return matchups
     }
 }
 
