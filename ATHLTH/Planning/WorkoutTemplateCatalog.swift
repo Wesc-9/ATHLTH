@@ -3424,6 +3424,8 @@ struct WorkoutTemplateBuilderView: View {
     @State private var selectedRouteID: UUID?
     @State private var showingExercisePicker = false
     @State private var showingRunningExercisePicker = false
+    @State private var resumeExercisePickerAfterWake = false
+    @State private var resumeRunningPickerAfterWake = false
     @State private var selectedExerciseInfo: WorkoutTemplateBlock?
     @State private var selectedPhase: WorkoutPhaseKind = .main
     @State private var expandedBlockIndex: Int?
@@ -3589,6 +3591,9 @@ struct WorkoutTemplateBuilderView: View {
         let selectedPhase: WorkoutPhaseKind?
         let studioAdvanced: Bool?
         let studioDate: Date?
+        // Optional to keep all existing workout drafts compatible.
+        let pendingExercisePicker: Bool?
+        let pendingRunningPicker: Bool?
     }
 
     private var draftStorageKey: String {
@@ -3629,6 +3634,8 @@ struct WorkoutTemplateBuilderView: View {
         selectedPhase = stored.selectedPhase ?? selectedPhase
         studioAdvanced = stored.studioAdvanced ?? studioAdvanced
         studioBasicDate = stored.studioDate ?? studioBasicDate
+        resumeExercisePickerAfterWake = stored.pendingExercisePicker ?? false
+        resumeRunningPickerAfterWake = stored.pendingRunningPicker ?? false
         collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
         draftRestored = true
         draftNotice = true
@@ -3655,7 +3662,9 @@ struct WorkoutTemplateBuilderView: View {
             },
             selectedPhase: selectedPhase,
             studioAdvanced: studioAdvanced,
-            studioDate: studioBasicDate
+            studioDate: studioBasicDate,
+            pendingExercisePicker: showingExercisePicker || resumeExercisePickerAfterWake,
+            pendingRunningPicker: showingRunningExercisePicker || resumeRunningPickerAfterWake
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: draftStorageKey)
@@ -3998,12 +4007,24 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 // Apply one explicitly requested block after the draft is
                 // restored. Never insert it twice on sheet reappearance.
-                if !draftRestored,
-                   !initialQuickAddConsumed, let initialQuickAdd {
+                if draftRestored {
+                    // Return directly to the picker the athlete had open
+                    // before app termination, not a step behind in Studio.
+                    Task { @MainActor in
+                        await Task.yield()
+                        if resumeExercisePickerAfterWake {
+                            showingExercisePicker = true
+                            resumeExercisePickerAfterWake = false
+                        } else if resumeRunningPickerAfterWake {
+                            showingRunningExercisePicker = true
+                            resumeRunningPickerAfterWake = false
+                        }
+                    }
+                } else if !initialQuickAddConsumed, let initialQuickAdd {
                     initialQuickAddConsumed = true
                     if initialQuickAdd == "exercise" && isPlannedWorkout {
-                        // SwiftUI cannot present a nested sheet during the
-                        // same appearance pass as its parent plan editor.
+                        // Present the shared library only after the Studio
+                        // sheet has actually entered its view hierarchy.
                         Task { @MainActor in
                             await Task.yield()
                             guard draftActive else { return }
@@ -4059,14 +4080,44 @@ struct WorkoutTemplateBuilderView: View {
             .onChange(of: studioAdvanced) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicDate) { _, _ in persistWorkoutDraft() }
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active { persistWorkoutDraft() }
+                if phase != .active {
+                    // A suspended iOS sheet can be implicitly dismissed.
+                    // Keep its presentation intent in the recoverable draft.
+                    resumeExercisePickerAfterWake = showingExercisePicker
+                        || resumeExercisePickerAfterWake
+                    resumeRunningPickerAfterWake = showingRunningExercisePicker
+                        || resumeRunningPickerAfterWake
+                    persistWorkoutDraft()
+                } else if resumeExercisePickerAfterWake || resumeRunningPickerAfterWake {
+                    Task { @MainActor in
+                        await Task.yield()
+                        if resumeExercisePickerAfterWake && !showingExercisePicker {
+                            showingExercisePicker = true
+                        }
+                        if resumeRunningPickerAfterWake && !showingRunningExercisePicker {
+                            showingRunningExercisePicker = true
+                        }
+                        resumeExercisePickerAfterWake = false
+                        resumeRunningPickerAfterWake = false
+                        persistWorkoutDraft()
+                    }
+                }
             }
             .onDisappear { persistWorkoutDraft() }
             .onChange(of: showingExercisePicker) { _, showing in
                 if !showing {
                     exerciseTargetGroupID = nil
                     pendingNewGroupKind = nil
+                    // An intentional close releases the saved picker flag.
+                    if scenePhase == .active && !resumeExercisePickerAfterWake {
+                        persistWorkoutDraft()
+                    }
+                } else {
+                    persistWorkoutDraft()
                 }
+            }
+            .onChange(of: showingRunningExercisePicker) { _, _ in
+                persistWorkoutDraft()
             }
             .task {
                 if exerciseLibrary.allExercises.isEmpty {
