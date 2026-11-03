@@ -286,11 +286,86 @@ struct PlannedWorkoutWatchBuilder {
         return configuration
     }
 
+    /// Converts the authoritative advanced workout recipe to the exact
+    /// ordered Watch steps, including explicit final recovery and active jog.
+    /// Legacy RunningWorkoutTemplate plans retain their existing builder.
+    static func runningStepsFromEditedBlocks(
+        _ blocks: [WorkoutTemplateBlock]
+    ) -> [WatchRunningWorkoutStep] {
+        blocks.expandedForExecution().compactMap { block in
+            guard block.kind == .run || block.kind == .rest else { return nil }
+            let measure: WatchRunningStepMeasure
+            if let seconds = block.durationSeconds,
+               seconds.isFinite, seconds > 0 {
+                measure = .time
+            } else if let distance = block.distanceMeters,
+                      distance.isFinite, distance > 0 {
+                measure = .distance
+            } else {
+                measure = .open
+            }
+            let phase: String
+            if block.isRestOrActiveRecovery || block.resolvedPhase == .recovery {
+                phase = "recovery"
+            } else {
+                switch block.resolvedPhase {
+                case .warmup: phase = "warmup"
+                case .cooldown: phase = "cooldown"
+                case .main: phase = "work"
+                case .recovery: phase = "recovery"
+                }
+            }
+            let pace = block.targetPaceSecondsPerKilometer
+            return WatchRunningWorkoutStep(
+                id: UUID(), title: block.title, measure: measure,
+                distanceMeters: measure == .distance ? block.distanceMeters : nil,
+                durationSeconds: measure == .time ? block.durationSeconds : nil,
+                intensityText: block.targetText,
+                targetPaceMinSecondsPerKilometer: pace,
+                targetPaceMaxSecondsPerKilometer: pace,
+                phase: phase, targetHeartRateZone: block.targetHeartRateZone,
+                targetTreadmillInclinePercent:
+                    block.isIndoor == true ? block.treadmillInclinePercent : nil,
+                coachBrief: phase == "work" ? block.notes : nil
+            )
+        }
+    }
+
     static func runningTransfer(
         from workout: PlannedSession,
         routeAlerts: WatchRouteAlertConfiguration,
         autoPauseEnabled: Bool? = nil
     ) -> WatchRunningWorkoutTransfer {
+        let editedBlocks = workout.resolvedWorkoutBlocks
+        if (workout.kind == .running || workout.kind == .walking),
+           !editedBlocks.isEmpty,
+           editedBlocks.contains(where: { $0.kind == .run }),
+           editedBlocks.allSatisfy({
+               $0.kind == .run || $0.kind == .rest
+           }) {
+            let steps = runningStepsFromEditedBlocks(editedBlocks)
+            return WatchRunningWorkoutTransfer(
+                title: workout.title,
+                steps: steps,
+                sourceWorkoutID: workout.id,
+                routeAlerts: workout.routeAlertConfiguration ?? routeAlerts,
+                targetAlerts: workout.targetAlertConfiguration,
+                treadmillInclinePercent: editedBlocks.first(where: {
+                    $0.kind == .run && !$0.isActiveRecovery &&
+                    $0.isIndoor == true &&
+                    $0.treadmillInclinePercent != nil
+                })?.treadmillInclinePercent,
+                autoPauseEnabled: autoPauseEnabled ?? workout.autoPauseEnabled,
+                autoAdvanceTimedSteps: true,
+                autoStartMainAfterWarmup:
+                    workout.resolvedRunningWorkouts.first?.autoStartMainAfterWarmup,
+                intervalCoachCueEverySeconds:
+                    workout.resolvedRunningWorkouts.first?.intervalCoachCueEverySeconds,
+                intervalCoachCountdownSeconds:
+                    workout.resolvedRunningWorkouts.first?.intervalCoachCountdownSeconds
+            )
+        }
+
         let structured = workout.resolvedRunningWorkouts
 
         if !structured.isEmpty {
