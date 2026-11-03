@@ -31,6 +31,8 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var errorMessage: String?
     @State private var visibleMatchLimit = 80
     @State private var selectedGroup = 0
+    @State private var pendingWithdrawal: UUID?
+    @State private var showingCancelConfirmation = false
 
     private let cloud = ATHLTHTournamentCloudService()
 
@@ -90,6 +92,45 @@ struct ATHLTHTournamentLiveDetailView: View {
         .background(ATHLTHArenaV3Style.cream.ignoresSafeArea())
         .navigationTitle(current.title)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if isOwner && current.status == "inviting" {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showingCancelConfirmation = true
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .accessibilityLabel("Avlys turnering")
+                }
+            }
+        }
+        .confirmationDialog(
+            "Avlyse turneringen?",
+            isPresented: $showingCancelConfirmation
+        ) {
+            Button("Avlys turneringen", role: .destructive) {
+                Task { await cancel() }
+            }
+            Button("Behold turneringen", role: .cancel) {}
+        } message: {
+            Text("Invitasjonene avsluttes. Oppsettet blir stående i historikken.")
+        }
+        .confirmationDialog(
+            "Trekk invitasjonen?",
+            isPresented: Binding(
+                get: { pendingWithdrawal != nil },
+                set: { if !$0 { pendingWithdrawal = nil } }
+            )
+        ) {
+            Button("Trekk invitasjonen", role: .destructive) {
+                guard let selected = pendingWithdrawal else { return }
+                pendingWithdrawal = nil
+                Task { await withdraw(selected) }
+            }
+            Button("Avbryt", role: .cancel) { pendingWithdrawal = nil }
+        } message: {
+            Text("Deltakeren tas ut av invitasjonslisten. Andre svar beholdes.")
+        }
         .refreshable { await reload() }
         .task(id: current.id) { await reload() }
         .onChange(of: scenePhase) { _, phase in
@@ -218,12 +259,23 @@ struct ATHLTHTournamentLiveDetailView: View {
                 }
             }
             ForEach(entries) { entry in
-                HStack {
+                HStack(spacing: 9) {
                     Text(name(entry.userID)).lineLimit(1)
                     Spacer(minLength: 6)
                     Text(entry.response == "accepted" ? "Godtatt" :
                          entry.response == "declined" ? "Avslått" : "Invitert")
                         .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    if isOwner && entry.userID != userID &&
+                       entry.response != "accepted" {
+                        Button {
+                            pendingWithdrawal = entry.userID
+                        } label: {
+                            Image(systemName: "xmark.circle")
+                                .foregroundStyle(.red.opacity(0.75))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Trekk invitasjon")
+                    }
                 }
                 .font(.caption)
             }
@@ -594,6 +646,28 @@ struct ATHLTHTournamentLiveDetailView: View {
         defer { busy = false }
         do {
             try await cloud.start(tournamentID: current.id)
+            await reload()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor private func withdraw(_ athlete: UUID) async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await cloud.withdrawInvitation(
+                tournamentID: current.id, athleteID: athlete
+            )
+            await reload()
+        } catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor private func cancel() async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        do {
+            try await cloud.cancelUnstarted(tournamentID: current.id)
             await reload()
         } catch { errorMessage = error.localizedDescription }
     }
