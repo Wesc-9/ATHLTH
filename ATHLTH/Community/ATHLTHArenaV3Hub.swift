@@ -141,6 +141,7 @@ struct ATHLTHArenaV3HomeView: View {
     @EnvironmentObject private var challenges: ChallengeStore
     @Environment(\.scenePhase) private var scenePhase
     @State private var tournaments: [ATHLTHTournamentDraft] = []
+    @State private var legacyDrafts: [ATHLTHArenaCompetitionDraft] = []
     @State private var remoteSeries: [ATHLTHArenaRemoteSeries] = []
     @State private var selectedFilter: ATHLTHArenaV3Filter = .active
     @State private var showCreatePicker = false
@@ -194,7 +195,7 @@ struct ATHLTHArenaV3HomeView: View {
                             .font(.system(size: 25, weight: .semibold, design: .serif))
                             .foregroundStyle(ATHLTHArenaV3Style.ink)
                         Spacer()
-                        Text("\(remoteSeries.count + challengesForUser.count)")
+                        Text("\(remoteSeries.count + challengesForUser.count + tournaments.count + legacyDrafts.count)")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(ATHLTHArenaV3Style.secondary)
                             .monospacedDigit()
@@ -207,7 +208,8 @@ struct ATHLTHArenaV3HomeView: View {
                     .pickerStyle(.segmented)
 
                     if visibleChallenges.isEmpty && visibleSeries.isEmpty &&
-                       (selectedFilter != .active || tournaments.isEmpty) {
+                       (selectedFilter != .active ||
+                        (tournaments.isEmpty && legacyDrafts.isEmpty)) {
                         emptyContent
                     }
                     ForEach(visibleChallenges) { challenge in
@@ -237,6 +239,29 @@ struct ATHLTHArenaV3HomeView: View {
                         .buttonStyle(.plain)
                     }
                     if selectedFilter == .active {
+                        ForEach(legacyDrafts) { draft in
+                            NavigationLink {
+                                ATHLTHArenaDraftDetailView(
+                                    draft: draft,
+                                    onSave: saveLegacy,
+                                    onPublished: { id in
+                                        legacyDrafts.removeAll { $0.id == id }
+                                        ATHLTHArenaDraftStorage.save(
+                                            legacyDrafts, for: session.profile.userID
+                                        )
+                                        Task { await reload() }
+                                    }
+                                )
+                            } label: {
+                                competitionRow(
+                                    title: draft.title,
+                                    caption: "Tidligere Arena-oppsett",
+                                    status: "Utkast",
+                                    symbol: "square.stack"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                         ForEach(tournaments) { draft in
                             NavigationLink {
                                 ATHLTHTournamentDraftDetailView(draft: draft)
@@ -429,6 +454,7 @@ struct ATHLTHArenaV3HomeView: View {
     @MainActor
     private func reload() async {
         tournaments = ATHLTHTournamentDraftStore.load(session.profile.userID)
+        legacyDrafts = ATHLTHArenaDraftStorage.load(for: session.profile.userID)
         do {
             let loaded = try await cloud.loadSeries()
             remoteSeries = loaded
@@ -440,6 +466,12 @@ struct ATHLTHArenaV3HomeView: View {
                 norwegian: "Kunne ikke oppdatere Arena-konkurransene."
             )
         }
+    }
+
+    private func saveLegacy(_ draft: ATHLTHArenaCompetitionDraft) {
+        legacyDrafts.removeAll { $0.id == draft.id }
+        legacyDrafts.insert(draft, at: 0)
+        ATHLTHArenaDraftStorage.save(legacyDrafts, for: session.profile.userID)
     }
 
     private func save(_ draft: ATHLTHTournamentDraft) {
