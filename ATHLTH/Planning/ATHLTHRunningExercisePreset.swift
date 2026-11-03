@@ -85,16 +85,20 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
             return Self.intervals(work: 45, recovery: 90, rounds: 8,
                                   effort: 8, phase: phase,
                                   workName: tr("Hill effort", "Bakkedrag"),
-                                  recoveryName: tr("Jog down the hill", "Jogg rolig ned bakken"))
+                                  recoveryName: tr("Jog down the hill", "Jogg rolig ned bakken"),
+                                  activeRecovery: true)
         case .fourByFour:
             return Self.intervals(work: 240, recovery: 180,
-                                  rounds: 4, effort: 8, phase: phase)
+                                  rounds: 4, effort: 8, phase: phase,
+                                  activeRecovery: true)
         case .thirtyThirty:
             return Self.intervals(work: 30, recovery: 30,
-                                  rounds: 20, effort: 8, phase: phase)
+                                  rounds: 20, effort: 8, phase: phase,
+                                  activeRecovery: true)
         case .fortyFiveFifteen:
             return Self.intervals(work: 45, recovery: 15,
-                                  rounds: 15, effort: 8, phase: phase)
+                                  rounds: 15, effort: 8, phase: phase,
+                                  activeRecovery: true)
         case .fiveByThree:
             return Self.intervals(work: 180, recovery: 90,
                                   rounds: 5, effort: 8, phase: phase)
@@ -111,7 +115,8 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
         case .fartlek:
             return Self.intervals(work: 60, recovery: 60,
                                   rounds: 10, effort: 7, phase: phase,
-                                  workName: tr("Fast effort", "Hurtig drag"))
+                                  workName: tr("Fast effort", "Hurtig drag"),
+                                  activeRecovery: true)
         case .sixMinuteTest:
             return [Self.run(title: title, seconds: 360, effort: 9, phase: phase)]
         case .cooldown:
@@ -128,7 +133,8 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
             targetWeightKilograms: nil, loadNote: nil, notes: nil, phase: phase
         )
         block.cardioActivity = .running
-        block.targetEffortRPE = effort
+        // RPE is still decodable on older workouts, but is not assigned
+        // automatically to any newly inserted running library exercise.
         return block
     }
 
@@ -138,9 +144,11 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
     private static func intervals(
         work: TimeInterval?, workDistanceMeters: Double? = nil,
         recovery: TimeInterval, rounds: Int, effort: Int, phase: WorkoutPhaseKind,
-        workName: String? = nil, recoveryName: String? = nil
+        workName: String? = nil, recoveryName: String? = nil,
+        activeRecovery: Bool = false
     ) -> [WorkoutTemplateBlock] {
         let count = min(max(rounds, 1), 20)
+        let groupID = UUID()
         let effortLabel = workName ?? tr("Effort", "Drag")
         let recoveryLabel = recoveryName ?? tr("Recovery", "Pause")
         var steps: [WorkoutTemplateBlock] = []
@@ -155,13 +163,22 @@ enum ATHLTHRunningExercisePreset: String, CaseIterable, Identifiable {
                 running.durationSeconds = nil
                 running.distanceMeters = workDistanceMeters
             }
+            running.groupID = groupID
+            running.groupKind = .intervals
+            running.groupRounds = 1
             steps.append(running)
 
             var pause = run(
                 title: "\(recoveryLabel) \(round)", seconds: recovery,
                 effort: 2, phase: phase
             )
-            pause.kind = .rest
+            pause.kind = activeRecovery ? .run : .rest
+            pause.activityTag = activeRecovery ? "active_recovery" : nil
+            pause.cardioActivity = activeRecovery ? .running : nil
+            pause.targetHeartRateZone = activeRecovery ? 1 : nil
+            pause.groupID = groupID
+            pause.groupKind = .intervals
+            pause.groupRounds = 1
             steps.append(pause)
         }
         return steps
