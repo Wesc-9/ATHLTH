@@ -39,6 +39,13 @@ struct ATHLTHTournamentCreator: View {
     @State private var rulesAuthority: ATHLTHTournamentRulesAuthority = .owner
     @State private var cadenceDays = 7
     @State private var completionHours = 48
+    @State private var rotationMode: ATHLTHTournamentRotationMode = .all
+    @State private var restWeekdays: Set<Int> = []
+    @State private var winPoints = 3
+    @State private var drawPoints = 1
+    @State private var allowExtensions = true
+    @State private var publicResults = false
+    @State private var proofMode: ATHLTHTournamentProofMode = .opponent
     @State private var exerciseMode: ATHLTHTournamentExerciseMode = .owner
     @State private var exerciseCount = 4
     @State private var proposalsCloseAt =
@@ -123,6 +130,15 @@ struct ATHLTHTournamentCreator: View {
                         completionHours: $completionHours
                     )
                     exerciseRulesSection
+                    ATHLTHTournamentAdvancedRulesSection(
+                        rotation: $rotationMode,
+                        restDays: $restWeekdays,
+                        winPoints: $winPoints,
+                        drawPoints: $drawPoints,
+                        allowExtensions: $allowExtensions,
+                        publicResults: $publicResults,
+                        proof: $proofMode
+                    )
                     warmupSection
                     if format == .groups { groupsSection }
                     inviteSection
@@ -252,7 +268,14 @@ struct ATHLTHTournamentCreator: View {
             },
             rulesAuthority: rulesAuthority,
             cadenceDays: cadenceDays,
-            completionHours: completionHours
+            completionHours: completionHours,
+            rotationMode: rotationMode,
+            restWeekdays: Array(restWeekdays).sorted(),
+            proofMode: proofMode,
+            publicResults: publicResults,
+            allowExtensions: allowExtensions,
+            winPoints: winPoints,
+            drawPoints: drawPoints
         )
     }
 
