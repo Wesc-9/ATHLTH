@@ -1184,6 +1184,84 @@ struct PlannedWorkoutLobbyView: View {
                     .foregroundStyle(tint)
             }
             Spacer(minLength: 0)
+
+            if userID != session.profile.userID,
+               let profile = social.profile(for: userID) {
+                Button {
+                    chatPartner = profile
+                } label: {
+                    Image(systemName: "bubble.left")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 34, height: 34)
+                        .background(
+                            ATHLTHTrainTogetherDesign.accentSoft,
+                            in: Circle()
+                        )
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Message participant",
+                    norwegian: "Send melding til deltaker"
+                ))
+
+                if isOrganizer,
+                   invitedAthletes.first(where: { $0.id == userID })?.decision == nil {
+                    Button {
+                        Task { await remindParticipant(userID) }
+                    } label: {
+                        Image(systemName: "bell")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(width: 34, height: 34)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                    .disabled(!canRemind(userID))
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Send invitation reminder",
+                        norwegian: "Send invitasjonspåminnelse"
+                    ))
+                }
+            }
+        }
+    }
+
+    private func canRemind(_ recipientID: UUID) -> Bool {
+        guard isOrganizer, !reminderInFlight.contains(recipientID) else {
+            return false
+        }
+        let key = "athlth.plannedInvite.reminder.\(sourceWorkoutID).\(recipientID)"
+        guard let last = UserDefaults.standard.object(forKey: key) as? Date else {
+            return true
+        }
+        return Date().timeIntervalSince(last) >= 900
+    }
+
+    @MainActor
+    private func remindParticipant(_ recipientID: UUID) async {
+        guard canRemind(recipientID) else { return }
+        reminderInFlight.insert(recipientID)
+        defer { reminderInFlight.remove(recipientID) }
+        do {
+            let id = try await messaging.openConversation(with: recipientID)
+            let text = ATHLTHLocalization.choose(
+                english: "Reminder: please reply to the invitation for \(workout.title) in ATHLTH.",
+                norwegian: "Påminnelse: Svar gjerne på invitasjonen til \(workout.title) i ATHLTH."
+            )
+            if await messaging.send(
+                to: recipientID, conversationID: id, body: text
+            ) {
+                let key = "athlth.plannedInvite.reminder.\(sourceWorkoutID).\(recipientID)"
+                UserDefaults.standard.set(Date(), forKey: key)
+            } else {
+                lifecycleError = messaging.errorMessage ??
+                    ATHLTHLocalization.choose(
+                        english: "Could not send reminder.",
+                        norwegian: "Kunne ikke sende påminnelse."
+                    )
+            }
+        } catch {
+            lifecycleError = error.localizedDescription
         }
     }
 
