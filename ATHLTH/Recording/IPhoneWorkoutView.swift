@@ -1218,6 +1218,7 @@ struct IPhoneWorkoutView: View {
     @EnvironmentObject private var recorder: IPhoneWorkoutStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var settings: AppSettingsStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
@@ -1255,6 +1256,7 @@ struct IPhoneWorkoutView: View {
                         }
 
                         TrainTogetherStatusStrip()
+                        ATHLTHLivePetSelectionCard(distanceMeters: workout.distanceMeters)
 
                         IPhoneWorkoutLiveMetricsPanel(
                             workout: workout,
