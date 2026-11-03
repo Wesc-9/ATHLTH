@@ -101,7 +101,7 @@ struct ATHLTHTournamentExerciseDeadlineEditor: View {
         }) else {
             return "Øvelse \(slot.position)"
         }
-        return names[exercise.exerciseID] ?? "Øvelse \(slot.position)"
+        return names[exercise.lookupID] ?? "Øvelse \(slot.position)"
     }
 
     @MainActor
@@ -113,9 +113,7 @@ struct ATHLTHTournamentExerciseDeadlineEditor: View {
             let loadedProposals=try await proposalRecords
             exercises=loadedSlots
             proposals=loadedProposals
-            names=try await cloud.exerciseNames(
-                ids: Set(loadedProposals.map(\.exerciseID))
-            )
+            names=try await cloud.candidateNames(loadedProposals)
             dates=Dictionary(uniqueKeysWithValues:
                 loadedSlots.map { ($0.id,$0.deadlineAt) })
             errorMessage=nil
