@@ -856,6 +856,7 @@ struct ChallengeCreationView: View {
     @State private var runningMinimumRepetitions = 3
     @State private var hillMinimumClimbMeters = 8.0
     @State private var showingRunningTemplatePicker = false
+    @State private var showingCustomRunningBuilder = false
     @State private var title = ""
     @State private var challengeSummary = ""
     @State private var selectedCoverArtworkName = "GoalRunning"
@@ -1131,7 +1132,10 @@ struct ChallengeCreationView: View {
             .onChange(of: runningComparison) { _, comparison in
                 guard runningFocus != .standard else { return }
                 if runningFocus == .intervals &&
-                   comparison != .mostWorkDistance {
+                   comparison != .mostWorkDistance &&
+                   !(comparison == .completedRepeats &&
+                     selectedRunningTemplate?.type == .custom &&
+                     selectedRunningTemplate?.isBuiltIn == false) {
                     runningComparison = .mostWorkDistance
                     scoring = .farthestInTime
                     return
@@ -1342,6 +1346,10 @@ struct ChallengeCreationView: View {
             }
             .sheet(isPresented: $showingRunningTemplatePicker) {
                 creationRunningTemplatePicker
+            }
+            .sheet(isPresented: $showingCustomRunningBuilder) {
+                RunningWorkoutBuilderView()
+                    .environmentObject(runningLibrary)
             }
             .sheet(
                 item:
@@ -3006,6 +3014,35 @@ struct ChallengeCreationView: View {
 
     private var creationSpecialRunningRules: some View {
         VStack(alignment: .leading, spacing: 12) {
+            if runningFocus == .intervals {
+                Button {
+                    showingCustomRunningBuilder = true
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "plus.circle.fill")
+                            .foregroundStyle(ChallengePlanTheme.gold)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Create a custom interval workout",
+                                norwegian: "Lag egen intervalløkt"
+                            ))
+                            .font(.subheadline.weight(.semibold))
+                            Text(ATHLTHLocalization.choose(
+                                english: "Create work and recovery blocks",
+                                norwegian: "Sett opp egne drag og pauser"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                    }
+                    .padding(12)
+                    .background(ATHLTHTheme.cardWarm,
+                                in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+            }
             Text(ATHLTHLocalization.choose(
                 english: "Competition result",
                 norwegian: "Hva skal avgjøre vinneren?"
@@ -3015,7 +3052,14 @@ struct ChallengeCreationView: View {
 
             if runningFocus == .intervals {
                 Label(
-                    ATHLTHLocalization.choose(
+                    runningComparison == .completedRepeats &&
+                    selectedRunningTemplate?.type == .custom &&
+                    selectedRunningTemplate?.isBuiltIn == false
+                    ? ATHLTHLocalization.choose(
+                        english: "Winner: most completed work intervals",
+                        norwegian: "Vinner: flest fullførte arbeidsdrag"
+                    )
+                    : ATHLTHLocalization.choose(
                         english: "Winner: longest recorded work distance",
                         norwegian: "Vinner: lengst målt distanse i dragene"
                     ),
@@ -3027,6 +3071,22 @@ struct ChallengeCreationView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(ATHLTHTheme.cardWarm,
                             in: RoundedRectangle(cornerRadius: 14))
+                if selectedRunningTemplate?.type == .custom &&
+                   selectedRunningTemplate?.isBuiltIn == false {
+                    Picker(
+                        ATHLTHLocalization.choose(
+                            english: "Custom workout scoring",
+                            norwegian: "Poeng for egen økt"
+                        ),
+                        selection: $runningComparison
+                    ) {
+                        Text(ATHLTHChallengeRunningComparison.mostWorkDistance.title)
+                            .tag(ATHLTHChallengeRunningComparison.mostWorkDistance)
+                        Text(ATHLTHChallengeRunningComparison.completedRepeats.title)
+                            .tag(ATHLTHChallengeRunningComparison.completedRepeats)
+                    }
+                    .pickerStyle(.segmented)
+                }
             } else {
                 challengeSegmentedRow(
                     items: ATHLTHChallengeRunningComparison.allCases,
@@ -7284,7 +7344,11 @@ struct ChallengeCreationView: View {
             runningFocus: sport == .running && runningFocus != .standard
                 ? runningFocus : nil,
             runningComparison: sport == .running && runningFocus != .standard
-                ? (runningFocus == .intervals ? .mostWorkDistance : runningComparison)
+                ? (runningFocus == .intervals &&
+                   !(runningComparison == .completedRepeats &&
+                     selectedRunningTemplate?.type == .custom &&
+                     selectedRunningTemplate?.isBuiltIn == false)
+                    ? .mostWorkDistance : runningComparison)
                 : nil,
             runningTemplateID: sport == .running && runningFocus != .standard
                 ? runningTemplateID : nil,
