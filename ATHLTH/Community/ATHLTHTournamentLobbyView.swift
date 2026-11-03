@@ -1,10 +1,11 @@
 import SwiftUI
 
 private enum ATHLTHTournamentLobbyTab: String, CaseIterable, Identifiable {
-    case members, exercises, chat
+    case rules, members, exercises, chat
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .rules: return "Regler"
         case .members: return "Deltakere"
         case .exercises: return "Øvelser"
         case .chat: return "Chat"
@@ -29,7 +30,7 @@ struct ATHLTHTournamentLobbyView: View {
     let matches: [ATHLTHTournamentRemoteMatch]
     let onChange: @MainActor () async -> Void
 
-    @State private var tab: ATHLTHTournamentLobbyTab = .members
+    @State private var tab: ATHLTHTournamentLobbyTab = .rules
     @State private var candidates: [ATHLTHTournamentExerciseCandidateRemote] = []
     @State private var votes: [ATHLTHTournamentExerciseVoteRemote] = []
     @State private var exerciseNames: [UUID: String] = [:]
@@ -37,7 +38,7 @@ struct ATHLTHTournamentLobbyView: View {
     @State private var replacements: [ATHLTHTournamentPlayerChangeRemote] = []
     @State private var replacementVotes: [ATHLTHTournamentPlayerChangeVoteRemote] = []
     @State private var exerciseQuery = ""
-    @State private var exerciseResults: [ATHLTHTournamentLibraryExerciseRemote] = []
+    @State private var exerciseResults: [ATHLTHTournamentExerciseSearchResult] = []
     @State private var chatText = ""
     @State private var announcing = false
     @State private var busy = false
@@ -77,7 +78,7 @@ struct ATHLTHTournamentLobbyView: View {
         Date() < (tournament.votesCloseAt ?? .distantPast)
     }
     private var canSuggest: Bool {
-        candidatePeriodOpen &&
+        candidatePeriodOpen && tournament.rulesConfirmedAt != nil &&
         (tournament.exerciseMode == .owner ? isOwner : isAccepted)
     }
     private var myVotes: Set<UUID> {
@@ -108,6 +109,13 @@ struct ATHLTHTournamentLobbyView: View {
                     .frame(maxWidth: .infinity,minHeight: 130)
             } else {
                 switch tab {
+                case .rules:
+                    ATHLTHTournamentLobbyRulesView(
+                        tournament: tournament,
+                        entries: entries,
+                        names: names,
+                        onChange: onChange
+                    )
                 case .members: participantsContent
                 case .exercises: exercisesContent
                 case .chat: chatContent
@@ -122,7 +130,10 @@ struct ATHLTHTournamentLobbyView: View {
                 return
             }
             do {
-                let result = try await cloud.searchExercises(exerciseQuery)
+                let result = try await cloud.searchCompetitionExercises(
+                    exerciseQuery,
+                    allowed: tournament.allowedActivities
+                )
                 if !Task.isCancelled { exerciseResults = result }
             } catch {
                 if !Task.isCancelled {
@@ -440,10 +451,17 @@ struct ATHLTHTournamentLobbyView: View {
                         Button {
                             Task {
                                 await perform {
-                                    try await cloud.suggest(
-                                        tournamentID: tournament.id,
-                                        exerciseID: exercise.id
-                                    )
+                                    if exercise.isActivityTemplate {
+                                        try await cloud.suggestTemplate(
+                                            tournamentID: tournament.id,
+                                            templateID: exercise.id
+                                        )
+                                    } else {
+                                        try await cloud.suggest(
+                                            tournamentID: tournament.id,
+                                            exerciseID: exercise.id
+                                        )
+                                    }
                                     exerciseQuery = ""
                                 }
                             }
@@ -459,7 +477,7 @@ struct ATHLTHTournamentLobbyView: View {
                             .padding(.vertical,7)
                         }
                         .disabled(busy || candidates.contains {
-                            $0.exerciseID == exercise.id
+                            $0.lookupID == exercise.id
                         })
                     }
                 }
@@ -468,7 +486,9 @@ struct ATHLTHTournamentLobbyView: View {
             }
 
             if candidates.isEmpty {
-                Text("Ingen øvelser foreslått ennå.")
+                Text(tournament.rulesConfirmedAt == nil
+                 ? "Godkjenn regelsettet før dere kan velge øvelser."
+                 : "Ingen øvelser foreslått ennå.")
                     .font(.subheadline)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     .frame(maxWidth: .infinity,minHeight: 100)
@@ -485,7 +505,7 @@ struct ATHLTHTournamentLobbyView: View {
                                 .foregroundStyle(ATHLTHArenaV3Style.gold)
                                 .frame(width: 29)
                             VStack(alignment: .leading,spacing: 4) {
-                                Text(exerciseNames[candidate.exerciseID] ??
+                                Text(exerciseNames[candidate.lookupID] ??
                                      "Øvelse")
                                     .font(.subheadline.weight(.medium))
                                     .foregroundStyle(ATHLTHArenaV3Style.ink)
@@ -825,9 +845,7 @@ struct ATHLTHTournamentLobbyView: View {
             votes = voteRows
             messages = messageRows
             replacements = changes
-            async let names = cloud.exerciseNames(
-                ids: Set(candidateRows.map(\.exerciseID))
-            )
+            async let names = cloud.candidateNames(candidateRows)
             async let approvals = cloud.changeVotes(
                 requestIDs: changes.map(\.id)
             )
