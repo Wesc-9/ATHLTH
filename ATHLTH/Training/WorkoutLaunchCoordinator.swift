@@ -386,7 +386,10 @@ struct PlannedWorkoutWatchBuilder {
         WatchRunningWorkoutTransfer(
             title: workout.title,
             steps: runningSteps(from: workout),
-            sourceWorkoutID: workout.id,
+            // Personal pace/incline copies retain the competition source
+            // identity. This is essential for verified work-interval scoring
+            // with the shared template ID in the accepted invitation.
+            sourceWorkoutID: workout.sharedSourceWorkoutID ?? workout.id,
             routeAlerts: routeAlerts,
             autoPauseEnabled: autoPauseEnabled,
             autoAdvanceTimedSteps: workout.autoAdvanceTimedSteps,
