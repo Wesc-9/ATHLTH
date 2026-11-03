@@ -129,8 +129,8 @@ struct ATHLTHTournamentPublicDirectoryView: View {
                 ).execute().value
             competitions=result
             error=nil
-        } catch {
-            error=error.localizedDescription
+        } catch let fetchError {
+            error = fetchError.localizedDescription
         }
     }
 }
@@ -236,8 +236,8 @@ struct ATHLTHTournamentSpectatorDetailView: View {
                 ).execute().value
             results=result
             error=nil
-        } catch {
-            error=error.localizedDescription
+        } catch let fetchError {
+            error = fetchError.localizedDescription
         }
     }
 }
