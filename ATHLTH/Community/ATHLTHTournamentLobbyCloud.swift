@@ -234,7 +234,7 @@ struct ATHLTHTournamentLobbyCloudService {
           .eq("tournament_id",value: tournamentID)
           .order("created_at",ascending: false)
           .limit(80).execute().value
-        return rows.reversed()
+        return Array(rows.reversed())
     }
 
     func sendMessage(tournamentID: UUID,text: String,
