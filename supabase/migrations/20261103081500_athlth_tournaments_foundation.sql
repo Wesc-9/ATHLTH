@@ -123,18 +123,23 @@ revoke all on function private.athlth_tournament_can_view(uuid) from public,anon
 grant usage on schema private to authenticated;
 grant execute on function private.athlth_tournament_can_view(uuid) to authenticated;
 
+drop policy if exists "tournament_read" on public.athlth_tournaments;
 create policy "tournament_read" on public.athlth_tournaments
     for select to authenticated
     using (private.athlth_tournament_can_view(id));
+drop policy if exists "tournament_entries_read" on public.athlth_tournament_entries;
 create policy "tournament_entries_read" on public.athlth_tournament_entries
     for select to authenticated
     using (private.athlth_tournament_can_view(tournament_id));
+drop policy if exists "tournament_practice_read" on public.athlth_tournament_practice;
 create policy "tournament_practice_read" on public.athlth_tournament_practice
     for select to authenticated
     using (private.athlth_tournament_can_view(tournament_id));
+drop policy if exists "tournament_matches_read" on public.athlth_tournament_matches;
 create policy "tournament_matches_read" on public.athlth_tournament_matches
     for select to authenticated
     using (private.athlth_tournament_can_view(tournament_id));
+drop policy if exists "tournament_audit_read" on public.athlth_tournament_audit;
 create policy "tournament_audit_read" on public.athlth_tournament_audit
     for select to authenticated
     using (private.athlth_tournament_can_view(tournament_id));
