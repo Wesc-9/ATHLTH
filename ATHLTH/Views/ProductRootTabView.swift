@@ -13385,6 +13385,7 @@ struct ATHLTHProfileView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
     @EnvironmentObject private var gear: ProfileGearStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout:
         StrengthWorkoutStore
@@ -13448,6 +13449,7 @@ struct ATHLTHProfileView: View {
                 trophyCabinetSection
                 personalRecordsSection
                 gearSection
+                ATHLTHPetProfileSection()
                 workoutMomentsSection
             }
             .padding(.horizontal, 14)
@@ -13482,6 +13484,7 @@ struct ATHLTHProfileView: View {
         }
         .task {
             await refreshProfile()
+            await pets.refresh()
         }
         .photosPicker(
             isPresented:
