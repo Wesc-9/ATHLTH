@@ -17,6 +17,7 @@ struct WatchHomeView: View {
                 let hasAdditionalContent =
                     routeStore.preparedWorkout != nil ||
                     !routeStore.todayWorkouts.isEmpty ||
+                    !routeStore.petCatalog.isEmpty ||
                     workoutManager.errorMessage != nil
 
                 Group {
@@ -33,6 +34,7 @@ struct WatchHomeView: View {
                                     todayWorkoutCard(today)
                                 }
                                 quickStartTiles(compact: compact)
+                                WatchPetSelectionButton()
                                 otherWorkoutsCard
                                 if let message = workoutManager.errorMessage {
                                     Label(
