@@ -43,6 +43,26 @@ enum ATHLTHWorkoutDurationEstimator {
                          defaultActivity: defaultActivity)
     }
 
+    /// Compact precise duration used in the workout builder and review.
+    /// Display never rounds an interval up to a fictitious five-minute target.
+    static func conciseDuration(_ seconds: TimeInterval) -> String {
+        guard seconds.isFinite, seconds >= 0 else { return "–" }
+        let value = Int(seconds.rounded())
+        let hours = value / 3_600
+        let minutes = (value / 60) % 60
+        let remainder = value % 60
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, remainder)
+        }
+        if value < 60 {
+            return "\(value) " + ATHLTHLocalization.choose(
+                english: "sec", norwegian: "sek"
+            )
+        }
+        if remainder > 0 { return String(format: "%d:%02d", minutes, remainder) }
+        return "\(minutes) min"
+    }
+
     private static func calculateSeconds(
         for blocks: [WorkoutTemplateBlock],
         fallbackPace: Bool,
