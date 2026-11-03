@@ -2828,6 +2828,27 @@ final class HealthKitManager: ObservableObject {
         let treadmillAllowed =
             rules.allowTreadmill ?? false
 
+        if rules.runningFocus == .intervals,
+           rules.runningVenueRaw != nil {
+            let venue = rules.runningVenue
+            if venue == .outdoor && isIndoor {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: nil,
+                    reason: "This interval challenge requires an outdoor GPS workout."
+                )
+            }
+            if venue != .outdoor && !isIndoor {
+                return challengeEvidenceFailure(
+                    result: result,
+                    duration: selectedDuration,
+                    routeMatch: nil,
+                    reason: "This interval challenge requires a verified indoor workout."
+                )
+            }
+        }
+
         if isIndoor &&
             !treadmillAllowed {
             return challengeEvidenceFailure(
