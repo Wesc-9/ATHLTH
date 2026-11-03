@@ -3695,7 +3695,9 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private var hasOutdoorCardio: Bool {
-        blocks.contains { $0.kind == .run && $0.isIndoor != true }
+        blocks.contains {
+            $0.kind == .run && !$0.isActiveRecovery && $0.isIndoor != true
+        }
     }
 
     private var hasWalking: Bool {
