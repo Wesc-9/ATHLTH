@@ -216,6 +216,17 @@ private struct ATHLTHSceneRootView: View {
                 isForeground: newPhase == .active && appSession.signedIn
             )
         }
+        .onChange(of: pets.pets) { _, _ in
+            if appSession.signedIn, let catalog = pets.makeWatchCatalog() {
+                watchConnection.sendPetCatalog(catalog)
+            }
+        }
+        .onChange(of: watchConnection.state) { _, state in
+            if state == .ready, appSession.signedIn,
+               let catalog = pets.makeWatchCatalog() {
+                watchConnection.sendPetCatalog(catalog)
+            }
+        }
         .onChange(of: appSession.signedIn) { _, signedIn in
             ATHLTHAliveController.reconcile(
                 isForeground: scenePhase == .active && signedIn
