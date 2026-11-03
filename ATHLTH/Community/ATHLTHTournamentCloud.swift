@@ -282,6 +282,13 @@ private struct ATHLTHTournamentInvitationID: Decodable {
     }
 }
 
+private struct ATHLTHTournamentReplacementOfferID: Decodable {
+    let tournamentID: UUID
+    enum CodingKeys: String, CodingKey {
+        case tournamentID = "tournament_id"
+    }
+}
+
 struct ATHLTHTournamentCloudService {
     private let client = SupabaseEnvironment.client
 
@@ -369,7 +376,20 @@ struct ATHLTHTournamentCloudService {
             if page.count < pageSize { break }
             offset += pageSize
         } while offset < 5_000
+        ids.formUnion(try await pendingReplacementTournamentIDs(userID: userID))
         return ids
+    }
+
+    private func pendingReplacementTournamentIDs(userID: UUID) async throws
+        -> Set<UUID> {
+        let records: [ATHLTHTournamentReplacementOfferID] = try await client
+            .from("athlth_tournament_player_change")
+            .select("tournament_id")
+            .eq("new_player_id",value: userID)
+            .eq("status",value: "pending")
+            .limit(200)
+            .execute().value
+        return Set(records.map(\.tournamentID))
     }
 
     func pendingInvitationIDs(userID: UUID) async throws -> Set<UUID> {
@@ -380,7 +400,9 @@ struct ATHLTHTournamentCloudService {
             .eq("response", value: "invited")
             .limit(500)
             .execute().value
-        return Set(pending.map(\.tournamentID))
+        var ids = Set(pending.map(\.tournamentID))
+        ids.formUnion(try await pendingReplacementTournamentIDs(userID: userID))
+        return ids
     }
 
     func entries(for tournamentID: UUID) async throws
