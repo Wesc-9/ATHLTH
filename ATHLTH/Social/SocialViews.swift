@@ -1506,6 +1506,8 @@ struct FriendProfileView: View {
                         remoteHighlightsCard(
                             profile.workoutMedia
                         )
+
+                        ATHLTHPublicPetProfileSection(userID: userID)
                     }
                 } else {
                     ContentUnavailableView(
