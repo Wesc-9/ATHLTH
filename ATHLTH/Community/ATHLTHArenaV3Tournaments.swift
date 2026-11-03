@@ -598,7 +598,21 @@ struct ATHLTHTournamentCreator: View {
 }
 
 struct ATHLTHTournamentDraftDetailView: View {
+    @Environment(\.dismiss) private var dismiss
     let draft: ATHLTHTournamentDraft
+    let onPublished: ((UUID) -> Void)?
+    @State private var publishing = false
+    @State private var publishError: String?
+
+    init(
+        draft: ATHLTHTournamentDraft,
+        onPublished: ((UUID) -> Void)? = nil
+    ) {
+        self.draft = draft
+        self.onPublished = onPublished
+    }
+
+    private let tournamentCloud = ATHLTHTournamentCloudService()
     @State private var selectedGroup = 0
     @State private var linkedSeason: ATHLTHArenaClubSeason?
     private let seasonCloud = ATHLTHArenaCloudService()
@@ -634,6 +648,29 @@ struct ATHLTHTournamentDraftDetailView: View {
                         }
                     }
                 }
+                if let publishError {
+                    Label(publishError, systemImage: "exclamationmark.triangle")
+                        .font(.caption)
+                        .foregroundStyle(.red)
+                }
+                Button {
+                    Task { await publish() }
+                } label: {
+                    HStack(spacing: 10) {
+                        if publishing { ProgressView().tint(.white) }
+                        Image(systemName: "paperplane")
+                        Text(publishing ? "Publiserer…" : "Publiser og inviter")
+                        Spacer()
+                        Image(systemName: "arrow.up.right")
+                    }
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .padding(16)
+                    .background(ATHLTHArenaV3Style.ink,
+                                in: RoundedRectangle(cornerRadius: 17))
+                }
+                .buttonStyle(.plain)
+                .disabled(publishing)
                 if !draft.warmupRounds.isEmpty {
                     warmupSection
                 }
@@ -644,7 +681,7 @@ struct ATHLTHTournamentDraftDetailView: View {
                 } else {
                     tableView(draft.participants, title: "Ligatabell")
                 }
-                Text("Dette er et lokalt konkurranseutkast. Kampoppsett er foreløpig, og ingen resultater, premier eller invitasjoner er publisert.")
+                Text("Forhåndsvisningen viser bare kampstrukturen. Ved publisering sendes invitasjoner, men ingen oppgjør eller resultater teller før alle har svart og arrangøren starter.")
                     .font(.caption)
                     .foregroundStyle(ATHLTHArenaV3Style.secondary)
             }
@@ -663,6 +700,19 @@ struct ATHLTHTournamentDraftDetailView: View {
             if let seasons = try? await seasonCloud.loadClubSeasons() {
                 linkedSeason = seasons.first { $0.id == seasonID }
             }
+        }
+    }
+
+    @MainActor private func publish() async {
+        guard !publishing else { return }
+        publishing = true
+        defer { publishing = false }
+        do {
+            let id = try await tournamentCloud.create(from: draft)
+            onPublished?(id)
+            dismiss()
+        } catch {
+            publishError = "Kunne ikke publisere: " + error.localizedDescription
         }
     }
 
