@@ -146,6 +146,25 @@ enum ATHLTHChallengeRunningComparison: String, CaseIterable, Identifiable, Codab
     }
 }
 
+/// Equal-time interval races must prescribe elapsed time for each work
+/// repetition. Distance-based blocks cannot decide a longest-distance
+/// winner fairly because they give every competitor the same distance.
+enum ATHLTHChallengeIntervalPolicy {
+    static func hasFixedWorkDuration(_ template: RunningWorkoutTemplate) -> Bool {
+        let blocks = template.blocks.filter { $0.kind == .work }
+        guard !blocks.isEmpty else { return false }
+        for block in blocks {
+            for repetition in 1...max(1, block.repetitions) {
+                let work = block.resolvedWork(at: repetition)
+                guard work.measure == .time,
+                      let seconds = work.durationSeconds,
+                      seconds.isFinite, seconds > 0 else { return false }
+            }
+        }
+        return true
+    }
+}
+
 /// Only measured WORK steps in the actual completed structured session
 /// count. Warmup, recovery, downhill jog and cooldown are never included.
 enum ATHLTHChallengeRunningWorkPolicy {
