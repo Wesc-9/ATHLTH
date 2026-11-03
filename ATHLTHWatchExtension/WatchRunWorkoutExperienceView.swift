@@ -3658,6 +3658,7 @@ struct WatchRunWorkoutExperienceView: View {
                 "CONTROLS",
                 icon: "slider.horizontal.3"
             )
+            WatchPetSelectionButton()
 
             if workoutManager.usesOutdoorGPS ||
                workoutManager.switchedIndoorVenue != nil {
