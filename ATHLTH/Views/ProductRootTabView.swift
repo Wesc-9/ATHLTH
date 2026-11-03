@@ -2258,7 +2258,9 @@ struct ATHLTHHomeView: View {
                             homeCompactCalendarRow(
                                 time: workout.scheduledStart,
                                 title: workout.title,
-                                icon: workout.kind.systemImage
+                                icon: workout.kind.systemImage,
+                                isTrainTogether: workout.trainTogetherMode != nil,
+                                trainingPartner: homeTrainTogetherPartner(for: workout)
                             )
                         }
                         .buttonStyle(.plain)
@@ -2494,10 +2496,25 @@ struct ATHLTHHomeView: View {
         }
     }
 
+    /// A guest's partner is the organizer; an organizer's partner is
+    /// the invited athlete. Prefer the public @username if available.
+    private func homeTrainTogetherPartner(for workout: PlannedSession) -> String? {
+        guard workout.trainTogetherMode != nil,
+              let partnerID = workout.sharedSourceOwnerID ?? workout.invitedPartnerID,
+              partnerID != session.profile.userID,
+              let profile = social.profile(for: partnerID)
+        else { return nil }
+        return profile.usernameLabel.isEmpty
+            ? profile.resolvedName
+            : profile.usernameLabel
+    }
+
     private func homeCompactCalendarRow(
         time: Date?,
         title: String,
-        icon: String
+        icon: String,
+        isTrainTogether: Bool = false,
+        trainingPartner: String? = nil
     ) -> some View {
         HStack(alignment: .center, spacing: 6) {
             Image(systemName: icon)
@@ -2510,7 +2527,7 @@ struct ATHLTHHomeView: View {
                 Text(title)
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(ATHLTHTrainDesign.ink)
-                    .lineLimit(2)
+                    .lineLimit(isTrainTogether ? 1 : 2)
                     .multilineTextAlignment(.leading)
                 Text(time?.formatted(date: .omitted, time: .shortened) ??
                      ATHLTHLocalization.choose(
@@ -2518,6 +2535,33 @@ struct ATHLTHHomeView: View {
                     .font(.system(size: 9))
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                     .lineLimit(1)
+
+                if isTrainTogether {
+                    HStack(spacing: 3) {
+                        Image(systemName: "person.2.fill")
+                            .font(.system(size: 8, weight: .semibold))
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Train together", norwegian: "Tren sammen"
+                            ) + (trainingPartner.map { " · \($0)" } ?? "")
+                        )
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                    }
+                    .font(.system(size: 8.5, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .accessibilityLabel(
+                        trainingPartner.map {
+                            ATHLTHLocalization.choose(
+                                english: "Training together with \($0)",
+                                norwegian: "Trener sammen med \($0)"
+                            )
+                        } ?? ATHLTHLocalization.choose(
+                            english: "Train together", norwegian: "Tren sammen"
+                        )
+                    )
+                }
             }
             Spacer(minLength: 0)
         }
