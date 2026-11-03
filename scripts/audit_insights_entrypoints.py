@@ -142,6 +142,24 @@ if "case overview, health, training, development" in sections:
 health_metrics = Path("ATHLTH/Insights/ATHLTHInsightHealthMetric.swift").read_text()
 health_library = Path("ATHLTH/Insights/ATHLTHInsightsHealthLibraryView.swift").read_text()
 training_signals = Path("ATHLTH/Insights/ATHLTHInsightsTrainingSignalsCard.swift").read_text()
+# Overview must add everyday movement context rather than restating the
+# sleep/HRV/resting-pulse figures already visible in Today's readiness.
+if "ATHLTHInsightsDailyRhythmCard()" not in insights:
+    fail("Overview must show Daily Rhythm below Today's readiness")
+if "ATHLTHInsightsVitalContextCard(" in insights:
+    fail("Overview must not duplicate readiness with the old vital-sign card")
+for required in (
+    "struct ATHLTHInsightsDailyRhythmCard: View",
+    "for: .steps, days: 15",
+    "for: .daylightMinutes, days: 15",
+    "for: .exerciseMinutes, days: 15",
+    "(-7 ... -1)",
+    "previousSteps.count >= 4",
+    "ATHLTHInsightsHealthMetricDetailView(metric: metric)",
+):
+    if required not in health_library:
+        fail(f"Everyday Rhythm has lost real-data or navigation logic: {required}")
+
 for symbol, source in (
     ("enum ATHLTHInsightHealthMetric", health_metrics),
     ("struct ATHLTHInsightsHealthMetricDetailView", health_library),
