@@ -107,6 +107,26 @@ private struct ATHLTHTournamentCreateParams: Encodable {
     let p_qualifiers: Int
     let p_invitees: [UUID]
     let p_warmup_titles: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case p_title, p_format, p_club, p_season
+        case p_group_size, p_qualifiers, p_invitees, p_warmup_titles
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(p_title, forKey: .p_title)
+        try values.encode(p_format, forKey: .p_format)
+        // These positional RPC args are required even when the user creates
+        // a personal competition. Explicit JSON nulls prevent PostgREST from
+        // mistaking an omitted optional parameter for a different overload.
+        try values.encode(p_club, forKey: .p_club)
+        try values.encode(p_season, forKey: .p_season)
+        try values.encode(p_group_size, forKey: .p_group_size)
+        try values.encode(p_qualifiers, forKey: .p_qualifiers)
+        try values.encode(p_invitees, forKey: .p_invitees)
+        try values.encode(p_warmup_titles, forKey: .p_warmup_titles)
+    }
 }
 
 private struct ATHLTHTournamentIDParams: Encodable {
