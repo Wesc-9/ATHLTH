@@ -16,6 +16,35 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
     }
 
     @MainActor
+    func testRunningIntervalPresetsCreateEveryEditableEffortAndPause() {
+        let presets: [(ATHLTHRunningExercisePreset, Int)] = [
+            (.strides, 6), (.hills, 8), (.fourByFour, 4),
+            (.shortIntervals, 10), (.fartlek, 10)
+        ]
+        for (preset, rounds) in presets {
+            let blocks = preset.blocks(in: .main)
+            XCTAssertEqual(blocks.count, rounds * 2, "\(preset)")
+            XCTAssertEqual(blocks.expandedForExecution().count, rounds * 2)
+            XCTAssertEqual(Set(blocks.map(\.editorDragID)).count, rounds * 2)
+            XCTAssertTrue(blocks.allSatisfy {
+                $0.groupID == nil && $0.groupKind == nil && $0.groupRounds == nil
+            })
+            for index in blocks.indices {
+                XCTAssertEqual(blocks[index].kind, index.isMultiple(of: 2) ? .run : .rest)
+                XCTAssertEqual(blocks[index].resolvedPhase, .main)
+            }
+        }
+
+        let fourByFour = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        XCTAssertEqual(fourByFour.filter { $0.kind == .run }.count, 4)
+        XCTAssertEqual(fourByFour.filter { $0.kind == .rest }.count, 4)
+        XCTAssertEqual(fourByFour.reduce(0.0) {
+            $0 + ($1.durationSeconds ?? 0)
+        }, 28 * 60, accuracy: 0.01)
+        XCTAssertEqual(ATHLTHWorkoutDurationEstimator.minutes(for: fourByFour), 30)
+    }
+
+    @MainActor
     func testSavedMainPhaseKeepsIntervalsWithoutWarmupOrCooldown() throws {
         let user = UUID()
         let workoutID = UUID()
@@ -29,15 +58,23 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
                                   blocks: [warmup] + main + [cooldown])
         XCTAssertTrue(ATHLTHWorkoutMainSectionLibrary.capture(workout, userID: user))
         let stored = try XCTUnwrap(ATHLTHWorkoutMainSectionLibrary.load(userID: user).first)
-        XCTAssertEqual(stored.blocks.count, 2)
+        XCTAssertEqual(stored.blocks.count, 8)
         XCTAssertTrue(stored.isRunningOnly)
-        XCTAssertEqual(stored.blocks.map(\.durationSeconds), [240, 180])
-        XCTAssertEqual(stored.blocks.map(\.groupRounds), [4, 4])
+        XCTAssertEqual(
+            stored.blocks.map(\.durationSeconds),
+            Array(repeating: [240.0, 180.0], count: 4).flatMap { $0 }
+        )
+        XCTAssertTrue(stored.blocks.allSatisfy {
+            $0.groupID == nil && $0.groupKind == nil && $0.groupRounds == nil
+        })
 
         let first = stored.blocksForReuse()
         let second = stored.blocksForReuse()
-        XCTAssertEqual(first[0].groupID, first[1].groupID)
-        XCTAssertNotEqual(first[0].groupID, second[0].groupID)
+        XCTAssertEqual(first.map(\.kind), Array(repeating: [
+            WorkoutTemplateBlockKind.run, .rest
+        ], count: 4).flatMap { $0 })
+        XCTAssertEqual(first.count, second.count)
+        XCTAssertNotEqual(first[0].editorDragID, first[1].editorDragID)
         XCTAssertNotEqual(first[0].editorDragID, second[0].editorDragID)
         XCTAssertTrue(first.allSatisfy { $0.resolvedPhase == .main })
     }
