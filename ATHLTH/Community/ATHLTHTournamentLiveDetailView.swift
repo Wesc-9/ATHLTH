@@ -27,6 +27,7 @@ struct ATHLTHTournamentLiveDetailView: View {
     @State private var names: [UUID: String] = [:]
     @State private var selection: ATHLTHTournamentDetailTab = .lobby
     @State private var showingMatchReport: ATHLTHTournamentRemoteMatch?
+    @State private var editingExerciseDeadlines: ATHLTHTournamentRemoteMatch?
     @State private var busy = false
     @State private var loading = true
     @State private var errorMessage: String?
@@ -156,6 +157,11 @@ struct ATHLTHTournamentLiveDetailView: View {
         .task(id: current.id) { await reload() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await reload() } }
+        }
+        .sheet(item: $editingExerciseDeadlines) { match in
+            ATHLTHTournamentExerciseDeadlineEditor(match: match) {
+                await reload()
+            }
         }
         .sheet(item: $showingMatchReport) { match in
             ATHLTHTournamentMatchReportView(match: match, names: names) {
@@ -634,6 +640,17 @@ struct ATHLTHTournamentLiveDetailView: View {
                     }
                     .font(.caption.weight(.semibold))
                     .disabled(busy)
+                }
+            }
+            if isOwner && current.status == "active" &&
+               !match.isWarmup && match.awayID != nil &&
+               match.status != "confirmed" {
+                Button {
+                    editingExerciseDeadlines = match
+                } label: {
+                    Label("Juster øvelsesfrister",systemImage: "calendar")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
                 }
             }
             if match.isWarmup {
