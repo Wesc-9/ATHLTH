@@ -23,9 +23,13 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onMove: (UUID, WorkoutPhaseKind, UUID?) -> Void
     let onRemove: (UUID) -> Void
     let onRemovePhase: (WorkoutPhaseKind) -> Void
+    let onUpdateIntervalGroup: (UUID, Int, Bool) -> Void
+    let onCopyIntervalTargets: (UUID) -> Void
+    let onUngroupIntervals: (UUID) -> Void
 
     @State private var phasePendingDeletion: WorkoutPhaseKind?
     @State private var collapsedPhases: Set<WorkoutPhaseKind> = []
+    @State private var expandedIntervalGroups: Set<UUID> = []
     @State private var draggingID: UUID?
     @State private var dragPoint: CGPoint = .zero
     @State private var dragFingerOffsetY: CGFloat = 0
@@ -210,7 +214,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
     private var addSectionMenu: some View {
         Menu {
-            ForEach(WorkoutPhaseKind.allCases) { phase in
+            ForEach(WorkoutPhaseKind.allCases.filter { $0 != .recovery }) { phase in
                 Button {
                     visiblePhases.insert(phase)
                     selectedPhase = phase
@@ -219,23 +223,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     Label(phase.title, systemImage: phase.symbol)
                 }
             }
-            Divider()
-            Button {
-                selectedPhase = .main
-                onSelectRoute(.main)
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Route as whole workout", norwegian: "Rute som hele økten"
-                ), systemImage: "map")
-            }
-            Button {
-                selectedPhase = .main
-                onBuildRoute(.main)
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Create route", norwegian: "Lag egen rute"
-                ), systemImage: "pencil.and.scribble")
-            }
+            // Routes belong in the contents menu of each category, not
+            // alongside categories in the outer Add category menu.
         } label: {
             Label(ATHLTHLocalization.choose(
                 english: "Add category", norwegian: "Legg til kategori"
@@ -251,7 +240,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     private func phaseCard(_ phase: WorkoutPhaseKind) -> some View {
         let rows = entries(in: phase)
         let expanded = advanced && !collapsedPhases.contains(phase)
-        let estimatedMinutes = ATHLTHWorkoutDurationEstimator.previewMinutes(
+        let durationSeconds = ATHLTHWorkoutDurationEstimator.previewSeconds(
             for: rows,
             defaultActivity: activity == .walking ? .walking : .running
         )
@@ -279,8 +268,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         Text("\(rows.count) " +
                             ATHLTHLocalization.choose(
                                 english: "steps", norwegian: "deløkter"
-                            ) + (estimatedMinutes.map {
-                                " · ~\($0) min"
+                            ) + (durationSeconds.map {
+                                " · ~" + ATHLTHWorkoutDurationEstimator.conciseDuration($0)
                             } ?? ""))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -324,7 +313,17 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 } else {
                     VStack(spacing: 3) {
                         ForEach(Array(rows.enumerated()), id: \.element.editorDragID) { position, block in
-                            stepRow(block, position: position + 1, phase: phase)
+                            if let groupID = ATHLTHIntervalRecipeEditing.explicitGroupID(
+                                for: block, in: rows
+                            ) {
+                                if !rows.prefix(position).contains(where: {
+                                    $0.groupID == groupID
+                                }) {
+                                    intervalGroupCard(groupID, rows: rows, phase: phase)
+                                }
+                            } else {
+                                stepRow(block, position: position + 1, phase: phase)
+                            }
                         }
                     }
                     .padding(.horizontal, 8)
@@ -352,6 +351,152 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             geometry.frame(in: .named("athlthWorkoutStudio"))
         } action: { _, frame in
             if phaseFrames[phase] != frame { phaseFrames[phase] = frame }
+        }
+    }
+
+    /// Collapsed by default so 30/30 remains one concise premium card,
+    /// while the execution recipe still contains all 40 editable rows.
+    private func intervalGroupCard(
+        _ id: UUID, rows: [WorkoutTemplateBlock], phase: WorkoutPhaseKind
+    ) -> some View {
+        let members = Array(rows.enumerated()).filter { $0.element.groupID == id }
+        let summary = ATHLTHIntervalRecipeEditing.summary(for: id, in: rows)
+        let isExpanded = expandedIntervalGroups.contains(id)
+
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 9) {
+                Image(systemName: "repeat")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(bronze)
+                    .frame(width: 37, height: 37)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        if isExpanded { expandedIntervalGroups.remove(id) }
+                        else { expandedIntervalGroups.insert(id) }
+                    }
+                } label: {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Interval sequence", norwegian: "Intervallrekke"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                        if let summary {
+                            Text("\(summary.rounds) " + ATHLTHLocalization.choose(
+                                english: "efforts", norwegian: "drag"
+                            ) + " · \(summary.recoveryCount) " +
+                                ATHLTHLocalization.choose(
+                                    english: "recoveries", norwegian: "pauser"
+                                ) + (summary.exactSeconds.map {
+                                    " · " + ATHLTHWorkoutDurationEstimator.conciseDuration($0)
+                                } ?? ""))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ink)
+                }
+                .buttonStyle(.plain)
+                .frame(minHeight: 44)
+
+                Menu {
+                    Button {
+                        onCopyIntervalTargets(id)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Copy first effort targets to all efforts",
+                            norwegian: "Kopier mål fra første drag til alle"
+                        ), systemImage: "arrow.triangle.2.circlepath")
+                    }
+                    Button {
+                        onUngroupIntervals(id)
+                        expandedIntervalGroups.remove(id)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Ungroup all steps", norwegian: "Løs opp gruppen"
+                        ), systemImage: "square.stack.3d.up.slash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 37, height: 44)
+                        .foregroundStyle(ink)
+                }
+            }
+
+            if let summary {
+                HStack(spacing: 8) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Efforts", norwegian: "Antall drag"
+                    ))
+                    .font(.subheadline)
+                    Spacer()
+                    Stepper(value: Binding(
+                        get: { summary.rounds },
+                        set: { onUpdateIntervalGroup(id, $0, summary.hasFinalRecovery) }
+                    ), in: 1...20) {
+                        Text("\(summary.rounds)")
+                            .font(.subheadline.weight(.semibold).monospacedDigit())
+                    }
+                    .fixedSize()
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Number of efforts", norwegian: "Antall drag"
+                    ))
+                }
+                .padding(.horizontal, 5)
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Recovery after final effort",
+                        norwegian: "Pause etter siste drag"
+                    ),
+                    isOn: Binding(
+                        get: { summary.hasFinalRecovery },
+                        set: { onUpdateIntervalGroup(id, summary.rounds, $0) }
+                    )
+                )
+                .font(.subheadline)
+                .tint(bronze)
+                .padding(.horizontal, 5)
+            }
+
+            if isExpanded {
+                VStack(spacing: 3) {
+                    ForEach(members, id: \.element.editorDragID) { member in
+                        stepRow(
+                            member.element, position: member.offset + 1,
+                            phase: phase
+                        )
+                    }
+                }
+            } else {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        expandedIntervalGroups.insert(id)
+                    }
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Edit individual efforts and recoveries",
+                        norwegian: "Rediger enkeltdrag og pauser"
+                    ), systemImage: "slider.horizontal.3")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(bronze)
+                    .frame(maxWidth: .infinity, minHeight: 36)
+                    .background(ATHLTHPlanDesign.selectedSurface,
+                                in: RoundedRectangle(cornerRadius: 11))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(10)
+        .background(ATHLTHPlanDesign.canvas,
+                    in: RoundedRectangle(cornerRadius: 16))
+        .overlay {
+            RoundedRectangle(cornerRadius: 16).strokeBorder(
+                bronze.opacity(0.23), lineWidth: 0.8
+            )
         }
     }
 
