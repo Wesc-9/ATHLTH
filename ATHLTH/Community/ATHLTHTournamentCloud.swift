@@ -159,6 +159,10 @@ private struct ATHLTHTournamentCreateParams: Encodable {
     }
 }
 
+private struct ATHLTHTournamentSeasonParams: Encodable {
+    let p_season: UUID
+}
+
 private struct ATHLTHTournamentIDParams: Encodable {
     let p_tournament: UUID
 }
@@ -338,6 +342,15 @@ struct ATHLTHTournamentCloudService {
         return Dictionary(uniqueKeysWithValues:
             records.map { ($0.userID, $0.preferredName) }
         )
+    }
+
+    func clubSeasonScores(
+        seasonID: UUID
+    ) async throws -> [ATHLTHArenaSeasonStandingsRow] {
+        return try await client.rpc(
+            "athlth_tournament_season_scores",
+            params: ATHLTHTournamentSeasonParams(p_season: seasonID)
+        ).execute().value
     }
 
     func respond(tournamentID: UUID, accept: Bool) async throws {
