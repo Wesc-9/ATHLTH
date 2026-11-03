@@ -65,6 +65,7 @@ private struct ATHLTHSceneRootView: View {
     @StateObject private var notifications = ATHLTHNotificationStore()
     @StateObject private var workoutCompletion = WorkoutCompletionCoordinator()
     @StateObject private var calendarSync = AppleCalendarSyncStore()
+    @StateObject private var tournamentCalendar = ATHLTHTournamentCalendarStore()
     @StateObject private var challengeStore = ChallengeStore()
     @StateObject private var social = SocialStore()
     @StateObject private var realtimeSocial = ATHLTHRealtimeSocialStore()
@@ -171,6 +172,7 @@ private struct ATHLTHSceneRootView: View {
                 .environmentObject(notifications)
                 .environmentObject(workoutCompletion)
                 .environmentObject(calendarSync)
+                .environmentObject(tournamentCalendar)
                 .environmentObject(challengeStore)
                 .environmentObject(social)
                 .environmentObject(realtimeSocial)
@@ -499,6 +501,7 @@ struct AppRootView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var workoutCompletion: WorkoutCompletionCoordinator
     @EnvironmentObject private var calendarSync: AppleCalendarSyncStore
+    @EnvironmentObject private var tournamentCalendar: ATHLTHTournamentCalendarStore
     @EnvironmentObject private var challengeStore: ChallengeStore
     @EnvironmentObject private var officialWeeklyChallenges: OfficialWeeklyChallengeStore
     @EnvironmentObject private var social: SocialStore
@@ -2169,11 +2172,17 @@ struct AppRootView: View {
 
 
     private func syncCalendarIfAllowed() async {
-        guard appSession.subscriptionAccess.hasPaidAccess,
+        guard appSession.signedIn,
+              appSession.subscriptionAccess.hasPaidAccess,
               calendarSync.isEnabled
         else {
             return
         }
+        // A failed network refresh must not delete previously synced
+        // tournament events as if the athlete had left every competition.
+        guard await tournamentCalendar.refresh(
+            for: appSession.profile.userID, force: true
+        ) else { return }
 
         async let eventRefresh: Void =
             communityEvents.refresh()
@@ -2203,6 +2212,7 @@ struct AppRootView: View {
             clubChallengeParticipations:
                 communityGroups.calendarChallengeParticipations,
             challenges: challengeStore.challenges,
+            tournamentExercises: tournamentCalendar.items,
             currentUserID:
                 appSession.profile.userID
         )
