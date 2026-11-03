@@ -152,7 +152,16 @@ enum ATHLTHIntervalRecipeEditing {
                 }
                 let members = Array(blocks[begin..<index])
                 if current.groupRounds ?? 1 > 1 {
-                    result.append(contentsOf: members.expandedForExecution())
+                    // Legacy repeat groups get one editable row per actual
+                    // effort/recovery and a single-round UI grouping. Their
+                    // historic missing final recovery stays missing.
+                    var expanded = members.expandedForExecution()
+                    for item in expanded.indices {
+                        expanded[item].groupID = id
+                        expanded[item].groupKind = .intervals
+                        expanded[item].groupRounds = 1
+                    }
+                    result.append(contentsOf: expanded)
                 } else {
                     result.append(contentsOf: members)
                 }
