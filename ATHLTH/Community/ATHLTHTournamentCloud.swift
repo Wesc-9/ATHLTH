@@ -26,6 +26,13 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
     let cadenceDays: Int
     let completionHours: Int
     let rulesConfirmedAt: Date?
+    let rotationMode: ATHLTHTournamentRotationMode
+    let restWeekdays: [Int]
+    let proofMode: ATHLTHTournamentProofMode
+    let publicResults: Bool
+    let allowExtensions: Bool
+    let ruleVersion: Int
+    let rulesFrozenAt: Date?
     let createdAt: Date
     let startedAt: Date?
     let completedAt: Date?
@@ -43,6 +50,13 @@ struct ATHLTHTournamentRemote: Decodable, Identifiable {
         case cadenceDays = "cadence_days"
         case completionHours = "completion_hours"
         case rulesConfirmedAt = "rules_confirmed_at"
+        case rotationMode = "rotation_mode"
+        case restWeekdays = "rest_weekdays"
+        case proofMode = "proof_mode"
+        case publicResults = "public_results"
+        case allowExtensions = "allow_extensions"
+        case ruleVersion = "rule_version"
+        case rulesFrozenAt = "rules_frozen_at"
         case ownerID = "owner_id"
         case clubID = "club_id"
         case seasonID = "season_id"
@@ -67,6 +81,8 @@ struct ATHLTHTournamentRemoteEntry: Decodable, Identifiable {
     let readyAt: Date?
     let removedAt: Date?
     let replacedBy: UUID?
+    let agreedRuleVersion: Int?
+    let agreedRulesAt: Date?
     var id: UUID { userID }
 
     enum CodingKeys: String, CodingKey {
@@ -79,6 +95,8 @@ struct ATHLTHTournamentRemoteEntry: Decodable, Identifiable {
         case readyAt = "ready_at"
         case removedAt = "removed_at"
         case replacedBy = "replaced_by"
+        case agreedRuleVersion = "agreed_rule_version"
+        case agreedRulesAt = "agreed_rules_at"
     }
 }
 
@@ -211,13 +229,22 @@ private struct ATHLTHTournamentConfiguredCreateParams: Encodable {
     let p_rules_authority: String
     let p_cadence_days: Int
     let p_completion_hours: Int
+    let p_rotation_mode: String
+    let p_rest_weekdays: [Int]
+    let p_proof_mode: String
+    let p_public_results: Bool
+    let p_allow_extensions: Bool
+    let p_win_points: Int
+    let p_draw_points: Int
 
     enum CodingKeys: String, CodingKey {
         case p_title,p_format,p_club,p_season,p_group_size,p_qualifiers,
              p_invitees,p_warmup_titles,p_exercise_mode,p_exercise_count,
              p_proposals_close,p_votes_close,p_approve_player_changes,
              p_allowed_activities,p_rules_authority,p_cadence_days,
-             p_completion_hours
+             p_completion_hours,p_rotation_mode,p_rest_weekdays,
+             p_proof_mode,p_public_results,p_allow_extensions,
+             p_win_points,p_draw_points
     }
 
     func encode(to encoder: Encoder) throws {
@@ -239,6 +266,13 @@ private struct ATHLTHTournamentConfiguredCreateParams: Encodable {
         try keyed.encode(p_rules_authority,forKey: .p_rules_authority)
         try keyed.encode(p_cadence_days,forKey: .p_cadence_days)
         try keyed.encode(p_completion_hours,forKey: .p_completion_hours)
+        try keyed.encode(p_rotation_mode,forKey: .p_rotation_mode)
+        try keyed.encode(p_rest_weekdays,forKey: .p_rest_weekdays)
+        try keyed.encode(p_proof_mode,forKey: .p_proof_mode)
+        try keyed.encode(p_public_results,forKey: .p_public_results)
+        try keyed.encode(p_allow_extensions,forKey: .p_allow_extensions)
+        try keyed.encode(p_win_points,forKey: .p_win_points)
+        try keyed.encode(p_draw_points,forKey: .p_draw_points)
     }
 }
 
@@ -324,7 +358,7 @@ struct ATHLTHTournamentCloudService {
         let targets = draft.participants.filter { $0.id != draft.ownerID }
         let timestamp = ISO8601DateFormatter()
         return try await client.rpc(
-            "athlth_tournament_create_with_rules",
+            "athlth_tournament_create_full_rules",
             params: ATHLTHTournamentConfiguredCreateParams(
                 p_title: draft.title,
                 p_format: draft.format.rawValue,
@@ -346,7 +380,14 @@ struct ATHLTHTournamentCloudService {
                 p_allowed_activities: draft.allowedActivities.map(\.rawValue),
                 p_rules_authority: draft.rulesAuthority.rawValue,
                 p_cadence_days: draft.cadenceDays,
-                p_completion_hours: draft.completionHours
+                p_completion_hours: draft.completionHours,
+                p_rotation_mode: draft.rotationMode.rawValue,
+                p_rest_weekdays: draft.restWeekdays,
+                p_proof_mode: draft.proofMode.rawValue,
+                p_public_results: draft.publicResults,
+                p_allow_extensions: draft.allowExtensions,
+                p_win_points: draft.winPoints,
+                p_draw_points: draft.drawPoints
             )
         ).execute().value
     }
