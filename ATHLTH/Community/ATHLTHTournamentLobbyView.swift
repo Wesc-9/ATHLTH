@@ -62,6 +62,10 @@ struct ATHLTHTournamentLobbyView: View {
     }
     private var readyCount: Int { accepted.filter(\.isReady).count }
     private var finalized: Bool { tournament.exerciseSelectionFinalizedAt != nil }
+    private var hasAcceptedRules: Bool {
+        tournament.rulesConfirmedAt != nil &&
+        myEntry?.agreedRuleVersion == tournament.ruleVersion
+    }
     private var selectedCandidates: [ATHLTHTournamentExerciseCandidateRemote] {
         candidates.filter { $0.selectedPosition != nil }
             .sorted { ($0.selectedPosition ?? 0) < ($1.selectedPosition ?? 0) }
@@ -288,9 +292,11 @@ struct ATHLTHTournamentLobbyView: View {
                         VStack(alignment: .leading,spacing: 4) {
                             Text(myEntry?.isReady == true ? "Du er klar" : "Jeg er klar")
                                 .font(.headline)
-                            Text(finalized
-                                 ? "Alle må bekrefte før konkurransen starter"
-                                 : "Øvelsene må bestemmes først")
+                            Text(!finalized
+                                 ? "Øvelsene må bestemmes først"
+                                 : !hasAcceptedRules
+                                 ? "Godkjenn reglene under fanen Regler først"
+                                 : "Alle må bekrefte før konkurransen starter")
                                 .font(.caption)
                                 .opacity(0.8)
                         }
@@ -302,8 +308,8 @@ struct ATHLTHTournamentLobbyView: View {
                                 in: RoundedRectangle(cornerRadius: 19))
                 }
                 .buttonStyle(.plain)
-                .disabled(!finalized || busy)
-                .opacity(finalized ? 1 : 0.55)
+                .disabled(!finalized || !hasAcceptedRules || busy)
+                .opacity(finalized && hasAcceptedRules ? 1 : 0.55)
             }
 
             VStack(spacing: 0) {
@@ -803,6 +809,10 @@ struct ATHLTHTournamentLobbyView: View {
         if entry.removedAt != nil { return "Tatt ut" }
         if entry.response == "invited" { return "Invitert" }
         if entry.response == "declined" { return "Avslått" }
+        if tournament.exerciseSelectionFinalizedAt != nil &&
+           entry.agreedRuleVersion != tournament.ruleVersion {
+            return "Må godkjenne reglene"
+        }
         return entry.isReady ? "Klar" : "Ikke klar"
     }
 
