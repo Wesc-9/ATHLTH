@@ -85,15 +85,42 @@ final class ATHLTHChallengeSpecialRunningTests: XCTestCase {
         ))
     }
 
-    func testChallengeAutomaticTitleCreditsBothPeople() {
+    func testChallengeAutomaticTitleLeavesNamesToParticipantCaption() {
         XCTAssertEqual(
             ChallengeCreationPolicy.resolvedTitle(
                 "", sport: .running, scoring: .fastestDistance,
                 creatorName: "Stian", invitedNames: ["Malin"],
-                scoringTitle: "Løping • Raskeste drag"
+                scoringTitle: "Løping • Lengst distanse i drag"
             ),
-            "Løping • Raskeste drag • Stian • Malin"
+            "Løping • Lengst distanse i drag"
         )
+    }
+
+    func testRunningVenueCanRepresentAllThreeLocations() {
+        XCTAssertEqual(ATHLTHChallengeRunningVenue.outdoor.rawValue, "outdoor")
+        XCTAssertEqual(ATHLTHChallengeRunningVenue.indoor.rawValue, "indoor")
+        XCTAssertEqual(ATHLTHChallengeRunningVenue.treadmill.rawValue, "treadmill")
+    }
+
+    func testIntervalComposerDraftPreservesSelectedTemplateAndVenue() throws {
+        let templateID = UUID()
+        let original = ATHLTHChallengeCreationDraft(
+            title: "", summary: "",
+            sport: .running, scoring: .farthestInTime,
+            runningFocus: .intervals, runningComparison: .mostWorkDistance,
+            runningTemplateID: templateID, runningVenue: .treadmill,
+            invited: [], startsAt: Date(), endsAt: Date(),
+            hasEnd: true, coverArtwork: "GoalRunning",
+            allowMultipleAttempts: false
+        )
+        let restored = try JSONDecoder().decode(
+            ATHLTHChallengeCreationDraft.self,
+            from: JSONEncoder().encode(original)
+        )
+        XCTAssertEqual(restored.runningTemplateID, templateID)
+        XCTAssertEqual(restored.runningFocus, .intervals)
+        XCTAssertEqual(restored.runningComparison, .mostWorkDistance)
+        XCTAssertEqual(restored.runningVenue, .treadmill)
     }
 
     func testCustomTitleIsNeverOverridden() {
