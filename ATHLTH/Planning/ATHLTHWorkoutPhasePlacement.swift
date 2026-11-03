@@ -51,6 +51,7 @@ enum ATHLTHWorkoutPhasePlacement {
             targetPaceSecondsPerKilometer: block.targetPaceSecondsPerKilometer,
             targetHeartRateZone: block.targetHeartRateZone
         )
+        next.routeID = block.routeID
         next.sourceIntensityZoneLabel = block.sourceIntensityZoneLabel
         next.targetHeartRatePercentMin = block.targetHeartRatePercentMin
         next.targetHeartRatePercentMax = block.targetHeartRatePercentMax
