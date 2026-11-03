@@ -237,6 +237,7 @@ struct ATHLTHArenaV3HomeView: View {
     @State private var remoteSeries: [ATHLTHArenaRemoteSeries] = []
     @State private var officialTournaments: [ATHLTHTournamentRemote] = []
     @State private var pendingTournamentIDs: Set<UUID> = []
+    @State private var myTournamentIDs: Set<UUID> = []
     @State private var tournamentError: String?
     @State private var selectedFilter: ATHLTHArenaV3Filter = .active
     @State private var showCreatePicker = false
@@ -282,6 +283,7 @@ struct ATHLTHArenaV3HomeView: View {
 
     private var visibleOfficialTournaments: [ATHLTHTournamentRemote] {
         officialTournaments.filter { item in
+            guard myTournamentIDs.contains(item.id) else { return false }
             switch selectedFilter {
             case .active:
                 return item.status != "completed" &&
@@ -307,7 +309,7 @@ struct ATHLTHArenaV3HomeView: View {
                             .font(.system(size: 25, weight: .semibold, design: .serif))
                             .foregroundStyle(ATHLTHArenaV3Style.ink)
                         Spacer()
-                        Text("\(remoteSeries.count + officialTournaments.count + challengesForUser.count + tournaments.count + legacyDrafts.count)")
+                        Text("\(remoteSeries.count + myTournamentIDs.count + challengesForUser.count + tournaments.count + legacyDrafts.count)")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(ATHLTHArenaV3Style.secondary)
                             .monospacedDigit()
@@ -607,8 +609,12 @@ struct ATHLTHArenaV3HomeView: View {
             async let pending = tournamentCloud.pendingInvitationIDs(
                 userID: session.profile.userID
             )
+            async let membership = tournamentCloud.myTournamentIDs(
+                userID: session.profile.userID
+            )
             officialTournaments = try await official
             pendingTournamentIDs = try await pending
+            myTournamentIDs = try await membership
             tournamentError = nil
         } catch {
             tournamentError = "Turneringer kunne ikke oppdateres: " +
