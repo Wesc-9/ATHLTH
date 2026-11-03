@@ -527,123 +527,7 @@ struct ATHLTHArenaV3HomeView: View {
             VStack(alignment: .leading, spacing: 23) {
                 header
                 createEntry
-                VStack(alignment: .leading, spacing: 13) {
-                    HStack {
-                        Text("Mine konkurranser")
-                            .font(.system(size: 25, weight: .semibold, design: .serif))
-                            .foregroundStyle(ATHLTHArenaV3Style.ink)
-                        Spacer()
-                        Text("\(remoteSeries.count + myTournamentIDs.count + challengesForUser.count + tournaments.count + legacyDrafts.count)")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
-                            .monospacedDigit()
-                    }
-                    Picker("Konkurranser", selection: $selectedFilter) {
-                        ForEach(ATHLTHArenaV3Filter.allCases) { filter in
-                            Text(filter.title).tag(filter)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-
-                    if visibleChallenges.isEmpty && visibleSeries.isEmpty &&
-                       visibleOfficialTournaments.isEmpty &&
-                       (selectedFilter != .active ||
-                        (tournaments.isEmpty && legacyDrafts.isEmpty)) {
-                        emptyContent
-                    }
-                    ForEach(visibleOfficialTournaments.sorted {
-                        $0.createdAt > $1.createdAt
-                    }) { tournament in
-                        NavigationLink {
-                            ATHLTHTournamentLiveDetailView(tournament: tournament)
-                        } label: {
-                            competitionRow(
-                                title: tournament.title,
-                                caption: tournament.format.title +
-                                    (tournament.clubID == nil ? "" : " · Klubb"),
-                                status: pendingTournamentIDs.contains(tournament.id)
-                                    ? "Svar på invitasjon" :
-                                    tournament.status == "completed" ? "Fullført" :
-                                    tournament.status == "inviting" ? "Invitert" : "Pågår",
-                                symbol: tournament.format.symbol
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    ForEach(visibleChallenges) { challenge in
-                        NavigationLink {
-                            ChallengeDetailView(challengeID: challenge.id)
-                        } label: {
-                            competitionRow(
-                                title: challenge.title,
-                                caption: "Duell · \(challenge.sport.title)",
-                                status: challenge.status == .completed ? "Fullført" : "Utfordring",
-                                symbol: "flag.checkered"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    ForEach(visibleSeries) { item in
-                        NavigationLink {
-                            ATHLTHArenaOnlineDetailView(series: item)
-                        } label: {
-                            competitionRow(
-                                title: item.title,
-                                caption: item.clubID == nil ? "Arena-serie" : "Klubbkonkurranse",
-                                status: item.status == "completed" ? "Fullført" : "Pågår",
-                                symbol: "person.3.sequence"
-                            )
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    if selectedFilter == .active {
-                        ForEach(legacyDrafts) { draft in
-                            NavigationLink {
-                                ATHLTHArenaDraftDetailView(
-                                    draft: draft,
-                                    onSave: saveLegacy,
-                                    onPublished: { id in
-                                        legacyDrafts.removeAll { $0.id == id }
-                                        ATHLTHArenaDraftStorage.save(
-                                            legacyDrafts, for: session.profile.userID
-                                        )
-                                        Task { await reload() }
-                                    }
-                                )
-                            } label: {
-                                competitionRow(
-                                    title: draft.title,
-                                    caption: "Tidligere Arena-oppsett",
-                                    status: "Utkast",
-                                    symbol: "square.stack"
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        ForEach(tournaments) { draft in
-                            NavigationLink {
-                                ATHLTHTournamentDraftDetailView(
-                                    draft: draft,
-                                    onPublished: { _ in
-                                        tournaments.removeAll { $0.id == draft.id }
-                                        ATHLTHTournamentDraftStore.save(
-                                            tournaments, owner: session.profile.userID
-                                        )
-                                        Task { await reload() }
-                                    }
-                                )
-                            } label: {
-                                competitionRow(
-                                    title: draft.title,
-                                    caption: draft.format.title + (draft.clubID == nil ? "" : " · Klubb"),
-                                    status: "Utkast",
-                                    symbol: draft.format.symbol
-                                )
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
+                competitionsList
                 HStack(spacing: 11) {
                     NavigationLink {
                         CommunityGroupsView()
@@ -734,6 +618,131 @@ struct ATHLTHArenaV3HomeView: View {
                     onPublished: { _ in Task { await reload() } }
                 ) { draft in
                     save(draft)
+                }
+            }
+        }
+    }
+
+    private var allCompetitionCount: Int {
+        remoteSeries.count + myTournamentIDs.count +
+            challengesForUser.count + tournaments.count + legacyDrafts.count
+    }
+
+    private var competitionsList: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                Text("Mine konkurranser")
+                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                Spacer()
+                Text("\(allCompetitionCount)")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    .monospacedDigit()
+            }
+            Picker("Konkurranser", selection: $selectedFilter) {
+                ForEach(ATHLTHArenaV3Filter.allCases) { filter in
+                    Text(filter.title).tag(filter)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if visibleChallenges.isEmpty && visibleSeries.isEmpty &&
+               visibleOfficialTournaments.isEmpty &&
+               (selectedFilter != .active ||
+                (tournaments.isEmpty && legacyDrafts.isEmpty)) {
+                emptyContent
+            }
+            ForEach(visibleOfficialTournaments.sorted {
+                $0.createdAt > $1.createdAt
+            }) { tournament in
+                NavigationLink {
+                    ATHLTHTournamentLiveDetailView(tournament: tournament)
+                } label: {
+                    competitionRow(
+                        title: tournament.title,
+                        caption: tournament.format.title +
+                            (tournament.clubID == nil ? "" : " · Klubb"),
+                        status: pendingTournamentIDs.contains(tournament.id)
+                            ? "Svar på invitasjon" :
+                            tournament.status == "completed" ? "Fullført" :
+                            tournament.status == "inviting" ? "Invitert" : "Pågår",
+                        symbol: tournament.format.symbol
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            ForEach(visibleChallenges) { challenge in
+                NavigationLink {
+                    ChallengeDetailView(challengeID: challenge.id)
+                } label: {
+                    competitionRow(
+                        title: challenge.title,
+                        caption: "Duell · \(challenge.sport.title)",
+                        status: challenge.status == .completed ? "Fullført" : "Utfordring",
+                        symbol: "flag.checkered"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            ForEach(visibleSeries) { item in
+                NavigationLink {
+                    ATHLTHArenaOnlineDetailView(series: item)
+                } label: {
+                    competitionRow(
+                        title: item.title,
+                        caption: item.clubID == nil ? "Arena-serie" : "Klubbkonkurranse",
+                        status: item.status == "completed" ? "Fullført" : "Pågår",
+                        symbol: "person.3.sequence"
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+            if selectedFilter == .active {
+                ForEach(legacyDrafts) { draft in
+                    NavigationLink {
+                        ATHLTHArenaDraftDetailView(
+                            draft: draft,
+                            onSave: saveLegacy,
+                            onPublished: { id in
+                                legacyDrafts.removeAll { $0.id == id }
+                                ATHLTHArenaDraftStorage.save(
+                                    legacyDrafts, for: session.profile.userID
+                                )
+                                Task { await reload() }
+                            }
+                        )
+                    } label: {
+                        competitionRow(
+                            title: draft.title,
+                            caption: "Tidligere Arena-oppsett",
+                            status: "Utkast",
+                            symbol: "square.stack"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+                ForEach(tournaments) { draft in
+                    NavigationLink {
+                        ATHLTHTournamentDraftDetailView(
+                            draft: draft,
+                            onPublished: { _ in
+                                tournaments.removeAll { $0.id == draft.id }
+                                ATHLTHTournamentDraftStore.save(
+                                    tournaments, owner: session.profile.userID
+                                )
+                                Task { await reload() }
+                            }
+                        )
+                    } label: {
+                        competitionRow(
+                            title: draft.title,
+                            caption: draft.format.title + (draft.clubID == nil ? "" : " · Klubb"),
+                            status: "Utkast",
+                            symbol: draft.format.symbol
+                        )
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
