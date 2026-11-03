@@ -52,8 +52,9 @@ struct ATHLTHTournamentRuleConfigurationSection: View {
                         .background(ATHLTHArenaV3Style.panel())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityAddTraits(activities.contains(activity)
-                                            ? .isSelected : [])
+                    .accessibilityValue(
+                        activities.contains(activity) ? "Valgt" : "Ikke valgt"
+                    )
                 }
             }
 
