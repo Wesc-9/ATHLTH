@@ -4526,8 +4526,16 @@ struct WorkoutInviteLaunchSheet: View {
                             )
                             .frame(width: 8, height: 8)
 
-                        Text(participant.displayNameSnapshot)
-                            .font(.caption.weight(.semibold))
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(participant.displayNameSnapshot)
+                                .font(.caption.weight(.semibold))
+                            if let arrival = participant.arrivalStatus,
+                               participant.workoutFinishedAt == nil {
+                                Label(arrival.label, systemImage: arrival.symbol)
+                                    .font(.caption2.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTrainTogetherDesign.accent)
+                            }
+                        }
 
                         Spacer()
 
