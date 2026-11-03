@@ -170,7 +170,10 @@ enum PrestigeTrophyCatalog {
     static func isPrestigeTrophy(
         _ id: String
     ) -> Bool {
-        ids.contains(id)
+        // An Arena champion is server-confirmed and deserves a full trophy
+        // in the same cabinet. Other placements remain medal awards.
+        ids.contains(id) ||
+            (id.hasPrefix("tournament.") && id.hasSuffix(".champion"))
     }
 }
 
