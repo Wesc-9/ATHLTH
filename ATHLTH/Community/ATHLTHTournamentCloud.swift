@@ -167,6 +167,11 @@ private struct ATHLTHTournamentIDParams: Encodable {
     let p_tournament: UUID
 }
 
+private struct ATHLTHTournamentWithdrawParams: Encodable {
+    let p_tournament: UUID
+    let p_athlete: UUID
+}
+
 private struct ATHLTHTournamentRespondParams: Encodable {
     let p_tournament: UUID
     let p_accept: Bool
@@ -359,6 +364,24 @@ struct ATHLTHTournamentCloudService {
             params: ATHLTHTournamentRespondParams(
                 p_tournament: tournamentID, p_accept: accept
             )
+        ).execute()
+    }
+
+    func withdrawInvitation(
+        tournamentID: UUID, athleteID: UUID
+    ) async throws {
+        try await client.rpc(
+            "athlth_tournament_withdraw_invite",
+            params: ATHLTHTournamentWithdrawParams(
+                p_tournament: tournamentID, p_athlete: athleteID
+            )
+        ).execute()
+    }
+
+    func cancelUnstarted(tournamentID: UUID) async throws {
+        try await client.rpc(
+            "athlth_tournament_cancel",
+            params: ATHLTHTournamentIDParams(p_tournament: tournamentID)
         ).execute()
     }
 
