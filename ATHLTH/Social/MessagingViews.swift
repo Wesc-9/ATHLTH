@@ -4929,6 +4929,7 @@ struct DirectMessageThreadView: View {
             // has already been promoted to accepted.
             await messaging.refreshConversation(id)
             session.syncApprovedSharedWorkouts(from: messaging.messages(in: id))
+            session.syncSharedWorkoutLifecycles(from: messaging.messages(in: id))
             await social.refreshChallenges(
                 challengeStore:
                     challengeStore
@@ -4955,6 +4956,7 @@ struct DirectMessageThreadView: View {
                     )
 
                 session.syncApprovedSharedWorkouts(from: messaging.messages(in: id))
+            session.syncSharedWorkoutLifecycles(from: messaging.messages(in: id))
 
                 pollTick += 1
                 if pollTick.isMultiple(
