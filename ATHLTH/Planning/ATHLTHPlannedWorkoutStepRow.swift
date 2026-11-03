@@ -33,6 +33,38 @@ struct ATHLTHPlannedWorkoutStepRow: View {
     }
     private var isPause: Bool { block.isRestOrActiveRecovery }
 
+    private var durationSummary: String {
+        if let seconds = block.durationSeconds, seconds > 0 {
+            let value = Int(seconds.rounded())
+            let minutes = value / 60
+            let remainder = value % 60
+            if minutes == 0 {
+                return "\(remainder) " + ATHLTHLocalization.choose(
+                    english: "sec", norwegian: "sek"
+                )
+            }
+            if remainder == 0 { return "\(minutes) min" }
+            return "\(minutes):" + String(format: "%02d", remainder)
+        }
+        if let meters = block.distanceMeters, meters > 0 {
+            if meters >= 1_000 {
+                return (meters / 1_000).formatted(
+                    .number.precision(.fractionLength(0...2)).locale(locale)
+                ) + " km"
+            }
+            return "\(Int(meters.rounded())) m"
+        }
+        return "–"
+    }
+
+    private var inclineSummary: String? {
+        guard let incline = block.treadmillInclinePercent,
+              incline.isFinite, incline >= 0 else { return nil }
+        return incline.formatted(
+            .number.precision(.fractionLength(0...1)).locale(locale)
+        ) + " %"
+    }
+
     private var paceSummary: String? {
         guard block.kind == .run,
               let secondsPerKm = block.targetPaceSecondsPerKilometer,
@@ -143,19 +175,27 @@ struct ATHLTHPlannedWorkoutStepRow: View {
                                 .minimumScaleFactor(0.85)
                             Spacer(minLength: 0)
                             VStack(alignment: .trailing, spacing: 2) {
-                                Text(block.durationSeconds.map { "\(Int($0 / 60)) min" }
-                                    ?? block.distanceMeters.map { "\(Int($0)) m" } ?? "–")
+                                Text(durationSummary)
                                     .font(.caption.weight(.medium))
                                     .foregroundStyle(ATHLTHTrainDesign.ink)
                                 if let paceSummary {
-                                    Text(paceSummary)
+                                    Text(
+                                        [paceSummary, inclineSummary]
+                                            .compactMap { $0 }.joined(separator: " · ")
+                                    )
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(.secondary)
+                                } else if let inclineSummary {
+                                    Text(inclineSummary)
                                         .font(.system(size: 10, weight: .medium))
                                         .foregroundStyle(.secondary)
                                 }
                             }
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                            Text(block.targetHeartRateZone.map { "Z\($0)" }
+                            Text(block.targetHeartRateZone.map {
+                                    (ATHLTHLocalization.isNorwegian ? "S" : "Z") + "\($0)"
+                                }
                                 ?? (isPause ? "Pause" : "–"))
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(ATHLTHTrainDesign.bronze)
