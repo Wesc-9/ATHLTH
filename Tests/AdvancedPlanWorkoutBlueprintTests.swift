@@ -74,6 +74,22 @@ final class AdvancedPlanWorkoutBlueprintTests: XCTestCase {
             XCTAssertTrue(week.days[1].sessions.isEmpty)
         }
     }
+    func testTreadmillPresetRemainsAnIndoorWorkoutWhenSavingAdvancedPlan() {
+        let steps = ATHLTHRunningExercisePreset.treadmill.blocks(in: .main)
+        let blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: "Treadmill", kind: .running, durationMinutes: 20,
+            routeID: UUID(), blocks: steps
+        )
+        XCTAssertTrue(blueprint.isValid)
+        XCTAssertEqual(blueprint.category, "treadmill")
+        let session = blueprint.applying(to: nil)
+        XCTAssertEqual(session.workoutCategory, "treadmill")
+        XCTAssertNil(session.routeID)
+        XCTAssertEqual(session.resolvedWorkoutBlocks.first?.isIndoor, true)
+        XCTAssertEqual(
+            session.resolvedWorkoutBlocks.first?.treadmillInclinePercent, 0
+        )
+    }
 
     func testHybridGroupsRoundTripWithoutChangingOriginalBlockMetadata() throws {
         let group = UUID()
