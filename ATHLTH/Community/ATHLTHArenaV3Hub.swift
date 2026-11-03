@@ -657,6 +657,28 @@ struct ATHLTHArenaV3HomeView: View {
                     }
                 }
                 NavigationLink {
+                    ATHLTHTournamentPublicDirectoryView()
+                } label: {
+                    HStack(spacing: 11) {
+                        Image(systemName: "eye")
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                        VStack(alignment: .leading,spacing: 4) {
+                            Text("Utforsk offentlige turneringer")
+                                .font(.subheadline.weight(.semibold))
+                            Text("Tabeller, cuptrær og godkjente resultater")
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    .padding(16)
+                    .background(ATHLTHArenaV3Style.panel())
+                }
+                .buttonStyle(.plain)
+                NavigationLink {
                     GhostFriendRaceHubView()
                 } label: {
                     HStack {
