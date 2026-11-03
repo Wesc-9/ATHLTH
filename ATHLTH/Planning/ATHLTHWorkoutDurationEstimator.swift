@@ -27,6 +27,27 @@ enum ATHLTHWorkoutDurationEstimator {
         fallbackPace: Bool,
         defaultActivity: WorkoutCardioActivity = .running
     ) -> Int? {
+        guard let seconds = calculateSeconds(
+            for: blocks, fallbackPace: fallbackPace, defaultActivity: defaultActivity
+        ) else { return nil }
+        return max(Int(ceil(seconds / 300)) * 5, 5)
+    }
+
+    /// Precise seconds for the editor. Scheduling may still round to five
+    /// minutes, but a 28:30 workout must never be presented as 30:00.
+    static func previewSeconds(
+        for blocks: [WorkoutTemplateBlock],
+        defaultActivity: WorkoutCardioActivity = .running
+    ) -> TimeInterval? {
+        calculateSeconds(for: blocks, fallbackPace: true,
+                         defaultActivity: defaultActivity)
+    }
+
+    private static func calculateSeconds(
+        for blocks: [WorkoutTemplateBlock],
+        fallbackPace: Bool,
+        defaultActivity: WorkoutCardioActivity = .running
+    ) -> TimeInterval? {
         guard !blocks.isEmpty else { return nil }
         let steps = blocks.expandedForExecution()
         guard !steps.isEmpty, steps.count <= 1_000 else { return nil }
@@ -89,6 +110,6 @@ enum ATHLTHWorkoutDurationEstimator {
         // The existing plan model permits at most 240 minutes. Do not
         // misrepresent an over-limit timeline as exactly four hours.
         guard hasActivity, seconds > 0, seconds <= 240 * 60 else { return nil }
-        return max(Int(ceil(seconds / 300)) * 5, 5)
+        return seconds
     }
 }
