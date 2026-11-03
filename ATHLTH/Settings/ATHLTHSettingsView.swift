@@ -55,7 +55,7 @@ private enum ATHLTHSettingsCategory: String, CaseIterable, Identifiable {
         switch self {
         case .health: return "health helse apple health watch klokke sync synkronisering import calendar kalender spotify garmin home assistant tilkobling connections"
         case .training: return "training trening workout styrke løping løp guidance veiledning audio coach ghost notifications varsler alarm achievements trophies medalje exercise data repdb øvelsesdatabase"
-        case .account: return "profile profil account konto health helseprofil sign-in login innlogging password passord security sikkerhet data privacy"
+        case .account: return "profile profil account konto health helseprofil sign-in login innlogging password passord security sikkerhet data privacy pet pets kjæledyr hund katt dyr"
         case .app: return "app språk language engelsk norsk måleenheter measurements units tid time format widget widgets lock screen siri"
         case .membership: return "medlemskap premium athlth plus abonnement billing betal kjøp purchase restore subscription trial"
         case .privacy: return "privacy personvern rettigheter vilkår terms policy legal"
@@ -801,6 +801,23 @@ settingsSection("Profile") {
                                         english: "Apple Health, measurements, goals and limitations",
                                         norwegian: "Apple Helse, kroppsmål, mål og treningshensyn"
                                     )
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            SettingsDivider()
+                            NavigationLink {
+                                ATHLTHPetsSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "pawprint.fill",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "My pets", norwegian: "Mine kjæledyr"),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Companions, profiles and activity history",
+                                        norwegian: "Turkamerater, profiler og aktivitetshistorikk")
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
