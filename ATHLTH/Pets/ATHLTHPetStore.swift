@@ -219,6 +219,7 @@ final class ATHLTHPetStore: ObservableObject {
             prepared = nil
             return
         }
+        restorePrepared()
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
@@ -340,6 +341,47 @@ final class ATHLTHPetStore: ObservableObject {
 
     func petIDs(for workoutID: UUID) -> Set<UUID> {
         Set(usage.filter { $0.workoutID == workoutID }.map(\.petID))
+    }
+
+    func makeWatchCatalog() -> WatchPetCatalogTransfer? {
+        guard let userID = currentUserID else { return nil }
+        return WatchPetCatalogTransfer(
+            ownerID: userID,
+            pets: pets.map { WatchPetIdentity(id: $0.id, name: $0.name) },
+            selectedPetIDs: Array(activePetIDs),
+            updatedAt: Date())
+    }
+
+    func acceptWatchPetSelection(_ value: WatchPetSelectionTransfer) {
+        guard let userID = currentUserID, value.ownerID == userID,
+              abs(value.updatedAt.timeIntervalSinceNow) < 36 * 3600 else { return }
+        let owned = Set(pets.filter { $0.userID == userID }.map(\.id))
+        let segments = value.segments
+            .filter { owned.contains($0.petID) }
+            .map { ATHLTHPetSegment(
+                petID: $0.petID, enteredAt: $0.enteredAt,
+                exitedAt: $0.exitedAt, enteredMeters: $0.enteredMeters,
+                exitedMeters: $0.exitedMeters) }
+        prepared = ATHLTHPreparedPetWorkout(
+            userID: userID, preparedAt: Date(), segments: segments)
+        persistPrepared()
+    }
+
+    // The final Watch result travels with the HealthKit workout and wins
+    // over delayed connectivity messages, so an offline session is not lost.
+    func acceptCompletedWatchPetSegments(_ segments: [WatchPetParticipationSegment]) {
+        guard let userID = currentUserID, !segments.isEmpty else { return }
+        let owned = Set(pets.filter { $0.userID == userID }.map(\.id))
+        let verified = segments.filter { owned.contains($0.petID) }.map {
+            ATHLTHPetSegment(
+                petID: $0.petID, enteredAt: $0.enteredAt,
+                exitedAt: $0.exitedAt, enteredMeters: $0.enteredMeters,
+                exitedMeters: $0.exitedMeters)
+        }
+        guard !verified.isEmpty else { return }
+        prepared = ATHLTHPreparedPetWorkout(
+            userID: userID, preparedAt: Date(), segments: verified)
+        persistPrepared()
     }
 
     func prepareNextWorkoutPets(_ ids: Set<UUID>) {
@@ -468,12 +510,19 @@ final class ATHLTHPetStore: ObservableObject {
     private func restorePrepared() {
         guard let data = UserDefaults.standard.data(forKey: preparedKey),
               let restored = try? JSONDecoder().decode(ATHLTHPreparedPetWorkout.self, from: data),
-              restored.userID == currentUserID,
               abs(restored.preparedAt.timeIntervalSinceNow) < 36 * 3600 else {
             UserDefaults.standard.removeObject(forKey: preparedKey)
             return
         }
-        prepared = restored
+        // Supabase restores its session asynchronously. Do not delete a
+        // persisted selection simply because auth is still loading.
+        guard let userID = currentUserID else { return }
+        if restored.userID == userID {
+            prepared = restored
+        } else {
+            prepared = nil
+            UserDefaults.standard.removeObject(forKey: preparedKey)
+        }
     }
 
     private func persistPrepared() {
