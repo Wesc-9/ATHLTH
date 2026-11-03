@@ -1650,6 +1650,14 @@ struct AppRootView: View {
                 await APNsPushManager.shared.syncCurrentToken()
             }
         }
+        .onChange(of: calendarSync.isEnabled) { _, enabled in
+            guard enabled, appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
+        .onChange(of: tournamentCalendar.items) { _, _ in
+            guard appSession.signedIn else { return }
+            Task { await syncCalendarIfAllowed() }
+        }
         .onChange(of: challengeStore.challenges) { _, updatedChallenges in
             notifications.syncChallengeEvents(
                 from: updatedChallenges,
