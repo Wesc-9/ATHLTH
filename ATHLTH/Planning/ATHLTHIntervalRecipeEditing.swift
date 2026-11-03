@@ -106,6 +106,12 @@ enum ATHLTHIntervalRecipeEditing {
                   $0.kind == .run && !$0.isActiveRecovery
               }) else { return nil }
         var result = source
+        // Active recovery is still part of the same indoor/treadmill
+        // environment, but deliberately keeps its own easy pace.
+        for index in range where result[index].isActiveRecovery {
+            result[index].isIndoor = first.isIndoor
+            result[index].treadmillInclinePercent = first.treadmillInclinePercent
+        }
         for index in range where result[index].kind == .run &&
                               !result[index].isActiveRecovery {
             result[index].targetPaceSecondsPerKilometer =
