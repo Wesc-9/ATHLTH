@@ -35,6 +35,13 @@ struct ATHLTHTournamentCreator: View {
     @State private var title = ""
     @State private var groupSize = 4
     @State private var qualifiersPerGroup = 2
+    @State private var exerciseMode: ATHLTHTournamentExerciseMode = .owner
+    @State private var exerciseCount = 4
+    @State private var proposalsCloseAt =
+        Date().addingTimeInterval(2 * 86_400)
+    @State private var votesCloseAt =
+        Date().addingTimeInterval(3 * 86_400)
+    @State private var approvePlayerChanges = false
     @State private var warmupRounds: [ATHLTHTournamentWarmupRound] = []
     @State private var selectedSeasonID: UUID?
     @State private var clubSeasons: [ATHLTHArenaClubSeason] = []
@@ -89,7 +96,12 @@ struct ATHLTHTournamentCreator: View {
     private var canSave: Bool {
         title.trimmingCharacters(in: .whitespacesAndNewlines).count >= 3 &&
         athletes.count >= 2 && !busy &&
-        (inviteSource != .club || selectedClubID != nil)
+        (inviteSource != .club || selectedClubID != nil) &&
+        (exerciseMode != .vote || (
+            proposalsCloseAt > Date().addingTimeInterval(120) &&
+            votesCloseAt > proposalsCloseAt &&
+            votesCloseAt < Date().addingTimeInterval(30 * 86_400)
+        ))
     }
 
     var body: some View {
@@ -98,6 +110,7 @@ struct ATHLTHTournamentCreator: View {
                 VStack(alignment: .leading, spacing: 22) {
                     titleSection
                     formatSection
+                    exerciseRulesSection
                     warmupSection
                     if format == .groups { groupsSection }
                     inviteSection
@@ -206,6 +219,11 @@ struct ATHLTHTournamentCreator: View {
             groupSize: groupSize,
             qualifiersPerGroup: qualifiersPerGroup,
             participants: athletes,
+            exerciseMode: exerciseMode,
+            exerciseCount: exerciseCount,
+            proposalsCloseAt: exerciseMode == .vote ? proposalsCloseAt : nil,
+            votesCloseAt: exerciseMode == .vote ? votesCloseAt : nil,
+            approvePlayerChanges: approvePlayerChanges,
             warmupRounds: warmupRounds.enumerated().map { index, round in
                 var copy = round
                 let clean = round.title.trimmingCharacters(
@@ -279,6 +297,93 @@ struct ATHLTHTournamentCreator: View {
                 }
                 .buttonStyle(.plain)
             }
+        }
+    }
+
+    private var exerciseRulesSection: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            sectionTitle("Velg øvelser")
+            Text("Bestem hvordan konkurransens øvelser skal settes sammen.")
+                .font(.caption)
+                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+
+            ForEach(ATHLTHTournamentExerciseMode.allCases) { mode in
+                Button {
+                    exerciseMode = mode
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: mode.symbol)
+                            .font(.system(size: 18, weight: .light))
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                            .frame(width: 34)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(mode.title)
+                                .font(.subheadline.weight(.semibold))
+                            Text(mode.detail)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 5)
+                        Image(systemName: exerciseMode == mode
+                              ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(ATHLTHArenaV3Style.gold)
+                    }
+                    .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    .padding(13)
+                    .background(ATHLTHArenaV3Style.panel())
+                }
+                .buttonStyle(.plain)
+            }
+
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Antall øvelser")
+                        .font(.subheadline.weight(.medium))
+                    Text("Velg mellom 1 og 12")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+                Spacer()
+                Stepper(value: $exerciseCount, in: 1...12) {
+                    Text("\(exerciseCount)")
+                        .font(.headline.monospacedDigit())
+                }
+                .fixedSize()
+            }
+            .padding(14)
+            .background(ATHLTHArenaV3Style.panel())
+
+            if exerciseMode == .vote {
+                VStack(spacing: 12) {
+                    DatePicker("Forslagsfrist", selection: $proposalsCloseAt,
+                               in: Date().addingTimeInterval(120)...,
+                               displayedComponents: [.date, .hourAndMinute])
+                    DatePicker("Stemmefrist", selection: $votesCloseAt,
+                               in: proposalsCloseAt.addingTimeInterval(60)...,
+                               displayedComponents: [.date, .hourAndMinute])
+                    Text("Alle får inntil \(exerciseCount) stemmer – én per øvelse. Å ikke stemme er helt greit. De \(exerciseCount) med flest stemmer velges. Ved likt resultat avgjør en tilfeldig trekning.")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .font(.subheadline)
+                .padding(15)
+                .background(ATHLTHArenaV3Style.panel())
+            }
+
+            Toggle(isOn: $approvePlayerChanges) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Alle må godkjenne spillerbytter")
+                        .font(.subheadline.weight(.medium))
+                    Text("Erstattere må godkjennes av gjenværende deltakere.")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                }
+            }
+            .tint(ATHLTHArenaV3Style.gold)
+            .padding(14)
+            .background(ATHLTHArenaV3Style.panel())
         }
     }
 
