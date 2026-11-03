@@ -24,6 +24,7 @@ struct WatchWorkoutStartView: View {
                     .watchSurface()
                 }
 
+                WatchPetSelectionButton()
                 workoutButton(.running)
                 workoutButton(.walking)
 
@@ -1469,6 +1470,7 @@ struct WatchActiveWorkoutView: View {
 
                 Spacer()
             }
+            WatchPetSelectionButton()
 
             Button {
                 if workoutManager.state == .paused {
