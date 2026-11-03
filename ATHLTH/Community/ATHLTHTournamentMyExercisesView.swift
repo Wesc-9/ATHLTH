@@ -78,94 +78,7 @@ struct ATHLTHTournamentMyExercisesView: View {
                             .foregroundStyle(ATHLTHArenaV3Style.secondary)
                     }
                     ForEach(exercises) { slot in
-                        let candidate = candidates.first { $0.id == slot.candidateID }
-                        let ownCompletion = completions.first {
-                            $0.matchExerciseID == slot.id && $0.userID == userID
-                        }
-                        let recorded = ownCompletion != nil
-                        let opponentID = match.homeID == userID
-                            ? match.awayID : match.homeID
-                        let unreviewedOpponent = completions.first {
-                            $0.matchExerciseID == slot.id &&
-                            $0.userID == opponentID &&
-                            $0.reviewStatus == "submitted"
-                        }
-                        HStack(alignment: .center,spacing: 10) {
-                            Image(systemName: recorded
-                                  ? "checkmark.circle.fill"
-                                  : slot.state == "walkover"
-                                  ? "flag.fill" : "circle")
-                                .foregroundStyle(ATHLTHArenaV3Style.gold)
-                            VStack(alignment: .leading,spacing: 4) {
-                                Text(candidate.flatMap {
-                                    exerciseNames[$0.lookupID]
-                                } ?? "Øvelse \(slot.position)")
-                                    .font(.subheadline.weight(.medium))
-                                    .foregroundStyle(ATHLTHArenaV3Style.ink)
-                                if slot.scheduledAt > Date() {
-                                    Text("Åpner " + slot.scheduledAt.formatted(
-                                        date: .abbreviated,time: .shortened))
-                                        .font(.caption)
-                                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
-                                }
-                                Text("Frist " + slot.deadlineAt.formatted(
-                                    date: .abbreviated,time: .shortened))
-                                    .font(.caption)
-                                    .foregroundStyle(ATHLTHArenaV3Style.secondary)
-                                if slot.state == "walkover" {
-                                    Text("Walkover registrert")
-                                        .font(.caption2.weight(.semibold))
-                                        .foregroundStyle(.orange)
-                                } else if slot.state == "disputed" {
-                                    Text("Må avklares av arrangør")
-                                        .font(.caption2)
-                                        .foregroundStyle(.orange)
-                                }
-                            }
-                            Spacer(minLength: 4)
-                            if recorded {
-                                Text(ownCompletion?.reviewStatus == "approved"
-                                     ? "Godkjent" :
-                                     ownCompletion?.reviewStatus == "disputed"
-                                     ? "Bestridt" : "Til godkjenning")
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ATHLTHArenaV3Style.gold)
-                            } else if match.status != "confirmed" &&
-                                      slot.state == "pending" &&
-                                      slot.deadlineAt > Date() &&
-                                      slot.scheduledAt <= Date() {
-                                Button("Registrer") { reportSlot = slot }
-                                    .font(.caption.weight(.semibold))
-                                    .foregroundStyle(ATHLTHArenaV3Style.gold)
-                            }
-                        }
-                        .padding(.vertical,8)
-                        if let opponent = unreviewedOpponent,
-                           slot.state == "pending" {
-                            VStack(alignment: .leading,spacing: 7) {
-                                Text("Motstanderen har registrert øvelsen.")
-                                    .font(.caption)
-                                HStack(spacing: 15) {
-                                    Button("Godkjenn") {
-                                        Task { await review(slot: slot,
-                                            athleteID: opponent.userID,
-                                            approved: true) }
-                                    }
-                                    Button("Bestrid") {
-                                        Task { await review(slot: slot,
-                                            athleteID: opponent.userID,
-                                            approved: false) }
-                                    }
-                                }
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(ATHLTHArenaV3Style.gold)
-                            }
-                            .padding(10)
-                            .frame(maxWidth: .infinity,alignment: .leading)
-                            .background(ATHLTHArenaV3Style.cream,
-                                in: RoundedRectangle(cornerRadius: 11))
-                        }
-                        Divider().opacity(0.45)
+                        exerciseSlotRow(slot, match: match)
                     }
                 }
                 .padding(15)
@@ -185,6 +98,105 @@ struct ATHLTHTournamentMyExercisesView: View {
                 )
                 await reload()
             }
+        }
+    }
+
+    @ViewBuilder
+    private func exerciseSlotRow(
+        _ slot: ATHLTHTournamentMatchExerciseRemote,
+        match: ATHLTHTournamentRemoteMatch
+    ) -> some View {
+        let candidate = candidates.first { $0.id == slot.candidateID }
+        let ownCompletion = completions.first {
+            $0.matchExerciseID == slot.id && $0.userID == userID
+        }
+        let recorded = ownCompletion != nil
+        let opponentID = match.homeID == userID
+            ? match.awayID : match.homeID
+        let unreviewedOpponent = completions.first {
+            $0.matchExerciseID == slot.id &&
+            $0.userID == opponentID &&
+            $0.reviewStatus == "submitted"
+        }
+
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center,spacing: 10) {
+                Image(systemName: recorded
+                      ? "checkmark.circle.fill"
+                      : slot.state == "walkover"
+                      ? "flag.fill" : "circle")
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                VStack(alignment: .leading,spacing: 4) {
+                    Text(candidate.flatMap {
+                        exerciseNames[$0.lookupID]
+                    } ?? "Øvelse \(slot.position)")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+                    if slot.scheduledAt > Date() {
+                        Text("Åpner " + slot.scheduledAt.formatted(
+                            date: .abbreviated,time: .shortened))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                    Text("Frist " + slot.deadlineAt.formatted(
+                        date: .abbreviated,time: .shortened))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    if slot.state == "walkover" {
+                        Text("Walkover registrert")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.orange)
+                    } else if slot.state == "disputed" {
+                        Text("Må avklares av arrangør")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+                }
+                Spacer(minLength: 4)
+                if recorded {
+                    Text(ownCompletion?.reviewStatus == "approved"
+                         ? "Godkjent" :
+                         ownCompletion?.reviewStatus == "disputed"
+                         ? "Bestridt" : "Til godkjenning")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                } else if match.status != "confirmed" &&
+                          slot.state == "pending" &&
+                          slot.deadlineAt > Date() &&
+                          slot.scheduledAt <= Date() {
+                    Button("Registrer") { reportSlot = slot }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                }
+            }
+            .padding(.vertical,8)
+            if let opponent = unreviewedOpponent,
+               slot.state == "pending" {
+                VStack(alignment: .leading,spacing: 7) {
+                    Text("Motstanderen har registrert øvelsen.")
+                        .font(.caption)
+                    HStack(spacing: 15) {
+                        Button("Godkjenn") {
+                            Task { await review(slot: slot,
+                                athleteID: opponent.userID,
+                                approved: true) }
+                        }
+                        Button("Bestrid") {
+                            Task { await review(slot: slot,
+                                athleteID: opponent.userID,
+                                approved: false) }
+                        }
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHArenaV3Style.gold)
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity,alignment: .leading)
+                .background(ATHLTHArenaV3Style.cream,
+                    in: RoundedRectangle(cornerRadius: 11))
+            }
+            Divider().opacity(0.45)
+
         }
     }
 
