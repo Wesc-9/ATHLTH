@@ -61,7 +61,7 @@ final class ATHLTHWorkoutMainSectionTests: XCTestCase {
         XCTAssertEqual(stored.blocks.count, 8)
         XCTAssertTrue(stored.isRunningOnly)
         XCTAssertEqual(
-            stored.blocks.map(\.durationSeconds),
+            stored.blocks.compactMap(\.durationSeconds),
             Array(repeating: [240.0, 180.0], count: 4).flatMap { $0 }
         )
         XCTAssertTrue(stored.blocks.allSatisfy {
