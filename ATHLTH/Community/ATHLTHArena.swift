@@ -789,7 +789,7 @@ struct ATHLTHArenaAllCompetitionsView: View {
 
 /// Dedicated destination so a seasons quick tile really opens standings,
 /// rather than expanding an offscreen disclosure group.
-private struct ATHLTHArenaSeasonsDestination: View {
+struct ATHLTHArenaSeasonsDestination: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 14) {
