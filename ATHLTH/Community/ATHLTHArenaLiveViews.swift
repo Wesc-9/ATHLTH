@@ -1403,6 +1403,13 @@ struct ATHLTHArenaSeasonDetailView: View {
     private let cloud = ATHLTHArenaCloudService()
     private let directory = ATHLTHArenaClubDirectory()
 
+    /// Tournament drafts are private to their organizer until they can be
+    /// published through the server-authorized competition workflow.
+    private var localTournamentDrafts: [ATHLTHTournamentDraft] {
+        ATHLTHTournamentDraftStore.load(session.profile.userID)
+            .filter { $0.seasonID == season.id && $0.clubID == season.clubID }
+    }
+
     private var candidates: [ATHLTHArenaRemoteSeries] {
         let linked = Set(links.map(\.seriesID))
         return competitionOptions.filter {
@@ -1599,6 +1606,46 @@ struct ATHLTHArenaSeasonDetailView: View {
                     ),
                     in: RoundedRectangle(cornerRadius: 23)
                 )
+
+                if !localTournamentDrafts.isEmpty {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Unpublished tournaments",
+                            norwegian: "Turneringsutkast"
+                        ))
+                        .font(.headline)
+                        .foregroundStyle(ATHLTHArenaV3Style.ink)
+
+                        ForEach(localTournamentDrafts) { tournament in
+                            NavigationLink {
+                                ATHLTHTournamentDraftDetailView(draft: tournament)
+                            } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: tournament.format.symbol)
+                                        .foregroundStyle(ATHLTHArenaV3Style.gold)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(tournament.title)
+                                            .font(.subheadline.weight(.semibold))
+                                        Text(tournament.format.title + " · Utkast")
+                                            .font(.caption)
+                                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                                }
+                                .foregroundStyle(ATHLTHArenaV3Style.ink)
+                                .padding(13)
+                                .background(ATHLTHArenaV3Style.panel())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        Text("Utkast teller ikke i sesongtabellen før konkurransene er publisert og resultatene godkjent.")
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHArenaV3Style.secondary)
+                    }
+                }
 
                 HStack {
                     Text(ATHLTHLocalization.choose(
