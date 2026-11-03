@@ -7666,6 +7666,12 @@ struct CommunityGroupDetailView: View {
             referenceClubComposer
 
             referenceClubPostsSection
+            // One club-specific location for administration, backed by the
+            // same competition records and local drafts shown in Arena.
+            ATHLTHArenaClubTournamentSection(
+                clubID: currentGroup.id,
+                isOrganizer: groups.canPublishUpdates(currentGroup)
+            )
             referenceComingUpSection
             clubLeaderboardCard
         }
