@@ -31,16 +31,96 @@ enum ATHLTHTournamentFormat: String, Codable, CaseIterable, Identifiable {
     }
 }
 
-struct ATHLTHTournamentDraft: Codable, Identifiable {
+/// A practice round is entirely separate from official fixtures. It must
+/// never feed the table, elimination engine, ranking or season points.
+struct ATHLTHTournamentWarmupRound: Codable, Identifiable, Hashable {
     var id: UUID = UUID()
+    var title: String
+
+    var countsForPoints: Bool { false }
+    var countsForAdvancement: Bool { false }
+    var mayEliminate: Bool { false }
+}
+
+/// Local tournament specification. Optional season/warm-up fields are decoded
+/// with defaults to keep tournament drafts created in v2.0.9 readable.
+struct ATHLTHTournamentDraft: Codable, Identifiable {
+    var id: UUID
     var ownerID: UUID
     var clubID: UUID?
+    var seasonID: UUID?
     var title: String
     var format: ATHLTHTournamentFormat
     var groupSize: Int
     var qualifiersPerGroup: Int
     var participants: [ATHLTHTournamentParticipant]
-    var createdAt: Date = Date()
+    var warmupRounds: [ATHLTHTournamentWarmupRound]
+    var createdAt: Date
+
+    init(
+        id: UUID = UUID(),
+        ownerID: UUID,
+        clubID: UUID?,
+        seasonID: UUID? = nil,
+        title: String,
+        format: ATHLTHTournamentFormat,
+        groupSize: Int,
+        qualifiersPerGroup: Int,
+        participants: [ATHLTHTournamentParticipant],
+        warmupRounds: [ATHLTHTournamentWarmupRound] = [],
+        createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.ownerID = ownerID
+        self.clubID = clubID
+        self.seasonID = clubID == nil ? nil : seasonID
+        self.title = title
+        self.format = format
+        self.groupSize = groupSize
+        self.qualifiersPerGroup = qualifiersPerGroup
+        self.participants = participants
+        self.warmupRounds = Array(warmupRounds.prefix(12))
+        self.createdAt = createdAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, ownerID, clubID, seasonID, title, format, groupSize
+        case qualifiersPerGroup, participants, warmupRounds, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        id = try values.decode(UUID.self, forKey: .id)
+        ownerID = try values.decode(UUID.self, forKey: .ownerID)
+        clubID = try values.decodeIfPresent(UUID.self, forKey: .clubID)
+        seasonID = clubID == nil ? nil :
+            try values.decodeIfPresent(UUID.self, forKey: .seasonID)
+        title = try values.decode(String.self, forKey: .title)
+        format = try values.decode(ATHLTHTournamentFormat.self, forKey: .format)
+        groupSize = try values.decode(Int.self, forKey: .groupSize)
+        qualifiersPerGroup = try values.decode(Int.self, forKey: .qualifiersPerGroup)
+        participants = try values.decode([ATHLTHTournamentParticipant].self,
+                                          forKey: .participants)
+        warmupRounds = Array(try values.decodeIfPresent(
+            [ATHLTHTournamentWarmupRound].self, forKey: .warmupRounds
+        )?.prefix(12) ?? [])
+        createdAt = try values.decode(Date.self, forKey: .createdAt)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var values = encoder.container(keyedBy: CodingKeys.self)
+        try values.encode(id, forKey: .id)
+        try values.encode(ownerID, forKey: .ownerID)
+        try values.encodeIfPresent(clubID, forKey: .clubID)
+        try values.encodeIfPresent(seasonID, forKey: .seasonID)
+        try values.encode(title, forKey: .title)
+        try values.encode(format, forKey: .format)
+        try values.encode(groupSize, forKey: .groupSize)
+        try values.encode(qualifiersPerGroup, forKey: .qualifiersPerGroup)
+        try values.encode(participants, forKey: .participants)
+        try values.encode(warmupRounds, forKey: .warmupRounds)
+        try values.encode(createdAt, forKey: .createdAt)
+    }
 }
 
 struct ATHLTHTournamentParticipant: Identifiable, Codable, Hashable {
