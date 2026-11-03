@@ -717,7 +717,7 @@ struct TrainTogetherCreatorLobbyView: View {
                 .buttonStyle(.borderedProminent)
                 .tint(ATHLTHTrainTogetherDesign.accent)
                 .disabled(
-                    isStarting ||
+                    isStarting || isMarkingReady ||
                     !everyoneReady ||
                     session?.invitePayload?.startIndependently == true
                 )
@@ -737,7 +737,7 @@ struct TrainTogetherCreatorLobbyView: View {
                     .frame(maxWidth: .infinity, minHeight: 38)
                 }
                 .buttonStyle(.plain)
-                .disabled(isStarting || session?.invitePayload == nil)
+                .disabled(isStarting || isMarkingReady || session?.invitePayload == nil)
 
                 if let startError {
                     Text(startError)
