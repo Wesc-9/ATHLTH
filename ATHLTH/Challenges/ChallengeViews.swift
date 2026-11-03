@@ -3225,6 +3225,21 @@ struct ChallengeCreationView: View {
             }
             .buttonStyle(.plain)
 
+            if runningFocus == .intervals,
+               let template = selectedRunningTemplate,
+               runningComparison == .mostWorkDistance &&
+               !ATHLTHChallengeIntervalPolicy.hasFixedWorkDuration(template) {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Choose an interval session with time-based work blocks. Distance-based intervals cannot be ranked by distance.",
+                        norwegian: "Velg en intervalløkt med tidsbestemte arbeidsdrag. Distansebaserte drag kan ikke rangeres på lengst distanse."
+                    ),
+                    systemImage: "exclamationmark.triangle"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+            }
+
             if runningFocus == .hills {
                 Stepper(
                     value: $runningMinimumRepetitions, in: 1...20
@@ -4593,6 +4608,13 @@ struct ChallengeCreationView: View {
         case .running, .walking:
             if sport == .running && runningFocus != .standard {
                 guard let template = selectedRunningTemplate else { return false }
+                if runningFocus == .intervals {
+                    let isCustomRepeatChallenge =
+                        runningComparison == .completedRepeats &&
+                        template.type == .custom && !template.isBuiltIn
+                    guard ATHLTHChallengeIntervalPolicy.hasFixedWorkDuration(template) ||
+                          isCustomRepeatChallenge else { return false }
+                }
                 let availableRepetitions = template.blocks.reduce(0) { total, block in
                     total + (block.kind == .work ? max(1, block.repetitions) : 0)
                 }
