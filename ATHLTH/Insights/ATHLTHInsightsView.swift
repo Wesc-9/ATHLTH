@@ -141,7 +141,7 @@ struct ATHLTHInsightsView: View {
     private var overviewSection: some View {
         Group {
             readinessOverviewCard
-            ATHLTHInsightsVitalContextCard(snapshot: recoverySnapshot)
+            ATHLTHInsightsDailyRhythmCard()
             ATHLTHInsightsSleepStagesCard()
             personalInsightsHighlights
             ATHLTHInsightsHealthLibraryEntry()
