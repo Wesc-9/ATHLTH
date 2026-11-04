@@ -805,7 +805,7 @@ struct StrengthAIExercisePlannerView: View {
                         .borderedProminent
                     )
                     .tint(
-                        ATHLTHTheme.vitality
+                        ATHLTHTheme.accentDeep
                     )
                     .disabled(
                         resolvedSuggestions
@@ -937,7 +937,7 @@ struct StrengthAIExercisePlannerView: View {
                         ATHLTHTheme
                             .accentDeep,
                         ATHLTHTheme
-                            .vitality
+                            .premiumGold
                     ],
                     startPoint:
                         .leading,
