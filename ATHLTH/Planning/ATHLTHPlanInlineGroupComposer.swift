@@ -85,6 +85,18 @@ struct ATHLTHPlanInlineGroupComposer: View {
                     }
                     .buttonStyle(.plain)
                 }
+                Stepper(
+                    tr("Rest between rounds", "Pause mellom runder") +
+                        ": \(recoverySeconds) " + tr("sec", "sek"),
+                    value: $recoverySeconds, in: 0...300, step: 15
+                )
+                .font(.subheadline)
+                Text(tr(
+                    "The number of rounds applies to both exercises. Edit individual sets after adding.",
+                    "Antall runder gjelder begge øvelsene. Enkeltsett kan redigeres etterpå."
+                ))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
             } else {
                 Stepper(
                     tr("Effort", "Drag") + ": \(workSeconds) " + tr("sec", "sek"),
