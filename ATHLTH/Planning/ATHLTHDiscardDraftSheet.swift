@@ -13,13 +13,13 @@ struct ATHLTHDiscardDraftSheet: View {
             switch self {
             case .workout:
                 return ATHLTHLocalization.choose(
-                    english: "Leave this workout?",
-                    norwegian: "Avslutte treningsøkten?"
+                    english: "Leave workout planning?",
+                    norwegian: "Avslutte øktplanleggingen?"
                 )
             case .trainingPlan:
                 return ATHLTHLocalization.choose(
-                    english: "Leave this training plan?",
-                    norwegian: "Avslutte treningsplanen?"
+                    english: "Leave plan creation?",
+                    norwegian: "Avslutte planleggingen?"
                 )
             case .savedTrainingPlanDraft:
                 return ATHLTHLocalization.choose(
