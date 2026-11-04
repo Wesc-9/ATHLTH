@@ -4,6 +4,30 @@ import Foundation
 /// Do not discard a real draft because ephemeral step IDs, source recipes or
 /// the plan's optimistic-lock version change while the app is not running.
 enum ATHLTHWorkoutDraftRecoveryPolicy {
+    /// "Start from scratch" is an explicit new-workout action, not a request
+    /// to edit a previously cached draft. A chosen activity is only metadata;
+    /// ignore any implicit activity seed and start with no timeline sections.
+    /// Imported/saved workouts and focused edits must retain their content.
+    static func beginsNewStandaloneScratch(
+        initialTitle: String,
+        selectedActivity: ATHLTHPlannedWorkoutType?,
+        createsStandalone: Bool,
+        sourceTemplateID: UUID?,
+        initialRouteID: UUID?,
+        focusedBlockIndex: Int?,
+        focusedExecutionStepIndex: Int?,
+        opensFocusedEditor: Bool
+    ) -> Bool {
+        createsStandalone &&
+            selectedActivity != nil &&
+            initialTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            sourceTemplateID == nil &&
+            initialRouteID == nil &&
+            focusedBlockIndex == nil &&
+            focusedExecutionStepIndex == nil &&
+            !opensFocusedEditor
+    }
+
     static func accepts(
         storedSignature: String,
         currentSignature: String,
