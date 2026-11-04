@@ -14315,9 +14315,9 @@ struct ATHLTHProfileView: View {
         }
     }
 
-    // The four slots use the real premium trophy artwork at a readable
-    // size, with identical badge dimensions for empty and filled positions.
-    private let profileTrophyBadgeSize: CGFloat = 68
+    // Compact profile shelf: full medal artwork remains available in
+    // the collection, while the four preview badges need less vertical room.
+    private let profileTrophyBadgeSize: CGFloat = 52
 
     private var trophyCabinetSection: some View {
         profileSection(
@@ -14332,7 +14332,7 @@ struct ATHLTHProfileView: View {
             ),
             destination: AnyView(TrophyCollectionView(startInCabinet: true))
         ) {
-            HStack(alignment: .top, spacing: 6) {
+            HStack(alignment: .top, spacing: 9) {
                 ForEach(0..<TrophyStore.showcaseLimit, id: \.self) { index in
                     if profileTrophySlots.indices.contains(index) {
                         let trophy = profileTrophySlots[index]
@@ -14342,7 +14342,7 @@ struct ATHLTHProfileView: View {
                                 replacingTrophyID: trophy.id
                             )
                         } label: {
-                            VStack(spacing: 5) {
+                            VStack(spacing: 3) {
                                 ATHLTHTrophyCoreView(
                                     trophy: trophy,
                                     size: profileTrophyBadgeSize
@@ -14353,47 +14353,33 @@ struct ATHLTHProfileView: View {
                                 )
 
                                 Text(trophy.title)
-                                    .font(.system(size: 10, weight: .bold))
+                                    .font(.system(size: 10.5, weight: .semibold))
                                     .foregroundStyle(ATHLTHTheme.primaryText)
                                     .lineLimit(2)
                                     .minimumScaleFactor(0.80)
                                     .multilineTextAlignment(.center)
                                     .frame(
                                         maxWidth: .infinity,
-                                        minHeight: 26,
+                                        minHeight: 25,
                                         alignment: .top
                                     )
 
-                                if trophy.isComplete {
-                                    Text(trophy.stageLabel)
-                                        .font(.system(size: 8.5, weight: .medium))
-                                        .foregroundStyle(ATHLTHTheme.mutedText)
-                                        .lineLimit(1)
-                                        .minimumScaleFactor(0.80)
-                                } else if trophy.nextTargetValue != nil {
-                                    VStack(spacing: 3) {
-                                        Text("\(Int((trophy.progress * 100).rounded())) %")
-                                            .font(.system(size: 8.5, weight: .semibold))
-                                            .foregroundStyle(ATHLTHTheme.mutedText)
-                                        GeometryReader { geometry in
-                                            Capsule()
-                                                .fill(ATHLTHTheme.premiumGold.opacity(0.18))
-                                                .overlay(alignment: .leading) {
-                                                    Capsule()
-                                                        .fill(ATHLTHTheme.premiumGold)
-                                                        .frame(
-                                                            width: geometry.size.width * trophy.progress
-                                                        )
-                                                }
-                                        }
+                                // One concise footer instead of percentage + a
+                                // second progress row under every medal.
+                                if !trophy.isComplete, trophy.nextTargetValue != nil {
+                                    ProgressView(value: min(max(trophy.progress, 0), 1))
+                                        .tint(ATHLTHTheme.premiumGold)
                                         .frame(height: 4)
                                         .padding(.horizontal, 7)
-                                    }
+                                        .accessibilityLabel(
+                                            "\(Int((trophy.progress * 100).rounded()))%"
+                                        )
                                 } else {
                                     Text(trophy.stageLabel)
-                                        .font(.system(size: 8.5, weight: .medium))
+                                        .font(.system(size: 8, weight: .medium))
                                         .foregroundStyle(ATHLTHTheme.mutedText)
                                         .lineLimit(1)
+                                        .minimumScaleFactor(0.8)
                                 }
                             }
                             .frame(maxWidth: .infinity, alignment: .top)
@@ -14405,7 +14391,7 @@ struct ATHLTHProfileView: View {
                         NavigationLink {
                             TrophyCollectionView(startInCabinet: true)
                         } label: {
-                            VStack(spacing: 5) {
+                            VStack(spacing: 3) {
                                 ZStack {
                                     ATHLTHTrophyPlateShape()
                                         .fill(
@@ -14449,7 +14435,7 @@ struct ATHLTHProfileView: View {
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                                 .frame(
                                     maxWidth: .infinity,
-                                    minHeight: 26,
+                                    minHeight: 25,
                                     alignment: .top
                                 )
                             }
@@ -14488,9 +14474,14 @@ struct ATHLTHProfileView: View {
                     )
                 )
         ) {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 8) {
-                    ForEach(
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 9),
+                    GridItem(.flexible(), spacing: 9)
+                ],
+                spacing: 9
+            ) {
+                ForEach(
                     0..<ProfileFeaturedRecordKind
                         .showcaseLimit,
                     id: \.self
@@ -14520,8 +14511,6 @@ struct ATHLTHProfileView: View {
                         .buttonStyle(.plain)
                     }
                 }
-                }
-
             }
         }
     }
