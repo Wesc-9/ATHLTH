@@ -55,6 +55,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 .buttonStyle(.plain)
                 .foregroundStyle(gold)
             }
+            if !isRestDay { quickActions }
             if let composingGroup, !isRestDay {
                 ATHLTHPlanInlineGroupComposer(
                     groupKind: composingGroup,
@@ -65,7 +66,6 @@ struct ATHLTHAdvancedGuidedDayView: View {
                     onCancel: { self.composingGroup = nil }
                 )
             }
-            if !isRestDay { quickActions }
         }
         .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
         .onChange(of: date) { _, _ in
