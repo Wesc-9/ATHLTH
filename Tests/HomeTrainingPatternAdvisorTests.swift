@@ -62,6 +62,35 @@ final class HomeTrainingPatternAdvisorTests: XCTestCase {
         )
     }
 
+
+    func testExtendedRunningGapHasShortCardCopyAndDetailedExplanation() {
+        let history = snapshot(
+            events: [5, 7, 9, 11, 13, 15]
+                .map { event(.running, daysAgo: $0) },
+            intervals: [.running: 2]
+        )
+
+        let selected = advice(history, readiness: .balanced)
+        XCTAssertEqual(selected.suggestedWorkout, .easyRun(minutes: 20))
+        XCTAssertEqual(
+            selected.shortDescription,
+            ATHLTHLocalization.choose(
+                english: "5 days since your last run. Ease back in.",
+                norwegian: "5 dager siden siste løpetur. Start rolig igjen."
+            )
+        )
+        XCTAssertTrue(selected.dayDescription.contains("5"))
+        XCTAssertGreaterThan(
+            selected.dayDescription.count,
+            selected.shortDescription.count,
+            "The information sheet should keep the full rationale."
+        )
+        XCTAssertNotNil(
+            selected.evidence,
+            "Training evidence remains available in the advice model."
+        )
+    }
+
     func testRegularRunnerKeepsRunningInsteadOfGettingWalkRecommendations() {
         let history = snapshot(
             events: [1, 2, 3, 5, 7, 9, 11, 14, 17, 19, 22, 25, 28,
