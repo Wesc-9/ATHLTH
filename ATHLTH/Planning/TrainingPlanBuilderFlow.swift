@@ -198,6 +198,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var showingPlanDesignLab = false
     @State private var isHydratingPlanDraft = false
     @State private var completedPlanCreation = false
+    @State private var showingPlanExitSheet = false
+    @State private var planDiscardError: String?
+    @State private var deliberatelyDiscardedPlanDraft = false
 
     private let draftStore = ATHLTHPlanCreationDraftStore()
 
@@ -574,9 +577,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             startDate = Calendar.current.startOfDay(for: .now)
         }
         .onDisappear {
-            // Persist the actual last visible wizard stage even if the
-            // athlete closes the sheet without changing another field.
-            saveResumableDraft()
+            // A confirmed discard must never be recreated by onDisappear.
+            if !deliberatelyDiscardedPlanDraft {
+                saveResumableDraft()
+            }
             // A normal dismissal exits the editing session, while locking
             // the phone leaves it recoverable after an OS process eviction.
             if scenePhase == .active {
@@ -700,6 +704,39 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
 
     private var planPresentations: some View {
         AnyView(planSecondaryObservers)
+        .sheet(isPresented: $showingPlanExitSheet) {
+            ATHLTHDiscardDraftSheet(
+                kind: .trainingPlan,
+                onKeepEditing: {
+                    showingPlanExitSheet = false
+                    planDiscardError = nil
+                },
+                onSaveDraftAndClose: {
+                    saveResumableDraft()
+                    draftStore.setEditing(
+                        false, userID: session.profile.userID, draftID: draftID
+                    )
+                    showingPlanExitSheet = false
+                    dismiss()
+                },
+                onDiscard: {
+                    if draftStore.deleteDraft(
+                        userID: session.profile.userID, draftID: draftID
+                    ) {
+                        deliberatelyDiscardedPlanDraft = true
+                        planDiscardError = nil
+                        showingPlanExitSheet = false
+                        dismiss()
+                    } else {
+                        planDiscardError = ATHLTHLocalization.choose(
+                            english: "The draft could not be deleted. Try again.",
+                            norwegian: "Utkastet kunne ikke slettes. Prøv på nytt."
+                        )
+                    }
+                },
+                errorMessage: planDiscardError
+            )
+        }
         .alert(
             ATHLTHLocalization.choose(
                 english: "Could not create plan",
@@ -1129,7 +1166,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     step = .basics
                 }
             },
-            onCancel: { dismiss() }
+            onCancel: { requestClosePlanCreation() }
         )
     }
 
@@ -1300,7 +1337,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         VStack(spacing: 13) {
             HStack(spacing: 8) {
                 Button {
-                    dismiss()
+                    requestClosePlanCreation()
                 } label: {
                     Text(ATHLTHLocalization.choose(
                         english: "Cancel", norwegian: "Avbryt"
@@ -1631,7 +1668,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         VStack(spacing: step == .mode ? 12 : 22) {
             HStack(spacing: 8) {
                 Button {
-                    if step == .mode { dismiss() } else { goBackInPlanBuilder() }
+                    if step == .mode { requestClosePlanCreation() }
+                    else { goBackInPlanBuilder() }
                 } label: {
                     Text(
                         step == .mode
@@ -7022,6 +7060,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     private func saveResumableDraft() {
         guard didApplySuggestedStartDate,
               !completedPlanCreation,
+              !deliberatelyDiscardedPlanDraft,
               !isHydratingPlanDraft else {
             return
         }
@@ -7074,6 +7113,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         draftStore.save(draft, userID: session.profile.userID, draftID: draftID)
     }
 
+    private func requestClosePlanCreation() {
+        if completedPlanCreation {
+            dismiss()
+            return
+        }
+        // An untouched entry screen with no checkpoint needs no warning.
+        if step == .mode && draftStore.load(
+            userID: session.profile.userID, draftID: draftID
+        ) == nil {
+            dismiss()
+            return
+        }
+        planDiscardError = nil
+        showingPlanExitSheet = true
+    }
+
     private func goForward() {
         guard let next = ATHLTHPlanJourney.next(
             after: step, advanced: mode == .advanced
@@ -7111,7 +7166,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         guard let previous = ATHLTHPlanJourney.previous(
             before: step, advanced: mode == .advanced
         ) else {
-            dismiss()
+            requestClosePlanCreation()
             return
         }
         withAnimation(.easeInOut(duration: 0.18)) {
