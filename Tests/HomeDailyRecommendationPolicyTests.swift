@@ -250,7 +250,7 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
             hasWorkoutToday: false,
             trainingLoadRatio: 0.58,
             trainingHistory: trainingHistory(
-                runs: 4, lastRunDaysAgo: 3, averageMinutes: 36
+                runs: 4, lastRunDaysAgo: 2, averageMinutes: 36
             )
         )
         XCTAssertEqual(advice.suggestedWorkout, .tempoRun(minutes: 35))
