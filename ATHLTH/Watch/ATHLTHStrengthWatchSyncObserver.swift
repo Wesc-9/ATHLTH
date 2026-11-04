@@ -1,5 +1,25 @@
 import SwiftUI
 
+/// Explicit Watch actions remain available even when the iPhone owns
+/// resistance, repetitions and timing settings. This permission boundary
+/// must not allow Watch-originated edits to the athlete's prescribed values.
+enum ATHLTHStrengthWatchControlPolicy {
+    static func permits(
+        _ command: WatchStrengthCommandKind,
+        whenIPhoneControls: Bool
+    ) -> Bool {
+        guard whenIPhoneControls else { return true }
+        switch command {
+        case .completeSet, .skipRest, .skipRestAndStartTimedSet,
+             .startTimedSet, .nextExercise:
+            return true
+        case .updateDraft, .completeSetWithoutDetails, .addRest,
+             .pauseTimedSet, .resetTimedSet, .requestSnapshot:
+            return false
+        }
+    }
+}
+
 /// Keeps the high-frequency strength <-> Apple Watch synchronization out of
 /// AppRootView so reps/weight/rest edits do not invalidate the entire app
 /// hierarchy.
@@ -141,20 +161,13 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             return true
         }
 
-        if workout.advancedConfiguration?.inputMode == .iPhone {
-            // iPhone still owns targets, pace and load. Explicit Watch
-            // completion / next-set actions are nevertheless allowed.
-            // Reject Watch draft edits, pauses and timer resets.
-            let permittedFromWatch =
-                command.kind == .completeSet ||
-                command.kind == .skipRest ||
-                command.kind == .skipRestAndStartTimedSet ||
-                command.kind == .startTimedSet ||
-                command.kind == .nextExercise
-            guard permittedFromWatch else {
-                sendSnapshotNow()
-                return true
-            }
+        if !ATHLTHStrengthWatchControlPolicy.permits(
+            command.kind,
+            whenIPhoneControls:
+                workout.advancedConfiguration?.inputMode == .iPhone
+        ) {
+            sendSnapshotNow()
+            return true
         }
 
         if let workoutID = command.workoutID,
