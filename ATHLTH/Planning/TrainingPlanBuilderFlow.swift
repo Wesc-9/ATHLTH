@@ -118,6 +118,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     }
     @State private var guidedDayCursor = 0
     @State private var firstGuidedWeekDecisionMade = false
+    /// Index of the completed week awaiting a repeat/continue decision.
+    /// Nil while the athlete is freely navigating already-planned days.
+    @State private var guidedWeekAwaitingDecision: Int?
     @State private var repeatWeekCount = 1
     @State private var selectingLibraryDay: WeekDayEditorSelection?
     @State private var pendingLibraryDay: WeekDayEditorSelection?
@@ -624,6 +627,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             saveResumableDraft()
         }
         .onChange(of: firstGuidedWeekDecisionMade) { _, _ in saveResumableDraft() }
+        .onChange(of: guidedWeekAwaitingDecision) { _, _ in saveResumableDraft() }
     }
 
     private var planSecondaryObservers: some View {
@@ -633,6 +637,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             weekDayEdits = weekDayEdits.filter { $0.key <= value * 7 }
             guidedDayCursor = min(guidedDayCursor, value * 7)
             repeatWeekCount = min(repeatWeekCount, max(1, value - 1))
+            if let pending = guidedWeekAwaitingDecision, pending >= value - 1 {
+                guidedWeekAwaitingDecision = nil
+            }
         }
         .onChange(of: selectedDays) { _, _ in
             // Simple and Advanced share the chosen weekdays. Do not erase
@@ -3733,8 +3740,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
                 }
-            } else if guidedDayCursor == 7 && !firstGuidedWeekDecisionMade {
-                guidedFirstWeekDecision
+            } else if let finishedWeek = guidedWeekDecisionSource {
+                guidedCompletedWeekDecision(sourceWeek: finishedWeek)
             } else {
                 guidedCurrentDayCard
             }
@@ -4348,27 +4355,53 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
-    private var guidedFirstWeekDecision: some View {
-        VStack(alignment: .leading, spacing: 15) {
+    private var guidedWeekDecisionSource: Int? {
+        if let pending = guidedWeekAwaitingDecision, pending < weekCount - 1 {
+            return pending
+        }
+        // A pre-2.1.2 saved draft could already be at the first-week decision.
+        if guidedDayCursor == 7 && !firstGuidedWeekDecisionMade && weekCount > 1 {
+            return 0
+        }
+        return nil
+    }
+
+    private func guidedCompletedWeekDecision(sourceWeek: Int) -> some View {
+        let remaining = max(0, weekCount - sourceWeek - 1)
+        let trainingDays = (1...7).filter { day in
+            let edit = weekDayEdits[weekDayKey(day, weekIndex: sourceWeek)]
+            return edit?.isRestDay != true && edit?.detailedWorkout?.isValid == true
+        }.count
+        let workouts = (1...7).reduce(0) { total, day in
+            guard let edit = weekDayEdits[weekDayKey(day, weekIndex: sourceWeek)],
+                  edit.isRestDay != true, edit.detailedWorkout?.isValid == true else {
+                return total
+            }
+            return total + 1 + (edit.additionalDetailedWorkouts?.count ?? 0)
+        }
+        return VStack(alignment: .leading, spacing: 15) {
             stepIntro(
-                eyebrow: ATHLTHLocalization.choose(english: "WEEK 1 COMPLETE", norwegian: "UKE 1 ER FERDIG"),
-                title: ATHLTHLocalization.choose(english: "How will you plan the rest?", norwegian: "Hvordan planlegger vi resten?"),
+                eyebrow: ATHLTHLocalization.choose(
+                    english: "WEEK \(sourceWeek + 1) COMPLETE",
+                    norwegian: "UKE \(sourceWeek + 1) ER FERDIG"),
+                title: ATHLTHLocalization.choose(
+                    english: "How will you plan the rest?",
+                    norwegian: "Hvordan planlegger vi resten?"),
                 subtitle: ATHLTHLocalization.choose(
-                    english: "Reuse the workouts you built, or customize every following day.",
-                    norwegian: "Gjenbruk øktene du har laget, eller tilpass hver dag i ukene fremover."
-                ),
+                    english: "Copy this week's workouts to the remaining weeks, or continue date by date.",
+                    norwegian: "Kopier ukens økter videre, eller fortsett dag for dag."),
                 icon: "checkmark.seal"
             )
             builderPanel {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("\(firstWeekWorkoutCount) " +
-                         ATHLTHLocalization.choose(english: "workouts", norwegian: "økter") +
-                         " · \(7 - firstWeekTrainingDayCount) " +
-                         ATHLTHLocalization.choose(english: "rest days", norwegian: "hviledager"))
+                    Text("\(workouts) " + ATHLTHLocalization.choose(
+                        english: "workouts", norwegian: "økter") +
+                        " · \(7 - trainingDays) " + ATHLTHLocalization.choose(
+                            english: "rest days", norwegian: "hviledager"))
                         .font(.headline)
                     Text(ATHLTHLocalization.choose(
-                        english: "Copies are independent. Changing a date later will not change your original week.",
-                        norwegian: "Hver uke kan redigeres separat etter kopiering."
+                        english: "Copies are independent; dates you have already planned remain unchanged.",
+                        norwegian: "Uker kan redigeres hver for seg. Dager du allerede har fylt ut, beholdes."
                     ))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -4376,68 +4409,76 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             ATHLTHPlanWeekApproachCard(
                 icon: "rectangle.on.rectangle",
-                title: ATHLTHLocalization.choose(english: "Copy to all remaining weeks", norwegian: "Kopier til alle resterende uker"),
+                title: ATHLTHLocalization.choose(
+                    english: "Copy to all remaining weeks",
+                    norwegian: "Kopier til alle resterende uker"),
                 subtitle: ATHLTHLocalization.choose(
-                    english: "Use week one as the starting point throughout the plan.",
-                    norwegian: "Bruk uke én som utgangspunkt for hele perioden."
-                )
+                    english: "Use this week as the starting point for the rest of the plan.",
+                    norwegian: "Bruk denne uken som utgangspunkt for resten av planen.")
             ) {
-                copyFirstGuidedWeek(toCount: weekCount - 1)
+                completeGuidedWeekDecision(sourceWeek: sourceWeek, copies: remaining)
             }
-            builderPanel {
-                VStack(alignment: .leading, spacing: 12) {
-                    Text(ATHLTHLocalization.choose(english: "Copy to selected weeks", norwegian: "Kopier til et antall uker"))
+            if remaining > 1 {
+                builderPanel {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Copy to a chosen number of weeks",
+                            norwegian: "Kopier til et antall uker"
+                        ))
                         .font(.subheadline.weight(.semibold))
-                    Stepper(
-                        "\(repeatWeekCount) " + ATHLTHLocalization.choose(english: "weeks", norwegian: "uker"),
-                        value: $repeatWeekCount, in: 1...max(1, weekCount - 1)
-                    )
-                    Button(ATHLTHLocalization.choose(english: "Copy and continue", norwegian: "Kopier og fortsett")) {
-                        copyFirstGuidedWeek(toCount: repeatWeekCount)
+                        Stepper(
+                            "\(min(repeatWeekCount, remaining)) " +
+                                ATHLTHLocalization.choose(english: "weeks", norwegian: "uker"),
+                            value: $repeatWeekCount, in: 1...remaining
+                        )
+                        Button(ATHLTHLocalization.choose(
+                            english: "Copy and continue", norwegian: "Kopier og fortsett"
+                        )) {
+                            completeGuidedWeekDecision(
+                                sourceWeek: sourceWeek,
+                                copies: min(repeatWeekCount, remaining)
+                            )
+                        }
+                        .font(.subheadline.weight(.semibold))
                     }
-                    .font(.subheadline.weight(.semibold))
                 }
             }
             ATHLTHPlanWeekApproachCard(
                 icon: "arrow.right",
-                title: ATHLTHLocalization.choose(english: "Continue day by day", norwegian: "Fortsett dag for dag"),
+                title: ATHLTHLocalization.choose(
+                    english: "Continue day by day", norwegian: "Fortsett dag for dag"),
                 subtitle: ATHLTHLocalization.choose(
-                    english: "Start building week two without copying.",
-                    norwegian: "Begynn på uke to uten å kopiere noe."
-                )
+                    english: "Move to the next week without copying.",
+                    norwegian: "Gå til neste uke uten å kopiere noe.")
             ) {
-                firstGuidedWeekDecisionMade = true
-                selectedPlanWeekIndex = 1
+                completeGuidedWeekDecision(sourceWeek: sourceWeek, copies: 0)
             }
             ATHLTHPlanWeekApproachCard(
                 icon: "calendar",
-                title: ATHLTHLocalization.choose(english: "Plan freely in week view", norwegian: "Planlegg fritt i ukeoversikten"),
+                title: ATHLTHLocalization.choose(
+                    english: "Switch to week overview", norwegian: "Bytt til ukeoversikt"),
                 subtitle: ATHLTHLocalization.choose(
-                    english: "Keep the first week and switch to the calendar overview.",
-                    norwegian: "Behold første uke og fortsett i kalenderen."
-                )
+                    english: "Keep this week's work and continue in the calendar.",
+                    norwegian: "Behold ukens økter og fortsett i ukeoversikten.")
             ) {
-                firstGuidedWeekDecisionMade = true
-                selectedPlanWeekIndex = 1
-                weekPlanningApproach = .quick
+                completeGuidedWeekDecision(sourceWeek: sourceWeek, copies: 0)
+                selectBuildMethod(.weekByWeek)
             }
         }
     }
 
-    private var firstWeekTrainingDayCount: Int {
-        (1...7).filter {
-            let edit = weekDayEdits[weekDayKey($0, weekIndex: 0)]
-            return edit?.isRestDay != true && edit?.detailedWorkout?.isValid == true
-        }.count
-    }
-
-    private var firstWeekWorkoutCount: Int {
-        (1...7).reduce(0) { total, day in
-            guard let edit = weekDayEdits[weekDayKey(day, weekIndex: 0)],
-                  edit.isRestDay != true,
-                  edit.detailedWorkout?.isValid == true else { return total }
-            return total + 1 + (edit.additionalDetailedWorkouts?.count ?? 0)
+    private func completeGuidedWeekDecision(sourceWeek: Int, copies: Int) {
+        if copies > 0 {
+            weekDayEdits = ATHLTHGuidedPlanAutofill.copy(
+                from: sourceWeek, into: weekDayEdits,
+                numberOfWeeks: copies, totalWeeks: weekCount
+            )
         }
+        if sourceWeek == 0 { firstGuidedWeekDecisionMade = true }
+        guidedWeekAwaitingDecision = nil
+        guidedDayCursor = min((sourceWeek + 1 + max(0, copies)) * 7, weekCount * 7)
+        selectedPlanWeekIndex = guidedCurrentWeek
+        saveResumableDraft()
     }
 
     private func advanceGuidedDay() {
@@ -4445,9 +4486,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
               ATHLTHGuidedPlanDayPolicy.isPlanned(
                 weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)]
               ) else { return }
+        let finishedWeek = guidedCurrentWeek
         guidedDayCursor += 1
         if guidedDayCursor == 7 {
-            // A manually built plan only uses the days actually chosen in week one.
             let days = Set((1...7).filter {
                 let edit = weekDayEdits[weekDayKey($0, weekIndex: 0)]
                 return edit?.isRestDay != true && edit?.detailedWorkout?.isValid == true
@@ -4458,21 +4499,17 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             if weekCount == 1 { firstGuidedWeekDecisionMade = true }
         }
-    }
-
-    private func copyFirstGuidedWeek(toCount count: Int) {
-        guard count > 0 else { return }
-        for week in 1...min(count, weekCount - 1) {
-            for day in 1...7 {
-                let destination = weekDayKey(day, weekIndex: week)
-                guard weekDayEdits[destination] == nil,
-                      let source = weekDayEdits[weekDayKey(day, weekIndex: 0)] else { continue }
-                weekDayEdits[destination] = source
+        // A weekly choice appears after completing any week, but never
+        // after the last week or where the upcoming week is already filled.
+        if guidedDayCursor % 7 == 0, guidedDayCursor < weekCount * 7 {
+            let nextWeek = guidedDayCursor / 7
+            let hasUnplannedDay = (1...7).contains { weekday in
+                !ATHLTHGuidedPlanDayPolicy.isPlanned(
+                    weekDayEdits[weekDayKey(weekday, weekIndex: nextWeek)]
+                )
             }
+            if hasUnplannedDay { guidedWeekAwaitingDecision = finishedWeek }
         }
-        firstGuidedWeekDecisionMade = true
-        guidedDayCursor = min((count + 1) * 7, weekCount * 7)
-        selectedPlanWeekIndex = min(guidedCurrentWeek, weekCount - 1)
     }
 
     private func quickDaySeed(_ option: QuickDayOption) -> [WorkoutTemplateBlock] {
@@ -6833,7 +6870,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     Button {
                         if step == .week && mode == .advanced &&
                            weekPlanningApproach == .guided && guidedDayCursor > 0 {
-                            guidedDayCursor -= 1
+                            if let pending = guidedWeekDecisionSource {
+                                guidedWeekAwaitingDecision = nil
+                                guidedDayCursor = pending * 7 + 6
+                            } else {
+                                guidedDayCursor -= 1
+                            }
                         } else {
                             goBack()
                         }
@@ -6997,7 +7039,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             if guidedDayCursor >= weekCount * 7 {
                 return !guidedChosenDays.isEmpty
             }
-            if guidedDayCursor == 7 && !firstGuidedWeekDecisionMade { return false }
+            if guidedWeekDecisionSource != nil { return false }
             return ATHLTHGuidedPlanDayPolicy.isPlanned(
                 weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)]
             )
@@ -7139,6 +7181,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         )
         guidedDayCursor = min(max(0, draft.guidedDayCursor ?? 0), weekCount * 7)
         firstGuidedWeekDecisionMade = draft.firstGuidedWeekDecisionMade ?? false
+        guidedWeekAwaitingDecision = draft.guidedWeekAwaitingDecision
         selectedPlanWeekIndex = min(max(0, draft.selectedPlanWeekIndex ?? 0), weekCount - 1)
         simpleMinutes = draft.simpleMinutes ?? simpleMinutes
         if let kinds = draft.simpleActivityKinds {
@@ -7195,6 +7238,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             planningApproach: weekPlanningApproach?.rawValue,
             guidedDayCursor: guidedDayCursor,
             firstGuidedWeekDecisionMade: firstGuidedWeekDecisionMade,
+            guidedWeekAwaitingDecision: guidedWeekAwaitingDecision,
             selectedPlanWeekIndex: selectedPlanWeekIndex,
             editorDay: mode == .advanced
                 ? (advancedAddDestination?.day ?? composingAdvancedDay?.id ??
