@@ -4,7 +4,7 @@ import SwiftUI
 /// and training-plan drafts. Never calls a destructive action when dismissed
 /// interactively: swipe-down means "keep editing" on the underlying screen.
 struct ATHLTHDiscardDraftSheet: View {
-    enum Kind {
+    enum Kind: Equatable {
         case workout
         case trainingPlan
         case savedTrainingPlanDraft
@@ -108,7 +108,6 @@ struct ATHLTHDiscardDraftSheet: View {
                         .font(.footnote)
                         .foregroundStyle(Color.red)
                         .multilineTextAlignment(.center)
-
                 }
 
                 VStack(spacing: 9) {
