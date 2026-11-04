@@ -291,6 +291,11 @@ struct ATHLTHiPadStudioRootView: View {
                 onStartQuick: {
                     trainRequest = .customQuick
                     showingTrain = true
+                },
+                onPlanningFocusChanged: { isFocused in
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        sidebarVisibility = isFocused ? .detailOnly : .all
+                    }
                 }
             )
         case .planner:
