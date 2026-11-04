@@ -23,7 +23,7 @@ print(jwt.encode(
 PY
   )"
 
-  for id_var in TEMP_PROFILE_MAIN_ID TEMP_PROFILE_WIDGET_ID TEMP_PROFILE_WATCH_ID; do
+  for id_var in TEMP_PROFILE_MAIN_ID TEMP_PROFILE_WIDGET_ID TEMP_PROFILE_WATCH_ID TEMP_PROFILE_WATCH_WIDGET_ID; do
     resource_id="${!id_var:-}"
     if [ -n "$resource_id" ]; then
       curl --silent --show-error --request DELETE \
