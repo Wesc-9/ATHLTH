@@ -17,6 +17,7 @@ struct ATHLTHStudioPlanCanvasView: View {
     @State private var newPlanStart = Date.now
     @State private var newPlanWeeks = 4
     @State private var showingAdvancedBuilder = false
+    @State private var showingPlanMetadata = false
     @State private var showingWorkoutFlow = false
     @State private var workoutNavigation: ATHLTHTrainNavigationRequest? = .plan
     @State private var dropMode: DropMode = .move
@@ -75,6 +76,11 @@ struct ATHLTHStudioPlanCanvasView: View {
             selectedDayID = nil
             creatingPlan = false
         }
+        .sheet(isPresented: $showingPlanMetadata) {
+            if let plan = selectedPlan {
+                ATHLTHStudioPlanMetadataView(plan: plan)
+            }
+        }
         .sheet(isPresented: $showingAdvancedBuilder) {
             ATHLTHTrainingPlanBuilderFlow(
                 startsAtSourceChoice: true,
@@ -120,6 +126,8 @@ struct ATHLTHStudioPlanCanvasView: View {
     ) -> some View {
         let weekIndex = currentWeekIndex(in: plan)
         let week = plan.weeks[weekIndex]
+
+        if !week.days.isEmpty {
         let day = currentDay(in: week, weekIndex: weekIndex, plan: plan)
         let dayDate = ATHLTHStudioPlanWeekSummary.date(
             for: day, inWeekIndex: weekIndex, planStart: plan.startDate
@@ -171,6 +179,15 @@ struct ATHLTHStudioPlanCanvasView: View {
         }
         .padding(.horizontal, width >= 875 ? 17 : 12)
         .padding(.vertical, 13)
+        } else {
+            ContentUnavailableView(
+                ATHLTHLocalization.choose(
+                    english: "This week contains no days",
+                    norwegian: "Denne uken mangler dager"
+                ),
+                systemImage: "calendar.badge.exclamationmark"
+            )
+        }
     }
 
     private func planHeader(_ plan: TrainingPlan) -> some View {
@@ -220,6 +237,15 @@ struct ATHLTHStudioPlanCanvasView: View {
                 .pickerStyle(.menu)
                 .frame(maxWidth: 220)
             }
+
+            Button {
+                showingPlanMetadata = true
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Details", norwegian: "Detaljer"
+                ), systemImage: "slider.horizontal.3")
+            }
+            .buttonStyle(.bordered)
 
             Button {
                 newPlanStart = session.suggestedTrainingPlanStartDate
