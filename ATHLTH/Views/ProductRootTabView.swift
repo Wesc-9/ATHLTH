@@ -15,6 +15,7 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
     case customQuick
     case ghost
     case library
+    case personalLibrary(ATHLTHPersonalLibrarySection)
 
     var id: String {
         switch self {
@@ -32,6 +33,8 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
             return "ghost"
         case .library:
             return "library"
+        case let .personalLibrary(section):
+            return "personalLibrary:\(section.rawValue)"
         }
     }
 }
@@ -691,6 +694,22 @@ struct ProductRootTabView: View {
 
         case .trainingLibrary:
             trainNavigationRequest = .library
+            selectedTab = 1
+
+        case .myExercises:
+            trainNavigationRequest = .personalLibrary(.exercises)
+            selectedTab = 1
+
+        case .myRoutes:
+            trainNavigationRequest = .personalLibrary(.routes)
+            selectedTab = 1
+
+        case .myTrainingPlans:
+            trainNavigationRequest = .personalLibrary(.trainingPlans)
+            selectedTab = 1
+
+        case .myWorkouts:
+            trainNavigationRequest = .personalLibrary(.workouts)
             selectedTab = 1
 
         case .ghostRace:
@@ -5543,6 +5562,7 @@ struct ATHLTHTrainView: View {
         PlannedSession?
     @State private var showingGhostHub = false
     @State private var showingLibrary = false
+    @State private var personalLibrarySection: ATHLTHPersonalLibrarySection?
     @State private var showingTrainPlanWorkspace = false
     @State private var showingTrainAllPlans = false
     @State private var trainProgramCreationLaunch: TrainProgramCreationLaunch?
@@ -5612,6 +5632,21 @@ struct ATHLTHTrainView: View {
                     english: "Library", norwegian: "Bibliotek"
                 ))
                 .navigationBarTitleDisplayMode(.inline)
+            }
+            .navigationDestination(item: $personalLibrarySection) { section in
+                ATHLTHPersonalLibraryDestinationView(
+                    section: section,
+                    onStartRunning: { workout in
+                        pendingPlannedEnduranceWorkout = nil
+                        pendingRunningTemplate = workout
+                    },
+                    onOpenPlan: openPlanFromTrainingLibrary
+                )
+                .background(
+                    ATHLTHPremiumCanvas(
+                        accent: ATHLTHTheme.premiumGold.opacity(0.10)
+                    )
+                )
             }
             .navigationDestination(
                 isPresented: $showingGhostHub
@@ -10874,18 +10909,21 @@ struct ATHLTHTrainView: View {
         )
     }
 
+    private func openPlanFromTrainingLibrary(_ planID: UUID) {
+        highlightedTrainPlanID = planID
+        selectedTrainPlanWeekIndex = nil
+        selectedSection = .plan
+        showingLibrary = false
+        personalLibrarySection = nil
+    }
+
     private var libraryContent: some View {
         TrainingLibraryHomeView(
             onStartRunning: { workout in
                 pendingPlannedEnduranceWorkout = nil
                 pendingRunningTemplate = workout
             },
-            onOpenPlan: { planID in
-                highlightedTrainPlanID = planID
-                selectedTrainPlanWeekIndex = nil
-                selectedSection = .plan
-                showingLibrary = false
-            }
+            onOpenPlan: openPlanFromTrainingLibrary
         )
     }
 
@@ -11957,7 +11995,13 @@ struct ATHLTHTrainView: View {
 
         case .library:
             selectedSection = .today
+            personalLibrarySection = nil
             showingLibrary = true
+
+        case let .personalLibrary(section):
+            selectedSection = .today
+            showingLibrary = false
+            personalLibrarySection = section
         }
 
         navigationRequest = nil
