@@ -18,6 +18,7 @@ struct ATHLTHStudioDashboardView: View {
     let onOpenSettings: () -> Void
     let onOpenWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onStartQuick: () -> Void
+    let onPlanningFocusChanged: (Bool) -> Void
 
     @State private var periodDays = 28
     @State private var selectedWeekDate = Date.now
@@ -142,11 +143,18 @@ struct ATHLTHStudioDashboardView: View {
             }
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
+        .onChange(of: focusedPlanningDate) { _, newDate in
+            onPlanningFocusChanged(newDate != nil)
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, focusedPlanningDate == nil,
                abs(selectedWeekDate.timeIntervalSinceNow) < 86_400 {
                 selectedWeekDate = .now
             }
+        }
+        .onDisappear {
+            // Returning to Overview should restore regular navigation.
+            onPlanningFocusChanged(false)
         }
         .sheet(isPresented: $showingReadinessExplanation) {
             ATHLTHReadinessExplanationSheet(
