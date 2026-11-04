@@ -133,13 +133,14 @@ final class ATHLTHPlannedWorkoutTypePickerTests: XCTestCase {
         XCTAssertEqual(ATHLTHPlannedWorkoutType.from(cycling), .cycling)
     }
 
-    func testScratchQuickAddsUseExistingTimelineActions() {
-        XCTAssertEqual(ATHLTHPlannedWorkoutType.strength.scratchQuickAdd, "exercise")
-        XCTAssertEqual(ATHLTHPlannedWorkoutType.running.scratchQuickAdd, "running")
-        XCTAssertEqual(ATHLTHPlannedWorkoutType.walking.scratchQuickAdd, "walking")
-        XCTAssertEqual(ATHLTHPlannedWorkoutType.cycling.scratchQuickAdd, "cycling")
-        XCTAssertEqual(ATHLTHPlannedWorkoutType.mobility.scratchQuickAdd, "stretching")
-        XCTAssertNil(ATHLTHPlannedWorkoutType.custom.scratchQuickAdd)
+    func testStartingFromScratchNeverPreloadsAnyActivityBlocks() {
+        // Selecting Running (or any other activity) only determines its
+        // editor category. Warm-up, main set and steps remain empty until
+        // the athlete deliberately adds them.
+        for activity in ATHLTHPlannedWorkoutType.allCases {
+            XCTAssertNil(activity.scratchQuickAdd,
+                         "\(activity.rawValue) must open with an empty workout")
+        }
     }
 
 }
