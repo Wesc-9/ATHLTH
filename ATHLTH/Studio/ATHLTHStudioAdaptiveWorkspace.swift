@@ -1,5 +1,30 @@
 import SwiftUI
 
+/// Pure geometry rules make Stage Manager and split-view sizing testable
+/// without building an alternate set of workout editing views.
+enum ATHLTHStudioWorkspaceLayout {
+    static func planWidth(
+        totalWidth: CGFloat,
+        fraction: Double,
+        dragging: CGFloat = 0
+    ) -> CGFloat {
+        let available = max(0, totalWidth - 14)
+        let desired = available * CGFloat(fraction) + dragging
+        let maximum = max(275, available - 530)
+        return min(maximum, max(275, desired))
+    }
+
+    static func persistedFraction(
+        totalWidth: CGFloat,
+        currentFraction: Double,
+        dragDelta: CGFloat
+    ) -> Double {
+        guard totalWidth > 0 else { return currentFraction }
+        let next = currentFraction + Double(dragDelta / totalWidth)
+        return min(0.53, max(0.26, next))
+    }
+}
+
 /// One reusable iPad workspace shell around the *existing* training-plan and
 /// workout editors. It owns only presentation, not training or draft data.
 /// iPhone never instantiates this component.
@@ -78,10 +103,11 @@ struct ATHLTHStudioAdaptiveWorkspace<Plan: View, Editor: View, FocusRail: View>:
     }
 
     private func planWidth(for width: CGFloat) -> CGFloat {
-        let desired = width * CGFloat(savedPlanFraction) + dragTranslation
-        // Always reserve a usable editor, including under Stage Manager.
-        let maximum = max(275, width - 530)
-        return min(maximum, max(275, desired))
+        ATHLTHStudioWorkspaceLayout.planWidth(
+            totalWidth: width,
+            fraction: savedPlanFraction,
+            dragging: dragTranslation
+        )
     }
 
     private func resizeHandle(availableWidth: CGFloat) -> some View {
@@ -100,11 +126,12 @@ struct ATHLTHStudioAdaptiveWorkspace<Plan: View, Editor: View, FocusRail: View>:
                         state = value.translation.width
                     }
                     .onEnded { value in
-                        let next = planWidth(for: availableWidth)
-                            + value.translation.width - dragTranslation
-                        savedPlanFraction = Double(
-                            min(0.53, max(0.26, next / availableWidth))
-                        )
+                        savedPlanFraction =
+                            ATHLTHStudioWorkspaceLayout.persistedFraction(
+                                totalWidth: availableWidth,
+                                currentFraction: savedPlanFraction,
+                                dragDelta: value.translation.width
+                            )
                     }
             )
             .accessibilityLabel(ATHLTHLocalization.choose(
