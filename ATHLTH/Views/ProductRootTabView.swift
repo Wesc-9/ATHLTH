@@ -5971,7 +5971,7 @@ struct ATHLTHTrainView: View {
                     WorkoutTemplateDetailView(entry: entry)
                 }
             }
-            .sheet(item: $selectedPlanWorkout) { selection in
+            .athlthStudioEditor(item: $selectedPlanWorkout, useFullScreen: studioFullscreenEditing) { selection in
                 PlannedWorkoutDetailView(
                     planID: selection.planID,
                     workout: selection.workout,
