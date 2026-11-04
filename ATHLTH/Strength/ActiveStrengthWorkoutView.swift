@@ -5795,18 +5795,29 @@ struct ActiveStrengthWorkoutView: View {
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     Spacer()
                     TimelineView(.periodic(from: .now, by: 1)) { tick in
-                        Text(
-                            (
-                                strength.currentSetEffortClock?
-                                    .elapsedSeconds(at: tick.date) ?? 0
-                            ).clockDuration
-                        )
-                        .font(.system(size: 23, weight: .bold, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text(
+                                (
+                                    strength.currentSetEffortClock?
+                                        .elapsedSeconds(at: tick.date) ?? 0
+                                ).clockDuration
+                            )
+                            .font(.system(size: 23, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Text(
+                                ATHLTHLocalization.choose(
+                                    english: "Exercise total",
+                                    norwegian: "Øvelse totalt"
+                                ) + " · " +
+                                strength.currentExerciseMeasuredSeconds.clockDuration
+                            )
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
                         .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Elapsed time in current set",
-                            norwegian: "Tid brukt i nåværende sett"
+                            english: "Elapsed set time and exercise total",
+                            norwegian: "Tid brukt i settet og totalt for øvelsen"
                         ))
                     }
                 }
