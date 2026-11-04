@@ -22,10 +22,10 @@ execute({ env: { get: () => 'test-only-value' }, serve: (callback: typeof handle
     const context = JSON.parse(request.input);
     assert.equal(context.focusBodyPart, 'Biceps');
     assert.ok(JSON.stringify(context.candidates).length <= 6000);
-    assert.ok(context.candidates.length >= 5);
+    assert.ok(context.candidates.length >= 1);
     assert.ok(request.input.length < 10000);
     return Response.json({ output_text: JSON.stringify({ title: 'Arm session', summary: 'Test', estimatedMinutes: 45,
-      exercises: context.candidates.slice(0, 5).map((c: { exerciseID: string }) => ({
+      exercises: context.candidates.slice(0, context.exerciseCount).map((c: { exerciseID: string }) => ({
         exerciseID: c.exerciseID, sets: 3, reps: 10, restSeconds: 60, targetRPE: 7, reason: 'Test',
       })),
     }) });
@@ -47,3 +47,19 @@ assert.equal(result.exercises[0].exerciseID, candidates[1].exerciseID);
 assert.ok(result.exercises.every((e: { exerciseID: string }) => candidates.some(c => c.exerciseID === e.exerciseID)));
 assert.ok(!result.exercises.some((e: { exerciseID: string }) => e.exerciseID === candidates[0].exerciseID));
 console.log('PASS: authenticated strength request preserves focus, existing-exercise exclusion and original IDs');
+
+const single = await handler!(new Request('https://test.example', { method: 'POST',
+  headers: { Authorization: 'Bearer test-only-user-token' },
+  body: JSON.stringify({
+    candidates, durationMinutes: 20, exerciseCount: 1,
+    focusBodyPart: 'Biceps', language: 'nb',
+    existingExerciseIDs: candidates.slice(0, 2).map(c => c.exerciseID),
+    personalize: true,
+  }),
+}));
+assert.equal(single.status, 200);
+const singleResult = await single.json();
+assert.equal(singleResult.exercises.length, 1);
+assert.equal(singleResult.exercises[0].exerciseID, candidates[2].exerciseID);
+assert.equal(providerCalls, 2);
+console.log('PASS: AI can recommend exactly one compatible exercise');
