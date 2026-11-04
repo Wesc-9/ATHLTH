@@ -40,6 +40,9 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var selectedWorkout: WorkoutSummary?
     @State private var showingInspector = false
     @State private var inspectorShowsCoach = false
+    @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
+    @State private var trainRequest: ATHLTHTrainNavigationRequest?
+    @State private var showingTrain = false
 
     private let canvas = Color(red: 0.985, green: 0.979, blue: 0.965)
     private let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
@@ -60,7 +63,7 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $sidebarVisibility) {
             sidebar
                 .navigationSplitViewColumnWidth(min: 210, ideal: 244, max: 280)
         } detail: {
@@ -83,6 +86,15 @@ struct ATHLTHiPadStudioRootView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .tint(gold)
+        .sheet(isPresented: $showingTrain) {
+            ATHLTHTrainView(
+                navigationRequest: $trainRequest,
+                isActive: true
+            )
+        }
+        .onChange(of: selection) { _, _ in
+            showingInspector = false
+        }
         .inspector(isPresented: $showingInspector) {
             if inspectorShowsCoach {
                 RecoveryCoachInboxDestinationView()
@@ -162,7 +174,31 @@ struct ATHLTHiPadStudioRootView: View {
     private var page: some View {
         switch selection {
         case .overview:
-            ATHLTHStudioDashboardView(onInspect: inspect)
+            ATHLTHStudioDashboardView(
+                onInspect: inspect,
+                onOpenPlanner: { selection = .planner },
+                onOpenInsights: { selection = .insights },
+                onOpenHistory: { selection = .history },
+                onOpenSettings: { selection = .settings },
+                onOpenWorkout: { entry in
+                    if let planID = entry.planID {
+                        trainRequest = .workout(
+                            planID: planID,
+                            workoutID: entry.workout.id
+                        )
+                    } else {
+                        // The current Train navigation contract has no
+                        // standalone-workout ID route. Open Train rather
+                        // than pretend this is a linked plan session.
+                        trainRequest = .today
+                    }
+                    showingTrain = true
+                },
+                onStartQuick: {
+                    trainRequest = .customQuick
+                    showingTrain = true
+                }
+            )
         case .planner:
             ATHLTHStudioPlannerView()
         case .insights:
