@@ -442,20 +442,6 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 }
             }
             if !day.isRestDay {
-                if inlineGroupDay == day.weekday, let inlineGroupKind {
-                    ATHLTHPlanInlineGroupComposer(
-                        groupKind: inlineGroupKind,
-                        onInsert: { blocks, kind in
-                            onAddGroup(day.weekday, blocks, kind)
-                            self.inlineGroupKind = nil
-                            inlineGroupDay = nil
-                        },
-                        onCancel: {
-                            inlineGroupKind = nil
-                            inlineGroupDay = nil
-                        }
-                    )
-                }
                 Button {
                     requestRestDayChange(for: day)
                 } label: {
@@ -477,6 +463,20 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 }
                 .padding(13)
                 .background(.white, in: RoundedRectangle(cornerRadius: 14))
+                if inlineGroupDay == day.weekday, let inlineGroupKind {
+                    ATHLTHPlanInlineGroupComposer(
+                        groupKind: inlineGroupKind,
+                        onInsert: { blocks, kind in
+                            onAddGroup(day.weekday, blocks, kind)
+                            self.inlineGroupKind = nil
+                            inlineGroupDay = nil
+                        },
+                        onCancel: {
+                            inlineGroupKind = nil
+                            inlineGroupDay = nil
+                        }
+                    )
+                }
             }
             HStack(spacing: 9) {
                 action(tr("Previous day", "Forrige dag"), icon: "arrow.left") {
