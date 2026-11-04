@@ -68,7 +68,8 @@ final class ATHLTHSpecificProgressEngineTests: XCTestCase {
             title: "4x4", recordedAt: now, effortSeconds: [240, 240, 240]
         )
         let shortEffort = try run(
-            title: "4x4", recordedAt: now, effortSeconds: [60, 60, 60, 60]
+            title: "4x4", recordedAt: now,
+            effortSeconds: [60, 60, 60, 60], metersPerEffort: 220
         )
         XCTAssertTrue(ATHLTHSpecificProgressEngine.isFourByFour(proper))
         XCTAssertFalse(ATHLTHSpecificProgressEngine.isFourByFour(wrongCount))
