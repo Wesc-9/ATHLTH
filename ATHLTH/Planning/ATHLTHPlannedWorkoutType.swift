@@ -82,18 +82,11 @@ enum ATHLTHPlannedWorkoutType: String, CaseIterable, Codable, Hashable, Identifi
         }
     }
 
-    /// An optional first editable block in the existing timeline composer.
-    /// A scratch workout contains no saved program or preselected loads.
-    var scratchQuickAdd: String? {
-        switch self {
-        case .strength: return "exercise"
-        case .running: return "running"
-        case .walking: return "walking"
-        case .cycling: return "cycling"
-        case .mobility: return "stretching"
-        case .custom: return nil
-        }
-    }
+    /// Picking an activity for "Start from scratch" only configures the
+    /// workout type and header. Never pre-add a main set, run, exercise,
+    /// stretching or any other step before the athlete explicitly adds it.
+    /// Keep the optional value for existing editor call sites.
+    var scratchQuickAdd: String? { nil }
 
     /// Use the saved activity and category, rather than guessing from title.
     func matches(_ workout: PlannedSession) -> Bool {
