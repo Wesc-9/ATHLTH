@@ -90,6 +90,57 @@ final class ATHLTHWorkoutDraftRecoveryPolicyTests: XCTestCase {
         ))
     }
 
+    func testNewScratchWorkoutStartsWithoutImplicitRunningOrMainSet() {
+        // Applies even if an older launcher passed a default one-kilometre
+        // running block. The new activity picker is metadata only.
+        for activity in ATHLTHPlannedWorkoutType.allCases {
+            XCTAssertTrue(ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
+                initialTitle: "",
+                selectedActivity: activity,
+                createsStandalone: true,
+                sourceTemplateID: nil,
+                initialRouteID: nil,
+                focusedBlockIndex: nil,
+                focusedExecutionStepIndex: nil,
+                opensFocusedEditor: false
+            ), "\(activity.rawValue) should start with an empty timeline")
+        }
+    }
+
+    func testEditingAnExistingWorkoutMustNotClearItsBlocks() {
+        let savedID = UUID()
+        XCTAssertFalse(ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
+            initialTitle: "",
+            selectedActivity: .running,
+            createsStandalone: true,
+            sourceTemplateID: savedID,
+            initialRouteID: nil,
+            focusedBlockIndex: nil,
+            focusedExecutionStepIndex: nil,
+            opensFocusedEditor: false
+        ))
+        XCTAssertFalse(ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
+            initialTitle: "Intervals",
+            selectedActivity: .running,
+            createsStandalone: true,
+            sourceTemplateID: nil,
+            initialRouteID: nil,
+            focusedBlockIndex: nil,
+            focusedExecutionStepIndex: nil,
+            opensFocusedEditor: false
+        ))
+        XCTAssertFalse(ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
+            initialTitle: "",
+            selectedActivity: .running,
+            createsStandalone: false,
+            sourceTemplateID: nil,
+            initialRouteID: nil,
+            focusedBlockIndex: nil,
+            focusedExecutionStepIndex: nil,
+            opensFocusedEditor: false
+        ))
+    }
+
     func testPlanRevisionRefreshDoesNotDiscardUnsavedSteps() {
         XCTAssertTrue(ATHLTHWorkoutDraftRecoveryPolicy.canRestorePlanDraft(
             storedVersion: 17,
