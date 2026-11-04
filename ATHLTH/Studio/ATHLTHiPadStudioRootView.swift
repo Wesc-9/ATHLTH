@@ -60,7 +60,12 @@ struct ATHLTHiPadStudioRootView: View {
         let destinations: [ATHLTHStudioDestination] = [
             .overview, .planner, .insights, .explore, .community
         ]
-        _selection = State(initialValue: destinations[min(max(0, index), 4)])
+        let initial = destinations[min(max(0, index), 4)]
+        _selection = State(initialValue: initial)
+        // Plan Studio starts with an icon rail instead of consuming a quarter
+        // of the landscape iPad with a full navigation sidebar.
+        _sidebarVisibility = State(initialValue:
+            initial == .planner ? .detailOnly : .all)
     }
 
     var body: some View {
@@ -69,7 +74,7 @@ struct ATHLTHiPadStudioRootView: View {
                 .navigationSplitViewColumnWidth(min: 210, ideal: 244, max: 280)
         } detail: {
             NavigationStack {
-                page
+                studioDetail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(canvas.ignoresSafeArea())
                     .navigationTitle(selection.label)
@@ -115,8 +120,12 @@ struct ATHLTHiPadStudioRootView: View {
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
         }
-        .onChange(of: selection) { _, _ in
+        .onChange(of: selection) { _, destination in
             showingInspector = false
+            withAnimation(.easeInOut(duration: 0.18)) {
+                sidebarVisibility = destination == .planner
+                    ? .detailOnly : .all
+            }
         }
         .inspector(isPresented: $showingInspector) {
             if inspectorShowsCoach {
@@ -127,6 +136,68 @@ struct ATHLTHiPadStudioRootView: View {
                     .inspectorColumnWidth(min: 270, ideal: 320, max: 400)
             }
         }
+    }
+
+    @ViewBuilder
+    private var studioDetail: some View {
+        if selection == .planner {
+            HStack(spacing: 0) {
+                compactPlannerRail
+                    .frame(width: 62)
+
+                ATHLTHStudioStyle.outline.opacity(0.55)
+                    .frame(width: 1)
+
+                page
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        } else {
+            page
+        }
+    }
+
+    /// Studio owns only navigation chrome. Every destination continues to
+    /// use its original shared iPhone/iPad stores and feature implementation.
+    private var compactPlannerRail: some View {
+        VStack(spacing: 11) {
+            Image(systemName: "square.grid.2x2")
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(gold)
+                .padding(.top, 12)
+                .accessibilityHidden(true)
+
+            ScrollView {
+                VStack(spacing: 7) {
+                    ForEach(ATHLTHStudioDestination.allCases) { destination in
+                        Button {
+                            selection = destination
+                        } label: {
+                            Image(systemName: destination.symbol)
+                                .font(.system(size: 18, weight: selection == destination
+                                    ? .semibold : .regular))
+                                .foregroundStyle(selection == destination
+                                    ? ink : ink.opacity(0.62))
+                                .frame(width: 44, height: 44)
+                                .background {
+                                    if selection == destination {
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .fill(.white)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .help(destination.label)
+                        .accessibilityLabel(destination.label)
+                        .accessibilityAddTraits(
+                            selection == destination ? .isSelected : []
+                        )
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+        }
+        .background(canvas)
     }
 
     private var sidebar: some View {
