@@ -149,6 +149,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 command.kind == .completeSet ||
                 command.kind == .skipRest ||
                 command.kind == .skipRestAndStartTimedSet ||
+                command.kind == .startTimedSet ||
                 command.kind == .nextExercise
             guard permittedFromWatch else {
                 sendSnapshotNow()
