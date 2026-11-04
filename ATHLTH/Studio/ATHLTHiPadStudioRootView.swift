@@ -43,6 +43,7 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var trainRequest: ATHLTHTrainNavigationRequest?
     @State private var showingTrain = false
+    @State private var selectedStandaloneWorkout: PlannedSession?
 
     private let canvas = Color(red: 0.985, green: 0.979, blue: 0.965)
     private let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
@@ -73,6 +74,26 @@ struct ATHLTHiPadStudioRootView: View {
                     .background(canvas.ignoresSafeArea())
                     .navigationTitle(selection.label)
                     .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    sidebarVisibility =
+                                        sidebarVisibility == .detailOnly ? .all : .detailOnly
+                                }
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Show or hide sidebar",
+                                        norwegian: "Vis eller skjul sidemeny"
+                                    ),
+                                    systemImage: "sidebar.left"
+                                )
+                            }
+                            .accessibilityHint(ATHLTHLocalization.choose(
+                                english: "Give the current Studio view more room",
+                                norwegian: "Gi den åpne Studio-visningen mer plass"
+                            ))
+                        }
                         ToolbarItem(placement: .topBarTrailing) {
                             Button {
                                 inspectorShowsCoach = true
@@ -91,6 +112,9 @@ struct ATHLTHiPadStudioRootView: View {
                 navigationRequest: $trainRequest,
                 isActive: true
             )
+        }
+        .sheet(item: $selectedStandaloneWorkout) { workout in
+            ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
         }
         .onChange(of: selection) { _, _ in
             showingInspector = false
@@ -186,13 +210,12 @@ struct ATHLTHiPadStudioRootView: View {
                             planID: planID,
                             workoutID: entry.workout.id
                         )
+                        showingTrain = true
                     } else {
-                        // The current Train navigation contract has no
-                        // standalone-workout ID route. Open Train rather
-                        // than pretend this is a linked plan session.
-                        trainRequest = .today
+                        // Open this precise standalone entry, not the
+                        // generic Train landing page.
+                        selectedStandaloneWorkout = entry.workout
                     }
-                    showingTrain = true
                 },
                 onStartQuick: {
                     trainRequest = .customQuick

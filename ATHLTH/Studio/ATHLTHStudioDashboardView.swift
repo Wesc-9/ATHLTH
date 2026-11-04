@@ -496,39 +496,70 @@ struct ATHLTHStudioDashboardView: View {
             .scrollIndicators(.hidden)
 
             if let selected {
-                HStack(spacing: 9) {
-                    Image(systemName: selected.planned.first?.workout.kind.systemImage ?? "calendar")
-                        .foregroundStyle(ATHLTHStudioStyle.gold)
-                        .frame(width: 26)
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(selected.planned.first?.workout.title ??
-                             tr("No scheduled workout", "Ingen planlagt økt"))
-                            .font(.subheadline.weight(.medium))
-                            .lineLimit(1)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(selected.date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(ATHLTHStudioStyle.ink)
-                        Text(healthHasDataAccess
-                            ? selected.date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)) +
-                                " · \(selected.recorded.count) " +
-                                tr("recorded activities", "registrerte aktiviteter")
-                            : selected.date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)) +
-                                " · " +
-                                tr("Health data unavailable", "Helsedata mangler")
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                    }
-                    Spacer(minLength: 5)
-                    if let entry = selected.planned.first {
-                        Button {
-                            onOpenWorkout(entry)
-                        } label: {
-                            Image(systemName: "arrow.up.right")
-                                .font(.subheadline.weight(.semibold))
-                                .frame(width: 38, height: 38)
+                        Spacer()
+                        if healthHasDataAccess {
+                            Text("\(selected.recorded.count) " +
+                                 tr("recorded", "registrerte"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.bordered)
-                        .accessibilityLabel(tr("Open planned workout", "Åpne planlagt økt"))
+                    }
+
+                    if selected.planned.isEmpty {
+                        Label(
+                            tr("No scheduled workout", "Ingen planlagt økt"),
+                            systemImage: "calendar"
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(minHeight: 32, alignment: .leading)
+                    } else {
+                        ForEach(selected.planned.prefix(3)) { entry in
+                            Button {
+                                onOpenWorkout(entry)
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: entry.workout.kind.systemImage)
+                                        .foregroundStyle(ATHLTHStudioStyle.gold)
+                                        .frame(width: 25)
+                                    Text(entry.workout.title)
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(ATHLTHStudioStyle.ink)
+                                        .lineLimit(1)
+                                    Spacer(minLength: 5)
+                                    if let duration = entry.workout.durationMinutes {
+                                        Text("\(duration) min")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Image(systemName: "arrow.up.right")
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHStudioStyle.gold)
+                                }
+                                .frame(minHeight: 42)
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(tr(
+                                "Open the details for this planned session",
+                                "Åpne detaljene for denne planlagte økten"
+                            ))
+                        }
+                        if selected.planned.count > 3 {
+                            Button {
+                                onOpenPlanner()
+                            } label: {
+                                Text("+ \(selected.planned.count - 3) " +
+                                     tr("more – open Plan Studio", "til – åpne Plan Studio"))
+                            }
+                            .font(.caption.weight(.semibold))
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
                 .padding(.horizontal, 12)
