@@ -6,6 +6,14 @@ enum HomeDailyRecommendationSessionFactory {
     static func make(
         advice: HomeDailyRecommendationPolicy.Advice
     ) -> PlannedSession? {
+        if case .historicalStrength = advice.suggestedWorkout,
+           var copy = advice.strengthSession {
+            // Every recommendation is a new independent workout and never
+            // modifies an old completed workout or a scheduled training plan.
+            copy.id = UUID()
+            copy.scheduledStart = nil
+            return copy
+        }
         guard let kind = advice.suggestedWorkout.kind,
               let minutes = advice.suggestedWorkout.durationMinutes,
               minutes > 0
@@ -78,7 +86,7 @@ enum HomeDailyRecommendationSessionFactory {
                 (.main, advice.suggestedTitle, minutes, 3, advice.suggestedDetail)
             ]
 
-        case .planned:
+        case .planned, .restDay, .historicalStrength:
             return nil
         }
 
