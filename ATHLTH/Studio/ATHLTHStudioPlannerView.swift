@@ -258,6 +258,19 @@ struct ATHLTHStudioPlannerView: View {
                         if let minutes = item.durationMinutes, !item.isExplicitRestDay {
                             Text("\(minutes) min").font(.caption2).foregroundStyle(.secondary)
                         }
+                        if !item.isExplicitRestDay {
+                            Button {
+                                trainRequest = .workout(planID: plan.id, workoutID: item.id)
+                                showingTrainingEditor = true
+                            } label: {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Details", norwegian: "Detaljer"
+                                ), systemImage: "arrow.up.right")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(ATHLTHStudioStyle.gold)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(12)

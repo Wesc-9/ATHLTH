@@ -17,11 +17,15 @@ struct ATHLTHStudioDashboardView: View {
         Array(health.workouts.sorted { $0.startDate > $1.startDate }.prefix(6))
     }
 
-    private var scheduled: [PlannedSession] {
-        let date = Date.now.addingTimeInterval(-86_400)
-        return session.standalonePlannedSessions
-            .filter { ($0.scheduledStart ?? .distantPast) >= date }
-            .sorted { ($0.scheduledStart ?? .distantFuture) < ($1.scheduledStart ?? .distantFuture) }
+    private var scheduled: [ATHLTHStudioSchedule.Occurrence] {
+        ATHLTHStudioSchedule.upcoming(
+            plans: session.trainingPlans,
+            standalone: session.standalonePlannedSessions,
+            pausedPlanIDs: session.pausedTrainingPlanIDs,
+            deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
+            now: .now,
+            days: 14
+        )
     }
 
     var body: some View {
@@ -142,21 +146,24 @@ struct ATHLTHStudioDashboardView: View {
             .font(.headline)
             if scheduled.isEmpty {
                 Text(ATHLTHLocalization.choose(
-                    english: "Nothing scheduled outside a training plan. Open Plan Studio to see your full training schedule.",
-                    norwegian: "Ingen frittstående økter planlagt. Åpne Plan Studio for hele treningsplanen."
+                    english: "No upcoming workouts found in your active plans or independent sessions.",
+                    norwegian: "Ingen kommende økter i aktive planer eller frittstående økter."
                 ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             } else {
-                ForEach(scheduled.prefix(4)) { workout in
+                ForEach(scheduled.prefix(4)) { entry in
                     HStack(spacing: 10) {
-                        Image(systemName: workout.kind.systemImage)
+                        Image(systemName: entry.workout.kind.systemImage)
                             .foregroundStyle(ATHLTHStudioStyle.gold)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(workout.title).font(.subheadline.weight(.medium)).lineLimit(1)
-                            if let date = workout.scheduledStart {
-                                Text(date.formatted(date: .abbreviated, time: .shortened))
-                                    .font(.caption).foregroundStyle(.secondary)
+                            Text(entry.workout.title).font(.subheadline.weight(.medium)).lineLimit(1)
+                            Text(entry.workout.scheduledStart == nil
+                                 ? entry.date.formatted(date: .abbreviated, time: .omitted)
+                                 : entry.date.formatted(date: .abbreviated, time: .shortened))
+                                .font(.caption).foregroundStyle(.secondary)
+                            if let source = entry.planTitle {
+                                Text(source).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
                             }
                         }
                         Spacer()
