@@ -197,6 +197,18 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @State private var showingCreatedPlan = false
     @State private var showingAIBuilder = false
     @State private var prefersAIPlanBuild = false
+    @State private var showingGuidedAIConsent = false
+    @State private var isGuidedAIFilling = false
+    @State private var guidedAIError: String?
+    @State private var guidedAIFillPreview: GuidedAIFillPreview?
+
+    private struct GuidedAIFillPreview: Identifiable {
+        let id = UUID()
+        let draft: AIProgramDraft
+        let proposal: ATHLTHGuidedPlanAutofill.Proposal
+    }
+
+    private let guidedAIService = AIProgramService()
     @State private var didApplySuggestedStartDate = false
     @State private var showingPlanDesignLab = false
     @State private var isHydratingPlanDraft = false
@@ -797,6 +809,39 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     draftStore.clear(userID: session.profile.userID, draftID: draftID)
                 }
             )
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Fill empty days with ATHLTH Coach?",
+                norwegian: "Fylle ut tomme dager med ATHLTH Coach?"),
+            isPresented: $showingGuidedAIConsent,
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Generate suggestions", norwegian: "Lag forslag med AI"
+            )) {
+                Task { await generateGuidedAISuggestions() }
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Your plan focus, goals, selected days and session duration are sent to Coach. Health history and injury notes are not shared. Your existing workouts and rest days will not be changed. Review suggestions before applying.",
+                norwegian: "Planfokus, mål, valgte dager og øktvarighet sendes til Coach. Helsehistorikk og skadeopplysninger deles ikke. Økter og hviledager du har lagt inn, beholdes. Du får godkjenne forslagene før de brukes."
+            ))
+        }
+        .sheet(item: $guidedAIFillPreview) { preview in
+            guidedAIFillReview(preview)
+        }
+        .alert(
+            ATHLTHLocalization.choose(
+                english: "Automatic plan fill", norwegian: "Automatisk utfylling"),
+            isPresented: Binding(
+                get: { guidedAIError != nil },
+                set: { if !$0 { guidedAIError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { guidedAIError = nil }
+        } message: {
+            Text(guidedAIError ?? "")
         }
         .sheet(item: $editingWeekDay, onDismiss: {
             if let pendingTrainingPlaceDay {
@@ -6862,6 +6907,51 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         VStack(spacing: 0) {
             Divider()
                 .opacity(0.35)
+
+            if step == .week && mode == .advanced &&
+               weekPlanningApproach == .guided {
+                Button {
+                    showingGuidedAIConsent = true
+                } label: {
+                    HStack(spacing: 11) {
+                        if isGuidedAIFilling {
+                            ProgressView()
+                                .tint(ATHLTHTrainDesign.bronze)
+                        } else {
+                            Image(systemName: "sparkles")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        Text(isGuidedAIFilling
+                             ? ATHLTHLocalization.choose(
+                                english: "ATHLTH Coach is preparing the plan...",
+                                norwegian: "ATHLTH Coach lager ukeplanen...")
+                             : ATHLTHLocalization.choose(
+                                english: "Fill empty days with AI",
+                                norwegian: "Fyll tomme dager med AI"))
+                            .font(.subheadline.weight(.semibold))
+                        Spacer(minLength: 0)
+                        if !isGuidedAIFilling {
+                            Image(systemName: "arrow.up.right")
+                                .font(.caption.weight(.medium))
+                        }
+                    }
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .padding(.horizontal, 17)
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                    .background(
+                        ATHLTHTrainDesign.canvas,
+                        in: RoundedRectangle(cornerRadius: 15)
+                    )
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 15)
+                            .strokeBorder(ATHLTHTrainDesign.bronze.opacity(0.38), lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
+                .disabled(isGuidedAIFilling)
+                .padding(.horizontal, 18)
+                .padding(.top, 10)
+            }
 
             HStack(spacing: 10) {
                 if step != .mode &&
