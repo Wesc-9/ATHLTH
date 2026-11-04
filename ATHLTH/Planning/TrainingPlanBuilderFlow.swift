@@ -4545,7 +4545,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                                 .foregroundStyle(ATHLTHTrainDesign.bronze)
 
                             ForEach(pair.element.days.sorted(by: {
-                                $0.dayIndex < $1.dayIndex
+                                dateForWeekDay($0.dayIndex, weekIndex: pair.offset) <
+                                dateForWeekDay($1.dayIndex, weekIndex: pair.offset)
                             }), id: \.dayIndex) { day in
                                 let key = pair.offset * 7 + day.dayIndex
                                 let protected = weekDayEdits[key] != nil ||
@@ -4617,7 +4618,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             return pending
         }
         // A pre-2.1.2 saved draft could already be at the first-week decision.
-        if guidedDayCursor == 7 && !firstGuidedWeekDecisionMade && weekCount > 1 {
+        if guidedDayCursor == 7 && !firstGuidedWeekDecisionMade &&
+           weekCount > 1 && (1...7).allSatisfy({
+               ATHLTHGuidedPlanDayPolicy.isPlanned(
+                   weekDayEdits[weekDayKey($0, weekIndex: 0)]
+               )
+           }) {
             return 0
         }
         return nil
