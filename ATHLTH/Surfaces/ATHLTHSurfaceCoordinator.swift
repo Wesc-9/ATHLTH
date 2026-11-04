@@ -269,6 +269,7 @@ private final class ATHLTHLiveActivityController {
 
     private var lastUpdateAt: Date?
     private var lastPhase: WatchWorkoutMirrorState?
+    private var lastStrengthPresentationKey: String?
     private var lastSessionIdentity: ATHLTHLiveActivitySessionIdentity?
     /// Never re-create an already stopped Watch session from a delayed
     /// .running snapshot delivered after the terminal result.
@@ -291,6 +292,7 @@ private final class ATHLTHLiveActivityController {
             guard revision == syncRevision else { return }
             lastPhase = nil
             lastUpdateAt = nil
+            lastStrengthPresentationKey = nil
             lastSessionIdentity = nil
             return
         }
@@ -309,6 +311,7 @@ private final class ATHLTHLiveActivityController {
             guard revision == syncRevision else { return }
             lastPhase = nil
             lastUpdateAt = nil
+            lastStrengthPresentationKey = nil
             lastSessionIdentity = nil
             return
         }
@@ -348,6 +351,7 @@ private final class ATHLTHLiveActivityController {
         if lastSessionIdentity.map({ !$0.matches(identity) }) ?? true {
             lastUpdateAt = nil
             lastPhase = nil
+            lastStrengthPresentationKey = nil
         }
 
         let storedLiveContext =
@@ -443,18 +447,34 @@ private final class ATHLTHLiveActivityController {
 
         let phaseChanged =
             lastPhase != snapshot.state
+        let strengthPresentationKey: String? = snapshot.kind == .strength
+            ? [
+                snapshot.strengthExerciseName ?? "",
+                String(snapshot.strengthSetIndex ?? -1),
+                String(snapshot.strengthSetCount ?? -1),
+                String(snapshot.strengthRestEndsAt?.timeIntervalSince1970 ?? -1),
+                snapshot.strengthNextExerciseName ?? "",
+                String(snapshot.strengthTimedSetResumedAt?.timeIntervalSince1970 ?? -1)
+              ].joined(separator: "|")
+            : nil
+        let strengthChanged =
+            lastStrengthPresentationKey != strengthPresentationKey
         let updateIsDue =
             lastUpdateAt.map {
                 Date().timeIntervalSince($0) >= 5
             } ?? true
 
+        // Keep the five-second throttle for pulse/elapsed samples but never
+        // delay a completed set, change of exercise or new rest countdown.
         if !phaseChanged &&
+            !strengthChanged &&
             !updateIsDue &&
             !isTerminal {
             return
         }
 
         lastPhase = snapshot.state
+        lastStrengthPresentationKey = strengthPresentationKey
         lastUpdateAt = Date()
 
         // Read each Activity only once. Filtering into a second array
