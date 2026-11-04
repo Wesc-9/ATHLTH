@@ -60,6 +60,7 @@ private struct ATHLTHSceneRootView: View {
     @StateObject private var strengthWorkout = StrengthWorkoutStore()
     @StateObject private var goals = GoalStore()
     @StateObject private var trainingBackups = TrainingBackupStore()
+    @StateObject private var studioPlanSync = ATHLTHStudioPlanSyncStore()
     @StateObject private var phoneWorkout = IPhoneWorkoutStore()
     @StateObject private var profileGear = ProfileGearStore()
     @StateObject private var pets = ATHLTHPetStore.shared
@@ -168,6 +169,7 @@ private struct ATHLTHSceneRootView: View {
                 .environmentObject(strengthWorkout)
                 .environmentObject(goals)
                 .environmentObject(trainingBackups)
+                .environmentObject(studioPlanSync)
                 .environmentObject(phoneWorkout)
                 .environmentObject(profileGear)
                 .environmentObject(pets)
@@ -207,6 +209,12 @@ private struct ATHLTHSceneRootView: View {
         }
         .onAppear {
             installBackgroundRefreshHandlersIfNeeded()
+            studioPlanSync.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
+            if appSession.signedIn {
+                studioPlanSync.scheduleSync(session: appSession)
+            }
             ATHLTHAliveController.reconcile(
                 isForeground: scenePhase == .active && appSession.signedIn
             )
@@ -215,6 +223,9 @@ private struct ATHLTHSceneRootView: View {
             ATHLTHAliveController.reconcile(
                 isForeground: newPhase == .active && appSession.signedIn
             )
+            if newPhase == .active && appSession.signedIn {
+                studioPlanSync.scheduleSync(session: appSession)
+            }
         }
         .onChange(of: pets.pets) { _, _ in
             if appSession.signedIn, let catalog = pets.makeWatchCatalog() {
@@ -228,6 +239,12 @@ private struct ATHLTHSceneRootView: View {
             }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
+            studioPlanSync.switchAccount(
+                signedIn ? appSession.profile.userID : nil
+            )
+            if signedIn {
+                studioPlanSync.scheduleSync(session: appSession)
+            }
             ATHLTHAliveController.reconcile(
                 isForeground: scenePhase == .active && signedIn
             )
@@ -241,6 +258,14 @@ private struct ATHLTHSceneRootView: View {
                     )
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .athlthTrainingDataDidChange
+        )) { message in
+            guard let owner = message.object as? UUID,
+                  appSession.signedIn,
+                  owner == appSession.profile.userID else { return }
+            studioPlanSync.scheduleSync(session: appSession)
         }
     }
 

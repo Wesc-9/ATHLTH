@@ -71,8 +71,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
 
     func setEnabled(_ shouldEnable: Bool, session: AppSessionStore) async {
         guard !isBusy, session.signedIn,
-              accountID == session.profile.userID,
-              client.auth.currentUser?.id == session.profile.userID
+              accountID == session.profile.userID
         else { return }
 
         let userID = session.profile.userID
@@ -80,6 +79,13 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         defer { isBusy = false }
         if shouldEnable {
             do {
+                guard client.auth.currentUser?.id == userID else {
+                    throw NSError(
+                        domain: "ATHLTH.PlanSync", code: 401,
+                        userInfo: [NSLocalizedDescriptionKey:
+                            "An online signed-in session is required to enable synchronization."]
+                    )
+                }
                 try await client.from("studio_plan_sync_consents")
                     .upsert(ConsentWrite(user_id: userID, enabled: true),
                             onConflict: "user_id")

@@ -102,17 +102,25 @@ begin
         raise exception 'Plan synchronization consent required' using errcode = '42501';
     end if;
 
-    insert into public.studio_plan_documents (
-        user_id, plan_id, revision, body_base64, updated_at
-    ) values (
-        v_uid, p_plan_id, 1, p_body_base64, now()
-    )
-    on conflict (user_id, plan_id) do update
-        set revision = public.studio_plan_documents.revision + 1,
-            body_base64 = excluded.body_base64,
+    -- A deleted row cannot be resurrected by a stale device expecting
+    -- a nonzero revision. Insert and update are deliberately separate.
+    if p_expected_revision = 0 then
+        insert into public.studio_plan_documents (
+            user_id, plan_id, revision, body_base64, updated_at
+        ) values (
+            v_uid, p_plan_id, 1, p_body_base64, now()
+        )
+        on conflict (user_id, plan_id) do nothing
+        returning revision into v_revision;
+    else
+        update public.studio_plan_documents
+        set revision = revision + 1,
+            body_base64 = p_body_base64,
             updated_at = now()
-        where public.studio_plan_documents.revision = p_expected_revision
-    returning revision into v_revision;
+        where user_id = v_uid and plan_id = p_plan_id
+          and revision = p_expected_revision
+        returning revision into v_revision;
+    end if;
 
     if v_revision is null then
         raise exception 'Plan revision conflict' using errcode = 'P0001';

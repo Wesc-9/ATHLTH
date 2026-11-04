@@ -5,6 +5,7 @@ struct TrainingDataSettingsView: View {
     @EnvironmentObject private var goals: GoalStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var backups: TrainingBackupStore
+    @EnvironmentObject private var studioPlanSync: ATHLTHStudioPlanSyncStore
     @EnvironmentObject private var exercises: ExerciseLibraryStore
     @EnvironmentObject private var running: RunningWorkoutLibraryStore
     @EnvironmentObject private var phone: IPhoneWorkoutStore
@@ -12,6 +13,7 @@ struct TrainingDataSettingsView: View {
     @State private var selectedBackup: TrainingBackupRow?
     @State private var confirmLegacy = false
     @State private var confirmDeleteBackups = false
+    @State private var planConflictToResolve: ATHLTHStudioPlanSyncStore.Conflict?
 
     var body: some View {
         Form {
@@ -55,6 +57,64 @@ struct TrainingDataSettingsView: View {
                     Text("Finish your active workout before restoring a backup.").font(.footnote)
                 }
             }
+            Section(ATHLTHLocalization.choose(
+                english: "Plan sync between devices",
+                norwegian: "Plansynkronisering mellom enheter"
+            )) {
+                Toggle(
+                    ATHLTHLocalization.choose(
+                        english: "Sync my training plans with other ATHLTH devices",
+                        norwegian: "Synkroniser treningsplaner mellom ATHLTH-enheter"
+                    ),
+                    isOn: Binding(
+                        get: { studioPlanSync.enabled },
+                        set: { newValue in
+                            Task {
+                                await studioPlanSync.setEnabled(newValue, session: session)
+                            }
+                        }
+                    )
+                )
+                .disabled(studioPlanSync.isBusy || !session.signedIn)
+                Text(ATHLTHLocalization.choose(
+                    english: "Optional and off by default. When enabled, your saved plans can be stored with ATHLTH’s cloud provider (Supabase), including manually entered notes, injuries and planned places. Completed workouts, Apple Health readings, GPS traces and readiness scores are never included. Enable it separately on each device. Disabling attempts to delete remote plan copies; local plans remain.",
+                    norwegian: "Valgfritt og av som standard. Når du aktiverer dette, kan lagrede treningsplaner lagres hos ATHLTHs skyleverandør (Supabase), inkludert egne notater, eventuelle skader og planlagte steder. Gjennomførte økter, Apple Health-data, GPS-spor og restitusjonsscore inngår aldri. Aktiver separat på hver enhet. Ved deaktivering forsøkes sky-kopiene slettet; lokale planer beholdes."
+                ))
+                .font(.footnote)
+
+                Text(studioPlanSync.status)
+                    .font(.footnote)
+                if let updated = studioPlanSync.lastSuccessfulSync {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Last checked: \(updated.formatted(date: .abbreviated, time: .shortened))",
+                        norwegian: "Sist kontrollert: \(updated.formatted(date: .abbreviated, time: .shortened))"
+                    ))
+                    .font(.caption).foregroundStyle(.secondary)
+                }
+                Button {
+                    Task { await studioPlanSync.sync(session: session) }
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Sync plans now", norwegian: "Synkroniser planer nå"
+                    ), systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(!studioPlanSync.enabled || studioPlanSync.isBusy)
+
+                if !studioPlanSync.conflicts.isEmpty {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Different versions were found. Decide which copy to keep; neither will be overwritten automatically.",
+                        norwegian: "Ulike versjoner er funnet. Velg hvilken kopi du vil beholde; ingen overskrives automatisk."
+                    ))
+                    .font(.footnote)
+                    ForEach(studioPlanSync.conflicts) { conflict in
+                        Button {
+                            planConflictToResolve = conflict
+                        } label: {
+                            Label(conflict.title, systemImage: "exclamationmark.arrow.triangle.2.circlepath")
+                        }
+                    }
+                }
+            }
             if goals.hasLegacyGoals || strength.hasLegacyHistory {
                 Section("Older data on this phone") {
                     Text("Older goals and strength logs have no recorded account owner. Restore them only if they belong to you.")
@@ -66,6 +126,47 @@ struct TrainingDataSettingsView: View {
         .navigationTitle("Training data & Coach")
         .task(id: session.profile.userID) {
             consent = AccountLocalStorage.read(Bool.self, name: "coachHistoryConsent", userID: session.profile.userID) ?? false
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Resolve training plan difference",
+                norwegian: "Velg hvilken treningsplan som skal beholdes"
+            ),
+            isPresented: Binding(
+                get: { planConflictToResolve != nil },
+                set: { if !$0 { planConflictToResolve = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Keep this device's version",
+                norwegian: "Behold versjonen på denne enheten"
+            )) {
+                guard let selected = planConflictToResolve else { return }
+                planConflictToResolve = nil
+                Task {
+                    await studioPlanSync.resolve(
+                        planID: selected.id, preferRemote: false, session: session
+                    )
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Use the cloud version",
+                norwegian: "Bruk versjonen fra skyen"
+            ), role: .destructive) {
+                guard let selected = planConflictToResolve else { return }
+                planConflictToResolve = nil
+                Task {
+                    await studioPlanSync.resolve(
+                        planID: selected.id, preferRemote: true, session: session
+                    )
+                }
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Only your selected training plan is affected. Other plans and recorded workout results are preserved.",
+                norwegian: "Kun den valgte treningsplanen påvirkes. Andre planer og registrerte treningsresultater beholdes."
+            ))
         }
         .confirmationDialog("Delete all cloud backups for this account?", isPresented: $confirmDeleteBackups, titleVisibility: .visible) {
             Button("Delete cloud backups", role: .destructive) { Task { await backups.deleteCloudBackups(userID: session.profile.userID) } }
