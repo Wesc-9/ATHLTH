@@ -147,8 +147,43 @@ print(matches[0]["id"] if matches else "")
 PY
   )"
 
+  if [ -z "$bundle_id" ] && [ "$identifier" = "com.wesc9.athlth.watchkitapp.widgets" ]; then
+    # The Watch Widget is its own signed app extension and needs a distinct
+    # explicit Apple Developer bundle ID even though it lives inside the Watch app.
+    local registration="$RUNNER_TEMP/register-watch-widgets.json"
+    python - "$registration" "$identifier" <<'PY'
+import json, sys
+with open(sys.argv[1], "w", encoding="utf-8") as handle:
+    json.dump({"data": {"type": "bundleIds", "attributes": {
+        "identifier": sys.argv[2],
+        "name": "ATHLTH Watch Widgets",
+        "platform": "IOS"
+    }}}, handle)
+PY
+    local registered="$RUNNER_TEMP/register-watch-widgets-response.json"
+    local registration_code
+    registration_code="$(curl --silent --show-error --retry 3 --retry-delay 5 \
+      --output "$registered" --write-out '%{http_code}' --request POST \
+      --header "Authorization: Bearer $TOKEN" \
+      --header "Content-Type: application/json" \
+      --data-binary "@$registration" \
+      "https://api.appstoreconnect.apple.com/v1/bundleIds")"
+    if [ "$registration_code" != "201" ]; then
+      echo "::error::Could not register $identifier with Apple (HTTP $registration_code)."
+      cat "$registered"
+      exit 1
+    fi
+    bundle_id="$(python - "$registered" <<'PY'
+import json, sys
+with open(sys.argv[1], encoding="utf-8") as handle:
+    print(json.load(handle)["data"]["id"])
+PY
+    )"
+    echo "Registered Watch Widget App ID: $identifier"
+  fi
+
   if [ -z "$bundle_id" ]; then
-    echo "::error::Missing Apple bundle ID: $identifier"
+    echo "::error::Missing Apple bundle ID: $identifier. Register it before TestFlight signing."
     exit 1
   fi
 
@@ -233,5 +268,6 @@ PY
 create_profile "com.wesc9.athlth" "Main" "MAIN"
 create_profile "com.wesc9.athlth.widgets" "Widgets" "WIDGET"
 create_profile "com.wesc9.athlth.watchkitapp" "Watch" "WATCH"
+create_profile "com.wesc9.athlth.watchkitapp.widgets" "Watch Widgets" "WATCH_WIDGET"
 
-echo "Ephemeral Apple Distribution signing material prepared."
+echo "Ephemeral Apple Distribution signing material prepared for all four signed bundles."
