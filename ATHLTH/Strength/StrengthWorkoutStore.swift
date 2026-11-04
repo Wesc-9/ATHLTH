@@ -66,11 +66,12 @@ struct StrengthSetEffortClock: Codable, Equatable {
     let startedAt: Date
 
     var pausedAt: Date? = nil
-    var totalPausedSeconds: TimeInterval = 0
+    // Optional for forward-compatible decoding of saved live-workout clocks.
+    var totalPausedSeconds: TimeInterval? = nil
 
     func elapsedSeconds(at now: Date = Date()) -> TimeInterval {
         max((pausedAt ?? now).timeIntervalSince(startedAt) -
-            totalPausedSeconds, 0)
+            (totalPausedSeconds ?? 0), 0)
     }
 
     mutating func pause(at now: Date) {
@@ -80,7 +81,8 @@ struct StrengthSetEffortClock: Codable, Equatable {
 
     mutating func resume(at now: Date) {
         guard let pausedAt else { return }
-        totalPausedSeconds += max(now.timeIntervalSince(pausedAt), 0)
+        totalPausedSeconds = (totalPausedSeconds ?? 0) +
+            max(now.timeIntervalSince(pausedAt), 0)
         self.pausedAt = nil
     }
 }
