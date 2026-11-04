@@ -44,6 +44,20 @@ struct ATHLTHiPadStudioRootView: View {
     private let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
     private let gold = Color(red: 0.69, green: 0.54, blue: 0.32)
 
+    init() {
+        // Reuse the smoke-test tab argument to inspect actual Studio pages.
+        let argument = ProcessInfo.processInfo.arguments.first {
+            $0.hasPrefix("--athlth-compatibility-tab=")
+        }
+        let index = argument.flatMap {
+            Int($0.dropFirst("--athlth-compatibility-tab=".count))
+        } ?? 0
+        let destinations: [ATHLTHStudioDestination] = [
+            .overview, .planner, .insights, .explore, .community
+        ]
+        _selection = State(initialValue: destinations[min(max(0, index), 4)])
+    }
+
     var body: some View {
         NavigationSplitView {
             sidebar

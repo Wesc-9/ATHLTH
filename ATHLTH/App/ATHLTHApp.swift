@@ -395,9 +395,13 @@ private struct ATHLTHCompatibilityPreviewRootView: View {
 
     @ViewBuilder
     var body: some View {
-        // Keep compatibility/screenshots in the same tab order and route
-        // as the production TabView. Do not restore Recovery as a root tab.
-        switch requestedTab {
+        // Exercise the actual iPad Studio shell in iPad smoke tests instead
+        // of displaying five enlarged legacy iPhone tabs.
+        if ATHLTHDeviceRole.isIPad {
+            ATHLTHiPadStudioRootView()
+        } else {
+            // Preserve the existing five-tab iPhone compatibility surface.
+            switch requestedTab {
         case 1:
             ATHLTHTrainView(
                 navigationRequest: $trainNavigationRequest,
@@ -421,6 +425,7 @@ private struct ATHLTHCompatibilityPreviewRootView: View {
                 onSelectTab: { _ in },
                 onOpenTrain: { _ in }
             )
+            }
         }
     }
 }
