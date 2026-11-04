@@ -14866,109 +14866,76 @@ struct ATHLTHProfileView: View {
             )
     }
 
-    private func recordCard(
-        kind:
-            ProfileFeaturedRecordKind
-    ) -> some View {
-        VStack(
-            alignment: .leading,
-            spacing: 4
-        ) {
-            Image(
-                systemName: kind.icon
-            )
-            .font(
-                .system(
-                    size: 11,
-                    weight: .semibold
-                )
-            )
-            .foregroundStyle(kind.tint)
-            .frame(
-                width: 24,
-                height: 24
-            )
-            .background(
-                kind.tint.opacity(0.11),
-                in: RoundedRectangle(
-                    cornerRadius: 8,
-                    style: .continuous
-                )
-            )
-
-            Text(kind.title)
-                .font(
-                    .system(
-                        size: 8.2,
-                        weight: .semibold
+    /// Readable 2-column results instead of four miniature single-line tiles.
+    /// The result is the visual focal point; icon and label stay restrained.
+    private func recordCard(kind: ProfileFeaturedRecordKind) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 7) {
+                Image(systemName: kind.icon)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 30, height: 30)
+                    .background(
+                        ATHLTHTheme.premiumGoldSoft.opacity(0.75),
+                        in: RoundedRectangle(cornerRadius: 10)
                     )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.62)
+                Spacer(minLength: 0)
+                Image(systemName: "medal")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.premiumGold.opacity(0.66))
+                    .accessibilityHidden(true)
+            }
 
             Text(
                 kind.displayValue(
-                    healthRecords:
-                        personalRecords,
-                    stats:
-                        performanceStats,
-                    strengthRecords:
-                        strengthWorkout.personalRecords,
-                    strengthRepRecords:
-                        strengthWorkout.repPersonalRecords,
-                    performanceWorkouts:
-                        profilePerformanceWorkoutHistory.isEmpty
-                            ? health.workouts
-                            : profilePerformanceWorkoutHistory,
-                    strengthWorkouts:
-                        strengthWorkout.workoutHistory
+                    healthRecords: personalRecords,
+                    stats: performanceStats,
+                    strengthRecords: strengthWorkout.personalRecords,
+                    strengthRepRecords: strengthWorkout.repPersonalRecords,
+                    performanceWorkouts: profilePerformanceWorkoutHistory.isEmpty
+                        ? health.workouts : profilePerformanceWorkoutHistory,
+                    strengthWorkouts: strengthWorkout.workoutHistory
                 )
             )
-            .font(
-                .system(
-                    size: 13.5,
-                    weight: .bold,
-                    design: .rounded
-                )
-            )
+            .font(.system(size: 22, weight: .bold, design: .rounded))
             .monospacedDigit()
-            .foregroundStyle(
-                ATHLTHTheme.primaryText
-            )
+            .foregroundStyle(ATHLTHTheme.primaryText)
             .lineLimit(1)
-            .minimumScaleFactor(0.58)
+            .minimumScaleFactor(0.72)
+            .contentTransition(.numericText())
+
+            Text(kind.title)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: 26, alignment: .topLeading)
         }
-        .padding(8)
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 72,
-            alignment: .topLeading
-        )
+        .padding(12)
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
         .background(
-            Color.black.opacity(0.018),
-            in: RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
+            LinearGradient(
+                colors: [
+                    Color.white.opacity(0.98),
+                    ATHLTHTheme.premiumGoldSoft.opacity(0.17)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            ),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
         )
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-            .stroke(
-                kind.tint.opacity(0.09),
-                lineWidth: 0.8
-            )
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(
+                    ATHLTHTheme.premiumGold.opacity(0.17), lineWidth: 0.8
+                )
         }
+        .accessibilityElement(children: .combine)
     }
 
     private var emptyRecordShowcaseCard:
         some View {
-        VStack(spacing: 5) {
+        VStack(spacing: 7) {
             Image(systemName: "plus")
                 .font(
                     .system(
@@ -14987,19 +14954,12 @@ struct ATHLTHProfileView: View {
                     norwegian: "Velg"
                 )
             )
-            .font(
-                .system(
-                    size: 8.5,
-                    weight: .semibold
-                )
-            )
-            .foregroundStyle(
-                ATHLTHTheme.mutedText
-            )
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(ATHLTHTheme.mutedText)
         }
         .frame(
             maxWidth: .infinity,
-            minHeight: 58
+            minHeight: 112
         )
         .background(
             Color.black.opacity(0.025),
