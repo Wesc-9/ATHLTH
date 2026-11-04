@@ -154,9 +154,10 @@ enum HomeTrainingPatternAdvisor {
             let uniqueDays = Set(matching.map {
                 calendar.startOfDay(for: $0.startedAt)
             }).sorted()
-            let gaps = zip(uniqueDays, uniqueDays.dropFirst()).compactMap {
-                lhs, rhs -> Double? in
-                let days = calendar.dateComponents([.day], from: lhs, to: rhs).day ?? 0
+            let gaps = zip(uniqueDays, uniqueDays.dropFirst()).compactMap { pair -> Double? in
+                let days = calendar.dateComponents(
+                    [.day], from: pair.0, to: pair.1
+                ).day ?? 0
                 return days > 0 ? Double(days) : nil
             }
             let minutes = matching.map(\.minutes).sorted()
@@ -238,14 +239,14 @@ enum HomeTrainingPatternAdvisor {
             }
         }
         var results: [StrengthRoutine] = []
-        for focus in Set(focused.map(\.focus)) {
+        for focus in Set(focused.map { $0.focus }) {
             let matches = focused.filter { $0.focus == focus }
                 .sorted { $0.workout.startedAt > $1.workout.startedAt }
             guard matches.count >= 2, let latest = matches.first,
                   let end = latest.workout.endedAt else { continue }
             let log = latest.workout
             let blocks: [WorkoutTemplateBlock] = log.exercises.compactMap { exercise in
-                let finished = exercise.sets.filter(\.isCompleted)
+                let finished = exercise.sets.filter { $0.isCompleted }
                 guard exercise.isCompleted, !finished.isEmpty else { return nil }
                 let typicalReps = finished.compactMap(\.completedReps).sorted()
                 var block = WorkoutTemplateBlock(
