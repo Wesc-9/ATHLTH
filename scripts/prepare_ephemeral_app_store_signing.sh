@@ -64,6 +64,70 @@ HTTP_CODE="$(curl --silent --show-error \
   --data-binary "@$RUNNER_TEMP/certificate-request.json" \
   "https://api.appstoreconnect.apple.com/v1/certificates")"
 
+# A previous 2.1.1 CI upload created distribution certificate 6TB6NHX4M6
+# (GitHub run 41816693546, signing at 2026-11-04 10:49 UTC). Its private
+# key was ephemeral and cannot be reused on a new runner. Do not indiscriminately
+# revoke any Apple certificate when the account reaches its signing limit.
+# This one-time recovery verifies the exact known CI certificate and its X.509
+# issuance window before retiring it. Other developer certificates are untouched.
+if [ "$HTTP_CODE" = "409" ] \
+  && grep -q "already have a current Distribution certificate" "$RUNNER_TEMP/certificate-response.json"; then
+  echo "::notice::Apple signing certificate limit reached; checking the verified previous ATHLTH CI certificate."
+  STALE_CERT_ID="6TB6NHX4M6"
+  LOOKUP_HTTP="$(curl --silent --show-error --retry 2 --retry-delay 3 \
+    --output "$RUNNER_TEMP/known-ci-certificate.json" \
+    --write-out '%{http_code}' \
+    --header "Authorization: Bearer $TOKEN" \
+    "https://api.appstoreconnect.apple.com/v1/certificates/$STALE_CERT_ID")"
+
+  if [ "$LOOKUP_HTTP" != "200" ]; then
+    echo "::error::Could not verify the previous ATHLTH CI signing certificate (HTTP $LOOKUP_HTTP); refusing to touch any other certificates."
+    exit 1
+  fi
+
+  python - "$RUNNER_TEMP/known-ci-certificate.json" "$STALE_CERT_ID" <<'PY'
+import base64
+from datetime import datetime, timezone
+import json
+import sys
+from cryptography import x509
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    item = json.load(handle)["data"]
+attrs = item["attributes"]
+if item.get("id") != sys.argv[2] or attrs.get("certificateType") != "DISTRIBUTION":
+    raise SystemExit("Previous ATHLTH CI certificate identity/type mismatch; no revocation performed")
+certificate = x509.load_der_x509_certificate(base64.b64decode(attrs["certificateContent"]))
+issued = certificate.not_valid_before_utc
+start = datetime(2026, 11, 4, 10, 40, tzinfo=timezone.utc)
+end = datetime(2026, 11, 4, 11, 0, tzinfo=timezone.utc)
+if not start <= issued <= end:
+    raise SystemExit(f"Certificate issued {issued} outside verified ATHLTH CI run; no revocation performed")
+print("Verified previous ATHLTH CI distribution certificate; safe targeted rotation.")
+PY
+
+  DELETE_HTTP="$(curl --silent --show-error \
+    --output "$RUNNER_TEMP/known-ci-delete-response.txt" \
+    --write-out '%{http_code}' \
+    --request DELETE \
+    --header "Authorization: Bearer $TOKEN" \
+    "https://api.appstoreconnect.apple.com/v1/certificates/$STALE_CERT_ID")"
+  if [ "$DELETE_HTTP" != "204" ]; then
+    echo "::error::Could not retire the verified CI certificate (HTTP $DELETE_HTTP); refusing any other certificate revocations."
+    exit 1
+  fi
+  echo "::notice::Retired only the verified old ATHLTH CI certificate. Retrying distribution signing."
+  TOKEN="$(make_token)"
+  HTTP_CODE="$(curl --silent --show-error \
+    --output "$RUNNER_TEMP/certificate-response.json" \
+    --write-out '%{http_code}' \
+    --request POST \
+    --header "Authorization: Bearer $TOKEN" \
+    --header "Content-Type: application/json" \
+    --data-binary "@$RUNNER_TEMP/certificate-request.json" \
+    "https://api.appstoreconnect.apple.com/v1/certificates")"
+fi
+
 if [ "$HTTP_CODE" != "201" ]; then
   echo "::error::Could not create Apple Distribution certificate (HTTP $HTTP_CODE)."
   cat "$RUNNER_TEMP/certificate-response.json"
