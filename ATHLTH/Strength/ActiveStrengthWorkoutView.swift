@@ -31,6 +31,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingAppendWorkout = false
 
     @State private var showingAIExercisePlanner = false
+    @State private var showingQuickAISuggestion = false
     @State private var pendingExercise: ExerciseLibraryEntry?
     @State private var editingSetResult:
         StrengthSetResultEditTarget?
@@ -321,6 +322,16 @@ struct ActiveStrengthWorkoutView: View {
                     appendAIExercises(
                         additions
                     )
+                }
+            }
+            .sheet(isPresented: $showingQuickAISuggestion) {
+                StrengthAIExercisePlannerView(
+                    existingExercises: activeExistingPlannedExercises,
+                    recentWorkouts: strength.workoutHistory,
+                    quickSuggestion: true
+                ) { additions in
+                    // Only the suggested single exercise is appended.
+                    appendAIExercises(Array(additions.prefix(1)))
                 }
             }
             .sheet(item: $pendingExercise) { entry in
@@ -7416,165 +7427,84 @@ struct ActiveStrengthWorkoutView: View {
                             .tint(ATHLTHTheme.accentDeep)
                         }
                     } else {
-                        VStack(spacing: 12) {
-                            Image(
-                                systemName:
-                                    "checkmark.seal.fill"
-                            )
-                            .font(.title2)
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .vitality
-                            )
-
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "All planned exercises are complete.",
-                                    norwegian:
-                                        "Alle planlagte øvelser er fullført."
-                                )
-                            )
+                        VStack(alignment: .leading, spacing: 15) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "checkmark.seal.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                Text(ATHLTHLocalization.choose(
+                                    english: "All exercises complete",
+                                    norwegian: "Alle øvelser fullført"
+                                ))
+                                .font(.headline)
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            }
+                            Text(ATHLTHLocalization.choose(
+                                english: "Review your results or add a little more training.",
+                                norwegian: "Se gjennom resultatene, eller legg til litt mer trening."
+                            ))
                             .font(.subheadline)
-                            .foregroundStyle(
-                                ATHLTHTheme
-                                    .mutedText
-                            )
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
                             Button {
-                                if strength
-                                    .addExtraSetToCurrentExercise() {
-                                    showingWorkoutReview =
-                                        false
-                                }
+                                showingWorkoutReview = true
                             } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "One more set",
-                                        norwegian:
-                                            "Ta ett ekstra sett"
-                                    ),
-                                    systemImage:
-                                        "plus.circle.fill"
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(.semibold)
-                                )
-                                .frame(
-                                    maxWidth:
-                                        .infinity,
-                                    minHeight: 44
-                                )
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(
-                                ATHLTHTheme
-                                    .accentDeep
-                            )
-
-                            Button {
-                                showingExerciseLibrary =
-                                    true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Add another exercise",
-                                        norwegian:
-                                            "Legg til en øvelse"
-                                    ),
-                                    systemImage:
-                                        "plus.rectangle.on.rectangle"
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(.semibold)
-                                )
-                                .frame(
-                                    maxWidth:
-                                        .infinity,
-                                    minHeight: 44
-                                )
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(
-                                ATHLTHTheme
-                                    .vitality
-                            )
-
-                            Button {
-                                showingAIExercisePlanner =
-                                    true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "AI add exercises",
-                                        norwegian:
-                                            "AI legg til øvelser"
-                                    ),
-                                    systemImage:
-                                        "sparkles"
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(.semibold)
-                                )
-                                .frame(
-                                    maxWidth:
-                                        .infinity,
-                                    minHeight: 44
-                                )
-                            }
-                            .buttonStyle(.bordered)
-                            .tint(
-                                ATHLTHTheme
-                                    .premiumGold
-                            )
-
-                            Button {
-                                showingWorkoutReview =
-                                    true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Review workout",
-                                        norwegian:
-                                            "Se sammendrag"
-                                    ),
-                                    systemImage:
-                                        "chart.bar.doc.horizontal"
-                                )
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Finish / View summary",
+                                    norwegian: "Avslutt / Se sammendrag"
+                                ), systemImage: "checkmark.circle")
                                 .font(.headline)
                                 .foregroundStyle(.white)
-                                .frame(
-                                    maxWidth:
-                                        .infinity,
-                                    minHeight: 52
-                                )
+                                .frame(maxWidth: .infinity, minHeight: 56)
                                 .background(
-                                    LinearGradient(
-                                        colors: [
-                                            ATHLTHTheme
-                                                .accentDeep,
-                                            ATHLTHTheme
-                                                .vitality
-                                        ],
-                                        startPoint:
-                                            .leading,
-                                        endPoint:
-                                            .trailing
-                                    ),
-                                    in:
-                                        RoundedRectangle(
-                                            cornerRadius: 18,
-                                            style:
-                                                .continuous
-                                        )
+                                    ATHLTHTheme.accentDeep,
+                                    in: RoundedRectangle(cornerRadius: 17)
                                 )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(ATHLTHLocalization.choose(
+                                english: "Review and save your workout before ending it.",
+                                norwegian: "Se over og lagre økten før den avsluttes."
+                            ))
+
+                            HStack(spacing: 7) {
+                                finishedWorkoutOption(
+                                    symbol: "plus.circle",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Add exercise", norwegian: "Legg til øvelse"
+                                    )
+                                ) {
+                                    showingExerciseLibrary = true
+                                }
+                                finishedWorkoutOption(
+                                    symbol: "repeat.circle",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Extra set", norwegian: "Ekstra sett"
+                                    )
+                                ) {
+                                    if strength.addExtraSetToCurrentExercise() {
+                                        showingWorkoutReview = false
+                                    }
+                                }
+                                finishedWorkoutOption(
+                                    symbol: "sparkles",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "AI suggestion", norwegian: "AI-forslag"
+                                    )
+                                ) {
+                                    showingQuickAISuggestion = true
+                                }
+                            }
+                            Button {
+                                showingAIExercisePlanner = true
+                            } label: {
+                                Label(ATHLTHLocalization.choose(
+                                    english: "Add several exercises with AI",
+                                    norwegian: "Legg til flere øvelser med AI"
+                                ), systemImage: "sparkles.rectangle.stack")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                .frame(maxWidth: .infinity, minHeight: 30)
                             }
                             .buttonStyle(.plain)
                         }
@@ -7737,6 +7667,36 @@ struct ActiveStrengthWorkoutView: View {
                             .none
                 )
             }
+    }
+
+    private func finishedWorkoutOption(
+        symbol: String,
+        title: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 17, weight: .medium))
+                Text(title)
+                    .font(.system(size: 11, weight: .semibold))
+                    .minimumScaleFactor(0.75)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
+            }
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .frame(maxWidth: .infinity, minHeight: 72)
+            .background(
+                ATHLTHPlanDesign.warmSurface,
+                in: RoundedRectangle(cornerRadius: 13)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 13)
+                    .strokeBorder(ATHLTHPlanDesign.accentInk.opacity(0.12))
+                    .allowsHitTesting(false)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func appendAIExercises(
