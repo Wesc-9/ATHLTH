@@ -54,19 +54,19 @@ enum ATHLTHPlanWorkoutActivityFilter: String, CaseIterable, Identifiable {
         case .all: return true
         case .running:
             return category == "running" || category == "treadmill" ||
-                (category.isEmpty && (workout.kind == .running || running))
+                running || (category.isEmpty && workout.kind == .running)
         case .walking:
-            return category == "walking" ||
-                (category.isEmpty && (workout.kind == .walking || walking))
+            return category == "walking" || walking ||
+                (category.isEmpty && workout.kind == .walking)
         case .strength:
-            return category == "strength" ||
-                (category.isEmpty && (workout.kind == .strength || strength))
+            return category == "strength" || strength ||
+                (category.isEmpty && workout.kind == .strength)
         case .cycling:
             return category == "cycling" || cycling
         case .mobility:
             return category == "mobility" || category == "recovery" ||
-                (category.isEmpty && (workout.kind == .mobility ||
-                                       workout.kind == .recovery || wellness))
+                wellness || (category.isEmpty &&
+                    (workout.kind == .mobility || workout.kind == .recovery))
         case .hybrid:
             return isHybrid
         }
