@@ -206,6 +206,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         let id = UUID()
         let draft: AIProgramDraft
         let proposal: ATHLTHGuidedPlanAutofill.Proposal
+        let ownerID: UUID
+        let planStart: Date
+        let weekCount: Int
     }
 
     private let guidedAIService = AIProgramService()
@@ -4398,6 +4401,215 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 day: day, week: guidedCurrentWeek,
                 phase: .main, kind: .exercise)
         }
+    }
+
+    /// Calls the same Supabase Coach generator used by the full AI plan flow.
+    /// No HealthKit history or injury notes are sent from this shortcut.
+    /// The request is explicitly consent-gated and never saves automatically.
+    @MainActor
+    private func generateGuidedAISuggestions() async {
+        guard !isGuidedAIFilling, session.signedIn,
+              step == .week, mode == .advanced,
+              weekPlanningApproach == .guided else { return }
+
+        isGuidedAIFilling = true
+        defer { isGuidedAIFilling = false }
+
+        let athleteID = session.profile.userID
+        let requestedStart = startDate
+        let requestedWeeks = weekCount
+        let availableDays = selectedDays.isEmpty ? Set([1, 3, 5]) : selectedDays
+        let minutes = min(max(advancedSessionMinutes, 5), 180)
+        let request = AIProgramRequest(
+            mode: AIProgramGenerationMode.generate.rawValue,
+            startDate: ISO8601DateFormatter().string(from: requestedStart),
+            weekCount: requestedWeeks,
+            sessionsPerWeek: availableDays.count,
+            aiChoosesFrequency: false,
+            preferredDays: availableDays.sorted(),
+            sessionDurationMinutes: minutes,
+            userNotes: "Activity: \(aiTrainingFocus.title). Goal: \(goal.title). " +
+                "Equipment: \(equipment.rawValue). Plan progressive, editable training " +
+                "on the selected weekdays; keep recovery days and realistic intensity. " +
+                "No health history or injury data has been shared.",
+            coachStrengthContext: nil,
+            goals: [AIProgramGoalInput(focus: aiTrainingFocus)],
+            existingDays: []
+        )
+
+        do {
+            let draft = try await guidedAIService.generate(request)
+            guard session.signedIn, session.profile.userID == athleteID,
+                  startDate == requestedStart, weekCount == requestedWeeks else {
+                // Never apply a response to a changed account or date range.
+                return
+            }
+
+            let issues = ATHLTHPlanDraftValidator.issues(
+                in: draft,
+                expectedWeeks: requestedWeeks,
+                allowedDayIndexes: availableDays,
+                maximumSessionsPerWeek: availableDays.count,
+                lockedDayKeys: [],
+                requireFullWeeks: true
+            )
+            guard issues.isEmpty else {
+                guidedAIError = ATHLTHLocalization.choose(
+                    english: "Coach returned an incomplete or incompatible plan. No dates were changed. Please retry.",
+                    norwegian: "Coach leverte en ufullstendig plan eller økter som ikke passer valgene dine. Ingen datoer ble endret. Prøv igjen."
+                )
+                return
+            }
+
+            let proposal = try ATHLTHGuidedPlanAutofill.propose(
+                draft,
+                existing: weekDayEdits,
+                protectedWeekdays: Set(structuredWorkoutsByDay.keys),
+                weekCount: requestedWeeks,
+                defaultSessionMinutes: minutes
+            )
+            guard proposal.hasChanges else {
+                guidedAIError = ATHLTHLocalization.choose(
+                    english: "Every date is already planned. AI will not replace workouts or rest days.",
+                    norwegian: "Alle dagene er allerede planlagt. AI erstatter ikke økter eller hviledager."
+                )
+                return
+            }
+            guidedAIFillPreview = GuidedAIFillPreview(
+                draft: draft, proposal: proposal,
+                ownerID: athleteID, planStart: requestedStart, weekCount: requestedWeeks
+            )
+        } catch {
+            guidedAIError = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func applyGuidedAISuggestions(_ preview: GuidedAIFillPreview) {
+        guard session.signedIn, session.profile.userID == preview.ownerID,
+              startDate == preview.planStart, weekCount == preview.weekCount else {
+            guidedAIFillPreview = nil
+            return
+        }
+        do {
+            // Re-apply the proposal against CURRENT edits. A newly hand-edited
+            // date is always protected even if the sheet opened earlier.
+            let proposal = try ATHLTHGuidedPlanAutofill.propose(
+                preview.draft,
+                existing: weekDayEdits,
+                protectedWeekdays: Set(structuredWorkoutsByDay.keys),
+                weekCount: weekCount,
+                defaultSessionMinutes: min(max(advancedSessionMinutes, 5), 180)
+            )
+            guard proposal.hasChanges else {
+                guidedAIFillPreview = nil
+                return
+            }
+            weekDayEdits = proposal.edits
+            firstGuidedWeekDecisionMade = true
+            guidedWeekAwaitingDecision = nil
+            guidedDayCursor = 0
+            selectedPlanWeekIndex = 0
+            guidedAIFillPreview = nil
+            saveResumableDraft()
+        } catch {
+            guidedAIFillPreview = nil
+            guidedAIError = error.localizedDescription
+        }
+    }
+
+    private func guidedAIFillReview(_ preview: GuidedAIFillPreview) -> some View {
+        NavigationStack {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Review ATHLTH Coach's suggestions",
+                        norwegian: "Se gjennom forslagene fra ATHLTH Coach"
+                    ))
+                    .font(.system(size: 25, weight: .semibold, design: .serif))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(preview.proposal.addedWorkouts) new workouts · \(preview.proposal.restDays) rest days. Existing days remain untouched.",
+                        norwegian: "\(preview.proposal.addedWorkouts) nye økter · \(preview.proposal.restDays) hviledager. Dager du har fylt ut, beholdes."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHTrainDesign.secondary)
+
+                    ForEach(Array(preview.draft.weeks.enumerated()), id: \.offset) { pair in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(ATHLTHLocalization.choose(english: "WEEK", norwegian: "UKE") +
+                                 " \(pair.offset + 1)")
+                                .font(.caption.weight(.bold))
+                                .tracking(1.4)
+                                .foregroundStyle(ATHLTHTrainDesign.bronze)
+
+                            ForEach(pair.element.days.sorted(by: {
+                                $0.dayIndex < $1.dayIndex
+                            }), id: \.dayIndex) { day in
+                                let key = pair.offset * 7 + day.dayIndex
+                                let protected = weekDayEdits[key] != nil ||
+                                    structuredWorkoutsByDay[day.dayIndex] != nil
+                                HStack(alignment: .top, spacing: 9) {
+                                    Text(dateForWeekDay(
+                                        day.dayIndex, weekIndex: pair.offset
+                                    ).formatted(.dateTime.weekday(.abbreviated).day().month()))
+                                        .font(.caption.weight(.medium))
+                                        .frame(width: 101, alignment: .leading)
+                                    Spacer(minLength: 2)
+                                    Text(protected
+                                         ? ATHLTHLocalization.choose(
+                                            english: "Kept as planned", norwegian: "Beholdes")
+                                         : (day.sessions.isEmpty
+                                            ? ATHLTHLocalization.choose(
+                                                english: "Rest day", norwegian: "Hviledag")
+                                            : day.sessions.map(\.title).joined(separator: ", ")))
+                                        .font(.caption)
+                                        .foregroundStyle(protected
+                                            ? ATHLTHTrainDesign.secondary
+                                            : ATHLTHTrainDesign.ink)
+                                        .multilineTextAlignment(.trailing)
+                                }
+                                .padding(.vertical, 5)
+                            }
+                        }
+                        .padding(14)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(ATHLTHPlanDesign.surface,
+                                    in: RoundedRectangle(cornerRadius: 17))
+                    }
+                }
+                .padding(18)
+            }
+            .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Coach suggestions", norwegian: "Forslag fra Coach"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(english: "Cancel", norwegian: "Avbryt")) {
+                        guidedAIFillPreview = nil
+                    }
+                }
+            }
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    applyGuidedAISuggestions(preview)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Fill empty days", norwegian: "Fyll ut tomme dager"),
+                          systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 51)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTrainDesign.bronze)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 10)
+                .background(.regularMaterial)
+            }
+        }
+        .presentationDetents([.large])
     }
 
     private var guidedWeekDecisionSource: Int? {
