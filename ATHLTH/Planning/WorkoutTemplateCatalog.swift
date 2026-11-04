@@ -348,6 +348,11 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
                 norwegian: "Pulssone S\(targetHeartRateZone)"
             ))
         }
+        // Include the athlete's planned perceived effort in the timeline.
+        // It is stored independently of the HR target and is not measured data.
+        if let targetEffortRPE, (1...10).contains(targetEffortRPE) {
+            parts.append("RPE \(targetEffortRPE)/10")
+        }
         if isIndoor == true, let treadmillInclinePercent,
            treadmillInclinePercent.isFinite,
            (0...20).contains(treadmillInclinePercent) {
