@@ -2208,90 +2208,101 @@ struct ActiveStrengthWorkoutView: View {
                 )
 
 
-                Button {
-                    _ = strength.continueFreeTrainingBetweenExercises()
-                    showingWorkoutReview = false
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Continue strength training without an exercise",
-                            norwegian: "Fortsett styrketrening uten bestemt øvelse"
-                        ),
-                        systemImage: "figure.strengthtraining.traditional"
-                    )
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .buttonStyle(.bordered)
-                .tint(ATHLTHPlanDesign.accentInk)
-
-                Button {
-                    showingExerciseLibrary =
-                        true
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Add another exercise",
-                            norwegian:
-                                "Legg til en øvelse"
-                        ),
-                        systemImage:
-                            "plus.rectangle.on.rectangle"
-                    )
-                    .font(.headline)
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 50
-                    )
-                }
-                .buttonStyle(.bordered)
-                .tint(
-                    ATHLTHTheme.vitality
-                )
-
-                Button {
-                    showingFinishConfirmation =
-                        true
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Finish workout",
-                            norwegian:
-                                "Avslutt økten"
-                        ),
-                        systemImage:
-                            "flag.checkered"
-                    )
-                    .font(.headline)
-                    .foregroundStyle(.white)
-                    .frame(
-                        maxWidth: .infinity,
-                        minHeight: 56
-                    )
-                    .background(
-                        LinearGradient(
-                            colors: [
-                                ATHLTHTheme
-                                    .accentDeep,
-                                ATHLTHTheme
-                                    .vitality
-                            ],
-                            startPoint:
-                                .leading,
-                            endPoint:
-                                .trailing
-                        ),
-                        in:
-                            RoundedRectangle(
-                                cornerRadius: 20,
-                                style:
-                                    .continuous
+                // One unmistakable primary action, then three equal-width
+                // secondary choices. All options keep the ongoing workout
+                // active unless the athlete confirms "Finish workout".
+                VStack(spacing: 10) {
+                    Button {
+                        showingFinishConfirmation = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Finish workout",
+                                norwegian: "Avslutt økten"
+                            ),
+                            systemImage: "flag.checkered"
+                        )
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, minHeight: 58)
+                        .background(
+                            LinearGradient(
+                                colors: [
+                                    ATHLTHTheme.accentDeep,
+                                    ATHLTHPlanDesign.accentInk
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            in: RoundedRectangle(
+                                cornerRadius: 18, style: .continuous
                             )
-                    )
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Review and confirm before ending this workout.",
+                        norwegian: "Se over og bekreft før treningsøkten avsluttes."
+                    ))
+
+                    HStack(alignment: .top, spacing: 8) {
+                        finishedWorkoutOption(
+                            symbol: "plus.circle",
+                            title: ATHLTHLocalization.choose(
+                                english: "Add exercise",
+                                norwegian: "Legg til øvelse"
+                            )
+                        ) {
+                            showingExerciseLibrary = true
+                        }
+
+                        finishedWorkoutOption(
+                            symbol: "sparkles",
+                            title: ATHLTHLocalization.choose(
+                                english: "Add with AI",
+                                norwegian: "Legg til fra AI"
+                            )
+                        ) {
+                            showingQuickAISuggestion = true
+                        }
+                        .contextMenu {
+                            Button {
+                                showingQuickAISuggestion = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Suggest one exercise",
+                                        norwegian: "Foreslå én øvelse"
+                                    ),
+                                    systemImage: "sparkles"
+                                )
+                            }
+                            Button {
+                                showingAIExercisePlanner = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Add several exercises",
+                                        norwegian: "Legg til flere øvelser"
+                                    ),
+                                    systemImage: "square.stack.3d.up"
+                                )
+                            }
+                        }
+
+                        finishedWorkoutOption(
+                            symbol: "figure.strengthtraining.traditional",
+                            title: ATHLTHLocalization.choose(
+                                english: "Continue without exercise",
+                                norwegian: "Fortsett uten øvelse"
+                            )
+                        ) {
+                            if strength.continueFreeTrainingBetweenExercises() {
+                                showingWorkoutReview = false
+                            }
+                        }
+                    }
                 }
-                .buttonStyle(.plain)
             } else {
                 if exercise.isEmbeddedRunningInterval == true &&
                     !strength.currentExerciseAllSetsCompleted {
@@ -3329,7 +3340,7 @@ struct ActiveStrengthWorkoutView: View {
                     style: .continuous
                 )
                 .stroke(
-                    ATHLTHTheme.vitality
+                    ATHLTHPlanDesign.accentInk
                         .opacity(0.12),
                     lineWidth: 1
                 )
@@ -3366,8 +3377,7 @@ struct ActiveStrengthWorkoutView: View {
         )
         .padding(12)
         .background(
-            ATHLTHTheme
-                .surfaceSage
+            ATHLTHTheme.premiumGoldSoft
                 .opacity(0.55),
             in:
                 RoundedRectangle(
@@ -3542,7 +3552,7 @@ struct ActiveStrengthWorkoutView: View {
                             .weight(.semibold)
                     )
                     .foregroundStyle(
-                        ATHLTHTheme.vitality
+                        ATHLTHPlanDesign.accentInk
                     )
                 }
             }
@@ -3577,7 +3587,7 @@ struct ActiveStrengthWorkoutView: View {
                                 .weight(.bold)
                         )
                         .foregroundStyle(
-                            ATHLTHTheme.vitality
+                            ATHLTHPlanDesign.accentInk
                         )
                         .frame(
                             width: 28,
