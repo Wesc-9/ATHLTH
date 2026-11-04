@@ -7287,160 +7287,88 @@ struct ActiveStrengthWorkoutView: View {
                                 .mutedText
                         )
 
+                        // The primary action is visually first and full width.
+                        // The current exercise has completed all its sets;
+                        // continuing enters set 1 of the *next exercise*.
                         Button {
-                            if strength
-                                .addExtraSetToCurrentExercise() {
-                                showingWorkoutReview =
-                                    false
-                            }
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "One more set",
-                                    norwegian:
-                                        "Ta ett ekstra sett"
-                                ),
-                                systemImage:
-                                    "plus.circle.fill"
-                            )
-                            .font(
-                                .subheadline
-                                    .weight(.semibold)
-                            )
-                            .frame(
-                                maxWidth: .infinity,
-                                minHeight: 44
-                            )
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(
-                            ATHLTHTheme
-                                .accentDeep
-                        )
-
-                        Button {
-                            showingExerciseQueue = true
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Choose another exercise",
-                                    norwegian: "Velg en annen øvelse"
-                                ),
-                                systemImage: "arrow.left.arrow.right"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .frame(maxWidth: .infinity, minHeight: 42)
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(ATHLTHTheme.accentDeep)
-
-                        Button {
-                            // Rest never blocks navigation. Clearing the timer
-                            // first also guarantees that the next exercise
-                            // starts in its normal logging state.
                             strength.skipRest()
-                            strength
-                                .moveToNextExercise()
+                            strength.moveToNextExercise()
                         } label: {
-                            HStack(spacing: 10) {
-                                Image(
-                                    systemName:
-                                        "arrow.right"
-                                )
-                                .font(
-                                    .system(
-                                        size: 16,
-                                        weight: .bold
-                                    )
-                                )
-
-                                Text(
-                                    ATHLTHLocalization.choose(
-                                        english:
-                                            "Next exercise now",
-                                        norwegian:
-                                            "Neste øvelse nå"
-                                    )
-                                )
-                                .font(
-                                    .headline
-                                )
-
-                                Spacer()
-
-                                Image(
-                                    systemName:
-                                        "chevron.right"
-                                )
-                                .font(
-                                    .caption
-                                        .weight(.bold)
-                                )
-                                .opacity(0.82)
+                            HStack(spacing: 12) {
+                                Image(systemName: "arrow.right.circle.fill")
+                                    .font(.title3)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Continue to next exercise",
+                                        norwegian: "Gå videre til neste øvelse"
+                                    ))
+                                    .font(.headline.weight(.semibold))
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Start set 1 of the next exercise",
+                                        norwegian: "Start sett 1 i neste øvelse"
+                                    ))
+                                    .font(.caption)
+                                    .opacity(0.86)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.bold))
                             }
-                            .foregroundStyle(
-                                .white
-                            )
-                            .padding(
-                                .horizontal,
-                                18
-                            )
-                            .frame(
-                                maxWidth:
-                                    .infinity,
-                                minHeight: 54
-                            )
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .frame(maxWidth: .infinity, minHeight: 62)
                             .background(
-                                LinearGradient(
-                                    colors: [
-                                        ATHLTHTheme
-                                            .accentDeep,
-                                        ATHLTHTheme
-                                            .vitality
-                                    ],
-                                    startPoint:
-                                        .leading,
-                                    endPoint:
-                                        .trailing
-                                ),
-                                in:
-                                    RoundedRectangle(
-                                        cornerRadius: 19,
-                                        style:
-                                            .continuous
-                                    )
-                            )
-                            .overlay {
-                                RoundedRectangle(
-                                    cornerRadius: 19,
-                                    style:
-                                        .continuous
+                                ATHLTHTheme.accentDeep,
+                                in: RoundedRectangle(
+                                    cornerRadius: 18, style: .continuous
                                 )
-                                .stroke(
-                                    Color.white
-                                        .opacity(0.22),
-                                    lineWidth: 1
-                                )
-                            }
-                            .shadow(
-                                color:
-                                    ATHLTHTheme
-                                        .accentDeep
-                                        .opacity(0.16),
-                                radius: 12,
-                                y: 6
                             )
                         }
                         .buttonStyle(.plain)
-                        .accessibilityHint(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Skips the remaining recommended rest and opens the next exercise.",
-                                norwegian:
-                                    "Hopper over resten av den anbefalte pausen og åpner neste øvelse."
-                            )
-                        )
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Finish resting and open set one in the next exercise.",
+                            norwegian: "Avslutt pausen og åpne første sett i neste øvelse."
+                        ))
+
+                        HStack(spacing: 10) {
+                            Button {
+                                if strength.addExtraSetToCurrentExercise() {
+                                    showingWorkoutReview = false
+                                }
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Extra set",
+                                        norwegian: "Ekstra sett"
+                                    ),
+                                    systemImage: "plus.circle"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.accentDeep)
+
+                            Button {
+                                showingExerciseQueue = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Change exercise",
+                                        norwegian: "Bytt øvelse"
+                                    ),
+                                    systemImage: "arrow.left.arrow.right"
+                                )
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.78)
+                                .frame(maxWidth: .infinity, minHeight: 48)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ATHLTHTheme.accentDeep)
+                        }
                     } else {
                         VStack(spacing: 12) {
                             Image(
