@@ -41,6 +41,28 @@ final class StrengthTimedSetCountdownTests: XCTestCase {
         // completes it explicitly from iPhone or the Watch command.
     }
 
+    func testWatchNextSetCommandSurvivesEncodingAndCanBeReplayedOnce() throws {
+        let command = WatchStrengthCommand(
+            id: UUID(),
+            workoutID: UUID(),
+            kind: .skipRestAndStartTimedSet,
+            reps: nil,
+            weightKilograms: nil,
+            restSeconds: nil,
+            addRestSeconds: nil,
+            sentAt: base,
+            exerciseIndex: 0,
+            setIndex: 1
+        )
+        let data = try JSONEncoder().encode(command)
+        let decoded = try JSONDecoder().decode(WatchStrengthCommand.self, from: data)
+        XCTAssertEqual(decoded.id, command.id)
+        XCTAssertEqual(decoded.workoutID, command.workoutID)
+        XCTAssertEqual(decoded.kind, .skipRestAndStartTimedSet)
+        XCTAssertEqual(decoded.exerciseIndex, 0)
+        XCTAssertEqual(decoded.setIndex, 1)
+    }
+
     func testFiveMinuteTimerCountsDownAgainstRealClock() {
         let timer = countdown(started: base)
         XCTAssertEqual(timer.secondsRemaining(at: base), 300)
