@@ -18,8 +18,17 @@ struct ATHLTHStudioPlanCanvasView: View {
     @State private var newPlanWeeks = 4
     @State private var showingAdvancedBuilder = false
     @State private var showingPlanMetadata = false
-    @State private var showingWorkoutFlow = false
-    @State private var workoutNavigation: ATHLTHTrainNavigationRequest? = .plan
+    /// The existing plan's workout edits in the right-hand Studio column.
+    /// This references the same AppSessionStore session as the iPhone builder.
+    @State private var inlineWorkout: InlineWorkoutDestination?
+
+    private struct InlineWorkoutDestination: Identifiable {
+        let planID: UUID
+        let dayID: UUID
+        let expectedPlanVersion: Int
+        let workout: PlannedSession
+        var id: UUID { workout.id }
+    }
     @State private var dropMode: DropMode = .move
     @State private var warning: String?
 
@@ -69,11 +78,16 @@ struct ATHLTHStudioPlanCanvasView: View {
         .onChange(of: selectedPlanID) { _, _ in
             selectedWeekID = nil
             selectedDayID = nil
+            inlineWorkout = nil
+        }
+        .onChange(of: selectedWeekID) { _, _ in
+            inlineWorkout = nil
         }
         .onChange(of: session.profile.userID) { _, _ in
             selectedPlanID = nil
             selectedWeekID = nil
             selectedDayID = nil
+            inlineWorkout = nil
             creatingPlan = false
         }
         .sheet(isPresented: $showingPlanMetadata) {
@@ -97,10 +111,7 @@ struct ATHLTHStudioPlanCanvasView: View {
             )
             .environment(\.athlthStudioFullscreenEditing, true)
         }
-        .fullScreenCover(isPresented: $showingWorkoutFlow) {
-            ATHLTHStudioTrainWorkspaceView(navigationRequest: $workoutNavigation)
-        }
-        .alert(
+         .alert(
             ATHLTHLocalization.choose(
                 english: "Could not update training plan",
                 norwegian: "Kunne ikke oppdatere treningsplanen"
@@ -143,18 +154,29 @@ struct ATHLTHStudioPlanCanvasView: View {
                     weekCanvas(plan, week: week, weekIndex: weekIndex)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    ATHLTHStudioPlanDayEditorView(
-                        plan: plan,
-                        day: day,
-                        date: dayDate,
-                        onOpenAdvanced: { workoutID in
-                            openFullWorkout(planID: plan.id, workoutID: workoutID)
+                    Group {
+                        if let inlineWorkout, inlineWorkout.planID == plan.id {
+                            inlineExistingWorkoutEditor(inlineWorkout)
+                                .frame(width: min(660, max(450, width * 0.49)))
+                        } else {
+                            ATHLTHStudioPlanDayEditorView(
+                                plan: plan,
+                                day: day,
+                                date: dayDate,
+                                onOpenAdvanced: { workoutID in
+                                    openFullWorkout(planID: plan.id, workoutID: workoutID)
+                                }
+                            )
+                            .id(day.id)
+                            .frame(width: min(344, max(286, width * 0.31)))
                         }
-                    )
-                    .id(day.id)
-                    .frame(width: min(344, max(286, width * 0.31)))
+                    }
                     .frame(maxHeight: .infinity)
                 }
+            } else if let inlineWorkout, inlineWorkout.planID == plan.id {
+                // In Stage Manager's narrow window the editor occupies the
+                // workspace rather than forcing three unusably slim columns.
+                inlineExistingWorkoutEditor(inlineWorkout)
             } else {
                 ScrollView {
                     VStack(spacing: 13) {
@@ -954,9 +976,39 @@ struct ATHLTHStudioPlanCanvasView: View {
         creatingPlan = false
     }
 
+    private func inlineExistingWorkoutEditor(
+        _ destination: InlineWorkoutDestination
+    ) -> some View {
+        ATHLTHTrainWorkoutBuilderView(
+            planID: destination.planID,
+            dayID: destination.dayID,
+            expectedPlanVersion: destination.expectedPlanVersion,
+            existingWorkout: destination.workout,
+            onCloseInline: { inlineWorkout = nil }
+        )
+        .id(destination.id)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(ATHLTHStudioStyle.paper)
+    }
+
     private func openFullWorkout(planID: UUID, workoutID: UUID) {
-        workoutNavigation = .workout(planID: planID, workoutID: workoutID)
-        showingWorkoutFlow = true
+        guard let plan = session.trainingPlan(withID: planID),
+              let day = plan.weeks.flatMap(\.days).first(where: {
+                  $0.sessions.contains(where: { $0.id == workoutID })
+              }),
+              let workout = day.sessions.first(where: { $0.id == workoutID }) else {
+            warning = ATHLTHLocalization.choose(
+                english: "The workout was not found in the latest plan. Reload the day and try again.",
+                norwegian: "Økten finnes ikke i den siste planen. Last inn dagen på nytt og prøv igjen."
+            )
+            return
+        }
+        inlineWorkout = InlineWorkoutDestination(
+            planID: plan.id,
+            dayID: day.id,
+            expectedPlanVersion: plan.version,
+            workout: workout
+        )
     }
 
     private func currentWeekIndex(in plan: TrainingPlan) -> Int {
