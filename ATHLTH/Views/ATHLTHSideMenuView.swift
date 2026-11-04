@@ -9,6 +9,9 @@ struct ATHLTHSideMenuView: View {
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var health: HealthKitManager
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @SceneStorage("athlth.sideMenu.trainingLibraryExpanded")
+    private var isTrainingLibraryExpanded = false
 
     let selectedTab: Int
     let onSelect: (ATHLTHSideMenuDestination) -> Void
@@ -63,12 +66,7 @@ struct ATHLTHSideMenuView: View {
                                 english: "TRAINING TOOLS",
                                 norwegian: "TRENING OG VERKTØY"
                             ) {
-                                menuRow(
-                                    .trainingLibrary,
-                                    english: "Training library",
-                                    norwegian: "Treningsbibliotek",
-                                    icon: "books.vertical"
-                                )
+                                trainingLibraryMenu
                                 menuRow(
                                     .trainTogether,
                                     english: "Train Together",
@@ -260,6 +258,102 @@ struct ATHLTHSideMenuView: View {
             .padding(.leading, 13)
 
             VStack(spacing: 2, content: content)
+        }
+    }
+
+
+    /// Library name opens the complete hub. Only the separate trailing
+    /// chevron expands or collapses the four personal shortcuts.
+    private var trainingLibraryMenu: some View {
+        VStack(spacing: 2) {
+            HStack(spacing: 0) {
+                Button {
+                    onSelect(.trainingLibrary)
+                } label: {
+                    HStack(spacing: 15) {
+                        Image(systemName: "books.vertical")
+                            .font(.system(size: 18, weight: .regular))
+                            .frame(width: 24)
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .accessibilityHidden(true)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Training library",
+                            norwegian: "Treningsbibliotek"
+                        ))
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+
+                        Spacer(minLength: 4)
+                    }
+                    .padding(.leading, 13)
+                    .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 58 : 48)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-side-menu-training-library-open")
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Opens the complete training library",
+                    norwegian: "Åpner hele treningsbiblioteket"
+                ))
+
+                Button {
+                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.20)) {
+                        isTrainingLibraryExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: isTrainingLibraryExpanded
+                          ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .frame(width: 48,
+                               height: dynamicTypeSize.isAccessibilitySize ? 58 : 48)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: isTrainingLibraryExpanded
+                        ? "Collapse training library shortcuts"
+                        : "Expand training library shortcuts",
+                    norwegian: isTrainingLibraryExpanded
+                        ? "Skjul snarveier i treningsbiblioteket"
+                        : "Vis snarveier i treningsbiblioteket"
+                ))
+                .accessibilityIdentifier("athlth-side-menu-training-library-expand")
+            }
+
+            if isTrainingLibraryExpanded {
+                VStack(spacing: 1) {
+                    menuRow(
+                        .myExercises,
+                        english: "My exercises",
+                        norwegian: "Mine øvelser",
+                        icon: "dumbbell"
+                    )
+                    menuRow(
+                        .myRoutes,
+                        english: "My routes",
+                        norwegian: "Mine ruter",
+                        icon: "map"
+                    )
+                    menuRow(
+                        .myTrainingPlans,
+                        english: "My training plans",
+                        norwegian: "Mine treningsplaner",
+                        icon: "calendar"
+                    )
+                    menuRow(
+                        .myWorkouts,
+                        english: "My workouts",
+                        norwegian: "Mine treningsøkter",
+                        icon: "bookmark"
+                    )
+                }
+                .padding(.leading, 18)
+                .padding(.bottom, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
         }
     }
 
