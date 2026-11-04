@@ -1,0 +1,168 @@
+import SwiftUI
+
+/// Separate iPad presentation over the same stores used by iPhone.
+/// The sidebar is permanent in regular-width landscape windows; the system
+/// collapses columns naturally when Stage Manager provides a narrow window.
+private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
+    case overview, planner, insights, history, explore, community, coach, settings
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .overview: return ATHLTHLocalization.choose(english: "Overview", norwegian: "Oversikt")
+        case .planner: return ATHLTHLocalization.choose(english: "Plan Studio", norwegian: "Plan Studio")
+        case .insights: return ATHLTHLocalization.choose(english: "Insights Lab", norwegian: "Innsiktslab")
+        case .history: return ATHLTHLocalization.choose(english: "Workout history", norwegian: "Treningshistorikk")
+        case .explore: return ATHLTHLocalization.choose(english: "Routes & Explore", norwegian: "Ruter og utforsk")
+        case .community: return ATHLTHLocalization.choose(english: "Community", norwegian: "Fellesskap")
+        case .coach: return "ATHLTH Coach"
+        case .settings: return ATHLTHLocalization.choose(english: "Settings", norwegian: "Innstillinger")
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .overview: "square.grid.2x2"
+        case .planner: "calendar"
+        case .insights: "chart.xyaxis.line"
+        case .history: "clock.arrow.circlepath"
+        case .explore: "map"
+        case .community: "person.3"
+        case .coach: "sparkles"
+        case .settings: "gearshape"
+        }
+    }
+}
+
+struct ATHLTHiPadStudioRootView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var selection: ATHLTHStudioDestination = .overview
+    @State private var selectedWorkout: WorkoutSummary?
+    @State private var showingInspector = false
+
+    private let canvas = Color(red: 0.985, green: 0.979, blue: 0.965)
+    private let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
+    private let gold = Color(red: 0.69, green: 0.54, blue: 0.32)
+
+    var body: some View {
+        NavigationSplitView {
+            sidebar
+                .navigationSplitViewColumnWidth(min: 210, ideal: 244, max: 280)
+        } detail: {
+            NavigationStack {
+                page
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(canvas.ignoresSafeArea())
+                    .navigationTitle(selection.label)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button {
+                                selection = .coach
+                            } label: {
+                                Label("ATHLTH Coach", systemImage: "sparkles")
+                            }
+                        }
+                    }
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+        .tint(gold)
+        .inspector(isPresented: $showingInspector) {
+            if let selectedWorkout {
+                ATHLTHStudioWorkoutInspectionView(workout: selectedWorkout)
+                    .inspectorColumnWidth(min: 270, ideal: 320, max: 400)
+            }
+        }
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 5) {
+                Text("ATHLTH")
+                    .font(.system(size: 25, weight: .bold, design: .rounded))
+                    .tracking(2.2)
+                    .foregroundStyle(ink)
+                Text("STUDIO")
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(3)
+                    .foregroundStyle(gold)
+            }
+            .padding(.horizontal, 23)
+            .padding(.top, 27)
+            .padding(.bottom, 26)
+
+            ScrollView {
+                VStack(spacing: 5) {
+                    ForEach(ATHLTHStudioDestination.allCases) { destination in
+                        Button {
+                            selection = destination
+                        } label: {
+                            HStack(spacing: 13) {
+                                Image(systemName: destination.symbol)
+                                    .font(.system(size: 17))
+                                    .frame(width: 24)
+                                Text(destination.label)
+                                    .font(.system(size: 14, weight: selection == destination ? .semibold : .medium))
+                                Spacer(minLength: 0)
+                            }
+                            .padding(.horizontal, 15)
+                            .frame(minHeight: 46)
+                            .foregroundStyle(selection == destination ? ink : ink.opacity(0.68))
+                            .background {
+                                if selection == destination {
+                                    RoundedRectangle(cornerRadius: 13).fill(.white)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selection == destination ? .isSelected : [])
+                    }
+                }
+                .padding(.horizontal, 11)
+            }
+
+            VStack(alignment: .leading, spacing: 5) {
+                Text(session.profile.displayName.isEmpty ? "ATHLTH" : session.profile.displayName)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                Text(ATHLTHLocalization.choose(
+                    english: "Your body. Your data. Your progress.",
+                    norwegian: "Din kropp. Dine data. Din fremgang."
+                ))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(2)
+            }
+            .padding(20)
+        }
+        .background(canvas)
+    }
+
+    @ViewBuilder
+    private var page: some View {
+        switch selection {
+        case .overview:
+            ATHLTHStudioDashboardView(onInspect: inspect)
+        case .planner:
+            ATHLTHStudioPlannerView()
+        case .insights:
+            ATHLTHStudioInsightsView()
+        case .history:
+            ATHLTHStudioHistoryView(onInspect: inspect)
+        case .explore:
+            ATHLTHExploreView()
+        case .community:
+            ATHLTHCommunityV5View()
+        case .coach:
+            RecoveryCoachInboxDestinationView()
+        case .settings:
+            ATHLTHSettingsView()
+        }
+    }
+
+    private func inspect(_ workout: WorkoutSummary) {
+        selectedWorkout = workout
+        showingInspector = true
+    }
+}

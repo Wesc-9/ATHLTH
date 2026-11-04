@@ -1092,6 +1092,10 @@ struct AppRootView: View {
                 )
             } else if !appSession.signedIn || !appSession.onboardingCompleted {
                 OnboardingFlowView()
+            } else if ATHLTHDeviceRole.isIPad {
+                // Studio has its own adaptive landscape-first navigation.
+                // Keep the existing iPhone tab shell untouched.
+                AnyView(ATHLTHiPadStudioRootView())
             } else {
                 AnyView(ProductRootTabView())
             }
