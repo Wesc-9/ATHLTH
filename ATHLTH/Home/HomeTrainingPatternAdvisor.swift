@@ -523,6 +523,69 @@ enum HomeTrainingPatternAdvisor {
             detail = tr("Controlled running.", "Kontrollert løping.")
         }
 
+        // The Home tile is intentionally short. The longer, specific
+        // explanation above is retained for its information sheet.
+        let shortDescription: String = {
+            switch choice {
+            case .planned:
+                return tr(
+                    "Your planned workout is ready. Adjust the effort.",
+                    "Den planlagte økten er klar. Tilpass innsatsen."
+                )
+            case .restDay:
+                if snapshot.hasCompletedWorkoutToday {
+                    return tr(
+                        "You have trained today. Make room for recovery.",
+                        "Du har trent i dag. Gi kroppen tid til hvile."
+                    )
+                }
+                return lowered
+                    ? tr("A quieter day is recommended.",
+                         "En roligere dag passer best nå.")
+                    : tr("Prioritize recovery today.",
+                         "Prioriter restitusjon i dag.")
+            case .historicalStrength:
+                return tr(
+                    "A familiar strength session fits your history.",
+                    "En kjent styrkeøkt passer treningsrytmen din."
+                )
+            case .easyWalk:
+                return tr(
+                    "An easy walk fits today's recommendation.",
+                    "En rolig gåtur passer i dag."
+                )
+            case .easyRun:
+                if lowered {
+                    return tr(
+                        "Keep your run shorter and easy today.",
+                        "Velg en kort og rolig løpetur i dag."
+                    )
+                }
+                if let days = runs?.daysSinceLast,
+                   let gap = runs?.usualGapDays,
+                   days > Int(max(3, ceil(gap * 1.6))) {
+                    return tr(
+                        "\(days) days since your last run. Ease back in.",
+                        "\(days) dager siden siste løpetur. Start rolig igjen."
+                    )
+                }
+                return tr(
+                    "An easy run fits your usual training rhythm.",
+                    "En rolig løpetur passer treningsrytmen din."
+                )
+            case .progressiveRun:
+                return tr(
+                    "Start easy. Increase the pace only if comfortable.",
+                    "Start rolig. Øk farten bare hvis det føles bra."
+                )
+            case .tempoRun:
+                return tr(
+                    "Controlled running fits your current rhythm.",
+                    "Kontrollert tempo passer treningsrytmen din."
+                )
+            }
+        }()
+
         let petPrompt: String? = {
             guard case .easyWalk = choice, let dogName = snapshot.dogName
             else { return nil }
@@ -543,6 +606,7 @@ enum HomeTrainingPatternAdvisor {
                 "Based on your routine", "Basert på dine treningsvaner"
             ), symbol: "sparkles", destination: .training,
             evidence: evidence, dayDescription: explanation,
+            shortDescription: shortDescription,
             suggestedWorkout: choice, suggestedTitle: title,
             suggestedDetail: (petPrompt ?? "") + detail,
             strengthSession: proposedStrength
