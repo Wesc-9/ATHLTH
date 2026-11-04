@@ -5,11 +5,20 @@ import SwiftUI
 /// preview must never silently rewrite scheduled dates or recorded workouts.
 struct ATHLTHStudioPlannerView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var health: HealthKitManager
+    @EnvironmentObject private var strength: StrengthWorkoutStore
     @State private var selectedWeekIndex = 0
     @State private var showingTrainingEditor = false
     @State private var trainRequest: ATHLTHTrainNavigationRequest? = .plan
     @State private var additionalMinutes: Double = 30
     @State private var scenario = 0
+    @State private var dragMode: DragMode = .move
+    @State private var moveError: String?
+
+    private enum DragMode: String, CaseIterable, Identifiable {
+        case move, copy
+        var id: String { rawValue }
+    }
 
     private var plan: TrainingPlan? {
         session.activePlan ?? session.scheduledPlans.first
@@ -47,7 +56,7 @@ struct ATHLTHStudioPlannerView: View {
                     Text(plan.title)
                         .font(.title2.weight(.semibold))
                     weekPicker(plan.weeks)
-                    weekLayout(week)
+                    weekLayout(week, plan: plan, weekIndex: safeWeek)
                     scenarioLab(week)
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
@@ -80,6 +89,17 @@ struct ATHLTHStudioPlannerView: View {
         .sheet(isPresented: $showingTrainingEditor) {
             ATHLTHTrainView(navigationRequest: $trainRequest, isActive: true)
         }
+        .alert(
+            ATHLTHLocalization.choose(english: "Could not update plan", norwegian: "Kunne ikke oppdatere planen"),
+            isPresented: Binding(
+                get: { moveError != nil },
+                set: { if !$0 { moveError = nil } }
+            )
+        ) {
+            Button("OK", role: .cancel) { moveError = nil }
+        } message: {
+            Text(moveError ?? "")
+        }
     }
 
     private func weekPicker(_ weeks: [TrainingPlanWeek]) -> some View {
@@ -106,7 +126,7 @@ struct ATHLTHStudioPlannerView: View {
         .scrollIndicators(.hidden)
     }
 
-    private func weekLayout(_ week: TrainingPlanWeek) -> some View {
+    private func weekLayout(_ week: TrainingPlanWeek, plan: TrainingPlan, weekIndex: Int) -> some View {
         VStack(alignment: .leading, spacing: 17) {
             HStack {
                 Text(ATHLTHLocalization.choose(
@@ -114,15 +134,27 @@ struct ATHLTHStudioPlannerView: View {
                 ))
                 .font(.headline)
                 Spacer()
+                Picker(ATHLTHLocalization.choose(english: "Drop action", norwegian: "Slipp-handling"), selection: $dragMode) {
+                    Text(ATHLTHLocalization.choose(english: "Move", norwegian: "Flytt")).tag(DragMode.move)
+                    Text(ATHLTHLocalization.choose(english: "Copy", norwegian: "Kopier")).tag(DragMode.copy)
+                }
+                .pickerStyle(.segmented)
+                .frame(width: 160)
                 Text("\(week.days.reduce(0) { $0 + $1.sessions.filter { !$0.isExplicitRestDay }.count }) " +
                     ATHLTHLocalization.choose(english: "sessions", norwegian: "økter"))
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Text(ATHLTHLocalization.choose(
+                english: "Drag a future workout to another day. Finished workouts stay protected.",
+                norwegian: "Dra en fremtidig økt til en annen dag. Fullførte økter er beskyttet."
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
             ScrollView(.horizontal) {
                 HStack(alignment: .top, spacing: 10) {
                     ForEach(week.days.sorted { $0.dayIndex < $1.dayIndex }) { day in
-                        dayCard(day)
+                        dayCard(day, plan: plan, weekIndex: weekIndex)
                             .frame(minWidth: 155, maxWidth: .infinity, alignment: .top)
                     }
                 }
@@ -134,7 +166,7 @@ struct ATHLTHStudioPlannerView: View {
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
-    private func dayCard(_ day: TrainingPlanDay) -> some View {
+    private func dayCard(_ day: TrainingPlanDay, plan: TrainingPlan, weekIndex: Int) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(day.title.isEmpty ? "\(ATHLTHLocalization.choose(english: "Day", norwegian: "Dag")) \(day.dayIndex + 1)" : day.title)
                 .font(.subheadline.weight(.semibold))
@@ -160,6 +192,7 @@ struct ATHLTHStudioPlannerView: View {
                     .padding(12)
                     .background(.white, in: RoundedRectangle(cornerRadius: 13))
                     .overlay(RoundedRectangle(cornerRadius: 13).stroke(ATHLTHStudioStyle.outline.opacity(0.5)))
+                    .draggable(item.id.uuidString)
                 }
             }
             Spacer(minLength: 0)
@@ -168,6 +201,41 @@ struct ATHLTHStudioPlannerView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(minHeight: 170, alignment: .top)
         .background(ATHLTHStudioStyle.canvas, in: RoundedRectangle(cornerRadius: 15))
+        .dropDestination(for: String.self) { values, _ in
+            guard let raw = values.first,
+                  let workoutID = UUID(uuidString: raw),
+                  let start = plan.startDate,
+                  let target = Calendar.current.date(
+                    byAdding: .day,
+                    value: weekIndex * 7 + day.dayIndex - 1,
+                    to: Calendar.current.startOfDay(for: start)
+                  ) else { return false }
+            let success: Bool
+            if dragMode == .copy {
+                success = session.copyPlanStudioWorkout(
+                    planID: plan.id,
+                    sourceWorkoutID: workoutID,
+                    targetDayID: day.id,
+                    expectedVersion: plan.version
+                )
+            } else {
+                success = session.movePlanStudioWorkout(
+                    planID: plan.id,
+                    workoutID: workoutID,
+                    targetDate: target,
+                    expectedVersion: plan.version,
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strength.workoutHistory
+                )
+            }
+            if !success {
+                moveError = ATHLTHLocalization.choose(
+                    english: "The workout may be completed, in the past, or the plan may have changed. Reload and try again.",
+                    norwegian: "Økten kan være fullført eller i fortiden, eller planen kan ha blitt endret. Oppdater og prøv igjen."
+                )
+            }
+            return success
+        }
     }
 
     private func scenarioLab(_ week: TrainingPlanWeek) -> some View {
