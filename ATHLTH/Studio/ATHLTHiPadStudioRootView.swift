@@ -78,7 +78,13 @@ struct ATHLTHiPadStudioRootView: View {
                 studioDetail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(canvas.ignoresSafeArea())
-                    .navigationTitle(selection.label)
+                    // Overview owns its compact title/metrics inside the
+                    // content. Avoid the duplicate large "Overview" title
+                    // that previously consumed substantial iPad space.
+                    .navigationTitle(selection == .overview ? "" : selection.label)
+                    .navigationBarTitleDisplayMode(
+                        selection == .overview ? .inline : .automatic
+                    )
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button {
