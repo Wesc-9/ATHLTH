@@ -56,6 +56,10 @@ struct WatchStrengthTimedSetPage: View {
                     session.inputMode == .iPhone && started &&
                     !session.isResting && !session.currentExerciseComplete &&
                     !workout.strengthActionPending
+                let canStartFromIPhoneMode =
+                    session.inputMode == .iPhone && !started &&
+                    !session.isResting && !session.currentExerciseComplete &&
+                    !workout.strengthActionPending
                 let isRunning = isRunningSegment(session)
 
                 GeometryReader { geometry in
@@ -167,7 +171,7 @@ struct WatchStrengthTimedSetPage: View {
 
                         Spacer(minLength: 1)
 
-                        if editable || canAdvanceFromIPhoneMode {
+                        if editable || canAdvanceFromIPhoneMode || canStartFromIPhoneMode {
                             HStack(spacing: 7) {
                                 if editable && !finished {
                                     Button {
@@ -190,12 +194,29 @@ struct WatchStrengthTimedSetPage: View {
                                           : tr("Start phase", "Start del"))
                                 }
 
-                                Button {
-                                    // The current workout/set IDs are included in the
-                                    // durable completion command. The phone accepts the
-                                    // action once and ignores stale/double taps.
-                                    workout.completeStrengthSet()
-                                } label: {
+                                if canStartFromIPhoneMode {
+                                    Button {
+                                        workout.startOrResumeTimedStrengthSet(
+                                            allowIPhoneOnly: true
+                                        )
+                                    } label: {
+                                        Label(
+                                            tr("Start set", "Start sett"),
+                                            systemImage: "play.fill"
+                                        )
+                                        .font(.system(size: 11, weight: .bold))
+                                        .frame(maxWidth: .infinity)
+                                        .frame(height: compact ? 32 : 36)
+                                    }
+                                    .buttonStyle(.borderedProminent)
+                                    .tint(WatchTheme.accentDeep)
+                                } else {
+                                    Button {
+                                        // The current workout/set IDs are included in the
+                                        // durable completion command. The phone accepts the
+                                        // action once and ignores stale/double taps.
+                                        workout.completeStrengthSet()
+                                    } label: {
                                     Label(
                                         isRunning
                                           ? tr("Finish running phase", "Avslutt løpedel")
@@ -214,10 +235,11 @@ struct WatchStrengthTimedSetPage: View {
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .tint(WatchTheme.accentDeep)
-                                .accessibilityHint(tr(
-                                    "Finish this set now, even before or after the time target.",
-                                    "Fullfør settet nå, før eller etter tidsmålet."
-                                ))
+                                    .accessibilityHint(tr(
+                                        "Finish this set now, even before or after the time target.",
+                                        "Fullfør settet nå, før eller etter tidsmålet."
+                                    ))
+                                }
                             }
                         } else if session.inputMode == .iPhone {
                             Text(tr("Timer controlled on iPhone", "Tid styres på iPhone"))
