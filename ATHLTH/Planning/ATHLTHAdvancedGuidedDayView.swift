@@ -68,6 +68,10 @@ struct ATHLTHAdvancedGuidedDayView: View {
             if !isRestDay { quickActions }
         }
         .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+        .onChange(of: date) { _, _ in
+            // Never carry an uncommitted group to another calendar day.
+            composingGroup = nil
+        }
         .confirmationDialog(
             tr("Replace workouts with a rest day?", "Erstatte øktene med en hviledag?"),
             isPresented: $confirmingRestReplacement, titleVisibility: .visible
