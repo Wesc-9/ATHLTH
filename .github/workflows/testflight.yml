@@ -374,6 +374,13 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      # The archive is intentionally unsigned. Create an explicit distribution
+      # profile for every embedded bundle before Xcode export, including the
+      # Watch Widget extension. This avoids the fragile online profile lookup.
+      - name: Prepare explicit App Store signing for all four bundles
+        shell: bash
+        run: bash scripts/prepare_ephemeral_app_store_signing.sh
+
       - name: Seed archive entitlements with ad-hoc signatures
         shell: bash
         run: |
@@ -416,9 +423,22 @@ jobs:
             <key>destination</key>
             <string>export</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
             <key>teamID</key>
             <string>$APPLE_TEAM_ID</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.wesc9.athlth</key>
+              <string>$PROFILE_MAIN_NAME</string>
+              <key>com.wesc9.athlth.widgets</key>
+              <string>$PROFILE_WIDGET_NAME</string>
+              <key>com.wesc9.athlth.watchkitapp</key>
+              <string>$PROFILE_WATCH_NAME</string>
+              <key>com.wesc9.athlth.watchkitapp.widgets</key>
+              <string>$PROFILE_WATCH_WIDGET_NAME</string>
+            </dict>
             <key>manageAppVersionAndBuildNumber</key>
             <false/>
             <key>uploadSymbols</key>
@@ -529,9 +549,22 @@ jobs:
             <key>destination</key>
             <string>upload</string>
             <key>signingStyle</key>
-            <string>automatic</string>
+            <string>manual</string>
+            <key>signingCertificate</key>
+            <string>Apple Distribution</string>
             <key>teamID</key>
             <string>$APPLE_TEAM_ID</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>com.wesc9.athlth</key>
+              <string>$PROFILE_MAIN_NAME</string>
+              <key>com.wesc9.athlth.widgets</key>
+              <string>$PROFILE_WIDGET_NAME</string>
+              <key>com.wesc9.athlth.watchkitapp</key>
+              <string>$PROFILE_WATCH_NAME</string>
+              <key>com.wesc9.athlth.watchkitapp.widgets</key>
+              <string>$PROFILE_WATCH_WIDGET_NAME</string>
+            </dict>
             <key>manageAppVersionAndBuildNumber</key>
             <false/>
             <key>uploadSymbols</key>
@@ -637,3 +670,8 @@ jobs:
             ~/Library/Logs/DiagnosticReports
             ${{ runner.temp }}/export
           if-no-files-found: ignore
+
+      - name: Clean up ephemeral App Store signing
+        if: always()
+        shell: bash
+        run: bash scripts/cleanup_ephemeral_app_store_signing.sh
