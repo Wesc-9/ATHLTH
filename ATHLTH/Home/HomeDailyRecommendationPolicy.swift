@@ -150,10 +150,19 @@ enum HomeDailyRecommendationPolicy {
              suggestedDetail: String = "",
              strengthSession: PlannedSession? = nil) {
             self.dayDescription = dayDescription
-            // Preserve all existing call sites while keeping Home concise.
-            self.shortDescription = shortDescription ??
-                String(dayDescription.split(separator: ".", maxSplits: 1).first ?? "")
+            // A compact fallback for older callers. Tailored history-aware
+            // recommendations supply their own shorter sentence.
+            if let shortDescription {
+                self.shortDescription = shortDescription
+            } else {
+                let firstSentence = dayDescription
+                    .split(separator: ".", maxSplits: 1)
+                    .first
+                    .map(String.init)?
                     .trimmingCharacters(in: .whitespacesAndNewlines)
+                self.shortDescription = firstSentence.map { $0 + "." }
+                    ?? dayDescription
+            }
             self.suggestedWorkout = suggestedWorkout
             self.suggestedTitle = suggestedTitle
             self.suggestedDetail = suggestedDetail
