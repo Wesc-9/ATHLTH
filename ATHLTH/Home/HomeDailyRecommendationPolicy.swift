@@ -21,17 +21,20 @@ enum HomeDailyRecommendationPolicy {
         case easyRun(minutes: Int)
         case progressiveRun(minutes: Int)
         case tempoRun(minutes: Int)
+        case historicalStrength
+        case restDay
 
         var kind: WorkoutKind? {
             switch self {
-            case .planned: return nil
+            case .planned, .restDay: return nil
+            case .historicalStrength: return .strength
             case .easyWalk: return .walking
             case .easyRun, .progressiveRun, .tempoRun: return .running
             }
         }
         var durationMinutes: Int? {
             switch self {
-            case .planned: return nil
+            case .planned, .historicalStrength, .restDay: return nil
             case .easyWalk(let minutes), .easyRun(let minutes),
                  .progressiveRun(let minutes), .tempoRun(let minutes):
                 return minutes
@@ -124,6 +127,9 @@ enum HomeDailyRecommendationPolicy {
         let suggestedWorkout: SuggestedWorkout
         let suggestedTitle: String
         let suggestedDetail: String
+        /// An executable copy of a historically completed strength routine.
+        /// Only present when the user has actually logged these exercises.
+        let strengthSession: PlannedSession?
         let title: String
         let detail: String
         let source: String
@@ -138,11 +144,13 @@ enum HomeDailyRecommendationPolicy {
              dayDescription: String = "",
              suggestedWorkout: SuggestedWorkout = .easyWalk(minutes: 20),
              suggestedTitle: String = "",
-             suggestedDetail: String = "") {
+             suggestedDetail: String = "",
+             strengthSession: PlannedSession? = nil) {
             self.dayDescription = dayDescription
             self.suggestedWorkout = suggestedWorkout
             self.suggestedTitle = suggestedTitle
             self.suggestedDetail = suggestedDetail
+            self.strengthSession = strengthSession
             self.title = title
             self.detail = detail
             self.source = source
@@ -158,8 +166,45 @@ enum HomeDailyRecommendationPolicy {
         trainingLoadRatio: Double?,
         plannedActivity: PlannedActivity? = nil,
         plannedWorkoutTitle: String? = nil,
-        trainingHistory: TrainingHistory = .empty
+        trainingHistory: TrainingHistory = .empty,
+        personalizedHistory: HomeTrainingPatternAdvisor.Snapshot? = nil
     ) -> Advice {
+        if let personalizedHistory {
+            if let tailored = HomeTrainingPatternAdvisor.recommend(
+                snapshot: personalizedHistory, readiness: readiness,
+                trainingLoadRatio: trainingLoadRatio,
+                hasWorkoutToday: hasWorkoutToday,
+                plannedWorkoutTitle: plannedWorkoutTitle
+            ) {
+                return tailored
+            }
+            // No evidenced preference: do not prescribe another activity.
+            return Advice(
+                title: ATHLTHLocalization.choose(
+                    english: "Explore your usual activity", norwegian: "Velg en aktivitet"
+                ),
+                detail: ATHLTHLocalization.choose(
+                    english: "Record workouts to personalize the suggestions.",
+                    norwegian: "Registrer økter for å få personlige anbefalinger."
+                ),
+                source: ATHLTHLocalization.choose(
+                    english: "Not enough history", norwegian: "For lite treningshistorikk"
+                ),
+                symbol: "figure.mixed.cardio", destination: .training,
+                dayDescription: ATHLTHLocalization.choose(
+                    english: "Your recorded history is currently too limited to recommend a specific training type.",
+                    norwegian: "Vi har foreløpig for lite registrert treningshistorikk til å anbefale en bestemt aktivitet."
+                ),
+                suggestedWorkout: .restDay,
+                suggestedTitle: ATHLTHLocalization.choose(
+                    english: "Explore Train", norwegian: "Utforsk Tren"
+                ),
+                suggestedDetail: ATHLTHLocalization.choose(
+                    english: "Choose an activity that suits you.",
+                    norwegian: "Velg en aktivitet som passer deg."
+                )
+            )
+        }
         func tr(_ en: String, _ no: String) -> String {
             ATHLTHLocalization.choose(english: en, norwegian: no)
         }
@@ -309,6 +354,12 @@ enum HomeDailyRecommendationPolicy {
         let suggestedTitle: String
         let suggestedDetail: String
         switch suggestedWorkout {
+        case .restDay, .historicalStrength:
+            suggestedTitle = tr("Choose in Train", "Velg i Tren")
+            suggestedDetail = tr(
+                "Open Train to choose an appropriate session.",
+                "Åpne Tren for å velge en passende økt."
+            )
         case .planned:
             suggestedTitle = plannedWorkoutTitle ?? tr(
                 "Planned workout", "Planlagt økt"
