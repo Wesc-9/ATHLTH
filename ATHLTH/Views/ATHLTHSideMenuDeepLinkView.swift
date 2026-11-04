@@ -7,9 +7,38 @@ struct ATHLTHSideMenuDeepLinkView: View {
 
     let destination: ATHLTHSideMenuDestination
 
+    @ViewBuilder
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 12) {
+        if destination == .profile {
+            // Keep the *existing* profile appearance edge-to-edge. The only
+            // new control is a floating close affordance above the hero.
+            NavigationStack {
+                ATHLTHProfileView()
+                    .overlay(alignment: .topLeading) {
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    Color.black.opacity(0.32),
+                                    in: Circle()
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Close profile",
+                            norwegian: "Lukk profil"
+                        ))
+                        .padding(.leading, 14)
+                        .padding(.top, 14)
+                    }
+            }
+        } else {
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(ATHLTHTheme.primaryText)
@@ -51,7 +80,8 @@ struct ATHLTHSideMenuDeepLinkView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(ATHLTHTheme.premiumGoldSoft.ignoresSafeArea())
-        .accessibilityIdentifier("athlth-side-menu-full-screen-destination")
+            .accessibilityIdentifier("athlth-side-menu-full-screen-destination")
+        }
     }
 
     private var title: String {
