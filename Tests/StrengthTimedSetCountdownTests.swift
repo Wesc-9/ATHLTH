@@ -41,6 +41,30 @@ final class StrengthTimedSetCountdownTests: XCTestCase {
         // completes it explicitly from iPhone or the Watch command.
     }
 
+    func testWatchCanStartOrFinishTimedSetWhenIPhoneControlsTargets() {
+        XCTAssertTrue(ATHLTHStrengthWatchControlPolicy.permits(
+            .skipRestAndStartTimedSet, whenIPhoneControls: true
+        ))
+        XCTAssertTrue(ATHLTHStrengthWatchControlPolicy.permits(
+            .startTimedSet, whenIPhoneControls: true
+        ))
+        XCTAssertTrue(ATHLTHStrengthWatchControlPolicy.permits(
+            .completeSet, whenIPhoneControls: true
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchControlPolicy.permits(
+            .updateDraft, whenIPhoneControls: true
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchControlPolicy.permits(
+            .pauseTimedSet, whenIPhoneControls: true
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchControlPolicy.permits(
+            .resetTimedSet, whenIPhoneControls: true
+        ))
+        XCTAssertTrue(ATHLTHStrengthWatchControlPolicy.permits(
+            .updateDraft, whenIPhoneControls: false
+        ))
+    }
+
     func testWatchNextSetCommandSurvivesEncodingAndCanBeReplayedOnce() throws {
         let command = WatchStrengthCommand(
             id: UUID(),
