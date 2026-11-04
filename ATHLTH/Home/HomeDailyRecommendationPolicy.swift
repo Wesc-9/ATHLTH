@@ -95,16 +95,27 @@ enum HomeDailyRecommendationPolicy {
             )
         }
 
+        /// Only a run in the last two calendar days is "recent" enough to
+        /// justify progressive pacing in the daily recommendation. A run
+        /// several days ago still contributes to training history, but does
+        /// not imply that the athlete ran "recently" or should speed up.
         var hasRecentRunningExperience: Bool {
             runsLast28Days >= 1 &&
-            (mostRecentRunDaysAgo ?? 100) <= 14 &&
+            (0...2).contains(mostRecentRunDaysAgo ?? 100) &&
             (averageRecentRunMinutes ?? 0) >= 20
         }
 
         var supportsControlledTempo: Bool {
             runsLast28Days >= 3 &&
-            (2...10).contains(mostRecentRunDaysAgo ?? 100) &&
+            mostRecentRunDaysAgo == 2 &&
             (averageRecentRunMinutes ?? 0) >= 30
+        }
+
+        /// A longer gap is a reason to propose easier running, not tempo.
+        var supportsEasyReturnToRunning: Bool {
+            runsLast28Days >= 1 &&
+            (0...14).contains(mostRecentRunDaysAgo ?? 100) &&
+            (averageRecentRunMinutes ?? 0) >= 20
         }
     }
 
@@ -189,9 +200,14 @@ enum HomeDailyRecommendationPolicy {
         } else if (readiness == .ready || readiness == .balanced),
                   trainingHistory.hasRecentRunningExperience {
             suggestedWorkout = .progressiveRun(minutes: 30)
-        } else if readiness == .ready {
-            suggestedWorkout = .easyRun(minutes: 25)
+        } else if (readiness == .ready || readiness == .balanced),
+                  trainingHistory.supportsEasyReturnToRunning {
+            // After several days off, choose an easy return instead of
+            // suggesting progressive efforts from an old running record.
+            suggestedWorkout = .easyRun(minutes: 20)
         } else {
+            // Readiness alone does not establish a running base. Missing
+            // or older-than-14-day running data must not imply recent runs.
             suggestedWorkout = .easyWalk(minutes: 20)
         }
 
@@ -227,6 +243,29 @@ enum HomeDailyRecommendationPolicy {
                     "Dagens planlagte økt ligger klar. Bruk restitusjonsmålingene og oppvarmingen til å tilpasse innsatsen."
                 )
             }
+            // Describe actual calendar-day gaps, not an imprecise "recently".
+            // The Health history may be incomplete; say "registered" rather
+            // than claiming the athlete definitely did or did not run.
+            if let days = trainingHistory.mostRecentRunDaysAgo,
+               days >= 3,
+               trainingHistory.runsLast28Days > 0 {
+                if case .easyRun = suggestedWorkout {
+                    return tr(
+                        "The last registered run was \(days) days ago. Start with an easy run and adjust the length to how you feel.",
+                        "Siste registrerte løpetur var for \(days) dager siden. Start med rolig løping og tilpass lengden etter dagsformen."
+                    )
+                }
+                return tr(
+                    "The last registered run was \(days) days ago. A gentle session is a better starting point before increasing the pace.",
+                    "Siste registrerte løpetur var for \(days) dager siden. En rolig økt er et bedre utgangspunkt før du øker tempoet."
+                )
+            }
+            if trainingHistory.runsLast28Days == 0 {
+                return tr(
+                    "No runs are available in your recorded training history from the last 28 days. Choose easy activity and build gradually.",
+                    "Vi finner ingen registrerte løpeturer i tilgjengelig treningshistorikk de siste 28 dagene. Velg rolig aktivitet og bygg gradvis opp."
+                )
+            }
             switch readiness {
             case .ready:
                 if suggestedWorkout == .tempoRun(minutes: 35) {
@@ -237,8 +276,8 @@ enum HomeDailyRecommendationPolicy {
                 }
                 if case .progressiveRun = suggestedWorkout {
                     return tr(
-                        "Your recovery looks good. You have some recent running behind you, so you can gradually raise the pace today.",
-                        "Restitusjonen ser god ut. Du har løpt nylig, så i dag kan du øke tempoet gradvis uten å gå rett på hardøkter."
+                        "Recovery looks good, and a run is registered within the last two days. Increase the pace gradually only if it feels right.",
+                        "Restitusjonen ser god ut, og en løpetur er registrert i løpet av de siste to dagene. Øk tempoet gradvis bare hvis det kjennes riktig."
                     )
                 }
                 return tr(
@@ -248,8 +287,8 @@ enum HomeDailyRecommendationPolicy {
             case .balanced:
                 if case .progressiveRun = suggestedWorkout {
                     return tr(
-                        "Readiness is balanced, and your recent runs support some variation. Start easy and finish a little faster if it feels right.",
-                        "Dagsformen er balansert, og du har løpt nylig. Start rolig og øk litt mot slutten hvis kroppen svarer bra."
+                        "Readiness is balanced, and a run is registered within the last two days. Start easy and finish a little faster only if it feels right.",
+                        "Dagsformen er balansert, og en løpetur er registrert i løpet av de siste to dagene. Start rolig og øk mot slutten bare hvis kroppen svarer bra."
                     )
                 }
                 return tr(
