@@ -65,8 +65,23 @@ struct StrengthSetEffortClock: Codable, Equatable {
     let setID: UUID
     let startedAt: Date
 
+    var pausedAt: Date? = nil
+    var totalPausedSeconds: TimeInterval = 0
+
     func elapsedSeconds(at now: Date = Date()) -> TimeInterval {
-        max(now.timeIntervalSince(startedAt), 0)
+        max((pausedAt ?? now).timeIntervalSince(startedAt) -
+            totalPausedSeconds, 0)
+    }
+
+    mutating func pause(at now: Date) {
+        guard pausedAt == nil else { return }
+        pausedAt = now
+    }
+
+    mutating func resume(at now: Date) {
+        guard let pausedAt else { return }
+        totalPausedSeconds += max(now.timeIntervalSince(pausedAt), 0)
+        self.pausedAt = nil
     }
 }
 
@@ -1445,11 +1460,24 @@ final class StrengthWorkoutStore: ObservableObject {
         guard !isResting, let workout = activeWorkout,
               let exercise = currentExercise, let set = currentSet,
               !set.isCompleted else { return }
-        guard currentSetEffortClock == nil else { return }
+        if var resumed = currentSetEffortClock {
+            resumed.resume(at: date)
+            setEffortClock = resumed
+            return
+        }
         setEffortClock = StrengthSetEffortClock(
             workoutID: workout.id, exerciseID: exercise.id,
             setID: set.id, startedAt: date
         )
+    }
+
+    /// Sum of measured working time in this exercise, without any rest.
+    var currentExerciseMeasuredSeconds: TimeInterval {
+        let recorded = currentExercise?.sets
+            .compactMap(\.actualSetElapsedSeconds)
+            .filter { $0.isFinite && $0 >= 0 }
+            .reduce(0, +) ?? 0
+        return recorded + (currentSetEffortClock?.elapsedSeconds() ?? 0)
     }
 
     private func discardStaleSetEffortClock() {
@@ -1551,6 +1579,10 @@ final class StrengthWorkoutStore: ObservableObject {
             countdown.secondsAtPause - max(now.timeIntervalSince(countdown.resumedAt ?? now), 0)
         countdown.resumedAt = nil
         timedSetCountdown = countdown
+        if var effort = currentSetEffortClock {
+            effort.pause(at: now)
+            setEffortClock = effort
+        }
         persistCheckpointNow()
     }
 
