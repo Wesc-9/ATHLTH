@@ -548,7 +548,27 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 .foregroundStyle(gold)
                 .accessibilityLabel(tr("Add to", "Legg til i") + " " + phase.title)
             }
-            ForEach(Array(blocks.enumerated()), id: \.offset) { pair in
+            ForEach(Array(blocks.enumerated()), id: \.element.editorDragID) { pair in
+                if let groupID = pair.element.groupID,
+                   let groupKind = pair.element.groupKind {
+                    if !blocks.prefix(pair.offset).contains(where: {
+                        $0.groupID == groupID
+                    }) {
+                        ATHLTHAdvancedPlanGroupSummaryRow(
+                            kind: groupKind,
+                            blocks: blocks.filter { $0.groupID == groupID },
+                            onEditStep: { blockID in
+                                if let sourceIndex = workout.blocks.firstIndex(where: {
+                                    $0.editorDragID == blockID
+                                }) {
+                                    onEditBlock(day, index, sourceIndex)
+                                } else {
+                                    onEditWorkout(day, index)
+                                }
+                            }
+                        )
+                    }
+                } else {
                 Button {
                     // Phase rows are a grouped display of the original
                     // workout. Pass the underlying block index to the editor.
@@ -591,6 +611,7 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                     "Edit the duration, pace, intensity or recovery for this step.",
                     "Rediger varighet, tempo, intensitet eller pause for denne deløkten."
                 ))
+                }
             }
             action(tr("Add to", "Legg til i") + " " + phase.title, icon: "plus") {
                 onAddExercise(day, index, phase)
