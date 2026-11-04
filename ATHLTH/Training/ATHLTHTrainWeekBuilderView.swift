@@ -764,6 +764,55 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             .onDisappear { persistLocalDraft() }
     }
 
+    private func closeEditor() {
+        if let onCloseInline {
+            onCloseInline()
+        } else {
+            dismiss()
+        }
+    }
+
+    private var detailedComposerClose: (() -> Void)? {
+        guard onCloseInline != nil else { return nil }
+        return { showDetailedComposer = false }
+    }
+
+    private var detailedComposer: some View {
+                WorkoutTemplateBuilderView(
+                    initialTitle: draft.title,
+                    initialBlocks: ATHLTHUnifiedWorkout.editorBlocks(from: draft),
+                    initialRouteID: draft.routeID,
+                    initialQuickAdd: initialQuickAdd,
+                    initialPhase: initialPhase,
+                    initialFocusedBlockIndex: initialFocusedBlockIndex,
+                    initialFocusedExecutionStepIndex: initialFocusedExecutionStepIndex,
+                    initialDurationOverrideMinutes: durationWasEditedManually
+                        ? draft.durationMinutes : nil,
+                    initialExtras: ATHLTHWorkoutPlannerExtras(
+                        gearIDs: draft.gearIDs,
+                        spotifyPlaylist: draft.spotifyPlaylist,
+                        spotifyAutoplayOnStart: draft.spotifyAutoplayOnStart
+                    ),
+                    draftContext: "plan-\(planID.uuidString)-day-\(dayID.uuidString)-workout-\(existingWorkout?.id.uuidString ?? "new")",
+                    onSaveToPlan: { title, blocks, routeID, knownMinutes, wasManual, extras in
+                        var nextDraft = draft
+                        ATHLTHUnifiedWorkout.apply(
+                            blocks: blocks, title: title, routeID: routeID,
+                            estimatedMinutes: knownMinutes,
+                            to: &nextDraft
+                        )
+                        nextDraft.gearIDs = extras.gearIDs
+                        nextDraft.spotifyPlaylist = extras.spotifyPlaylist
+                        nextDraft.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
+                        draft = nextDraft
+                        durationWasEditedManually = wasManual
+                        persistLocalDraft()
+                        return true
+                    },
+                    onCloseInline: detailedComposerClose
+                )
+    }
+
     private var editorNavigation: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -869,39 +918,13 @@ struct ATHLTHTrainWorkoutBuilderView: View {
                     selection: $draft.spotifyPlaylist
                 )
             }
-            .sheet(isPresented: $showDetailedComposer) {
-                WorkoutTemplateBuilderView(
-                    initialTitle: draft.title,
-                    initialBlocks: ATHLTHUnifiedWorkout.editorBlocks(from: draft),
-                    initialRouteID: draft.routeID,
-                    initialQuickAdd: initialQuickAdd,
-                    initialPhase: initialPhase,
-                    initialFocusedBlockIndex: initialFocusedBlockIndex,
-                    initialFocusedExecutionStepIndex: initialFocusedExecutionStepIndex,
-                    initialDurationOverrideMinutes: durationWasEditedManually
-                        ? draft.durationMinutes : nil,
-                    initialExtras: ATHLTHWorkoutPlannerExtras(
-                        gearIDs: draft.gearIDs,
-                        spotifyPlaylist: draft.spotifyPlaylist,
-                        spotifyAutoplayOnStart: draft.spotifyAutoplayOnStart
-                    ),
-                    draftContext: "plan-\(planID.uuidString)-day-\(dayID.uuidString)-workout-\(existingWorkout?.id.uuidString ?? "new")",
-                    onSaveToPlan: { title, blocks, routeID, knownMinutes, wasManual, extras in
-                        var nextDraft = draft
-                        ATHLTHUnifiedWorkout.apply(
-                            blocks: blocks, title: title, routeID: routeID,
-                            estimatedMinutes: knownMinutes,
-                            to: &nextDraft
-                        )
-                        nextDraft.gearIDs = extras.gearIDs
-                        nextDraft.spotifyPlaylist = extras.spotifyPlaylist
-                        nextDraft.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
-                        draft = nextDraft
-                        durationWasEditedManually = wasManual
-                        persistLocalDraft()
-                        return true
-                    }
-                )
+            // The iPhone editor keeps its sheet; iPad Studio switches its
+            // right-hand column to the same recipe editor instead.
+            .sheet(isPresented: Binding(
+                get: { onCloseInline == nil && showDetailedComposer },
+                set: { showDetailedComposer = $0 }
+            )) {
+                detailedComposer
             }
             .confirmationDialog(
                 tr("Remove detailed workout structure?",
