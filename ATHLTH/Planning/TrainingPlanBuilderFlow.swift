@@ -773,8 +773,22 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
             saveResumableDraft()
         }
-        .onChange(of: step) { _, _ in saveResumableDraft() }
-        .onChange(of: selectedPlanWeekIndex) { _, _ in saveResumableDraft() }
+        .onChange(of: step) { _, next in
+            if studioFullscreenEditing, next != .week,
+               composingAdvancedDay != nil {
+                closeInlineWorkoutBuilder()
+            }
+            saveResumableDraft()
+        }
+        .onChange(of: selectedPlanWeekIndex) { old, new in
+            // A day number is only unique *within its week*. Never let an
+            // open inspector save day 3 into a newly selected week.
+            if studioFullscreenEditing, old != new,
+               composingAdvancedDay != nil {
+                closeInlineWorkoutBuilder()
+            }
+            saveResumableDraft()
+        }
         .onChange(of: simpleMinutes) { _, _ in saveResumableDraft() }
         .onChange(of: simpleActivities) { _, _ in saveResumableDraft() }
         .onChange(of: editingWeekDay) { _, _ in saveResumableDraft() }
