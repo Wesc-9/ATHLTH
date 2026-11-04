@@ -64,8 +64,8 @@ HTTP_CODE="$(curl --silent --show-error \
   --data-binary "@$RUNNER_TEMP/certificate-request.json" \
   "https://api.appstoreconnect.apple.com/v1/certificates")"
 
-# A previous 2.1.1 CI upload created distribution certificate 6TB6NHX4M6
-# (GitHub run 41816693546, signing at 2026-11-04 10:49 UTC). Its private
+# The failed 2.1.2 upload created distribution certificate 33KJ4B4T3N
+# (GitHub run 41899064455, signing at 2026-11-04 19:40 UTC). Its private
 # key was ephemeral and cannot be reused on a new runner. Do not indiscriminately
 # revoke any Apple certificate when the account reaches its signing limit.
 # This one-time recovery verifies the exact known CI certificate and its X.509
@@ -73,7 +73,7 @@ HTTP_CODE="$(curl --silent --show-error \
 if [ "$HTTP_CODE" = "409" ] \
   && grep -q "already have a current Distribution certificate" "$RUNNER_TEMP/certificate-response.json"; then
   echo "::notice::Apple signing certificate limit reached; checking the verified previous ATHLTH CI certificate."
-  STALE_CERT_ID="6TB6NHX4M6"
+  STALE_CERT_ID="33KJ4B4T3N"
   LOOKUP_HTTP="$(curl --silent --show-error --retry 2 --retry-delay 3 \
     --output "$RUNNER_TEMP/known-ci-certificate.json" \
     --write-out '%{http_code}' \
@@ -99,10 +99,11 @@ if item.get("id") != sys.argv[2] or attrs.get("certificateType") != "DISTRIBUTIO
     raise SystemExit("Previous ATHLTH CI certificate identity/type mismatch; no revocation performed")
 certificate = x509.load_der_x509_certificate(base64.b64decode(attrs["certificateContent"]))
 issued = certificate.not_valid_before_utc
-# Apple backdated this certificate's validity by about ten minutes:
-# actual verified Not Before: 2026-11-04 10:39:32 UTC.
-start = datetime(2026, 11, 4, 10, 39, tzinfo=timezone.utc)
-end = datetime(2026, 11, 4, 10, 41, tzinfo=timezone.utc)
+# Apple normally backdates the certificate validity by about ten minutes.
+# The verified CI creation time was 2026-11-04 19:40:27 UTC; accept
+# only that narrow signing run window, never a different team's certificate.
+start = datetime(2026, 11, 4, 19, 29, tzinfo=timezone.utc)
+end = datetime(2026, 11, 4, 19, 42, tzinfo=timezone.utc)
 if not start <= issued <= end:
     raise SystemExit(f"Certificate issued {issued} outside verified ATHLTH CI run; no revocation performed")
 print("Verified previous ATHLTH CI distribution certificate; safe targeted rotation.")
