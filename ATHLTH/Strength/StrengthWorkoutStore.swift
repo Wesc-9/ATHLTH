@@ -5,6 +5,18 @@ enum StrengthDraftMutationOrigin {
     case watch
 }
 
+/// iPhone time targets are edited as whole minutes while the engine, Watch
+/// synchronization and HealthKit history continue to use precise seconds.
+enum StrengthTimedSetMinuteInput {
+    static func minutes(for seconds: Int) -> Int {
+        min(max((max(seconds, 0) + 59) / 60, 1), 120)
+    }
+
+    static func seconds(for minutes: Int) -> Int {
+        min(max(minutes, 1), 120) * 60
+    }
+}
+
 /// Date-anchored and checkpointed; the displayed seconds do not depend on a
 /// foreground Timer continuing to run while the phone is locked.
 struct StrengthTimedSetCountdown: Codable, Equatable {
