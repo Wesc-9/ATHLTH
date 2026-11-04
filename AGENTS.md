@@ -1,5 +1,9 @@
 # ATHLTH development baseline
 
+- **Current active development version: 2.1.3 (build 121)** on `release/v2.1.3`, created on 2026-11-04 from the verified 2.1.2 release snapshot. Keep all new features and fixes on this branch. **Do not upload to TestFlight without a new explicit user request.**
+- **Version 2.1.2 (build 120) is frozen** at commit `4b354992c0cb05cdf663f404491a1774bacd5e9e`. Preservation refs: `locked/v2.1.2` and `backup/v2.1.2-locked-before-v2.1.3-20261104`. Same-commit Build ATHLTH, backend regressions, Train/Hybrid XCTest, and TestFlight upload run `41907757515` succeeded on 2026-11-04. GitHub reports successful upload; this does not independently establish App Store Connect processing or tester availability. Do not modify `release/v2.1.2` or its preservation refs.
+- Historical entries below document older version baselines only; the 2.1.3 instructions above supersede earlier active-version declarations.
+
 - Active development version: **2.0.8** on `release/v2.0.8` (2026-11-02; build 116), branched from the frozen 2.0.7 source commit `679065f5dec6c06c194368b1cb38e44a497d397b`. All new work belongs on `release/v2.0.8`; TestFlight upload requires a fresh explicit user request.
 - Version **2.0.7** (build 115) is frozen for further development at `679065f5dec6c06c194368b1cb38e44a497d397b`. Snapshot branches: `locked/v2.0.7` and `backup/v2.0.7-locked-before-v2.0.8-20261102`. Same-commit iOS build, backend regressions, hybrid XCTest and GitHub TestFlight upload workflow run **41404736450** succeeded on 2026-11-02. GitHub upload success does not independently confirm Apple processing or tester availability. Do not modify `release/v2.0.7` or the preservation branches.
 - Version **2.0.6** (build 114) is a previous release and must remain unchanged. Preservation branches: `locked/v2.0.6` and `backup/v2.0.6-locked-before-v2.0.7-20261101`.
