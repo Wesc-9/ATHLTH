@@ -22,6 +22,30 @@ enum ATHLTHStudioHomeWeek {
         }
     }
 
+    /// Monday-based weeks advance by calendar days, not 604_800 seconds,
+    /// which would drift over daylight saving changes in Norway.
+    static func shiftedWeek(
+        from date: Date,
+        offset: Int,
+        calendar: Calendar = .current
+    ) -> Date {
+        calendar.date(byAdding: .weekOfYear, value: offset, to: date) ?? date
+    }
+
+    static func weekRange(
+        containing date: Date,
+        calendar source: Calendar = .current
+    ) -> (start: Date, end: Date) {
+        var calendar = source
+        calendar.firstWeekday = 2
+        let startDay = calendar.startOfDay(for: date)
+        let days = (calendar.component(.weekday, from: startDay) + 5) % 7
+        let start = calendar.date(byAdding: .day, value: -days, to: startDay)
+            ?? startDay
+        let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
+        return (start, end)
+    }
+
     static func make(
         plans: [TrainingPlan],
         standalone: [PlannedSession],
@@ -33,11 +57,11 @@ enum ATHLTHStudioHomeWeek {
     ) -> Snapshot {
         var calendar = sourceCalendar
         calendar.firstWeekday = 2
-        let today = calendar.startOfDay(for: now)
-        let daysSinceMonday = (calendar.component(.weekday, from: today) + 5) % 7
+        let referenceDay = calendar.startOfDay(for: now)
+        let daysSinceMonday = (calendar.component(.weekday, from: referenceDay) + 5) % 7
         let monday = calendar.date(
-            byAdding: .day, value: -daysSinceMonday, to: today
-        ) ?? today
+            byAdding: .day, value: -daysSinceMonday, to: referenceDay
+        ) ?? referenceDay
 
         let planned = ATHLTHStudioSchedule.window(
             plans: plans,
