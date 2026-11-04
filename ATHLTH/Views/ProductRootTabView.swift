@@ -5791,6 +5791,7 @@ struct ATHLTHTrainView: View {
     private let isActive: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
 
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
@@ -5939,7 +5940,7 @@ struct ATHLTHTrainView: View {
             .sheet(isPresented: $showingTrainAllPlans) {
                 AllTrainingPlansView()
             }
-            .sheet(item: $trainProgramCreationLaunch, onDismiss: {
+            .athlthStudioEditor(item: $trainProgramCreationLaunch, useFullScreen: studioFullscreenEditing, onDismiss: {
                 // Switch tabs only once the creation sheet has fully closed.
                 // Updating the underlying tab while the sheet is dismissing
                 // could otherwise expose "I dag" instead of the saved plan.
