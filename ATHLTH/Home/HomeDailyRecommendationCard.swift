@@ -67,7 +67,11 @@ struct HomeDailyRecommendationCard: View {
                     Image(systemName: advice.suggestedWorkout.kind == .walking
                           ? "figure.walk" :
                           advice.suggestedWorkout.kind == .running
-                          ? "figure.run" : "play.circle.fill")
+                          ? "figure.run" :
+                          advice.suggestedWorkout.kind == .strength
+                          ? "dumbbell" :
+                          advice.suggestedWorkout == .restDay
+                          ? "moon.stars" : "play.circle.fill")
                         .font(.system(size: compact ? 14 : 15, weight: .semibold))
                         .foregroundStyle(ATHLTHTrainDesign.bronze)
                         .frame(width: compact ? 27 : 29, height: compact ? 27 : 29)
@@ -99,10 +103,17 @@ struct HomeDailyRecommendationCard: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(advice.suggestedTitle)
-            .accessibilityHint(ATHLTHLocalization.choose(
-                english: "Open and start exactly this workout.",
-                norwegian: "Åpner oppstart av akkurat denne økten."
-            ))
+            .accessibilityHint(
+                advice.suggestedWorkout == .restDay
+                ? ATHLTHLocalization.choose(
+                    english: "Open Train. No workout starts automatically.",
+                    norwegian: "Åpner Tren. Ingen økt starter automatisk."
+                )
+                : ATHLTHLocalization.choose(
+                    english: "Open the recommended workout for review and start.",
+                    norwegian: "Åpner anbefalt økt for gjennomgang og oppstart."
+                )
+            )
 
             // Remaining space belongs beneath the suggested workout, never
             // between the assessment and the dividing line.
