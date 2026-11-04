@@ -402,19 +402,26 @@ struct ATHLTHStudioPlanCanvasView: View {
             }
 
             Label(
-                ATHLTHLocalization.choose(
-                    english: "Saved on this device",
-                    norwegian: "Lagret på denne enheten"
-                ),
-                systemImage: "checkmark.circle"
+                inlineWorkout == nil
+                    ? ATHLTHLocalization.choose(
+                        english: "Plan saved on this device",
+                        norwegian: "Planen lagret på enheten"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Workout draft — not saved to plan yet",
+                        norwegian: "Øktutkast – ikke lagret i planen ennå"
+                    ),
+                systemImage: inlineWorkout == nil
+                    ? "checkmark.circle" : "pencil.circle"
             )
             .font(.caption)
-            .foregroundStyle(ATHLTHStudioStyle.gold)
+            .foregroundStyle(inlineWorkout == nil
+                ? ATHLTHStudioStyle.gold : Color.secondary)
             .help(ATHLTHLocalization.choose(
-                english: "Local plan storage is confirmed. Cloud synchronization is a separate opt-in feature and is not asserted here.",
-                norwegian: "Planen er lagret lokalt. Skysynkronisering krever separat samtykke og bekreftes ikke her."
+                english: "The stored plan is local. Unsaved workout changes remain drafts. Cloud synchronization requires separate consent.",
+                norwegian: "Planen er lagret lokalt. Endringer i en åpen økt er utkast. Skysynkronisering krever separat samtykke."
             ))
-            .lineLimit(1)
+            .lineLimit(2)
         }
         .padding(.horizontal, 5)
     }
