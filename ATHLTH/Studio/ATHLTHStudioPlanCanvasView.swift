@@ -147,13 +147,69 @@ struct ATHLTHStudioPlanCanvasView: View {
 
         VStack(alignment: .leading, spacing: 14) {
             planHeader(plan)
-            planMetrics(plan, selectedWeek: week)
+            if inlineWorkout == nil {
+                planMetrics(plan, selectedWeek: week)
+            }
 
-            if let inlineWorkout, inlineWorkout.planID == plan.id,
-               width < 1120 {
-                // Preserve a useful editor width in iPad portrait and
-                // narrow Stage Manager windows; no modal presentation.
-                inlineExistingWorkoutEditor(inlineWorkout)
+            if let inlineWorkout, inlineWorkout.planID == plan.id {
+                // The existing-plan editor uses exactly the same adjustable
+                // workspace as new-plan construction. The week stays visible
+                // in the left column and the shared editor remains on the right.
+                ATHLTHStudioAdaptiveWorkspace {
+                    VStack(alignment: .leading, spacing: 11) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "YOUR TRAINING WEEK",
+                            norwegian: "DIN TRENINGSUKE"
+                        ))
+                        .font(.caption2.weight(.bold))
+                        .tracking(1.4)
+                        .foregroundStyle(ATHLTHStudioStyle.gold)
+
+                        Text(plan.title)
+                            .font(.headline)
+                            .lineLimit(2)
+                            .foregroundStyle(ATHLTHStudioStyle.ink)
+
+                        compactWeekNavigation(plan, selectedIndex: weekIndex)
+                            .allowsHitTesting(false)
+
+                        weekCanvas(plan, week: week, weekIndex: weekIndex)
+                            .allowsHitTesting(false)
+                            .frame(maxHeight: .infinity)
+
+                        Text(ATHLTHLocalization.choose(
+                            english: "Save or close the workout before selecting another day.",
+                            norwegian: "Lagre eller lukk økten før du velger en annen dag."
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ATHLTHStudioStyle.canvas)
+                } editor: {
+                    inlineExistingWorkoutEditor(inlineWorkout)
+                } focusRail: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "calendar")
+                            .foregroundStyle(ATHLTHStudioStyle.gold)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Week", norwegian: "Uke"
+                        ))
+                        .font(.caption2)
+                        Text("\(week.weekNumber)")
+                            .font(.title3.weight(.bold))
+                        Divider()
+                        Image(systemName: "square.and.pencil")
+                            .foregroundStyle(ATHLTHStudioStyle.gold)
+                    }
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                    .padding(.top, 18)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity,
+                           alignment: .top)
+                    .background(ATHLTHStudioStyle.canvas)
+                }
+                .frame(maxHeight: .infinity)
             } else if width >= 875 {
                 HStack(alignment: .top, spacing: 13) {
                     weekNavigation(plan, selectedIndex: weekIndex)
@@ -162,23 +218,16 @@ struct ATHLTHStudioPlanCanvasView: View {
                     weekCanvas(plan, week: week, weekIndex: weekIndex)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-                    Group {
-                        if let inlineWorkout, inlineWorkout.planID == plan.id {
-                            inlineExistingWorkoutEditor(inlineWorkout)
-                                .frame(width: min(660, max(450, width * 0.49)))
-                        } else {
-                            ATHLTHStudioPlanDayEditorView(
-                                plan: plan,
-                                day: day,
-                                date: dayDate,
-                                onOpenAdvanced: { workoutID in
-                                    openFullWorkout(planID: plan.id, workoutID: workoutID)
-                                }
-                            )
-                            .id(day.id)
-                            .frame(width: min(344, max(286, width * 0.31)))
+                    ATHLTHStudioPlanDayEditorView(
+                        plan: plan,
+                        day: day,
+                        date: dayDate,
+                        onOpenAdvanced: { workoutID in
+                            openFullWorkout(planID: plan.id, workoutID: workoutID)
                         }
-                    }
+                    )
+                    .id(day.id)
+                    .frame(width: min(344, max(286, width * 0.31)))
                     .frame(maxHeight: .infinity)
                 }
             } else {
