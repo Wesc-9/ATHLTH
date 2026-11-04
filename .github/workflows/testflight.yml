@@ -224,6 +224,13 @@ jobs:
           openssl pkey -in "$KEY_PATH" -check -noout >/dev/null
           echo "ASC_KEY_PATH=$KEY_PATH" >> "$GITHUB_ENV"
 
+      # Fail early on missing signing rights, identifiers or certificates,
+      # instead of compiling for 40 minutes before discovering the problem.
+      # Every embedded app/extension needs its own distribution profile.
+      - name: Prepare explicit App Store signing for all four bundles
+        shell: bash
+        run: bash scripts/prepare_ephemeral_app_store_signing.sh
+
       - name: Archive without creating development certificates
         shell: bash
         run: |
@@ -373,13 +380,6 @@ jobs:
           path: ${{ runner.temp }}/ATHLTH.xcarchive/dSYMs
           if-no-files-found: error
           retention-days: 90
-
-      # The archive is intentionally unsigned. Create an explicit distribution
-      # profile for every embedded bundle before Xcode export, including the
-      # Watch Widget extension. This avoids the fragile online profile lookup.
-      - name: Prepare explicit App Store signing for all four bundles
-        shell: bash
-        run: bash scripts/prepare_ephemeral_app_store_signing.sh
 
       - name: Seed archive entitlements with ad-hoc signatures
         shell: bash
