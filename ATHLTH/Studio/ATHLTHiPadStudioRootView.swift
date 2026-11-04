@@ -106,12 +106,15 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
+        // All child plan flows use the same iPhone editors, shown full-screen on iPad.
+        .environment(\.athlthStudioFullscreenEditing, true)
         .tint(gold)
-        .sheet(isPresented: $showingTrain) {
+        .fullScreenCover(isPresented: $showingTrain) {
             ATHLTHTrainView(
                 navigationRequest: $trainRequest,
                 isActive: true
             )
+            .environment(\.athlthStudioFullscreenEditing, true)
         }
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
