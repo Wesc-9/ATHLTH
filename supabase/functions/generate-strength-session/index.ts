@@ -257,7 +257,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const candidates = Array.from(candidateMap.values());
-  if (candidates.length < 3) {
+  if (candidates.length < 1) {
     return json({
       error: "Not enough compatible exercises are available.",
     }, 400);
@@ -265,7 +265,7 @@ Deno.serve(async (req: Request) => {
 
   const requestedCount = clampInteger(
     body.exerciseCount,
-    3,
+    1,
     8,
     5,
   );
