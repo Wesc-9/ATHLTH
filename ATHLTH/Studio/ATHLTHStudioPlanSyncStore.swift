@@ -169,7 +169,13 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 ($0.plan_id, $0)
             })
             let localPlans = session.trainingPlans.filter { $0.ownerID == userID }
-            let localByID = Dictionary(uniqueKeysWithValues: localPlans.map { ($0.id, $0) })
+            // Corrupted/legacy duplicate local plan IDs must never crash sync.
+            let localByID = Dictionary(
+                localPlans.map { ($0.id, $0) },
+                uniquingKeysWith: { first, second in
+                    first.updatedAt >= second.updatedAt ? first : second
+                }
+            )
             let allIDs = Set(remoteByID.keys).union(localByID.keys)
 
             for planID in allIDs.sorted(by: { $0.uuidString < $1.uuidString }) {

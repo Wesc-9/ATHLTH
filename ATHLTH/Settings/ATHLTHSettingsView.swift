@@ -1339,6 +1339,30 @@ settingsSection("Preferences") {
                             SettingsDivider()
 
                             NavigationLink {
+                                TrainingDataSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "arrow.triangle.2.circlepath",
+                                    iconTint: ATHLTHTheme.premiumGold,
+                                    iconBackground: ATHLTHTheme.premiumGoldSoft,
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Training data & sync",
+                                        norwegian: "Treningsdata og synkronisering"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Private iPad/iPhone plan sync, cloud backup and Coach permissions",
+                                        norwegian: "Privat plansynk, skybackup og Coach-tillatelser"
+                                    )
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
                                 ATHLTHWorkoutGuidanceSettingsView()
                             } label: {
                                 PremiumSettingsRow(
