@@ -227,7 +227,7 @@ enum HomeTrainingPatternAdvisor {
         var focused: [(focus: String, workout: StrengthWorkoutLog)] = []
         for log in history {
             var counts: [String: Int] = [:]
-            for exercise in log.exercises where exercise.isCompleted &&
+            for exercise in log.exercises where
                 exercise.sets.contains(where: \.isCompleted) {
                 if let focus = focus(for: exercise) {
                     counts[focus, default: 0] += 1
@@ -247,7 +247,7 @@ enum HomeTrainingPatternAdvisor {
             let log = latest.workout
             let blocks: [WorkoutTemplateBlock] = log.exercises.compactMap { exercise in
                 let finished = exercise.sets.filter { $0.isCompleted }
-                guard exercise.isCompleted, !finished.isEmpty else { return nil }
+                guard !finished.isEmpty else { return nil }
                 let typicalReps = finished.compactMap(\.completedReps).sorted()
                 var block = WorkoutTemplateBlock(
                     sequence: 1, kind: .exercise,
@@ -265,8 +265,26 @@ enum HomeTrainingPatternAdvisor {
             }
             guard !blocks.isEmpty else { continue }
             let minutes = Int((end.timeIntervalSince(log.startedAt) / 60).rounded())
+            let regularTitle = log.title.trimmingCharacters(
+                in: .whitespacesAndNewlines
+            )
+            let focusedTitle: String
+            if regularTitle.isEmpty ||
+               ["styrke", "strength", "styrkeøkt", "workout"].contains(
+                regularTitle.lowercased()
+               ) {
+                focusedTitle = ATHLTHLocalization.isNorwegian
+                    ? (["chest": "Brystøkt", "back": "Ryggøkt",
+                        "legs": "Beinøkt", "shoulders": "Skulderøkt",
+                        "core": "Kjerneøkt"][focus] ?? "Styrkeøkt")
+                    : (["chest": "Chest workout", "back": "Back workout",
+                        "legs": "Leg workout", "shoulders": "Shoulder workout",
+                        "core": "Core workout"][focus] ?? "Strength workout")
+            } else {
+                focusedTitle = regularTitle
+            }
             var session = PlannedSession(
-                id: UUID(), title: log.title, kind: .strength,
+                id: UUID(), title: focusedTitle, kind: .strength,
                 scheduledStart: nil, durationMinutes: min(max(minutes, 20), 120),
                 targetDistanceKilometers: nil,
                 targetPaceSecondsPerKilometer: nil,
@@ -372,10 +390,17 @@ enum HomeTrainingPatternAdvisor {
                 choice = .historicalStrength
                 proposedStrength = routine.session
                 let focus = localizedFocus(routine.focus)
-                explanation = tr(
-                    "After \(recentRuns) recent runs, \(focus) is a familiar strength focus you have trained before. Its last session was \(snapshot.daysSince(routine.lastPerformed)) days ago.",
-                    "Etter \(recentRuns) nylige løpeturer er \(focus) et styrkefokus du har trent tidligere. Siste økt var for \(snapshot.daysSince(routine.lastPerformed)) dager siden."
-                )
+                if recentRuns >= 2 {
+                    explanation = tr(
+                        "You have recorded \(recentRuns) runs in the last four days. \(focus) is a strength focus you have trained repeatedly, last \(snapshot.daysSince(routine.lastPerformed)) days ago.",
+                        "Du har registrert \(recentRuns) løpeturer de siste fire dagene. \(focus) er et styrkefokus du har trent flere ganger, sist for \(snapshot.daysSince(routine.lastPerformed)) dager siden."
+                    )
+                } else {
+                    explanation = tr(
+                        "This is a familiar \(focus) strength routine from your own training history. Its last session was \(snapshot.daysSince(routine.lastPerformed)) days ago.",
+                        "Dette er en kjent \(focus)-økt fra din egen treningshistorikk. Siste økt var for \(snapshot.daysSince(routine.lastPerformed)) dager siden."
+                    )
+                }
             } else {
                 // A frequent runner should be assessed against their *own*
                 // weekly frequency and normal gap, not a universal 2-day cut.
@@ -487,8 +512,8 @@ enum HomeTrainingPatternAdvisor {
             guard case .easyWalk = choice, let dogName = snapshot.dogName
             else { return nil }
             return tr(
-                " You could invite \(dogName) along if it suits them. Select your pet when starting.",
-                " Ta gjerne med \(dogName) hvis turen passer. Du kan velge kjæledyr ved øktstart."
+                "Bring \(dogName) if the walk suits them? Select your pet when starting. ",
+                "Ta med \(dogName) hvis turen passer? Velg kjæledyr ved start. "
             )
         }()
         let cadence = main.sessionsPerWeek.formatted(
@@ -504,7 +529,7 @@ enum HomeTrainingPatternAdvisor {
             ), symbol: "sparkles", destination: .training,
             evidence: evidence, dayDescription: explanation,
             suggestedWorkout: choice, suggestedTitle: title,
-            suggestedDetail: detail + (petPrompt ?? ""),
+            suggestedDetail: (petPrompt ?? "") + detail,
             strengthSession: proposedStrength
         )
     }
