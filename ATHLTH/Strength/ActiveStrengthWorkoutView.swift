@@ -5710,40 +5710,9 @@ struct ActiveStrengthWorkoutView: View {
                     }
                 }
 
-                // The active timer remains visible above the primary set
-                // action. It ticks from the same date-anchored clock shared
-                // with Apple Watch, including when the phone was backgrounded.
-                if currentStrengthTargetKind == .time,
-                   let timer = strength.currentTimedSetCountdown {
-                    TimelineView(.periodic(from: .now, by: 1)) { tick in
-                        let remaining = timer.secondsRemaining(at: tick.date)
-                        let finished = timer.isFinished(at: tick.date)
-                        HStack(spacing: 10) {
-                            Image(systemName: finished ? "checkmark.circle.fill" : "timer")
-                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            Text(finished
-                                ? ATHLTHLocalization.choose(
-                                    english: "Time reached · finish when ready",
-                                    norwegian: "Tiden er ute · fullfør når du vil")
-                                : ATHLTHLocalization.choose(
-                                    english: timer.isRunning ? "Counting down" : "Countdown paused",
-                                    norwegian: timer.isRunning ? "Nedtelling pågår" : "Nedtelling pauset"))
-                                .font(.caption.weight(.semibold))
-                                .lineLimit(2)
-                            Spacer(minLength: 6)
-                            Text(TimeInterval(remaining).clockDuration)
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .monospacedDigit()
-                        }
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 11)
-                        .background(
-                            ATHLTHPlanDesign.accent.opacity(0.09),
-                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        )
-                        .accessibilityElement(children: .combine)
-                    }
+                // Keep the timer immediately beside the set action.
+                if currentStrengthTargetKind == .time {
+                    focusedTimedCountdown
                 }
 
                 Button {
@@ -6590,6 +6559,43 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
         )
+    }
+
+    /// Shows the same date-anchored active countdown next to Start/Finish Set
+    /// in the fixed bottom panel. This is shared by iPhone/Watch control modes.
+    @ViewBuilder
+    private var focusedTimedCountdown: some View {
+        if let timer = strength.currentTimedSetCountdown {
+            TimelineView(.periodic(from: .now, by: 1)) { tick in
+                let remaining = timer.secondsRemaining(at: tick.date)
+                let finished = timer.isFinished(at: tick.date)
+                HStack(spacing: 10) {
+                    Image(systemName: finished ? "checkmark.circle.fill" : "timer")
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Text(finished
+                        ? ATHLTHLocalization.choose(
+                            english: "Time reached · finish when ready",
+                            norwegian: "Tiden er ute · fullfør når du vil")
+                        : ATHLTHLocalization.choose(
+                            english: timer.isRunning ? "Counting down" : "Countdown paused",
+                            norwegian: timer.isRunning ? "Nedtelling pågår" : "Nedtelling pauset"))
+                        .font(.caption.weight(.semibold))
+                        .lineLimit(2)
+                    Spacer(minLength: 6)
+                    Text(TimeInterval(remaining).clockDuration)
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                }
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 11)
+                .background(
+                    ATHLTHPlanDesign.accent.opacity(0.09),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                )
+                .accessibilityElement(children: .combine)
+            }
+        }
     }
 
     /// The athlete edits whole minutes; the workout engine continues storing
