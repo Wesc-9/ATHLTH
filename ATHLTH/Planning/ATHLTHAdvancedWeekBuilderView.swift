@@ -93,6 +93,16 @@ struct ATHLTHAdvancedWeekBuilderView: View {
         .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
         .animation(.easeInOut(duration: 0.16), value: selectedDay)
         .animation(.easeInOut(duration: 0.16), value: showingStructure)
+        .onChange(of: selectedWeek) { _, _ in
+            inlineGroupKind = nil
+            inlineGroupDay = nil
+        }
+        .onChange(of: selectedDay) { _, newDay in
+            if inlineGroupDay != newDay {
+                inlineGroupKind = nil
+                inlineGroupDay = nil
+            }
+        }
         .sheet(isPresented: $showingCopy) {
             copySheet
                 .presentationDetents([.medium, .large])
