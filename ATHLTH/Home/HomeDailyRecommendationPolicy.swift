@@ -123,6 +123,8 @@ enum HomeDailyRecommendationPolicy {
     }
 
     struct Advice {
+        /// Concise Home-card copy; the full explanation remains in dayDescription.
+        let shortDescription: String
         let dayDescription: String
         let suggestedWorkout: SuggestedWorkout
         let suggestedTitle: String
@@ -142,11 +144,16 @@ enum HomeDailyRecommendationPolicy {
              symbol: String, destination: Destination,
              evidence: String? = nil,
              dayDescription: String = "",
+             shortDescription: String? = nil,
              suggestedWorkout: SuggestedWorkout = .easyWalk(minutes: 20),
              suggestedTitle: String = "",
              suggestedDetail: String = "",
              strengthSession: PlannedSession? = nil) {
             self.dayDescription = dayDescription
+            // Preserve all existing call sites while keeping Home concise.
+            self.shortDescription = shortDescription ??
+                String(dayDescription.split(separator: ".", maxSplits: 1).first ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
             self.suggestedWorkout = suggestedWorkout
             self.suggestedTitle = suggestedTitle
             self.suggestedDetail = suggestedDetail
