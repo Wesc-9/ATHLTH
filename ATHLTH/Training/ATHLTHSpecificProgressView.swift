@@ -311,7 +311,9 @@ struct ATHLTHSpecificProgressView: View {
                     Text("\(point.completedWorkingSets) " +
                          tr("sets", "sett"))
                     if let seconds = point.measuredEffortSeconds {
-                        Text(seconds.clockDuration)
+                        Text(String(format: "%02d:%02d",
+                                    max(0, Int(seconds)) / 60,
+                                    max(0, Int(seconds)) % 60))
                             .foregroundStyle(muted)
                             .accessibilityLabel(tr(
                                 "Measured active set time",

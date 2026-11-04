@@ -300,7 +300,7 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                         .delete()
                         .eq("user_id", value: userID)
                         .eq("plan_id", value: planID)
-                        .eq("revision", value: row.revision)
+                        .eq("revision", value: String(row.revision))
                         .select("plan_id")
                         .execute().value
                     guard removed.count == 1 else {

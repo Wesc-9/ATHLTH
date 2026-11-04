@@ -117,7 +117,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         self.guidedDayCursor = guidedDayCursor.map { min(max($0, 0), min(max(weekCount, 1), 52) * 7) }
         self.firstGuidedWeekDecisionMade = firstGuidedWeekDecisionMade
         self.guidedWeekAwaitingDecision = guidedWeekAwaitingDecision.flatMap { week in
-            (0..<max(0, self.weekCount - 1)).contains(week) ? week : nil
+            (0..<max(0, min(max(weekCount, 1), 52) - 1)).contains(week) ? week : nil
         }
         self.selectedPlanWeekIndex = selectedPlanWeekIndex.map {
             min(max($0, 0), min(max(weekCount, 1), 52) - 1)
