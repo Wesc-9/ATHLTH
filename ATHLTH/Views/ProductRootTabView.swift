@@ -950,6 +950,7 @@ struct ATHLTHHomeView: View {
     @State private var homeCalendarPendingCustom = false
     @State private var selectedHomeStandaloneWorkout: PlannedSession?
     @State private var selectedHomeRecommendedWorkout: PlannedSession?
+    @State private var selectedHomeRecommendationInfo: HomeDailyRecommendationInfo?
     @State private var homeRecommendedPlanID: UUID?
     @State private var selectedHomeAllStandaloneWorkout: PlannedSession?
     @State private var selectedHomeStrengthSession: PlannedSession?
@@ -1400,6 +1401,12 @@ struct ATHLTHHomeView: View {
                     activityRefresh,
                     friendsRefresh
                 )
+            }
+            .sheet(item: $selectedHomeRecommendationInfo) { information in
+                HomeDailyRecommendationInfoSheet(info: information)
+                    .presentationDetents([.fraction(0.82), .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationCornerRadius(28)
             }
             .sheet(item: $selectedHomeRecommendedWorkout) { workout in
                 HomeDailyRecommendedWorkoutSheet(
@@ -2037,19 +2044,29 @@ struct ATHLTHHomeView: View {
         return nil
     }
 
-    private var homeDailyRecommendation: HomeDailyRecommendationPolicy.Advice {
-        let readiness: HomeDailyRecommendationPolicy.Readiness
+    private var homeRecommendationReadiness: HomeDailyRecommendationPolicy.Readiness {
         if health.recovery.score == nil {
-            readiness = .unavailable
-        } else {
-            switch health.recovery.state {
-            case .ready: readiness = .ready
-            case .balanced: readiness = .balanced
-            case .takeItEasy: readiness = .takeItEasy
-            case .recover: readiness = .recover
-            case .buildingBaseline: readiness = .unavailable
-            }
+            return .unavailable
         }
+        switch health.recovery.state {
+        case .ready: return .ready
+        case .balanced: return .balanced
+        case .takeItEasy: return .takeItEasy
+        case .recover: return .recover
+        case .buildingBaseline: return .unavailable
+        }
+    }
+
+    private var homeRecommendationHistory: HomeTrainingPatternAdvisor.Snapshot {
+        HomeTrainingPatternAdvisor.snapshot(
+            workouts: health.workouts,
+            strengthHistory: strengthWorkout.workoutHistory,
+            phoneHistory: phoneWorkout.history,
+            dogs: pets.pets.filter { $0.userID == session.profile.userID }
+        )
+    }
+
+    private var homeDailyRecommendation: HomeDailyRecommendationPolicy.Advice {
         let scheduled = homeRecommendedScheduledWorkout
         let activity: HomeDailyRecommendationPolicy.PlannedActivity? =
             scheduled.map {
@@ -2060,7 +2077,7 @@ struct ATHLTHHomeView: View {
                 }
             }
         return HomeDailyRecommendationPolicy.recommendation(
-            readiness: readiness,
+            readiness: homeRecommendationReadiness,
             hasWorkoutToday: scheduled != nil,
             trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio,
             plannedActivity: activity,
@@ -2068,12 +2085,18 @@ struct ATHLTHHomeView: View {
             trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(
                 workouts: health.workouts
             ),
-            personalizedHistory: HomeTrainingPatternAdvisor.snapshot(
-                workouts: health.workouts,
-                strengthHistory: strengthWorkout.workoutHistory,
-                phoneHistory: phoneWorkout.history,
-                dogs: pets.pets.filter { $0.userID == session.profile.userID }
-            )
+            personalizedHistory: homeRecommendationHistory
+        )
+    }
+
+    private func showHomeDailyRecommendationDetails(
+        _ advice: HomeDailyRecommendationPolicy.Advice
+    ) {
+        selectedHomeRecommendationInfo = HomeDailyRecommendationInfo(
+            advice: advice,
+            history: homeRecommendationHistory,
+            readiness: homeRecommendationReadiness,
+            trainingLoadRatio: homeRecoveryTrendSnapshot.trainingLoad.ratio
         )
     }
 
@@ -2175,9 +2198,15 @@ struct ATHLTHHomeView: View {
         return Group {
             if homeDynamicTypeSize.isAccessibilitySize {
                 VStack(spacing: 10) {
-                    HomeDailyRecommendationCard(advice: advice) {
-                        openHomeDailyRecommendation(advice)
-                    }
+                    HomeDailyRecommendationCard(
+                        advice: advice,
+                        onShowDetails: {
+                            showHomeDailyRecommendationDetails(advice)
+                        },
+                        onStartRecommendedWorkout: {
+                            openHomeDailyRecommendation(advice)
+                        }
+                    )
                     homeTodayCalendarCard
                 }
             } else {
@@ -2186,6 +2215,9 @@ struct ATHLTHHomeView: View {
                 HStack(alignment: .top, spacing: 10) {
                     HomeDailyRecommendationCard(
                         advice: advice,
+                        onShowDetails: {
+                            showHomeDailyRecommendationDetails(advice)
+                        },
                         onStartRecommendedWorkout: {
                             openHomeDailyRecommendation(advice)
                         },
