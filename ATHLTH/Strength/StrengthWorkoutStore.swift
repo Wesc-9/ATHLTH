@@ -3440,9 +3440,10 @@ final class StrengthWorkoutStore: ObservableObject {
               }),
               workout.exercises[exerciseIndex].sets[setIndex].resolvedLoadKind ==
                   .weightKilograms else { return false }
-        guard kilograms == nil ||
-                (kilograms!.isFinite && kilograms! >= 0 && kilograms! <= 999.5)
-        else { return false }
+        if let kilograms {
+            guard kilograms.isFinite && kilograms >= 0 && kilograms <= 999.5
+            else { return false }
+        }
 
         // Planned load is metadata; completedWeightKilograms and effortSegments
         // contain the historical performed load and stay unmodified.
