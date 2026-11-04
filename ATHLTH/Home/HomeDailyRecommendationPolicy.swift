@@ -261,7 +261,7 @@ enum HomeDailyRecommendationPolicy {
                     "Siste registrerte løpetur var for \(days) dager siden. En rolig økt er et bedre utgangspunkt før du øker tempoet."
                 )
             }
-            if trainingHistory.runsLast28Days == 0 {
+            if readiness != .unavailable && trainingHistory.runsLast28Days == 0 {
                 return tr(
                     "No runs are available in your recorded training history from the last 28 days. Choose easy activity and build gradually.",
                     "Vi finner ingen registrerte løpeturer i tilgjengelig treningshistorikk de siste 28 dagene. Velg rolig aktivitet og bygg gradvis opp."
