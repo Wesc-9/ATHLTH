@@ -4077,9 +4077,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             isRestDay: weekDayEdits[
                 weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)
             ]?.isRestDay == true,
-            onSelectDay: { offset in
-                guidedDayCursor = min(weekCount * 7 - 1,
-                    guidedCurrentWeek * 7 + offset)
+            onSelectDay: { absoluteDay in
+                // The grouped menu spans all plan weeks, not just this week.
+                guidedDayCursor = min(max(0, absoluteDay), weekCount * 7 - 1)
             },
             onAddExercise: { phase, workoutIndex in
                 openPlanStudioExercise(
