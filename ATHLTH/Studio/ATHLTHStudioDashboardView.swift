@@ -152,10 +152,6 @@ struct ATHLTHStudioDashboardView: View {
                 selectedWeekDate = .now
             }
         }
-        .onDisappear {
-            // Returning to Overview should restore regular navigation.
-            onPlanningFocusChanged(false)
-        }
         .sheet(isPresented: $showingReadinessExplanation) {
             ATHLTHReadinessExplanationSheet(
                 recovery: health.recovery,
