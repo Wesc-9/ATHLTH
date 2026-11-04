@@ -30,4 +30,18 @@ extension View {
             sheet(item: item, onDismiss: onDismiss, content: content)
         }
     }
+
+    @ViewBuilder
+    func athlthStudioEditor<Destination: View>(
+        isPresented: Binding<Bool>,
+        useFullScreen: Bool,
+        onDismiss: (() -> Void)? = nil,
+        @ViewBuilder content: @escaping () -> Destination
+    ) -> some View {
+        if useFullScreen {
+            fullScreenCover(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        } else {
+            sheet(isPresented: isPresented, onDismiss: onDismiss, content: content)
+        }
+    }
 }
