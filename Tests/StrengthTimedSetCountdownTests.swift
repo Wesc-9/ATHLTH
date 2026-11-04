@@ -19,6 +19,28 @@ final class StrengthTimedSetCountdownTests: XCTestCase {
         )
     }
 
+    func testTimeTargetsAreEditedInMinutesButRemainSecondsInternally() {
+        XCTAssertEqual(StrengthTimedSetMinuteInput.minutes(for: 300), 5)
+        XCTAssertEqual(StrengthTimedSetMinuteInput.seconds(for: 5), 300)
+        XCTAssertEqual(StrengthTimedSetMinuteInput.minutes(for: 90), 2)
+        XCTAssertEqual(StrengthTimedSetMinuteInput.seconds(for: 0), 60)
+        XCTAssertEqual(StrengthTimedSetMinuteInput.seconds(for: 121), 7_200)
+    }
+
+    func testManualFinishCanRecordActualTimeBeforeOrAfterCountdown() {
+        let timer = countdown(started: base)
+        let early = base.addingTimeInterval(199)
+        let late = base.addingTimeInterval(379)
+        XCTAssertEqual(timer.secondsRemaining(at: early), 101)
+        XCTAssertEqual(timer.elapsedSeconds(at: early), 199)
+        XCTAssertFalse(timer.isFinished(at: early))
+        XCTAssertEqual(timer.secondsRemaining(at: late), 0)
+        XCTAssertEqual(timer.elapsedSeconds(at: late), 379)
+        XCTAssertTrue(timer.isFinished(at: late))
+        // The countdown never advances the set on its own: the athlete
+        // completes it explicitly from iPhone or the Watch command.
+    }
+
     func testFiveMinuteTimerCountsDownAgainstRealClock() {
         let timer = countdown(started: base)
         XCTAssertEqual(timer.secondsRemaining(at: base), 300)
