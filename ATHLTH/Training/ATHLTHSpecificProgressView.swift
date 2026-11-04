@@ -6,10 +6,11 @@ import Charts
 struct ATHLTHSpecificProgressView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
 
     private enum Category: String, CaseIterable, Identifiable {
-        case strength, intervals
+        case strength, intervals, workouts
         var id: String { rawValue }
         var label: String {
             switch self {
@@ -17,6 +18,8 @@ struct ATHLTHSpecificProgressView: View {
                 return ATHLTHLocalization.choose(english: "Exercise", norwegian: "Øvelse")
             case .intervals:
                 return ATHLTHLocalization.choose(english: "Intervals", norwegian: "Intervaller")
+            case .workouts:
+                return ATHLTHLocalization.choose(english: "Workouts", norwegian: "Økter")
             }
         }
     }
@@ -25,6 +28,8 @@ struct ATHLTHSpecificProgressView: View {
     @State private var period: ATHLTHSpecificProgressEngine.Period = .month
     @State private var selectedExerciseID = ""
     @State private var selectedIntervalID = ""
+    @State private var selectedWorkoutActivity = ""
+    @State private var healthSessions: [SocialPublishableWorkout] = []
     @State private var watchHistory: [ATHLTHCompletedRunningPerformance] = []
 
     private var gold: Color { ATHLTHPlanDesign.accentInk }
@@ -73,6 +78,26 @@ struct ATHLTHSpecificProgressView: View {
         return ATHLTHSpecificProgressEngine.intervalRecords(
             key: selectedInterval.id, from: recordedIntervals, period: period
         )
+    }
+
+    private var activityChoices: [String] {
+        Array(Set(healthSessions.map { $0.activity.rawValue })).sorted()
+    }
+
+    private var selectedActivity: String? {
+        activityChoices.contains(selectedWorkoutActivity)
+            ? selectedWorkoutActivity : activityChoices.first
+    }
+
+    private var selectedActivityRecords: [SocialPublishableWorkout] {
+        guard let selectedActivity else { return [] }
+        let from = period.start(now: Date())
+        return healthSessions.filter {
+            $0.activity.rawValue == selectedActivity &&
+                $0.endDate >= from && $0.endDate <= Date() &&
+                $0.duration.isFinite && $0.duration > 0
+        }
+        .sorted { $0.endDate < $1.endDate }
     }
 
     var body: some View {
@@ -135,7 +160,7 @@ struct ATHLTHSpecificProgressView: View {
                     periodPicker
                     strengthDetail
                 }
-            } else {
+            } else if category == .intervals {
                 if intervalChoices.isEmpty {
                     emptyState(tr(
                         "Finish a structured interval workout to compare efforts.",
@@ -158,6 +183,29 @@ struct ATHLTHSpecificProgressView: View {
                     periodPicker
                     intervalDetail
                 }
+            } else {
+                if activityChoices.isEmpty {
+                    emptyState(tr(
+                        "Connect Apple Health to compare completed activities.",
+                        "Koble til Apple Health for å sammenligne gjennomførte aktiviteter."
+                    ))
+                } else {
+                    Picker(tr("Select activity", "Velg aktivitet"),
+                           selection: Binding(
+                            get: { selectedActivity ?? "" },
+                            set: { selectedWorkoutActivity = $0 }
+                           )) {
+                        ForEach(activityChoices, id: \.self) { name in
+                            Text(name).tag(name)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(ink)
+                    .padding(11)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 13))
+                    periodPicker
+                    workoutDetail
+                }
             }
 
             Label(
@@ -173,9 +221,13 @@ struct ATHLTHSpecificProgressView: View {
         .padding(16)
         .athlthPlanCard(radius: 20)
         .onAppear(perform: reloadWatchHistory)
+        .task { await loadHealthHistory() }
         .onReceive(NotificationCenter.default.publisher(
             for: .athlthTrainingDataDidChange
-        )) { _ in reloadWatchHistory() }
+        )) { _ in
+            reloadWatchHistory()
+            Task { await loadHealthHistory() }
+        }
     }
 
     private var periodPicker: some View {
@@ -340,6 +392,90 @@ struct ATHLTHSpecificProgressView: View {
         }
     }
 
+    @ViewBuilder
+    private var workoutDetail: some View {
+        if selectedActivityRecords.isEmpty {
+            emptyState(tr(
+                "No completed workouts of this activity in this period.",
+                "Ingen fullførte økter av denne aktiviteten i perioden."
+            ))
+        } else {
+            let workouts = selectedActivityRecords
+            let distances = workouts.compactMap(\.distanceMeters).filter {
+                $0.isFinite && $0 > 0
+            }
+            let longestDistance = distances.max()
+            let longestTime = workouts.map(\.duration).max() ?? 0
+            let averageDuration = workouts.reduce(0.0) {
+                $0 + $1.duration
+            } / Double(workouts.count)
+
+            HStack(spacing: 10) {
+                progressStat(title: tr("Workouts", "Økter"),
+                             value: "\(workouts.count)")
+                progressStat(
+                    title: tr("Average time", "Snittid"),
+                    value: String(format: "%.0f min", averageDuration / 60)
+                )
+                progressStat(
+                    title: longestDistance == nil
+                        ? tr("Longest", "Lengste")
+                        : tr("Longest distance", "Lengste distanse"),
+                    value: longestDistance.map {
+                        String(format: "%.1f km", $0 / 1_000)
+                    } ?? String(format: "%.0f min", longestTime / 60)
+                )
+            }
+
+            Chart(workouts) { workout in
+                if longestDistance != nil {
+                    if let meters = workout.distanceMeters, meters > 0 {
+                        BarMark(
+                            x: .value("Dato", workout.endDate),
+                            y: .value("Km", meters / 1_000)
+                        )
+                        .foregroundStyle(gold)
+                    }
+                } else {
+                    BarMark(
+                        x: .value("Dato", workout.endDate),
+                        y: .value("Min", workout.duration / 60)
+                    )
+                    .foregroundStyle(gold)
+                }
+            }
+            .frame(height: 180)
+            .chartYAxis { AxisMarks(position: .leading) }
+
+            Text(
+                longestDistance != nil
+                    ? tr("Recorded distance per session (km).",
+                         "Registrert distanse per økt (km).")
+                    : tr("Recorded duration per session (minutes).",
+                         "Registrert varighet per økt (minutter).")
+            )
+            .font(.caption2)
+            .foregroundStyle(muted)
+
+            resultListHeader
+            ForEach(Array(workouts.suffix(6).reversed())) { workout in
+                HStack(spacing: 6) {
+                    Text(workout.endDate.formatted(
+                        date: .abbreviated, time: .omitted
+                    ))
+                    Spacer(minLength: 2)
+                    Text(String(format: "%.0f min", workout.duration / 60))
+                    if let meters = workout.distanceMeters, meters > 0 {
+                        Text(String(format: "%.1f km", meters / 1_000))
+                            .fontWeight(.semibold)
+                    }
+                }
+                .font(.caption)
+                .foregroundStyle(ink)
+            }
+        }
+    }
+
     private var resultListHeader: some View {
         Text(tr("RECENT RECORDED RESULTS", "SISTE REGISTRERTE RESULTATER"))
             .font(.system(size: 10, weight: .semibold))
@@ -379,6 +515,19 @@ struct ATHLTHSpecificProgressView: View {
         guard speed > 0, speed.isFinite else { return "–" }
         let seconds = Int((3_600 / speed).rounded())
         return String(format: "%d:%02d/km", seconds / 60, seconds % 60)
+    }
+
+    private func loadHealthHistory() async {
+        guard health.hasRequestedAuthorization else {
+            healthSessions = []
+            return
+        }
+        guard let completed = try? await health.workoutHistory() else { return }
+        // Apple Health's UUIDs are stable and guard against re-importing one
+        // physical activity twice. Exercise-level detail stays in ATHLTH logs.
+        var seen = Set<UUID>()
+        healthSessions = completed.map(SocialPublishableWorkout.init(summary:))
+            .filter { seen.insert($0.id).inserted }
     }
 
     private func reloadWatchHistory() {
