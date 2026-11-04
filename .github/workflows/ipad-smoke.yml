@@ -250,7 +250,52 @@ jobs:
             xcrun simctl terminate "$UDID" com.wesc9.athlth || true
           done
 
-          echo "ATHLTH onboarding and all five main tabs rendered on iPad."
+          # Check the actual first logged-in Studio frame on a larger iPad,
+          # in addition to the 11-inch device tested above. Keep the PNG for
+          # visual inspection; entropy alone cannot prove layout quality.
+          LARGE_DEVICE_TYPE=$(python3 - "$DEVICE_TYPES_JSON" <<'PY'
+          import json,sys
+          with open(sys.argv[1]) as fh:
+              devices=json.load(fh)["devicetypes"]
+          preferred=[
+              "iPad Pro 13-inch (M5)",
+              "iPad Pro 13-inch (M4)",
+              "iPad Air 13-inch (M3)",
+              "iPad Air 13-inch (M2)",
+          ]
+          by_name={item["name"]:item["identifier"] for item in devices}
+          for name in preferred:
+              if name in by_name:
+                  print(by_name[name])
+                  break
+          else:
+              options=[
+                  item["identifier"] for item in devices
+                  if item["name"].startswith("iPad")
+                  and ("13-inch" in item["name"] or "13 inch" in item["name"])
+              ]
+              print(options[-1] if options else "")
+          PY
+          )
+
+          if [ -n "$LARGE_DEVICE_TYPE" ]; then
+            echo "Rendering the first Studio screen on a 13-inch iPad."
+            xcrun simctl shutdown "$UDID" >/dev/null 2>&1 || true
+            xcrun simctl delete "$UDID" >/dev/null 2>&1 || true
+            UDID=$(xcrun simctl create "ATHLTH-iPad-13" "$LARGE_DEVICE_TYPE" "$RUNTIME")
+            xcrun simctl boot "$UDID"
+            xcrun simctl bootstatus "$UDID" -b
+            xcrun simctl install "$UDID" "$APP"
+            xcrun simctl launch "$UDID" com.wesc9.athlth \
+              --athlth-compatibility-preview \
+              "--athlth-compatibility-tab=0"
+            validate_screen "13-inch-home"
+            xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+          else
+            echo "::warning::No 13-inch iPad simulator exists on this runner; 11-inch screenshots are available."
+          fi
+
+          echo "ATHLTH onboarding, five iPad views and 13-inch Home (where available) inspected for blank frames."
 
       - name: Upload iPad smoke screenshots
         if: always()
