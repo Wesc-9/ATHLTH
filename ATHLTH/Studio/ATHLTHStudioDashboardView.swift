@@ -74,6 +74,53 @@ struct ATHLTHStudioDashboardView: View {
         )
     }
 
+    /// Header values always refer to the actual current week, even when the
+    /// calendar below is browsing an earlier or later week.
+    private var actualWeek: ATHLTHStudioHomeWeek.Snapshot {
+        ATHLTHStudioHomeWeek.make(
+            plans: session.trainingPlans,
+            standalone: session.standalonePlannedSessions,
+            recorded: healthHasDataAccess ? health.workouts : [],
+            pausedPlanIDs: session.pausedTrainingPlanIDs,
+            deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
+            now: .now
+        )
+    }
+
+    private var headerPulse: ATHLTHStudioDashboardHeaderPulse {
+        let current = actualWeek
+        let confirmed = Set(current.days.flatMap(\.planned).compactMap {
+            entry -> String? in
+            guard let planID = entry.planID,
+                  session.isPlanSessionCompleted(
+                    planID: planID,
+                    sessionID: entry.workout.id,
+                    healthWorkouts: health.workouts,
+                    strengthHistory: strength.workoutHistory
+                  ) else { return nil }
+            return entry.id
+        })
+        return ATHLTHStudioDashboardHeaderPulse.make(
+            week: current,
+            completedOccurrenceIDs: confirmed,
+            healthAvailable: healthHasDataAccess
+        )
+    }
+
+    private var headerProgram: TrainingPlan? {
+        if let currentProgram { return currentProgram }
+        return session.trainingPlans
+            .filter {
+                !session.pausedTrainingPlanIDs.contains($0.id) &&
+                !session.deactivatedTrainingPlanIDs.contains($0.id) &&
+                session.trainingPlanStatus($0) == .completed
+            }
+            .max {
+                ($0.startDate ?? .distantPast) <
+                ($1.startDate ?? .distantPast)
+            }
+    }
+
     private var recent: [WorkoutSummary] {
         Array(health.workouts.sorted { $0.startDate > $1.startDate }.prefix(2))
     }
@@ -102,7 +149,7 @@ struct ATHLTHStudioDashboardView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 17) {
-                    heading
+                    heading(wide: wide)
 
                     if wide {
                         HStack(alignment: .top, spacing: 15) {
@@ -159,38 +206,236 @@ struct ATHLTHStudioDashboardView: View {
         }
     }
 
-    private var heading: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(tr("YOUR TRAINING SPACE", "DIN TRENINGSOVERSIKT"))
-                    .font(.caption.weight(.semibold))
-                    .tracking(1.8)
-                    .foregroundStyle(ATHLTHStudioStyle.gold)
+    /// A compact command center replaces the duplicate iPad navigation
+    /// title and giant welcome heading. The underlying data is never mocked.
+    private func heading(wide: Bool) -> some View {
+        let pulse = headerPulse
 
-                Text(tr("Your training today", "Din trening i dag"))
-                    .font(.system(.largeTitle, design: .rounded, weight: .semibold))
-                    .foregroundStyle(ATHLTHStudioStyle.ink)
-                    .minimumScaleFactor(0.8)
-                    .lineLimit(1)
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(tr("ATHLTH STUDIO / OVERVIEW",
+                            "ATHLTH STUDIO / OVERSIKT"))
+                        .font(.caption2.weight(.semibold))
+                        .tracking(1.5)
+                        .foregroundStyle(ATHLTHStudioStyle.gold)
 
-                Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide)))
-                    .font(.subheadline)
+                    Text(tr("Your training overview",
+                            "Din treningsoversikt"))
+                        .font(.system(.title2, design: .rounded,
+                                      weight: .semibold))
+                        .foregroundStyle(ATHLTHStudioStyle.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.72)
+
+                    Text(Date.now.formatted(
+                        .dateTime.weekday(.wide).day().month(.wide)
+                    ))
+                    .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+
+                Spacer(minLength: 8)
+
+                Button {
+                    focusedPlanningDate =
+                        Calendar.current.startOfDay(for: .now)
+                } label: {
+                    Label(tr("Plan workout", "Planlegg økt"),
+                          systemImage: "plus")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHStudioStyle.ink)
+                .accessibilityHint(tr(
+                    "Opens the iPad planner with the week vertically at left",
+                    "Åpner planlegging med ukedagene loddrett til venstre"
+                ))
+
+                Menu {
+                    Button(action: onStartQuick) {
+                        Label(tr("Start workout now", "Start økt nå"),
+                              systemImage: "play.fill")
+                    }
+                    Button(action: onOpenPlanner) {
+                        Label(tr("Open Plan Studio", "Åpne Plan Studio"),
+                              systemImage: "calendar")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(width: 30, height: 30)
+                }
+                .accessibilityLabel(tr("More workout actions",
+                                       "Flere treningshandlinger"))
+                .buttonStyle(.bordered)
             }
 
-            Spacer(minLength: 8)
-
-            Button(action: onStartQuick) {
-                Label(tr("New workout", "Ny økt"), systemImage: "plus")
+            if wide {
+                HStack(spacing: 10) {
+                    commandCard(
+                        label: tr("YOUR PROGRAM", "DITT PROGRAM"),
+                        title: headerProgramTitle,
+                        detail: headerProgramSubtitle,
+                        icon: "calendar",
+                        action: onOpenPlanner
+                    )
+                    commandCard(
+                        label: tr("THIS WEEK", "DENNE UKEN"),
+                        title: pulse.plannedSessions == 0
+                            ? "—" :
+                            "\(pulse.completedSessions) / \(pulse.plannedSessions)",
+                        detail: pulse.plannedSessions == 0
+                            ? tr("No plan workouts", "Ingen planøkter")
+                            : tr("Planned workouts completed",
+                                 "Planøkter gjennomført"),
+                        icon: "checkmark.circle",
+                        action: onOpenPlanner
+                    )
+                    commandCard(
+                        label: tr("RECORDED TIME", "TRENINGSTID"),
+                        title: recordedTimeTitle(pulse.recordedMinutes),
+                        detail: pulse.recordedMinutes == nil
+                            ? tr("Apple Health unavailable",
+                                 "Apple Health utilgjengelig")
+                            : tr("This calendar week", "Denne kalenderuken"),
+                        icon: "clock",
+                        action: onOpenHistory
+                    )
+                }
+            } else {
+                VStack(spacing: 9) {
+                    commandCard(
+                        label: tr("YOUR PROGRAM", "DITT PROGRAM"),
+                        title: headerProgramTitle,
+                        detail: headerProgramSubtitle,
+                        icon: "calendar",
+                        action: onOpenPlanner
+                    )
+                    commandCard(
+                        label: tr("THIS WEEK", "DENNE UKEN"),
+                        title: pulse.plannedSessions == 0
+                            ? "—" :
+                            "\(pulse.completedSessions) / \(pulse.plannedSessions)",
+                        detail: pulse.plannedSessions == 0
+                            ? tr("No plan workouts", "Ingen planøkter")
+                            : tr("Planned workouts completed",
+                                 "Planøkter gjennomført"),
+                        icon: "checkmark.circle",
+                        action: onOpenPlanner
+                    )
+                    commandCard(
+                        label: tr("RECORDED TIME", "TRENINGSTID"),
+                        title: recordedTimeTitle(pulse.recordedMinutes),
+                        detail: pulse.recordedMinutes == nil
+                            ? tr("Apple Health unavailable",
+                                 "Apple Health utilgjengelig")
+                            : tr("This calendar week", "Denne kalenderuken"),
+                        icon: "clock",
+                        action: onOpenHistory
+                    )
+                }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHStudioStyle.ink)
-            .controlSize(.regular)
-            .accessibilityHint(tr(
-                "Opens ATHLTH's workout creator",
-                "Åpner ATHLTHs øktplanlegger"
-            ))
         }
+        .padding(.vertical, 1)
+        .accessibilityIdentifier("athlth-ipad-training-command-header")
+    }
+
+    private var headerProgramTitle: String {
+        headerProgram?.title ??
+            tr("Create a training plan", "Opprett treningsplan")
+    }
+
+    private var headerProgramSubtitle: String {
+        guard let plan = headerProgram else {
+            return tr("Get started in Plan Studio",
+                      "Kom i gang i Plan Studio")
+        }
+
+        let progress = session.trainingPlanProgress(
+            plan,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        if progress.totalSessions > 0 &&
+           progress.completedSessions == progress.totalSessions {
+            return tr("All planned workouts completed",
+                      "Alle planøkter gjennomført")
+        }
+        switch session.trainingPlanStatus(plan) {
+        case .active:
+            return weekLabel(for: plan)
+        case .upcoming:
+            if let start = plan.startDate {
+                return tr("Starts", "Starter") + " " +
+                    start.formatted(.dateTime.day().month(.abbreviated))
+            }
+            return tr("Upcoming program", "Kommende plan")
+        case .completed:
+            return tr("Plan period ended", "Planperioden avsluttet")
+        case .unscheduled:
+            return tr("Dates not set", "Datoer ikke angitt")
+        }
+    }
+
+    private func recordedTimeTitle(_ minutes: Int?) -> String {
+        guard let minutes else { return "—" }
+        let hours = minutes / 60
+        let rest = minutes % 60
+        return tr("\(hours) h \(rest) min", "\(hours) t \(rest) min")
+    }
+
+    private func commandCard(
+        label: String,
+        title: String,
+        detail: String,
+        icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(spacing: 6) {
+                    Image(systemName: icon)
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHStudioStyle.gold)
+                    Text(label)
+                        .font(.caption2.weight(.semibold))
+                        .tracking(0.7)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHStudioStyle.gold.opacity(0.75))
+                }
+
+                Text(title)
+                    .font(.system(.headline, design: .rounded,
+                                  weight: .semibold))
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.68)
+
+                Text(detail)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity, minHeight: 75,
+                   alignment: .leading)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 9)
+            .background(Color.white,
+                        in: RoundedRectangle(cornerRadius: 15))
+            .overlay {
+                RoundedRectangle(cornerRadius: 15)
+                    .stroke(ATHLTHStudioStyle.outline.opacity(0.55))
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 15))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .combine)
     }
 
     private func todayCard(_ next: ATHLTHStudioSchedule.Occurrence?) -> some View {
