@@ -4,6 +4,10 @@ import SwiftUI
 /// It does not create parallel copies of ATHLTH's workout or social screens.
 struct ATHLTHSideMenuView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var messaging: MessagingStore
+    @EnvironmentObject private var notificationStore: ATHLTHNotificationStore
+    @EnvironmentObject private var social: SocialStore
+    @EnvironmentObject private var health: HealthKitManager
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     let selectedTab: Int
@@ -41,29 +45,66 @@ struct ATHLTHSideMenuView: View {
                     ScrollView {
                         VStack(alignment: .leading, spacing: 22) {
                             menuSection(
-                                english: "OVERVIEW",
-                                norwegian: "OVERSIKT"
+                                english: "HOME",
+                                norwegian: "HJEM"
                             ) {
-                                menuRow(.home, english: "Home", norwegian: "Hjem", icon: "house", selected: selectedTab == 0)
-                                menuRow(.calendar, english: "Calendar", norwegian: "Kalender", icon: "calendar")
-                                menuRow(.insights, english: "Insights", norwegian: "Innsikt", icon: "chart.xyaxis.line", selected: selectedTab == 2)
+                                menuRow(
+                                    .home,
+                                    english: "Home",
+                                    norwegian: "Hjem",
+                                    icon: "house",
+                                    selected: selectedTab == 0
+                                )
+                                homeUtilityActions
+                                    .padding(.top, 9)
                             }
 
                             menuSection(
-                                english: "TRAINING",
-                                norwegian: "TRENING"
+                                english: "TRAINING TOOLS",
+                                norwegian: "TRENING OG VERKTØY"
                             ) {
-                                menuRow(.train, english: "Train", norwegian: "Tren", icon: "dumbbell", selected: selectedTab == 1)
-                                menuRow(.plans, english: "Training plans", norwegian: "Treningsplaner", icon: "square.stack.3d.up")
-                                menuRow(.explore, english: "Routes & explore", norwegian: "Ruter og Explore", icon: "map", selected: selectedTab == 3)
+                                menuRow(
+                                    .trainingLibrary,
+                                    english: "Training library",
+                                    norwegian: "Treningsbibliotek",
+                                    icon: "books.vertical"
+                                )
+                                menuRow(
+                                    .trainTogether,
+                                    english: "Train Together",
+                                    norwegian: "Tren sammen",
+                                    icon: "person.2"
+                                )
+                                menuRow(
+                                    .ghostRace,
+                                    english: "Ghost Race",
+                                    norwegian: "Ghost Race",
+                                    icon: "figure.run"
+                                )
+                                menuRow(
+                                    .exerciseProgress,
+                                    english: "Exercise progression",
+                                    norwegian: "Øvelsesfremdrift",
+                                    icon: "chart.xyaxis.line"
+                                )
                             }
 
                             menuSection(
-                                english: "COMMUNITY",
-                                norwegian: "FELLESSKAP"
+                                english: "COMPETITION & CLUBS",
+                                norwegian: "KONKURRANSER OG KLUBBER"
                             ) {
-                                menuRow(.community, english: "Community", norwegian: "Fellesskap", icon: "person.3", selected: selectedTab == 4)
-                                menuRow(.profile, english: "My profile & gear", norwegian: "Min profil og utstyr", icon: "person.crop.circle")
+                                menuRow(
+                                    .arena,
+                                    english: "Arena",
+                                    norwegian: "Arena",
+                                    icon: "trophy"
+                                )
+                                menuRow(
+                                    .clubs,
+                                    english: "Clubs",
+                                    norwegian: "Klubber",
+                                    icon: "person.3"
+                                )
                             }
                         }
                         .padding(.horizontal, 14)
@@ -264,6 +305,112 @@ struct ATHLTHSideMenuView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    private var homeUnreadInbox: Int {
+        max(
+            0,
+            messaging.unreadCount +
+                messaging.messageRequestCount +
+                social.inboxEvents.filter {
+                    $0.kind == "challenge_invite" && $0.readAt == nil
+                }.count
+        )
+    }
+
+    private var homeUnreadNotifications: Int {
+        max(
+            0,
+            notificationStore.notificationCenterUnreadCount +
+                health.pendingWorkoutImportCount
+        )
+    }
+
+    /// The former Home hero actions now live immediately under Hjem. Their
+    /// destinations and unread counters remain identical to the old toolbar.
+    private var homeUtilityActions: some View {
+        HStack(alignment: .top, spacing: 9) {
+            utilityAction(
+                .search,
+                english: "Search",
+                norwegian: "Søk",
+                icon: "magnifyingglass"
+            )
+            utilityAction(
+                .inbox,
+                english: "Inbox",
+                norwegian: "Innboks",
+                icon: "tray",
+                count: homeUnreadInbox
+            )
+            utilityAction(
+                .notifications,
+                english: "Alerts",
+                norwegian: "Varsler",
+                icon: "bell",
+                count: homeUnreadNotifications
+            )
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 4)
+        .accessibilityIdentifier("athlth-side-menu-home-utilities")
+    }
+
+    private func utilityAction(
+        _ destination: ATHLTHSideMenuDestination,
+        english: String,
+        norwegian: String,
+        icon: String,
+        count: Int = 0
+    ) -> some View {
+        let name = ATHLTHLocalization.choose(
+            english: english, norwegian: norwegian
+        )
+
+        return Button {
+            onSelect(destination)
+        } label: {
+            VStack(spacing: 7) {
+                ZStack(alignment: .topTrailing) {
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Color.white.opacity(0.88))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 14)
+                                .strokeBorder(warmDivider, lineWidth: 1)
+                        }
+                        .frame(height: 52)
+                        .overlay {
+                            Image(systemName: icon)
+                                .font(.system(size: 19, weight: .medium))
+                                .foregroundStyle(ATHLTHTheme.accentDeep)
+                        }
+
+                    if count > 0 {
+                        Text(count > 99 ? "99+" : "\(count)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 6)
+                            .frame(minHeight: 18)
+                            .background(Color.red, in: Capsule())
+                            .offset(x: 3, y: -6)
+                            .accessibilityHidden(true)
+                    }
+                }
+
+                Text(name)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(count > 0
+            ? "\(name), \(count)"
+            : name
+        )
     }
 
     private var footer: some View {
