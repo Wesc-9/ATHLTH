@@ -148,6 +148,8 @@ struct StrengthAIExercisePlannerView: View {
 
     let existingExercises: [PlannedExercise]
     let recentWorkouts: [StrengthWorkoutLog]
+    /// Quick mode shows one reviewed recommendation, without the large planner.
+    var quickSuggestion: Bool = false
     let onApply: ([PlannedExercise]) -> Void
 
     @State private var goal:
@@ -271,8 +273,18 @@ struct StrengthAIExercisePlannerView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 14) {
-                    introCard
-                    setupCard
+                    if quickSuggestion {
+                        Text(ATHLTHLocalization.choose(
+                            english: "One exercise based on your current session, trained muscle groups and previous workouts.",
+                            norwegian: "Én øvelse valgt ut fra dagens økt, muskelgrupper og treningshistorikk."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        introCard
+                        setupCard
+                    }
 
                     if let errorMessage {
                         errorCard(
@@ -281,10 +293,16 @@ struct StrengthAIExercisePlannerView: View {
                     }
 
                     if plan != nil {
-                        resultCard
+                        if quickSuggestion {
+                            singleSuggestionCard
+                        } else {
+                            resultCard
+                        }
                     }
 
-                    generateButton
+                    if plan == nil || !quickSuggestion {
+                        generateButton
+                    }
                 }
                 .padding(16)
                 .padding(.bottom, 26)
@@ -299,10 +317,12 @@ struct StrengthAIExercisePlannerView: View {
             )
             .navigationTitle(
                 ATHLTHLocalization.choose(
-                    english:
-                        "AI exercise picker",
-                    norwegian:
-                        "AI velger øvelser"
+                    english: quickSuggestion
+                        ? "ATHLTH Coach recommends"
+                        : "AI exercise picker",
+                    norwegian: quickSuggestion
+                        ? "Anbefalt av ATHLTH Coach"
+                        : "AI velger øvelser"
                 )
             )
             .navigationBarTitleDisplayMode(
@@ -325,8 +345,13 @@ struct StrengthAIExercisePlannerView: View {
             }
         }
         .presentationDetents(
-            [.large]
+            quickSuggestion ? [.medium, .large] : [.large]
         )
+        .task {
+            if quickSuggestion && plan == nil && !isGenerating {
+                generate()
+            }
+        }
     }
 
     private var introCard: some View {
@@ -525,7 +550,7 @@ struct StrengthAIExercisePlannerView: View {
 
                 Stepper(
                     value: $exerciseCount,
-                    in: 3...8
+                    in: 1...8
                 ) {
                     HStack {
                         Text(
@@ -791,6 +816,78 @@ struct StrengthAIExercisePlannerView: View {
         }
     }
 
+    private var singleSuggestionCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if let (suggestion, entry) = resolvedSuggestions.first {
+                HStack(alignment: .top, spacing: 12) {
+                    ATHLTHAIExerciseSuggestionImage(entry: entry)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(entry.name)
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .lineLimit(2)
+                        Text("\(suggestion.sets) sett · \(suggestion.reps) reps · \(suggestion.restSeconds)s pause")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        if let group = entry.bodyPart, !group.isEmpty {
+                            Text(group)
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                }
+                if !suggestion.reason.isEmpty {
+                    Text(suggestion.reason)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Button {
+                    applyPlan()
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Add this exercise",
+                        norwegian: "Legg til denne øvelsen"
+                    ), systemImage: "plus")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                    .background(
+                        ATHLTHTheme.accentDeep,
+                        in: RoundedRectangle(cornerRadius: 15)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(isGenerating)
+                Button {
+                    generate()
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Suggest another exercise",
+                        norwegian: "Foreslå en annen øvelse"
+                    ), systemImage: "arrow.clockwise")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 40)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHTheme.accentDeep)
+            } else {
+                Text(ATHLTHLocalization.choose(
+                    english: "No compatible exercise was suggested. Try another.",
+                    norwegian: "Ingen passende øvelse ble foreslått. Prøv igjen."
+                ))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                generateButton
+            }
+        }
+        .padding(17)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            ATHLTHPlanDesign.warmSurface,
+            in: RoundedRectangle(cornerRadius: 20)
+        )
+    }
+
     private var generateButton: some View {
         Button {
             generate()
@@ -861,8 +958,8 @@ struct StrengthAIExercisePlannerView: View {
             candidateEntries
                 .count <
                 min(
-                    exerciseCount,
-                    3
+                    quickSuggestion ? 1 : exerciseCount,
+                    1
                 )
         )
         .opacity(
@@ -994,7 +1091,7 @@ struct StrengthAIExercisePlannerView: View {
                     durationMinutes,
                 exerciseCount:
                     min(
-                        exerciseCount,
+                        quickSuggestion ? 1 : exerciseCount,
                         candidates.count
                     ),
                 focusBodyPart:
