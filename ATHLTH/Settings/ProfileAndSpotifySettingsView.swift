@@ -3556,6 +3556,8 @@ struct SpotifySettingsView: View {
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
 
     @State private var showingPlaylistPicker = false
+    @State private var showingQuickPlaylistOne = false
+    @State private var showingQuickPlaylistTwo = false
 
     var body: some View {
         Form {
@@ -3652,6 +3654,48 @@ struct SpotifySettingsView: View {
                             norwegian: "Velg en standardspilleliste for nye quick-økter. Planlagte økter og programmer kan fortsatt velge en egen spilleliste eller slå av Spotify."
                         )
                     )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
+                Section(ATHLTHLocalization.choose(
+                    english: "Workout music shortcuts",
+                    norwegian: "Musikksnarveier under trening"
+                )) {
+                    Button { showingQuickPlaylistOne = true } label: {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Playlist 1",
+                                    norwegian: "Spilleliste 1"
+                                ), systemImage: "1.circle"
+                            )
+                            Spacer()
+                            Text(settings.spotifyQuickPlaylistOne?.name ??
+                                 ATHLTHLocalization.choose(english: "Choose", norwegian: "Velg"))
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Button { showingQuickPlaylistTwo = true } label: {
+                        HStack {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Playlist 2",
+                                    norwegian: "Spilleliste 2"
+                                ), systemImage: "2.circle"
+                            )
+                            Spacer()
+                            Text(settings.spotifyQuickPlaylistTwo?.name ??
+                                 ATHLTHLocalization.choose(english: "Choose", norwegian: "Velg"))
+                                .lineLimit(1)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    Text(ATHLTHLocalization.choose(
+                        english: "Tap a shortcut during training to switch playlists. A shortcut only starts music when you tap it.",
+                        norwegian: "Trykk på en snarvei under trening for å bytte spilleliste. Musikk starter bare når du trykker."
+                    ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                 }
@@ -3763,6 +3807,24 @@ struct SpotifySettingsView: View {
                     ),
                 selection:
                     $settings.spotifyDefaultPlaylist
+            )
+        }
+        .sheet(isPresented: $showingQuickPlaylistOne) {
+            SpotifyPlaylistPickerView(
+                title: ATHLTHLocalization.choose(
+                    english: "Playlist shortcut 1",
+                    norwegian: "Spillelistesnarvei 1"
+                ),
+                selection: $settings.spotifyQuickPlaylistOne
+            )
+        }
+        .sheet(isPresented: $showingQuickPlaylistTwo) {
+            SpotifyPlaylistPickerView(
+                title: ATHLTHLocalization.choose(
+                    english: "Playlist shortcut 2",
+                    norwegian: "Spillelistesnarvei 2"
+                ),
+                selection: $settings.spotifyQuickPlaylistTwo
             )
         }
         .task {
