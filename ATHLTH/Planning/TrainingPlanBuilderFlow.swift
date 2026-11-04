@@ -539,36 +539,157 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         .background(ATHLTHTrainDesign.canvas)
     }
 
-    private var planNavigation: some View {
-        NavigationStack(path: $sourceRoute) {
-            GeometryReader { proxy in
-                HStack(spacing: 0) {
-                    // Keep the plan on the left while the workout on the
-                    // right edits the exact same week/day data. In narrow
-                    // Stage Manager windows the editor occupies the workspace
-                    // instead of shrinking the plan to an unusable column.
-                    if !studioFullscreenEditing ||
-                       composingAdvancedDay == nil ||
-                       proxy.size.width >= 900 {
-                        AnyView(planCanvasWithActions)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
+    /// This is a compact *view* of the canonical plan draft, not a second
+    /// week/day data model. The editor stays pinned to its original day until
+    /// it is saved or closed, avoiding accidental edits to a different date.
+    private var inlinePlanOutline: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(ATHLTHLocalization.choose(
+                english: "TRAINING PLAN", norwegian: "TRENINGSPROGRAM"
+            ))
+            .font(.caption2.weight(.bold))
+            .tracking(1.4)
+            .foregroundStyle(ATHLTHStudioStyle.gold)
 
-                    if studioFullscreenEditing,
-                       let selection = composingAdvancedDay {
-                        ATHLTHTrainDesign.rule
-                            .frame(width: 1)
+            Text(resolvedPlanTitle)
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(ATHLTHStudioStyle.ink)
+                .lineLimit(2)
 
-                        inlineWorkoutPanel(for: selection)
-                            .frame(
-                                width: proxy.size.width >= 900
-                                    ? min(750, max(490, proxy.size.width * 0.56))
-                                    : max(1, proxy.size.width - 1)
+            HStack(spacing: 12) {
+                Button {
+                    selectedPlanWeekIndex = max(0, selectedPlanWeekIndex - 1)
+                } label: {
+                    Image(systemName: "chevron.left")
+                }
+                .disabled(composingAdvancedDay != nil || selectedPlanWeekIndex == 0)
+
+                Spacer(minLength: 0)
+                Text(ATHLTHLocalization.format(
+                    english: "Week %d of %d",
+                    norwegian: "Uke %d av %d",
+                    selectedPlanWeekIndex + 1, weekCount
+                ))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHStudioStyle.ink)
+                Spacer(minLength: 0)
+
+                Button {
+                    selectedPlanWeekIndex = min(weekCount - 1, selectedPlanWeekIndex + 1)
+                } label: {
+                    Image(systemName: "chevron.right")
+                }
+                .disabled(composingAdvancedDay != nil ||
+                          selectedPlanWeekIndex >= weekCount - 1)
+            }
+            .buttonStyle(.borderless)
+            .padding(.vertical, 8)
+
+            Divider()
+
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(advancedWeekItems(for: selectedPlanWeekIndex)) { day in
+                        let isEditing = composingAdvancedDay?.id == day.weekday
+                        Button {
+                            selectedAdvancedWeekDay = day.weekday
+                        } label: {
+                            HStack(alignment: .center, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(day.date.formatted(.dateTime.weekday(.wide)))
+                                        .font(.subheadline.weight(.semibold))
+                                    Text(day.title)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .lineLimit(2)
+                                }
+                                Spacer(minLength: 4)
+                                if isEditing {
+                                    Image(systemName: "square.and.pencil")
+                                        .foregroundStyle(ATHLTHStudioStyle.gold)
+                                } else if day.isRestDay {
+                                    Image(systemName: "moon.zzz")
+                                        .foregroundStyle(.secondary)
+                                } else if !day.workouts.isEmpty {
+                                    Image(systemName: "checkmark.circle")
+                                        .foregroundStyle(ATHLTHStudioStyle.gold)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(
+                                isEditing ? ATHLTHStudioStyle.canvas : .white,
+                                in: RoundedRectangle(cornerRadius: 12)
                             )
-                            .frame(maxHeight: .infinity)
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 12)
+                                    .stroke(
+                                        isEditing
+                                            ? ATHLTHStudioStyle.gold.opacity(0.65)
+                                            : ATHLTHStudioStyle.outline.opacity(0.5)
+                                    )
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(!isEditing && composingAdvancedDay != nil)
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Finish editing before switching days",
+                            norwegian: "Avslutt redigeringen før du bytter dag"
+                        ))
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.vertical, 4)
+            }
+
+            Text(ATHLTHLocalization.choose(
+                english: "Your entire week stays visible as you edit the selected workout.",
+                norwegian: "Hele uken er synlig mens du redigerer den valgte økten."
+            ))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .background(ATHLTHStudioStyle.canvas)
+    }
+
+    private var inlinePlanFocusRail: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "calendar")
+                .foregroundStyle(ATHLTHStudioStyle.gold)
+            Text(ATHLTHLocalization.choose(english: "Week", norwegian: "Uke"))
+                .font(.caption2)
+            Text("\(selectedPlanWeekIndex + 1)")
+                .font(.title3.weight(.bold))
+            Divider()
+            Text(ATHLTHLocalization.choose(english: "Day", norwegian: "Dag"))
+                .font(.caption2)
+            Text("\(composingAdvancedDay?.id ?? 1)")
+                .font(.title3.weight(.bold))
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .padding(.top, 18)
+        .foregroundStyle(ATHLTHStudioStyle.ink)
+        .background(ATHLTHStudioStyle.canvas)
+    }
+
+    private var planNavigation: some View {
+        NavigationStack(path: $sourceRoute) {
+            Group {
+                if studioFullscreenEditing, step == .week,
+                   let selection = composingAdvancedDay {
+                    // The plan and its workout now remain on the same screen.
+                    // One shared iPad shell owns width, drag resizing and focus.
+                    ATHLTHStudioAdaptiveWorkspace {
+                        inlinePlanOutline
+                    } editor: {
+                        inlineWorkoutPanel(for: selection)
+                    } focusRail: {
+                        inlinePlanFocusRail
+                    }
+                } else {
+                    AnyView(planCanvasWithActions)
+                }
             }
             .navigationTitle(
                 ATHLTHLocalization.choose(
