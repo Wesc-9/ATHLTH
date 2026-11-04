@@ -608,9 +608,157 @@ struct ATHLTHWorkoutLiveActivity: Widget {
     }
 
 
-    /// One premium lock-screen card for every sport. Long exercise and phase
-    /// titles have room to wrap; progress is never cramped by the music UI.
+    /// Strength uses a deliberately compact Live Activity. Earlier versions
+    /// stacked multiple timers and long rows, overflowing the Lock Screen.
+    /// Running and other sports keep their existing display unchanged.
+    @ViewBuilder
     private func unifiedLightLockScreenContent(_ context: Context) -> some View {
+        if context.state.workoutKindRaw == "strength" {
+            compactStrengthLockScreenContent(context)
+        } else {
+            generalLockScreenContent(context)
+        }
+    }
+
+    private func compactStrengthLockScreenContent(_ context: Context) -> some View {
+        let state = context.state
+        let resting = state.strengthRestEndsAt != nil
+        let paused = state.phase == "paused"
+        let label = paused
+            ? localized("PAUSED", "PAUSET")
+            : resting
+                ? localized("REST", "PAUSE")
+                : localized("ACTIVE", "PÅGÅR")
+        let exerciseName = state.strengthExerciseName
+            ?? localized("Strength", "Styrke")
+        let completedSet = max(state.strengthSetIndex ?? 1, 1)
+        let totalSets = max(state.strengthSetCount ?? 1, 1)
+        let restEndsAt = state.strengthRestEndsAt
+        let remainingAtRender = restEndsAt?.timeIntervalSinceNow ?? 0
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                ATHLTHMarkShape()
+                    .fill(ATHLTHWidgetPalette.ink)
+                    .frame(width: 21, height: 17)
+                    .accessibilityHidden(true)
+                Text("ATHLTH")
+                    .font(.system(size: 12, weight: .medium))
+                    .tracking(2.2)
+                Spacer(minLength: 5)
+                HStack(spacing: 5) {
+                    Circle()
+                        .fill(ATHLTHWidgetPalette.brandGold)
+                        .frame(width: 7, height: 7)
+                    Text(label)
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.5)
+                }
+                .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(
+                    ATHLTHWidgetPalette.brandGold.opacity(0.09),
+                    in: Capsule()
+                )
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(exerciseName)
+                    .font(.system(size: 17, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.77)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if state.strengthSetCount ?? 0 > 0 {
+                    Text("\(min(completedSet, totalSets))/\(totalSets)")
+                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                        .fixedSize()
+                }
+            }
+
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                if let restEndsAt {
+                    Text(localized("Rest", "Pause"))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    Spacer(minLength: 2)
+                    if remainingAtRender > 0 {
+                        // Apple's system-driven countdown clamps to zero.
+                        // A date-style timer can produce a growing negative
+                        // value that overlaps adjacent Lock Screen content.
+                        Text(
+                            timerInterval: Date()...restEndsAt,
+                            countsDown: true,
+                            showsHours: false
+                        )
+                        .font(.system(size: 25, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .contentTransition(.identity)
+                        .frame(minWidth: 82, alignment: .trailing)
+                    } else {
+                        Text(localized("Ready", "Klar"))
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                    }
+                } else if let target = state.strengthTimedSetTargetSeconds,
+                          target > 0 {
+                    Text(localized("Timed set", "Tidssett"))
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    Spacer(minLength: 2)
+                    Text(duration(max(
+                        state.strengthTimedSetSecondsAtSnapshot
+                            ?? Double(target), 0
+                    )))
+                    .font(.system(size: 23, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                } else if let reps = state.strengthReps, reps > 0 {
+                    Label("\(reps) reps", systemImage: "repeat")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    Spacer(minLength: 0)
+                }
+            }
+            .frame(height: 29)
+
+            Rectangle()
+                .fill(ATHLTHWidgetPalette.ink.opacity(0.09))
+                .frame(height: 1)
+
+            HStack(spacing: 12) {
+                Label {
+                    if paused {
+                        Text(duration(state.elapsedTime))
+                    } else if let startedAt = context.attributes.startedAt {
+                        Text(startedAt, style: .timer)
+                    } else {
+                        Text(duration(state.elapsedTime))
+                    }
+                } icon: {
+                    Image(systemName: "clock")
+                }
+                Spacer(minLength: 6)
+                if state.heartRate.isFinite, state.heartRate > 0 {
+                    Label(
+                        "\(Int(state.heartRate.rounded())) bpm",
+                        systemImage: "heart.fill"
+                    )
+                }
+            }
+            .font(.system(size: 11, weight: .medium))
+            .monospacedDigit()
+            .lineLimit(1)
+            .foregroundStyle(ATHLTHWidgetPalette.muted)
+        }
+        .foregroundStyle(ATHLTHWidgetPalette.ink)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .contain)
+    }
+
+    /// Preserve the existing sport Live Activity outside strength workouts.
+    private func generalLockScreenContent(_ context: Context) -> some View {
         let isStrength = context.state.workoutKindRaw == "strength"
         let headline = isStrength
             ? (context.state.strengthExerciseName ??
