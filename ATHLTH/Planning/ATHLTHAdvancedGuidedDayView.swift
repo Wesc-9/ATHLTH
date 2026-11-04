@@ -272,7 +272,27 @@ struct ATHLTHAdvancedGuidedDayView: View {
                 }
                 .accessibilityLabel(tr("Add to", "Legg til i") + " " + phase.title)
             }
-            ForEach(Array(blocks.enumerated()), id: \.offset) { pair in
+            ForEach(Array(blocks.enumerated()), id: \.element.editorDragID) { pair in
+                if let groupID = pair.element.groupID,
+                   let groupKind = pair.element.groupKind {
+                    if !blocks.prefix(pair.offset).contains(where: {
+                        $0.groupID == groupID
+                    }) {
+                        ATHLTHAdvancedPlanGroupSummaryRow(
+                            kind: groupKind,
+                            blocks: blocks.filter { $0.groupID == groupID },
+                            onEditStep: { blockID in
+                                if let sourceIndex = workout.blocks.firstIndex(where: {
+                                    $0.editorDragID == blockID
+                                }) {
+                                    onEditBlock(workoutIndex, sourceIndex)
+                                } else {
+                                    onEditWorkout(workoutIndex)
+                                }
+                            }
+                        )
+                    }
+                } else {
                 Button {
                     // Use the original blueprint index, not the index within
                     // a displayed phase. This also handles interleaved rests.
@@ -318,6 +338,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
                     "Edit the duration, pace, intensity or recovery for this step.",
                     "Rediger varighet, tempo, intensitet eller pause for denne deløkten."
                 ))
+                }
             }
         }
     }
