@@ -277,6 +277,7 @@ struct ProductRootTabView: View {
                         showingSideMenu = true
                     }
                 },
+                sideMenuUnreadCount: visibleAppBadgeCount,
                 isActive: selectedTab == 0
             )
                 .tabItem { Label("Home", systemImage: "house.fill") }
@@ -898,6 +899,7 @@ struct ATHLTHHomeView: View {
         (ATHLTHTrainNavigationRequest) -> Void =
         { _ in }
     var onOpenSideMenu: () -> Void = {}
+    var sideMenuUnreadCount = 0
     // TabView can instantiate inactive tabs while rendering the first frame.
     // Defer Home's network/Health loads until it is the selected tab.
     var isActive: Bool = true
@@ -1009,11 +1011,28 @@ struct ATHLTHHomeView: View {
                                     )
                                     .allowsHitTesting(false)
                             }
+                            .overlay(alignment: .topTrailing) {
+                                if sideMenuUnreadCount > 0 {
+                                    Circle()
+                                        .fill(ATHLTHTheme.premiumGold)
+                                        .frame(width: 9, height: 9)
+                                        .overlay {
+                                            Circle()
+                                                .stroke(.white, lineWidth: 1.5)
+                                        }
+                                        .offset(x: 2, y: -1)
+                                        .accessibilityHidden(true)
+                                }
+                            }
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Open navigation menu",
-                            norwegian: "Åpne sidemenyen"
+                            english: sideMenuUnreadCount > 0
+                                ? "Open menu, unread items available"
+                                : "Open navigation menu",
+                            norwegian: sideMenuUnreadCount > 0
+                                ? "Åpne menyen, uleste elementer"
+                                : "Åpne sidemenyen"
                         ))
                         .padding(.leading, 16)
                         .padding(.top, 60)
