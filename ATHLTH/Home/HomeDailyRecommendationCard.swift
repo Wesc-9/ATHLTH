@@ -6,48 +6,63 @@ enum HomeTodayTwinCardLayout {
 }
 
 /// Editorial daily context followed by a specific, executable recommendation.
-/// Only the workout row is interactive; the body assessment is never treated
-/// as medical advice or a measured state when Health data is missing.
+/// Tapping the assessment opens its detailed explanation, while the workout
+/// row preserves its separate launch action. Neither is medical advice.
 struct HomeDailyRecommendationCard: View {
     let advice: HomeDailyRecommendationPolicy.Advice
+    let onShowDetails: () -> Void
     let onStartRecommendedWorkout: () -> Void
     /// Dense presentation in Home's two-column row; accessibility remains naturally sized.
     var compact: Bool = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: compact ? 5 : 10) {
-            HStack(spacing: 6) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                Text(ATHLTHLocalization.choose(
-                    english: "Today's recommendation",
-                    norwegian: "Dagens anbefaling"
-                ))
-                .font(.system(size: compact ? 11.5 : 12, weight: .bold))
-                .foregroundStyle(ATHLTHTrainDesign.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                Spacer(minLength: 0)
-            }
+            Button(action: onShowDetails) {
+                VStack(alignment: .leading, spacing: compact ? 5 : 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                            .accessibilityHidden(true)
 
-            Text(advice.dayDescription)
-                .font(.system(size: compact ? 11.5 : 12))
-                .foregroundStyle(ATHLTHTrainDesign.secondary)
-                .lineSpacing(compact ? 1.0 : 2)
-                .lineLimit(compact ? 4 : nil)
-                .minimumScaleFactor(compact ? 0.94 : 1)
-                .fixedSize(horizontal: false, vertical: !compact)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Today's recommendation",
+                            norwegian: "Dagens anbefaling"
+                        ))
+                        .font(.system(size: compact ? 11.5 : 12, weight: .bold))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.78)
+
+                        Spacer(minLength: 0)
+
+                        Image(systemName: "info.circle")
+                            .font(.system(size: compact ? 11 : 12))
+                            .foregroundStyle(ATHLTHTrainDesign.bronze.opacity(0.8))
+                            .accessibilityHidden(true)
+                    }
+
+                    Text(advice.shortDescription)
+                        .font(.system(size: compact ? 10.5 : 11.5))
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        .lineSpacing(compact ? 1 : 2)
+                        .lineLimit(compact ? 2 : 3)
+                        .minimumScaleFactor(0.93)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .layoutPriority(1)
-
-            if let evidence = advice.evidence {
-                Text(evidence)
-                    .font(.system(size: compact ? 8.5 : 9.5, weight: .medium))
-                    .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    .lineLimit(compact ? 2 : nil)
-                    .fixedSize(horizontal: false, vertical: !compact)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Today's recommendation. \(advice.shortDescription)",
+                norwegian: "Dagens anbefaling. \(advice.shortDescription)"
+            ))
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Open the detailed explanation behind this recommendation",
+                norwegian: "Åpner en detaljert forklaring på anbefalingen"
+            ))
+            .accessibilityIdentifier("home-daily-recommendation-details")
 
             // Keep the divider close to the advice rather than letting a
             // flexible Spacer create a large empty band above the workout.
@@ -129,10 +144,16 @@ struct HomeDailyRecommendationCard: View {
             height: compact ? HomeTodayTwinCardLayout.height : nil,
             alignment: .topLeading
         )
-        .background(
-            ATHLTHTrainDesign.paper,
-            in: RoundedRectangle(cornerRadius: 20, style: .continuous)
-        )
+        .background {
+            // Also make the card's empty space open the explanation.
+            // The visible workout Button above keeps its own tap handling.
+            Button(action: onShowDetails) {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(ATHLTHTrainDesign.paper)
+            }
+            .buttonStyle(.plain)
+            .accessibilityHidden(true)
+        }
         .overlay {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .strokeBorder(ATHLTHTrainDesign.rule.opacity(0.34),
