@@ -97,6 +97,70 @@ final class ATHLTHLiveWorkoutSnapshotSelectionTests: XCTestCase {
         )
     }
 
+    private func strengthSession(
+        resting: Bool = true,
+        startedAt: Date
+    ) -> WatchStrengthSessionSnapshot {
+        WatchStrengthSessionSnapshot(
+            workoutID: UUID(),
+            title: "Styrke",
+            exerciseIndex: 0,
+            exerciseCount: 2,
+            exerciseName: "Rowing Machine",
+            primaryMuscles: [],
+            setIndex: 2,
+            setCount: 3,
+            setNumber: 3,
+            completedSets: 3,
+            totalSets: 6,
+            draftReps: 10,
+            draftWeightKilograms: 0,
+            draftRestSeconds: 90,
+            isResting: resting,
+            restEndsAt: resting ? startedAt.addingTimeInterval(90) : nil,
+            currentExerciseComplete: true,
+            hasNextExercise: true,
+            allExercisesComplete: false,
+            updatedAt: startedAt.addingTimeInterval(5)
+        )
+    }
+
+    func testCurrentPhoneStrengthSetReplacesStaleWatchPresentation() throws {
+        var watch = snapshot(kind: .strength, elapsed: 110, at: now)
+        watch.strengthExerciseName = "Machine Chest Fly"
+        watch.strengthSetIndex = 2
+        watch.strengthSetCount = 3
+        watch.strengthRestEndsAt = nil
+        let result = try XCTUnwrap(
+            ATHLTHLiveWorkoutSnapshotSelection.enrichStrength(
+                watch,
+                local: strengthSession(startedAt: now),
+                localStartedAt: now,
+                displayName: "Romaskin"
+            )
+        )
+        XCTAssertEqual(result.heartRate, 120)
+        XCTAssertEqual(result.strengthExerciseName, "Romaskin")
+        XCTAssertEqual(result.strengthSetIndex, 3)
+        XCTAssertEqual(result.strengthSetCount, 3)
+        XCTAssertEqual(result.strengthRestEndsAt, now.addingTimeInterval(90))
+        XCTAssertNil(result.strengthTimedSetTargetSeconds)
+    }
+
+    func testUnrelatedStrengthSessionNeverChangesWatchLiveActivity() throws {
+        var watch = snapshot(kind: .strength, elapsed: 110, at: now)
+        watch.strengthExerciseName = "Machine Chest Fly"
+        let result = try XCTUnwrap(
+            ATHLTHLiveWorkoutSnapshotSelection.enrichStrength(
+                watch,
+                local: strengthSession(startedAt: now),
+                localStartedAt: now.addingTimeInterval(3_600),
+                displayName: "Romaskin"
+            )
+        )
+        XCTAssertEqual(result, watch)
+    }
+
     func testNoWorkoutDoesNotInventSession() {
         XCTAssertNil(
             ATHLTHLiveWorkoutSnapshotSelection.resolve(
