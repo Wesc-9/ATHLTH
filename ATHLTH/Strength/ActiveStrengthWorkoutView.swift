@@ -5600,8 +5600,17 @@ struct ActiveStrengthWorkoutView: View {
     ) -> some View {
         VStack(spacing: 10) {
             if strength.isResting, let end = strength.restEndsAt {
+                let upcomingSet = strength.currentSet?.setNumber ?? min(strength.currentSetIndex + 1, exercise.sets.count)
+                let totalSets = max(exercise.sets.count, 1)
                 HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "NEXT SET · \(upcomingSet) OF \(totalSets)",
+                            norwegian: "NESTE SETT · \(upcomingSet) AV \(totalSets)"
+                        ))
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                        .accessibilityAddTraits(.isHeader)
                         Text(ATHLTHLocalization.choose(
                             english: "REST · REMAINING",
                             norwegian: "PAUSE · GJENSTÅR"
@@ -5636,13 +5645,27 @@ struct ActiveStrengthWorkoutView: View {
                     Spacer()
                     Button {
                         strength.skipRest()
+                        // "Start next set" is an actual start, not only closing
+                        // the rest sheet. Timed sets begin counting down here.
+                        if strength.currentSet?.resolvedTargetKind == .time {
+                            strength.startOrResumeTimedSet()
+                        }
                     } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Continue", norwegian: "Fortsett"
-                        ), systemImage: "play.fill")
+                        VStack(spacing: 2) {
+                            Label(ATHLTHLocalization.choose(
+                                english: "Start next set",
+                                norwegian: "Start neste sett"
+                            ), systemImage: "play.fill")
+                            Text("\(upcomingSet) / \(totalSets)")
+                                .font(.caption2.weight(.bold).monospacedDigit())
+                        }
                         .font(.subheadline.weight(.semibold))
-                        .frame(minHeight: 46)
+                        .frame(minHeight: 50)
                     }
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Start set \(upcomingSet) of \(totalSets)",
+                        norwegian: "Start sett \(upcomingSet) av \(totalSets)"
+                    ))
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHPlanDesign.accentInk)
                 }
