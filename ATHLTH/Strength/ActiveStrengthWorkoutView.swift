@@ -5698,8 +5698,8 @@ struct ActiveStrengthWorkoutView: View {
                     if currentStrengthTargetKind == .time {
                         compactLiveIntegerMetric(
                             title: ATHLTHLocalization.choose(
-                                english: "Seconds", norwegian: "Sekunder"),
-                            value: draftDurationBinding, step: 15
+                                english: "Minutes", norwegian: "Minutter"),
+                            value: draftDurationMinutesBinding, step: 1
                         )
                     } else {
                         compactLiveIntegerMetric(
@@ -5707,6 +5707,42 @@ struct ActiveStrengthWorkoutView: View {
                                 english: "Reps", norwegian: "Reps"),
                             value: draftRepsBinding, step: 1
                         )
+                    }
+                }
+
+                // The active timer remains visible above the primary set
+                // action. It ticks from the same date-anchored clock shared
+                // with Apple Watch, including when the phone was backgrounded.
+                if currentStrengthTargetKind == .time,
+                   let timer = strength.currentTimedSetCountdown {
+                    TimelineView(.periodic(from: .now, by: 1)) { tick in
+                        let remaining = timer.secondsRemaining(at: tick.date)
+                        let finished = timer.isFinished(at: tick.date)
+                        HStack(spacing: 10) {
+                            Image(systemName: finished ? "checkmark.circle.fill" : "timer")
+                                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                            Text(finished
+                                ? ATHLTHLocalization.choose(
+                                    english: "Time reached · finish when ready",
+                                    norwegian: "Tiden er ute · fullfør når du vil")
+                                : ATHLTHLocalization.choose(
+                                    english: timer.isRunning ? "Counting down" : "Countdown paused",
+                                    norwegian: timer.isRunning ? "Nedtelling pågår" : "Nedtelling pauset"))
+                                .font(.caption.weight(.semibold))
+                                .lineLimit(2)
+                            Spacer(minLength: 6)
+                            Text(TimeInterval(remaining).clockDuration)
+                                .font(.system(size: 22, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                        }
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 11)
+                        .background(
+                            ATHLTHPlanDesign.accent.opacity(0.09),
+                            in: RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        )
+                        .accessibilityElement(children: .combine)
                     }
                 }
 
@@ -6551,6 +6587,21 @@ struct ActiveStrengthWorkoutView: View {
                             max(value, 15),
                             7_200
                         )
+                )
+            }
+        )
+    }
+
+    /// The athlete edits whole minutes; the workout engine continues storing
+    /// seconds so saved sets, Watch snapshots and the countdown stay exact.
+    private var draftDurationMinutesBinding: Binding<Int> {
+        Binding(
+            get: {
+                min(max((strength.draftDurationSeconds + 59) / 60, 1), 120)
+            },
+            set: { minutes in
+                strength.setDraft(
+                    durationSeconds: min(max(minutes, 1), 120) * 60
                 )
             }
         )
