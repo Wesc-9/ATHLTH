@@ -360,6 +360,9 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     var targetKind: StrengthExerciseTargetKind? = nil
     var plannedDurationSeconds: Int? = nil
     var completedDurationSeconds: Int? = nil
+    /// Independently measured real set time (including repetition sets).
+    /// Never includes the rest period; nil means not measured in older logs.
+    var actualSetElapsedSeconds: TimeInterval? = nil
     // An explicit bodyweight/no-load choice; nil preserves legacy sessions.
     var recordsWeight: Bool? = nil
 
