@@ -246,7 +246,8 @@ enum HomeDailyRecommendationPolicy {
             // Describe actual calendar-day gaps, not an imprecise "recently".
             // The Health history may be incomplete; say "registered" rather
             // than claiming the athlete definitely did or did not run.
-            if let days = trainingHistory.mostRecentRunDaysAgo,
+            if readiness != .unavailable,
+               let days = trainingHistory.mostRecentRunDaysAgo,
                days >= 3,
                trainingHistory.runsLast28Days > 0 {
                 if case .easyRun = suggestedWorkout {
