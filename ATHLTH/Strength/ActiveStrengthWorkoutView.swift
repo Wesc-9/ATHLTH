@@ -6597,11 +6597,15 @@ struct ActiveStrengthWorkoutView: View {
     private var draftDurationMinutesBinding: Binding<Int> {
         Binding(
             get: {
-                min(max((strength.draftDurationSeconds + 59) / 60, 1), 120)
+                StrengthTimedSetMinuteInput.minutes(
+                    for: strength.draftDurationSeconds
+                )
             },
             set: { minutes in
                 strength.setDraft(
-                    durationSeconds: min(max(minutes, 1), 120) * 60
+                    durationSeconds: StrengthTimedSetMinuteInput.seconds(
+                        for: minutes
+                    )
                 )
             }
         )
