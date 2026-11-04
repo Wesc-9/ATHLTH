@@ -15,6 +15,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var goalStore: GoalStore
 
@@ -909,7 +910,7 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selectingLibraryDay = nil
             }
         }
-        .sheet(item: $composingAdvancedDay, onDismiss: {
+        .athlthStudioEditor(item: $composingAdvancedDay, useFullScreen: studioFullscreenEditing, onDismiss: {
             quickStudioOption = nil
             studioInitialQuickAdd = nil
             studioInitialPhase = nil
