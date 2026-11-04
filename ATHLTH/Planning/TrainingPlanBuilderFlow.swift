@@ -4249,23 +4249,33 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         )
         guard blueprint.isValid else { return }
 
-        if var existing = base, existing.isValid, existing.kind == kind,
-           existing.blocks.count + steps.count <= 200 {
-            existing.blocks += steps
-            existing.blocks = existing.blocks.enumerated().map {
-                ATHLTHWorkoutPhasePlacement.renumbered(
-                    $0.element, sequence: $0.offset + 1
-                )
+        var appendAsExtra = false
+        if var existing = base, existing.isValid {
+            if existing.kind == kind &&
+               existing.blocks.count + steps.count <= 200 {
+                existing.blocks += steps
+                existing.blocks = existing.blocks.enumerated().map {
+                    ATHLTHWorkoutPhasePlacement.renumbered(
+                        $0.element, sequence: $0.offset + 1
+                    )
+                }
+                if let minutes = ATHLTHWorkoutDurationEstimator.minutes(
+                    for: existing.blocks
+                ) {
+                    existing.durationMinutes = minutes
+                }
+                if existing.isValid {
+                    blueprint = existing
+                } else {
+                    appendAsExtra = true
+                }
+            } else {
+                appendAsExtra = true
             }
-            if let minutes = ATHLTHWorkoutDurationEstimator.minutes(
-                for: existing.blocks
-            ) {
-                existing.durationMinutes = minutes
-            }
-            if existing.isValid { blueprint = existing }
-        } else if base?.isValid == true {
-            // An unrelated running/strength workout already owns the day.
-            // Preserve it and place the new group as an additional workout.
+        }
+        if appendAsExtra {
+            // Never replace a complete workout when merging would exceed
+            // playback limits or the activity type differs.
             edit.additionalDetailedWorkouts =
                 (edit.additionalDetailedWorkouts ?? []) + [blueprint]
             edit.isRestDay = false
