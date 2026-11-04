@@ -274,24 +274,28 @@ jobs:
           IOS_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/Info.plist"
           WATCH_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/Watch/ATHLTH.app/Info.plist"
           WIDGET_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/PlugIns/ATHLTHWidgets.appex/Info.plist"
+          WATCH_WIDGET_PLIST="$RUNNER_TEMP/ATHLTH.xcarchive/Products/Applications/ATHLTH.app/Watch/ATHLTH.app/PlugIns/ATHLTHWatchWidgets.appex/Info.plist"
+          test -s "$WATCH_WIDGET_PLIST" || { echo "::error::Watch Widget is missing from the archive."; exit 1; }
           IOS_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$IOS_PLIST")
           WATCH_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_PLIST")
           WIDGET_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WIDGET_PLIST")
+          WATCH_WIDGET_BUILD=$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$WATCH_WIDGET_PLIST")
           INTERFACE_STYLE=$(/usr/libexec/PlistBuddy -c "Print :UIUserInterfaceStyle" "$IOS_PLIST")
           echo "iPhone CFBundleVersion: $IOS_BUILD"
           echo "Watch CFBundleVersion: $WATCH_BUILD"
-          echo "Widget CFBundleVersion: $WIDGET_BUILD"
+          echo "iPhone Widget CFBundleVersion: $WIDGET_BUILD"
+          echo "Watch Widget CFBundleVersion: $WATCH_WIDGET_BUILD"
           echo "iPhone UIUserInterfaceStyle: $INTERFACE_STYLE"
           if [ "$INTERFACE_STYLE" != "Light" ]; then
             echo "::error::ATHLTH must archive with UIUserInterfaceStyle=Light."
             exit 1
           fi
-          if [ "$IOS_BUILD" -le 1 ] || [ "$WATCH_BUILD" -le 1 ] || [ "$WIDGET_BUILD" -le 1 ]; then
-            echo "::error::iPhone, Watch and Widget bundle versions must be greater than 1."
+          if [ "$IOS_BUILD" -le 1 ] || [ "$WATCH_BUILD" -le 1 ] || [ "$WIDGET_BUILD" -le 1 ] || [ "$WATCH_WIDGET_BUILD" -le 1 ]; then
+            echo "::error::All iPhone, Watch and Widget bundle versions must be greater than 1."
             exit 1
           fi
-          if [ "$IOS_BUILD" != "$WATCH_BUILD" ] || [ "$IOS_BUILD" != "$WIDGET_BUILD" ]; then
-            echo "::error::iPhone, Watch and Widget bundle versions must match."
+          if [ "$IOS_BUILD" != "$WATCH_BUILD" ] || [ "$IOS_BUILD" != "$WIDGET_BUILD" ] || [ "$IOS_BUILD" != "$WATCH_WIDGET_BUILD" ]; then
+            echo "::error::All iPhone, Watch and Widget bundle versions must match."
             exit 1
           fi
 
