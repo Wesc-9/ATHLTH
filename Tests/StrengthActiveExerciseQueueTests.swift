@@ -82,6 +82,35 @@ final class StrengthActiveExerciseQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testEditingPreviousTargetWeightKeepsActualResultAndActiveSet() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(exercise("Benkpress"), sets: 3, reps: 10)
+        store.setDraft(reps: 10, weightKilograms: 60)
+        store.completeCurrentDraftSet()
+
+        let exerciseID = try XCTUnwrap(store.activeWorkout?.exercises.first?.id)
+        let previousSet = try XCTUnwrap(store.activeWorkout?.exercises.first?.sets.first)
+        let activeSetID = try XCTUnwrap(store.currentSet?.id)
+        let originalVolume = store.activeWorkout?.totalVolumeKilograms ?? 0
+
+        XCTAssertTrue(store.updateActiveSetTargetWeight(
+            exerciseID: exerciseID, setID: previousSet.id,
+            kilograms: 72.5
+        ))
+        let updated = try XCTUnwrap(store.activeWorkout?.exercises.first?.sets.first)
+        XCTAssertEqual(updated.plannedWeightKilograms ?? 0, 72.5, accuracy: 0.001)
+        XCTAssertEqual(updated.completedWeightKilograms ?? 0, 60, accuracy: 0.001)
+        XCTAssertEqual(store.activeWorkout?.totalVolumeKilograms ?? 0,
+                       originalVolume, accuracy: 0.001)
+        XCTAssertEqual(store.currentSet?.id, activeSetID)
+        XCTAssertFalse(store.updateActiveSetTargetWeight(
+            exerciseID: exerciseID, setID: UUID(),
+            kilograms: 72.5
+        ))
+    }
+
+    @MainActor
     func testBarWeightIsMetadataNotAdditionalLoggedKilograms() throws {
         let store = StrengthWorkoutStore()
         store.startFreestyle(watchSessionID: nil)
