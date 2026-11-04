@@ -826,11 +826,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             WorkoutTemplateBuilderView(
                 initialTitle: quickStudioOption?.title ??
                     (addingExtraWorkout ? "" : (selectedWorkoutForEditor(day: selection.id)?.title ?? "")),
-                initialQuickAdd: studioInitialQuickAdd,
-                initialPhase: studioInitialPhase,
                 initialBlocks: quickStudioOption.map { quickDaySeed($0) } ??
                     (addingExtraWorkout ? [] : (selectedWorkoutForEditor(day: selection.id)?.blocks ?? [])),
                 initialRouteID: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeID,
+                initialQuickAdd: studioInitialQuickAdd,
+                initialPhase: studioInitialPhase,
                 initialFocusedBlockIndex: addingExtraWorkout ? nil : editingFocusedBlockIndex,
                 openFocusedStepEditor: !addingExtraWorkout && editingFocusedBlockIndex != nil,
                 initialExtras: ATHLTHWorkoutPlannerExtras(
