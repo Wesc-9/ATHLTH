@@ -310,6 +310,14 @@ struct ATHLTHSpecificProgressView: View {
                     Spacer()
                     Text("\(point.completedWorkingSets) " +
                          tr("sets", "sett"))
+                    if let seconds = point.measuredEffortSeconds {
+                        Text(seconds.clockDuration)
+                            .foregroundStyle(muted)
+                            .accessibilityLabel(tr(
+                                "Measured active set time",
+                                "Målt aktiv setttid"
+                            ))
+                    }
                     if let kg = point.peakWeightKilograms {
                         Text(String(format: "%.1f kg", kg))
                             .fontWeight(.semibold)
