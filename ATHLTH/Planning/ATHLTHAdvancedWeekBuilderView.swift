@@ -35,12 +35,15 @@ struct ATHLTHAdvancedWeekBuilderView: View {
     let onAddWorkout: (Int) -> Void
     let onMarkRest: (Int) -> Void
     let onQuick: (Int, String) -> Void
+    let onAddGroup: (Int, [WorkoutTemplateBlock], WorkoutKind) -> Void
     let onCopyWeek: (Int, [Int], Bool) -> Void
     let onMakeRecoveryWeek: (Int) -> Void
     let onSwitchToDayView: () -> Void
 
     @State private var showingStructure = false
     @State private var showingQuickActions = false
+    @State private var inlineGroupKind: WorkoutBlockGroupKind?
+    @State private var inlineGroupDay: Int?
     @State private var pendingRestReplacementDay: Int?
     @State private var confirmingRestReplacement = false
     @State private var showingCopy = false
@@ -429,6 +432,20 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 }
             }
             if !day.isRestDay {
+                if inlineGroupDay == day.weekday, let inlineGroupKind {
+                    ATHLTHPlanInlineGroupComposer(
+                        groupKind: inlineGroupKind,
+                        onInsert: { blocks, kind in
+                            onAddGroup(day.weekday, blocks, kind)
+                            self.inlineGroupKind = nil
+                            inlineGroupDay = nil
+                        },
+                        onCancel: {
+                            inlineGroupKind = nil
+                            inlineGroupDay = nil
+                        }
+                    )
+                }
                 Button {
                     requestRestDayChange(for: day)
                 } label: {
@@ -615,7 +632,14 @@ struct ATHLTHAdvancedWeekBuilderView: View {
 
     private func quick(_ id: String, _ symbol: String,
                        _ text: String, _ day: Int) -> some View {
-        Button { onQuick(day, id) } label: {
+        Button {
+            if id == "interval" || id == "superset" {
+                inlineGroupDay = day
+                inlineGroupKind = id == "interval" ? .intervals : .superset
+            } else {
+                onQuick(day, id)
+            }
+        } label: {
             Label(text, systemImage: symbol)
                 .font(.system(size: 10, weight: .medium))
                 .padding(.horizontal, 10).frame(minHeight: 32)
