@@ -81,7 +81,7 @@ struct ATHLTHStudioPlanCanvasView: View {
                 ATHLTHStudioPlanMetadataView(plan: plan)
             }
         }
-        .sheet(isPresented: $showingAdvancedBuilder) {
+        .fullScreenCover(isPresented: $showingAdvancedBuilder) {
             ATHLTHTrainingPlanBuilderFlow(
                 startsAtSourceChoice: true,
                 initialAdvanced: true,
@@ -95,12 +95,14 @@ struct ATHLTHStudioPlanCanvasView: View {
                     showingAdvancedBuilder = false
                 }
             )
+            .environment(\.athlthStudioFullscreenEditing, true)
         }
-        .sheet(isPresented: $showingWorkoutFlow) {
+        .fullScreenCover(isPresented: $showingWorkoutFlow) {
             ATHLTHTrainView(
                 navigationRequest: $workoutNavigation,
                 isActive: true
             )
+            .environment(\.athlthStudioFullscreenEditing, true)
         }
         .alert(
             ATHLTHLocalization.choose(
