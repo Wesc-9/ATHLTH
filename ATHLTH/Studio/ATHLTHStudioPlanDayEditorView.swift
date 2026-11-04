@@ -252,6 +252,44 @@ struct ATHLTHStudioPlanDayEditorView: View {
                 ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+                if let summary = ATHLTHWorkoutContentSummary.text(for: workout) {
+                    Text(summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                ForEach(
+                    Array(workout.resolvedWorkoutBlocks.prefix(4).enumerated()),
+                    id: \.offset
+                ) { _, block in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Image(systemName: "circle.fill")
+                            .font(.system(size: 5))
+                            .foregroundStyle(ATHLTHStudioStyle.gold)
+                        Text(block.title)
+                            .font(.caption)
+                            .lineLimit(2)
+                    }
+                }
+
+                ForEach(workout.exercises.prefix(5)) { exercise in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Image(systemName: "dumbbell")
+                            .font(.caption2)
+                            .foregroundStyle(ATHLTHStudioStyle.gold)
+                        Text(exercise.embeddedExercise.displayName)
+                            .font(.caption)
+                            .lineLimit(2)
+                        Spacer(minLength: 0)
+                        Text("\(exercise.sets) " + ATHLTHLocalization.choose(
+                            english: "sets", norwegian: "sett"
+                        ))
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                    }
+                }
             }
 
             HStack(spacing: 8) {
@@ -434,6 +472,7 @@ struct ATHLTHStudioPlanDayEditorView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(ATHLTHStudioStyle.ink)
+                .keyboardShortcut("s", modifiers: .command)
 
                 Button {
                     isEditing = false

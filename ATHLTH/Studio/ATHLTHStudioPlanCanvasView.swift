@@ -213,6 +213,12 @@ struct ATHLTHStudioPlanCanvasView: View {
                             ))
                     }
                 }
+                if !plan.summary.isEmpty {
+                    Text(plan.summary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
                 if let start = plan.startDate {
                     Text(
                         start.formatted(date: .abbreviated, time: .omitted) +
