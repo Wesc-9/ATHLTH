@@ -669,7 +669,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     .lineLimit(1)
                     .minimumScaleFactor(0.77)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                if state.strengthSetCount ?? 0 > 0 {
+                if (state.strengthSetCount ?? 0) > 0 {
                     Text("\(min(completedSet, totalSets))/\(totalSets)")
                         .font(.system(size: 12, weight: .bold, design: .rounded))
                         .monospacedDigit()
@@ -695,7 +695,6 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                         )
                         .font(.system(size: 25, weight: .semibold, design: .rounded))
                         .monospacedDigit()
-                        .contentTransition(.identity)
                         .frame(minWidth: 82, alignment: .trailing)
                     } else {
                         Text(localized("Ready", "Klar"))
