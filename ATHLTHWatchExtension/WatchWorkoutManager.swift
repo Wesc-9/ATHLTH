@@ -2210,6 +2210,50 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    /// Start the selected timed set from the Watch, even when its values
+    /// are controlled on iPhone. This must be one durable command: a separate
+    /// skip-rest followed by start-timer may be reordered during reconnection.
+    func startNextStrengthSetAfterRest() {
+        guard let snapshot = strengthSession else { return }
+        guard snapshot.isResting,
+              !snapshot.currentExerciseComplete,
+              snapshot.targetKindRaw == "time" else {
+            skipStrengthRest()
+            return
+        }
+
+        let now = Date()
+        let seconds = min(max(snapshot.draftDurationSeconds ?? 60, 15), 7_200)
+        let sent = sendStrengthCommand(
+            WatchStrengthCommand(
+                id: UUID(),
+                workoutID: snapshot.workoutID,
+                kind: .skipRestAndStartTimedSet,
+                reps: nil,
+                weightKilograms: nil,
+                restSeconds: nil,
+                addRestSeconds: nil,
+                sentAt: now,
+                exerciseIndex: snapshot.exerciseIndex,
+                setIndex: snapshot.setIndex
+            )
+        )
+        guard sent else { return }
+
+        var updated = snapshot
+        updated.isResting = false
+        updated.restEndsAt = nil
+        updated.timedSetCountdown = WatchTimedStrengthCountdown(
+            targetSeconds: seconds,
+            secondsAtPause: TimeInterval(seconds),
+            resumedAt: now
+        )
+        updated.updatedAt = now
+        publish { self.strengthSession = updated }
+        refreshStrengthTimedGoalHaptic()
+        persistWorkoutRecoveryState()
+    }
+
     func skipStrengthRest() {
         guard let snapshot = strengthSession else {
             return
