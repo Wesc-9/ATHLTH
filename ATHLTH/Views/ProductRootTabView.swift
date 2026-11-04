@@ -14,6 +14,7 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
     case quick(WorkoutKind)
     case customQuick
     case ghost
+    case library
 
     var id: String {
         switch self {
@@ -29,6 +30,8 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
             return "quick:custom"
         case .ghost:
             return "ghost"
+        case .library:
+            return "library"
         }
     }
 }
@@ -120,6 +123,8 @@ struct ProductRootTabView: View {
     @State private var showingCoachFromDock = false
     @State private var showingSideMenu = false
     @State private var sideMenuModalDestination: ATHLTHSideMenuDestination?
+    @State private var sideMenuUtilityDestination: ATHLTHSideMenuDestination?
+    @State private var sideMenuFullScreenDestination: ATHLTHSideMenuDestination?
     @Environment(\.accessibilityReduceMotion) private var reduceSideMenuMotion
 
     private func openPendingDailyCheckInIfNeeded() {
@@ -646,36 +651,28 @@ struct ProductRootTabView: View {
                 .zIndex(100)
             }
         }
-        .sheet(item: $sideMenuModalDestination) { destination in
+        .sheet(item: $sideMenuModalDestination) { _ in
             NavigationStack {
-                if destination == .profile {
-                    ATHLTHProfileView()
-                        .overlay(alignment: .topLeading) {
-                            Button {
+                ATHLTHSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Close", norwegian: "Lukk"
+                            )) {
                                 sideMenuModalDestination = nil
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 13, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .frame(width: 44, height: 44)
-                                    .background(
-                                        Color.black.opacity(0.30),
-                                        in: Circle()
-                                    )
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel(ATHLTHLocalization.choose(
-                                english: "Close profile",
-                                norwegian: "Lukk profil"
-                            ))
-                            .padding(.leading, 14)
-                            .padding(.top, 14)
                         }
-                } else if destination == .settings {
-                    ATHLTHSettingsView()
-                }
+                    }
             }
             .presentationDragIndicator(.visible)
+        }
+        .sheet(item: $sideMenuUtilityDestination) { destination in
+            ATHLTHSideMenuUtilitiesView(destination: destination)
+        }
+        // Unlike the former 90% sheet, profile and deeper destinations
+        // occupy the entire iPhone screen, including the safe area.
+        .fullScreenCover(item: $sideMenuFullScreenDestination) { destination in
+            ATHLTHSideMenuDeepLinkView(destination: destination)
         }
     }
 
@@ -687,22 +684,23 @@ struct ProductRootTabView: View {
         switch destination {
         case .home:
             selectedTab = 0
-        case .calendar:
-            trainNavigationRequest = .today
+
+        case .search, .inbox, .notifications:
+            sideMenuUtilityDestination = destination
+
+        case .trainingLibrary:
+            trainNavigationRequest = .library
             selectedTab = 1
-        case .train:
+
+        case .ghostRace:
+            trainNavigationRequest = .ghost
             selectedTab = 1
-        case .plans:
-            trainNavigationRequest = .plan
-            selectedTab = 1
-        case .insights:
-            selectedTab = 2
-        case .explore:
-            selectedTab = 3
-        case .community:
-            selectedTab = 4
-        case .profile, .settings:
-            sideMenuModalDestination = destination
+
+        case .profile, .trainTogether, .arena, .clubs, .exerciseProgress:
+            sideMenuFullScreenDestination = destination
+
+        case .settings:
+            sideMenuModalDestination = .settings
         }
     }
 
@@ -12255,6 +12253,10 @@ struct ATHLTHTrainView: View {
         case .ghost:
             selectedSection = .today
             showingGhostHub = true
+
+        case .library:
+            selectedSection = .today
+            showingLibrary = true
         }
 
         navigationRequest = nil
