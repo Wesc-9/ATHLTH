@@ -154,6 +154,12 @@ struct ATHLTHCommunityV5View: View {
     @EnvironmentObject private var health: HealthKitManager
 
     @State private var tab: ATHLTHCommunityMainTab = .overview
+
+    /// A side-menu shortcut can open the existing Clubs tab directly;
+    /// the main Community tab continues to default to Overview.
+    init(initialTab: ATHLTHCommunityMainTab = .overview) {
+        _tab = State(initialValue: initialTab)
+    }
     @State private var showSearch = false
     @FocusState private var searchFocused: Bool
     @State private var showCreateClub = false
