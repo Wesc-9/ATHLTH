@@ -613,6 +613,9 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     let initialPhase: WorkoutPhaseKind?
     let initialFocusedBlockIndex: Int?
     let initialFocusedExecutionStepIndex: Int?
+    /// When embedded in the iPad Plan Studio inspector, dismissal is owned
+    /// by the parent column instead of SwiftUI modal presentation.
+    let onCloseInline: (() -> Void)?
 
     @State private var draft: PlannedSession
     @State private var showExerciseSearch = false
@@ -696,7 +699,8 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         initialQuickAdd: String? = nil,
         initialPhase: WorkoutPhaseKind? = nil,
         initialFocusedBlockIndex: Int? = nil,
-        initialFocusedExecutionStepIndex: Int? = nil
+        initialFocusedExecutionStepIndex: Int? = nil,
+        onCloseInline: (() -> Void)? = nil
     ) {
         self.planID = planID
         self.dayID = dayID
@@ -706,6 +710,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         self.initialPhase = initialPhase
         self.initialFocusedBlockIndex = initialFocusedBlockIndex
         self.initialFocusedExecutionStepIndex = initialFocusedExecutionStepIndex
+        self.onCloseInline = onCloseInline
         _draft = State(initialValue: existingWorkout ?? PlannedSession(
             id: UUID(), title: "", kind: .strength,
             scheduledStart: nil, durationMinutes: 50,
@@ -724,7 +729,15 @@ struct ATHLTHTrainWorkoutBuilderView: View {
     }
 
     private var draftPreservingEditor: some View {
-        editorNavigation
+        Group {
+            // The full recipe builder replaces this same right-hand column
+            // in iPad Studio; no nested modal or duplicate editing logic.
+            if onCloseInline != nil && showDetailedComposer {
+                detailedComposer
+            } else {
+                editorNavigation
+            }
+        }
             .onAppear {
                 guard !localDraftReady else { return }
                 restoreLocalDraft()
@@ -800,7 +813,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button(tr("Close", "Lukk")) { dismiss() }
+                    Button(tr("Close", "Lukk")) { closeEditor() }
                         .foregroundStyle(ink)
                 }
             }
@@ -1824,7 +1837,7 @@ struct ATHLTHTrainWorkoutBuilderView: View {
         if saved {
             localDraftSaved = true
             UserDefaults.standard.removeObject(forKey: localDraftKey)
-            dismiss()
+            closeEditor()
         } else {
             errorMessage = tr(
                 "The plan has changed, or this session is completed or in the past. Close and reopen the editor to use the latest version.",
