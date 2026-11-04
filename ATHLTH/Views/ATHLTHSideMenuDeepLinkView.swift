@@ -137,7 +137,8 @@ struct ATHLTHSideMenuDeepLinkView: View {
             .scrollIndicators(.hidden)
 
         case .home, .search, .inbox, .notifications,
-             .trainingLibrary, .ghostRace, .settings:
+             .trainingLibrary, .myExercises, .myRoutes,
+             .myTrainingPlans, .myWorkouts, .ghostRace, .settings:
             ContentUnavailableView(
                 ATHLTHLocalization.choose(
                     english: "Return to Home",
