@@ -8,6 +8,7 @@ enum ATHLTHStudioSchedule {
         let workout: PlannedSession
         let date: Date
         let planTitle: String?
+        let planID: UUID?
     }
 
     static func upcoming(
@@ -19,7 +20,29 @@ enum ATHLTHStudioSchedule {
         days: Int = 14,
         calendar: Calendar = .current
     ) -> [Occurrence] {
-        let start = calendar.startOfDay(for: now)
+        window(
+            plans: plans,
+            standalone: standalone,
+            pausedPlanIDs: pausedPlanIDs,
+            deactivatedPlanIDs: deactivatedPlanIDs,
+            startDate: now,
+            days: days,
+            calendar: calendar
+        )
+    }
+
+    /// A calendar-date window used by iPad's Monday–Sunday overview.
+    /// No past plans or recordings are marked completed by date alone.
+    static func window(
+        plans: [TrainingPlan],
+        standalone: [PlannedSession],
+        pausedPlanIDs: Set<UUID> = [],
+        deactivatedPlanIDs: Set<UUID> = [],
+        startDate: Date,
+        days: Int,
+        calendar: Calendar = .current
+    ) -> [Occurrence] {
+        let start = calendar.startOfDay(for: startDate)
         let end = calendar.date(byAdding: .day, value: max(1, min(days, 90)), to: start) ?? start
         var entries: [Occurrence] = []
         var identifiers: Set<String> = []
@@ -27,7 +50,7 @@ enum ATHLTHStudioSchedule {
             guard !item.isExplicitRestDay, date >= start, date < end else { return }
             let key = "\(planID?.uuidString ?? "standalone"):\(item.id.uuidString)"
             guard identifiers.insert(key).inserted else { return }
-            entries.append(Occurrence(id: key, workout: item, date: date, planTitle: planTitle))
+            entries.append(Occurrence(id: key, workout: item, date: date, planTitle: planTitle, planID: planID))
         }
         for plan in plans {
             guard !pausedPlanIDs.contains(plan.id),
