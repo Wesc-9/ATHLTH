@@ -1837,31 +1837,34 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private var programSheets: some View {
         AnyView(planContent)
-        .alert(
-            tr("Delete this draft?", "Slette dette utkastet?"),
-            isPresented: $showingDeletePlanDraftConfirmation
-        ) {
-            Button(tr("Delete draft", "Slett utkast"), role: .destructive) {
-                if unfinishedDraftStore.deleteDraft(
-                    userID: session.profile.userID,
-                    draftID: draftPendingDeletionID
-                ) {
-                    refreshUnfinishedPlanDraft()
+        .sheet(isPresented: $showingDeletePlanDraftConfirmation) {
+            ATHLTHDiscardDraftSheet(
+                kind: .savedTrainingPlanDraft,
+                onKeepEditing: {
+                    showingDeletePlanDraftConfirmation = false
+                    draftPendingDeletionID = nil
                     planDraftDeletionError = nil
-                } else {
-                    planDraftDeletionError = tr(
-                        "The draft could not be deleted. Please try again.",
-                        "Utkastet kunne ikke slettes. Prøv på nytt."
-                    )
-                    refreshUnfinishedPlanDraft()
-                }
-            }
-            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
-        } message: {
-            Text(tr(
-                "This permanently deletes only the unfinished plan on this iPhone. Saved and active training plans will not be changed.",
-                "Dette sletter kun det uferdige utkastet på denne iPhonen. Lagrede og aktive treningsplaner blir ikke endret."
-            ))
+                },
+                onSaveDraftAndClose: nil,
+                onDiscard: {
+                    if unfinishedDraftStore.deleteDraft(
+                        userID: session.profile.userID,
+                        draftID: draftPendingDeletionID
+                    ) {
+                        refreshUnfinishedPlanDraft()
+                        planDraftDeletionError = nil
+                        draftPendingDeletionID = nil
+                        showingDeletePlanDraftConfirmation = false
+                    } else {
+                        planDraftDeletionError = tr(
+                            "The draft could not be deleted. Please try again.",
+                            "Utkastet kunne ikke slettes. Prøv på nytt."
+                        )
+                        refreshUnfinishedPlanDraft()
+                    }
+                },
+                errorMessage: planDraftDeletionError
+            )
         }
         .sheet(isPresented: $showingCreation, onDismiss: {
             if let planID = pendingCreatedPlanID {
