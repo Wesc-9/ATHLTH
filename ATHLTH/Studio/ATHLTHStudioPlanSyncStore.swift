@@ -28,6 +28,9 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         let revision: Int64
         let body_base64: String
     }
+    private struct DeletedPlan: Decodable {
+        let plan_id: UUID
+    }
     private struct SaveParams: Encodable {
         let p_plan_id: UUID
         let p_expected_revision: Int64
@@ -272,32 +275,64 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
                 .eq("plan_id", value: planID)
                 .limit(1).execute().value
             guard accountID == userID, enabled else { return }
-            guard let row = rows.first else {
-                status = ATHLTHLocalization.choose(
-                    english: "Remote plan no longer exists. Sync again.",
-                    norwegian: "Sky-planen finnes ikke lenger. Synkroniser på nytt."
-                )
-                return
-            }
-
-            if preferRemote {
-                guard let decoded = try decode(row.body_base64, owner: userID, id: planID),
-                      session.addTrainingPlan(decoded) else {
-                    status = ATHLTHLocalization.choose(
-                        english: "Cannot import plan while another plan conflicts in the calendar.",
-                        norwegian: "Planen kan ikke importeres på grunn av en overlappende kalenderplan."
-                    )
-                    return
+            if let row = rows.first {
+                if preferRemote {
+                    guard let decoded = try decode(row.body_base64, owner: userID, id: planID),
+                          session.addTrainingPlan(decoded) else {
+                        status = ATHLTHLocalization.choose(
+                            english: "Cannot import plan while another plan conflicts in the calendar.",
+                            norwegian: "Planen kan ikke importeres på grunn av en overlappende kalenderplan."
+                        )
+                        return
+                    }
+                    acknowledge(planID, revision: row.revision,
+                                fingerprint: try fingerprint(for: decoded), owner: userID)
+                } else if let local = session.trainingPlan(withID: planID) {
+                    let revision = try await save(local, expected: row.revision)
+                    guard accountID == userID else { return }
+                    acknowledge(planID, revision: revision,
+                                fingerprint: try fingerprint(for: local), owner: userID)
+                } else {
+                    // Explicitly keep the local deletion, but only if the
+                    // remote revision still matches the one the user reviewed.
+                    let removed: [DeletedPlan] = try await client
+                        .from("studio_plan_documents")
+                        .delete()
+                        .eq("user_id", value: userID)
+                        .eq("plan_id", value: planID)
+                        .eq("revision", value: row.revision)
+                        .select("plan_id")
+                        .execute().value
+                    guard removed.count == 1 else {
+                        throw NSError(domain: "ATHLTH.PlanSync", code: 409,
+                            userInfo: [NSLocalizedDescriptionKey: "Remote revision changed."])
+                    }
+                    acknowledgements.removeValue(forKey: planID.uuidString)
+                    persistAcknowledgements(for: userID)
                 }
-                acknowledge(planID, revision: row.revision,
-                            fingerprint: try fingerprint(for: decoded), owner: userID)
-            } else {
-                guard let local = session.trainingPlan(withID: planID) else { return }
-                let revision = try await save(local, expected: row.revision)
+            } else if preferRemote {
+                // Remote absence is meaningful only after explicit conflict
+                // review. Never delete local plans automatically in sync().
+                if session.trainingPlan(withID: planID) != nil {
+                    session.deleteTrainingPlan(planID)
+                }
+                acknowledgements.removeValue(forKey: planID.uuidString)
+                persistAcknowledgements(for: userID)
+            } else if let local = session.trainingPlan(withID: planID) {
+                // Recreate a previously deleted cloud copy only after the
+                // athlete explicitly chooses to keep their local plan.
+                let revision = try await save(local, expected: 0)
                 guard accountID == userID else { return }
                 acknowledge(planID, revision: revision,
                             fingerprint: try fingerprint(for: local), owner: userID)
+            } else {
+                status = ATHLTHLocalization.choose(
+                    english: "The plan no longer exists on either device.",
+                    norwegian: "Planen finnes ikke lenger på noen av enhetene."
+                )
+                return
             }
+            guard accountID == userID else { return }
             conflicts.removeAll { $0.id == planID }
             status = ATHLTHLocalization.choose(
                 english: "Plan conflict resolved.", norwegian: "Plankonflikten er løst."
