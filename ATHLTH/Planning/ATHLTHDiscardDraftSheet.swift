@@ -108,7 +108,7 @@ struct ATHLTHDiscardDraftSheet: View {
                         .font(.footnote)
                         .foregroundStyle(Color.red)
                         .multilineTextAlignment(.center)
-                        .accessibilityAddTraits(.updatesFrequently)
+
                 }
 
                 VStack(spacing: 9) {
@@ -116,8 +116,13 @@ struct ATHLTHDiscardDraftSheet: View {
                         onKeepEditing()
                         dismiss()
                     } label: {
-                        Label(tr("Keep editing", "Fortsett å redigere"),
-                              systemImage: "arrow.uturn.backward")
+                        Label(
+                            kind == .savedTrainingPlanDraft
+                                ? tr("Keep draft", "Behold utkast")
+                                : tr("Keep editing", "Fortsett å redigere"),
+                            systemImage: kind == .savedTrainingPlanDraft
+                                ? "checkmark" : "arrow.uturn.backward"
+                        )
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity, minHeight: 50)
