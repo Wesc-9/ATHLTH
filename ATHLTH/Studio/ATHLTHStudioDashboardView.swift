@@ -6,6 +6,7 @@ import Charts
 /// access, AI suggestion, plan completion or server write is inferred here.
 struct ATHLTHStudioDashboardView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -132,6 +133,11 @@ struct ATHLTHStudioDashboardView: View {
             .scrollIndicators(.hidden)
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                selectedWeekDate = .now
+            }
+        }
         .sheet(isPresented: $showingReadinessExplanation) {
             ATHLTHReadinessExplanationSheet(
                 recovery: health.recovery,
@@ -275,7 +281,9 @@ struct ATHLTHStudioDashboardView: View {
                     Label(
                         next == nil
                             ? tr("Build a plan", "Bygg en plan")
-                            : tr("Open workout", "Åpne økten"),
+                            : next?.planID == nil
+                                ? tr("Open Train", "Åpne Tren")
+                                : tr("Open workout", "Åpne økten"),
                         systemImage: next == nil ? "calendar.badge.plus" : "arrow.up.right"
                     )
                     .frame(maxWidth: .infinity)
@@ -324,7 +332,13 @@ struct ATHLTHStudioDashboardView: View {
                     .accessibilityHidden(true)
             }
 
-            if healthHasDataAccess, let score = health.recovery.score {
+            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil {
+                ProgressView(tr(
+                    "Loading training signals", "Henter treningssignaler"
+                ))
+                .frame(maxWidth: .infinity, minHeight: 140)
+                Spacer(minLength: 0)
+            } else if healthHasDataAccess, let score = health.recovery.score {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
                     Text("\(score)")
                         .font(.system(size: 54, weight: .light, design: .rounded))
@@ -433,7 +447,9 @@ struct ATHLTHStudioDashboardView: View {
         let selected = currentWeek.days.first {
             Calendar.current.isDate($0.date, inSameDayAs: selectedWeekDate)
         } ?? currentWeek.days.first
-        let cardWidth = max(106, (width - 74) / 7)
+        // Seven cards fit without sideways scrolling in regular-width
+        // landscape. Narrow Stage Manager windows scroll horizontally.
+        let cardWidth = max(96, (width - 138) / 7)
 
         return VStack(alignment: .leading, spacing: 15) {
             HStack(alignment: .center) {
@@ -441,11 +457,14 @@ struct ATHLTHStudioDashboardView: View {
                     Text(tr("This week", "Denne uken"))
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(ATHLTHStudioStyle.ink)
-                    Text(
-                        "\(currentWeek.plannedCount) " +
-                        tr("planned", "planlagte") + " · " +
-                        "\(currentWeek.recordedCount) " +
-                        tr("recorded", "registrerte")
+                    Text(healthHasDataAccess
+                         ? "\(currentWeek.plannedCount) " +
+                            tr("planned", "planlagte") + " · " +
+                            "\(currentWeek.recordedCount) " +
+                            tr("recorded", "registrerte")
+                         : "\(currentWeek.plannedCount) " +
+                            tr("planned", "planlagte") + " · " +
+                            tr("Health history unavailable", "Helsehistorikk mangler")
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -487,10 +506,13 @@ struct ATHLTHStudioDashboardView: View {
                             .font(.subheadline.weight(.medium))
                             .lineLimit(1)
                             .foregroundStyle(ATHLTHStudioStyle.ink)
-                        Text(
-                            selected.date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)) +
-                            " · \(selected.recorded.count) " +
-                            tr("recorded activities", "registrerte aktiviteter")
+                        Text(healthHasDataAccess
+                            ? selected.date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)) +
+                                " · \(selected.recorded.count) " +
+                                tr("recorded activities", "registrerte aktiviteter")
+                            : selected.date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)) +
+                                " · " +
+                                tr("Health data unavailable", "Helsedata mangler")
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -558,7 +580,7 @@ struct ATHLTHStudioDashboardView: View {
                     Spacer(minLength: 0)
                     Image(systemName: "checkmark.circle")
                         .font(.caption2)
-                    Text("\(day.recorded.count)")
+                    Text(healthHasDataAccess ? "\(day.recorded.count)" : "—")
                         .font(.caption.weight(.medium))
                 }
                 .foregroundStyle(selected ? ATHLTHStudioStyle.ink : .secondary)
@@ -586,7 +608,9 @@ struct ATHLTHStudioDashboardView: View {
         .accessibilityLabel(
             day.date.formatted(date: .complete, time: .omitted) + ", " +
             "\(day.planned.count) " + tr("planned", "planlagte") + ", " +
-            "\(day.recorded.count) " + tr("recorded", "registrerte")
+            (healthHasDataAccess
+                ? "\(day.recorded.count) " + tr("recorded", "registrerte")
+                : tr("Health history unavailable", "Helsehistorikk mangler"))
         )
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
@@ -617,7 +641,13 @@ struct ATHLTHStudioDashboardView: View {
                 .accessibilityLabel(tr("Number of days", "Antall dager"))
             }
 
-            if healthHasDataAccess, data.sessions > 0 {
+            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil {
+                ProgressView(tr(
+                    "Loading workouts from Apple Health",
+                    "Henter økter fra Apple Health"
+                ))
+                .frame(maxWidth: .infinity, minHeight: 165)
+            } else if healthHasDataAccess, data.sessions > 0 {
                 HStack(alignment: .firstTextBaseline, spacing: 14) {
                     Label("\(data.sessions) " + tr("workouts", "økter"), systemImage: "checkmark.circle")
                     Label(
