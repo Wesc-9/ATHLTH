@@ -2167,6 +2167,19 @@ final class StrengthWorkoutStore: ObservableObject {
             case .skipRest:
                 skipRest()
 
+            case .skipRestAndStartTimedSet:
+                // Offline Watch commands are replayed against the correct
+                // original set only. One command must both release the rest
+                // gate and start its clock; never skip or restart a later set.
+                guard command.exerciseIndex == currentExerciseIndex,
+                      command.setIndex == currentSetIndex,
+                      isResting,
+                      currentSet?.resolvedTargetKind == .time,
+                      currentSet?.isCompleted == false
+                else { continue }
+                skipRest()
+                startOrResumeTimedSet(at: command.sentAt)
+
             case .addRest:
                 addRest(
                     seconds:
