@@ -64,7 +64,8 @@ final class HomeTrainingPatternAdvisorTests: XCTestCase {
 
     func testRegularRunnerKeepsRunningInsteadOfGettingWalkRecommendations() {
         let history = snapshot(
-            events: [1, 2, 3, 5, 7, 9, 11, 14, 17, 19, 22, 25, 28]
+            events: [1, 2, 3, 5, 7, 9, 11, 14, 17, 19, 22, 25, 28,
+                     30, 32, 34, 36, 38, 40]
                 .map { event(.running, daysAgo: $0) },
             intervals: [.running: 2]
         )
