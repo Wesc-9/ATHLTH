@@ -82,6 +82,37 @@ final class StrengthActiveExerciseQueueTests: XCTestCase {
     }
 
     @MainActor
+    func testEverySetRestartsStopwatchAndExcludesRestTime() throws {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil)
+        store.appendExercise(exercise("Knebøy"), sets: 2, reps: 8)
+        XCTAssertNil(store.currentSetEffortClock)
+
+        let start = Date().addingTimeInterval(-12)
+        store.startCurrentSetEffort(at: start)
+        XCTAssertEqual(
+            store.currentSetEffortClock?.elapsedSeconds(at: start.addingTimeInterval(7))
+                ?? -1, 7, accuracy: 0.01
+        )
+        let firstSetID = try XCTUnwrap(store.currentSet?.id)
+        store.completeCurrentDraftSet()
+
+        let first = try XCTUnwrap(
+            store.activeWorkout?.exercises.first?.sets.first
+        )
+        XCTAssertEqual(first.id, firstSetID)
+        XCTAssertGreaterThanOrEqual(first.actualSetElapsedSeconds ?? 0, 11)
+        XCTAssertNil(store.currentSetEffortClock)
+        XCTAssertTrue(store.isResting)
+
+        store.skipRest()
+        let next = try XCTUnwrap(store.currentSetEffortClock)
+        XCTAssertNotEqual(next.setID, firstSetID)
+        XCTAssertLessThan(next.elapsedSeconds(), 2)
+        XCTAssertEqual(store.currentSet?.setNumber, 2)
+    }
+
+    @MainActor
     func testEditingPreviousTargetWeightKeepsActualResultAndActiveSet() throws {
         let store = StrengthWorkoutStore()
         store.startFreestyle(watchSessionID: nil)
