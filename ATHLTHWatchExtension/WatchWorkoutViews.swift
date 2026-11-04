@@ -704,12 +704,15 @@ struct WatchActiveWorkoutView: View {
                             workoutManager.addStrengthRest(seconds: 30)
                         },
                         onSkip: {
-                            workoutManager.skipStrengthRest()
+                            workoutManager.startNextStrengthSetAfterRest()
                         },
                         onNextExercise: snapshot.currentExerciseComplete && snapshot.hasNextExercise
                             ? { workoutManager.moveToNextStrengthExercise() }
                             : nil,
-                        allowsControls: snapshot.inputMode != .iPhone
+                        allowsControls: true,
+                        allowsExtendRest: snapshot.inputMode != .iPhone,
+                        nextSetNumber: snapshot.setIndex + 1,
+                        totalSetCount: snapshot.setCount
                     )
                 }
                 .padding(
@@ -1780,7 +1783,7 @@ struct WatchActiveWorkoutView: View {
                             workoutManager.addStrengthRest(seconds: 30)
                         },
                         onSkip: {
-                            workoutManager.skipStrengthRest()
+                            workoutManager.startNextStrengthSetAfterRest()
                         },
                         onNextExercise: snapshot.currentExerciseComplete && snapshot.hasNextExercise
                             ? { workoutManager.moveToNextStrengthExercise() }
@@ -1832,7 +1835,7 @@ struct WatchActiveWorkoutView: View {
                         workoutManager.addStrengthRest(seconds: 30)
                     },
                     onSkip: {
-                        workoutManager.skipStrengthRest()
+                        workoutManager.startNextStrengthSetAfterRest()
                     },
                     onNextExercise: snapshot.currentExerciseComplete && snapshot.hasNextExercise
                         ? { workoutManager.moveToNextStrengthExercise() }
@@ -3249,6 +3252,9 @@ private struct WatchStrengthRestView: View {
     let onSkip: () -> Void
     let onNextExercise: (() -> Void)?
     var allowsControls = true
+    var allowsExtendRest = true
+    var nextSetNumber: Int? = nil
+    var totalSetCount: Int? = nil
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -3289,16 +3295,28 @@ private struct WatchStrengthRestView: View {
                     .foregroundStyle(WatchTheme.liveAction)
                 }
 
+                if let nextSetNumber, let totalSetCount,
+                   onNextExercise == nil, totalSetCount > 0 {
+                    Text(ATHLTHLocalization.choose(
+                        english: "NEXT SET \(nextSetNumber) OF \(totalSetCount)",
+                        norwegian: "NESTE SETT \(nextSetNumber) AV \(totalSetCount)"
+                    ))
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundStyle(WatchTheme.accentDeep)
+                }
+
                 if allowsControls {
                     HStack(spacing: 7) {
-                        Button {
-                            onAdd()
-                        } label: {
-                            Text("+30 s")
-                                .font(.system(size: 11, weight: .bold))
-                                .frame(maxWidth: .infinity, minHeight: 32)
+                        if allowsExtendRest {
+                            Button {
+                                onAdd()
+                            } label: {
+                                Text("+30 s")
+                                    .font(.system(size: 11, weight: .bold))
+                                    .frame(maxWidth: .infinity, minHeight: 32)
+                            }
+                            .buttonStyle(.bordered)
                         }
-                        .buttonStyle(.bordered)
 
                         Button {
                             if let onNextExercise {
@@ -3320,8 +3338,8 @@ private struct WatchStrengthRestView: View {
                                                 norwegian: "Hopp over"
                                             )
                                             : ATHLTHLocalization.choose(
-                                                english: "Next set",
-                                                norwegian: "Neste sett"
+                                                english: "Start next set",
+                                                norwegian: "Start neste sett"
                                             )
                                     )
                             )
