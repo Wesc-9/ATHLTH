@@ -99,8 +99,10 @@ if item.get("id") != sys.argv[2] or attrs.get("certificateType") != "DISTRIBUTIO
     raise SystemExit("Previous ATHLTH CI certificate identity/type mismatch; no revocation performed")
 certificate = x509.load_der_x509_certificate(base64.b64decode(attrs["certificateContent"]))
 issued = certificate.not_valid_before_utc
-start = datetime(2026, 11, 4, 10, 40, tzinfo=timezone.utc)
-end = datetime(2026, 11, 4, 11, 0, tzinfo=timezone.utc)
+# Apple backdated this certificate's validity by about ten minutes:
+# actual verified Not Before: 2026-11-04 10:39:32 UTC.
+start = datetime(2026, 11, 4, 10, 39, tzinfo=timezone.utc)
+end = datetime(2026, 11, 4, 10, 41, tzinfo=timezone.utc)
 if not start <= issued <= end:
     raise SystemExit(f"Certificate issued {issued} outside verified ATHLTH CI run; no revocation performed")
 print("Verified previous ATHLTH CI distribution certificate; safe targeted rotation.")
