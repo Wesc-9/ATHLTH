@@ -818,7 +818,9 @@ struct StrengthAIExercisePlannerView: View {
 
     private var singleSuggestionCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let (suggestion, entry) = resolvedSuggestions.first {
+            if let match = resolvedSuggestions.first {
+                let suggestion = match.0
+                let entry = match.1
                 HStack(alignment: .top, spacing: 12) {
                     ATHLTHAIExerciseSuggestionImage(entry: entry)
                     VStack(alignment: .leading, spacing: 5) {
@@ -1041,8 +1043,18 @@ struct StrengthAIExercisePlannerView: View {
             return
         }
 
+        // A request for "another" suggestion should exclude the last
+        // recommendation whenever at least one other library candidate exists.
+        let previousSuggestionIDs = quickSuggestion
+            ? Set(resolvedSuggestions.map { $0.0.exerciseID })
+            : Set<UUID>()
+        let alternateEntries = candidateEntries.filter {
+            !previousSuggestionIDs.contains($0.id)
+        }
+        let requestedEntries = alternateEntries.isEmpty
+            ? candidateEntries : alternateEntries
         let candidates =
-            candidateEntries
+            requestedEntries
                 .map {
                     entry in
 
