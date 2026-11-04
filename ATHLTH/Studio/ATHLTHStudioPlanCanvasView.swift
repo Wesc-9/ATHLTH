@@ -11,6 +11,11 @@ struct ATHLTHStudioPlanCanvasView: View {
     @State private var selectedPlanID: UUID?
     @State private var selectedWeekID: UUID?
     @State private var selectedDayID: UUID?
+    @SceneStorage("athlth.studio.plan.viewMode") private var viewMode = "overview"
+    @State private var copyingWeekID: UUID?
+    @State private var pendingWeekCopyTarget: UUID?
+    @State private var lastWeekCopy: AppSessionStore.PlanStudioWeekCopyReceipt?
+    @State private var copyMessage: String?
     @State private var creatingPlan = false
     @State private var newPlanName = ""
     @State private var newPlanSummary = ""
@@ -35,6 +40,24 @@ struct ATHLTHStudioPlanCanvasView: View {
     private enum DropMode: String, CaseIterable, Identifiable {
         case move, copy
         var id: String { rawValue }
+    }
+
+    private enum StudioPlanMode: String, CaseIterable, Identifiable {
+        case overview, week, progress
+        var id: String { rawValue }
+        var label: String {
+            switch self {
+            case .overview: return ATHLTHLocalization.choose(
+                english: "Whole plan", norwegian: "Hele planen"
+            )
+            case .week: return ATHLTHLocalization.choose(
+                english: "Planning", norwegian: "Planlegging"
+            )
+            case .progress: return ATHLTHLocalization.choose(
+                english: "Progress", norwegian: "Fremdrift"
+            )
+            }
+        }
     }
 
     private var plans: [TrainingPlan] { session.trainingPlans }
@@ -79,6 +102,10 @@ struct ATHLTHStudioPlanCanvasView: View {
             selectedWeekID = nil
             selectedDayID = nil
             inlineWorkout = nil
+            copyingWeekID = nil
+            pendingWeekCopyTarget = nil
+            lastWeekCopy = nil
+            copyMessage = nil
         }
         .onChange(of: selectedWeekID) { _, _ in
             inlineWorkout = nil
@@ -91,6 +118,10 @@ struct ATHLTHStudioPlanCanvasView: View {
             selectedWeekID = nil
             selectedDayID = nil
             inlineWorkout = nil
+            copyingWeekID = nil
+            pendingWeekCopyTarget = nil
+            lastWeekCopy = nil
+            copyMessage = nil
             creatingPlan = false
         }
         .sheet(isPresented: $showingPlanMetadata) {
@@ -114,7 +145,34 @@ struct ATHLTHStudioPlanCanvasView: View {
             )
             .environment(\.athlthStudioFullscreenEditing, true)
         }
-         .alert(
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Copy entire training week?",
+                norwegian: "Kopiere hele treningsuken?"
+            ),
+            isPresented: Binding(
+                get: { pendingWeekCopyTarget != nil },
+                set: { if !$0 { pendingWeekCopyTarget = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Copy week", norwegian: "Kopier uke"
+            )) {
+                copySelectedWeek()
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {
+                pendingWeekCopyTarget = nil
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "All seven days are copied in one step. The destination must be empty and in the future. Your original week is unchanged.",
+                norwegian: "Alle syv dager kopieres samlet. Måluken må være tom og ligge i fremtiden. Den opprinnelige uken endres ikke."
+            ))
+        }
+        .alert(
             ATHLTHLocalization.choose(
                 english: "Could not update training plan",
                 norwegian: "Kunne ikke oppdatere treningsplanen"
@@ -147,11 +205,56 @@ struct ATHLTHStudioPlanCanvasView: View {
 
         VStack(alignment: .leading, spacing: 14) {
             planHeader(plan)
-            if inlineWorkout == nil {
+            planControlBar(plan)
+            if let copyingWeekID {
+                weekCopyControls(
+                    plan, sourceWeekID: copyingWeekID
+                )
+            }
+            if let copyMessage {
+                HStack(spacing: 10) {
+                    Label(copyMessage, systemImage: "info.circle")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHStudioStyle.ink)
+                    Spacer(minLength: 0)
+                    if let receipt = lastWeekCopy,
+                       plan.id == receipt.planID,
+                       plan.version == receipt.expectedVersionAfterCopy {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Undo week copy", norwegian: "Angre ukekopiering"
+                        )) {
+                            undoWeekCopy()
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
+                .padding(.horizontal, 7)
+            }
+            if inlineWorkout == nil && viewMode == StudioPlanMode.week.rawValue {
                 planMetrics(plan, selectedWeek: week)
             }
 
-            if let inlineWorkout, inlineWorkout.planID == plan.id {
+            if inlineWorkout == nil,
+               viewMode == StudioPlanMode.overview.rawValue ||
+               (inlineWorkout == nil &&
+                viewMode == StudioPlanMode.progress.rawValue) {
+                ATHLTHStudioPlanOverviewView(
+                    plan: plan,
+                    display: viewMode == StudioPlanMode.progress.rawValue
+                        ? .progress : .overview,
+                    selectedWeekID: selectedWeekID,
+                    onSelect: { weekID, dayID in
+                        selectedWeekID = weekID
+                        selectedDayID = dayID
+                        viewMode = StudioPlanMode.week.rawValue
+                    },
+                    onCopyWeek: { weekID in
+                        copyingWeekID = weekID
+                        copyMessage = nil
+                    }
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let inlineWorkout, inlineWorkout.planID == plan.id {
                 // The existing-plan editor uses exactly the same adjustable
                 // workspace as new-plan construction. The week stays visible
                 // in the left column and the shared editor remains on the right.
@@ -261,6 +364,191 @@ struct ATHLTHStudioPlanCanvasView: View {
                 systemImage: "calendar.badge.exclamationmark"
             )
         }
+    }
+
+    private func planControlBar(_ plan: TrainingPlan) -> some View {
+        HStack(spacing: 12) {
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Plan view", norwegian: "Planvisning"
+                ),
+                selection: $viewMode
+            ) {
+                ForEach(StudioPlanMode.allCases) { mode in
+                    Text(mode.label).tag(mode.rawValue)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 390)
+            .disabled(inlineWorkout != nil)
+
+            Spacer(minLength: 2)
+
+            if viewMode == StudioPlanMode.week.rawValue,
+               inlineWorkout == nil {
+                Button {
+                    copyingWeekID = plan.weeks[currentWeekIndex(in: plan)].id
+                    copyMessage = nil
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Copy week", norwegian: "Kopier uke"
+                        ),
+                        systemImage: "square.on.square"
+                    )
+                    .labelStyle(.titleAndIcon)
+                }
+                .buttonStyle(.bordered)
+            }
+
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Saved on this device",
+                    norwegian: "Lagret på denne enheten"
+                ),
+                systemImage: "checkmark.circle"
+            )
+            .font(.caption)
+            .foregroundStyle(ATHLTHStudioStyle.gold)
+            .help(ATHLTHLocalization.choose(
+                english: "Local plan storage is confirmed. Cloud synchronization is a separate opt-in feature and is not asserted here.",
+                norwegian: "Planen er lagret lokalt. Skysynkronisering krever separat samtykke og bekreftes ikke her."
+            ))
+            .lineLimit(1)
+        }
+        .padding(.horizontal, 5)
+    }
+
+    private func weekCopyControls(
+        _ plan: TrainingPlan,
+        sourceWeekID: UUID
+    ) -> some View {
+        let sourceWeek = plan.weeks.first(where: { $0.id == sourceWeekID })
+        let targets = availableWeekCopyTargets(
+            in: plan, excluding: sourceWeekID
+        )
+        return HStack(spacing: 10) {
+            Image(systemName: "square.on.square")
+                .foregroundStyle(ATHLTHStudioStyle.gold)
+            Text(ATHLTHLocalization.format(
+                english: "Copy week %d to",
+                norwegian: "Kopier uke %d til",
+                sourceWeek?.weekNumber ?? 0
+            ))
+            .font(.caption.weight(.semibold))
+
+            Menu {
+                ForEach(targets) { target in
+                    Button(ATHLTHLocalization.format(
+                        english: "Week %d (empty)",
+                        norwegian: "Uke %d (tom)",
+                        target.weekNumber
+                    )) {
+                        pendingWeekCopyTarget = target.id
+                    }
+                }
+            } label: {
+                Label(
+                    targets.isEmpty
+                        ? ATHLTHLocalization.choose(
+                            english: "No empty future weeks",
+                            norwegian: "Ingen tomme fremtidige uker"
+                        )
+                        : ATHLTHLocalization.choose(
+                            english: "Choose target week",
+                            norwegian: "Velg måluke"
+                        ),
+                    systemImage: "chevron.down"
+                )
+            }
+            .disabled(targets.isEmpty || inlineWorkout != nil)
+            .buttonStyle(.bordered)
+
+            Spacer(minLength: 0)
+            Button {
+                copyingWeekID = nil
+                pendingWeekCopyTarget = nil
+            } label: {
+                Image(systemName: "xmark")
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Close week copy",
+                norwegian: "Lukk ukekopiering"
+            ))
+        }
+        .padding(12)
+        .background(
+            ATHLTHStudioStyle.paper,
+            in: RoundedRectangle(cornerRadius: 14)
+        )
+    }
+
+    private func availableWeekCopyTargets(
+        in plan: TrainingPlan,
+        excluding sourceID: UUID
+    ) -> [TrainingPlanWeek] {
+        let today = Calendar.current.startOfDay(for: Date())
+        return plan.weeks.enumerated().compactMap { index, week in
+            guard week.id != sourceID,
+                  week.days.count == 7,
+                  week.days.allSatisfy(\.sessions.isEmpty),
+                  week.days.allSatisfy({ day in
+                      guard let date = ATHLTHStudioPlanWeekSummary.date(
+                          for: day, inWeekIndex: index,
+                          planStart: plan.startDate
+                      ) else { return false }
+                      return date >= today
+                  })
+            else { return nil }
+            return week
+        }
+    }
+
+    private func copySelectedWeek() {
+        defer { pendingWeekCopyTarget = nil }
+        guard let sourceID = copyingWeekID,
+              let targetID = pendingWeekCopyTarget,
+              let plan = selectedPlan,
+              let receipt = session.copyPlanStudioWeek(
+                  planID: plan.id,
+                  sourceWeekID: sourceID,
+                  targetWeekID: targetID,
+                  expectedVersion: plan.version
+              ) else {
+            warning = ATHLTHLocalization.choose(
+                english: "Could not copy the whole week. Refresh the plan and check that the destination is empty and future-dated.",
+                norwegian: "Kunne ikke kopiere hele uken. Oppdater planen og kontroller at måluken er tom og ligger i fremtiden."
+            )
+            return
+        }
+        lastWeekCopy = receipt
+        copyingWeekID = nil
+        copyMessage = ATHLTHLocalization.choose(
+            english: "The whole week was copied. You can undo until the next change.",
+            norwegian: "Hele uken er kopiert. Du kan angre frem til neste endring."
+        )
+        selectedWeekID = targetID
+    }
+
+    private func undoWeekCopy() {
+        guard let receipt = lastWeekCopy,
+              session.undoPlanStudioWeekCopy(
+                  receipt,
+                  healthWorkouts: health.workouts,
+                  strengthHistory: strength.workoutHistory
+              ) else {
+            warning = ATHLTHLocalization.choose(
+                english: "Cannot undo: the week has changed or training was completed after copying.",
+                norwegian: "Kan ikke angre: Uken er endret eller trening er gjennomført siden kopieringen."
+            )
+            return
+        }
+        lastWeekCopy = nil
+        copyMessage = ATHLTHLocalization.choose(
+            english: "The week copy was undone; the original week is unchanged.",
+            norwegian: "Ukekopieringen er angret. Den opprinnelige uken er urørt."
+        )
     }
 
     private func planHeader(_ plan: TrainingPlan) -> some View {
