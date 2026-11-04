@@ -910,12 +910,39 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 selectingLibraryDay = nil
             }
         }
-        .athlthStudioEditor(item: $composingAdvancedDay, useFullScreen: studioFullscreenEditing, onDismiss: {
-            quickStudioOption = nil
-            studioInitialQuickAdd = nil
-            studioInitialPhase = nil
-            addingExtraWorkout = false
+        // iPhone retains the original modal presentation. On iPad Studio,
+        // the identical workout builder is embedded in the right-hand pane.
+        .sheet(item: Binding(
+            get: { studioFullscreenEditing ? nil : composingAdvancedDay },
+            set: { composingAdvancedDay = $0 }
+        ), onDismiss: {
+            resetWorkoutComposerContext()
         }) { selection in
+            plannedWorkoutBuilder(for: selection)
+        }
+    }
+
+    private func resetWorkoutComposerContext() {
+        quickStudioOption = nil
+        studioInitialQuickAdd = nil
+        studioInitialPhase = nil
+        editingFocusedBlockIndex = nil
+        addingExtraWorkout = false
+    }
+
+    private func closeInlineWorkoutBuilder() {
+        // Only close the inline panel; never dismiss the parent plan or
+        // discard its week/day selections.
+        composingAdvancedDay = nil
+        resetWorkoutComposerContext()
+    }
+
+    /// The *same* iPhone workout builder, including block validation, shared
+    /// exercise catalog, template copy, and draft persistence.
+    private func plannedWorkoutBuilder(
+        for selection: WeekDayEditorSelection,
+        onClose: (() -> Void)? = nil
+    ) -> some View {
             WorkoutTemplateBuilderView(
                 initialTitle: quickStudioOption?.title ??
                     (addingExtraWorkout ? "" : (selectedWorkoutForEditor(day: selection.id)?.title ?? "")),
@@ -984,9 +1011,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     }
                     addingExtraWorkout = false
                     return true
-                }
+                },
+                onCloseInline: onClose
             )
-        }
     }
 
     // Kept separate from the main navigation body to avoid excessive
