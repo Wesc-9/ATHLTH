@@ -27,6 +27,8 @@ struct ATHLTHAdvancedPlanAddContentView: View {
     @State private var origin: Origin = .all
     @State private var search = ""
     @State private var muscle: String? = nil
+    @State private var workoutActivity: ATHLTHPlanWorkoutActivityFilter = .all
+    @State private var runningType: RunningWorkoutType?
     @State private var selectedExerciseID: UUID?
     @State private var showingCustomExercise = false
 
@@ -58,22 +60,27 @@ struct ATHLTHAdvancedPlanAddContentView: View {
         let mine: Bool
         let favoriteID: String
         var title: String { session.title }
+        var type: RunningWorkoutType? = nil
+        var catalogEntry: WorkoutTemplateCatalogEntry? = nil
     }
 
     private var workouts: [WorkoutChoice] {
         let personal = session.savedWorkoutTemplates.map {
             WorkoutChoice(id: "saved-" + $0.id.uuidString, session: $0,
-                          mine: true, favoriteID: $0.id.uuidString)
+                          mine: true, favoriteID: $0.id.uuidString,
+                          type: $0.resolvedRunningWorkouts.first?.type)
         }
         let runs = running.allTemplates.map { item in
             WorkoutChoice(id: "run-" + item.id.uuidString,
                           session: item.plannedSession(),
-                          mine: !item.isBuiltIn, favoriteID: item.id.uuidString)
+                          mine: !item.isBuiltIn, favoriteID: item.id.uuidString,
+                          type: item.type)
         }
         let builtIn = catalog.entries.map { item in
             WorkoutChoice(id: "catalog-" + item.id.uuidString,
                           session: item.plannedSession(),
-                          mine: false, favoriteID: item.id.uuidString)
+                          mine: false, favoriteID: item.id.uuidString,
+                          catalogEntry: item)
         }
         let query = search.trimmingCharacters(in: .whitespacesAndNewlines)
         return (personal + runs + builtIn).filter { item in
@@ -85,7 +92,17 @@ struct ATHLTHAdvancedPlanAddContentView: View {
             case .favorites:
                 sourceMatches = favorites.isFavorite(.workout, itemID: item.favoriteID)
             }
-            return sourceMatches &&
+            let activityMatches = workoutActivity.matches(item.session)
+            let subtypeMatches: Bool
+            if workoutActivity == .running, let runningType {
+                subtypeMatches = item.type == runningType ||
+                    ATHLTHWorkoutDiscoveryFilter(
+                        runningType: runningType
+                    ).matches(item.session, catalogEntry: item.catalogEntry)
+            } else {
+                subtypeMatches = true
+            }
+            return sourceMatches && activityMatches && subtypeMatches &&
                 (query.isEmpty || item.title.localizedCaseInsensitiveContains(query))
         }
     }
@@ -148,6 +165,8 @@ struct ATHLTHAdvancedPlanAddContentView: View {
             .onChange(of: kind) { _, _ in
                 search = ""
                 muscle = nil
+                workoutActivity = .all
+                runningType = nil
             }
             .navigationTitle(kind == .exercise
                              ? tr("Add exercise", "Legg til øvelse")
@@ -292,9 +311,75 @@ struct ATHLTHAdvancedPlanAddContentView: View {
         .buttonStyle(.plain)
     }
 
+    private func runningTypeChip(
+        _ type: RunningWorkoutType?, _ title: String
+    ) -> some View {
+        Button {
+            runningType = type
+        } label: {
+            Text(title)
+                .font(.system(size: 11, weight: runningType == type
+                              ? .semibold : .regular))
+                .foregroundStyle(runningType == type ? .white : ink)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 31)
+                .background(runningType == type ? gold : .white, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(runningType == type ? .isSelected : [])
+    }
+
     private var workoutContent: some View {
         VStack(alignment: .leading, spacing: 11) {
-            Text(tr("Saved and ready-made workouts", "Lagrede og ferdige treningsøkter"))
+            // The same round icon/name picker used for exercise muscle
+            // groups, now classified from workout metadata instead of names.
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 13) {
+                    ForEach(ATHLTHPlanWorkoutActivityFilter.allCases) { option in
+                        Button {
+                            workoutActivity = option
+                            runningType = nil
+                        } label: {
+                            VStack(spacing: 5) {
+                                Image(systemName: option.symbol)
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(workoutActivity == option
+                                                     ? .white : gold)
+                                    .frame(width: 43, height: 43)
+                                    .background(workoutActivity == option
+                                                ? gold : .white, in: Circle())
+                                Text(option.title)
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(workoutActivity == option
+                                                ? .isSelected : [])
+                    }
+                }
+            }
+            if workoutActivity == .running {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 7) {
+                        runningTypeChip(nil, tr("All runs", "Alle løp"))
+                        ForEach([
+                            RunningWorkoutType.easy, .intervals, .longRun,
+                            .tempo, .threshold, .hills, .fartlek, .progression
+                        ]) { type in
+                            runningTypeChip(type, type.title)
+                        }
+                    }
+                }
+            }
+            HStack {
+                Text(tr("Saved and ready-made workouts", "Lagrede og ferdige treningsøkter"))
+                    .font(.system(size: 19, weight: .semibold, design: .serif))
+                Spacer()
+                Text("\(workouts.count)")
+                    .font(.caption).foregroundStyle(secondary)
+            }
                 .font(.system(size: 19, weight: .semibold, design: .serif))
             if workouts.isEmpty {
                 ContentUnavailableView(tr("No workouts", "Ingen treningsøkter"),
