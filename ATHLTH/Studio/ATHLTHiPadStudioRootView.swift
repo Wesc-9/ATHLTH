@@ -110,11 +110,7 @@ struct ATHLTHiPadStudioRootView: View {
         .environment(\.athlthStudioFullscreenEditing, true)
         .tint(gold)
         .fullScreenCover(isPresented: $showingTrain) {
-            ATHLTHTrainView(
-                navigationRequest: $trainRequest,
-                isActive: true
-            )
-            .environment(\.athlthStudioFullscreenEditing, true)
+            ATHLTHStudioTrainWorkspaceView(navigationRequest: $trainRequest)
         }
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
