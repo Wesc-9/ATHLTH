@@ -1,5 +1,6 @@
 import AVKit
 import SwiftUI
+import Translation
 import UIKit
 
 struct ActiveStrengthWorkoutView: View {
@@ -14,6 +15,9 @@ struct ActiveStrengthWorkoutView: View {
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
     @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var social: SocialStore
+    @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
+    @State private var instructionTranslationConfig: TranslationSession.Configuration?
+    @State private var instructionLanguageStatus: LanguageAvailability.Status = .unsupported
 
     @StateObject private var socialCompanion =
         SocialWorkoutCompanionStore()
@@ -506,6 +510,35 @@ struct ActiveStrengthWorkoutView: View {
             } message: {
                 Text(
                     watchFinishError ?? ""
+                )
+            }
+            .task(id: showingExerciseInstructions ? strength.currentExercise?.id : nil) {
+                guard showingExerciseInstructions,
+                      ATHLTHLocalization.isNorwegian,
+                      let exercise = strength.currentExercise,
+                      let entry = focusedExerciseLibraryEntry(exercise),
+                      entry.source == .repDB else {
+                    instructionTranslationConfig = nil
+                    return
+                }
+                instructionTranslationConfig = nil
+                instructionLanguageStatus =
+                    await NorwegianExerciseAutoTranslation.availabilityStatus()
+                if instructionLanguageStatus == .installed {
+                    instructionTranslationConfig =
+                        NorwegianExerciseAutoTranslation.configuration()
+                }
+            }
+            .translationTask(instructionTranslationConfig) { translator in
+                guard showingExerciseInstructions,
+                      let exercise = strength.currentExercise,
+                      let entry = focusedExerciseLibraryEntry(exercise),
+                      entry.source == .repDB else { return }
+                let texts = [entry.summary].compactMap { $0 }
+                    + entry.exercise.instructions
+                    + entry.tips
+                await norwegianTranslations.translate(
+                    texts: texts, using: translator, batchSize: 12
                 )
             }
             .onAppear {
@@ -4656,52 +4689,28 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedExerciseInstructionSteps(
         _ exercise: StrengthExerciseLog
     ) -> [String] {
-        let snapshotSteps =
-            exercise.exercise
-                .instructions
-                .map {
-                    $0.trimmingCharacters(
-                        in:
-                            .whitespacesAndNewlines
-                    )
-                }
-                .filter {
-                    !$0.isEmpty
-                }
-
-        if !snapshotSteps.isEmpty {
-            return snapshotSteps
+        // Reuse the same reviewed Norwegian text / on-device translation
+        // pipeline as the exercise library. Do not render stale English
+        // workout snapshots ahead of the translated catalog source.
+        if let entry = focusedExerciseLibraryEntry(exercise) {
+            let localized = exerciseLibrary.localizedExerciseInstructions(entry)
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+            if !localized.isEmpty { return localized }
         }
-
-        return
-            focusedExerciseLibraryEntry(
-                exercise
-            )?
-            .exercise
-            .instructions
-            .map {
-                $0.trimmingCharacters(
-                    in:
-                        .whitespacesAndNewlines
-                )
-            }
-            .filter {
-                !$0.isEmpty
-            } ?? []
+        return exercise.exercise.instructions.compactMap { raw in
+            let step = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !step.isEmpty else { return nil }
+            return norwegianTranslations.translated(step) ?? step
+        }
     }
 
     private func focusedExerciseSummary(
         _ exercise: StrengthExerciseLog
     ) -> String? {
-        let value =
-            focusedExerciseLibraryEntry(
-                exercise
-            )?
-            .summary?
-            .trimmingCharacters(
-                in:
-                    .whitespacesAndNewlines
-            )
+        let value = focusedExerciseLibraryEntry(exercise)
+            .flatMap(exerciseLibrary.localizedExerciseSummary)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
 
         guard let value,
               !value.isEmpty
@@ -4715,10 +4724,8 @@ struct ActiveStrengthWorkoutView: View {
     private func focusedExerciseTips(
         _ exercise: StrengthExerciseLog
     ) -> [String] {
-        focusedExerciseLibraryEntry(
-            exercise
-        )?
-        .tips
+        focusedExerciseLibraryEntry(exercise)
+            .map(exerciseLibrary.localizedExerciseTips)?
         .map {
             $0.trimmingCharacters(
                 in:
@@ -5113,6 +5120,23 @@ struct ActiveStrengthWorkoutView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 14))
                                 .id(demoURL)
                         }
+                    }
+
+                    if ATHLTHLocalization.isNorwegian,
+                       let entry = focusedExerciseLibraryEntry(exercise),
+                       entry.source == .repDB,
+                       instructionLanguageStatus == .supported,
+                       instructionTranslationConfig == nil {
+                        Button {
+                            instructionTranslationConfig =
+                                NorwegianExerciseAutoTranslation.configuration()
+                        } label: {
+                            Label("Oversett instruksjonene til norsk",
+                                  systemImage: "character.book.closed")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityHint("Laster ned språkressurser etter godkjenning.")
                     }
 
                     if let summary {
