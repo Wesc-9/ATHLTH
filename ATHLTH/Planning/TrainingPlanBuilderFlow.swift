@@ -490,14 +490,16 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 Image(systemName: "square.and.pencil")
                     .foregroundStyle(ATHLTHTrainDesign.bronze)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "WORKOUT BUILDER", norwegian: "ØKTBYGGER"
+                    Text(ATHLTHLocalization.format(
+                        english: "Week %d · Day %d",
+                        norwegian: "Uke %d · Dag %d",
+                        selectedPlanWeekIndex + 1, selection.id
                     ))
                     .font(.caption.weight(.semibold))
-                    .tracking(1.5)
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
                     Text(ATHLTHLocalization.choose(
-                        english: "Edit here. The plan stays open beside it.",
-                        norwegian: "Rediger her. Planen forblir åpen ved siden av."
+                        english: "Editing this workout",
+                        norwegian: "Redigerer denne økten"
                     ))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
