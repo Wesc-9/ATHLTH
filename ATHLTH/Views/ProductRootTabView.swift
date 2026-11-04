@@ -14330,7 +14330,8 @@ struct ATHLTHProfileView: View {
                 english: "Edit",
                 norwegian: "Rediger"
             ),
-            destination: AnyView(TrophyCollectionView(startInCabinet: true))
+            destination: AnyView(TrophyCollectionView(startInCabinet: true)),
+            compact: true
         ) {
             HStack(alignment: .top, spacing: 9) {
                 ForEach(0..<TrophyStore.showcaseLimit, id: \.self) { index in
