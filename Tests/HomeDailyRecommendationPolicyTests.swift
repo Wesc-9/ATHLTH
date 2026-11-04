@@ -25,10 +25,15 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
             )
         ]
 
+        XCTAssertTrue(adviceSamples.allSatisfy {
+            !$0.shortDescription.isEmpty
+        })
+
         for width in [158.0, 185.0, 225.0] {
             for advice in adviceSamples {
                 let card = HomeDailyRecommendationCard(
                     advice: advice,
+                    onShowDetails: {},
                     onStartRecommendedWorkout: {},
                     compact: true
                 )
