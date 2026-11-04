@@ -463,9 +463,9 @@ struct ATHLTHAdvancedWeekBuilderView: View {
                 }
                 .padding(13)
                 .background(.white, in: RoundedRectangle(cornerRadius: 14))
-                if inlineGroupDay == day.weekday, let inlineGroupKind {
+                if inlineGroupDay == day.weekday, let selectedGroupKind = inlineGroupKind {
                     ATHLTHPlanInlineGroupComposer(
-                        groupKind: inlineGroupKind,
+                        groupKind: selectedGroupKind,
                         onInsert: { blocks, kind in
                             onAddGroup(day.weekday, blocks, kind)
                             self.inlineGroupKind = nil
