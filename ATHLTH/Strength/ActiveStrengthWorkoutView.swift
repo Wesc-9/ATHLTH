@@ -13,6 +13,7 @@ struct ActiveStrengthWorkoutView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var runningWorkoutLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var social: SocialStore
     @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
@@ -135,13 +136,11 @@ struct ActiveStrengthWorkoutView: View {
             .safeAreaInset(edge: .top, spacing: 0) {
                 if showingSpotifyControls && spotify.isConnected &&
                    strength.activeWorkout != nil {
-                    HStack(spacing: 0) {
-                        inlineSpotifyBar
-                        Spacer(minLength: 0)
-                    }
-                    .padding(.leading, 80)
-                    .padding(.top, 3)
-                    .padding(.bottom, 5)
+                    inlineSpotifyBar
+                        .frame(maxWidth: .infinity)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 3)
+                        .padding(.bottom, 5)
                     .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
@@ -1881,11 +1880,16 @@ struct ActiveStrengthWorkoutView: View {
             .accessibilityLabel(ATHLTHLocalization.choose(
                 english: "Next Spotify track", norwegian: "Neste Spotify-låt"
             ))
+            Rectangle()
+                .fill(ATHLTHTrainDesign.rule)
+                .frame(width: 1, height: 20)
+                .padding(.horizontal, 1)
+            spotifyWorkoutShortcut(1, playlist: settings.spotifyQuickPlaylistOne)
+            spotifyWorkoutShortcut(2, playlist: settings.spotifyQuickPlaylistTwo)
         }
         .foregroundStyle(ATHLTHTrainDesign.ink)
-        .padding(.leading, 9)
-        .padding(.trailing, 5)
-        .frame(width: 207, height: 40)
+        .padding(.horizontal, 11)
+        .frame(maxWidth: .infinity, minHeight: 42, maxHeight: 42)
         .background(ATHLTHTrainDesign.paper, in: Capsule())
         .overlay {
             Capsule()
@@ -1894,6 +1898,48 @@ struct ActiveStrengthWorkoutView: View {
         }
         .shadow(color: ATHLTHTrainDesign.ink.opacity(0.05),
                 radius: 6, x: 0, y: 2)
+    }
+
+    private func spotifyWorkoutShortcut(
+        _ index: Int, playlist: SpotifyPlaylistReference?
+    ) -> some View {
+        Button {
+            guard let playlist else { return }
+            // Explicit tap authorizes playback even if automatic workout
+            // playlist starting was disabled in Settings.
+            Task {
+                await spotify.startLinkedPlaylist(
+                    playlist,
+                    settings: settings,
+                    respectGlobalAutoplay: false
+                )
+            }
+        } label: {
+            Text(playlist?.name ?? "\(index)")
+                .font(.system(size: 10, weight: .semibold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity, minHeight: 34)
+                .padding(.horizontal, 4)
+                .background(
+                    playlist == nil
+                        ? ATHLTHTrainDesign.rule.opacity(0.28)
+                        : ATHLTHPlanDesign.accent.opacity(0.10),
+                    in: RoundedRectangle(cornerRadius: 9)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(playlist == nil)
+        .opacity(playlist == nil ? 0.52 : 1)
+        .accessibilityLabel(
+            playlist.map { ATHLTHLocalization.choose(
+                english: "Play playlist \($0.name)",
+                norwegian: "Spill spillelisten \($0.name)"
+            ) } ?? ATHLTHLocalization.choose(
+                english: "Configure playlist shortcut \(index) in Settings",
+                norwegian: "Velg spillelistesnarvei \(index) i Innstillinger"
+            )
+        )
     }
 
     @ViewBuilder
