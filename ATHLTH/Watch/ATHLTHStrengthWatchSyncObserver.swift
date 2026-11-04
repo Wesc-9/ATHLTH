@@ -141,11 +141,19 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             return true
         }
 
-        if workout
-            .advancedConfiguration?
-            .inputMode == .iPhone {
-            sendSnapshotNow()
-            return true
+        if workout.advancedConfiguration?.inputMode == .iPhone {
+            // iPhone still owns targets, pace and load. Explicit Watch
+            // completion / next-set actions are nevertheless allowed.
+            // Reject Watch draft edits, pauses and timer resets.
+            let permittedFromWatch =
+                command.kind == .completeSet ||
+                command.kind == .skipRest ||
+                command.kind == .skipRestAndStartTimedSet ||
+                command.kind == .nextExercise
+            guard permittedFromWatch else {
+                sendSnapshotNow()
+                return true
+            }
         }
 
         if let workoutID = command.workoutID,
@@ -161,7 +169,8 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 .completeSetWithoutDetails ||
             command.kind == .startTimedSet ||
             command.kind == .pauseTimedSet ||
-            command.kind == .resetTimedSet
+            command.kind == .resetTimedSet ||
+            command.kind == .skipRestAndStartTimedSet
 
         if setScopedCommand,
            let exerciseIndex =
@@ -331,6 +340,16 @@ struct ATHLTHStrengthWatchSyncObserver: View {
 
         case .skipRest:
             strengthWorkout.skipRest()
+
+        case .skipRestAndStartTimedSet:
+            // Skip the rest and start the already selected next time-based
+            // set as one authoritative mutation. Never double-start or
+            // jump past a set when a Watch command is replayed.
+            if strengthWorkout.isResting,
+               strengthWorkout.currentSet?.resolvedTargetKind == .time {
+                strengthWorkout.skipRest()
+                strengthWorkout.startOrResumeTimedSet(at: command.sentAt)
+            }
 
         case .addRest:
             strengthWorkout.addRest(
