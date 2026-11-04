@@ -153,8 +153,9 @@ struct ATHLTHStudioPlannerView: View {
         .onChange(of: session.activePlan?.id) { _, _ in
             selectedWeekIndex = 0
         }
-        .sheet(isPresented: $showingTrainingEditor) {
+        .fullScreenCover(isPresented: $showingTrainingEditor) {
             ATHLTHTrainView(navigationRequest: $trainRequest, isActive: true)
+                .environment(\.athlthStudioFullscreenEditing, true)
         }
         .alert(
             ATHLTHLocalization.choose(english: "Could not update plan", norwegian: "Kunne ikke oppdatere planen"),
