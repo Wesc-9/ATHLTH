@@ -605,9 +605,10 @@ private struct ATHLTHTrainGeneralProgressContent: View {
                 )
             }
 
-            // Interval progression is backed only by completed recordings,
-            // like exercise progression is backed by finished strength logs.
-            ATHLTHRunningSpeedProgressCard()
+            // One searchable target at a time: a named exercise, a
+            // source-linked running workout, or a measured 4x4 benchmark.
+            // Week / month / year comparisons use completed results only.
+            ATHLTHSpecificProgressView()
 
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline) {
