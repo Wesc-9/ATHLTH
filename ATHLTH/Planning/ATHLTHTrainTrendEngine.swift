@@ -17,6 +17,8 @@ enum ATHLTHTrainTrendEngine {
         let volumeKilograms: Double
         let completedWorkingSets: Int
         let completedRepetitions: Int
+        // Only actually measured active set time; absent in older sessions.
+        var measuredEffortSeconds: TimeInterval? = nil
     }
 
     struct Snapshot {
@@ -38,6 +40,8 @@ enum ATHLTHTrainTrendEngine {
         var volume = 0.0
         var sets = 0
         var reps = 0
+        var measuredEffortSeconds = 0.0
+        var measuredSetCount = 0
     }
 
     static func makeGeneral(
@@ -118,6 +122,11 @@ enum ATHLTHTrainTrendEngine {
                     let volume = set.volumeKilograms
                     if volume.isFinite { aggregate.volume += max(0, volume) }
                     aggregate.reps += max(0, set.resolvedCompletedReps ?? 0)
+                    if let seconds = set.actualSetElapsedSeconds,
+                       seconds.isFinite && seconds >= 0 {
+                        aggregate.measuredEffortSeconds += seconds
+                        aggregate.measuredSetCount += 1
+                    }
 
                     // A split/drop set can record several different weights.
                     // The heaviest *actual* segment is the observed peak.
@@ -145,7 +154,9 @@ enum ATHLTHTrainTrendEngine {
                 peakWeightKilograms: aggregate.peakWeight,
                 volumeKilograms: aggregate.volume,
                 completedWorkingSets: aggregate.sets,
-                completedRepetitions: aggregate.reps
+                completedRepetitions: aggregate.reps,
+                measuredEffortSeconds: aggregate.measuredSetCount > 0
+                    ? aggregate.measuredEffortSeconds : nil
             )
         }.sorted {
             $0.date == $1.date
