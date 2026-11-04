@@ -11933,6 +11933,7 @@ private struct StrengthActiveExerciseQueueView: View {
     @State private var pendingExercise: ExerciseLibraryEntry?
     @State private var justCreatedExercise: ExerciseLibraryEntry?
     @State private var pendingRemovalID: UUID?
+    @State private var editingTargetWeight: StrengthSetTargetWeightEdit?
     @State private var showingRemovalBlocked = false
 
     private var exercisePendingRemovalName: String {
@@ -12195,7 +12196,20 @@ private struct StrengthActiveExerciseQueueView: View {
                                     VStack(spacing: 0) {
                                         ForEach(exercise.sets) { set in
                                             Button {
-                                                if strength.selectSetForNow(
+                                                if set.isCompleted {
+                                                    if set.resolvedLoadKind == .weightKilograms {
+                                                        editingTargetWeight =
+                                                            StrengthSetTargetWeightEdit(
+                                                                exerciseID: exercise.id,
+                                                                setID: set.id,
+                                                                setNumber: set.setNumber,
+                                                                plannedKilograms:
+                                                                    set.plannedWeightKilograms,
+                                                                recordedKilograms:
+                                                                    set.completedWeightKilograms
+                                                            )
+                                                    }
+                                                } else if strength.selectSetForNow(
                                                     exerciseID: exercise.id, setID: set.id
                                                 ) {
                                                     dismiss()
@@ -12218,9 +12232,13 @@ private struct StrengthActiveExerciseQueueView: View {
                                                 )
                                                 .monospacedDigit()
                                                 if let weight = set.plannedWeightKilograms {
-                                                    Text(String(format: "· %.1f kg", weight))
+                                                    Text(String(format: "· Mål %.1f kg", weight))
                                                 }
-                                                if !set.isCompleted {
+                                                if set.isCompleted &&
+                                                   set.resolvedLoadKind == .weightKilograms {
+                                                    Image(systemName: "pencil.circle")
+                                                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                                                } else if !set.isCompleted {
                                                     Image(systemName: "arrow.right.circle.fill")
                                                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
                                                 }
@@ -12230,7 +12248,21 @@ private struct StrengthActiveExerciseQueueView: View {
                                             .padding(.vertical, 10)
                                             }
                                             .buttonStyle(.plain)
-                                            .disabled(set.isCompleted)
+                                            .disabled(
+                                                set.isCompleted &&
+                                                set.resolvedLoadKind != .weightKilograms
+                                            )
+                                            .accessibilityHint(
+                                                set.isCompleted
+                                                  ? ATHLTHLocalization.choose(
+                                                      english: "Edit this completed set's target weight without changing recorded weight.",
+                                                      norwegian: "Rediger målvekt for det fullførte settet, uten å endre registrert vekt."
+                                                    )
+                                                  : ATHLTHLocalization.choose(
+                                                      english: "Select this set to perform now.",
+                                                      norwegian: "Velg dette settet for å trene det nå."
+                                                    )
+                                            )
                                             if set.id != exercise.sets.last?.id {
                                                 Divider()
                                             }
@@ -12468,6 +12500,17 @@ private struct StrengthActiveExerciseQueueView: View {
                 )
             }
         }
+        .sheet(item: $editingTargetWeight) { target in
+            StrengthSetTargetWeightEditor(target: target) { updatedKilograms in
+                _ = strength.updateActiveSetTargetWeight(
+                    exerciseID: target.exerciseID,
+                    setID: target.setID,
+                    kilograms: updatedKilograms
+                )
+            }
+            .presentationDetents([.height(322)])
+            .presentationDragIndicator(.visible)
+        }
         .sheet(
             isPresented: Binding(
                 get: { pendingRemovalID != nil },
@@ -12489,6 +12532,90 @@ private struct StrengthActiveExerciseQueueView: View {
                 norwegian: "Øvelser med fullførte sett eller et pågående tidssett kan ikke slettes. Avslutt tidtakingen før du fjerner en øvelse uten registrerte sett."
             ))
         }
+    }
+}
+
+private struct StrengthSetTargetWeightEdit: Identifiable {
+    let id = UUID()
+    let exerciseID: UUID
+    let setID: UUID
+    let setNumber: Int
+    let plannedKilograms: Double?
+    let recordedKilograms: Double?
+}
+
+private struct StrengthSetTargetWeightEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    let target: StrengthSetTargetWeightEdit
+    let onSave: (Double?) -> Void
+    @State private var kilograms: Double
+
+    init(target: StrengthSetTargetWeightEdit, onSave: @escaping (Double?) -> Void) {
+        self.target = target
+        self.onSave = onSave
+        _kilograms = State(initialValue: target.plannedKilograms ?? 0)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(ATHLTHLocalization.choose(
+                    english: "Set \(target.setNumber) · target weight",
+                    norwegian: "Sett \(target.setNumber) · målvekt"
+                ))
+                .font(.headline)
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                }
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Close", norwegian: "Lukk"
+                ))
+            }
+            HStack(spacing: 7) {
+                StrengthClearableNumericField(
+                    value: $kilograms, allowsDecimal: true
+                )
+                Text("kg")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            .padding(12)
+            .background(
+                ATHLTHPlanDesign.warmSurface,
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+            if let recorded = target.recordedKilograms {
+                Text(ATHLTHLocalization.choose(
+                    english: "Actually recorded: \(String(format: "%.1f", recorded)) kg · unchanged",
+                    norwegian: "Registrert vekt: \(String(format: "%.1f", recorded)) kg · endres ikke"
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            }
+            Button {
+                onSave(kilograms > 0 ? kilograms : nil)
+                dismiss()
+            } label: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Save target weight", norwegian: "Lagre målvekt"
+                ))
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .background(
+                    ATHLTHTheme.accentDeep,
+                    in: RoundedRectangle(cornerRadius: 15)
+                )
+            }
+            .buttonStyle(.plain)
+            Spacer(minLength: 0)
+        }
+        .padding(20)
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
     }
 }
 
