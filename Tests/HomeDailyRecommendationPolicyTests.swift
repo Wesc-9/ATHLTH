@@ -149,20 +149,23 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
         )
         XCTAssertEqual(advice.destination, .training)
     }
-    func testReadyWithoutPlanRecommendsRealTimedEasyRun() {
+    func testReadyWithoutRunHistoryDoesNotAssumeRunningExperience() {
         let advice = HomeDailyRecommendationPolicy.recommendation(
             readiness: .ready,
             hasWorkoutToday: false,
             trainingLoadRatio: 1
         )
-        XCTAssertEqual(advice.suggestedWorkout, .easyRun(minutes: 25))
-        XCTAssertFalse(advice.dayDescription.isEmpty)
-        XCTAssertFalse(advice.suggestedTitle.isEmpty)
+        XCTAssertEqual(advice.suggestedWorkout, .easyWalk(minutes: 20))
+        XCTAssertTrue(advice.dayDescription.localizedCaseInsensitiveContains(
+            ATHLTHLocalization.choose(
+                english: "last 28 days", norwegian: "28 dagene"
+            )
+        ))
         let workout = HomeDailyRecommendationSessionFactory.make(advice: advice)
-        XCTAssertEqual(workout?.kind, .running)
-        XCTAssertEqual(workout?.durationMinutes, 25)
-        XCTAssertEqual(workout?.resolvedWorkoutBlocks.first?.durationSeconds, 1500)
-        XCTAssertEqual(workout?.resolvedWorkoutBlocks.first?.cardioActivity, .running)
+        XCTAssertEqual(workout?.kind, .walking)
+        XCTAssertEqual(workout?.durationMinutes, 20)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.first?.durationSeconds, 1200)
+        XCTAssertEqual(workout?.resolvedWorkoutBlocks.first?.cardioActivity, .walking)
     }
 
     func testUnavailableRecoveryDoesNotClaimGoodCondition() {
@@ -276,7 +279,7 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
             hasWorkoutToday: false,
             trainingLoadRatio: 0.35,
             trainingHistory: trainingHistory(
-                runs: 1, lastRunDaysAgo: 6, averageMinutes: 28
+                runs: 1, lastRunDaysAgo: 2, averageMinutes: 28
             )
         )
         XCTAssertEqual(advice.suggestedWorkout, .progressiveRun(minutes: 30))
@@ -299,7 +302,8 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
                 runs: 5, lastRunDaysAgo: 21, averageMinutes: 45
             )
         )
-        XCTAssertEqual(advice.suggestedWorkout, .easyRun(minutes: 25))
+        XCTAssertEqual(advice.suggestedWorkout, .easyWalk(minutes: 20))
+        XCTAssertTrue(advice.dayDescription.contains("21"))
     }
 
     func testBalancedReadinessCanRecommendSteadyProgression() {
@@ -308,10 +312,76 @@ final class HomeDailyRecommendationPolicyTests: XCTestCase {
             hasWorkoutToday: false,
             trainingLoadRatio: 0.8,
             trainingHistory: trainingHistory(
-                runs: 2, lastRunDaysAgo: 4, averageMinutes: 34
+                runs: 2, lastRunDaysAgo: 2, averageMinutes: 34
             )
         )
         XCTAssertEqual(advice.suggestedWorkout, .progressiveRun(minutes: 30))
+    }
+
+    func testSeveralDaysWithoutRunningDoesNotRecommendProgression() {
+        for days in [3, 4, 6, 10, 14] {
+            for readiness in [
+                HomeDailyRecommendationPolicy.Readiness.balanced, .ready
+            ] {
+                let advice = HomeDailyRecommendationPolicy.recommendation(
+                    readiness: readiness,
+                    hasWorkoutToday: false,
+                    trainingLoadRatio: 0.8,
+                    trainingHistory: trainingHistory(
+                        runs: 3, lastRunDaysAgo: days, averageMinutes: 32
+                    )
+                )
+                XCTAssertEqual(advice.suggestedWorkout, .easyRun(minutes: 20))
+                XCTAssertTrue(advice.dayDescription.contains("\(days)"),
+                              "Description must state actual days since recorded run")
+                XCTAssertFalse(advice.dayDescription.localizedCaseInsensitiveContains(
+                    ATHLTHLocalization.choose(
+                        english: "recent runs", norwegian: "løpt nylig"
+                    )
+                ))
+            }
+        }
+    }
+
+    func testLongGapOrUnavailableRunHistoryNeverClaimsRecentRunning() {
+        for days in [15, 21, 28] {
+            let advice = HomeDailyRecommendationPolicy.recommendation(
+                readiness: .balanced,
+                hasWorkoutToday: false,
+                trainingLoadRatio: nil,
+                trainingHistory: trainingHistory(
+                    runs: 3, lastRunDaysAgo: days, averageMinutes: 40
+                )
+            )
+            XCTAssertEqual(advice.suggestedWorkout, .easyWalk(minutes: 20))
+            XCTAssertTrue(advice.dayDescription.contains("\(days)"))
+        }
+        let missing = HomeDailyRecommendationPolicy.recommendation(
+            readiness: .balanced,
+            hasWorkoutToday: false,
+            trainingLoadRatio: nil,
+            trainingHistory: .empty
+        )
+        XCTAssertEqual(missing.suggestedWorkout, .easyWalk(minutes: 20))
+        XCTAssertFalse(missing.dayDescription.localizedCaseInsensitiveContains(
+            ATHLTHLocalization.choose(
+                english: "recent runs", norwegian: "løpt nylig"
+            )
+        ))
+    }
+
+    func testMultipleOldRunsDoNotAllowHardTempoBecauseReadinessIsGood() {
+        for days in [3, 6, 10] {
+            let advice = HomeDailyRecommendationPolicy.recommendation(
+                readiness: .ready,
+                hasWorkoutToday: false,
+                trainingLoadRatio: 0.5,
+                trainingHistory: trainingHistory(
+                    runs: 8, lastRunDaysAgo: days, averageMinutes: 45
+                )
+            )
+            XCTAssertEqual(advice.suggestedWorkout, .easyRun(minutes: 20))
+        }
     }
 
     func testPoorReadinessAndExcessiveLoadOverrideRunningHistory() {
