@@ -3418,6 +3418,7 @@ struct ATHLTHWorkoutStudioStepEditorSelection: Identifiable {
 struct WorkoutTemplateBuilderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
 
@@ -4170,6 +4171,52 @@ struct WorkoutTemplateBuilderView: View {
             }
     }
 
+    // One shared iPhone/iPad editor: only the presentation adapts.
+    // All block operations, validation, draft recovery and save closures
+    // remain in WorkoutTemplateBuilderView on both platforms.
+    private var studioPlanHeader: some View {
+        ATHLTHPlannedWorkoutStudioHeader(
+            workoutName: $title,
+            activity: initialActivity,
+            blocks: blocks,
+            durationMinutes: resolvedDurationMinutes,
+            route: activeRoute,
+            plannedDate: plannedDate,
+            onDateChanged: onScheduledTimeChanged
+        )
+        .overlay(alignment: .topTrailing) {
+            workoutExtrasMenu
+                .padding(.top, 18)
+                .padding(.trailing, 18)
+        }
+    }
+
+    @ViewBuilder
+    private var studioPlanWorkspace: some View {
+        if studioFullscreenEditing {
+            // A landscape iPad gets a genuine two-column workbench;
+            // Stage Manager's narrow windows keep the same stacked editor.
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 20) {
+                    studioPlanHeader
+                        .frame(minWidth: 330, idealWidth: 370, maxWidth: 415,
+                               alignment: .topLeading)
+                    plannedStudio
+                        .frame(minWidth: 490, maxWidth: .infinity,
+                               alignment: .topLeading)
+                }
+
+                VStack(alignment: .leading, spacing: 16) {
+                    studioPlanHeader
+                    plannedStudio
+                }
+            }
+        } else {
+            studioPlanHeader
+            plannedStudio
+        }
+    }
+
     private var editorWithPresentation: some View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -4208,21 +4255,7 @@ struct WorkoutTemplateBuilderView: View {
                                 .foregroundStyle(studioInk.opacity(0.65))
                             }
                         } else {
-                            ATHLTHPlannedWorkoutStudioHeader(
-                                workoutName: $title,
-                                activity: initialActivity,
-                                blocks: blocks,
-                                durationMinutes: resolvedDurationMinutes,
-                                route: activeRoute,
-                                plannedDate: plannedDate,
-                                onDateChanged: onScheduledTimeChanged
-                            )
-                            .overlay(alignment: .topTrailing) {
-                                workoutExtrasMenu
-                                    .padding(.top, 18)
-                                    .padding(.trailing, 18)
-                            }
-                            plannedStudio
+                            studioPlanWorkspace
                         }
                         if let actionNotice {
                             Label(actionNotice, systemImage: "info.circle")
@@ -4254,7 +4287,7 @@ struct WorkoutTemplateBuilderView: View {
                 .padding(.horizontal, 16)
                 .padding(.top, 10)
                 .padding(.bottom, 28)
-                .frame(maxWidth: 720)
+                .frame(maxWidth: studioFullscreenEditing && isPlannedWorkout ? 1280 : 720)
                 .frame(maxWidth: .infinity)
             }
             .background(studioBackground.ignoresSafeArea())
@@ -6202,6 +6235,8 @@ struct WorkoutTemplateBuilderView: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
+        .frame(maxWidth: studioFullscreenEditing && isPlannedWorkout ? 1010 : .infinity)
+        .frame(maxWidth: .infinity)
         .background(.regularMaterial)
         .overlay(alignment: .top) {
             ATHLTHPlanDesign.outline.frame(height: 1)
