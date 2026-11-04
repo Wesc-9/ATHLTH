@@ -3845,39 +3845,13 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
-    private func insertPlanWorkoutCopy(
+    /// The one shared clone engine for single-workout and whole-week copies.
+    /// New exercise/set/superset IDs prevent completion history from leaking
+    /// between a source session and its future duplicate.
+    private func makeIndependentPlanStudioCopy(
         source: PlannedSession,
-        planID: UUID,
-        dayID: UUID
-    ) -> Bool {
-        guard var plan = trainingPlan(withID: planID),
-              let start = plan.startDate,
-              let location = plan.weeks.enumerated().compactMap({
-                weekNumber, week -> (Int, Int)? in
-                guard let dayNumber = week.days.firstIndex(where: { $0.id == dayID }) else {
-                    return nil
-                }
-                return (weekNumber, dayNumber)
-              }).first
-        else { return false }
-
-        let (weekNumber, dayNumber) = location
-        let originalDay = plan.weeks[weekNumber].days[dayNumber]
-        let calendar = Calendar.current
-        let date = calendar.date(
-            byAdding: .day,
-            value: weekNumber * 7 + originalDay.dayIndex - 1,
-            to: calendar.startOfDay(for: start)
-        ) ?? start
-        let scheduled: Date? = source.scheduledStart.flatMap { original in
-            let time = calendar.dateComponents([.hour, .minute], from: original)
-            return calendar.date(
-                bySettingHour: time.hour ?? 18,
-                minute: time.minute ?? 0,
-                second: 0,
-                of: date
-            )
-        }
+        scheduled: Date?
+    ) -> PlannedSession {
         // A copied workout and its exercises are separate from the source.
         // Re-map supersets, keeping their internal grouping intact.
         var supersetIDs: [UUID: UUID] = [:]
@@ -3950,6 +3924,45 @@ final class AppSessionStore: ObservableObject {
         )
         copy.sharedSourceOwnerID = source.sharedSourceOwnerID
         copy.sharedSourceSessionID = source.sharedSourceSessionID
+        return copy
+    }
+
+    private func insertPlanWorkoutCopy(
+        source: PlannedSession,
+        planID: UUID,
+        dayID: UUID
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: planID),
+              let start = plan.startDate,
+              let location = plan.weeks.enumerated().compactMap({
+                weekNumber, week -> (Int, Int)? in
+                guard let dayNumber = week.days.firstIndex(where: { $0.id == dayID }) else {
+                    return nil
+                }
+                return (weekNumber, dayNumber)
+              }).first
+        else { return false }
+
+        let (weekNumber, dayNumber) = location
+        let originalDay = plan.weeks[weekNumber].days[dayNumber]
+        let calendar = Calendar.current
+        let date = calendar.date(
+            byAdding: .day,
+            value: weekNumber * 7 + originalDay.dayIndex - 1,
+            to: calendar.startOfDay(for: start)
+        ) ?? start
+        let scheduled: Date? = source.scheduledStart.flatMap { original in
+            let time = calendar.dateComponents([.hour, .minute], from: original)
+            return calendar.date(
+                bySettingHour: time.hour ?? 18,
+                minute: time.minute ?? 0,
+                second: 0,
+                of: date
+            )
+        }
+        let copy = makeIndependentPlanStudioCopy(
+            source: source, scheduled: scheduled
+        )
         plan.weeks[weekNumber].days[dayNumber].sessions.append(copy)
         plan.version += 1
         plan.updatedAt = Date()
@@ -4050,6 +4063,135 @@ final class AppSessionStore: ObservableObject {
             workoutID: sourceWorkoutID,
             dayID: targetDayID
         )
+    }
+
+    struct PlanStudioWeekCopyReceipt {
+        let planID: UUID
+        let targetWeekID: UUID
+        let newSessionIDs: Set<UUID>
+        let expectedVersionAfterCopy: Int
+    }
+
+    /// Copies an entire week as ONE atomic change, reusing exactly the
+    /// same independent-ID clone logic as an individual copied workout.
+    /// The destination must be empty and entirely future-dated; existing,
+    /// completed and skipped history is never replaced or cleared.
+    @discardableResult
+    func copyPlanStudioWeek(
+        planID: UUID,
+        sourceWeekID: UUID,
+        targetWeekID: UUID,
+        expectedVersion: Int
+    ) -> PlanStudioWeekCopyReceipt? {
+        guard var plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion,
+              let sourceIndex = plan.weeks.firstIndex(where: { $0.id == sourceWeekID }),
+              let targetIndex = plan.weeks.firstIndex(where: { $0.id == targetWeekID }),
+              sourceIndex != targetIndex,
+              plan.weeks[targetIndex].days.allSatisfy(\.sessions.isEmpty)
+        else { return nil }
+
+        let sourceWeek = plan.weeks[sourceIndex]
+        let destinationWeek = plan.weeks[targetIndex]
+        guard sourceWeek.days.count == 7,
+              destinationWeek.days.count == 7,
+              sourceWeek.days.contains(where: { !$0.sessions.isEmpty })
+        else { return nil }
+
+        let today = Calendar.current.startOfDay(for: Date())
+        let calendar = Calendar.current
+        var copied: [UUID] = []
+        var reminders: [PlannedSession] = []
+
+        // Every guard is checked before ANY plan mutation is persisted.
+        for day in destinationWeek.days {
+            guard let sourceDay = sourceWeek.days.first(where: {
+                $0.dayIndex == day.dayIndex
+            }),
+            let target = planStudioDayLocation(in: plan, dayID: day.id),
+            target.date >= today else { return nil }
+
+            var newSessions: [PlannedSession] = []
+            for original in sourceDay.sessions {
+                let scheduled = original.scheduledStart.flatMap { previous in
+                    let time = calendar.dateComponents(
+                        [.hour, .minute, .second], from: previous
+                    )
+                    return calendar.date(
+                        bySettingHour: time.hour ?? 18,
+                        minute: time.minute ?? 0,
+                        second: time.second ?? 0,
+                        of: target.date
+                    )
+                }
+                let next = makeIndependentPlanStudioCopy(
+                    source: original, scheduled: scheduled
+                )
+                copied.append(next.id)
+                if next.scheduledStart != nil { reminders.append(next) }
+                newSessions.append(next)
+            }
+            plan.weeks[targetIndex].days[target.day].sessions = newSessions
+        }
+        guard !copied.isEmpty else { return nil }
+
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        for reminder in reminders {
+            PlannedWorkoutReminderScheduler.sync(reminder)
+        }
+        return PlanStudioWeekCopyReceipt(
+            planID: planID, targetWeekID: targetWeekID,
+            newSessionIDs: Set(copied),
+            expectedVersionAfterCopy: plan.version
+        )
+    }
+
+    /// Undo only the exact week-copy transaction that is still current.
+    /// Any intervening edit/version bump prevents rollback rather than
+    /// overwriting other changes or recorded training.
+    @discardableResult
+    func undoPlanStudioWeekCopy(
+        _ receipt: PlanStudioWeekCopyReceipt,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        guard var plan = trainingPlan(withID: receipt.planID),
+              plan.version == receipt.expectedVersionAfterCopy,
+              let targetIndex = plan.weeks.firstIndex(where: {
+                  $0.id == receipt.targetWeekID
+              }) else { return false }
+
+        let sessions = plan.weeks[targetIndex].days.flatMap(\.sessions)
+        guard Set(sessions.map(\.id)) == receipt.newSessionIDs,
+              sessions.count == receipt.newSessionIDs.count,
+              plan.weeks[targetIndex].days.allSatisfy({ day in
+                  guard let location = planStudioDayLocation(
+                      in: plan, dayID: day.id
+                  ) else { return false }
+                  return location.date >= Calendar.current.startOfDay(for: Date())
+              }),
+              sessions.allSatisfy({
+                  !isPlanSessionSkipped(
+                      planID: receipt.planID, sessionID: $0.id
+                  ) && !isPlanSessionCompleted(
+                      planID: receipt.planID, sessionID: $0.id,
+                      healthWorkouts: healthWorkouts,
+                      strengthHistory: strengthHistory
+                  )
+              }) else { return false }
+
+        for dayIndex in plan.weeks[targetIndex].days.indices {
+            plan.weeks[targetIndex].days[dayIndex].sessions.removeAll()
+        }
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        for session in sessions {
+            PlannedWorkoutReminderScheduler.cancel(session.id)
+        }
+        return true
     }
 
     /// The older move API remains available to existing training flows.
