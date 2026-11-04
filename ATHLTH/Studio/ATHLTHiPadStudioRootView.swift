@@ -41,6 +41,7 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var showingInspector = false
     @State private var inspectorShowsCoach = false
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
+    @State private var focusedPlanningDate: Date?
     @State private var trainRequest: ATHLTHTrainNavigationRequest?
     @State private var showingTrain = false
     @State private var selectedStandaloneWorkout: PlannedSession?
@@ -123,9 +124,16 @@ struct ATHLTHiPadStudioRootView: View {
         }
         .onChange(of: selection) { _, destination in
             showingInspector = false
+            if destination != .overview { focusedPlanningDate = nil }
             withAnimation(.easeInOut(duration: 0.18)) {
                 sidebarVisibility = destination == .planner
                     ? .detailOnly : .all
+            }
+        }
+        .onChange(of: focusedPlanningDate) { _, newDate in
+            withAnimation(.easeInOut(duration: 0.18)) {
+                sidebarVisibility = newDate != nil ? .detailOnly :
+                    selection == .planner ? .detailOnly : .all
             }
         }
         .inspector(isPresented: $showingInspector) {
@@ -292,11 +300,7 @@ struct ATHLTHiPadStudioRootView: View {
                     trainRequest = .customQuick
                     showingTrain = true
                 },
-                onPlanningFocusChanged: { isFocused in
-                    withAnimation(.easeInOut(duration: 0.18)) {
-                        sidebarVisibility = isFocused ? .detailOnly : .all
-                    }
-                }
+                focusedPlanningDate: $focusedPlanningDate
             )
         case .planner:
             ATHLTHStudioPlannerView()
