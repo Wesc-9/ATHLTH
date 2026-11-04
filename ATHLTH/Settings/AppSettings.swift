@@ -607,6 +607,11 @@ final class AppSettingsStore: ObservableObject {
     @Published var spotifyAutoplayLinkedPlaylists: Bool { didSet { persist() } }
     @Published var spotifyDefaultPlaylist:
         SpotifyPlaylistReference? { didSet { persist() } }
+    /// Two optional manually selected quick-switch playlists during workouts.
+    @Published var spotifyQuickPlaylistOne:
+        SpotifyPlaylistReference? { didSet { persist() } }
+    @Published var spotifyQuickPlaylistTwo:
+        SpotifyPlaylistReference? { didSet { persist() } }
 
     var interfaceLocale: Locale {
         var components =
@@ -626,6 +631,26 @@ final class AppSettingsStore: ObservableObject {
 
     @Published var healthConnected: Bool = false
     @Published var watchConnected: Bool { didSet { persist() } }
+    private static func savedSpotifyPlaylist(
+        _ defaults: UserDefaults, key: String
+    ) -> SpotifyPlaylistReference? {
+        guard let data = defaults.data(forKey: key) else { return nil }
+        return try? JSONDecoder().decode(SpotifyPlaylistReference.self, from: data)
+    }
+
+    private static func storeSpotifyPlaylist(
+        _ playlist: SpotifyPlaylistReference?,
+        defaults: UserDefaults,
+        key: String
+    ) {
+        if let playlist,
+           let data = try? JSONEncoder().encode(playlist) {
+            defaults.set(data, forKey: key)
+        } else {
+            defaults.removeObject(forKey: key)
+        }
+    }
+
     @Published var spotifyConnected: Bool { didSet { persist() } }
     @Published var homeAssistantConnected: Bool { didSet { persist() } }
 
@@ -1109,6 +1134,12 @@ final class AppSettingsStore: ObservableObject {
         } else {
             spotifyDefaultPlaylist = nil
         }
+        spotifyQuickPlaylistOne = Self.savedSpotifyPlaylist(
+            defaults, key: "settings.spotifyQuickPlaylistOne"
+        )
+        spotifyQuickPlaylistTwo = Self.savedSpotifyPlaylist(
+            defaults, key: "settings.spotifyQuickPlaylistTwo"
+        )
         watchConnected = defaults.object(forKey: "settings.watchConnected") as? Bool ?? false
         spotifyConnected =
             defaults.object(
@@ -1438,6 +1469,14 @@ final class AppSettingsStore: ObservableObject {
                     "settings.spotifyDefaultPlaylist"
             )
         }
+        Self.storeSpotifyPlaylist(
+            spotifyQuickPlaylistOne, defaults: defaults,
+            key: "settings.spotifyQuickPlaylistOne"
+        )
+        Self.storeSpotifyPlaylist(
+            spotifyQuickPlaylistTwo, defaults: defaults,
+            key: "settings.spotifyQuickPlaylistTwo"
+        )
         defaults.set(watchConnected, forKey: "settings.watchConnected")
         defaults.set(spotifyConnected, forKey: "settings.spotifyConnected")
         defaults.set(homeAssistantConnected, forKey: "settings.homeAssistantConnected")
