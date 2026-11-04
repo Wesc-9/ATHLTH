@@ -118,6 +118,9 @@ struct ProductRootTabView: View {
     @State private var showingDailyCheckInFromNotification = false
     @State private var deferredTabReminderTask: Task<Void, Never>?
     @State private var showingCoachFromDock = false
+    @State private var showingSideMenu = false
+    @State private var sideMenuModalDestination: ATHLTHSideMenuDestination?
+    @Environment(\.accessibilityReduceMotion) private var reduceSideMenuMotion
 
     private func openPendingDailyCheckInIfNeeded() {
         guard pushManager.pendingDailyCheckInAccountID ==
@@ -263,6 +266,11 @@ struct ProductRootTabView: View {
                 onOpenTrain: { request in
                     trainNavigationRequest = request
                     selectedTab = 1
+                },
+                onOpenSideMenu: {
+                    withAnimation(reduceSideMenuMotion ? nil : .easeOut(duration: 0.22)) {
+                        showingSideMenu = true
+                    }
                 },
                 isActive: selectedTab == 0
             )
@@ -623,6 +631,79 @@ struct ProductRootTabView: View {
                 .environmentObject(social)
             }
         }
+        .overlay {
+            if showingSideMenu {
+                ATHLTHSideMenuView(
+                    selectedTab: selectedTab,
+                    onSelect: selectFromSideMenu,
+                    onDismiss: {
+                        withAnimation(reduceSideMenuMotion ? nil : .easeOut(duration: 0.18)) {
+                            showingSideMenu = false
+                        }
+                    }
+                )
+                .transition(.opacity)
+                .zIndex(100)
+            }
+        }
+        .sheet(item: $sideMenuModalDestination) { destination in
+            NavigationStack {
+                if destination == .profile {
+                    ATHLTHProfileView()
+                        .overlay(alignment: .topLeading) {
+                            Button {
+                                sideMenuModalDestination = nil
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 44, height: 44)
+                                    .background(
+                                        Color.black.opacity(0.30),
+                                        in: Circle()
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Close profile",
+                                norwegian: "Lukk profil"
+                            ))
+                            .padding(.leading, 14)
+                            .padding(.top, 14)
+                        }
+                } else if destination == .settings {
+                    ATHLTHSettingsView()
+                }
+            }
+            .presentationDragIndicator(.visible)
+        }
+    }
+
+    private func selectFromSideMenu(_ destination: ATHLTHSideMenuDestination) {
+        withAnimation(reduceSideMenuMotion ? nil : .easeOut(duration: 0.18)) {
+            showingSideMenu = false
+        }
+
+        switch destination {
+        case .home:
+            selectedTab = 0
+        case .calendar:
+            trainNavigationRequest = .today
+            selectedTab = 1
+        case .train:
+            selectedTab = 1
+        case .plans:
+            trainNavigationRequest = .plan
+            selectedTab = 1
+        case .insights:
+            selectedTab = 2
+        case .explore:
+            selectedTab = 3
+        case .community:
+            selectedTab = 4
+        case .profile, .settings:
+            sideMenuModalDestination = destination
+        }
     }
 
     @MainActor
@@ -818,6 +899,7 @@ struct ATHLTHHomeView: View {
     var onOpenTrain:
         (ATHLTHTrainNavigationRequest) -> Void =
         { _ in }
+    var onOpenSideMenu: () -> Void = {}
     // TabView can instantiate inactive tabs while rendering the first frame.
     // Defer Home's network/Health loads until it is the selected tab.
     var isActive: Bool = true
@@ -914,8 +996,38 @@ struct ATHLTHHomeView: View {
                         }
                     )
 
-                    // Compact premium toolbar: small handle + three shortcuts;
-                    // keep the original larger profile avatar visible in both states.
+                    // White three-line menu button aligned with the Home utility row.
+                    // Keep the existing hero and right-hand toolbar untouched.
+                    Button(action: onOpenSideMenu) {
+                        VStack(spacing: 5) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                Capsule()
+                                    .fill(Color.white)
+                                    .frame(width: 21, height: 2)
+                            }
+                        }
+                        .frame(width: 48, height: 48)
+                        .background(Color.black.opacity(0.27), in: Circle())
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
+                                    Color.white.opacity(0.36),
+                                    lineWidth: 0.8
+                                )
+                                .allowsHitTesting(false)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Open navigation menu",
+                        norwegian: "Åpne sidemenyen"
+                    ))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 16)
+                    .padding(.top, 60)
+
+                    // Compact premium toolbar: keep the original larger
+                    // profile avatar visible in both states.
                     HStack(spacing: 0) {
                         HomeHeroUtilityButtons(
                             challengeInviteUnreadCount:
