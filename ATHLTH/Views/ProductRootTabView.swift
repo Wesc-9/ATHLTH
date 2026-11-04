@@ -840,6 +840,7 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
     @EnvironmentObject private var ghostRace: GhostRaceStore
+    @EnvironmentObject private var pets: ATHLTHPetStore
 
     @State private var homeStreakDays: [Date]?
     @State private var lastHomeInitialLoadAt: Date?
@@ -2040,6 +2041,12 @@ struct ATHLTHHomeView: View {
             plannedWorkoutTitle: scheduled?.workout.title,
             trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(
                 workouts: health.workouts
+            ),
+            personalizedHistory: HomeTrainingPatternAdvisor.snapshot(
+                workouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory,
+                phoneHistory: phoneWorkout.history,
+                dogs: pets.pets.filter { $0.userID == session.profile.userID }
             )
         )
     }
@@ -2047,6 +2054,10 @@ struct ATHLTHHomeView: View {
     private func openHomeDailyRecommendation(
         _ advice: HomeDailyRecommendationPolicy.Advice
     ) {
+        if advice.suggestedWorkout == .restDay {
+            onOpenTrain(.today)
+            return
+        }
         if advice.suggestedWorkout == .planned {
             guard let scheduled = homeRecommendedScheduledWorkout else {
                 onOpenTrain(.today)
