@@ -21,6 +21,7 @@ struct ATHLTHStudioDashboardView: View {
 
     @State private var periodDays = 28
     @State private var selectedWeekDate = Date.now
+    @State private var focusedPlanningDate: Date?
     @State private var showingReadinessExplanation = false
 
     private func tr(_ english: String, _ norwegian: String) -> String {
@@ -66,7 +67,8 @@ struct ATHLTHStudioDashboardView: View {
             standalone: session.standalonePlannedSessions,
             recorded: healthHasDataAccess ? health.workouts : [],
             pausedPlanIDs: session.pausedTrainingPlanIDs,
-            deactivatedPlanIDs: session.deactivatedTrainingPlanIDs
+            deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
+            now: selectedWeekDate
         )
     }
 
@@ -85,6 +87,12 @@ struct ATHLTHStudioDashboardView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            if let focusedPlanningDate {
+                ATHLTHStudioFocusedWeekPlannerView(
+                    initialDate: focusedPlanningDate,
+                    onClose: { self.focusedPlanningDate = nil }
+                )
+            } else {
             let wide = geometry.size.width >= 795 &&
                 !dynamicTypeSize.isAccessibilitySize
             let currentWeek = week
@@ -131,10 +139,12 @@ struct ATHLTHStudioDashboardView: View {
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
+            }
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
+            if phase == .active, focusedPlanningDate == nil,
+               abs(selectedWeekDate.timeIntervalSinceNow) < 86_400 {
                 selectedWeekDate = .now
             }
         }
@@ -454,7 +464,13 @@ struct ATHLTHStudioDashboardView: View {
         return VStack(alignment: .leading, spacing: 15) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(tr("This week", "Denne uken"))
+                    Text(ATHLTHStudioHomeWeek.weekRange(
+                        containing: selectedWeekDate
+                    ).start.formatted(.dateTime.day().month(.abbreviated)) +
+                         " – " +
+                         ATHLTHStudioHomeWeek.weekRange(
+                            containing: selectedWeekDate
+                         ).end.formatted(.dateTime.day().month(.abbreviated)))
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(ATHLTHStudioStyle.ink)
                     Text(healthHasDataAccess
@@ -471,6 +487,33 @@ struct ATHLTHStudioDashboardView: View {
                 }
 
                 Spacer(minLength: 8)
+                HStack(spacing: 4) {
+                    Button {
+                        shiftWeek(-1)
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .frame(width: 32, height: 32)
+                    }
+                    .accessibilityLabel(tr("Previous week", "Forrige uke"))
+
+                    Button {
+                        selectedWeekDate = .now
+                    } label: {
+                        Text(tr("Today", "I dag"))
+                            .font(.caption.weight(.semibold))
+                    }
+                    .accessibilityLabel(tr("Go to current week", "Gå til denne uken"))
+
+                    Button {
+                        shiftWeek(1)
+                    } label: {
+                        Image(systemName: "chevron.right")
+                            .frame(width: 32, height: 32)
+                    }
+                    .accessibilityLabel(tr("Next week", "Neste uke"))
+                }
+                .buttonStyle(.borderless)
+
                 Button(action: onOpenPlanner) {
                     Label(tr("See plan", "Se planen"), systemImage: "arrow.up.right")
                 }
@@ -510,9 +553,9 @@ struct ATHLTHStudioDashboardView: View {
                         }
                     }
 
-                    if selected.planned.isEmpty {
+                    if selected.planned.isEmpty && selected.recorded.isEmpty {
                         Label(
-                            tr("No scheduled workout", "Ingen planlagt økt"),
+                            tr("No workouts on this day", "Ingen økter denne dagen"),
                             systemImage: "calendar"
                         )
                         .font(.subheadline)
@@ -532,7 +575,14 @@ struct ATHLTHStudioDashboardView: View {
                                         .foregroundStyle(ATHLTHStudioStyle.ink)
                                         .lineLimit(1)
                                     Spacer(minLength: 5)
-                                    if let duration = entry.workout.durationMinutes {
+                                    if isRecordedCompleted(entry) {
+                                        Label(
+                                            tr("Completed", "Utført"),
+                                            systemImage: "checkmark.circle.fill"
+                                        )
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ATHLTHStudioStyle.gold)
+                                    } else if let duration = entry.workout.durationMinutes {
                                         Text("\(duration) min")
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
@@ -560,7 +610,55 @@ struct ATHLTHStudioDashboardView: View {
                             .font(.caption.weight(.semibold))
                             .buttonStyle(.plain)
                         }
+
+                        if healthHasDataAccess {
+                            ForEach(selected.recorded) { recorded in
+                                Button {
+                                    onInspect(recorded)
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        Image(systemName: "checkmark.circle.fill")
+                                            .foregroundStyle(ATHLTHStudioStyle.gold)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(recorded.activity.rawValue)
+                                                .font(.subheadline.weight(.medium))
+                                            Text(recorded.startDate.formatted(
+                                                date: .omitted, time: .shortened
+                                            ))
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                        }
+                                        Spacer(minLength: 4)
+                                        Text("\(Int(recorded.duration / 60)) min")
+                                            .font(.caption)
+                                        Text(tr("Recorded", "Registrert"))
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(ATHLTHStudioStyle.gold)
+                                        Image(systemName: "arrow.up.right")
+                                            .font(.caption)
+                                    }
+                                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                                    .frame(minHeight: 42)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
                     }
+
+                    Button {
+                        focusedPlanningDate = selected.date
+                    } label: {
+                        Label(
+                            tr("Plan a workout", "Planlegg økt"),
+                            systemImage: "plus.circle"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHStudioStyle.ink)
+                    .disabled(Calendar.current.startOfDay(for: selected.date) <
+                              Calendar.current.startOfDay(for: .now))
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
@@ -609,8 +707,11 @@ struct ATHLTHStudioDashboardView: View {
                     Text("\(day.planned.count)")
                         .font(.caption.weight(.medium))
                     Spacer(minLength: 0)
-                    Image(systemName: "checkmark.circle")
+                    Image(systemName: !day.recorded.isEmpty
+                          ? "checkmark.circle.fill" : "checkmark.circle")
                         .font(.caption2)
+                        .foregroundStyle(!day.recorded.isEmpty
+                            ? ATHLTHStudioStyle.gold : Color.secondary)
                     Text(healthHasDataAccess ? "\(day.recorded.count)" : "—")
                         .font(.caption.weight(.medium))
                 }
@@ -644,6 +745,26 @@ struct ATHLTHStudioDashboardView: View {
                 : tr("Health history unavailable", "Helsehistorikk mangler"))
         )
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func shiftWeek(_ amount: Int) {
+        selectedWeekDate = ATHLTHStudioHomeWeek.shiftedWeek(
+            from: selectedWeekDate, offset: amount
+        )
+    }
+
+    /// Only the plan's own completion identity may mark a scheduled
+    /// workout completed. A random HealthKit recording on the same date
+    /// must never silently complete a plan session.
+    private func isRecordedCompleted(
+        _ entry: ATHLTHStudioSchedule.Occurrence
+    ) -> Bool {
+        guard let planID = entry.planID else { return false }
+        return session.isPlanSessionCompleted(
+            planID: planID, sessionID: entry.workout.id,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
     }
 
     private var trainingDevelopment: some View {
