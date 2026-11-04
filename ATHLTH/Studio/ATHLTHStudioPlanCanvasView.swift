@@ -83,6 +83,9 @@ struct ATHLTHStudioPlanCanvasView: View {
         .onChange(of: selectedWeekID) { _, _ in
             inlineWorkout = nil
         }
+        .onChange(of: selectedDayID) { _, _ in
+            inlineWorkout = nil
+        }
         .onChange(of: session.profile.userID) { _, _ in
             selectedPlanID = nil
             selectedWeekID = nil
@@ -146,7 +149,12 @@ struct ATHLTHStudioPlanCanvasView: View {
             planHeader(plan)
             planMetrics(plan, selectedWeek: week)
 
-            if width >= 875 {
+            if let inlineWorkout, inlineWorkout.planID == plan.id,
+               width < 1120 {
+                // Preserve a useful editor width in iPad portrait and
+                // narrow Stage Manager windows; no modal presentation.
+                inlineExistingWorkoutEditor(inlineWorkout)
+            } else if width >= 875 {
                 HStack(alignment: .top, spacing: 13) {
                     weekNavigation(plan, selectedIndex: weekIndex)
                         .frame(width: min(198, width * 0.21))
@@ -173,10 +181,6 @@ struct ATHLTHStudioPlanCanvasView: View {
                     }
                     .frame(maxHeight: .infinity)
                 }
-            } else if let inlineWorkout, inlineWorkout.planID == plan.id {
-                // In Stage Manager's narrow window the editor occupies the
-                // workspace rather than forcing three unusably slim columns.
-                inlineExistingWorkoutEditor(inlineWorkout)
             } else {
                 ScrollView {
                     VStack(spacing: 13) {
