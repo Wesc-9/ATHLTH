@@ -130,6 +130,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         Task<Void, Never>?
     private var strengthStatusCoachTask:
         Task<Void, Never>?
+    /// Independent of Audio Coach: time-goal haptics still work when speech
+    /// is disabled. A set identity guarantees at most one alert per target.
+    private var strengthTimedGoalHapticTask: Task<Void, Never>?
+    private var strengthTimedGoalHapticScheduleKey: String?
+    private var strengthTimedGoalHapticDeliveredKey: String?
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
     private var coachEventLedger = ATHLTHCoachEventLedger()
@@ -1102,12 +1107,71 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             from: previous,
             to: accepted
         )
+        refreshStrengthTimedGoalHaptic()
         synchronizeHybridTreadmillSensors()
         persistWorkoutRecoveryState()
         if kind == .strength && mirroringActive {
             // Reflect iPhone-initiated exercise and rest changes immediately
             // on the lock screen rather than waiting for the next HR tick.
             Task { await sendLiveSnapshot(force: true) }
+        }
+    }
+
+    /// Schedule one Watch haptic at the *absolute* target deadline, not
+    /// from the SwiftUI display refresh. This survives scrolling and does not
+    /// require the user to look at the watch face.
+    private func refreshStrengthTimedGoalHaptic() {
+        guard let snapshot = strengthSession,
+              snapshot.targetKindRaw == "time",
+              !snapshot.isResting,
+              !snapshot.currentExerciseComplete,
+              let timer = snapshot.timedSetCountdown else {
+            strengthTimedGoalHapticTask?.cancel()
+            strengthTimedGoalHapticTask = nil
+            strengthTimedGoalHapticScheduleKey = nil
+            // Reset when the active set is cleared or the workout advances.
+            strengthTimedGoalHapticDeliveredKey = nil
+            return
+        }
+
+        let setKey = "\(snapshot.workoutID.uuidString):\(snapshot.exerciseIndex):\(snapshot.setIndex)"
+        guard strengthTimedGoalHapticDeliveredKey != setKey else { return }
+        guard timer.isRunning, let resumedAt = timer.resumedAt else {
+            strengthTimedGoalHapticTask?.cancel()
+            strengthTimedGoalHapticTask = nil
+            strengthTimedGoalHapticScheduleKey = nil
+            return
+        }
+
+        let deadline = resumedAt.addingTimeInterval(timer.secondsAtPause)
+        let scheduleKey = "\(setKey):\(deadline.timeIntervalSince1970)"
+        guard strengthTimedGoalHapticScheduleKey != scheduleKey else { return }
+        strengthTimedGoalHapticTask?.cancel()
+        strengthTimedGoalHapticScheduleKey = scheduleKey
+        strengthTimedGoalHapticTask = Task { @MainActor [weak self] in
+            let delay = max(deadline.timeIntervalSinceNow, 0)
+            if delay > 0 {
+                try? await Task.sleep(for: .seconds(delay))
+            }
+            guard !Task.isCancelled, let self,
+                  let current = self.strengthSession,
+                  current.workoutID == snapshot.workoutID,
+                  current.exerciseIndex == snapshot.exerciseIndex,
+                  current.setIndex == snapshot.setIndex,
+                  current.targetKindRaw == "time",
+                  !current.isResting,
+                  !current.currentExerciseComplete,
+                  let currentTimer = current.timedSetCountdown,
+                  currentTimer.isRunning else { return }
+            if currentTimer.remaining(at: Date()) > 0.05 {
+                self.strengthTimedGoalHapticScheduleKey = nil
+                self.refreshStrengthTimedGoalHaptic()
+                return
+            }
+            guard self.strengthTimedGoalHapticDeliveredKey != setKey else { return }
+            self.strengthTimedGoalHapticDeliveredKey = setKey
+            self.strengthTimedGoalHapticScheduleKey = nil
+            WKInterfaceDevice.current().play(.notification)
         }
     }
 
@@ -2096,6 +2160,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         else { return }
         snapshot.updatedAt = now
         publish { self.strengthSession = snapshot }
+        refreshStrengthTimedGoalHaptic()
         persistWorkoutRecoveryState()
     }
 
@@ -2113,6 +2178,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         else { return }
         snapshot.updatedAt = now
         publish { self.strengthSession = snapshot }
+        refreshStrengthTimedGoalHaptic()
         persistWorkoutRecoveryState()
     }
 
@@ -2127,6 +2193,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         else { return }
         snapshot.updatedAt = now
         publish { self.strengthSession = snapshot }
+        refreshStrengthTimedGoalHaptic()
         persistWorkoutRecoveryState()
     }
 
