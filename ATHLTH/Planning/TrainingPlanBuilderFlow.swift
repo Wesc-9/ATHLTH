@@ -503,6 +503,25 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 0)
+                Button {
+                    // An explicit close leaves the recoverable workout draft;
+                    // the shared builder persists it on disappearance.
+                    closeInlineWorkoutBuilder()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Close (keep draft)",
+                            norwegian: "Lukk (behold utkast)"
+                        ),
+                        systemImage: "xmark"
+                    )
+                    .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.bordered)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Return to the plan without deleting the workout draft",
+                    norwegian: "Gå tilbake til planen uten å slette øktutkastet"
+                ))
             }
             .padding(.horizontal, 20)
             .frame(minHeight: 65)
