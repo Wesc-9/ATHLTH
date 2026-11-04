@@ -446,8 +446,9 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         AnyView(planPresentations)
     }
 
-    private var planNavigation: some View {
-        NavigationStack(path: $sourceRoute) {
+    // Footer buttons belong to the *plan* column. The workout editor
+    // owns its own sticky Save action in the right-hand column.
+    private var planCanvasWithActions: some View {
             ZStack {
                 ATHLTHPremiumCanvas(
                     accent:
@@ -459,6 +460,96 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 )
 
                 AnyView(content)
+            }
+            .safeAreaInset(edge: .bottom) {
+                if !showingCreatedPlan {
+                    if step == .mode {
+                        EmptyView()
+                    } else if step == .goal {
+                        AnyView(goalContinueBar)
+                    } else if step == .basics && mode == .advanced {
+                        AnyView(goalContinueBar)
+                    } else if step == .basics && mode == .basic {
+                        AnyView(simpleContinueBar)
+                    } else if step == .approach {
+                        AnyView(buildApproachContinueBar)
+                    } else if step == .source {
+                        AnyView(sourceContinueBar)
+                    } else {
+                        AnyView(bottomActionBar)
+                    }
+                }
+            }
+    }
+
+    private func inlineWorkoutPanel(
+        for selection: WeekDayEditorSelection
+    ) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: "square.and.pencil")
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "WORKOUT BUILDER", norwegian: "ØKTBYGGER"
+                    ))
+                    .font(.caption.weight(.semibold))
+                    .tracking(1.5)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Edit here. The plan stays open beside it.",
+                        norwegian: "Rediger her. Planen forblir åpen ved siden av."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 20)
+            .frame(minHeight: 65)
+            .background(.regularMaterial)
+
+            Divider()
+
+            plannedWorkoutBuilder(
+                for: selection,
+                onClose: { closeInlineWorkoutBuilder() }
+            )
+            .id("\(selectedPlanWeekIndex)-\(selection.id)")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+        .background(ATHLTHTrainDesign.canvas)
+    }
+
+    private var planNavigation: some View {
+        NavigationStack(path: $sourceRoute) {
+            GeometryReader { proxy in
+                HStack(spacing: 0) {
+                    // Keep the plan on the left while the workout on the
+                    // right edits the exact same week/day data. In narrow
+                    // Stage Manager windows the editor occupies the workspace
+                    // instead of shrinking the plan to an unusable column.
+                    if !studioFullscreenEditing ||
+                       composingAdvancedDay == nil ||
+                       proxy.size.width >= 900 {
+                        AnyView(planCanvasWithActions)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+
+                    if studioFullscreenEditing,
+                       let selection = composingAdvancedDay {
+                        ATHLTHTrainDesign.rule
+                            .frame(width: 1)
+
+                        inlineWorkoutPanel(for: selection)
+                            .frame(
+                                width: proxy.size.width >= 900
+                                    ? min(750, max(490, proxy.size.width * 0.56))
+                                    : max(1, proxy.size.width - 1)
+                            )
+                            .frame(maxHeight: .infinity)
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
             .navigationTitle(
                 ATHLTHLocalization.choose(
@@ -489,25 +580,6 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                         Button(backButtonTitle) {
                             goBack()
                         }
-                    }
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                if !showingCreatedPlan {
-                    if step == .mode {
-                        EmptyView()
-                    } else if step == .goal {
-                        AnyView(goalContinueBar)
-                    } else if step == .basics && mode == .advanced {
-                        AnyView(goalContinueBar)
-                    } else if step == .basics && mode == .basic {
-                        AnyView(simpleContinueBar)
-                    } else if step == .approach {
-                        AnyView(buildApproachContinueBar)
-                    } else if step == .source {
-                        AnyView(sourceContinueBar)
-                    } else {
-                        AnyView(bottomActionBar)
                     }
                 }
             }
