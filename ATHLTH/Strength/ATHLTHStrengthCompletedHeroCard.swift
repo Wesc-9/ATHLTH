@@ -148,8 +148,9 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                 }
 
                 if !profile.activations.isEmpty {
-                    // The figures reach the full artwork height; do not
-                    // embed a tiny muscle-map card within the image.
+                    // In strength details, keep both atlas orientations on the
+                    // right, above the metric tiles. Other uses of this shared
+                    // artwork retain their original full-height muscle map.
                     StrengthMuscleMapView(
                         profile: profile,
                         compact: true,
@@ -159,12 +160,18 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         regionTints: sessionRegionTints
                     )
                     .frame(
-                        width: tight ? min(cardWidth * 0.60, 210) : min(cardWidth * 0.88, 390),
-                        height: cardHeight * (tight ? 0.94 : 0.98)
+                        width: trainDetailStyle
+                            ? min(cardWidth * 0.56, 240)
+                            : (tight ? min(cardWidth * 0.60, 210) : min(cardWidth * 0.88, 390)),
+                        height: cardHeight * (trainDetailStyle ? 0.72 : (tight ? 0.94 : 0.98))
                     )
+                    // The slightly narrower silhouettes leave a clear space for
+                    // the title, focus label and two information tiles.
+                    .scaleEffect(x: trainDetailStyle ? 0.81 : 1, y: 1, anchor: .trailing)
                     .frame(maxWidth: .infinity, maxHeight: .infinity,
-                           alignment: .topTrailing)
-                    .padding(.trailing, tight ? 6 : (small ? 2 : 12))
+                           alignment: trainDetailStyle ? .bottomTrailing : .topTrailing)
+                    .padding(.trailing, trainDetailStyle ? 10 : (tight ? 6 : (small ? 2 : 12)))
+                    .offset(y: trainDetailStyle ? -cardHeight * 0.10 : 0)
                     .allowsHitTesting(false)
                 }
 
