@@ -1383,6 +1383,9 @@ enum WatchStrengthCommandKind: String, Codable, Hashable {
     case completeSet
     case completeSetWithoutDetails
     case skipRest
+    /// One atomic command: end rest and start the upcoming timed set.
+    /// Avoids a race where a second start command can be dropped in transit.
+    case skipRestAndStartTimedSet
     case addRest
     case nextExercise
     case requestSnapshot
