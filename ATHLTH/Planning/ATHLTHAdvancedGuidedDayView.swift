@@ -21,6 +21,7 @@ struct ATHLTHAdvancedGuidedDayView: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var confirmingRestReplacement = false
+    @State private var showingDayPicker = false
     @State private var composingGroup: WorkoutBlockGroupKind?
     private let ink = ATHLTHTrainDesign.ink
     private let secondary = ATHLTHTrainDesign.secondary
@@ -110,33 +111,8 @@ struct ATHLTHAdvancedGuidedDayView: View {
                         .tracking(1.4)
                         .foregroundStyle(secondary)
                     Spacer()
-                    Menu {
-                        ForEach(0..<max(1, totalWeeks), id: \.self) { week in
-                            Section {
-                                ForEach(0..<7, id: \.self) { offset in
-                                    let absoluteDay = week * 7 + offset
-                                    Button {
-                                        onSelectDay(absoluteDay)
-                                    } label: {
-                                        if absoluteDay == (weekNumber - 1) * 7 + dayIndex {
-                                            Label(
-                                                dayDate(absoluteDay).formatted(
-                                                    .dateTime.weekday(.wide).day().month()
-                                                ),
-                                                systemImage: "checkmark"
-                                            )
-                                        } else {
-                                            Text(dayDate(absoluteDay).formatted(
-                                                .dateTime.weekday(.wide).day().month()
-                                            ))
-                                        }
-                                    }
-                                }
-                            } header: {
-                                // Menu section headers are non-interactive.
-                                Text(tr("WEEK", "UKE") + " \(week + 1)")
-                            }
-                        }
+                    Button {
+                        showingDayPicker = true
                     } label: {
                         Label(tr("Change day", "Skift dag"), systemImage: "chevron.down")
                             .font(.system(size: 10, weight: .medium))
@@ -144,6 +120,11 @@ struct ATHLTHAdvancedGuidedDayView: View {
                             .padding(.horizontal, 11)
                             .frame(height: 30)
                             .background(.white.opacity(0.85), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .popover(isPresented: $showingDayPicker, arrowEdge: .top) {
+                        allPlanDaysPicker
+                            .presentationCompactAdaptation(.popover)
                     }
                 }
                 Text(date.formatted(.dateTime.weekday(.wide)).capitalized)
@@ -157,6 +138,71 @@ struct ATHLTHAdvancedGuidedDayView: View {
         }
         .frame(height: typeSize.isAccessibilitySize ? 155 : 128)
         .clipped()
+    }
+
+    /// One continuous scrollable list of *every* date in the plan.
+    /// Week labels are visual dividers only, never navigation or submenus.
+    /// A 4-week plan contains 28 individual date buttons in the same list.
+    private var allPlanDaysPicker: some View {
+        ScrollViewReader { scrollProxy in
+            ScrollView(.vertical) {
+                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: []) {
+                    ForEach(0..<max(1, totalWeeks), id: \.self) { week in
+                        Text(tr("WEEK", "UKE") + " \(week + 1)")
+                            .font(.system(size: 11, weight: .semibold))
+                            .tracking(1.4)
+                            .foregroundStyle(secondary)
+                            .padding(.horizontal, 18)
+                            .padding(.top, week == 0 ? 15 : 19)
+                            .padding(.bottom, 6)
+                            .accessibilityAddTraits(.isHeader)
+
+                        ForEach(0..<7, id: \.self) { weekday in
+                            let absoluteDay = week * 7 + weekday
+                            let isSelected = absoluteDay == (weekNumber - 1) * 7 + dayIndex
+
+                            Button {
+                                onSelectDay(absoluteDay)
+                                showingDayPicker = false
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Text(dayDate(absoluteDay).formatted(
+                                        .dateTime.weekday(.wide).day().month()
+                                    ))
+                                        .font(.system(size: 16))
+                                        .foregroundStyle(ink)
+                                    Spacer(minLength: 8)
+                                    if isSelected {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundStyle(gold)
+                                    }
+                                }
+                                .frame(minHeight: 48)
+                                .padding(.horizontal, 18)
+                                .contentShape(Rectangle())
+                                .background(isSelected ? gold.opacity(0.10) : Color.clear)
+                            }
+                            .buttonStyle(.plain)
+                            .id(absoluteDay)
+                        }
+
+                        if week < max(1, totalWeeks) - 1 {
+                            Divider()
+                                .padding(.horizontal, 18)
+                        }
+                    }
+                }
+            }
+            .frame(width: 330, height: 460)
+            .background(canvas)
+            .onAppear {
+                // Keep the currently selected date near the visible portion,
+                // but all earlier/later weeks remain in this *same* list.
+                let selected = (weekNumber - 1) * 7 + dayIndex
+                scrollProxy.scrollTo(selected, anchor: .center)
+            }
+        }
     }
 
     private func dayDate(_ absoluteDay: Int) -> Date {
