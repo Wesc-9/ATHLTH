@@ -332,7 +332,7 @@ struct ATHLTHStudioPlanOverviewView: View {
                     .font(.caption)
                     .foregroundStyle(
                         !training.isEmpty && completed == training.count
-                            ? ATHLTHStudioStyle.gold : .secondary
+                            ? ATHLTHStudioStyle.gold : Color.secondary
                     )
             }
             .padding(.vertical, display == .progress ? 8 : 6)
