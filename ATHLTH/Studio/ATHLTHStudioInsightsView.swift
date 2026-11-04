@@ -12,6 +12,19 @@ struct ATHLTHStudioInsightsView: View {
         ATHLTHStudioAnalytics.snapshot(from: health.workouts, days: periodDays)
     }
 
+    private var previousPeriod: ATHLTHStudioAnalytics.Snapshot {
+        let anchor = Calendar.current.date(byAdding: .day, value: -periodDays, to: .now) ?? .now
+        return ATHLTHStudioAnalytics.snapshot(from: health.workouts, days: periodDays, now: anchor)
+    }
+
+    private var trainingTimeChange: String {
+        guard previousPeriod.minutes > 0 else {
+            return ATHLTHLocalization.choose(english: "No previous baseline", norwegian: "Ingen tidligere sammenligning")
+        }
+        let delta = (result.minutes - previousPeriod.minutes) / previousPeriod.minutes * 100
+        return String(format: "%+.0f%%", delta)
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
@@ -49,6 +62,23 @@ struct ATHLTHStudioInsightsView: View {
                         title: ATHLTHLocalization.choose(english: "Strength", norwegian: "Styrke"),
                         value: "\(result.strengthSessions)",
                         note: ATHLTHLocalization.choose(english: "sessions", norwegian: "økter")
+                    )
+                }
+                HStack(spacing: 12) {
+                    ATHLTHStudioMetricCard(
+                        title: ATHLTHLocalization.choose(english: "Current duration", norwegian: "Nåværende varighet"),
+                        value: String(format: "%.1f h", result.minutes / 60),
+                        note: ATHLTHLocalization.choose(english: "Selected period", norwegian: "Valgt periode")
+                    )
+                    ATHLTHStudioMetricCard(
+                        title: ATHLTHLocalization.choose(english: "Previous duration", norwegian: "Forrige varighet"),
+                        value: String(format: "%.1f h", previousPeriod.minutes / 60),
+                        note: ATHLTHLocalization.choose(english: "Prior equal-length period", norwegian: "Foregående like lange periode")
+                    )
+                    ATHLTHStudioMetricCard(
+                        title: ATHLTHLocalization.choose(english: "Duration change", norwegian: "Endring i varighet"),
+                        value: trainingTimeChange,
+                        note: ATHLTHLocalization.choose(english: "Descriptive, not a readiness score", norwegian: "Beskrivende, ikke restitusjonsscore")
                     )
                 }
                 HStack(alignment: .top, spacing: 16) {

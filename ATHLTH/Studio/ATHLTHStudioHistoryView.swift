@@ -6,6 +6,7 @@ struct ATHLTHStudioHistoryView: View {
     @EnvironmentObject private var health: HealthKitManager
     let onInspect: (WorkoutSummary) -> Void
     @State private var searchText = ""
+    @State private var showsFullReplay = false
 
     private var workouts: [WorkoutSummary] {
         let ordered = health.workouts.sorted { $0.startDate > $1.startDate }
@@ -34,11 +35,27 @@ struct ATHLTHStudioHistoryView: View {
                     .foregroundStyle(.secondary)
                 }
                 Spacer()
+                Button {
+                    showsFullReplay.toggle()
+                } label: {
+                    Label(
+                        showsFullReplay
+                            ? ATHLTHLocalization.choose(english: "Zone inspector", norwegian: "Soneoversikt")
+                            : "ATHLTH Replay",
+                        systemImage: showsFullReplay ? "heart.text.square" : "point.topleft.down.curvedto.point.bottomright.up"
+                    )
+                }
+                .buttonStyle(.bordered)
                 Text("\(workouts.count)").foregroundStyle(.secondary)
             }
             .padding(.horizontal, 24)
             .padding(.top, 25)
 
+            if showsFullReplay {
+                // Existing rich workout replay includes maps, completed
+                // workout history and strength entries beyond Health summaries.
+                WorkoutHistoryView()
+            } else {
             List(workouts) { workout in
                 Button {
                     onInspect(workout)
@@ -71,6 +88,7 @@ struct ATHLTHStudioHistoryView: View {
             .searchable(text: $searchText, prompt: ATHLTHLocalization.choose(
                 english: "Search workout type or date", norwegian: "Søk på aktivitet eller dato"
             ))
+            }
         }
         .background(ATHLTHStudioStyle.canvas)
     }

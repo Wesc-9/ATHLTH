@@ -39,6 +39,7 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var selection: ATHLTHStudioDestination = .overview
     @State private var selectedWorkout: WorkoutSummary?
     @State private var showingInspector = false
+    @State private var inspectorShowsCoach = false
 
     private let canvas = Color(red: 0.985, green: 0.979, blue: 0.965)
     private let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
@@ -71,7 +72,8 @@ struct ATHLTHiPadStudioRootView: View {
                     .toolbar {
                         ToolbarItem(placement: .topBarTrailing) {
                             Button {
-                                selection = .coach
+                                inspectorShowsCoach = true
+                                showingInspector = true
                             } label: {
                                 Label("ATHLTH Coach", systemImage: "sparkles")
                             }
@@ -82,7 +84,10 @@ struct ATHLTHiPadStudioRootView: View {
         .navigationSplitViewStyle(.balanced)
         .tint(gold)
         .inspector(isPresented: $showingInspector) {
-            if let selectedWorkout {
+            if inspectorShowsCoach {
+                RecoveryCoachInboxDestinationView()
+                    .inspectorColumnWidth(min: 300, ideal: 370, max: 480)
+            } else if let selectedWorkout {
                 ATHLTHStudioWorkoutInspectionView(workout: selectedWorkout)
                     .inspectorColumnWidth(min: 270, ideal: 320, max: 400)
             }
@@ -177,6 +182,7 @@ struct ATHLTHiPadStudioRootView: View {
 
     private func inspect(_ workout: WorkoutSummary) {
         selectedWorkout = workout
+        inspectorShowsCoach = false
         showingInspector = true
     }
 }
