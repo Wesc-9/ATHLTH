@@ -497,7 +497,7 @@ struct LibraryHubCollectionRow: View {
 /// My Workouts unifies the two existing sources without duplicating them
 /// on the library home screen. Opening either source still uses its existing
 /// editor and launching behavior.
-private struct LibrarySavedWorkoutsHubView: View {
+struct LibrarySavedWorkoutsHubView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     let onStartRunning: (RunningWorkoutTemplate) -> Void
