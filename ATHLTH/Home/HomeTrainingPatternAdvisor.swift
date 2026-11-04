@@ -374,8 +374,11 @@ enum HomeTrainingPatternAdvisor {
             // when that muscle group has had time since its last session.
             let eligibleStrength = snapshot.routines
                 .filter {
-                    snapshot.daysSince($0.lastPerformed) >= 3 &&
-                    $0.occurrences42Days >= 2
+                    let days = snapshot.daysSince($0.lastPerformed)
+                    let typicalGap = strength?.usualGapDays ?? 7
+                    return days >= 3 &&
+                        days <= Int(max(10, min(21, typicalGap * 2.5))) &&
+                        $0.occurrences42Days >= 2
                 }
                 .sorted {
                     let ld = snapshot.daysSince($0.lastPerformed)
@@ -422,8 +425,12 @@ enum HomeTrainingPatternAdvisor {
                             minutes: min(max(runs?.usualMinutes ?? 30, 20), 45)
                         )
                     } else {
+                        let historicMinutes = min(
+                            max(runs?.usualMinutes ?? 25, 15), 45
+                        )
                         choice = .easyRun(
-                            minutes: min(max(runs?.usualMinutes ?? 25, 15), 45)
+                            minutes: normalReturn
+                                ? historicMinutes : min(historicMinutes, 20)
                         )
                     }
                     explanation = normalReturn
@@ -436,7 +443,15 @@ enum HomeTrainingPatternAdvisor {
                             "Det er \(daysSinceRun) dager siden siste registrerte løpetur, lenger enn ditt vanlige opphold. Start med en kortere, rolig økt."
                         )
                 case .walking:
-                    choice = .easyWalk(minutes: min(max(walk?.usualMinutes ?? 25, 15), 75))
+                    let previousLength = min(
+                        max(walk?.usualMinutes ?? 25, 15), 75
+                    )
+                    let daysOff = walk?.daysSinceLast ?? 90
+                    let expected = walk?.usualGapDays ?? 7
+                    choice = .easyWalk(
+                        minutes: daysOff > Int(max(4, expected * 1.7))
+                            ? min(previousLength, 25) : previousLength
+                    )
                     explanation = tr(
                         "Walking is your usual activity, so the recommendation follows your walking history.",
                         "Gåturer er din vanlige aktivitet, derfor tar anbefalingen utgangspunkt i turhistorikken din."
