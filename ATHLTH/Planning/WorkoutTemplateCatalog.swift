@@ -4436,7 +4436,8 @@ struct WorkoutTemplateBuilderView: View {
                 }
                 ToolbarItem(placement: .cancellationAction) {
                     Button(tr("Cancel", "Avbryt")) {
-                        if !blocks.isEmpty || !title.isEmpty {
+                        if !blocks.isEmpty || !title.isEmpty ||
+                           selectedRouteID != nil || !studioVisiblePhases.isEmpty {
                             showingDiscardConfirmation = true
                         } else {
                             dismiss()
@@ -4444,20 +4445,28 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
             }
-            .confirmationDialog(
-                tr("Discard workout?", "Forkaste treningsøkten?"),
-                isPresented: $showingDiscardConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button(tr("Discard", "Forkast"), role: .destructive) {
-                    draftFinished = true
-                    UserDefaults.standard.removeObject(forKey: draftStorageKey)
-                    dismiss()
-                }
-                Button(tr("Keep editing", "Fortsett å redigere"), role: .cancel) {}
-            } message: {
-                Text(tr("A recoverable local draft is kept until you discard or save.",
-                        "Utkastet er lagret lokalt til du forkaster eller lagrer det."))
+            .sheet(isPresented: $showingDiscardConfirmation) {
+                ATHLTHDiscardDraftSheet(
+                    kind: .workout,
+                    onKeepEditing: {
+                        showingDiscardConfirmation = false
+                    },
+                    onSaveDraftAndClose: {
+                        // The existing local checkpoint is the recoverable
+                        // draft; do not silently create a scheduled workout.
+                        persistWorkoutDraft()
+                        showingDiscardConfirmation = false
+                        dismiss()
+                    },
+                    onDiscard: {
+                        // The onDisappear draft observer must not recreate
+                        // the deleted checkpoint after dismissing this view.
+                        draftFinished = true
+                        UserDefaults.standard.removeObject(forKey: draftStorageKey)
+                        showingDiscardConfirmation = false
+                        dismiss()
+                    }
+                )
             }
             .sheet(item: $selectedExerciseInfo) { block in
                 ATHLTHLinkedExerciseDetailView(block: block)
