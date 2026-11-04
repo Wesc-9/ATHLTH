@@ -2265,6 +2265,10 @@ struct ActiveStrengthWorkoutView: View {
                         ) {
                             showingQuickAISuggestion = true
                         }
+                        .accessibilityHint(ATHLTHLocalization.choose(
+                            english: "Tap for one recommended exercise. Touch and hold to add several.",
+                            norwegian: "Trykk for én anbefalt øvelse. Hold inne for å legge til flere."
+                        ))
                         .contextMenu {
                             Button {
                                 showingQuickAISuggestion = true
@@ -7229,7 +7233,7 @@ struct ActiveStrengthWorkoutView: View {
                                                 .premiumGold
                                                 .opacity(0.30),
                                             ATHLTHTheme
-                                                .vitality
+                                                .premiumGold
                                                 .opacity(0.16)
                                         ],
                                         startPoint:
@@ -7582,7 +7586,7 @@ struct ActiveStrengthWorkoutView: View {
                         Color.white
                             .opacity(0.62),
                         ATHLTHTheme
-                            .surfaceSage
+                            .premiumGoldSoft
                             .opacity(0.26),
                         ATHLTHTheme
                             .premiumGoldSoft
@@ -7613,7 +7617,7 @@ struct ActiveStrengthWorkoutView: View {
                                 .premiumGold
                                 .opacity(0.16),
                             ATHLTHTheme
-                                .vitality
+                                .premiumGold
                                 .opacity(0.12)
                         ],
                         startPoint:
