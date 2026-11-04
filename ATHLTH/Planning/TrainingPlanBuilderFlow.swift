@@ -824,10 +824,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             addingExtraWorkout = false
         }) { selection in
             WorkoutTemplateBuilderView(
-                initialQuickAdd: studioInitialQuickAdd,
-                initialPhase: studioInitialPhase,
                 initialTitle: quickStudioOption?.title ??
                     (addingExtraWorkout ? "" : (selectedWorkoutForEditor(day: selection.id)?.title ?? "")),
+                initialQuickAdd: studioInitialQuickAdd,
+                initialPhase: studioInitialPhase,
                 initialBlocks: quickStudioOption.map { quickDaySeed($0) } ??
                     (addingExtraWorkout ? [] : (selectedWorkoutForEditor(day: selection.id)?.blocks ?? [])),
                 initialRouteID: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeID,
