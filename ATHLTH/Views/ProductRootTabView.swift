@@ -2105,6 +2105,24 @@ struct ATHLTHHomeView: View {
                 )
                 return
             }
+            // History-backed strength suggestions must use the existing
+            // strength workout engine. Never launch them as a walking/running
+            // recorder just because they came from the Home recommendation.
+            if workout.kind == .strength {
+                if device == .appleWatch && !watchConnection.isReady {
+                    homeWatchTransferError = ATHLTHLocalization.choose(
+                        english: "Apple Watch is unavailable. Start with iPhone instead.",
+                        norwegian: "Apple Watch er ikke tilgjengelig. Start med iPhone i stedet."
+                    )
+                    return
+                }
+                if device == .iPhone && workout.isStructuredWorkout {
+                    selectedHomeStructuredWorkout = workout
+                } else {
+                    startHomePlannedStrengthWorkout(workout, device: device)
+                }
+                return
+            }
             if device == .appleWatch {
                 guard watchConnection.isReady else {
                     homeWatchTransferError = ATHLTHLocalization.choose(
