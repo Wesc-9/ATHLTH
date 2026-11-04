@@ -188,6 +188,37 @@ final class ATHLTHPlanCreationDraftTests: XCTestCase {
                       "Deleting an already missing draft is safe")
     }
 
+    func testDeleteOneDraftDoesNotDeleteOtherDraftsForSameAthlete() throws {
+        let (settings, suite) = defaults()
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ATHLTHPlanDraftSelectiveDelete.\(UUID().uuidString)",
+                                    isDirectory: true)
+        defer {
+            settings.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        let athlete = UUID()
+        let discardID = UUID()
+        let keepID = UUID()
+        let store = ATHLTHPlanCreationDraftStore(
+            defaults: settings, directoryURL: folder
+        )
+        store.save(draft(name: "Discard this plan"), userID: athlete,
+                   draftID: discardID)
+        store.save(draft(name: "Keep this plan"), userID: athlete,
+                   draftID: keepID)
+        store.setEditing(true, userID: athlete, draftID: discardID)
+        XCTAssertEqual(store.records(userID: athlete).count, 2)
+
+        XCTAssertTrue(store.deleteDraft(userID: athlete, draftID: discardID))
+        XCTAssertNil(store.load(userID: athlete, draftID: discardID))
+        XCTAssertFalse(store.wasEditing(userID: athlete, draftID: discardID))
+        XCTAssertEqual(store.load(userID: athlete, draftID: keepID)?.title,
+                       "Keep this plan")
+        XCTAssertEqual(store.records(userID: athlete).count, 1)
+        XCTAssertEqual(store.records(userID: athlete).first?.draftID, keepID)
+    }
+
     func testDeleteDraftClearsLegacyCheckpointWithoutTouchingStoredPlans() throws {
         let (settings, suite) = defaults()
         let folder = FileManager.default.temporaryDirectory
