@@ -75,6 +75,19 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                 if previous != nil && current == nil {
                     spotify.endLinkedWorkoutPlaybackSession()
                 }
+                syncStrengthLiveActivity()
+            }
+            .onChange(of: strengthWorkout.currentExerciseIndex) { _, _ in
+                syncStrengthLiveActivity()
+            }
+            .onChange(of: strengthWorkout.currentSetIndex) { _, _ in
+                syncStrengthLiveActivity()
+            }
+            .onChange(of: strengthWorkout.restEndsAt) { _, _ in
+                syncStrengthLiveActivity()
+            }
+            .onChange(of: strengthWorkout.activeWorkout?.totalCompletedSets) { _, _ in
+                syncStrengthLiveActivity()
             }
             .onChange(
                 of:
@@ -132,6 +145,16 @@ struct ATHLTHSurfaceRuntimeObserver: View {
                         )
                 }
             }
+    }
+
+    private func syncStrengthLiveActivity() {
+        let selected = ATHLTHLiveWorkoutSnapshotSelection.resolve(
+            mirroredWatch: workoutMirroring.snapshot,
+            phoneWorkout: phoneWorkout.currentLiveSnapshot()
+        )
+        ATHLTHSurfaceCoordinator.syncLiveActivity(
+            with: enrichedWorkoutSnapshot(selected)
+        )
     }
 
     private func publishSurface() {
@@ -373,6 +396,19 @@ struct ATHLTHSurfaceRuntimeObserver: View {
     ) -> WatchWorkoutLiveSnapshot? {
         guard var snapshot else {
             return nil
+        }
+
+        // The source Watch mirror can lag behind an iPhone set transition.
+        // Keep its pulse/recording data, but read the current exercise and
+        // rest state from the authoritative active strength session.
+        if let current = strengthWorkout.activeWorkout,
+           current.captureDevice == .appleWatch {
+            snapshot = ATHLTHLiveWorkoutSnapshotSelection.enrichStrength(
+                snapshot,
+                local: strengthWorkout.watchSnapshot,
+                localStartedAt: current.startedAt,
+                displayName: strengthWorkout.currentExercise?.exercise.displayName
+            ) ?? snapshot
         }
 
         if let reference =
