@@ -720,7 +720,7 @@ struct ATHLTHWorkoutLiveActivity: Widget {
                     Spacer(minLength: 0)
                 }
             }
-            .frame(height: 29)
+            .frame(minHeight: 36)
 
             Rectangle()
                 .fill(ATHLTHWidgetPalette.ink.opacity(0.09))
