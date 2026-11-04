@@ -111,7 +111,8 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .navigationSplitViewStyle(.balanced)
-        // All child plan flows use the same iPhone editors, shown full-screen on iPad.
+        // iPhone/iPad share the workout engine; only Studio navigation and
+        // adaptive side-by-side presentation differ on iPad.
         .environment(\.athlthStudioFullscreenEditing, true)
         .tint(gold)
         .fullScreenCover(isPresented: $showingTrain) {
