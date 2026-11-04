@@ -111,9 +111,30 @@ struct ATHLTHAdvancedGuidedDayView: View {
                         .foregroundStyle(secondary)
                     Spacer()
                     Menu {
-                        ForEach(0..<7, id: \.self) { offset in
-                            Button(dayDate(offset).formatted(.dateTime.weekday(.wide).day().month())) {
-                                onSelectDay(offset)
+                        ForEach(0..<max(1, totalWeeks), id: \.self) { week in
+                            Section {
+                                ForEach(0..<7, id: \.self) { offset in
+                                    let absoluteDay = week * 7 + offset
+                                    Button {
+                                        onSelectDay(absoluteDay)
+                                    } label: {
+                                        if absoluteDay == (weekNumber - 1) * 7 + dayIndex {
+                                            Label(
+                                                dayDate(absoluteDay).formatted(
+                                                    .dateTime.weekday(.wide).day().month()
+                                                ),
+                                                systemImage: "checkmark"
+                                            )
+                                        } else {
+                                            Text(dayDate(absoluteDay).formatted(
+                                                .dateTime.weekday(.wide).day().month()
+                                            ))
+                                        }
+                                    }
+                                }
+                            } header: {
+                                // Menu section headers are non-interactive.
+                                Text(tr("WEEK", "UKE") + " \(week + 1)")
                             }
                         }
                     } label: {
@@ -138,9 +159,9 @@ struct ATHLTHAdvancedGuidedDayView: View {
         .clipped()
     }
 
-    private func dayDate(_ offset: Int) -> Date {
+    private func dayDate(_ absoluteDay: Int) -> Date {
         Calendar.current.date(byAdding: .day,
-            value: (weekNumber - 1) * 7 + offset,
+            value: absoluteDay,
             to: Calendar.current.startOfDay(for: startDate)) ?? date
     }
 
