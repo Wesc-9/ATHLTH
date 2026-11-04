@@ -3,6 +3,7 @@ import SwiftUI
 
 struct PlannedWorkoutDetailView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var settings: AppSettingsStore
@@ -277,7 +278,7 @@ struct PlannedWorkoutDetailView: View {
                 }
                 .environmentObject(session)
             }
-            .sheet(isPresented: $showingEditor) {
+            .athlthStudioEditor(isPresented: $showingEditor, useFullScreen: studioFullscreenEditing) {
                 SessionEditorView(
                     planID: planID,
                     workout: currentWorkout
