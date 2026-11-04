@@ -908,8 +908,6 @@ struct ATHLTHHomeView: View {
     @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @Environment(\.dynamicTypeSize) private var homeDynamicTypeSize
-    @SceneStorage("homeHeroUtilityToolbarExpanded.v1")
-    private var homeHeroToolbarExpanded = true
     @EnvironmentObject private var goalStore: GoalStore
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
     @EnvironmentObject private var community: CommunityEventStore
@@ -925,7 +923,6 @@ struct ATHLTHHomeView: View {
     @State private var homeStreakDays: [Date]?
     @State private var lastHomeInitialLoadAt: Date?
     @State private var homeInitialLoadAccountID: UUID?
-    @State private var showingGlobalSearch = false
     @State private var showingHomeTodayCalendarAll = false
     @State private var showingHomeCalendarWorkoutPicker = false
     @State private var homeCalendarPendingKind: WorkoutKind?
@@ -1022,69 +1019,7 @@ struct ATHLTHHomeView: View {
                         .padding(.top, 60)
                     }
 
-                    // Compact premium toolbar: keep the original larger
-                    // profile avatar visible in both states.
-                    HStack(spacing: 0) {
-                        HomeHeroUtilityButtons(
-                            challengeInviteUnreadCount:
-                                social.inboxEvents.filter {
-                                    $0.kind == "challenge_invite" &&
-                                    $0.readAt == nil
-                                }.count,
-                            pendingWorkoutImportCount:
-                                health.pendingWorkoutImportCount,
-                            expanded: $homeHeroToolbarExpanded,
-                            onSearch: {
-                                showingGlobalSearch = true
-                            }
-                        )
 
-                        // The profile avatar remains visible and tappable in
-                        // both expanded and collapsed Home toolbar states.
-                        NavigationLink {
-                            ATHLTHProfileView()
-                        } label: {
-                            homeProfileShortcut
-                                .frame(width: 52, height: 52)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(
-                            ATHLTHLocalization.choose(
-                                english: "Profile", norwegian: "Profil"
-                            )
-                        )
-                    }
-                    .padding(.horizontal, 4)
-                    .background {
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Capsule()
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                .white.opacity(0.22),
-                                                .white.opacity(0.04)
-                                            ],
-                                            startPoint: .top,
-                                            endPoint: .bottom
-                                        )
-                                    )
-                                    .allowsHitTesting(false)
-                            }
-                    }
-                    .overlay {
-                        Capsule()
-                            .strokeBorder(
-                                Color.white.opacity(0.48),
-                                lineWidth: 0.8
-                            )
-                            .allowsHitTesting(false)
-                    }
-                    .shadow(color: .black.opacity(0.11), radius: 9, y: 4)
-                    .padding(.top, 60)
-                    .padding(.trailing, 16)
                 }
             } content: {
                 LazyVStack(spacing: 12) {
@@ -1428,18 +1363,6 @@ struct ATHLTHHomeView: View {
                     friendsRefresh
                 )
             }
-            // Present search outside Home's refreshable environment so its
-            // scroll view never inherits Home's pull-to-refresh action.
-            .athlthStablePresentationBoundary()
-            .sheet(isPresented: $showingGlobalSearch) {
-                ATHLTHGlobalSearchView()
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                    // Scroll results normally; the native sheet handle
-                    // remains available for a downward swipe back to Home.
-                    .presentationContentInteraction(.scrolls)
-                    .presentationCornerRadius(30)
-            }
             .sheet(item: $selectedHomeRecommendedWorkout) { workout in
                 HomeDailyRecommendedWorkoutSheet(
                     workout: workout,
@@ -1736,49 +1659,6 @@ struct ATHLTHHomeView: View {
         }
 
         return streak
-    }
-
-    @ViewBuilder
-    private var homeProfileShortcut: some View {
-        if let avatarURL = session.profile.avatarURL {
-            ATHLTHStorageImage(
-                url: avatarURL,
-                maxPixelSize: 180
-            ) { phase in
-                switch phase {
-                case .success(let image):
-                    image
-                        .resizable()
-                        .scaledToFill()
-                default:
-                    Circle()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Image(systemName: "person.fill")
-                                .foregroundStyle(.white)
-                        }
-                }
-            }
-            .frame(width: 46, height: 46)
-            .clipShape(Circle())
-            .overlay {
-                Circle()
-                    .stroke(.white.opacity(0.48), lineWidth: 1)
-            }
-        } else {
-            Circle()
-                .fill(.ultraThinMaterial)
-                .frame(width: 46, height: 46)
-                .overlay {
-                    Image(systemName: "person.fill")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.white)
-                }
-                .overlay {
-                    Circle()
-                        .stroke(.white.opacity(0.48), lineWidth: 1)
-                }
-        }
     }
 
     private var homeHealthSourceText: String {
@@ -5581,204 +5461,6 @@ private struct ATHLTHTrainPlanWorkspaceView: View {
             )
         )
         .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-private struct HomeHeroUtilityButtons: View {
-    @EnvironmentObject private var notifications:
-        ATHLTHNotificationStore
-    @EnvironmentObject private var messaging:
-        MessagingStore
-    @Environment(\.accessibilityReduceMotion)
-    private var reduceMotion
-
-    let challengeInviteUnreadCount: Int
-    let pendingWorkoutImportCount: Int
-    @Binding var expanded: Bool
-    let onSearch: () -> Void
-
-    private var inboxUnreadCount: Int {
-        messaging.unreadCount +
-            messaging.messageRequestCount +
-            challengeInviteUnreadCount
-    }
-
-    private var notificationCount: Int {
-        notifications.notificationCenterUnreadCount +
-            pendingWorkoutImportCount
-    }
-
-    var body: some View {
-        HStack(spacing: 0) {
-            Button(action: toggleExpanded) {
-                ZStack(alignment: .topTrailing) {
-                    Image(systemName: expanded
-                          ? "chevron.right" : "chevron.left")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(.white.opacity(0.96))
-                        .frame(width: 23, height: 23)
-                        .background(Color.black.opacity(0.22), in: Circle())
-                        .overlay {
-                            Circle()
-                                .strokeBorder(
-                                    Color.white.opacity(0.32),
-                                    lineWidth: 0.7
-                                )
-                                .allowsHitTesting(false)
-                        }
-
-                    // Surface pending updates even in the compact state.
-                    if !expanded &&
-                        (inboxUnreadCount > 0 || notificationCount > 0) {
-                        Circle()
-                            .fill(Color.red)
-                            .frame(width: 7, height: 7)
-                            .offset(x: 1, y: -1)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .frame(width: 37, height: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: expanded
-                    ? "Hide Home shortcuts" : "Show Home shortcuts",
-                norwegian: expanded
-                    ? "Skjul snarveier på Hjem"
-                    : "Vis snarveier på Hjem"
-            ))
-            .accessibilityHint(ATHLTHLocalization.choose(
-                english: "Tap or drag the arrow horizontally.",
-                norwegian: "Trykk eller dra pilen vannrett."
-            ))
-            .simultaneousGesture(
-                DragGesture(minimumDistance: 18, coordinateSpace: .local)
-                    .onEnded { value in
-                        finishHandleDrag(value.translation)
-                    }
-            )
-
-            if expanded {
-                // Search now sits immediately beside the compact handle.
-                heroButton(
-                    icon: "magnifyingglass",
-                    action: onSearch
-                )
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Search ATHLTH",
-                    norwegian: "Søk i ATHLTH"
-                ))
-
-                NavigationLink {
-                    MessageInboxDestinationView()
-                } label: {
-                    badgeButton(
-                        icon: inboxUnreadCount > 0
-                            ? "tray.full.fill" : "tray",
-                        count: inboxUnreadCount
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: inboxUnreadCount > 0
-                        ? "Inbox, \(inboxUnreadCount) unread"
-                        : "Inbox",
-                    norwegian: inboxUnreadCount > 0
-                        ? "Innboks, \(inboxUnreadCount) uleste"
-                        : "Innboks"
-                ))
-
-                NavigationLink {
-                    ATHLTHNotificationCenterView()
-                } label: {
-                    badgeButton(
-                        icon: notificationCount > 0
-                            ? "bell.fill" : "bell",
-                        count: notificationCount
-                    )
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: notificationCount > 0
-                        ? "Notifications, \(notificationCount) pending"
-                        : "Notifications",
-                    norwegian: notificationCount > 0
-                        ? "Varsler, \(notificationCount) nye"
-                        : "Varsler"
-                ))
-            }
-        }
-    }
-
-    private func toggleExpanded() {
-        setExpanded(!expanded)
-    }
-
-    private func finishHandleDrag(_ translation: CGSize) {
-        let shouldExpand = ATHLTHHomeToolbarDragPolicy.expanded(
-            currentlyExpanded: expanded,
-            translation: translation
-        )
-        guard shouldExpand != expanded else { return }
-        setExpanded(shouldExpand)
-    }
-
-    private func setExpanded(_ value: Bool) {
-        withAnimation(reduceMotion ? nil : .smooth(duration: 0.26)) {
-            expanded = value
-        }
-    }
-
-    private func heroButton(
-        icon: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.98))
-                .frame(width: 32, height: 32)
-                .background(.white.opacity(0.12), in: Circle())
-                .overlay {
-                    Circle().strokeBorder(.white.opacity(0.20), lineWidth: 0.6)
-                }
-                .frame(width: 42, height: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func badgeButton(
-        icon: String,
-        count: Int
-    ) -> some View {
-        ZStack(alignment: .topTrailing) {
-            Image(systemName: icon)
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(.white.opacity(0.98))
-                .frame(width: 32, height: 32)
-                .background(.white.opacity(0.12), in: Circle())
-                .overlay {
-                    Circle().strokeBorder(.white.opacity(0.20), lineWidth: 0.6)
-                }
-                .frame(width: 42, height: 44)
-                .contentShape(Rectangle())
-
-            if count > 0 {
-                Text(count > 99 ? "99+" : "\(count)")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white)
-                    .frame(minWidth: 15, minHeight: 15)
-                    .padding(.horizontal, count > 9 ? 2 : 0)
-                    .background(.red, in: Capsule())
-                    .overlay {
-                        Capsule().strokeBorder(.white.opacity(0.9), lineWidth: 0.8)
-                    }
-                    .offset(x: -3, y: -1)
-                    .allowsHitTesting(false)
-            }
-        }
     }
 }
 
