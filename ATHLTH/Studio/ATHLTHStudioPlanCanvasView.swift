@@ -98,11 +98,7 @@ struct ATHLTHStudioPlanCanvasView: View {
             .environment(\.athlthStudioFullscreenEditing, true)
         }
         .fullScreenCover(isPresented: $showingWorkoutFlow) {
-            ATHLTHTrainView(
-                navigationRequest: $workoutNavigation,
-                isActive: true
-            )
-            .environment(\.athlthStudioFullscreenEditing, true)
+            ATHLTHStudioTrainWorkspaceView(navigationRequest: $workoutNavigation)
         }
         .alert(
             ATHLTHLocalization.choose(
