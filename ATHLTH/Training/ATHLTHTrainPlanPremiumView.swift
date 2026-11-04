@@ -5,6 +5,7 @@ import SwiftUI
 struct ATHLTHTrainPlanPremiumView: View {
     @EnvironmentObject private var session: AppSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @EnvironmentObject private var goalStore: GoalStore
@@ -2030,7 +2031,7 @@ struct ATHLTHTrainPlanPremiumView: View {
 
     private var editingSheets: some View {
         AnyView(insightsSheets)
-        .sheet(isPresented: $showingEditor) {
+        .athlthStudioEditor(isPresented: $showingEditor, useFullScreen: studioFullscreenEditing) {
             if let plan {
                 ATHLTHTrainWeekBuilderView(
                     planID: plan.id,
@@ -2190,7 +2191,7 @@ struct ATHLTHTrainPlanPremiumView: View {
         .sheet(isPresented: $showingAIHelp) {
             CoachPlanAdaptationView()
         }
-        .sheet(item: $editingWorkout) { destination in
+        .athlthStudioEditor(item: $editingWorkout, useFullScreen: studioFullscreenEditing) { destination in
             ATHLTHTrainWorkoutBuilderView(
                 planID: destination.planID,
                 dayID: destination.dayID,
