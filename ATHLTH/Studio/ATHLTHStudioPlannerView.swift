@@ -8,6 +8,7 @@ struct ATHLTHStudioPlannerView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
     @State private var selectedWeekIndex = 0
+    @State private var showsAllWeeks = false
     @State private var showingTrainingEditor = false
     @State private var trainRequest: ATHLTHTrainNavigationRequest? = .plan
     @State private var additionalMinutes: Double = 30
@@ -55,8 +56,31 @@ struct ATHLTHStudioPlannerView: View {
                     let week = plan.weeks[safeWeek]
                     Text(plan.title)
                         .font(.title2.weight(.semibold))
-                    weekPicker(plan.weeks)
-                    weekLayout(week, plan: plan, weekIndex: safeWeek)
+                    HStack(spacing: 18) {
+                        Toggle(ATHLTHLocalization.choose(
+                            english: "Show entire training block", norwegian: "Vis hele treningsblokken"
+                        ), isOn: $showsAllWeeks)
+                        .toggleStyle(.switch)
+                        .fixedSize()
+                        Spacer()
+                        Text(ATHLTHLocalization.choose(
+                            english: "Select a week or inspect the entire block.",
+                            norwegian: "Velg én uke eller se hele treningsblokken."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    savedWorkoutLibrary
+                    if showsAllWeeks {
+                        LazyVStack(spacing: 16) {
+                            ForEach(Array(plan.weeks.enumerated()), id: \.element.id) { index, fullWeek in
+                                weekLayout(fullWeek, plan: plan, weekIndex: index)
+                            }
+                        }
+                    } else {
+                        weekPicker(plan.weeks)
+                        weekLayout(week, plan: plan, weekIndex: safeWeek)
+                    }
                     scenarioLab(week)
                 } else {
                     VStack(alignment: .leading, spacing: 12) {
@@ -100,6 +124,53 @@ struct ATHLTHStudioPlannerView: View {
         } message: {
             Text(moveError ?? "")
         }
+    }
+
+    private var savedWorkoutLibrary: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Label(ATHLTHLocalization.choose(
+                    english: "My saved workouts", norwegian: "Mine lagrede treningsøkter"
+                ), systemImage: "square.stack")
+                .font(.headline)
+                Spacer()
+                Text(ATHLTHLocalization.choose(
+                    english: "Drag a saved workout into a future plan day",
+                    norwegian: "Dra en lagret økt til en fremtidig dag i planen"
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            if session.savedWorkoutTemplates.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "Your saved workouts will appear here.",
+                    norwegian: "Lagrede treningsøkter vises her."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            } else {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 10) {
+                        ForEach(session.savedWorkoutTemplates.prefix(20)) { item in
+                            Label(item.title, systemImage: item.kind.systemImage)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                                .frame(minWidth: 145, minHeight: 46)
+                                .padding(.horizontal, 15)
+                                .background(ATHLTHStudioStyle.canvas, in: RoundedRectangle(cornerRadius: 13))
+                                .draggable("library:\(item.id.uuidString)")
+                                .accessibilityHint(ATHLTHLocalization.choose(
+                                    english: "Drag to a future day in the training plan",
+                                    norwegian: "Dra til en fremtidig dag i treningsplanen"
+                                ))
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .padding(20)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private func weekPicker(_ weeks: [TrainingPlanWeek]) -> some View {
@@ -203,30 +274,43 @@ struct ATHLTHStudioPlannerView: View {
         .background(ATHLTHStudioStyle.canvas, in: RoundedRectangle(cornerRadius: 15))
         .dropDestination(for: String.self) { values, _ in
             guard let raw = values.first,
-                  let workoutID = UUID(uuidString: raw),
                   let start = plan.startDate,
                   let target = Calendar.current.date(
                     byAdding: .day,
                     value: weekIndex * 7 + day.dayIndex - 1,
                     to: Calendar.current.startOfDay(for: start)
                   ) else { return false }
+            guard session.trainingPlan(withID: plan.id)?.version == plan.version,
+                  Calendar.current.startOfDay(for: target) >= Calendar.current.startOfDay(for: .now)
+            else { return false }
             let success: Bool
-            if dragMode == .copy {
-                success = session.copyPlanStudioWorkout(
+            if raw.hasPrefix("library:"),
+               let libraryID = UUID(uuidString: String(raw.dropFirst("library:".count))) {
+                success = session.insertSavedWorkoutIntoPlan(
+                    templateID: libraryID,
                     planID: plan.id,
-                    sourceWorkoutID: workoutID,
-                    targetDayID: day.id,
-                    expectedVersion: plan.version
+                    dayID: day.id
                 )
+            } else if let workoutID = UUID(uuidString: raw) {
+                if dragMode == .copy {
+                    success = session.copyPlanStudioWorkout(
+                        planID: plan.id,
+                        sourceWorkoutID: workoutID,
+                        targetDayID: day.id,
+                        expectedVersion: plan.version
+                    )
+                } else {
+                    success = session.movePlanStudioWorkout(
+                        planID: plan.id,
+                        workoutID: workoutID,
+                        targetDate: target,
+                        expectedVersion: plan.version,
+                        healthWorkouts: health.workouts,
+                        strengthHistory: strength.workoutHistory
+                    )
+                }
             } else {
-                success = session.movePlanStudioWorkout(
-                    planID: plan.id,
-                    workoutID: workoutID,
-                    targetDate: target,
-                    expectedVersion: plan.version,
-                    healthWorkouts: health.workouts,
-                    strengthHistory: strength.workoutHistory
-                )
+                return false
             }
             if !success {
                 moveError = ATHLTHLocalization.choose(
