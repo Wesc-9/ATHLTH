@@ -3422,6 +3422,37 @@ final class StrengthWorkoutStore: ObservableObject {
         persistWorkoutHistory()
     }
 
+    /// Edit the prescribed target for an earlier set without changing the
+    /// kilograms the athlete actually recorded. The active set index and
+    /// ongoing Watch recording must not move.
+    @discardableResult
+    func updateActiveSetTargetWeight(
+        exerciseID: UUID,
+        setID: UUID,
+        kilograms: Double?
+    ) -> Bool {
+        guard var workout = activeWorkout,
+              let exerciseIndex = workout.exercises.firstIndex(where: {
+                  $0.id == exerciseID
+              }),
+              let setIndex = workout.exercises[exerciseIndex].sets.firstIndex(where: {
+                  $0.id == setID
+              }),
+              workout.exercises[exerciseIndex].sets[setIndex].resolvedLoadKind ==
+                  .weightKilograms else { return false }
+        guard kilograms == nil ||
+                (kilograms!.isFinite && kilograms! >= 0 && kilograms! <= 999.5)
+        else { return false }
+
+        // Planned load is metadata; completedWeightKilograms and effortSegments
+        // contain the historical performed load and stay unmodified.
+        workout.exercises[exerciseIndex].sets[setIndex].plannedWeightKilograms =
+            kilograms
+        activeWorkout = workout
+        persistCheckpointNow()
+        return true
+    }
+
     func setCurrentExerciseRestSeconds(
         _ seconds: Int
     ) {
