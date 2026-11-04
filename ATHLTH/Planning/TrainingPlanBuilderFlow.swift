@@ -4095,6 +4095,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             onQuick: { quick in
                 addAdvancedQuickContent(quick)
             },
+            onAddGroup: { blocks, kind in
+                insertAdvancedInlineGroup(
+                    blocks, kind: kind,
+                    day: guidedCurrentWeekday, week: guidedCurrentWeek
+                )
+            },
             onEditWorkout: { index in
                 selectedPlanWeekIndex = guidedCurrentWeek
                 editPreviewWorkout(guidedCurrentWeekday, index: index)
@@ -4207,6 +4213,82 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         }
     }
 
+    /// Inline interval/superset insertion uses the same dated override
+    /// as library workouts and the Studio. Only complete, executable groups
+    /// are committed. Never replace an unrelated existing workout.
+    private func insertAdvancedInlineGroup(
+        _ steps: [WorkoutTemplateBlock], kind: WorkoutKind,
+        day: Int, week: Int
+    ) {
+        guard !steps.isEmpty, steps.count <= 200,
+              steps.contains(where: { $0.kind == .run || $0.kind == .exercise })
+        else { return }
+        let groupIDs = Set(steps.compactMap(\.groupID))
+        guard groupIDs.count == 1,
+              steps.allSatisfy({ $0.groupID == steps.first?.groupID }) else {
+            return
+        }
+        selectedPlanWeekIndex = week
+        let key = weekDayKey(day, weekIndex: week)
+        var edit = weekDayEdits[key] ?? ATHLTHPlanWeekDayEdit()
+        let base = edit.removeTemplateDetail ? nil :
+            (edit.detailedWorkout ?? structuredWorkoutsByDay[day])
+        let first = steps.first
+        let title = first?.groupKind == .superset
+            ? ATHLTHLocalization.choose(
+                english: "Superset workout", norwegian: "Supersett"
+            )
+            : ATHLTHLocalization.choose(
+                english: "Interval workout", norwegian: "Intervalløkt"
+            )
+        var blueprint = ATHLTHPlanStructuredWorkoutBlueprint(
+            title: title, kind: kind,
+            durationMinutes: ATHLTHWorkoutDurationEstimator.minutes(
+                for: steps
+            ) ?? 30, routeID: nil, blocks: steps
+        )
+        guard blueprint.isValid else { return }
+
+        if var existing = base, existing.isValid, existing.kind == kind,
+           existing.blocks.count + steps.count <= 200 {
+            existing.blocks += steps
+            existing.blocks = existing.blocks.enumerated().map {
+                ATHLTHWorkoutPhasePlacement.renumbered(
+                    $0.element, sequence: $0.offset + 1
+                )
+            }
+            if let minutes = ATHLTHWorkoutDurationEstimator.minutes(
+                for: existing.blocks
+            ) {
+                existing.durationMinutes = minutes
+            }
+            if existing.isValid { blueprint = existing }
+        } else if base?.isValid == true {
+            // An unrelated running/strength workout already owns the day.
+            // Preserve it and place the new group as an additional workout.
+            edit.additionalDetailedWorkouts =
+                (edit.additionalDetailedWorkouts ?? []) + [blueprint]
+            edit.isRestDay = false
+            edit.removeTemplateDetail = false
+            weekDayEdits[key] = edit
+            selectedDays.insert(day)
+            sessionsPerWeek = selectedDays.count
+            saveResumableDraft()
+            return
+        }
+
+        edit.detailedWorkout = blueprint
+        edit.title = blueprint.title
+        edit.kind = blueprint.kind
+        edit.durationMinutes = blueprint.durationMinutes
+        edit.isRestDay = false
+        edit.removeTemplateDetail = false
+        weekDayEdits[key] = edit
+        selectedDays.insert(day)
+        sessionsPerWeek = selectedDays.count
+        saveResumableDraft()
+    }
+
     private func addAdvancedQuickContent(_ choice: String) {
         selectedPlanWeekIndex = guidedCurrentWeek
         let day = guidedCurrentWeekday
@@ -4215,13 +4297,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case "walking": chooseQuickWorkout(.walk, on: day)
         case "yoga": chooseQuickWorkout(.yoga, on: day)
         case "meditation": chooseQuickWorkout(.meditation, on: day)
-        case "cycling", "interval", "superset":
-            // Opens the real advanced workout composer with all available
-            // cycling, interval and superset timeline tools.
+        case "cycling":
             quickStudioOption = nil
             addingExtraWorkout = false
             editingWorkoutIndex = 0
             composingAdvancedDay = WeekDayEditorSelection(id: day)
+        case "interval", "superset":
+            // These are handled inline by ATHLTHPlanInlineGroupComposer.
+            break
         case "restday":
             setRestDay(day)
         case "stretching":
@@ -4780,6 +4863,12 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             onQuick: { day, choice in
                 addAdvancedWeekQuickContent(day: day, choice: choice)
             },
+            onAddGroup: { day, blocks, kind in
+                insertAdvancedInlineGroup(
+                    blocks, kind: kind,
+                    day: day, week: selectedPlanWeekIndex
+                )
+            },
             onCopyWeek: { source, destinations, overwrite in
                 copyAdvancedWeek(from: source, to: destinations, overwrite: overwrite)
             },
@@ -4853,13 +4942,14 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         case "walking": chooseQuickWorkout(.walk, on: day)
         case "yoga": chooseQuickWorkout(.yoga, on: day)
         case "meditation": chooseQuickWorkout(.meditation, on: day)
-        case "cycling", "interval", "superset":
-            // The shared Studio owns the detailed cycling/interval/
-            // superset timeline and can append another session.
+        case "cycling":
             quickStudioOption = nil
             editingWorkoutIndex = 0
             addingExtraWorkout = !previewWorkouts(for: day).isEmpty
             composingAdvancedDay = WeekDayEditorSelection(id: day)
+        case "interval", "superset":
+            // Inline in the selected week/day, never a separate Studio card.
+            break
         case "stretching":
             advancedAddDestination = AdvancedAddDestination(
                 day: day, week: selectedPlanWeekIndex,
