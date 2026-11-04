@@ -77,6 +77,56 @@ final class ATHLTHStudioHomeWeekTests: XCTestCase {
         ).plannedCount, 0)
     }
 
+    func testNextWeekNavigationFindsItsOwnScheduledWorkout() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let wednesday = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 4, hour: 12
+        )))
+        let followingWednesday = ATHLTHStudioHomeWeek.shiftedWeek(
+            from: wednesday, offset: 1, calendar: calendar
+        )
+        let nextWeekWorkout = session("Next week run", on: followingWednesday)
+        let current = ATHLTHStudioHomeWeek.make(
+            plans: [], standalone: [nextWeekWorkout],
+            recorded: [], now: wednesday, calendar: calendar
+        )
+        let next = ATHLTHStudioHomeWeek.make(
+            plans: [], standalone: [nextWeekWorkout],
+            recorded: [], now: followingWednesday, calendar: calendar
+        )
+        XCTAssertEqual(current.plannedCount, 0)
+        XCTAssertEqual(next.plannedCount, 1)
+        XCTAssertEqual(next.days[2].planned.first?.workout.id,
+                       nextWeekWorkout.id)
+        XCTAssertEqual(calendar.component(.weekday, from: next.days[0].date), 2)
+    }
+
+    func testWeekArrowsPreserveCalendarDateOverOsloDst() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let before = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 10, day: 21, hour: 12
+        )))
+        let next = ATHLTHStudioHomeWeek.shiftedWeek(
+            from: before, offset: 1, calendar: calendar
+        )
+        XCTAssertEqual(calendar.component(.day, from: next), 28)
+        XCTAssertEqual(calendar.component(.hour, from: next), 12)
+        XCTAssertNotEqual(next.timeIntervalSince(before), 7 * 86_400)
+
+        let back = ATHLTHStudioHomeWeek.shiftedWeek(
+            from: next, offset: -1, calendar: calendar
+        )
+        XCTAssertEqual(back, before)
+        let range = ATHLTHStudioHomeWeek.weekRange(
+            containing: next, calendar: calendar
+        )
+        XCTAssertEqual(calendar.component(.day, from: range.start), 26)
+        XCTAssertEqual(calendar.component(.day, from: range.end), 1)
+        XCTAssertEqual(calendar.component(.month, from: range.end), 11)
+    }
+
     func testWeekStartsOnMondayEvenWhenLocaleCalendarStartsOnSunday() throws {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
