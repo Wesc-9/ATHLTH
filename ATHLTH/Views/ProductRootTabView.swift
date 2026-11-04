@@ -995,36 +995,34 @@ struct ATHLTHHomeView: View {
                             onOpenTrain(.plan)
                         }
                     )
-
-                    // White three-line menu button aligned with the Home utility row.
-                    // Keep the existing hero and right-hand toolbar untouched.
-                    Button(action: onOpenSideMenu) {
-                        VStack(spacing: 5) {
-                            ForEach(0..<3, id: \.self) { _ in
-                                Capsule()
-                                    .fill(Color.white)
-                                    .frame(width: 21, height: 2)
+                    .overlay(alignment: .topLeading) {
+                        Button(action: onOpenSideMenu) {
+                            VStack(spacing: 5) {
+                                ForEach(0..<3, id: \.self) { _ in
+                                    Capsule()
+                                        .fill(Color.white)
+                                        .frame(width: 21, height: 2)
+                                }
+                            }
+                            .frame(width: 48, height: 48)
+                            .background(Color.black.opacity(0.27), in: Circle())
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(
+                                        Color.white.opacity(0.36),
+                                        lineWidth: 0.8
+                                    )
+                                    .allowsHitTesting(false)
                             }
                         }
-                        .frame(width: 48, height: 48)
-                        .background(Color.black.opacity(0.27), in: Circle())
-                        .overlay {
-                            Circle()
-                                .strokeBorder(
-                                    Color.white.opacity(0.36),
-                                    lineWidth: 0.8
-                                )
-                                .allowsHitTesting(false)
-                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Open navigation menu",
+                            norwegian: "Åpne sidemenyen"
+                        ))
+                        .padding(.leading, 16)
+                        .padding(.top, 60)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Open navigation menu",
-                        norwegian: "Åpne sidemenyen"
-                    ))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.leading, 16)
-                    .padding(.top, 60)
 
                     // Compact premium toolbar: keep the original larger
                     // profile avatar visible in both states.
