@@ -5786,6 +5786,38 @@ struct ActiveStrengthWorkoutView: View {
                 }
 
                 HStack(spacing: 10) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "SET TIME", norwegian: "SETTID"
+                        ), systemImage: "stopwatch"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    Spacer()
+                    TimelineView(.periodic(from: .now, by: 1)) { tick in
+                        Text(
+                            (
+                                strength.currentSetEffortClock?
+                                    .elapsedSeconds(at: tick.date) ?? 0
+                            ).clockDuration
+                        )
+                        .font(.system(size: 23, weight: .bold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "Elapsed time in current set",
+                            norwegian: "Tid brukt i nåværende sett"
+                        ))
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
+                .background(
+                    ATHLTHPlanDesign.accent.opacity(0.07),
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+
+                HStack(spacing: 10) {
                     if currentStrengthLoadKind == .resistanceLevel {
                         compactLiveIntegerMetric(
                             title: ATHLTHLocalization.choose(
@@ -5819,26 +5851,29 @@ struct ActiveStrengthWorkoutView: View {
                     focusedTimedCountdown
                 }
 
+                let needsStart = strength.currentSetEffortClock == nil ||
+                    (currentStrengthTargetKind == .time &&
+                     strength.currentTimedSetCountdown?.isRunning != true)
                 Button {
-                    if currentStrengthTargetKind == .time &&
-                       strength.currentTimedSetCountdown?.isRunning != true {
-                        strength.startOrResumeTimedSet()
+                    if needsStart {
+                        if currentStrengthTargetKind == .time {
+                            strength.startOrResumeTimedSet()
+                        } else {
+                            strength.startCurrentSetEffort()
+                        }
                     } else {
                         strength.completeCurrentDraftSet()
                     }
                 } label: {
                     Label(
-                        currentStrengthTargetKind == .time &&
-                        strength.currentTimedSetCountdown?.isRunning != true
+                        needsStart
                             ? ATHLTHLocalization.choose(
                                 english: "Start set", norwegian: "Start sett"
                             )
                             : ATHLTHLocalization.choose(
                                 english: "Complete set", norwegian: "Fullfør sett"
                             ),
-                        systemImage: currentStrengthTargetKind == .time &&
-                            strength.currentTimedSetCountdown?.isRunning != true
-                            ? "play.fill" : "checkmark.circle.fill"
+                        systemImage: needsStart ? "play.fill" : "checkmark.circle.fill"
                     )
                     .font(.subheadline.weight(.bold))
                     .frame(maxWidth: .infinity, minHeight: 48)
