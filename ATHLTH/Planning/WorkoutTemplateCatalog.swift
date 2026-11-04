@@ -3499,6 +3499,9 @@ struct WorkoutTemplateBuilderView: View {
     private let onAddStandalone: ((PlannedSession) -> Bool)?
     private let onValidateSave: ((PlannedSession) -> String?)?
     private let saveButtonTitle: String?
+    /// An embedded iPad inspector closes itself, not the surrounding plan.
+    /// All iPhone callers keep their existing sheet dismissal.
+    private let onCloseInline: (() -> Void)?
 
     init(
         initialTitle: String = "",
@@ -3523,7 +3526,8 @@ struct WorkoutTemplateBuilderView: View {
         onSaveToPlan: ((String, [WorkoutTemplateBlock], UUID?, Int?, Bool, ATHLTHWorkoutPlannerExtras) -> Bool)? = nil,
         onAddStandalone: ((PlannedSession) -> Bool)? = nil,
         onValidateSave: ((PlannedSession) -> String?)? = nil,
-        saveButtonTitle: String? = nil
+        saveButtonTitle: String? = nil,
+        onCloseInline: (() -> Void)? = nil
     ) {
         let startBlank = ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
             initialTitle: initialTitle,
@@ -3591,6 +3595,7 @@ struct WorkoutTemplateBuilderView: View {
         self.onAddStandalone = onAddStandalone
         self.onValidateSave = onValidateSave
         self.saveButtonTitle = saveButtonTitle
+        self.onCloseInline = onCloseInline
     }
 
     private struct StoredWorkoutDraft: Codable {
@@ -3986,6 +3991,14 @@ struct WorkoutTemplateBuilderView: View {
                 routeTitle: activeRoute?.title,
                 fallbackDurationMinutes: resolvedDurationMinutes
             )
+        }
+    }
+
+    private func closeWorkoutEditor() {
+        if let onCloseInline {
+            onCloseInline()
+        } else {
+            dismiss()
         }
     }
 
@@ -4497,7 +4510,7 @@ struct WorkoutTemplateBuilderView: View {
                            selectedRouteID != nil || !studioVisiblePhases.isEmpty {
                             showingDiscardConfirmation = true
                         } else {
-                            dismiss()
+                            closeWorkoutEditor()
                         }
                     }
                 }
@@ -4513,7 +4526,7 @@ struct WorkoutTemplateBuilderView: View {
                         // draft; do not silently create a scheduled workout.
                         persistWorkoutDraft()
                         showingDiscardConfirmation = false
-                        dismiss()
+                        closeWorkoutEditor()
                     },
                     onDiscard: {
                         // The onDisappear draft observer must not recreate
@@ -4521,7 +4534,7 @@ struct WorkoutTemplateBuilderView: View {
                         draftFinished = true
                         UserDefaults.standard.removeObject(forKey: draftStorageKey)
                         showingDiscardConfirmation = false
-                        dismiss()
+                        closeWorkoutEditor()
                     }
                 )
             }
@@ -6640,7 +6653,7 @@ struct WorkoutTemplateBuilderView: View {
         // by AppSessionStore, not through a special button in this editor.
         draftFinished = true
         UserDefaults.standard.removeObject(forKey: draftStorageKey)
-        dismiss()
+        closeWorkoutEditor()
     }
 
     private var resolvedWorkoutKind: WorkoutKind {
