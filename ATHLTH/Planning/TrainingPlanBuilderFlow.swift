@@ -827,8 +827,8 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
             }
         } message: {
             Text(ATHLTHLocalization.choose(
-                english: "Your plan focus, goals, selected days and session duration are sent to Coach. Health history and injury notes are not shared. Your existing workouts and rest days will not be changed. Review suggestions before applying.",
-                norwegian: "Planfokus, mål, valgte dager og øktvarighet sendes til Coach. Helsehistorikk og skadeopplysninger deles ikke. Økter og hviledager du har lagt inn, beholdes. Du får godkjenne forslagene før de brukes."
+                english: "Your plan focus, goals, equipment, selected days and session duration are sent to Coach. Health history and injury notes are not shared. Your existing workouts and rest days will not be changed. Review suggestions before applying.",
+                norwegian: "Planfokus, mål, utstyr, valgte dager og øktvarighet sendes til Coach. Helsehistorikk og skadeopplysninger deles ikke. Økter og hviledager du har lagt inn, beholdes. Du får godkjenne forslagene før de brukes."
             ))
         }
         .sheet(item: $guidedAIFillPreview) { preview in
@@ -4738,28 +4738,64 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         saveResumableDraft()
     }
 
+    private func guidedDateKey(at position: Int) -> Int {
+        let date = Calendar.current.date(
+            byAdding: .day, value: position,
+            to: Calendar.current.startOfDay(for: startDate)
+        ) ?? startDate
+        let weekday = (Calendar.current.component(.weekday, from: date) + 5) % 7 + 1
+        return weekDayKey(weekday, weekIndex: position / 7)
+    }
+
     private func advanceGuidedDay() {
         guard guidedDayCursor < weekCount * 7,
               ATHLTHGuidedPlanDayPolicy.isPlanned(
-                weekDayEdits[weekDayKey(guidedCurrentWeekday, weekIndex: guidedCurrentWeek)]
+                weekDayEdits[guidedDateKey(at: guidedDayCursor)]
               ) else { return }
         let finishedWeek = guidedCurrentWeek
-        guidedDayCursor += 1
-        if guidedDayCursor == 7 {
-            let days = Set((1...7).filter {
-                let edit = weekDayEdits[weekDayKey($0, weekIndex: 0)]
-                return edit?.isRestDay != true && edit?.detailedWorkout?.isValid == true
-            })
-            if !days.isEmpty {
-                selectedDays = days
-                sessionsPerWeek = days.count
+        let totalDays = weekCount * 7
+        let next = guidedDayCursor + 1
+
+        if next % 7 == 0 {
+            // The new menu permits jumps between ALL weeks. Finishing the
+            // final day of a week is not the same as completing all seven days.
+            // Return to the first unplanned date before offering to copy.
+            if let missed = (finishedWeek * 7..<next).first(where: {
+                !ATHLTHGuidedPlanDayPolicy.isPlanned(
+                    weekDayEdits[guidedDateKey(at: $0)]
+                )
+            }) {
+                guidedDayCursor = missed
+                return
             }
-            if weekCount == 1 { firstGuidedWeekDecisionMade = true }
+            if next == 7 {
+                let days = Set((1...7).filter {
+                    let edit = weekDayEdits[weekDayKey($0, weekIndex: 0)]
+                    return edit?.isRestDay != true && edit?.detailedWorkout?.isValid == true
+                })
+                if !days.isEmpty {
+                    selectedDays = days
+                    sessionsPerWeek = days.count
+                }
+                if weekCount == 1 { firstGuidedWeekDecisionMade = true }
+            }
         }
-        // A weekly choice appears after completing any week, but never
-        // after the last week or where the upcoming week is already filled.
-        if guidedDayCursor % 7 == 0, guidedDayCursor < weekCount * 7 {
-            let nextWeek = guidedDayCursor / 7
+
+        // Also prevent a jump to the final date from silently skipping
+        // earlier dates in other weeks.
+        if next == totalDays,
+           let missed = (0..<totalDays).first(where: {
+               !ATHLTHGuidedPlanDayPolicy.isPlanned(
+                   weekDayEdits[guidedDateKey(at: $0)]
+               )
+           }) {
+            guidedDayCursor = missed
+            return
+        }
+        guidedDayCursor = next
+
+        if next % 7 == 0, next < totalDays {
+            let nextWeek = next / 7
             let hasUnplannedDay = (1...7).contains { weekday in
                 !ATHLTHGuidedPlanDayPolicy.isPlanned(
                     weekDayEdits[weekDayKey(weekday, weekIndex: nextWeek)]
