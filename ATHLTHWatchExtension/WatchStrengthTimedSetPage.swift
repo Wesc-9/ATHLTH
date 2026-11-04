@@ -49,6 +49,13 @@ struct WatchStrengthTimedSetPage: View {
                 let editable = session.inputMode != .iPhone &&
                     !session.isResting && !session.currentExerciseComplete &&
                     !workout.strengthActionPending
+                // iPhone controls the timer and target, but the athlete may
+                // manually finish the active set from Watch at any time.
+                // Do not mark a time set completed before its clock starts.
+                let canAdvanceFromIPhoneMode =
+                    session.inputMode == .iPhone && started &&
+                    !session.isResting && !session.currentExerciseComplete &&
+                    !workout.strengthActionPending
                 let isRunning = isRunningSegment(session)
 
                 GeometryReader { geometry in
@@ -160,9 +167,9 @@ struct WatchStrengthTimedSetPage: View {
 
                         Spacer(minLength: 1)
 
-                        if editable {
+                        if editable || canAdvanceFromIPhoneMode {
                             HStack(spacing: 7) {
-                                if !finished {
+                                if editable && !finished {
                                     Button {
                                         if running {
                                             workout.pauseTimedStrengthSet()
@@ -184,13 +191,20 @@ struct WatchStrengthTimedSetPage: View {
                                 }
 
                                 Button {
+                                    // The current workout/set IDs are included in the
+                                    // durable completion command. The phone accepts the
+                                    // action once and ignores stale/double taps.
                                     workout.completeStrengthSet()
                                 } label: {
                                     Label(
                                         isRunning
                                           ? tr("Finish running phase", "Avslutt løpedel")
-                                          : tr("Complete set", "Fullfør sett"),
-                                        systemImage: "checkmark.circle.fill"
+                                          : canAdvanceFromIPhoneMode
+                                            ? tr("Finish / next", "Fullfør / neste")
+                                            : tr("Complete set", "Fullfør sett"),
+                                        systemImage: canAdvanceFromIPhoneMode
+                                            ? "arrow.right.circle.fill"
+                                            : "checkmark.circle.fill"
                                     )
                                     .font(.system(size: 10, weight: .bold))
                                     .lineLimit(1)
@@ -200,9 +214,13 @@ struct WatchStrengthTimedSetPage: View {
                                 }
                                 .buttonStyle(.borderedProminent)
                                 .tint(WatchTheme.accentDeep)
+                                .accessibilityHint(tr(
+                                    "Finish this set now, even before or after the time target.",
+                                    "Fullfør settet nå, før eller etter tidsmålet."
+                                ))
                             }
                         } else if session.inputMode == .iPhone {
-                            Text(tr("Controlled on iPhone", "Styres på iPhone"))
+                            Text(tr("Timer controlled on iPhone", "Tid styres på iPhone"))
                                 .font(.system(size: 9, weight: .semibold))
                                 .foregroundStyle(WatchTheme.textSecondary)
                         }
