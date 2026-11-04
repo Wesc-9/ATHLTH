@@ -40,6 +40,8 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
     var planningApproach: String? = nil
     var guidedDayCursor: Int? = nil
     var firstGuidedWeekDecisionMade: Bool? = nil
+    // Optional; old checkpoints remain decodable after the new week-by-week prompt.
+    var guidedWeekAwaitingDecision: Int? = nil
     // Restore the actual workspace position, not just the plan's fields.
     var selectedPlanWeekIndex: Int? = nil
     var editorDay: Int? = nil
@@ -76,6 +78,7 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
         planningApproach: String? = nil,
         guidedDayCursor: Int? = nil,
         firstGuidedWeekDecisionMade: Bool? = nil,
+        guidedWeekAwaitingDecision: Int? = nil,
         selectedPlanWeekIndex: Int? = nil,
         editorDay: Int? = nil,
         editorKind: String? = nil,
@@ -113,6 +116,9 @@ struct ATHLTHPlanCreationDraft: Codable, Equatable {
             ? planningApproach : nil
         self.guidedDayCursor = guidedDayCursor.map { min(max($0, 0), min(max(weekCount, 1), 52) * 7) }
         self.firstGuidedWeekDecisionMade = firstGuidedWeekDecisionMade
+        self.guidedWeekAwaitingDecision = guidedWeekAwaitingDecision.flatMap { week in
+            (0..<max(0, self.weekCount - 1)).contains(week) ? week : nil
+        }
         self.selectedPlanWeekIndex = selectedPlanWeekIndex.map {
             min(max($0, 0), min(max(weekCount, 1), 52) - 1)
         }
