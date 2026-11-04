@@ -57,15 +57,15 @@ final class ATHLTHStudioPlanWeekSummaryTests: XCTestCase {
             year: 2026, month: 10, day: 24
         )))
         let day = TrainingPlanDay(
-            id: UUID(), dayIndex: 2, title: "", sessions: []
+            id: UUID(), dayIndex: 3, title: "", sessions: []
         )
         let resolved = try XCTUnwrap(ATHLTHStudioPlanWeekSummary.date(
             for: day, inWeekIndex: 0, planStart: start, calendar: calendar
         ))
-        XCTAssertEqual(calendar.component(.day, from: resolved), 25)
+        XCTAssertEqual(calendar.component(.day, from: resolved), 26)
         XCTAssertNotEqual(
             resolved.timeIntervalSince(start),
-            24 * 3600,
+            48 * 3600,
             "Calendar math must respect Oslo's daylight saving change."
         )
     }

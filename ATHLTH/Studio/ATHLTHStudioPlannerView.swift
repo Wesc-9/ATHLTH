@@ -15,6 +15,7 @@ struct ATHLTHStudioPlannerView: View {
     @State private var scenario = 0
     @State private var dragMode: DragMode = .move
     @State private var moveError: String?
+    @State private var showingLegacyOverview = false
 
     private enum DragMode: String, CaseIterable, Identifiable {
         case move, copy
@@ -26,6 +27,48 @@ struct ATHLTHStudioPlannerView: View {
     }
 
     var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("ATHLTH PLAN STUDIO")
+                        .font(.system(size: 11, weight: .semibold))
+                        .tracking(1.8)
+                        .foregroundStyle(ATHLTHStudioStyle.gold)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Build your training program",
+                        norwegian: "Bygg treningsprogrammet ditt"
+                    ))
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                }
+                Spacer()
+                Picker(ATHLTHLocalization.choose(
+                    english: "Layout", norwegian: "Visning"
+                ), selection: $showingLegacyOverview) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Full plan canvas", norwegian: "Stor planarbeidsflate"
+                    )).tag(false)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Overview / Scenario Lab", norwegian: "Oversikt / Scenario Lab"
+                    )).tag(true)
+                }
+                .pickerStyle(.segmented)
+                .frame(maxWidth: 350)
+            }
+            .padding(.horizontal, 22)
+            .padding(.vertical, 10)
+            .background(.white.opacity(0.85))
+
+            if showingLegacyOverview {
+                legacyOverview
+            } else {
+                ATHLTHStudioPlanCanvasView()
+            }
+        }
+        .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
+    }
+
+    private var legacyOverview: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 22) {
                 HStack {
