@@ -8,6 +8,10 @@ enum ATHLTHSideMenuDestination: String, Identifiable {
     case inbox
     case notifications
     case trainingLibrary
+    case myExercises
+    case myRoutes
+    case myTrainingPlans
+    case myWorkouts
     case trainTogether
     case ghostRace
     case arena
