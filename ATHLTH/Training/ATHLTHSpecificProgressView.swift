@@ -526,7 +526,7 @@ struct ATHLTHSpecificProgressView: View {
         // Apple Health's UUIDs are stable and guard against re-importing one
         // physical activity twice. Exercise-level detail stays in ATHLTH logs.
         var seen = Set<UUID>()
-        healthSessions = completed.map(SocialPublishableWorkout.init(summary:))
+        healthSessions = completed.map { SocialPublishableWorkout(summary: $0) }
             .filter { seen.insert($0.id).inserted }
     }
 
