@@ -3477,6 +3477,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var savedTemplateID: UUID?
     @State private var actionNotice: String?
     private let draftContext: String
+    private let isNewStandaloneScratch: Bool
     private let sourceTemplateID: UUID?
     private let initialQuickAdd: String?
     private let initialFocusedBlockIndex: Int?
@@ -3523,26 +3524,41 @@ struct WorkoutTemplateBuilderView: View {
         onValidateSave: ((PlannedSession) -> String?)? = nil,
         saveButtonTitle: String? = nil
     ) {
+        let startBlank = ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
+            initialTitle: initialTitle,
+            selectedActivity: initialActivity,
+            createsStandalone: onAddStandalone != nil && onSaveToPlan == nil,
+            sourceTemplateID: sourceTemplateID,
+            initialRouteID: initialRouteID,
+            focusedBlockIndex: initialFocusedBlockIndex,
+            focusedExecutionStepIndex: initialFocusedExecutionStepIndex,
+            opensFocusedEditor: openFocusedStepEditor
+        )
+        // Ignore an activity-specific seed when the athlete explicitly
+        // chose "Start from scratch"; existing/saved workouts are untouched.
+        let initialRecipe: [WorkoutTemplateBlock] = startBlank ? [] : initialBlocks
+        let initialMinutes = startBlank ? nil : initialDurationOverrideMinutes
         _title = State(initialValue: initialTitle)
-        _blocks = State(initialValue: initialBlocks)
+        _blocks = State(initialValue: initialRecipe)
         // A newly planned workout starts at warm-up; when editing a saved
         // sequence, open its first actual phase instead of assuming main.
         _selectedPhase = State(initialValue:
             initialPhase ?? (onSaveToPlan == nil
                 ? .main
-                : initialBlocks.first?.resolvedPhase ?? .warmup)
+                : initialRecipe.first?.resolvedPhase ?? .warmup)
         )
         _selectedRouteID = State(initialValue: initialRouteID)
         _selectedWorkoutGearIDs = State(initialValue: Set(initialExtras.gearIDs ?? []))
         _gearSelectionTouched = State(initialValue: initialExtras.gearIDs != nil)
         _selectedSpotifyPlaylist = State(initialValue: initialExtras.spotifyPlaylist)
         _spotifyAutoplayOnStart = State(initialValue: initialExtras.spotifyAutoplayOnStart)
-        _manualDurationMinutes = State(initialValue: initialDurationOverrideMinutes)
-        _durationInputText = State(initialValue: (initialDurationOverrideMinutes ??
-            ATHLTHWorkoutDurationEstimator.minutes(for: initialBlocks)).map(String.init) ?? "")
+        _manualDurationMinutes = State(initialValue: initialMinutes)
+        _durationInputText = State(initialValue: (initialMinutes ??
+            ATHLTHWorkoutDurationEstimator.minutes(for: initialRecipe)).map(String.init) ?? "")
         self.draftContext = draftContext
+        self.isNewStandaloneScratch = startBlank
         self.sourceTemplateID = sourceTemplateID
-        self.initialQuickAdd = initialQuickAdd
+        self.initialQuickAdd = startBlank ? nil : initialQuickAdd
         self.initialFocusedBlockIndex = initialFocusedBlockIndex
         self.initialFocusedExecutionStepIndex = initialFocusedExecutionStepIndex
         self.openFocusedStepEditor = openFocusedStepEditor
@@ -3553,9 +3569,9 @@ struct WorkoutTemplateBuilderView: View {
             initialStudioAdvanced ?? (initialActivity == nil))
         _studioBasicRunMode = State(initialValue:
             initialRouteID != nil ? .route :
-            initialBlocks.count > 1 ? .structured : .free
+            initialRecipe.count > 1 ? .structured : .free
         )
-        let firstRun = initialBlocks.first { $0.kind == .run }
+        let firstRun = initialRecipe.first { $0.kind == .run }
         _studioBasicRunEnvironment = State(initialValue:
             firstRun?.isIndoor == true
                 ? (firstRun?.treadmillInclinePercent != nil ? .treadmill : .indoor)
@@ -3565,10 +3581,10 @@ struct WorkoutTemplateBuilderView: View {
         self.planCopyDays = planCopyDays
         self.onCopyToPlan = onCopyToPlan
         _copyWeekIndex = State(initialValue: initialCopyWeekIndex)
-        let originalBlocks = (try? JSONEncoder().encode(initialBlocks))?.base64EncodedString() ?? ""
+        let originalBlocks = (try? JSONEncoder().encode(initialRecipe))?.base64EncodedString() ?? ""
         self.initialDraftSignature = initialTitle + "|" + originalBlocks +
             "|" + (initialRouteID?.uuidString ?? "") +
-            "|" + String(initialDurationOverrideMinutes ?? -1)
+            "|" + String(initialMinutes ?? -1)
         self.initialSourceTitle = initialTitle
         self.onSaveToPlan = onSaveToPlan
         self.onAddStandalone = onAddStandalone
@@ -3605,6 +3621,9 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func restoreWorkoutDraft() {
+        // An explicit fresh scratch session must never rehydrate a previous
+        // same-activity attempt from the reused editor draft storage key.
+        guard !isNewStandaloneScratch else { return }
         guard let data = UserDefaults.standard.data(forKey: draftStorageKey),
               let stored = try? JSONDecoder().decode(StoredWorkoutDraft.self, from: data),
               ATHLTHWorkoutDraftRecoveryPolicy.accepts(
