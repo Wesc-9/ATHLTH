@@ -7,11 +7,17 @@ enum HomeDailyRecommendationSessionFactory {
         advice: HomeDailyRecommendationPolicy.Advice
     ) -> PlannedSession? {
         if case .historicalStrength = advice.suggestedWorkout,
-           var copy = advice.strengthSession {
-            // Every recommendation is a new independent workout and never
-            // modifies an old completed workout or a scheduled training plan.
-            copy.id = UUID()
-            copy.scheduledStart = nil
+           let source = advice.strengthSession {
+            // An independent copy: never mutate the athlete's old workout.
+            var copy = PlannedSession(
+                id: UUID(), title: source.title, kind: .strength,
+                scheduledStart: nil, durationMinutes: source.durationMinutes,
+                targetDistanceKilometers: nil,
+                targetPaceSecondsPerKilometer: nil, routeID: nil,
+                exercises: source.exercises, notes: source.notes
+            )
+            copy.workoutBlocks = source.workoutBlocks
+            copy.workoutCategory = "strength"
             return copy
         }
         guard let kind = advice.suggestedWorkout.kind,
