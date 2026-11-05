@@ -365,6 +365,10 @@ final class IPhoneWorkoutStore:
     private var lastSpokenRouteTurnAt: Date?
     private var lastSpokenRouteTurnIndex: Int?
     private var routeWasOff = false
+    /// Only announce departure after accurate GPS has first acquired the
+    /// planned course; an offset or wrong initial route must not shout 180 m.
+    private var routeAlertArmed = false
+    private var routeOnTrackSamples = 0
     private var nextGhostDistanceAnnouncementMeters: Double?
     private var nextGhostTimeAnnouncementSeconds: TimeInterval?
     private var lastGhostAnnouncedLeadMeters: Double?
@@ -2732,6 +2736,8 @@ final class IPhoneWorkoutStore:
         lastSpokenRouteTurnAt = nil
         lastSpokenRouteTurnIndex = nil
         routeWasOff = false
+        routeAlertArmed = false
+        routeOnTrackSamples = 0
     }
 
     private func resetGhostRuntime(
@@ -2974,6 +2980,7 @@ final class IPhoneWorkoutStore:
             workout: workout,
             deviationMeters: guidance.deviationMeters,
             horizontalAccuracy: location.horizontalAccuracy,
+            locationAge: abs(location.timestamp.timeIntervalSinceNow),
             recoveryCue: recoveryCue
         )
         evaluateUpcomingTurn(
@@ -3657,22 +3664,40 @@ final class IPhoneWorkoutStore:
         workout: PhoneWorkout,
         deviationMeters: Double,
         horizontalAccuracy: Double,
+        locationAge: TimeInterval,
         recoveryCue: ATHLTHRouteNavigationCue.Instruction?
     ) {
-        guard let configuration =
-                workout.routeAlertConfiguration,
+        guard let configuration = workout.routeAlertConfiguration,
               configuration.enabled,
-              horizontalAccuracy >= 0,
-              horizontalAccuracy <= 50
+              deviationMeters.isFinite, deviationMeters >= 0,
+              horizontalAccuracy.isFinite,
+              (0...25).contains(horizontalAccuracy),
+              (0...10).contains(locationAge)
         else {
+            // Do not keep an off-route timer running through bad GPS.
             offRouteStartedAt = nil
+            routeOnTrackSamples = 0
             return
         }
 
         let now = Date()
         let isOffRoute =
-            deviationMeters >
+            max(deviationMeters - horizontalAccuracy, 0) >
             configuration.deviationMeters
+
+        if !isOffRoute {
+            routeOnTrackSamples += 1
+            if routeOnTrackSamples >= 2 { routeAlertArmed = true }
+        } else {
+            routeOnTrackSamples = 0
+            // A course must be acquired with trusted GPS before warning
+            // that a user deviated from it. This avoids spurious alerts
+            // at start and during bad map-matching.
+            guard routeAlertArmed else {
+                offRouteStartedAt = nil
+                return
+            }
+        }
 
         guard isOffRoute else {
             offRouteStartedAt = nil
