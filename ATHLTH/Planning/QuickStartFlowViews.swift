@@ -2519,6 +2519,7 @@ struct RunQuickStartSheet: View {
                     routeAlerts,
                 ghostTargetDurationSeconds:
                     isAdvancedSetup &&
+                    ghostDraft.enabled &&
                     guidanceRoute != nil
                         ? ghostDraft
                             .targetDuration
