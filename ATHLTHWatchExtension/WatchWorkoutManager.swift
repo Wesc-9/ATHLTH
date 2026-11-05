@@ -200,6 +200,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var ghostLastTrustedCourseMeters: Double?
     private var ghostLastTrustedCourseElapsed: TimeInterval?
     private var ghostOffRoute = false
+    /// The Ghost clock begins at the route's main section, not at the
+    /// HealthKit recording start when a route warm-up is enabled.
+    private var ghostMainStartElapsedTime: TimeInterval? = nil
     private var ghostReentryReliableSamples = 0
     private var ghostLastAnnouncedGapPercent: Double?
     private var ghostLastGapAlertAt: Date?
@@ -475,6 +478,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func configureRunningWorkout(
         _ workout: WatchRunningWorkoutTransfer
     ) {
+        ghostMainStartElapsedTime = nil
         publish {
             self.structuredRunningWorkout =
                 workout.steps.isEmpty ? nil : workout
@@ -675,6 +679,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         ghostLastTrustedCourseMeters = nil
         ghostLastTrustedCourseElapsed = nil
         ghostOffRoute = false
+        ghostMainStartElapsedTime = nil
         ghostReentryReliableSamples = 0
         ghostLastAnnouncedGapPercent = nil
         ghostLastGapAlertAt = nil
@@ -4653,6 +4658,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if structuredRunningWorkout?.deferRouteUntilMain == true,
            structuredStepIndex == 1 {
             routeLegDistanceOffsetMeters = distanceMeters
+            ghostMainStartElapsedTime = elapsedTime
         }
         publish { self.awaitingMainStart = false }
         persistWorkoutRecoveryState()
@@ -4733,6 +4739,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         if finishedStep?.phase == "warmup",
            workout.deferRouteUntilMain == true {
             routeLegDistanceOffsetMeters = distanceMeters
+            if !mustStartMainManually {
+                ghostMainStartElapsedTime = elapsedTime
+            }
         }
         publish {
             self.structuredStepIndex = nextIndex
@@ -5165,12 +5174,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         deviationMeters: Double,
         userLocation: CLLocation
     ) {
+        // Even a GPS update arriving after a phase change must not let the
+        // opponent consume warm-up time or speak before the route starts.
+        if structuredRunningWorkout?.deferRouteUntilMain == true {
+            guard structuredStepIndex > 0, !awaitingMainStart else { return }
+            if ghostMainStartElapsedTime == nil {
+                ghostMainStartElapsedTime = max(
+                    0, elapsedTime - currentStructuredStepElapsedTime
+                )
+            }
+        }
         guard let ghost = ghostRaceConfiguration,
               ghost.points.count >= 2,
               ghost.routeDistanceMeters > 0 else { return }
 
         let points = ghost.points
-        let targetTime = max(elapsedTime, 0)
+        let targetTime = max(
+            elapsedTime - (ghostMainStartElapsedTime ?? 0), 0
+        )
         // Crucial: Ghost runs on its own fixed course clock. Its location
         // keeps moving even while the athlete is off the planned route.
         guard let ghostAtTime = ATHLTHGhostTimeline.interpolate(
@@ -5251,7 +5272,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // Off-course extra kilometres cost elapsed time. They never advance
         // own course progress or drag the Ghost icon toward the runner.
         let distanceDelta = userDistance - ghostAtTime
-        let timeDelta = ghostAtDistance - elapsedTime
+        let timeDelta = ghostAtDistance - targetTime
         publish {
             self.ghostDistanceDeltaMeters = distanceDelta
             self.ghostTimeDeltaSeconds = timeDelta
