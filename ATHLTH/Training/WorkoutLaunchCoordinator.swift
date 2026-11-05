@@ -673,8 +673,13 @@ enum WorkoutLaunchCoordinator {
         workout: PlannedSession,
         session: AppSessionStore,
         settings: AppSettingsStore,
-        spotify: SpotifyPlaybackStore
+        spotify: SpotifyPlaybackStore,
+        captureDevice: WorkoutCaptureDevice = .iPhone
     ) {
+        // Spotify App Remote runs in the iPhone app; it cannot choose the
+        // Watch's Bluetooth audio target. Launching here can resume a remote
+        // Spotify Connect speaker instead of the athlete's headphones.
+        guard captureDevice == .iPhone else { return }
         let hasWorkoutOverride =
             workout.spotifyAutoplayOnStart != nil
 
@@ -706,9 +711,12 @@ enum WorkoutLaunchCoordinator {
         playlist: SpotifyPlaylistReference?,
         autoplay: Bool,
         settings: AppSettingsStore,
-        spotify: SpotifyPlaybackStore
+        spotify: SpotifyPlaybackStore,
+        captureDevice: WorkoutCaptureDevice = .iPhone
     ) {
-        guard autoplay,
+        // Never start iPhone Spotify App Remote for a Watch-owned workout.
+        // Music on Watch is controlled locally in the installed Spotify app.
+        guard captureDevice == .iPhone, autoplay,
               let playlist
         else {
             return
@@ -1148,15 +1156,14 @@ enum WorkoutLaunchCoordinator {
             )
         }
 
-        // Preserve the existing Quick Run music behavior. This is independent
-        // of HealthKit workout timing and does not start the workout itself.
+        // Watch Spotify remains local to the Watch. Never start playback on
+        // a previously selected Spotify Connect speaker from iPhone.
         startQuickSpotifyIfNeeded(
-            playlist:
-                configuration.spotifyPlaylist,
-            autoplay:
-                configuration.spotifyAutoplay,
+            playlist: configuration.spotifyPlaylist,
+            autoplay: configuration.spotifyAutoplay,
             settings: settings,
-            spotify: spotify
+            spotify: spotify,
+            captureDevice: .appleWatch
         )
     }
 
@@ -1332,12 +1339,11 @@ enum WorkoutLaunchCoordinator {
             watchConnection.sendPetCatalog(catalog)
         }
         startQuickSpotifyIfNeeded(
-            playlist:
-                configuration.spotifyPlaylist,
-            autoplay:
-                configuration.spotifyAutoplay,
+            playlist: configuration.spotifyPlaylist,
+            autoplay: configuration.spotifyAutoplay,
             settings: settings,
-            spotify: spotify
+            spotify: spotify,
+            captureDevice: .appleWatch
         )
 
         watchConnection
@@ -1545,7 +1551,7 @@ enum WorkoutLaunchCoordinator {
                 )
         }
 
-        if trackingMode == .advanced {
+        if captureDevice == .iPhone && trackingMode == .advanced {
             if advancedConfiguration
                 .spotifyAutoplay,
                let playlist =
@@ -1559,7 +1565,7 @@ enum WorkoutLaunchCoordinator {
                     )
                 }
             }
-        } else {
+        } else if captureDevice == .iPhone {
             startLinkedSpotifyIfNeeded(
                 workout: workout,
                 session: session,
