@@ -5463,6 +5463,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    private var ghostRouteElapsedSeconds: TimeInterval {
+        max(elapsedTime - (ghostMainStartElapsedTime ?? 0), 0)
+    }
+
     private func evaluateGhostRaceCoach(
         configuration:
             WatchGhostRaceAudioConfiguration?,
@@ -5479,7 +5483,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
         let confirmedOvertake = ghostOvertakeTracker.observe(
             signedGapMeters: distanceDelta,
-            elapsedSeconds: elapsedTime
+            elapsedSeconds: ghostRouteElapsedSeconds
         )
 
         var periodicAnnouncement = false
@@ -5506,13 +5510,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
            interval > 0,
            let next =
                 nextGhostTimeAnnouncementSeconds,
-           elapsedTime >= next {
+           ghostRouteElapsedSeconds >= next {
             periodicAnnouncement = true
 
             var updatedNext = next
             repeat {
                 updatedNext += interval
-            } while elapsedTime >= updatedNext
+            } while ghostRouteElapsedSeconds >= updatedNext
 
             nextGhostTimeAnnouncementSeconds =
                 updatedNext
@@ -5746,7 +5750,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
            let fixedGhost = ghostRaceConfiguration,
            let targetPace = ATHLTHGhostFinishPaceCoach.requiredSecondsPerKilometre(
                 remainingMeters: finalPhaseRemainingMeters,
-                elapsedSeconds: elapsedTime,
+                elapsedSeconds: ghostRouteElapsedSeconds,
                 ghostFinishSeconds: fixedGhost.referenceDuration
            ) {
             let formatted = ATHLTHGhostFinishPaceCoach.minuteSecondText(targetPace)
