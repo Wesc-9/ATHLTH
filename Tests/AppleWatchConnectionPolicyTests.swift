@@ -130,4 +130,30 @@ final class AppleWatchConnectionPolicyTests: XCTestCase {
             return XCTFail("A different active iPhone session must retain its existing error")
         }
     }
+    func testCompletedWatchResultReleasesDeviceWideActiveGuard() {
+        // The account may have changed, but the Watch is no longer recording.
+        let endedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let active = WatchWorkoutActivityState(
+            isActive: true, title: "Run",
+            updatedAt: endedAt.addingTimeInterval(-900)
+        )
+        let resolved = WatchWorkoutActivityState.afterCompletion(
+            current: active, endedAt: endedAt
+        )
+        XCTAssertFalse(resolved.isActive)
+        XCTAssertEqual(resolved.updatedAt, endedAt)
+    }
+
+    func testDelayedOldCompletionDoesNotClearNewerActiveWatchWorkout() {
+        let endedAt = Date(timeIntervalSince1970: 1_800_000_000)
+        let newer = WatchWorkoutActivityState(
+            isActive: true, title: "Strength",
+            updatedAt: endedAt.addingTimeInterval(120)
+        )
+        let resolved = WatchWorkoutActivityState.afterCompletion(
+            current: newer, endedAt: endedAt
+        )
+        XCTAssertEqual(resolved, newer)
+    }
+
 }
