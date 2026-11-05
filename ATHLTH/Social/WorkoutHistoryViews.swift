@@ -1330,8 +1330,8 @@ struct PostWorkoutReviewView: View {
                         .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     VStack(alignment: .leading, spacing: 3) {
                         Text(ATHLTHLocalization.choose(
-                            english: "Kilometer by kilometer",
-                            norwegian: "Kilometer for kilometer"
+                            english: "Your kilometre splits",
+                            norwegian: "Dine kilometersplitt"
                         ))
                         .font(.headline)
                         .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -2689,9 +2689,9 @@ struct PostWorkoutReviewView: View {
                             ATHLTHLocalization
                                 .choose(
                                     english:
-                                        "KILOMETER BY KILOMETER",
+                                        "GHOST SPLIT COMPARISON",
                                     norwegian:
-                                        "KILOMETER FOR KILOMETER"
+                                        "GHOST-DUELL PER KILOMETER"
                                 )
                         )
                         .font(
@@ -2899,137 +2899,52 @@ struct PostWorkoutReviewView: View {
         }
     }
 
+    /// Both summary cards must show identical measured user kilometres.
+    /// Ghost provides only the comparison timeline, never another estimate
+    /// of the runner's pace from differently rescaled GPS coordinates.
     private func ghostSplitComparisons(
         reference: GhostRaceReference
     ) -> [PostWorkoutGhostSplit] {
-        guard completionRoute.count >= 2,
-              let officialDistance =
-                workout.distanceMeters,
+        guard let officialDistance = workout.distanceMeters,
               officialDistance >= 1_000,
               reference.points.count >= 2
-        else {
-            return []
-        }
+        else { return [] }
 
-        let sortedRoute =
-            completionRoute.sorted {
-                $0.timestamp <
-                $1.timestamp
-            }
-        let rawCumulative =
-            routeCumulativeDistances(
-                sortedRoute
-            )
-        guard let rawTotal =
-                rawCumulative.last,
-              rawTotal > 100
-        else {
-            return []
-        }
+        let ghostDistance = max(
+            reference.points.last?.cumulativeMeters ??
+                reference.routeDistanceMeters,
+            0
+        )
+        let sharedKilometers = Int(
+            floor(min(officialDistance, ghostDistance) / 1_000)
+        )
+        guard sharedKilometers > 0 else { return [] }
 
-        let firstTimestamp =
-            sortedRoute[0].timestamp
-        let timestampSpan =
-            sortedRoute.last?
-                .timestamp
-                .timeIntervalSince(
-                    firstTimestamp
-                ) ?? 0
+        var comparisons: [PostWorkoutGhostSplit] = []
+        var previousGhostElapsed: TimeInterval = 0
 
-        let routeDistance =
-            min(
-                officialDistance,
-                reference.points.last?
-                    .cumulativeMeters ??
-                reference
-                    .routeDistanceMeters
-            )
-        let completedKilometers =
-            Int(
-                floor(
-                    routeDistance /
-                    1_000
+        for split in reviewedKilometerSplits {
+            guard (1...sharedKilometers).contains(split.kilometer),
+                  split.durationSeconds.isFinite,
+                  split.durationSeconds > 0,
+                  let ghostElapsed = ghostElapsedAtDistance(
+                      Double(split.kilometer) * 1_000,
+                      reference: reference
+                  ),
+                  ghostElapsed.isFinite,
+                  ghostElapsed > previousGhostElapsed
+            else { continue }
+
+            comparisons.append(
+                PostWorkoutGhostSplit(
+                    kilometer: split.kilometer,
+                    userSplitSeconds: split.durationSeconds,
+                    ghostSplitSeconds: ghostElapsed - previousGhostElapsed
                 )
             )
-
-        guard completedKilometers > 0
-        else {
-            return []
+            previousGhostElapsed = ghostElapsed
         }
-
-        var result:
-            [PostWorkoutGhostSplit] = []
-        var previousUserElapsed:
-            TimeInterval = 0
-        var previousGhostElapsed:
-            TimeInterval = 0
-
-        for kilometer in
-            1...completedKilometers {
-            let target =
-                Double(kilometer) *
-                1_000
-
-            guard let userElapsed =
-                    userElapsedAtDistance(
-                        target,
-                        locations:
-                            sortedRoute,
-                        rawCumulative:
-                            rawCumulative,
-                        rawTotal:
-                            rawTotal,
-                        officialDistance:
-                            officialDistance,
-                        firstTimestamp:
-                            firstTimestamp,
-                        timestampSpan:
-                            timestampSpan
-                    ),
-                  let ghostElapsed =
-                    ghostElapsedAtDistance(
-                        target,
-                        reference:
-                            reference
-                    )
-            else {
-                continue
-            }
-
-            let userSplit =
-                max(
-                    userElapsed -
-                    previousUserElapsed,
-                    0
-                )
-            let ghostSplit =
-                max(
-                    ghostElapsed -
-                    previousGhostElapsed,
-                    0
-                )
-
-            if userSplit > 0,
-               ghostSplit > 0 {
-                result.append(
-                    PostWorkoutGhostSplit(
-                        kilometer:
-                            kilometer,
-                        userSplitSeconds:
-                            userSplit,
-                        ghostSplitSeconds:
-                            ghostSplit
-                    )
-                )
-            }
-
-            previousUserElapsed =
-                userElapsed
-            previousGhostElapsed =
-                ghostElapsed
-        }
-
-        return result
+        return comparisons
     }
 
     private func routeCumulativeDistances(
