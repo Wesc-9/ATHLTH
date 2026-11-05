@@ -89,6 +89,10 @@ struct AudioCoachDraft {
     var timeTriggerEnabled = false
     var distanceIntervalKilometers = 1.0
     var timeIntervalMinutes = 10
+    // Existing rules and motivation engine are shared with Settings and Watch.
+    // Per-workout selections are snapshots, never edits to the saved preset.
+    var customRules: [ATHLTHAudioCoachRule] = []
+    var smartPrompts = ATHLTHAudioCoachSmartSettings()
 
     var announceDistance = true
     var announceElapsedTime = true
@@ -160,6 +164,8 @@ struct AudioCoachDraft {
             settings.audioCoachDistanceIntervalKilometers
         timeIntervalMinutes =
             settings.audioCoachTimeIntervalMinutes
+        customRules = settings.audioCoachCustomRules
+        smartPrompts = settings.audioCoachSmartSettings
         announceDistance =
             settings.audioCoachAnnounceDistance
         announceElapsedTime =
@@ -204,6 +210,40 @@ struct AudioCoachDraft {
         language = settings.audioCoachLanguage
     }
 
+    /// Load a reusable named coach profile just for this workout.
+    /// Voice configuration, event wording and delivery stay in the same
+    /// existing shared Audio Coach engines.
+    mutating func load(profile: ATHLTHAudioCoachProfile) {
+        let config = profile.configuration
+        enabled = true
+        language = config.language
+        customRules = config.customRules ?? []
+        smartPrompts = config.smartPrompts ?? ATHLTHAudioCoachSmartSettings()
+        distanceTriggerEnabled = config.distanceIntervalMeters != nil
+        distanceIntervalKilometers = (config.distanceIntervalMeters ?? 1_000) / 1_000
+        timeTriggerEnabled = config.timeIntervalSeconds != nil
+        timeIntervalMinutes = max(1, Int(((config.timeIntervalSeconds ?? 600) / 60).rounded()))
+        announceDistance = config.announceDistance
+        announceElapsedTime = config.announceElapsedTime
+        announceAveragePace = config.announceAveragePace
+        announceClockTime = config.announceClockTime
+        announceHeartRate = config.announceHeartRate
+        announceRemainingRouteDistance = config.announceRemainingRouteDistance
+        announceEstimatedRemainingRouteTime = config.announceEstimatedRemainingRouteTime
+        announceCurrentWorkoutStep = config.announceCurrentWorkoutStep
+        announceRemainingStepTime = config.announceRemainingStepTime
+        announceRemainingStepDistance = config.announceRemainingStepDistance
+        duckOtherAudio = config.duckOtherAudio
+        guidanceQuietPeriodSeconds = config.guidanceQuietPeriodSeconds
+        voiceIdentifier = config.voiceIdentifier
+        speechRate = Double(config.speechRate)
+        speechVolume = Double(config.speechVolume)
+        speechStyle = config.speechStyle ?? .balanced
+        announceWorkoutStart = config.announceWorkoutStart
+        announcePauseResume = config.announcePauseResume
+        announceWorkoutComplete = config.announceWorkoutComplete
+    }
+
     func configuration(
         routeDistanceMeters: Double? = nil
     ) -> WatchAudioCoachConfiguration {
@@ -211,13 +251,16 @@ struct AudioCoachDraft {
             enabled: enabled,
             language: language,
             distanceIntervalMeters:
-                enabled && distanceTriggerEnabled
+                enabled && customRules.isEmpty && distanceTriggerEnabled
                     ? distanceIntervalKilometers * 1_000
                     : nil,
             timeIntervalSeconds:
-                enabled && timeTriggerEnabled
+                enabled && customRules.isEmpty && timeTriggerEnabled
                     ? Double(timeIntervalMinutes * 60)
                     : nil,
+            customRules: enabled && !customRules.isEmpty
+                ? Array(customRules.prefix(20)) : nil,
+            smartPrompts: enabled ? smartPrompts : nil,
             announceDistance: enabled && announceDistance,
             announceElapsedTime:
                 enabled && announceElapsedTime,
@@ -3866,6 +3909,7 @@ struct StrengthQuickBuilderView: View {
 }
 
 struct AudioCoachSetupCard: View {
+    @EnvironmentObject private var settings: AppSettingsStore
     @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
@@ -3911,6 +3955,54 @@ struct AudioCoachSetupCard: View {
             if draft.enabled {
                 VStack(alignment: .leading, spacing: 14) {
                     Divider()
+
+                    if !settings.audioCoachProfiles.isEmpty {
+                        Menu {
+                            ForEach(settings.audioCoachProfiles) { profile in
+                                Button {
+                                    draft.load(profile: profile)
+                                } label: {
+                                    Label(profile.name, systemImage: "waveform")
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "square.stack.3d.up")
+                                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Load saved Audio Coach",
+                                        norwegian: "Hent lagret Audio Coach"
+                                    ))
+                                    .font(.subheadline.weight(.semibold))
+                                    Text(ATHLTHLocalization.choose(
+                                        english: "Competition, intervals or easy run",
+                                        norwegian: "Konkurranse, intervaller eller rolig tur"
+                                    ))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 4)
+                                Image(systemName: "chevron.down")
+                            }
+                            .frame(maxWidth: .infinity, minHeight: 54)
+                            .padding(11)
+                            .background(
+                                ATHLTHTheme.premiumGoldSoft.opacity(0.55),
+                                in: RoundedRectangle(cornerRadius: 15)
+                            )
+                        }
+                        .accessibilityIdentifier("athlth-preworkout-coach-presets")
+                    }
+
+                    if !draft.customRules.isEmpty {
+                        Label(ATHLTHLocalization.choose(
+                            english: "\(draft.customRules.count) custom announcements active",
+                            norwegian: "\(draft.customRules.count) tilpassede beskjeder aktive"
+                        ), systemImage: "waveform.badge.mic")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
 
                     Text(ATHLTHLocalization.choose(
                         english: "How much guidance?",
