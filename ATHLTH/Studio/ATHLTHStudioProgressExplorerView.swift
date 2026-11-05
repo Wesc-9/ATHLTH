@@ -96,17 +96,16 @@ struct ATHLTHStudioProgressExplorerView: View {
                 workout.exercises.compactMap { exercise in
                     guard exercise.exercise.name.caseInsensitiveCompare(
                         chosen
-                    ) == .orderedSame,
-                    let maxWeight = exercise.sets
-                        .filter {
-                            $0.completedAt != nil &&
-                            $0.isWarmUp != true &&
-                            $0.resolvedLoadKind == .weightKilograms
+                    ) == .orderedSame else { return nil }
+                    let weights = exercise.sets
+                        .filter { set in
+                            set.completedAt != nil &&
+                            set.isWarmUp != true &&
+                            set.resolvedLoadKind == .weightKilograms
                         }
                         .compactMap(\.completedWeightKilograms)
-                        .filter({ $0.isFinite && $0 > 0 })
-                        .max()
-                    else { return nil }
+                        .filter { $0.isFinite && $0 > 0 }
+                    guard let maxWeight = weights.max() else { return nil }
                     return ProgressPoint(
                         id: workout.id.uuidString + "-" + exercise.id.uuidString,
                         date: workout.endedAt ?? workout.startedAt,
