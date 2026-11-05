@@ -507,6 +507,31 @@ struct ATHLTHiPadStudioRootView: View {
                     trainRequest = .customQuick
                     showingTrain = true
                 },
+                onStartWorkout: { entry in
+                    if let planID = entry.planID {
+                        trainRequest = .startPlannedWorkout(
+                            planID: planID, workoutID: entry.workout.id
+                        )
+                        showingTrain = true
+                    } else {
+                        selectedStandaloneWorkout = entry.workout
+                    }
+                },
+                onSendToWatch: { entry in
+                    guard let planID = entry.planID else { return }
+                    trainRequest = .sendPlannedWorkoutToWatch(
+                        planID: planID, workoutID: entry.workout.id
+                    )
+                    showingTrain = true
+                },
+                onStartAfter: { entry, seconds in
+                    guard let planID = entry.planID else { return }
+                    trainRequest = .startPlannedWorkoutAfter(
+                        planID: planID, workoutID: entry.workout.id,
+                        seconds: seconds
+                    )
+                    showingTrain = true
+                },
                 focusedPlanningDate: $focusedPlanningDate
             )
         case .planner:
