@@ -66,3 +66,73 @@ enum ATHLTHWorkoutCompletionSpokenSummary {
         return (english.joined(separator: " "), norwegian.joined(separator: " "))
     }
 }
+
+/// Pure comparison, shared by saved iPhone sessions and authorized Apple
+/// Health history on Watch. A first activity is never called a new record.
+struct ATHLTHVerifiedRunningEvidence: Hashable {
+    let distanceMeters: Double
+    let activeSeconds: TimeInterval
+}
+
+enum ATHLTHVerifiedRunningRecordComparison {
+    enum Achievement: Hashable {
+        case longestDistance
+        case fastestAveragePace
+    }
+
+    static func achievements(
+        current: ATHLTHVerifiedRunningEvidence,
+        previous: [ATHLTHVerifiedRunningEvidence]
+    ) -> Set<Achievement> {
+        guard current.distanceMeters.isFinite,
+              current.activeSeconds.isFinite,
+              current.distanceMeters >= 1_000,
+              current.activeSeconds > 0
+        else { return [] }
+        let validPrevious = previous.filter {
+            $0.distanceMeters.isFinite && $0.distanceMeters >= 1_000 &&
+            $0.activeSeconds.isFinite && $0.activeSeconds > 0
+        }
+        guard !validPrevious.isEmpty else { return [] }
+        var results: Set<Achievement> = []
+        if let distance = validPrevious.map(\.distanceMeters).max(),
+           current.distanceMeters >= distance + 10 {
+            results.insert(.longestDistance)
+        }
+        let previousPaces = validPrevious.map {
+            $0.activeSeconds / ($0.distanceMeters / 1_000)
+        }.filter { (120...3_600).contains($0) }
+        let currentPace = current.activeSeconds /
+            (current.distanceMeters / 1_000)
+        if let bestPace = previousPaces.min(),
+           currentPace.isFinite, (120...3_600).contains(currentPace),
+           currentPace <= bestPace - 2 {
+            results.insert(.fastestAveragePace)
+        }
+        return results
+    }
+
+    static func phrase(
+        achievements: Set<Achievement>,
+        sourceEnglish: String,
+        sourceNorwegian: String
+    ) -> (english: String, norwegian: String)? {
+        guard !achievements.isEmpty else { return nil }
+        var english: [String] = []
+        var norwegian: [String] = []
+        if achievements.contains(.longestDistance) {
+            english.append("longest recorded run")
+            norwegian.append("lengste registrerte løpetur")
+        }
+        if achievements.contains(.fastestAveragePace) {
+            english.append("best average pace on a recorded run")
+            norwegian.append("beste gjennomsnittstempo på en registrert løpetur")
+        }
+        return (
+            english: "New record in \(sourceEnglish): " +
+                english.joined(separator: ", ") + ".",
+            norwegian: "Ny rekord i \(sourceNorwegian): " +
+                norwegian.joined(separator: ", ") + "."
+        )
+    }
+}
