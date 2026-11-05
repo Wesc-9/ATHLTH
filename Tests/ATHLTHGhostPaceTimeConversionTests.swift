@@ -41,6 +41,29 @@ final class ATHLTHGhostPaceTimeConversionTests: XCTestCase {
         XCTAssertEqual(duration, 6_198)
     }
 
+    func testQuickRunGhostPacingStrategyDoesNotChangePaceGoal() {
+        var draft = GhostQuickStartDraft()
+        draft.enabled = true
+        draft.setTargetPaceText("5:30", distanceKilometers: 10)
+        let target = draft.targetDuration
+
+        draft.pacingStrategy = .terrainAdaptive
+        XCTAssertEqual(draft.targetDuration, target)
+        XCTAssertEqual(draft.targetPaceText, "5:30")
+
+        draft.pacingStrategy = .progressive
+        XCTAssertEqual(draft.targetDuration, target)
+    }
+
+    func testDisabledQuickRunGhostCannotCreateAHiddenRace() {
+        var draft = GhostQuickStartDraft()
+        draft.enabled = true
+        draft.setTargetPaceText("5:30", distanceKilometers: 10)
+        XCTAssertNotNil(draft.targetDuration)
+        draft.enabled = false
+        XCTAssertNil(draft.targetDuration)
+    }
+
     func testInvalidPaceNeverLaunchesWithPreviousStaleTime() {
         var draft = GhostQuickStartDraft()
         draft.enabled = true
