@@ -93,6 +93,9 @@ struct RouteGuardianDraft {
 
 struct GhostQuickStartDraft {
     var enabled = false
+    // Selecting a strategy does not alter the requested pace / finish time.
+    // It is applied only when generating the recorded target Ghost timeline.
+    var pacingStrategy: GhostTargetPacingStrategy = .even
     var targetTimeText = ""
     var targetPaceText = ""
     var updatesEnabled = true
@@ -829,6 +832,81 @@ struct PerWorkoutGhostView: View {
                                 .font(.caption)
                                 .foregroundStyle(.orange)
                                 .accessibilityAddTraits(.updatesFrequently)
+                            }
+                        }
+                    }
+                }
+
+                if draft.enabled, route != nil {
+                    ATHLTHPlanSurface(ghost: false) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Label(ATHLTHLocalization.choose(
+                                english: "How should Ghost run?",
+                                norwegian: "Hvordan skal Ghost løpe?"
+                            ), systemImage: "figure.run")
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                            Text(ATHLTHLocalization.choose(
+                                english: "The selected finish time stays the same. Only how Ghost distributes its pace changes.",
+                                norwegian: "Ghost beholder samme sluttid. Du bestemmer hvordan farten fordeles underveis."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                            LazyVGrid(
+                                columns: [
+                                    GridItem(.flexible(), spacing: 8),
+                                    GridItem(.flexible(), spacing: 8)
+                                ],
+                                spacing: 8
+                            ) {
+                                ForEach(GhostTargetPacingStrategy.allCases) { strategy in
+                                    Button {
+                                        draft.pacingStrategy = strategy
+                                    } label: {
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            HStack {
+                                                Image(systemName: strategy.icon)
+                                                Spacer()
+                                                if draft.pacingStrategy == strategy {
+                                                    Image(systemName: "checkmark.circle.fill")
+                                                }
+                                            }
+                                            .font(.subheadline.weight(.bold))
+                                            Text(strategy.title)
+                                                .font(.subheadline.weight(.semibold))
+                                                .lineLimit(2)
+                                            Text(strategy.subtitle)
+                                                .font(.caption2)
+                                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                                                .fixedSize(horizontal: false, vertical: true)
+                                        }
+                                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                                        .frame(maxWidth: .infinity, minHeight: 89, alignment: .topLeading)
+                                        .padding(11)
+                                        .background(
+                                            draft.pacingStrategy == strategy
+                                                ? ATHLTHPlanDesign.accentSoft
+                                                : ATHLTHPlanDesign.surface,
+                                            in: RoundedRectangle(cornerRadius: 14)
+                                        )
+                                        .overlay {
+                                            RoundedRectangle(cornerRadius: 14)
+                                                .strokeBorder(
+                                                    draft.pacingStrategy == strategy
+                                                        ? ATHLTHPlanDesign.accentInk
+                                                        : ATHLTHPlanDesign.warmDivider,
+                                                    lineWidth: 1
+                                                )
+                                        }
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityAddTraits(
+                                        draft.pacingStrategy == strategy
+                                            ? [.isSelected] : []
+                                    )
+                                }
                             }
                         }
                     }
