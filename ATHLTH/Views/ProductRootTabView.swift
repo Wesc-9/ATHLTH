@@ -11866,6 +11866,51 @@ struct ATHLTHTrainView: View {
                 selectedSection = .plan
             }
 
+        case let .startPlannedWorkout(planID, workoutID):
+            selectedSection = .today
+            if let workout = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == workoutID }) {
+                // The canonical launch flow revalidates completion, activity
+                // locks, session existence, device and workout structure.
+                openTodayPrimaryWorkout(
+                    workout, planID: planID, isHealthCompleted: false
+                )
+            } else {
+                watchTransferError = ATHLTHLocalization.choose(
+                    english: "This planned workout is no longer available.",
+                    norwegian: "Denne planlagte økten er ikke lenger tilgjengelig."
+                )
+            }
+
+        case let .sendPlannedWorkoutToWatch(planID, workoutID):
+            selectedSection = .today
+            if let workout = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == workoutID }) {
+                prepareTodayWorkoutForAppleWatch(workout, planID: planID)
+            } else {
+                watchTransferError = ATHLTHLocalization.choose(
+                    english: "This planned workout is no longer available.",
+                    norwegian: "Denne planlagte økten er ikke lenger tilgjengelig."
+                )
+            }
+
+        case let .delayPlannedWorkout(planID, workoutID, seconds):
+            selectedSection = .today
+            if let workout = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == workoutID }) {
+                scheduleTodayWorkoutStart(
+                    workout, planID: planID, after: seconds
+                )
+            } else {
+                watchTransferError = ATHLTHLocalization.choose(
+                    english: "This planned workout is no longer available.",
+                    norwegian: "Denne planlagte økten er ikke lenger tilgjengelig."
+                )
+            }
+
         case let .quick(kind):
             selectedSection = .today
             handleQuickStart(kind)
