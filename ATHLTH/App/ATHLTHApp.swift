@@ -2700,6 +2700,9 @@ struct AppRootView: View {
                 )
             }
 
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
+
             let routeLocations:
                 [CLLocation]
             if let workoutID =
@@ -2714,6 +2717,9 @@ struct AppRootView: View {
             } else {
                 routeLocations = []
             }
+
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
 
             await homeAssistant.sendCompletedWorkout(
                 name: publishable.title,
@@ -2736,12 +2742,21 @@ struct AppRootView: View {
                 device: "Apple Watch"
             )
 
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
+
             await refreshHealthAfterWatchCompletion()
+
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
 
             await officialWeeklyChallenges
                 .syncCompletionState(
                     workouts: health.workouts
                 )
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
+
             syncAppleHealthProfileDetailsIfNeeded()
 
             await goals
@@ -2750,6 +2765,9 @@ struct AppRootView: View {
                     strength:
                         strengthWorkout
                 )
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
+
             notifications.syncGoalEvents(
                 from: goals.goals
             )
@@ -2770,6 +2788,9 @@ struct AppRootView: View {
                             .maximumHeartRateBPM
                 )
 
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
+
             await social.finishActiveWorkout(
                 sourceWorkoutID:
                     result
@@ -2777,6 +2798,9 @@ struct AppRootView: View {
                     result.id,
                 endedAt: result.endedAt
             )
+
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
 
             await gear.savePreparedGearUsage(
                 for: publishable
@@ -2786,6 +2810,9 @@ struct AppRootView: View {
                 .recordCompletedWorkout(
                     publishable
                 )
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
+
             notifications
                 .syncGearUsageAlerts(
                     from: gear
@@ -2796,6 +2823,9 @@ struct AppRootView: View {
                 sourceIDs:
                     completionSourceIDs
             )
+
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
 
             await handleCompletedWorkoutReview(
                 publishable
