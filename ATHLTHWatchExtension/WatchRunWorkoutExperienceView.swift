@@ -34,6 +34,7 @@ struct WatchRunWorkoutExperienceView: View {
 
     @State private var coachOutputName: String?
     @State private var confirmingEnd = false
+    @State private var showingQuickActions = false
     @State private var showingAutomaticIndoorSuggestion = false
     @State private var showingManualIndoorChoice = false
     @State private var ghostMapPosition:
@@ -186,6 +187,36 @@ struct WatchRunWorkoutExperienceView: View {
             Button(ATHLTHLocalization.choose(
                 english: "Cancel", norwegian: "Avbryt"
             ), role: .cancel) {}
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Workout controls", norwegian: "Øktkontroller"
+            ),
+            isPresented: $showingQuickActions,
+            titleVisibility: .visible
+        ) {
+            if workoutManager.state == .paused {
+                Button(ATHLTHLocalization.choose(
+                    english: "Resume workout", norwegian: "Fortsett økt"
+                )) { workoutManager.resume() }
+            } else if workoutManager.state == .running {
+                Button(ATHLTHLocalization.choose(
+                    english: "Pause workout", norwegian: "Pause økt"
+                )) { workoutManager.pause() }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Finish workout…", norwegian: "Avslutt økt …"
+            ), role: .destructive) {
+                confirmingEnd = true
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Keep training", norwegian: "Fortsett å trene"
+            ), role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Finishing always requires a separate confirmation.",
+                norwegian: "Avslutning må alltid bekreftes separat."
+            ))
         }
         .confirmationDialog(
             "End workout?",
@@ -1896,6 +1927,26 @@ struct WatchRunWorkoutExperienceView: View {
                          ? "PAUSE" : "LIVE")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundStyle(WatchTheme.textSecondary)
+
+                    Button {
+                        showingQuickActions = true
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(WatchTheme.textSecondary)
+                            .frame(width: 34, height: 34)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Workout controls, including finish",
+                        norwegian: "Øktkontroller, inkludert avslutt"
+                    ))
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Requires confirmation before ending",
+                        norwegian: "Krever bekreftelse før avslutning"
+                    ))
+                    .accessibilityIdentifier("athlth-watch-first-page-workout-controls")
                 }
 
                 if workoutManager.currentStructuredRunningStep != nil {
@@ -1985,6 +2036,31 @@ struct WatchRunWorkoutExperienceView: View {
                     .buttonStyle(.borderedProminent)
                     .tint(WatchTheme.liveAction)
                     .accessibilityIdentifier("athlth-watch-start-main-first-page")
+                }
+
+                if workoutManager.isNearVerifiedRouteFinish {
+                    Button {
+                        confirmingEnd = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "At the finish? End workout",
+                                norwegian: "Ved mål? Avslutt økt"
+                            ),
+                            systemImage: "flag.checkered"
+                        )
+                        .font(.system(size: compact ? 10 : 12, weight: .bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                        .frame(maxWidth: .infinity, minHeight: compact ? 31 : 39)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(WatchTheme.premiumGold)
+                    .accessibilityHint(ATHLTHLocalization.choose(
+                        english: "Requires confirmation; the workout does not end automatically",
+                        norwegian: "Krever bekreftelse; økten avsluttes ikke automatisk"
+                    ))
+                    .accessibilityIdentifier("athlth-watch-verified-route-finish")
                 }
 
                 Spacer(minLength: 0)
