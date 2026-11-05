@@ -1048,27 +1048,15 @@ enum WorkoutLaunchCoordinator {
                     )
                     : nil
 
-        // The configuration is stored with the prepared workout. If iPhone is
-        // still reachable after START, Audio Coach may use the phone audio
-        // route; Watch remains the fallback when the phone is unavailable.
-        var watchAudioCoach =
-            resolvedAudioCoach
-
-        if workoutMirroring != nil,
-           resolvedAudioCoach.enabled {
-            watchAudioCoach
-                .preferIPhoneAudioWhenReachable =
-                    true
-            watchAudioCoach
-                .useAcknowledgedVoiceLease = true
-            workoutMirroring?
-                .prepareIPhoneAudioCoach(
-                    watchAudioCoach
-                )
-        } else {
-            workoutMirroring?
-                .clearIPhoneAudioCoach()
-        }
+        // A Watch-owned workout speaks through the Watch audio session.
+        // The iPhone mirror is visual/control-only: a phone voice lease
+        // would route routine prompts to the iPhone speaker while Ghost
+        // alerts still came from Watch, splitting the user's headphone
+        // experience across two devices.
+        var watchAudioCoach = resolvedAudioCoach
+        watchAudioCoach.preferIPhoneAudioWhenReachable = false
+        watchAudioCoach.useAcknowledgedVoiceLease = false
+        workoutMirroring?.clearIPhoneAudioCoach()
 
         let preparedSummary: String = {
             if let advanced = configuration.advancedWorkout {
@@ -1295,21 +1283,10 @@ enum WorkoutLaunchCoordinator {
             to: configuration.audioCoach
         )
 
-        if workoutMirroring != nil,
-           configuration.audioCoach.enabled {
-            watchAudioCoach
-                .preferIPhoneAudioWhenReachable =
-                    true
-            watchAudioCoach
-                .useAcknowledgedVoiceLease = true
-            workoutMirroring?
-                .prepareIPhoneAudioCoach(
-                    watchAudioCoach
-                )
-        } else {
-            workoutMirroring?
-                .clearIPhoneAudioCoach()
-        }
+        // Walking on Watch uses the same single speaker rule as running.
+        watchAudioCoach.preferIPhoneAudioWhenReachable = false
+        watchAudioCoach.useAcknowledgedVoiceLease = false
+        workoutMirroring?.clearIPhoneAudioCoach()
 
         watchConnection
             .sendAudioCoachConfiguration(
