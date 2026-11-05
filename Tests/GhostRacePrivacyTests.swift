@@ -1,3 +1,4 @@
+import CoreLocation
 import XCTest
 @testable import ATHLTH
 
@@ -397,15 +398,33 @@ final class GhostRacePrivacyTests: XCTestCase {
         let store = GhostRaceStore()
         try store.prepare(reference: reference)
 
-        // At 60s the Ghost is only 200m in, but the user is already at
-        // the halfway GPS point. Matching must use actual course progress.
+        // A 1 km GPS teleport after only 60 seconds cannot earn a lead:
+        // the course speed check must reject physically impossible progress.
+        func trustedFix() -> CLLocation {
+            CLLocation(
+                coordinate: reference.points[10].coordinate,
+                altitude: 0,
+                horizontalAccuracy: 5,
+                verticalAccuracy: 5,
+                timestamp: Date()
+            )
+        }
         store.updatePhoneWorkout(
-            location: reference.points[10].location,
+            location: trustedFix(),
             elapsedTime: 60,
             state: .running,
             routeProgressPercent: 50
         )
+        XCTAssertNil(store.comparison)
 
+        // At 120 seconds the same verified course position is plausible,
+        // and the runner is 600m ahead of the Ghost, which is at 400m.
+        store.updatePhoneWorkout(
+            location: trustedFix(),
+            elapsedTime: 120,
+            state: .running,
+            routeProgressPercent: 50
+        )
         let comparison = try XCTUnwrap(store.comparison)
         XCTAssertEqual(comparison.userProgress, 0.5, accuracy: 0.02)
         XCTAssertGreaterThan(comparison.signedDistanceMeters, 500)
