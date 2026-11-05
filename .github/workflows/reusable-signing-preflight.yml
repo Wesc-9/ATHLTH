@@ -10,6 +10,7 @@ on:
       - scripts/tests/test_reusable_apple_signing_identity.py
       - scripts/restore_reusable_app_store_signing.sh
       - scripts/prepare_ephemeral_app_store_signing.sh
+      - scripts/cleanup_ephemeral_app_store_signing.sh
       - .github/workflows/testflight.yml
       - .github/workflows/reusable-signing-preflight.yml
   pull_request:
@@ -18,6 +19,7 @@ on:
       - scripts/tests/test_reusable_apple_signing_identity.py
       - scripts/restore_reusable_app_store_signing.sh
       - scripts/prepare_ephemeral_app_store_signing.sh
+      - scripts/cleanup_ephemeral_app_store_signing.sh
       - .github/workflows/testflight.yml
       - .github/workflows/reusable-signing-preflight.yml
 
@@ -38,6 +40,7 @@ jobs:
       - name: Validate CI signing shell scripts
         run: |
           bash -n scripts/prepare_ephemeral_app_store_signing.sh
+          bash -n scripts/cleanup_ephemeral_app_store_signing.sh
           bash -n scripts/restore_reusable_app_store_signing.sh
       - name: Verify encryption, decryption and certificate safeguards
         run: python -m unittest discover -s scripts/tests -p 'test_reusable_apple_signing_identity.py' -v
