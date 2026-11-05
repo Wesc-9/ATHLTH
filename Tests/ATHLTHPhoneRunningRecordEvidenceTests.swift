@@ -3,13 +3,15 @@ import XCTest
 
 final class ATHLTHPhoneRunningRecordEvidenceTests: XCTestCase {
     private func run(start: Date, seconds: Double, meters: Double) -> PhoneWorkout {
-        PhoneWorkout(
+        var workout = PhoneWorkout(
             walking: false,
             start: start,
             end: start.addingTimeInterval(seconds),
             lastCheckpoint: start.addingTimeInterval(seconds),
             distanceMeters: meters
         )
+        workout.accumulatedSeconds = seconds
+        return workout
     }
 
     func testFirstRunDoesNotClaimPersonalRecord() {
