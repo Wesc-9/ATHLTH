@@ -535,7 +535,26 @@ struct ATHLTHiPadStudioRootView: View {
                 focusedPlanningDate: $focusedPlanningDate
             )
         case .planner:
-            ATHLTHStudioPlannerView()
+            ATHLTHStudioPlannerView(
+                onStartWorkout: { planID, workoutID in
+                    trainRequest = .startPlannedWorkout(
+                        planID: planID, workoutID: workoutID
+                    )
+                    showingTrain = true
+                },
+                onSendToWatch: { planID, workoutID in
+                    trainRequest = .sendPlannedWorkoutToWatch(
+                        planID: planID, workoutID: workoutID
+                    )
+                    showingTrain = true
+                },
+                onStartAfter: { planID, workoutID, seconds in
+                    trainRequest = .startPlannedWorkoutAfter(
+                        planID: planID, workoutID: workoutID, seconds: seconds
+                    )
+                    showingTrain = true
+                }
+            )
         case .insights:
             ATHLTHStudioInsightsView()
         case .history:
