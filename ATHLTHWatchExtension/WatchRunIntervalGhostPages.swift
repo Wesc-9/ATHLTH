@@ -231,7 +231,8 @@ struct WatchRunIntervalFocusPage: View {
                         step.phase == "cooldown" ||
                         step.measure == .open ||
                         workoutPlan.autoAdvanceTimedSteps == false),
-                       workout.state == .running {
+                       workout.state == .running,
+                       (workout.awaitingMainStart || workout.nextStructuredRunningStep != nil) {
                         Button {
                             workout.advanceStructuredRunningWorkoutManually()
                         } label: {
