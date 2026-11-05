@@ -207,18 +207,20 @@ final class MirroredWorkoutAudioCoach:
 
         if snapshot.state == .completed {
             finished = true
-
-            if configuration
-                .shouldAnnounceWorkoutComplete {
-                speak(
+            if configuration.shouldAnnounceWorkoutComplete {
+                let highlights = ATHLTHWorkoutCompletionSpokenSummary.make(
+                    elapsedSeconds: snapshot.confirmedActiveDuration,
+                    distanceMeters: snapshot.distanceMeters,
+                    averageHeartRateBPM: snapshot.averageHeartRate
+                )
+                // Never rely on an Azure fallback after 'finished' becomes
+                // true: its asynchronous completion callback is deliberately
+                // suppressed after a stopped workout. Local speech is safe.
+                speakFinishedWorkoutRecap(
                     phrase(
-                        english:
-                            "Workout complete. Nice work.",
-                        norwegian:
-                            "Økten er fullført. Bra jobbet."
-                    ),
-                    priority:
-                        .structuredStep
+                        english: highlights.english,
+                        norwegian: highlights.norwegian
+                    )
                 )
             }
         } else if snapshot.state == .failed {
@@ -858,6 +860,27 @@ final class MirroredWorkoutAudioCoach:
                 ? norwegian
                 : english
         }
+    }
+
+    private func speakFinishedWorkoutRecap(_ phrase: String) {
+        guard configuration.enabled, !phrase.isEmpty else { return }
+        azureCoachSpeech.stop()
+        synthesizer.stopSpeaking(at: .immediate)
+        guidanceGate.reset()
+
+        let utterance = AVSpeechUtterance(string: phrase)
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: configuration.voiceIdentifier,
+            language: configuration.language
+        )
+        utterance.rate = configuration.resolvedSpeechRate
+        utterance.volume = configuration.resolvedSpeechVolume
+        try? ATHLTHSpokenAudioSession.activate(
+            duckOtherAudio: configuration.shouldDuckOtherAudio,
+            owner: audioOwner
+        )
+        synthesizer.speak(utterance)
+        watchLocalSpeech(utterance)
     }
 
     private func speak(
