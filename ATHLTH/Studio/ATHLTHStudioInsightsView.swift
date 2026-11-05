@@ -7,6 +7,7 @@ struct ATHLTHStudioInsightsView: View {
     @EnvironmentObject private var health: HealthKitManager
     @SceneStorage("athlth.studio.insights.periodDays") private var periodDays = 28
     @State private var showingDetailedInsights = false
+    @State private var showingSpecificProgress = false
 
     private var result: ATHLTHStudioAnalytics.Snapshot {
         ATHLTHStudioAnalytics.snapshot(from: health.workouts, days: periodDays)
@@ -131,6 +132,15 @@ struct ATHLTHStudioInsightsView: View {
                 }
                 ATHLTHStudioProgressExplorerView()
                 Button {
+                    showingSpecificProgress = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Analyze a specific exercise or 4 × 4 interval",
+                        norwegian: "Analyser en bestemt øvelse eller 4 × 4-intervall"
+                    ), systemImage: "chart.line.uptrend.xyaxis")
+                }
+                .buttonStyle(.bordered)
+                Button {
                     showingDetailedInsights = true
                 } label: {
                     Label(ATHLTHLocalization.choose(
@@ -153,6 +163,17 @@ struct ATHLTHStudioInsightsView: View {
         }
         .sheet(isPresented: $showingDetailedInsights) {
             ATHLTHInsightsView()
+        }
+        .sheet(isPresented: $showingSpecificProgress) {
+            NavigationStack {
+                ATHLTHSpecificProgressView()
+                    .navigationTitle(ATHLTHLocalization.choose(
+                        english: "Specific training progress",
+                        norwegian: "Spesifikk treningsutvikling"
+                    ))
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .presentationDetents([.large])
         }
     }
 
