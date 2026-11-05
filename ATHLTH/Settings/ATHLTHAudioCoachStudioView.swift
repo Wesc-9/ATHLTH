@@ -434,6 +434,86 @@ struct ATHLTHAudioCoachStudioView: View {
             icon: "bolt.heart"
         ) {
             VStack(alignment: .leading, spacing: 12) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose your coaching energy",
+                    norwegian: "Velg hvor tett coachen skal følge deg"
+                ))
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTheme.primaryText)
+
+                HStack(spacing: 8) {
+                    Button {
+                        settings.audioCoachSmartSettings.motivationEnabled = true
+                        settings.audioCoachSmartSettings.motivationIntervalSeconds = 180
+                        settings.audioCoachSmartSettings.randomEncouragementEnabled = false
+                        settings.audioCoachSpeechStyle = .motivating
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "hand.thumbsup.fill")
+                                .foregroundStyle(ATHLTHTheme.premiumGold)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Praise", norwegian: "Gi skryt"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            Text("3 min")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 68)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        settings.audioCoachSmartSettings.motivationEnabled = true
+                        settings.audioCoachSmartSettings.motivationIntervalSeconds = 60
+                        settings.audioCoachSmartSettings.randomEncouragementEnabled = true
+                        settings.audioCoachSmartSettings.randomIntervalSeconds = 180
+                        settings.audioCoachSpeechStyle = .motivating
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "heart.fill")
+                                .foregroundStyle(ATHLTHTheme.premiumGold)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Encourage", norwegian: "Oppmuntre"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            Text("1 min")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 68)
+                    }
+                    .buttonStyle(.bordered)
+
+                    Button {
+                        settings.audioCoachSmartSettings.motivationEnabled = true
+                        settings.audioCoachSmartSettings.motivationIntervalSeconds = 30
+                        settings.audioCoachSmartSettings.randomEncouragementEnabled = true
+                        settings.audioCoachSmartSettings.randomIntervalSeconds = 90
+                        settings.audioCoachSpeechStyle = .motivating
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "bolt.fill")
+                                .foregroundStyle(ATHLTHTheme.premiumGold)
+                            Text(ATHLTHLocalization.choose(
+                                english: "More push", norwegian: "Mer push"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            Text("30 sek")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 68)
+                    }
+                    .buttonStyle(.bordered)
+                }
+                Text(ATHLTHLocalization.choose(
+                    english: "These options use the existing motivational voice and change how often it speaks, not your workout metrics or music.",
+                    norwegian: "Valgene bruker dagens motivasjonsstemme og styrer hvor ofte den snakker – ikke treningsdata eller musikk."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+
                 Toggle(ATHLTHLocalization.choose(
                     english: "Enable motivational updates",
                     norwegian: "Motiverende oppdateringer"
