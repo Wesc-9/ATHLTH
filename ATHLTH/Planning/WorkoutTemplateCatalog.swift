@@ -4207,6 +4207,20 @@ struct WorkoutTemplateBuilderView: View {
     @ViewBuilder
     private var studioPlanWorkspace: some View {
         if studioFullscreenEditing {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) {
+                    Label(tr("WORKOUT BUILDER", "ØKTBYGGER"),
+                          systemImage: "slider.horizontal.3")
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.0)
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Spacer(minLength: 8)
+                    ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
+                        .accessibilityIdentifier("athlth-ipad-workout-mode")
+                }
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+
             // A landscape iPad gets a genuine two-column workbench;
             // Stage Manager's narrow windows keep the same stacked editor.
             ViewThatFits(in: .horizontal) {
@@ -4223,6 +4237,7 @@ struct WorkoutTemplateBuilderView: View {
                     studioPlanHeader
                     plannedStudio
                 }
+            }
             }
         } else {
             studioPlanHeader
@@ -4499,7 +4514,7 @@ struct WorkoutTemplateBuilderView: View {
                 : tr("Build planned workout", "Bygg planlagt økt"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if isPlannedWorkout {
+                if isPlannedWorkout && !studioFullscreenEditing {
                     ToolbarItem(placement: .confirmationAction) {
                         ATHLTHPlannerModeSwitch(advanced: $studioAdvanced)
                     }
