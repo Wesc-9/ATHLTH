@@ -887,7 +887,7 @@ struct PerWorkoutGhostView: View {
                                         .padding(11)
                                         .background(
                                             draft.pacingStrategy == strategy
-                                                ? ATHLTHPlanDesign.accentSoft
+                                                ? ATHLTHTheme.accentSoft
                                                 : ATHLTHPlanDesign.surface,
                                             in: RoundedRectangle(cornerRadius: 14)
                                         )
