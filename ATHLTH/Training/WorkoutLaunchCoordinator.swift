@@ -855,8 +855,8 @@ enum WorkoutLaunchCoordinator {
 
             try ghostRace.prepareTarget(
                 route: selectedRoute,
-                targetDurationSeconds:
-                    targetDuration
+                targetDurationSeconds: targetDuration,
+                strategy: configuration.ghostPacingStrategy
             )
         } else {
             ghostRace?.cancel()
