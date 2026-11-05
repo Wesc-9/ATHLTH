@@ -56,6 +56,14 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
         }
     }
 
+    private var hasTwoUsableAltitudeProfiles: Bool {
+        guard workouts.count == 2 else { return false }
+        let grouped = Set(points.map(\.run))
+        return grouped.contains(0) && grouped.contains(1) &&
+            points.filter { $0.run == 0 }.count >= 3 &&
+            points.filter { $0.run == 1 }.count >= 3
+    }
+
     private func pace(_ workout: WorkoutSummary) -> String {
         guard let km = workout.distanceKilometers, km > 0.25,
               workout.duration.isFinite, workout.duration > 0 else { return "—" }
@@ -99,7 +107,7 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
                             Text(tr("Elevation along each recorded GPS route",
                                     "Høyde langs hver registrerte GPS-rute"))
                                 .font(.headline)
-                            if points.count >= 6 {
+                            if hasTwoUsableAltitudeProfiles {
                                 Chart {
                                     ForEach(points) { point in
                                         LineMark(
