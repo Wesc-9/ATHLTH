@@ -205,6 +205,10 @@ final class HealthKitManager: ObservableObject {
     private var backgroundRefreshTask: Task<Void, Never>?
     private var backgroundRefreshNeedsFull = false
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
+    // Coalesce profile, trophy and performance consumers sharing an expired
+    // all-time HealthKit snapshot. They should never issue parallel unlimited
+    // HKSampleQuery requests for the same history.
+    private var allWorkoutsFetchTask: Task<[HKWorkout], Error>?
     private var workoutPeakCache:
         (records: [ATHLTHWorkoutHeartRatePeak], generatedAt: Date)?
     // Background auto-updates scan only a few uncached sample histories.
@@ -5713,13 +5717,23 @@ final class HealthKitManager: ObservableObject {
             return cached.workouts
         }
 
-        let fetched = try await fetchAllWorkouts()
+        if let inFlight = allWorkoutsFetchTask {
+            return try await inFlight.value
+        }
+
+        let fetch = Task { @MainActor in
+            let signpost = ATHLTHPerformance.begin("HealthHistoricalRead")
+            defer {
+                ATHLTHPerformance.end("HealthHistoricalRead", id: signpost)
+            }
+            return try await fetchAllWorkouts()
+        }
+        allWorkoutsFetchTask = fetch
+        defer { allWorkoutsFetchTask = nil }
+        let fetched = try await fetch.value
+
         allWorkoutsCache = (fetched, Date())
-
-        cacheWorkoutObjects(
-            fetched
-        )
-
+        cacheWorkoutObjects(fetched)
         return fetched
     }
 
