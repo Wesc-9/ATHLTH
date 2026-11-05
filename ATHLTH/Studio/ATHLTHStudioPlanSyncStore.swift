@@ -37,6 +37,10 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         let p_body_base64: String
     }
 
+    // MainActor serializes plan writes across multiple Stage Manager windows
+    // using different ATHLTHStudioPlanSyncStore instances for one account.
+    private static var accountsWithNetworkMutation = Set<UUID>()
+
     private let client = SupabaseEnvironment.client
     private var accountID: UUID?
     private var acknowledgements: [String: ATHLTHStudioPlanSyncDecision.Acknowledgement] = [:]
@@ -78,8 +82,19 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
         else { return }
 
         let userID = session.profile.userID
+        guard !Self.accountsWithNetworkMutation.contains(userID) else {
+            status = ATHLTHLocalization.choose(
+                english: "Another ATHLTH window is updating this account. Retry shortly.",
+                norwegian: "Et annet ATHLTH-vindu oppdaterer kontoen. Prøv igjen om litt."
+            )
+            return
+        }
+        Self.accountsWithNetworkMutation.insert(userID)
         isBusy = true
-        defer { isBusy = false }
+        defer {
+            Self.accountsWithNetworkMutation.remove(userID)
+            isBusy = false
+        }
         if shouldEnable {
             do {
                 guard client.auth.currentUser?.id == userID else {
@@ -155,8 +170,31 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
               client.auth.currentUser?.id == userID
         else { return }
 
+        // Disabling in another iPad window immediately invalidates the
+        // persisted consent. A stale scene must not upload old local plans.
+        guard AccountLocalStorage.read(
+            Bool.self, name: "studioPlanSyncConsent", userID: userID
+        ) == true else {
+            enabled = false
+            status = ATHLTHLocalization.choose(
+                english: "Plan sync is off on this device.",
+                norwegian: "Plansynkronisering er av på denne enheten."
+            )
+            return
+        }
+        guard !Self.accountsWithNetworkMutation.contains(userID) else {
+            status = ATHLTHLocalization.choose(
+                english: "Another ATHLTH window is synchronizing this account.",
+                norwegian: "Et annet ATHLTH-vindu synkroniserer denne kontoen."
+            )
+            return
+        }
+        Self.accountsWithNetworkMutation.insert(userID)
         isBusy = true
-        defer { isBusy = false }
+        defer {
+            Self.accountsWithNetworkMutation.remove(userID)
+            isBusy = false
+        }
         var unresolved: [Conflict] = []
 
         do {
@@ -266,8 +304,25 @@ final class ATHLTHStudioPlanSyncStore: ObservableObject {
               let userID = accountID,
               userID == session.profile.userID, session.signedIn
         else { return }
+        guard AccountLocalStorage.read(
+            Bool.self, name: "studioPlanSyncConsent", userID: userID
+        ) == true else {
+            enabled = false
+            return
+        }
+        guard !Self.accountsWithNetworkMutation.contains(userID) else {
+            status = ATHLTHLocalization.choose(
+                english: "Plan changes are in progress in another window.",
+                norwegian: "Planendringer pågår i et annet vindu."
+            )
+            return
+        }
+        Self.accountsWithNetworkMutation.insert(userID)
         isBusy = true
-        defer { isBusy = false }
+        defer {
+            Self.accountsWithNetworkMutation.remove(userID)
+            isBusy = false
+        }
         do {
             let rows: [RemotePlan] = try await client.from("studio_plan_documents")
                 .select("plan_id,revision,body_base64")
