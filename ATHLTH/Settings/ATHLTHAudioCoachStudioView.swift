@@ -22,6 +22,7 @@ struct ATHLTHAudioCoachStudioView: View {
     @State private var customPhrase = ""
     @State private var placeSearch = ""
     @State private var placeSide: ATHLTHCoachLandmarkSide = .unspecified
+    @State private var placeKind: ATHLTHCoachLandmarkKind = .ordinary
     @State private var foundPlaces: [ATHLTHAudioCoachPlaceCandidate] = []
     @State private var searching = false
     @State private var placeError: String?
@@ -444,6 +445,7 @@ struct ATHLTHAudioCoachStudioView: View {
                 HStack(spacing: 8) {
                     Button {
                         settings.audioCoachSmartSettings.motivationEnabled = true
+                        settings.audioCoachSmartSettings.encouragementStyle = .praise
                         settings.audioCoachSmartSettings.motivationIntervalSeconds = 180
                         settings.audioCoachSmartSettings.randomEncouragementEnabled = false
                         settings.audioCoachSpeechStyle = .motivating
@@ -465,6 +467,7 @@ struct ATHLTHAudioCoachStudioView: View {
 
                     Button {
                         settings.audioCoachSmartSettings.motivationEnabled = true
+                        settings.audioCoachSmartSettings.encouragementStyle = .encouragement
                         settings.audioCoachSmartSettings.motivationIntervalSeconds = 60
                         settings.audioCoachSmartSettings.randomEncouragementEnabled = true
                         settings.audioCoachSmartSettings.randomIntervalSeconds = 180
@@ -487,6 +490,7 @@ struct ATHLTHAudioCoachStudioView: View {
 
                     Button {
                         settings.audioCoachSmartSettings.motivationEnabled = true
+                        settings.audioCoachSmartSettings.encouragementStyle = .push
                         settings.audioCoachSmartSettings.motivationIntervalSeconds = 45
                         settings.audioCoachSmartSettings.randomEncouragementEnabled = true
                         settings.audioCoachSmartSettings.randomIntervalSeconds = 90
@@ -508,8 +512,8 @@ struct ATHLTHAudioCoachStudioView: View {
                     .buttonStyle(.bordered)
                 }
                 Text(ATHLTHLocalization.choose(
-                    english: "These options use the existing motivational voice and change how often it speaks, not your workout metrics or music.",
-                    norwegian: "Valgene bruker dagens motivasjonsstemme og styrer hvor ofte den snakker – ikke treningsdata eller musikk."
+                    english: "Each style has different phrases. Recent lines are not repeated; verified hills and the final stretch can shape the message.",
+                    norwegian: "Hver stil har egne, varierte setninger. Nylige beskjeder gjentas ikke; bekreftede bakker og siste etappe kan påvirke innholdet."
                 ))
                 .font(.caption)
                 .foregroundStyle(ATHLTHTheme.mutedText)
@@ -532,9 +536,18 @@ struct ATHLTHAudioCoachStudioView: View {
                         .font(.subheadline)
                     }
                 }
+                Toggle(ATHLTHLocalization.choose(
+                    english: "Use reliable terrain and route context",
+                    norwegian: "Bruk sikre bakke- og rutedata i motivasjonen"
+                ), isOn: Binding(
+                    get: { settings.audioCoachSmartSettings.contextualFeedbackEnabled ?? true },
+                    set: { settings.audioCoachSmartSettings.contextualFeedbackEnabled = $0 }
+                ))
+                .tint(ATHLTHTheme.accentDeep)
+
                 info(ATHLTHLocalization.choose(
-                    english: "Pace feedback is based on measured data. Personal bests are never claimed without verified records.",
-                    norwegian: "Tempokommentarer bruker målte data. Personlig rekord påstås aldri uten verifiserte resultater."
+                    english: "Hills require fresh accurate GPS elevation, the last stretch needs real route progress. Sea or home is only mentioned for places you explicitly mark below. No invented personal records.",
+                    norwegian: "Bakker krever nøyaktig, oppdatert GPS-høyde, og siste etappe krever faktisk rutefremdrift. Sjø eller hjemme nevnes bare når du selv markerer disse stedene nedenfor. Ingen oppdiktede rekorder."
                 ))
             }
         }
@@ -644,7 +657,8 @@ struct ATHLTHAudioCoachStudioView: View {
                             .foregroundStyle(ATHLTHTheme.accentDeep)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(landmark.name).font(.subheadline.weight(.semibold))
-                            Text(landmark.side.title).font(.caption)
+                            Text((landmark.kind ?? .ordinary).title + " · " + landmark.side.title)
+                                .font(.caption)
                                 .foregroundStyle(ATHLTHTheme.mutedText)
                         }
                         Spacer()
@@ -670,6 +684,16 @@ struct ATHLTHAudioCoachStudioView: View {
                 .padding(12)
                 .background(ATHLTHTheme.canvasTop,
                             in: RoundedRectangle(cornerRadius: 12))
+                Picker(ATHLTHLocalization.choose(
+                    english: "What kind of place?",
+                    norwegian: "Hva slags sted?"
+                ), selection: $placeKind) {
+                    ForEach(ATHLTHCoachLandmarkKind.allCases) { kind in
+                        Text(kind.title).tag(kind)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 Picker(ATHLTHLocalization.choose(
                     english: "Which side?", norwegian: "Hvilken side?"
                 ), selection: $placeSide) {
@@ -700,11 +724,13 @@ struct ATHLTHAudioCoachStudioView: View {
                                 name: candidate.name,
                                 latitude: candidate.latitude,
                                 longitude: candidate.longitude,
-                                side: placeSide
+                                side: placeSide,
+                                kind: placeKind
                             )
                         )
                         foundPlaces = []
                         placeSearch = ""
+                        placeKind = .ordinary
                         placeError = nil
                     } label: {
                         HStack {
@@ -724,8 +750,8 @@ struct ATHLTHAudioCoachStudioView: View {
                     .disabled(settings.audioCoachSmartSettings.landmarks.count >= 30)
                 }
                 info(ATHLTHLocalization.choose(
-                    english: "Outdoor GPS only. The selected side is read as you entered it; it is not inferred from your direction of travel.",
-                    norwegian: "Kun utendørs med god GPS. Valgt side leses slik du har angitt den, ikke beregnet ut fra løperetningen."
+                    english: "Sea and home cues are used only for places you classify yourself. Outdoor GPS must be fresh and accurate. ATHLTH never guesses which side of the street a place is on.",
+                    norwegian: "Beskjeder om sjøen og hjemmet brukes bare for steder du selv merker. GPS må være nøyaktig og oppdatert. ATHLTH gjetter ikke hvilken side et sted ligger på."
                 ))
             }
         }
