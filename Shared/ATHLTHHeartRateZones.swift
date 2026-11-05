@@ -3,6 +3,24 @@ import Foundation
 /// Single range calculation for Training Plan and live workouts.
 /// A zone is a target, never a claim that a pulse has been measured.
 enum ATHLTHHeartRateZones {
+    /// Shared free-run/plan/Ghost HRmax source. A configured maximum takes
+    /// precedence; age estimate is a fallback, never a measured heart rate.
+    static func resolvedMaximumBPM(
+        configured: Int?,
+        dateOfBirth: Date?,
+        now: Date = Date()
+    ) -> Double? {
+        if let configured, (100...240).contains(configured) {
+            return Double(configured)
+        }
+        guard let dateOfBirth else { return nil }
+        let age = Calendar.current.dateComponents(
+            [.year], from: dateOfBirth, to: now
+        ).year ?? 0
+        guard (18...100).contains(age) else { return nil }
+        return max(100, 208 - 0.7 * Double(age))
+    }
+
     static func range(for zone: Int, maximumBPM: Double?) -> ClosedRange<Int>? {
         guard (1...5).contains(zone),
               let maximumBPM, maximumBPM.isFinite,
