@@ -16,7 +16,8 @@ enum GhostRaceStartService {
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore? = nil,
         captureDevice: WorkoutCaptureDevice = .appleWatch,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        maximumHeartRateBPM: Double? = nil
     ) async throws {
         try ghostRace.prepare(
             workoutID: workoutID,
@@ -35,7 +36,8 @@ enum GhostRaceStartService {
             watchConnection: watchConnection,
             phoneWorkout: phoneWorkout,
             captureDevice: captureDevice,
-            settings: settings
+            settings: settings,
+            maximumHeartRateBPM: maximumHeartRateBPM
         )
     }
 
@@ -48,7 +50,8 @@ enum GhostRaceStartService {
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore? = nil,
         captureDevice: WorkoutCaptureDevice = .appleWatch,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        maximumHeartRateBPM: Double? = nil
     ) async throws {
         try ghostRace.prepare(
             reference: reference
@@ -65,7 +68,8 @@ enum GhostRaceStartService {
             watchConnection: watchConnection,
             phoneWorkout: phoneWorkout,
             captureDevice: captureDevice,
-            settings: settings
+            settings: settings,
+            maximumHeartRateBPM: maximumHeartRateBPM
         )
     }
 
@@ -109,7 +113,8 @@ enum GhostRaceStartService {
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore? = nil,
         captureDevice: WorkoutCaptureDevice = .appleWatch,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        maximumHeartRateBPM: Double? = nil
     ) async throws {
         try await start(
             workoutID: workout.id,
@@ -125,7 +130,8 @@ enum GhostRaceStartService {
             watchConnection: watchConnection,
             phoneWorkout: phoneWorkout,
             captureDevice: captureDevice,
-            settings: settings
+            settings: settings,
+            maximumHeartRateBPM: maximumHeartRateBPM
         )
     }
 
@@ -137,7 +143,8 @@ enum GhostRaceStartService {
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore? = nil,
         captureDevice: WorkoutCaptureDevice = .appleWatch,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        maximumHeartRateBPM: Double? = nil
     ) async throws {
         try await start(
             workoutID: workout.id,
@@ -153,7 +160,8 @@ enum GhostRaceStartService {
             watchConnection: watchConnection,
             phoneWorkout: phoneWorkout,
             captureDevice: captureDevice,
-            settings: settings
+            settings: settings,
+            maximumHeartRateBPM: maximumHeartRateBPM
         )
     }
 
@@ -166,7 +174,8 @@ enum GhostRaceStartService {
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore? = nil,
         captureDevice: WorkoutCaptureDevice = .appleWatch,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        maximumHeartRateBPM: Double? = nil
     ) async throws {
         let detail =
             await health.workoutDetail(
@@ -192,7 +201,8 @@ enum GhostRaceStartService {
             watchConnection: watchConnection,
             phoneWorkout: phoneWorkout,
             captureDevice: captureDevice,
-            settings: settings
+            settings: settings,
+            maximumHeartRateBPM: maximumHeartRateBPM
         )
     }
 
