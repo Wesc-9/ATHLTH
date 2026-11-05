@@ -21,6 +21,7 @@ struct ATHLTHStudioPlannerView: View {
     @State private var moveError: String?
     @State private var showingLegacyOverview = false
     @State private var showingScenarioPreview = false
+    @State private var showingCoachAdaptation = false
 
     private enum DragMode: String, CaseIterable, Identifiable {
         case move, copy
@@ -48,6 +49,21 @@ struct ATHLTHStudioPlannerView: View {
                 }
                 Spacer(minLength: 4)
                 if plan != nil {
+                    if session.activePlan != nil {
+                        Button {
+                            showingCoachAdaptation = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Coach plan suggestions",
+                                    norwegian: "Coach-forslag til planen"
+                                ),
+                                systemImage: "wand.and.stars"
+                            )
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("athlth-ipad-coach-plan-adaptation")
+                    }
                     Button {
                         showingScenarioPreview = true
                     } label: {
@@ -92,6 +108,10 @@ struct ATHLTHStudioPlannerView: View {
             }
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
+        .sheet(isPresented: $showingCoachAdaptation) {
+            CoachPlanAdaptationView()
+                .presentationDetents([.large])
+        }
         .sheet(isPresented: $showingScenarioPreview) {
             if let plan {
                 ATHLTHStudioPlanningScenarioView(
