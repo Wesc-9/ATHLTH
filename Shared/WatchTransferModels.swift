@@ -1501,6 +1501,10 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var strengthCommands: [WatchStrengthCommand]? = nil
     // Authoritative Watch-side pet participation, including offline sessions.
     var petSegments: [WatchPetParticipationSegment]? = nil
+    // Captured when the Watch workout starts, never at delayed delivery.
+    // Nil for legacy Watch versions; the phone must not silently attribute
+    // an unowned result to whichever user happens to be signed in.
+    var accountOwnerID: UUID? = nil
 }
 
 enum WatchWorkoutMirrorState: String, Codable, Hashable {
@@ -1928,6 +1932,12 @@ struct WatchPetCatalogTransfer: Codable, Hashable {
     let updatedAt: Date
 }
 
+/// Latest signed-in account identity for the companion Watch.
+struct WatchAccountIdentityTransfer: Codable, Hashable {
+    let ownerID: UUID?
+    let updatedAt: Date
+}
+
 struct WatchPetSelectionTransfer: Codable, Hashable {
     let ownerID: UUID
     let selectedPetIDs: [UUID]
@@ -1955,6 +1965,7 @@ enum WatchTransferKind: String {
     case todayWorkoutRequest
     case petCatalog
     case petSelection
+    case accountIdentity
     case strengthSnapshot
     case strengthCommand
     case spotifyCommand
