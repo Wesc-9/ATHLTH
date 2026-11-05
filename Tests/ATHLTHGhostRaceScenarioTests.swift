@@ -266,6 +266,88 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
                           "Main phase should start a new Ghost clock, not reuse warm-up time.")
     }
 
+    @MainActor
+    func testBadAccuracyOrOldGPSCannotCreateGhostLead() throws {
+        let route = reference()
+        let store = GhostRaceStore()
+        try store.prepare(reference: route)
+        let point = route.points[6]
+        let unreliable = CLLocation(
+            coordinate: point.coordinate,
+            altitude: 0,
+            horizontalAccuracy: 180,
+            verticalAccuracy: 5,
+            timestamp: Date()
+        )
+        store.updatePhoneWorkout(
+            location: unreliable, elapsedTime: 190, state: .running
+        )
+        XCTAssertNil(store.comparison)
+        let stale = CLLocation(
+            coordinate: point.coordinate,
+            altitude: 0,
+            horizontalAccuracy: 5,
+            verticalAccuracy: 5,
+            timestamp: Date().addingTimeInterval(-45)
+        )
+        store.updatePhoneWorkout(
+            location: stale, elapsedTime: 192, state: .running
+        )
+        XCTAssertNil(store.comparison)
+        store.updatePhoneWorkout(
+            location: trusted(point), elapsedTime: 195, state: .running
+        )
+        XCTAssertNotNil(store.comparison)
+    }
+
+    @MainActor
+    func testTargetPaceUsesTrueGeometryEvenWhenStoredMetadataIsWrong() throws {
+        let coordinates = (0...10).map { index in
+            RouteCoordinate(
+                latitude: 63.4305,
+                longitude: 10.3900 + Double(index) * 0.0007,
+                altitude: nil,
+                sequence: index
+            )
+        }
+        let route = TrainingRoute(
+            id: UUID(),
+            ownerID: UUID(),
+            title: "Sparse example",
+            visibility: .privateOnly,
+            coordinates: coordinates,
+            distanceKilometers: 10, // wrong legacy metadata
+            elevationGainMeters: nil,
+            importedFilename: nil,
+            createdAt: Date(),
+            startName: "A",
+            endName: "B",
+            expectedTravelTimeSeconds: nil,
+            routeSource: "test",
+            sharedSourceOwnerID: nil,
+            sharedSourceRouteID: nil
+        )
+        let courseKilometers = try XCTUnwrap(
+            GhostTargetRouteEligibility.geometryDistanceKilometers(route)
+        )
+        let duration = try XCTUnwrap(GhostTargetPaceFormatter.duration(
+            paceSeconds: 300, routeKilometers: courseKilometers
+        ))
+        let store = GhostRaceStore()
+        try store.prepareTarget(
+            route: route, targetDurationSeconds: duration
+        )
+        let reference = try XCTUnwrap(store.reference)
+        XCTAssertEqual(
+            reference.durationSeconds, courseKilometers * 300, accuracy: 0.6
+        )
+        XCTAssertEqual(
+            reference.routeDistanceMeters / 1_000, courseKilometers,
+            accuracy: 0.01
+        )
+        XCTAssertNotEqual(reference.durationSeconds, 3_000)
+    }
+
     func testTerrainGhostPreservesFinishTimeAndSlowsOnUphill() {
         let altitudes: [Double] = [0, 0, 5, 17, 25, 24, 10, 0, 0]
         let coordinates = altitudes.enumerated().map { i, altitude in
