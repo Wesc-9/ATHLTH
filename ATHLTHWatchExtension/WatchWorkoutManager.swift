@@ -4415,7 +4415,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                longitude: location.coordinate.longitude,
                horizontalAccuracy: location.horizontalAccuracy,
                locationAge: Date().timeIntervalSince(location.timestamp),
-               norwegian: norwegian
+               norwegian: norwegian,
+               elapsedSeconds: elapsedTime,
+               routeProgressPercent: routeProgressPercent
            ) {
             speak(
                 message,
