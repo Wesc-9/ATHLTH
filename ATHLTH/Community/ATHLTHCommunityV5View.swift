@@ -307,7 +307,9 @@ struct ATHLTHCommunityV5View: View {
                    Date().timeIntervalSince(lastBackgroundRefreshAt) < 90 {
                     return
                 }
+                let signpost = ATHLTHPerformance.begin("CommunityTabRefresh")
                 await refreshContent(force: false)
+                ATHLTHPerformance.end("CommunityTabRefresh", id: signpost)
                 guard !Task.isCancelled else { return }
                 lastBackgroundRefreshAccountID = accountID
                 lastBackgroundRefreshAt = Date()
