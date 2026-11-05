@@ -826,6 +826,16 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         )
     }
 
+    func sendAccountIdentity(_ ownerID: UUID?) {
+        // User identity is sent even if this account has no pets, planned
+        // workouts or routes. A logout sends nil to clear future ownership.
+        sendWatchPayload(
+            WatchAccountIdentityTransfer(ownerID: ownerID, updatedAt: Date()),
+            kind: .accountIdentity,
+            durable: true
+        )
+    }
+
     func sendPetCatalog(_ catalog: WatchPetCatalogTransfer) {
         // The Watch retains its last trusted catalog while offline.
         sendWatchPayload(catalog, kind: .petCatalog, durable: true)
