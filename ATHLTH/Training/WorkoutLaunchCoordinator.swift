@@ -679,7 +679,7 @@ enum WorkoutLaunchCoordinator {
         // Spotify App Remote runs in the iPhone app; it cannot choose the
         // Watch's Bluetooth audio target. Launching here can resume a remote
         // Spotify Connect speaker instead of the athlete's headphones.
-        guard captureDevice == .iPhone else { return }
+        guard ATHLTHSpotifyWorkoutOutputPolicy.mayAutoplayFromIPhone(for: captureDevice) else { return }
         let hasWorkoutOverride =
             workout.spotifyAutoplayOnStart != nil
 
@@ -716,7 +716,8 @@ enum WorkoutLaunchCoordinator {
     ) {
         // Never start iPhone Spotify App Remote for a Watch-owned workout.
         // Music on Watch is controlled locally in the installed Spotify app.
-        guard captureDevice == .iPhone, autoplay,
+        guard ATHLTHSpotifyWorkoutOutputPolicy.mayAutoplayFromIPhone(for: captureDevice),
+              autoplay,
               let playlist
         else {
             return
