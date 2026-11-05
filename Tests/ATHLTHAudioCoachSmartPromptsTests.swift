@@ -140,6 +140,27 @@ final class ATHLTHAudioCoachSmartPromptsTests: XCTestCase {
         XCTAssertEqual(Set(spoken.dropFirst()).count, 4)
     }
 
+    func testDisablingEnvironmentalContextRetainsMeasuredPaceFeedback() {
+        var state = ATHLTHAudioCoachSmartState()
+        var config = ATHLTHAudioCoachSmartSettings()
+        config.motivationEnabled = true
+        config.contextualFeedbackEnabled = false
+        _ = state.nextMotivation(
+            settings: config, elapsed: 60,
+            paceSecondsPerKilometer: 330, norwegian: true
+        )
+        let faster = state.nextMotivation(
+            settings: config, elapsed: 120,
+            paceSecondsPerKilometer: 300, norwegian: true,
+            environment: .init(
+                routeRemainingMeters: 60,
+                routeProgressPercent: 98,
+                terrain: .uphill
+            )
+        )
+        XCTAssertTrue(faster?.contains("økt farten") == true)
+    }
+
     func testLastStretchUsesVerifiedRouteProgressNotJustDistance() {
         var state = ATHLTHAudioCoachSmartState()
         var config = ATHLTHAudioCoachSmartSettings()
