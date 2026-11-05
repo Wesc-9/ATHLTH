@@ -487,7 +487,7 @@ struct ATHLTHAudioCoachStudioView: View {
 
                     Button {
                         settings.audioCoachSmartSettings.motivationEnabled = true
-                        settings.audioCoachSmartSettings.motivationIntervalSeconds = 30
+                        settings.audioCoachSmartSettings.motivationIntervalSeconds = 45
                         settings.audioCoachSmartSettings.randomEncouragementEnabled = true
                         settings.audioCoachSmartSettings.randomIntervalSeconds = 90
                         settings.audioCoachSpeechStyle = .motivating
@@ -499,7 +499,7 @@ struct ATHLTHAudioCoachStudioView: View {
                                 english: "More push", norwegian: "Mer push"
                             ))
                             .font(.caption.weight(.semibold))
-                            Text("30 sek")
+                            Text("45 sek")
                                 .font(.caption2)
                                 .foregroundStyle(.secondary)
                         }
