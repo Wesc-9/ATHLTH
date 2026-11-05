@@ -55,6 +55,17 @@ struct ATHLTHStudioPlanCanvasView: View {
     }
     @State private var dropMode: DropMode = .move
     @State private var warning: String?
+    @State private var actionToUndo: StudioAction?
+    @State private var actionToRedo: StudioAction?
+
+    /// Only the most recent drag-and-drop change can be undone safely.
+    /// Its stored plan version prevents reversing another device's edits.
+    private enum StudioAction {
+        case move(planID: UUID, workoutID: UUID, sourceDate: Date,
+                  targetDate: Date, expectedVersion: Int)
+        case copy(planID: UUID, sourceWorkoutID: UUID,
+                  targetDayID: UUID, copyID: UUID?, expectedVersion: Int)
+    }
 
     private enum DropMode: String, CaseIterable, Identifiable {
         case move, copy
@@ -147,6 +158,8 @@ struct ATHLTHStudioPlanCanvasView: View {
             pendingWeekCopyTarget = nil
             lastWeekCopy = nil
             copyMessage = nil
+            actionToUndo = nil
+            actionToRedo = nil
         }
         .onChange(of: selectedWeekID) { _, selected in
             sceneWeekID = selected?.uuidString ?? ""
@@ -513,6 +526,35 @@ struct ATHLTHStudioPlanCanvasView: View {
             .disabled(inlineWorkout != nil)
 
             Spacer(minLength: 2)
+
+            if inlineWorkout == nil && inlineNewWorkout == nil {
+                if actionToUndo != nil {
+                    Button {
+                        undoLastStudioAction()
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Undo", norwegian: "Angre"
+                        ), systemImage: "arrow.uturn.backward")
+                    }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut("z", modifiers: [.command])
+                    .help(ATHLTHLocalization.choose(
+                        english: "Undo last drag-and-drop change",
+                        norwegian: "Angre siste dra-og-slipp-endring"
+                    ))
+                }
+                if actionToRedo != nil {
+                    Button {
+                        redoLastStudioAction()
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Redo", norwegian: "Gjør om"
+                        ), systemImage: "arrow.uturn.forward")
+                    }
+                    .buttonStyle(.bordered)
+                    .keyboardShortcut("z", modifiers: [.command, .shift])
+                }
+            }
 
             if viewMode == StudioPlanMode.week.rawValue,
                inlineWorkout == nil {
@@ -1163,23 +1205,61 @@ struct ATHLTHStudioPlanCanvasView: View {
               session.trainingPlan(withID: plan.id)?.version == plan.version
         else { return false }
 
+        var action: StudioAction?
         let success: Bool
         if raw.hasPrefix("library:"),
-           let libraryID = UUID(uuidString: String(raw.dropFirst("library:".count))) {
+           let libraryID = UUID(uuidString: String(
+               raw.dropFirst("library:".count)
+           )) {
+            let oldIDs = Set(target.sessions.map(\.id))
             success = session.insertSavedWorkoutIntoPlan(
                 templateID: libraryID,
                 planID: plan.id,
                 dayID: target.id
             )
+            // Library templates also create a new independent planned session.
+            // Its source ID is not another plan session, so only move/copy
+            // mutations are registered for redo here.
+            if success, let newPlan = session.trainingPlan(withID: plan.id),
+               let newSession = newPlan.weeks.flatMap(\.days)
+                   .first(where: { $0.id == target.id })?
+                   .sessions.first(where: { !oldIDs.contains($0.id) }) {
+                _ = newSession.id
+            }
         } else if let workoutID = UUID(uuidString: raw) {
             if dropMode == .copy {
+                let oldIDs = Set(target.sessions.map(\.id))
                 success = session.copyPlanStudioWorkout(
                     planID: plan.id,
                     sourceWorkoutID: workoutID,
                     targetDayID: target.id,
                     expectedVersion: plan.version
                 )
+                if success, let updated = session.trainingPlan(withID: plan.id),
+                   let updatedDay = updated.weeks.flatMap(\.days)
+                       .first(where: { $0.id == target.id }),
+                   let copied = updatedDay.sessions.first(where: {
+                       !oldIDs.contains($0.id)
+                   }) {
+                    action = .copy(
+                        planID: plan.id,
+                        sourceWorkoutID: workoutID,
+                        targetDayID: target.id,
+                        copyID: copied.id,
+                        expectedVersion: updated.version
+                    )
+                }
             } else {
+                let sourceDate = plan.weeks.enumerated().compactMap {
+                    offset, week -> Date? in
+                    guard let source = week.days.first(where: {
+                        $0.sessions.contains(where: { $0.id == workoutID })
+                    }) else { return nil }
+                    return ATHLTHStudioPlanWeekSummary.date(
+                        for: source, inWeekIndex: offset,
+                        planStart: plan.startDate
+                    )
+                }.first
                 success = session.movePlanStudioWorkout(
                     planID: plan.id,
                     workoutID: workoutID,
@@ -1188,12 +1268,24 @@ struct ATHLTHStudioPlanCanvasView: View {
                     healthWorkouts: health.workouts,
                     strengthHistory: strength.workoutHistory
                 )
+                if success, let sourceDate,
+                   let updated = session.trainingPlan(withID: plan.id) {
+                    action = .move(
+                        planID: plan.id,
+                        workoutID: workoutID,
+                        sourceDate: sourceDate,
+                        targetDate: date,
+                        expectedVersion: updated.version
+                    )
+                }
             }
         } else {
             return false
         }
         if success {
             selectedDayID = target.id
+            actionToUndo = action
+            actionToRedo = nil
         } else {
             warning = ATHLTHLocalization.choose(
                 english: "This workout cannot be moved or copied. Check the date, completion status and latest plan version.",
@@ -1201,6 +1293,115 @@ struct ATHLTHStudioPlanCanvasView: View {
             )
         }
         return success
+    }
+
+    private func undoLastStudioAction() {
+        guard let action = actionToUndo else { return }
+        let succeeded: Bool
+        switch action {
+        case let .move(planID, workoutID, sourceDate, _, expectedVersion):
+            succeeded = session.movePlanStudioWorkout(
+                planID: planID, workoutID: workoutID,
+                targetDate: sourceDate, expectedVersion: expectedVersion,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            )
+        case let .copy(planID, _, dayID, copyID, expectedVersion):
+            guard let copyID else { return }
+            succeeded = session.removePlanStudioWorkout(
+                planID: planID, workoutID: copyID,
+                dayID: dayID, expectedVersion: expectedVersion,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            )
+        }
+        actionToUndo = nil
+        if succeeded {
+            switch action {
+            case let .move(planID, workoutID, sourceDate, targetDate, _):
+                if let version = session.trainingPlan(withID: planID)?.version {
+                    actionToRedo = .move(
+                        planID: planID, workoutID: workoutID,
+                        sourceDate: sourceDate, targetDate: targetDate,
+                        expectedVersion: version
+                    )
+                }
+            case let .copy(planID, sourceID, dayID, _, _):
+                if let version = session.trainingPlan(withID: planID)?.version {
+                    actionToRedo = .copy(
+                        planID: planID, sourceWorkoutID: sourceID,
+                        targetDayID: dayID, copyID: nil,
+                        expectedVersion: version
+                    )
+                }
+            }
+        } else {
+            actionToRedo = nil
+            warning = ATHLTHLocalization.choose(
+                english: "This plan changed or the workout was completed. Undo was not applied.",
+                norwegian: "Planen er endret eller økten er fullført. Endringen ble ikke angret."
+            )
+        }
+    }
+
+    private func redoLastStudioAction() {
+        guard let action = actionToRedo else { return }
+        let succeeded: Bool
+        var newCopyID: UUID?
+        switch action {
+        case let .move(planID, workoutID, _, targetDate, expectedVersion):
+            succeeded = session.movePlanStudioWorkout(
+                planID: planID, workoutID: workoutID,
+                targetDate: targetDate, expectedVersion: expectedVersion,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            )
+        case let .copy(planID, sourceID, dayID, _, expectedVersion):
+            let existingIDs = Set(
+                session.trainingPlan(withID: planID)?
+                    .weeks.flatMap(\.days)
+                    .first(where: { $0.id == dayID })?
+                    .sessions.map(\.id) ?? []
+            )
+            succeeded = session.copyPlanStudioWorkout(
+                planID: planID, sourceWorkoutID: sourceID,
+                targetDayID: dayID, expectedVersion: expectedVersion
+            )
+            if succeeded {
+                newCopyID = session.trainingPlan(withID: planID)?
+                    .weeks.flatMap(\.days)
+                    .first(where: { $0.id == dayID })?
+                    .sessions.first(where: { !existingIDs.contains($0.id) })?.id
+            }
+        }
+        actionToRedo = nil
+        guard succeeded else {
+            actionToUndo = nil
+            warning = ATHLTHLocalization.choose(
+                english: "The plan changed. Redo was not applied.",
+                norwegian: "Planen er endret. Endringen ble ikke utført på nytt."
+            )
+            return
+        }
+        switch action {
+        case let .move(planID, workoutID, sourceDate, targetDate, _):
+            if let version = session.trainingPlan(withID: planID)?.version {
+                actionToUndo = .move(
+                    planID: planID, workoutID: workoutID,
+                    sourceDate: sourceDate, targetDate: targetDate,
+                    expectedVersion: version
+                )
+            }
+        case let .copy(planID, sourceID, dayID, _, _):
+            if let version = session.trainingPlan(withID: planID)?.version,
+               let newCopyID {
+                actionToUndo = .copy(
+                    planID: planID, sourceWorkoutID: sourceID,
+                    targetDayID: dayID, copyID: newCopyID,
+                    expectedVersion: version
+                )
+            }
+        }
     }
 
     @ViewBuilder
