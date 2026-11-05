@@ -178,6 +178,33 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
     }
 
     @MainActor
+    func testPhoneWarmupUsesTheSameGhostStartBoundaryAsWatch() throws {
+        let route = reference()
+        let store = GhostRaceStore()
+        try store.prepare(reference: route)
+
+        store.updatePhoneWorkout(
+            location: route.points[0].location,
+            elapsedTime: 300,
+            state: .running,
+            routeProgressPercent: 0,
+            routeWarmup: true
+        )
+        XCTAssertNil(store.comparison)
+
+        store.updatePhoneWorkout(
+            location: route.points[0].location,
+            elapsedTime: 301,
+            state: .running,
+            routeProgressPercent: 0,
+            routeWarmup: false,
+            mainStepElapsedSeconds: 1
+        )
+        let comparison = try XCTUnwrap(store.comparison)
+        XCTAssertLessThan(comparison.ghostProgress, 0.02)
+    }
+
+    @MainActor
     func testWarmupDoesNotAdvanceGhostClockOrShowComparison() throws {
         let route = reference()
         let store = GhostRaceStore()
