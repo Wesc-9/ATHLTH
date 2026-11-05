@@ -23,6 +23,7 @@ struct HomeActivityRunDetailView: View {
     @State private var linkedRoute: TrainingRoute?
     @State private var linkedRouteAttempt: RouteAttemptRecord?
     @State private var linkedRouteAttempts: [RouteAttemptRecord] = []
+    @State private var historicalAchievements: [ATHLTHRunningAchievement] = []
     @State private var isLoadingRouteResult = false
     @State private var showingResultShare = false
     @State private var showingRunActionsSheet = false
@@ -104,6 +105,21 @@ struct HomeActivityRunDetailView: View {
     }
     private var elevationProfile: [ATHLTHRunningResultInsights.ElevationPoint] {
         routeAnalysis.elevation
+    }
+
+    private var newAchievements: [ATHLTHRunningAchievement] {
+        var records = historicalAchievements
+        if !isIndoorActivity,
+           let routeBest = ATHLTHRunningAchievementPolicy.routePersonalBest(
+                current: linkedRouteAttempt,
+                attempts: linkedRouteAttempts,
+                userID: session.profile.userID,
+                workoutID: workout.id,
+                routeName: linkedRoute?.title
+           ) {
+            records.append(routeBest)
+        }
+        return ATHLTHRunningAchievementPolicy.top(records)
     }
 
     private var recordedRouteSource: String {
@@ -274,8 +290,15 @@ struct HomeActivityRunDetailView: View {
                         elevation: elevationProfile,
                         activeEnergyKilocalories: workout.activeEnergyKilocalories,
                         maxHeartRateBPM: detail?.maxHeartRate,
-                        pulseSamples: measuredPulse
+                        pulseSamples: measuredPulse,
+                        achievements: newAchievements
                     )
+                }
+
+                // Indoor recordings may still have an independently verified
+                // longer-run or pulse record, even without a GPS highlight.
+                if isIndoorActivity && !newAchievements.isEmpty {
+                    ATHLTHRunningAchievementsCard(achievements: newAchievements)
                 }
 
                 ATHLTHRunningPulseResultCard(
@@ -336,6 +359,14 @@ struct HomeActivityRunDetailView: View {
                 userID: session.profile.userID
             )
             await loadDetailAndCoach()
+        }
+        .task(id: session.profile.userID.uuidString + ":" + workout.id.uuidString) {
+            // Reuse HealthKit's account-wide verified route performance cache;
+            // do not slow down the initial detail and split rendering.
+            historicalAchievements = []
+            let records = await health.runningAchievements(for: workout.id)
+            guard !Task.isCancelled else { return }
+            historicalAchievements = records
         }
         .onReceive(NotificationCenter.default.publisher(
             for: .athlthTrainingDataDidChange
