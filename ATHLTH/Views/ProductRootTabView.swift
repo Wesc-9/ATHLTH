@@ -2956,7 +2956,13 @@ struct ATHLTHHomeView: View {
                 if workout.kind == .running || workout.kind == .walking {
                     Button {
                         showingHomeTodayCalendarAll = false
-                        homeDeferredPhoneWorkout = workout
+                        // A calendar all-sessions sheet may still be dismissing.
+                        // Present the countdown only after it has left.
+                        Task { @MainActor in
+                            do { try await Task.sleep(for: .milliseconds(450)) }
+                            catch { return }
+                            homeDeferredPhoneWorkout = workout
+                        }
                     } label: {
                         Label(
                             ATHLTHLocalization.choose(
