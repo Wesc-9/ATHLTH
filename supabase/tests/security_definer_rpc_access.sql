@@ -34,6 +34,39 @@ begin
       exposed_count, exposed_signatures;
   end if;
 
+  -- Every newly added authenticated SECURITY DEFINER RPC should make
+  -- its actor check explicit. Three legacy wrappers are deliberately
+  -- allowlisted after reviewing the complete delegated implementation:
+  --  * respond_to_direct_message_request -> private implementation checks
+  --    auth.uid() and conversation membership;
+  --  * shift_official_weekly_challenges_forward -> private.is_app_admin();
+  --  * ensure_official_weekly_challenge_horizon -> bounded, idempotent,
+  --    advisory-locked client maintenance (4...52 weeks).
+  -- This is a guardrail, not a substitute for full RPC authorization tests.
+  select string_agg(
+      format('%I.%I(%s)', n.nspname, p.proname,
+             pg_get_function_identity_arguments(p.oid)),
+      ', '
+  )
+  into exposed_signatures
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public'
+    and p.prosecdef
+    and has_function_privilege('authenticated', p.oid, 'EXECUTE')
+    and pg_get_functiondef(p.oid) not ilike '%auth.uid%'
+    and p.proname not in (
+      'respond_to_direct_message_request',
+      'shift_official_weekly_challenges_forward',
+      'ensure_official_weekly_challenge_horizon'
+    );
+
+  if exposed_signatures is not null then
+    raise exception
+      'New privileged RPCs lack an explicit auth.uid() guard: %',
+      exposed_signatures;
+  end if;
+
   -- These tables are intentionally service-role-only.
   -- RLS with zero policies should never become accidentally disabled.
   if not exists (
