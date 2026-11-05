@@ -4625,7 +4625,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     func advanceStructuredRunningWorkoutManually() {
         guard state == .running,
               currentStructuredRunningStep != nil,
-              !structuredWorkoutComplete else { return }
+              !structuredWorkoutComplete,
+              (awaitingMainStart || nextStructuredRunningStep != nil) else { return }
         if awaitingMainStart {
             startStructuredMainAfterWarmup()
             return
