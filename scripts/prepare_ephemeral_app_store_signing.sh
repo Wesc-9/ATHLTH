@@ -195,6 +195,12 @@ echo "TEMP_CERT_ID=$CERT_ID" >> "$GITHUB_ENV"
 openssl x509 -inform DER -in "$RUNNER_TEMP/athlth-dist.cer" -out "$RUNNER_TEMP/athlth-dist.pem"
 
 P12_PASSWORD="$(openssl rand -hex 16)"
+openssl pkcs12 -export -legacy \
+  -inkey "$RUNNER_TEMP/athlth-dist.key" \
+  -in "$RUNNER_TEMP/athlth-dist.pem" \
+  -out "$RUNNER_TEMP/athlth-dist.p12" \
+  -passout "pass:$P12_PASSWORD"
+
   printf '%s\n' "$P12_PASSWORD" > "$SIGNING_PASSWORD_FILE"
   chmod 600 "$SIGNING_PASSWORD_FILE"
 fi
@@ -209,12 +215,6 @@ python scripts/reusable_apple_signing_identity.py seal \
 
 KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
 KEYCHAIN_PATH="$RUNNER_TEMP/athlth-signing.keychain-db"
-
-openssl pkcs12 -export -legacy \
-  -inkey "$RUNNER_TEMP/athlth-dist.key" \
-  -in "$RUNNER_TEMP/athlth-dist.pem" \
-  -out "$RUNNER_TEMP/athlth-dist.p12" \
-  -passout "pass:$P12_PASSWORD"
 
 security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
