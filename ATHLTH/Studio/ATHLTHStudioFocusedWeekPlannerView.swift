@@ -14,6 +14,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     @State private var pendingDate: Date?
     @State private var saveMessage: String?
     @State private var saveSucceeded = false
+    @State private var selectedActivity: ATHLTHPlannedWorkoutType?
 
     init(initialDate: Date, onClose: @escaping () -> Void) {
         self.onClose = onClose
@@ -296,28 +297,105 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                         .padding(.horizontal, 16)
                         .padding(.vertical, 7)
                 }
-                WorkoutTemplateBuilderView(
-                    draftContext: "ipad-focused-day-\(dateKey)",
-                    plannedDate: scheduledTime,
-                    initialStudioAdvanced: true,
-                    onScheduledTimeChanged: { scheduledTime = $0 },
-                    onAddStandalone: { draft in
-                        saveWorkout(draft, for: selectedDate)
-                    },
-                    onValidateSave: { _ in
-                        validateDay()
-                    },
-                    saveButtonTitle: ATHLTHLocalization.choose(
-                        english: "Save planned workout",
-                        norwegian: "Lagre planlagt økt"
-                    ),
-                    onCloseInline: onClose
-                )
-                .environment(\.athlthStudioFullscreenEditing, true)
-                .id(dateKey)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                if let selectedActivity {
+                    WorkoutTemplateBuilderView(
+                        draftContext: "ipad-focused-day-\(dateKey)-\(selectedActivity.rawValue)",
+                        plannedDate: scheduledTime,
+                        initialActivity: selectedActivity,
+                        initialStudioAdvanced: selectedActivity != .running,
+                        onScheduledTimeChanged: { scheduledTime = $0 },
+                        onAddStandalone: { draft in
+                            let saved = saveWorkout(draft, for: selectedDate)
+                            if saved { self.selectedActivity = nil }
+                            return saved
+                        },
+                        onValidateSave: { _ in
+                            validateDay()
+                        },
+                        saveButtonTitle: ATHLTHLocalization.choose(
+                            english: "Save planned workout",
+                            norwegian: "Lagre planlagt økt"
+                        ),
+                        onCloseInline: { self.selectedActivity = nil }
+                    )
+                    .environment(\.athlthStudioFullscreenEditing, true)
+                    .id("\(dateKey)-\(selectedActivity.rawValue)")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    activitySelection
+                }
             }
         }
+    }
+
+    private var activitySelection: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 19) {
+                Text(ATHLTHLocalization.choose(
+                    english: "BUILD A SESSION", norwegian: "BYGG EN ØKT"
+                ))
+                .font(.caption.weight(.semibold))
+                .tracking(1.8)
+                .foregroundStyle(ATHLTHStudioStyle.gold)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "What are you training?",
+                    norwegian: "Hva skal du trene?"
+                ))
+                .font(.system(.title2, design: .rounded, weight: .semibold))
+                .foregroundStyle(ATHLTHStudioStyle.ink)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose a discipline, then use Simple or Advanced to build every detail. Your week stays beside the editor.",
+                    norwegian: "Velg aktivitet, og bruk Enkel eller Avansert til å bygge økten. Uken blir liggende ved siden av."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 175), spacing: 12)],
+                    spacing: 12
+                ) {
+                    ForEach(ATHLTHPlannedWorkoutType.defaultOrder) { type in
+                        Button {
+                            selectedActivity = type
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: type.symbol)
+                                    .font(.title3)
+                                    .foregroundStyle(ATHLTHStudioStyle.gold)
+                                    .frame(width: 38, height: 38)
+                                    .background(
+                                        ATHLTHStudioStyle.canvas,
+                                        in: RoundedRectangle(cornerRadius: 11)
+                                    )
+                                Text(type.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                                Spacer(minLength: 2)
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHStudioStyle.gold)
+                            }
+                            .padding(14)
+                            .frame(maxWidth: .infinity, minHeight: 80, alignment: .leading)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(ATHLTHStudioStyle.outline.opacity(0.7))
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(23)
+            .frame(maxWidth: 850)
+            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .scrollIndicators(.hidden)
     }
 
     private var dateKey: String {
@@ -438,5 +516,6 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
         pendingDate = nil
         saveMessage = nil
         saveSucceeded = false
+        selectedActivity = nil
     }
 }
