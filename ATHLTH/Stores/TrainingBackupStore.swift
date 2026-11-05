@@ -386,11 +386,14 @@ final class TrainingBackupStore: ObservableObject {
                 training.onboardingProfile = AccountLocalStorage.read(AccountTrainingContent.self, name: "training", userID: userID)?.onboardingProfile
                 restoredRecords["training"] = try JSONEncoder().encode(training)
             }
-            for name in TrainingBackupPayload.names {
-                let key = AccountLocalStorage.key(name, userID: userID)
-                if let data = restoredRecords[name] { UserDefaults.standard.set(data, forKey: key) }
-                else { UserDefaults.standard.removeObject(forKey: key) }
-            }
+            // Stage the complete, already-validated snapshot before touching
+            // any local keys. An interrupted restore is replayed at next launch
+            // before account stores are initialized.
+            try TrainingBackupRestoreJournal.stage(
+                records: restoredRecords,
+                userID: userID
+            )
+            try TrainingBackupRestoreJournal.finishPending()
             lastPayload = nil
             markDirty(userID: userID)
             status = "Training data restored. Your previous data is also backed up."
