@@ -210,24 +210,20 @@ struct ATHLTHStudioDashboardView: View {
         }
     }
 
-    /// A compact command center replaces the duplicate iPad navigation
-    /// title and giant welcome heading. The underlying data is never mocked.
+    /// A quiet title area, not another row of summary cards. Weekly
+    /// metrics already belong to This Week and Training Development.
     private func heading(wide: Bool) -> some View {
-        let pulse = headerPulse
-
-        return VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(tr("ATHLTH STUDIO / OVERVIEW",
-                            "ATHLTH STUDIO / OVERSIKT"))
+                    Text(tr("ATHLTH STUDIO", "ATHLTH STUDIO"))
                         .font(.caption2.weight(.semibold))
                         .tracking(1.5)
                         .foregroundStyle(ATHLTHStudioStyle.gold)
 
-                    Text(tr("Your training overview",
-                            "Din treningsoversikt"))
-                        .font(.system(.title2, design: .rounded,
-                                      weight: .semibold))
+                    Text(tr("Your training today", "Treningen din i dag"))
+                        .font(.system(size: wide ? 30 : 25, weight: .semibold,
+                                      design: .rounded))
                         .foregroundStyle(ATHLTHStudioStyle.ink)
                         .lineLimit(1)
                         .minimumScaleFactor(0.72)
@@ -275,75 +271,6 @@ struct ATHLTHStudioDashboardView: View {
                 .buttonStyle(.bordered)
             }
 
-            if wide {
-                HStack(spacing: 10) {
-                    if headerProgram != nil {
-                        commandCard(
-                            label: tr("YOUR PROGRAM", "DITT PROGRAM"),
-                            title: headerProgramTitle,
-                            detail: headerProgramSubtitle,
-                            icon: "calendar",
-                            action: onOpenPlanner
-                        )
-                    }
-                    commandCard(
-                        label: tr("THIS WEEK", "DENNE UKEN"),
-                        title: pulse.plannedSessions == 0
-                            ? "—" :
-                            "\(pulse.completedSessions) / \(pulse.plannedSessions)",
-                        detail: pulse.plannedSessions == 0
-                            ? tr("No plan workouts", "Ingen planøkter")
-                            : tr("Planned workouts completed",
-                                 "Planøkter gjennomført"),
-                        icon: "checkmark.circle",
-                        action: onOpenPlanner
-                    )
-                    commandCard(
-                        label: tr("RECORDED TIME", "TRENINGSTID"),
-                        title: recordedTimeTitle(pulse.recordedMinutes),
-                        detail: pulse.recordedMinutes == nil
-                            ? tr("Apple Health unavailable",
-                                 "Apple Health utilgjengelig")
-                            : tr("This calendar week", "Denne kalenderuken"),
-                        icon: "clock",
-                        action: onOpenHistory
-                    )
-                }
-            } else {
-                VStack(spacing: 9) {
-                    if headerProgram != nil {
-                        commandCard(
-                            label: tr("YOUR PROGRAM", "DITT PROGRAM"),
-                            title: headerProgramTitle,
-                            detail: headerProgramSubtitle,
-                            icon: "calendar",
-                            action: onOpenPlanner
-                        )
-                    }
-                    commandCard(
-                        label: tr("THIS WEEK", "DENNE UKEN"),
-                        title: pulse.plannedSessions == 0
-                            ? "—" :
-                            "\(pulse.completedSessions) / \(pulse.plannedSessions)",
-                        detail: pulse.plannedSessions == 0
-                            ? tr("No plan workouts", "Ingen planøkter")
-                            : tr("Planned workouts completed",
-                                 "Planøkter gjennomført"),
-                        icon: "checkmark.circle",
-                        action: onOpenPlanner
-                    )
-                    commandCard(
-                        label: tr("RECORDED TIME", "TRENINGSTID"),
-                        title: recordedTimeTitle(pulse.recordedMinutes),
-                        detail: pulse.recordedMinutes == nil
-                            ? tr("Apple Health unavailable",
-                                 "Apple Health utilgjengelig")
-                            : tr("This calendar week", "Denne kalenderuken"),
-                        icon: "clock",
-                        action: onOpenHistory
-                    )
-                }
-            }
         }
         .padding(.vertical, 1)
         .accessibilityIdentifier("athlth-ipad-training-command-header")
