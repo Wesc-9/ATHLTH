@@ -1551,16 +1551,16 @@ final class IPhoneWorkoutStore:
                 distanceMeters: workout.distanceMeters
             )
             deactivateCoachAudioSession()
-            guidancePriorityGate.reset()
-            speak(
+            // Local playback is deliberate here: an asynchronous Azure
+            // fallback can otherwise arrive after active has been cleared
+            // and be rejected by the active-workout voice policy.
+            speakFinishedWorkoutRecap(
                 localizedCoachPhrase(
                     english: highlights.english,
                     norwegian: highlights.norwegian,
                     configuration: coach
                 ),
-                configuration: coach,
-                priority: .structuredStep,
-                rememberForReplay: false
+                configuration: coach
             )
         } else {
             deactivateCoachAudioSession()
@@ -4475,6 +4475,28 @@ final class IPhoneWorkoutStore:
                 validFor: 10
             )
         )
+    }
+
+    /// The completion narration is allowed after recording ends, and has
+    /// no network dependency or race with an expired active workout.
+    private func speakFinishedWorkoutRecap(
+        _ phrase: String,
+        configuration: WatchAudioCoachConfiguration
+    ) {
+        guard !phrase.isEmpty else { return }
+        let utterance = AVSpeechUtterance(string: phrase)
+        utterance.voice = ATHLTHCoachPreferredSystemVoice.resolve(
+            selectedIdentifier: configuration.voiceIdentifier,
+            language: configuration.language
+        )
+        utterance.rate = configuration.resolvedSpeechRate
+        utterance.volume = configuration.resolvedSpeechVolume
+        try? ATHLTHSpokenAudioSession.activate(
+            duckOtherAudio: configuration.shouldDuckOtherAudio,
+            owner: audioOwner
+        )
+        speechSynthesizer.speak(utterance)
+        watchLocalCoachSpeech(utterance)
     }
 
     private func speak(
