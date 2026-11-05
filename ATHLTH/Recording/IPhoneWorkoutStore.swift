@@ -1541,6 +1541,31 @@ final class IPhoneWorkoutStore:
             return
         }
 
+        // Deliver the completion recap while the finished workout is still
+        // the active coach context. Previously active became nil before
+        // speak(), so its voice policy silently rejected the announcement.
+        if let coach = workout.audioCoachConfiguration,
+           coach.enabled, coach.shouldAnnounceWorkoutComplete {
+            let highlights = ATHLTHWorkoutCompletionSpokenSummary.make(
+                elapsedSeconds: workout.elapsed(at: workout.end ?? Date()),
+                distanceMeters: workout.distanceMeters
+            )
+            deactivateCoachAudioSession()
+            guidancePriorityGate.reset()
+            speak(
+                localizedCoachPhrase(
+                    english: highlights.english,
+                    norwegian: highlights.norwegian,
+                    configuration: coach
+                ),
+                configuration: coach,
+                priority: .structuredStep,
+                rememberForReplay: false
+            )
+        } else {
+            deactivateCoachAudioSession()
+        }
+
         syncLiveActivity(workout: workout, state: .completed)
         treadmillTickTask?.cancel()
         treadmillTickTask = nil
@@ -1561,30 +1586,6 @@ final class IPhoneWorkoutStore:
         persistActiveCheckpoint(force: true)
         // completedHistory was already encoded and written before clearing active.
         ATHLTHTrainingDataChangeSignal.post(userID: userID)
-
-        if workout
-            .audioCoachConfiguration?
-            .enabled == true,
-           workout
-            .audioCoachConfiguration?
-            .shouldAnnounceWorkoutComplete == true {
-            speak(
-                localizedCoachPhrase(
-                    english: "Workout complete.",
-                    norwegian: "Økten er fullført.",
-                    configuration:
-                        workout
-                            .audioCoachConfiguration
-                ),
-                configuration:
-                    workout
-                        .audioCoachConfiguration,
-                priority:
-                    .structuredStep
-            )
-        } else {
-            deactivateCoachAudioSession()
-        }
 
         // Publish a stable pre-save completion checkpoint. The app captures
         // Goals/Challenge/Gear state here, before HealthKit can change the
