@@ -127,6 +127,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var audioCoachSpeechWatchdog: Task<Void, Never>?
     private var audioCoachActivationTask:
         Task<Void, Never>?
+    /// A cancelled older route-activation must never deactivate a newer cue.
+    private var audioCoachActivationGeneration = UUID()
     private var audioCoachReadyAnnouncedForWorkout = false
     private var strengthRestCoachTask:
         Task<Void, Never>?
@@ -6897,6 +6899,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             audioCoachConfiguration
                 .resolvedSpeechVolume
 
+        let activationGeneration = UUID()
+        audioCoachActivationGeneration = activationGeneration
         audioCoachActivationTask =
             Task { @MainActor [weak self] in
                 guard let self else {
@@ -6907,21 +6911,20 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     await self
                         .activateAudioCoachAudioSession()
 
-                guard !Task.isCancelled
+                guard !Task.isCancelled,
+                      self.audioCoachActivationGeneration == activationGeneration
                 else {
-                    if activated {
-                        self
-                            .deactivateAudioCoachAudioSession()
+                    // Newer speech may already be activating or playing.
+                    // Never release its ducking lease from a stale task.
+                    if self.audioCoachActivationGeneration == activationGeneration {
+                        self.audioCoachActivationTask = nil
+                        self.guidancePriorityGate.voiceDidFinish()
+                        if activated { self.deactivateAudioCoachAudioSession() }
                     }
-                    self.audioCoachActivationTask =
-                        nil
-                    self.guidancePriorityGate
-                        .voiceDidFinish()
                     return
                 }
 
-                self.audioCoachActivationTask =
-                    nil
+                self.audioCoachActivationTask = nil
 
                 guard activated
                 else {
@@ -8148,7 +8151,8 @@ extension WatchWorkoutManager:
     ) {
         Task { @MainActor [weak self] in
             guard let self,
-                  !self.speechSynthesizer.isSpeaking
+                  !self.speechSynthesizer.isSpeaking,
+                  self.audioCoachActivationTask == nil
             else {
                 return
             }
@@ -8168,7 +8172,8 @@ extension WatchWorkoutManager:
     ) {
         Task { @MainActor [weak self] in
             guard let self,
-                  !self.speechSynthesizer.isSpeaking
+                  !self.speechSynthesizer.isSpeaking,
+                  self.audioCoachActivationTask == nil
             else {
                 return
             }
