@@ -9,6 +9,7 @@ struct ATHLTHStudioHistoryView: View {
     @State private var showsFullReplay = false
     @State private var compared: [WorkoutSummary] = []
     @State private var comparisonMessage: String?
+    @State private var showingWorkoutLab = false
 
 
     private var workouts: [WorkoutSummary] {
@@ -122,6 +123,12 @@ struct ATHLTHStudioHistoryView: View {
             }
         }
         .background(ATHLTHStudioStyle.canvas)
+        .sheet(isPresented: $showingWorkoutLab) {
+            if compared.count == 2 {
+                ATHLTHStudioWorkoutComparisonLabView(workouts: compared)
+                    .presentationDetents([.large])
+            }
+        }
         .alert(
             ATHLTHLocalization.choose(
                 english: "Cannot compare these workouts",
@@ -171,6 +178,19 @@ struct ATHLTHStudioHistoryView: View {
                 .tracking(1)
                 .foregroundStyle(ATHLTHStudioStyle.gold)
                 Spacer(minLength: 4)
+                Button {
+                    showingWorkoutLab = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Workout Lab", norwegian: "Øktlaboratorium"
+                        ),
+                        systemImage: "chart.xyaxis.line"
+                    )
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHStudioStyle.ink)
+                .accessibilityIdentifier("athlth-ipad-open-workout-lab")
                 Button {
                     compared = []
                 } label: {
