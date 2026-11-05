@@ -1671,6 +1671,10 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     // Old Watch builds omit this marker. New iPhone builds can retain the
     // legacy phone-voice path for mixed-version Watch/iPhone installations.
     var supportsAudioCoachVoiceLease: Bool? = nil
+    /// New Watch builds explicitly mark their own speech authority.
+    /// A phone mirror must never request a voice lease while this is true.
+    /// Optional for mixed-version watch/phone compatibility.
+    var watchOwnedAudioCoach: Bool? = nil
 
     // Sample ages travel separately from the current displayed values.
     // Older Watch builds omit these markers; coaching then avoids claiming
