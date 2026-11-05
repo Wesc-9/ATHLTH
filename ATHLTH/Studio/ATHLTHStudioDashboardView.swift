@@ -16,6 +16,7 @@ struct ATHLTHStudioDashboardView: View {
     let onOpenInsights: () -> Void
     let onOpenHistory: () -> Void
     let onOpenSettings: () -> Void
+    let onOpenLibrary: () -> Void
     let onOpenWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onStartQuick: () -> Void
     /// Stored at the Studio scene root so sidebar changes or window
@@ -273,13 +274,15 @@ struct ATHLTHStudioDashboardView: View {
 
             if wide {
                 HStack(spacing: 10) {
-                    commandCard(
-                        label: tr("YOUR PROGRAM", "DITT PROGRAM"),
-                        title: headerProgramTitle,
-                        detail: headerProgramSubtitle,
-                        icon: "calendar",
-                        action: onOpenPlanner
-                    )
+                    if headerProgram != nil {
+                        commandCard(
+                            label: tr("YOUR PROGRAM", "DITT PROGRAM"),
+                            title: headerProgramTitle,
+                            detail: headerProgramSubtitle,
+                            icon: "calendar",
+                            action: onOpenPlanner
+                        )
+                    }
                     commandCard(
                         label: tr("THIS WEEK", "DENNE UKEN"),
                         title: pulse.plannedSessions == 0
@@ -305,13 +308,15 @@ struct ATHLTHStudioDashboardView: View {
                 }
             } else {
                 VStack(spacing: 9) {
-                    commandCard(
-                        label: tr("YOUR PROGRAM", "DITT PROGRAM"),
-                        title: headerProgramTitle,
-                        detail: headerProgramSubtitle,
-                        icon: "calendar",
-                        action: onOpenPlanner
-                    )
+                    if headerProgram != nil {
+                        commandCard(
+                            label: tr("YOUR PROGRAM", "DITT PROGRAM"),
+                            title: headerProgramTitle,
+                            detail: headerProgramSubtitle,
+                            icon: "calendar",
+                            action: onOpenPlanner
+                        )
+                    }
                     commandCard(
                         label: tr("THIS WEEK", "DENNE UKEN"),
                         title: pulse.plannedSessions == 0
@@ -505,21 +510,14 @@ struct ATHLTHStudioDashboardView: View {
                         .font(.title2)
                         .foregroundStyle(ATHLTHStudioStyle.gold)
 
-                    Text(session.trainingPlans.isEmpty
-                         ? tr("Build your first program", "Bygg ditt første treningsprogram")
-                         : tr("Nothing scheduled next", "Ingen kommende økt planlagt"))
+                    Text(tr("Your next workout starts here", "Din neste økt starter her"))
                         .font(.system(.title, design: .rounded, weight: .semibold))
                         .foregroundStyle(ATHLTHStudioStyle.ink)
 
-                    Text(session.trainingPlans.isEmpty
-                         ? tr(
-                            "Start with an empty plan, or use the advanced ATHLTH builder.",
-                            "Start med en tom plan, eller bruk ATHLTHs avanserte planlegger."
-                           )
-                         : tr(
-                            "Your saved plans are still available. Add a workout or review your calendar.",
-                            "Planene dine er fortsatt tilgjengelige. Legg til en økt eller se kalenderen."
-                           ))
+                    Text(tr(
+                        "Choose a day below to plan a single session. Build a multi-week program in Plan Studio when you're ready.",
+                        "Velg en dag nedenfor for å planlegge én økt. Bygg et program over flere uker i Plan Studio når du ønsker det."
+                    ))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -532,15 +530,13 @@ struct ATHLTHStudioDashboardView: View {
                     if let next {
                         onOpenWorkout(next)
                     } else {
-                        onOpenPlanner()
+                        focusedPlanningDate = Calendar.current.startOfDay(for: .now)
                     }
                 } label: {
                     Label(
                         next == nil
-                            ? tr("Build a plan", "Bygg en plan")
-                            : next?.planID == nil
-                                ? tr("Open Train", "Åpne Tren")
-                                : tr("Open workout", "Åpne økten"),
+                            ? tr("Plan a workout", "Planlegg en økt")
+                            : tr("Open workout", "Åpne økten"),
                         systemImage: next == nil ? "calendar.badge.plus" : "arrow.up.right"
                     )
                     .frame(maxWidth: .infinity)
@@ -1183,15 +1179,15 @@ struct ATHLTHStudioDashboardView: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             } else {
-                Image(systemName: "calendar.badge.plus")
+                Image(systemName: "books.vertical")
                     .font(.title2)
                     .foregroundStyle(ATHLTHStudioStyle.gold)
-                Text(tr("Create a training program", "Opprett et treningsprogram"))
+                Text(tr("Your training library", "Ditt treningsbibliotek"))
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(ATHLTHStudioStyle.ink)
                 Text(tr(
-                    "Build weeks, add workouts and follow your progress in one place.",
-                    "Bygg uker, legg inn økter og følg utviklingen på ett sted."
+                    "\(session.savedWorkoutTemplates.count) saved workouts ready to reuse. Discover workouts, exercises, routes and plans.",
+                    "\(session.savedWorkoutTemplates.count) lagrede økter klare til gjenbruk. Finn økter, øvelser, ruter og planer."
                 ))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
@@ -1200,10 +1196,10 @@ struct ATHLTHStudioDashboardView: View {
 
             Spacer(minLength: 0)
 
-            Button(action: onOpenPlanner) {
+            Button(action: currentProgram == nil ? onOpenLibrary : onOpenPlanner) {
                 Label(
                     currentProgram == nil
-                        ? tr("Create a plan", "Opprett plan")
+                        ? tr("Open library", "Åpne biblioteket")
                         : tr("Open Plan Studio", "Åpne Plan Studio"),
                     systemImage: "arrow.up.right"
                 )
