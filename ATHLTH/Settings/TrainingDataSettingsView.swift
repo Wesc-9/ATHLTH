@@ -204,7 +204,11 @@ struct TrainingDataSettingsView: View {
                     guard session.signedIn,
                           session.profile.userID == ownerID,
                           mayRestoreBackup else { return }
-                    if await backups.restore(backup, userID: ownerID) {
+                    if await backups.restore(
+                        backup,
+                        userID: ownerID,
+                        canApply: { mayRestoreBackup }
+                    ) {
                         guard session.signedIn,
                               session.profile.userID == ownerID else { return }
                         // All cached stores must see the restored snapshot now,
