@@ -4,6 +4,7 @@ import SwiftUI
 /// Today. The callbacks must route through the owning Train launch engine;
 /// this modifier never starts HealthKit or Watch sessions on its own.
 struct ATHLTHStudioWorkoutLaunchMenu: ViewModifier {
+    let isPlanned: Bool
     let canLaunch: Bool
     let supportsWatch: Bool
     let onStart: () -> Void
@@ -15,8 +16,10 @@ struct ATHLTHStudioWorkoutLaunchMenu: ViewModifier {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
     }
 
+    @ViewBuilder
     func body(content: Content) -> some View {
-        content
+        if isPlanned {
+            content
             .contextMenu {
                 if canLaunch {
                     Button(action: onStart) {
@@ -51,5 +54,8 @@ struct ATHLTHStudioWorkoutLaunchMenu: ViewModifier {
                           systemImage: "info.circle")
                 }
             }
+        } else {
+            content
+        }
     }
 }
