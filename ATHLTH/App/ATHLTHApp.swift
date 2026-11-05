@@ -241,9 +241,14 @@ private struct ATHLTHSceneRootView: View {
             }
         }
         .onChange(of: watchConnection.state) { _, state in
-            if state == .ready, appSession.signedIn,
-               let catalog = pets.makeWatchCatalog() {
-                watchConnection.sendPetCatalog(catalog)
+            if state == .ready {
+                watchConnection.sendAccountIdentity(
+                    appSession.signedIn ? appSession.profile.userID : nil
+                )
+                if appSession.signedIn,
+                   let catalog = pets.makeWatchCatalog() {
+                    watchConnection.sendPetCatalog(catalog)
+                }
             }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
@@ -1661,20 +1666,24 @@ struct AppRootView: View {
         }
         .task(
             id:
-                "\(watchConnection.lastCompletedWorkout?.id.uuidString ?? "none")-\(startupAuthenticationResolved)-\(appSession.signedIn)"
+                "\(watchConnection.pendingWorkoutResults.first(where: {
+                    ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+                        resultOwnerID: $0.accountOwnerID,
+                        signedInUserID: signedInUserID
+                    )
+                })?.id.uuidString ?? "none")-\(startupAuthenticationResolved)-\(signedInUserID?.uuidString ?? "none")"
         ) {
             guard startupAuthenticationResolved,
                   appSession.signedIn,
-                  let result =
-                    watchConnection
-                        .lastCompletedWorkout
-            else {
-                return
-            }
-
-            handleWatchWorkoutCompletion(
-                result
-            )
+                  let result = watchConnection.pendingWorkoutResults.first(
+                    where: {
+                        ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+                            resultOwnerID: $0.accountOwnerID,
+                            signedInUserID: signedInUserID
+                        )
+                    }
+                  ) else { return }
+            handleWatchWorkoutCompletion(result)
         }
         .onChange(of: phoneWorkout.completionStartedWorkout?.id) { _, _ in
             guard let workout =
@@ -1903,6 +1912,9 @@ struct AppRootView: View {
             lifecycleSocialContent
         .environment(\.athlthImageAccountID, signedInUserID)
         .onChange(of: signedInUserID, initial: true) { _, userID in
+            // The companion must know which user owns a new Watch workout.
+            // A delayed old result retains its session-start account.
+            watchConnection.sendAccountIdentity(userID)
             // Suspend HA transfers on logout/account transitions without
             // deleting the device's Keychain pairing. A restored session for
             // the same account can resume without requesting a new code.
@@ -2522,6 +2534,13 @@ struct AppRootView: View {
     private func handleWatchWorkoutCompletion(
         _ result: WatchWorkoutResult
     ) {
+        guard appSession.signedIn,
+              ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+                resultOwnerID: result.accountOwnerID,
+                signedInUserID: appSession.profile.userID
+              ) else { return }
+
+        let resultOwnerID = appSession.profile.userID
         // A completed Watch result is authoritative evidence that the matching
         // mirrored workout has ended, even if HealthKit's mirror callback is
         // a fraction of a second late.
@@ -2631,7 +2650,7 @@ struct AppRootView: View {
             // effect, including the post-Watch Health refresh. The raw Watch
             // result is now fully consumed.
             watchConnection
-                .clearCompletedWorkout()
+                .consumeCompletedWorkout(result.id)
             return
         }
 
@@ -2667,6 +2686,8 @@ struct AppRootView: View {
             .recordWatchWorkout(result)
 
         Task { @MainActor in
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
             // Finish the synchronized race before slower HealthKit and
             // integration work can delay the opponent's result.
             if result.kind == .running {
@@ -2788,8 +2809,10 @@ struct AppRootView: View {
                 challengeStore
             )
             await syncSocialOwnedData()
+            guard appSession.signedIn,
+                  appSession.profile.userID == resultOwnerID else { return }
             watchConnection
-                .clearCompletedWorkout()
+                .consumeCompletedWorkout(result.id)
         }
     }
 
