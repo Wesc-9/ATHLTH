@@ -12,6 +12,8 @@ struct ATHLTHStudioPlanDayEditorView: View {
     let day: TrainingPlanDay
     let date: Date?
     let onOpenAdvanced: (UUID) -> Void
+    /// The iPad canvas supplies the shared iPhone workout engine for new sessions.
+    var onCreateAdvanced: (() -> Void)? = nil
 
     @State private var isEditing = false
     @State private var originalWorkout: PlannedSession?
@@ -166,7 +168,11 @@ struct ATHLTHStudioPlanDayEditorView: View {
 
             if dayIsEditable && !hasRestDay {
                 Button {
-                    beginNewWorkout()
+                    if let onCreateAdvanced {
+                        onCreateAdvanced()
+                    } else {
+                        beginNewWorkout()
+                    }
                 } label: {
                     Label(ATHLTHLocalization.choose(
                         english: "Create workout", norwegian: "Opprett økt"
