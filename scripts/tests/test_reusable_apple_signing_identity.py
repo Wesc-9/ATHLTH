@@ -3,6 +3,7 @@ import base64
 from datetime import datetime, timedelta, timezone
 import json
 import os
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -104,6 +105,29 @@ class ReusableAppleSigningTests(unittest.TestCase):
         signing.verify(
             str(self.apple_json()), str(output), str(password), str(cert_id)
         )
+
+    def test_openssl_legacy_pkcs12_can_be_encrypted_and_reused(self):
+        # The macOS signing workflow exports P12 using openssl -legacy.
+        # Check this exact binary encoding rather than only a Python-created P12.
+        private = self.root / "legacy-key.pem"
+        certificate = self.root / "legacy-cert.pem"
+        subprocess.run([
+            "openssl", "req", "-new", "-x509", "-nodes",
+            "-newkey", "rsa:2048", "-days", "365",
+            "-keyout", str(private), "-out", str(certificate),
+            "-subj", "/CN=ATHLTH CI Test",
+        ], check=True, capture_output=True)
+        subprocess.run([
+            "openssl", "pkcs12", "-export", "-legacy",
+            "-inkey", str(private), "-in", str(certificate),
+            "-out", str(self.p12),
+            "-passout", "pass:" + self.password.decode(),
+        ], check=True, capture_output=True)
+        self.seal()
+        output, password, cert_id = self.unseal()
+        self.assertEqual(output.read_bytes(), self.p12.read_bytes())
+        self.assertEqual(password.read_bytes().strip(), self.password)
+        self.assertEqual(cert_id.read_text().strip(), self.cert_id)
 
     def test_ciphertext_tampering_is_rejected(self):
         self.seal()
