@@ -7418,8 +7418,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         sendToPhone(result)
         WatchRouteStore.shared.clearCompletedPetSelection()
 
+        // Mirrored iPhone speaks the recap when it owns the acknowledged
+        // voice lease. Do not speak the same finish twice in AirPods.
+        // Strength remains Watch-owned by design.
         if audioCoachConfiguration.enabled,
-           audioCoachConfiguration.shouldAnnounceWorkoutComplete {
+           audioCoachConfiguration.shouldAnnounceWorkoutComplete,
+           (kind == .strength || shouldSpeakLocally(priority: .structuredStep)) {
             let recap = ATHLTHWorkoutCompletionSpokenSummary.make(
                 elapsedSeconds: result.duration,
                 distanceMeters: result.distanceMeters,
