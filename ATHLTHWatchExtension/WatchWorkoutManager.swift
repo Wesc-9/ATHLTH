@@ -296,6 +296,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         return ATHLTHWatchFinishAccessPolicy.shouldShowRouteFinish(
             routeProgressPercent: routeProgressPercent,
             routeRemainingMeters: routeRemainingMeters,
+            recordedRouteMeters: max(
+                distanceMeters - routeLegDistanceOffsetMeters, 0
+            ),
+            expectedRouteMeters: max(route.distanceKilometers * 1_000, 0),
             metersFromFinish: current.distance(from: finishLocation),
             gpsHorizontalAccuracy: current.horizontalAccuracy,
             gpsAgeSeconds: Date().timeIntervalSince(current.timestamp),
