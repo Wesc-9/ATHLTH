@@ -53,6 +53,7 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var showingTrain = false
     @State private var selectedStandaloneWorkout: PlannedSession?
     @State private var showingPlanSync = false
+    @State private var showingPresentation = false
 
     private let canvas = Color(red: 0.985, green: 0.979, blue: 0.965)
     private let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
@@ -165,6 +166,23 @@ struct ATHLTHiPadStudioRootView: View {
                             .help(studioPlanSync.status)
                             .accessibilityIdentifier("athlth-ipad-plan-sync")
 
+                            Button {
+                                showingPresentation = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Presentation mode",
+                                        norwegian: "Presentasjonsmodus"
+                                    ),
+                                    systemImage: "rectangle.on.rectangle"
+                                )
+                            }
+                            .help(ATHLTHLocalization.choose(
+                                english: "Show an aggregate, private-safe training overview",
+                                norwegian: "Vis en samlet treningsoversikt uten personlige detaljer"
+                            ))
+                            .accessibilityIdentifier("athlth-ipad-presentation-button")
+
                             Menu {
                                 Button {
                                     selection = .overview
@@ -248,6 +266,9 @@ struct ATHLTHiPadStudioRootView: View {
         .sheet(isPresented: $showingPlanSync) {
             ATHLTHStudioPlanSyncPanel(sync: studioPlanSync)
                 .environmentObject(session)
+        }
+        .fullScreenCover(isPresented: $showingPresentation) {
+            ATHLTHStudioPresentationView()
         }
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
