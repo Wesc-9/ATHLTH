@@ -85,6 +85,10 @@ struct WatchPersistedWorkoutState: Codable {
     var startedAt: Date?
     /// Stable owner captured at session start; optional for older snapshots.
     var accountOwnerID: UUID? = nil
+    /// Distinguishes a locally started Watch workout from an iPhone launch
+    /// after HealthKit restores a suspended or terminated Watch process.
+    /// Optional to decode recovery snapshots from older Watch versions.
+    var initiatedLocallyOnWatch: Bool? = nil
     var plannedRoute: WatchRouteTransfer?
     var audioCoach: WatchAudioCoachConfiguration
     var structuredRunningWorkout: WatchRunningWorkoutTransfer?
