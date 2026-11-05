@@ -112,9 +112,11 @@ struct ATHLTHInsightsView: View {
                     return
                 }
 
+                let signpost = ATHLTHPerformance.begin("InsightsTabRefresh")
                 async let trendLoad: Void = loadTrend()
                 async let recoveryLoad: Void = loadRecoverySignals()
                 _ = await (trendLoad, recoveryLoad)
+                ATHLTHPerformance.end("InsightsTabRefresh", id: signpost)
                 guard !Task.isCancelled else { return }
                 lastInsightsRefreshAt = Date()
                 lastInsightsRefreshAccountID = accountID
