@@ -30,6 +30,40 @@ print(jwt.encode(
 PY
 }
 
+# Reuse the private key as well as its Apple Distribution certificate.
+# The encrypted envelope is restored from the previous GitHub Actions run.
+SIGNING_ENVELOPE_DIR="$RUNNER_TEMP/athlth-reusable-signing"
+ENCRYPTED_SIGNING_DIR="$RUNNER_TEMP/athlth-ci-signing-output"
+SIGNING_PASSWORD_FILE="$RUNNER_TEMP/athlth-dist-password"
+mkdir -p "$SIGNING_ENVELOPE_DIR" "$ENCRYPTED_SIGNING_DIR"
+chmod 700 "$SIGNING_ENVELOPE_DIR" "$ENCRYPTED_SIGNING_DIR"
+
+if [ -s "$SIGNING_ENVELOPE_DIR/signing-envelope.json" ]; then
+  echo "::notice::Reusing previously stored ATHLTH Apple Distribution identity."
+  python scripts/reusable_apple_signing_identity.py unseal \
+    "$SIGNING_ENVELOPE_DIR/signing-envelope.json" \
+    "$RUNNER_TEMP/athlth-dist.p12" \
+    "$SIGNING_PASSWORD_FILE" \
+    "$RUNNER_TEMP/athlth-dist-cert-id"
+  CERT_ID="$(cat "$RUNNER_TEMP/athlth-dist-cert-id")"
+  TOKEN="$(make_token)"
+  LOOKUP_HTTP="$(curl --silent --show-error --retry 2 --retry-delay 3 \
+    --output "$RUNNER_TEMP/reused-ci-certificate.json" \
+    --write-out '%{http_code}' \
+    --header "Authorization: Bearer $TOKEN" \
+    "https://api.appstoreconnect.apple.com/v1/certificates/$CERT_ID")"
+  if [ "$LOOKUP_HTTP" != "200" ]; then
+    echo "::error::Stored ATHLTH Distribution certificate unavailable at Apple (HTTP $LOOKUP_HTTP). No certificates created or revoked."
+    exit 1
+  fi
+  python scripts/reusable_apple_signing_identity.py verify \
+    "$RUNNER_TEMP/reused-ci-certificate.json" \
+    "$RUNNER_TEMP/athlth-dist.p12" \
+    "$SIGNING_PASSWORD_FILE" \
+    "$RUNNER_TEMP/athlth-dist-cert-id"
+  P12_PASSWORD="$(cat "$SIGNING_PASSWORD_FILE")"
+else
+  echo "::notice::First reusable signing identity bootstrap; generating Apple Distribution certificate."
 openssl req -new -newkey rsa:2048 -nodes \
   -keyout "$RUNNER_TEMP/athlth-dist.key" \
   -out "$RUNNER_TEMP/athlth-dist.csr" \
@@ -161,6 +195,18 @@ echo "TEMP_CERT_ID=$CERT_ID" >> "$GITHUB_ENV"
 openssl x509 -inform DER -in "$RUNNER_TEMP/athlth-dist.cer" -out "$RUNNER_TEMP/athlth-dist.pem"
 
 P12_PASSWORD="$(openssl rand -hex 16)"
+  printf '%s\n' "$P12_PASSWORD" > "$SIGNING_PASSWORD_FILE"
+  chmod 600 "$SIGNING_PASSWORD_FILE"
+fi
+
+# Store ONLY the AES-GCM authenticated ciphertext; never upload a private
+# key, raw P12, encryption secret, password or unencrypted provisioning data.
+python scripts/reusable_apple_signing_identity.py seal \
+  "$RUNNER_TEMP/athlth-dist.p12" \
+  "$SIGNING_PASSWORD_FILE" \
+  "$CERT_ID" \
+  "$ENCRYPTED_SIGNING_DIR/signing-envelope.json"
+
 KEYCHAIN_PASSWORD="$(openssl rand -hex 16)"
 KEYCHAIN_PATH="$RUNNER_TEMP/athlth-signing.keychain-db"
 
@@ -266,7 +312,7 @@ PY
   local request="$RUNNER_TEMP/profile-$env_prefix-request.json"
   local response="$RUNNER_TEMP/profile-$env_prefix-response.json"
 
-  python - "$request" "$profile_name" "$bundle_id" "$TEMP_CERT_ID" <<'PY'
+  python - "$request" "$profile_name" "$bundle_id" "$CERT_ID" <<'PY'
 import json, sys
 path, name, bundle_id, cert_id = sys.argv[1:5]
 payload = {
@@ -345,4 +391,4 @@ create_profile "com.wesc9.athlth.widgets" "Widgets" "WIDGET"
 create_profile "com.wesc9.athlth.watchkitapp" "Watch" "WATCH"
 create_profile "com.wesc9.athlth.watchkitapp.widgets" "Watch Widgets" "WATCH_WIDGET"
 
-echo "Ephemeral Apple Distribution signing material prepared for all four signed bundles."
+echo "Reusable Apple Distribution signing identity and profiles ready for all four signed bundles."
