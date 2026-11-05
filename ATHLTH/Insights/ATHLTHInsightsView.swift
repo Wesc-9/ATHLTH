@@ -7,6 +7,7 @@ struct ATHLTHInsightsView: View {
 
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var session: AppSessionStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var selectedSection: ATHLTHInsightsSection = .overview
     @StateObject private var checkInStore = RecoverySorenessStore()
@@ -24,6 +25,10 @@ struct ATHLTHInsightsView: View {
     // Compute history aggregates only when the Health workout snapshot changes,
     // not every time SwiftUI recreates cards while the user scrolls.
     @State private var sessionBaselines = InsightsSessionBaselines.empty
+    @State private var lastInsightsRefreshAt: Date?
+    @State private var lastInsightsRefreshAccountID: UUID?
+    @State private var lastInsightsWorkoutCount = -1
+    @State private var lastInsightsWorkoutID: UUID?
 
     var body: some View {
         NavigationStack {
@@ -92,10 +97,29 @@ struct ATHLTHInsightsView: View {
                 await loadTrend()
                 await loadRecoverySignals()
             }
-            .task(id: isActive) {
+            .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
                 guard isActive else { return }
-                await loadTrend()
-                await loadRecoverySignals()
+                // Keep the already-rendered insight snapshots on quick tab
+                // returns, but invalidate on new workouts/account switches.
+                let accountID = session.profile.userID
+                let currentCount = health.workouts.count
+                let newestID = health.workouts.first?.id
+                if lastInsightsRefreshAccountID == accountID,
+                   lastInsightsWorkoutCount == currentCount,
+                   lastInsightsWorkoutID == newestID,
+                   let lastInsightsRefreshAt,
+                   Date().timeIntervalSince(lastInsightsRefreshAt) < 90 {
+                    return
+                }
+
+                async let trendLoad: Void = loadTrend()
+                async let recoveryLoad: Void = loadRecoverySignals()
+                _ = await (trendLoad, recoveryLoad)
+                guard !Task.isCancelled else { return }
+                lastInsightsRefreshAt = Date()
+                lastInsightsRefreshAccountID = accountID
+                lastInsightsWorkoutCount = currentCount
+                lastInsightsWorkoutID = newestID
             }
             .onReceive(health.$workouts) { workouts in
                 let updated = InsightsSessionBaselines.calculate(
