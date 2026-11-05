@@ -3189,9 +3189,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         recoveryInProgress = true
+        // A recovered session gets its original start source from the saved
+        // snapshot. Do not overwrite that source in defer after recovery.
+        workoutInitiatedLocallyOnWatch = false
         defer {
             recoveryInProgress = false
-        workoutInitiatedLocallyOnWatch = false
         }
 
         do {
@@ -3379,6 +3381,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 kind: kind,
                 startedAt: startedAt,
                 accountOwnerID: workoutOwnerID,
+                initiatedLocallyOnWatch: workoutInitiatedLocallyOnWatch,
                 plannedRoute: plannedRoute,
                 audioCoach:
                     audioCoachConfiguration,
@@ -3448,6 +3451,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             startedAt ??
             snapshot.startedAt
         workoutOwnerID = snapshot.accountOwnerID
+        workoutInitiatedLocallyOnWatch =
+            snapshot.initiatedLocallyOnWatch ?? false
         switchedIndoorVenue = snapshot.indoorVenue
         if let venue = snapshot.indoorVenue {
             indoorPromptedInThisWorkout = true
