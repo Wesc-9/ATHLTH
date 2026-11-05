@@ -3,6 +3,21 @@ import CoreLocation
 import Foundation
 @preconcurrency import HealthKit
 
+/// Prevent an older, still-running all-history query from repopulating a
+/// cache invalidated by a newly received HealthKit workout or memory pressure.
+/// HealthKitManager owns this value on the main actor.
+struct ATHLTHHealthHistoryCacheEpoch {
+    private(set) var value: UInt64 = 0
+
+    mutating func invalidate() {
+        value &+= 1
+    }
+
+    func acceptsResult(startedAt: UInt64) -> Bool {
+        startedAt == value
+    }
+}
+
 private final class HealthRouteQueryAccumulator:
     @unchecked Sendable {
 
@@ -205,6 +220,7 @@ final class HealthKitManager: ObservableObject {
     private var backgroundRefreshTask: Task<Void, Never>?
     private var backgroundRefreshNeedsFull = false
     private var allWorkoutsCache: (workouts: [HKWorkout], generatedAt: Date)?
+    private var allWorkoutsCacheEpoch = ATHLTHHealthHistoryCacheEpoch()
     // Coalesce profile, trophy and performance consumers sharing an expired
     // all-time HealthKit snapshot. They should never issue parallel unlimited
     // HKSampleQuery requests for the same history.
@@ -5426,6 +5442,7 @@ final class HealthKitManager: ObservableObject {
     }
 
     func releaseTransientCachesForMemoryPressure() {
+        allWorkoutsCacheEpoch.invalidate()
         allWorkoutsCache = nil
 
         workoutObjects
@@ -5455,6 +5472,7 @@ final class HealthKitManager: ObservableObject {
     }
 
     private func invalidateWorkoutDerivedCaches() {
+        allWorkoutsCacheEpoch.invalidate()
         allWorkoutsCache = nil
         workoutPeakCache = nil
         workoutPeakLightCache = nil
@@ -5721,6 +5739,7 @@ final class HealthKitManager: ObservableObject {
             return try await inFlight.value
         }
 
+        let startedAtEpoch = allWorkoutsCacheEpoch.value
         let fetch = Task { @MainActor in
             let signpost = ATHLTHPerformance.begin("HealthHistoricalRead")
             defer {
@@ -5732,8 +5751,13 @@ final class HealthKitManager: ObservableObject {
         defer { allWorkoutsFetchTask = nil }
         let fetched = try await fetch.value
 
-        allWorkoutsCache = (fetched, Date())
-        cacheWorkoutObjects(fetched)
+        // A new workout may have arrived while HKSampleQuery was running.
+        // Return this result to its original caller, but never overwrite
+        // the newly invalidated cache with an older snapshot.
+        if allWorkoutsCacheEpoch.acceptsResult(startedAt: startedAtEpoch) {
+            allWorkoutsCache = (fetched, Date())
+            cacheWorkoutObjects(fetched)
+        }
         return fetched
     }
 
