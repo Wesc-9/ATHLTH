@@ -19,6 +19,9 @@ struct ATHLTHStudioDashboardView: View {
     let onOpenLibrary: () -> Void
     let onOpenWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onStartQuick: () -> Void
+    let onStartWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
+    let onSendToWatch: (ATHLTHStudioSchedule.Occurrence) -> Void
+    let onStartAfter: (ATHLTHStudioSchedule.Occurrence, TimeInterval) -> Void
     /// Stored at the Studio scene root so sidebar changes or window
     /// resizing cannot throw away an active day-planning session.
     @Binding var focusedPlanningDate: Date?
@@ -528,7 +531,7 @@ struct ATHLTHStudioDashboardView: View {
             HStack(spacing: 10) {
                 Button {
                     if let next {
-                        onOpenWorkout(next)
+                        onStartWorkout(next)
                     } else {
                         focusedPlanningDate = Calendar.current.startOfDay(for: .now)
                     }
@@ -543,6 +546,11 @@ struct ATHLTHStudioDashboardView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(ATHLTHStudioStyle.ink)
+                .contextMenu {
+                    if let next {
+                        plannedWorkoutContextActions(next)
+                    }
+                }
 
                 Button(action: onOpenPlanner) {
                     Label(tr("Plan Studio", "Plan Studio"), systemImage: "calendar")
@@ -807,7 +815,7 @@ struct ATHLTHStudioDashboardView: View {
                     } else {
                         ForEach(selected.planned.prefix(3)) { entry in
                             Button {
-                                onOpenWorkout(entry)
+                                onStartWorkout(entry)
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: entry.workout.kind.systemImage)
@@ -839,9 +847,12 @@ struct ATHLTHStudioDashboardView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityHint(tr(
-                                "Open the details for this planned session",
-                                "Åpne detaljene for denne planlagte økten"
+                                "Start the planned workout. Hold to choose Watch or a delayed start.",
+                                "Start den planlagte økten. Hold inne for Watch eller utsatt start."
                             ))
+                            .contextMenu {
+                                plannedWorkoutContextActions(entry)
+                            }
                         }
                         if selected.planned.count > 3 {
                             Button {
@@ -916,6 +927,45 @@ struct ATHLTHStudioDashboardView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 22)
                 .stroke(ATHLTHStudioStyle.outline.opacity(0.55))
+        }
+    }
+
+    @ViewBuilder
+    private func plannedWorkoutContextActions(
+        _ entry: ATHLTHStudioSchedule.Occurrence
+    ) -> some View {
+        Button {
+            onStartWorkout(entry)
+        } label: {
+            Label(tr("Start workout", "Start økt"), systemImage: "play.fill")
+        }
+
+        Button {
+            onOpenWorkout(entry)
+        } label: {
+            Label(tr("Workout details", "Øktdetaljer"), systemImage: "info.circle")
+        }
+
+        if entry.planID != nil {
+            Button {
+                onSendToWatch(entry)
+            } label: {
+                Label(tr("Send to Apple Watch", "Send til Apple Watch"),
+                      systemImage: "applewatch")
+            }
+            Menu {
+                Button(tr("In 5 minutes", "Om 5 minutter")) {
+                    onStartAfter(entry, 5 * 60)
+                }
+                Button(tr("In 15 minutes", "Om 15 minutter")) {
+                    onStartAfter(entry, 15 * 60)
+                }
+                Button(tr("In 30 minutes", "Om 30 minutter")) {
+                    onStartAfter(entry, 30 * 60)
+                }
+            } label: {
+                Label(tr("Start later", "Start senere"), systemImage: "clock")
+            }
         }
     }
 
