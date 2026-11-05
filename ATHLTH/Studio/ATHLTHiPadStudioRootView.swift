@@ -40,6 +40,9 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var selectedWorkout: WorkoutSummary?
     @State private var showingInspector = false
     @State private var inspectorShowsCoach = false
+    @State private var inspectorShowsInbox = false
+    @State private var showingProfile = false
+    @SceneStorage("athlth.studio.libraryExpanded") private var libraryExpanded = false
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var focusedPlanningDate: Date?
     @State private var trainRequest: ATHLTHTrainNavigationRequest?
@@ -82,9 +85,9 @@ struct ATHLTHiPadStudioRootView: View {
                     // content. Avoid the duplicate large "Overview" title
                     // that previously consumed substantial iPad space.
                     .navigationTitle(selection == .overview ? "" : selection.label)
-                    .navigationBarTitleDisplayMode(
-                        selection == .overview ? .inline : .automatic
-                    )
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbarBackground(canvas, for: .navigationBar)
+                    .toolbarBackground(.visible, for: .navigationBar)
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button {
@@ -106,13 +109,36 @@ struct ATHLTHiPadStudioRootView: View {
                                 norwegian: "Gi den åpne Studio-visningen mer plass"
                             ))
                         }
-                        ToolbarItem(placement: .topBarTrailing) {
+                        ToolbarItemGroup(placement: .topBarTrailing) {
                             Button {
+                                let closing = showingInspector && inspectorShowsCoach
                                 inspectorShowsCoach = true
-                                showingInspector = true
+                                inspectorShowsInbox = false
+                                showingInspector = !closing
                             } label: {
                                 Label("ATHLTH Coach", systemImage: "sparkles")
                             }
+                            .help("ATHLTH Coach")
+                            .accessibilityIdentifier("athlth-ipad-coach-panel")
+
+                            Button {
+                                let closing = showingInspector && inspectorShowsInbox
+                                inspectorShowsCoach = false
+                                inspectorShowsInbox = true
+                                showingInspector = !closing
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Inbox", norwegian: "Innboks"
+                                    ),
+                                    systemImage: "bubble.left.and.bubble.right"
+                                )
+                            }
+                            .help(ATHLTHLocalization.choose(
+                                english: "Open messages alongside your work",
+                                norwegian: "Åpne meldinger ved siden av arbeidet"
+                            ))
+                            .accessibilityIdentifier("athlth-ipad-inbox-panel")
                         }
                     }
             }
@@ -128,8 +154,16 @@ struct ATHLTHiPadStudioRootView: View {
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
         }
+        .sheet(isPresented: $showingProfile) {
+            // The existing iPhone profile stays unchanged inside a tall,
+            // phone-width sheet rather than stretching across the iPad.
+            ATHLTHSideMenuDeepLinkView(destination: .profile)
+                .frame(width: 430)
+                .presentationSizing(.fitted)
+                .presentationDetents([.large])
+        }
         .onChange(of: selection) { _, destination in
-            showingInspector = false
+            // Keep Coach and Inbox docked while navigating Studio.
             if destination != .overview { focusedPlanningDate = nil }
             withAnimation(.easeInOut(duration: 0.18)) {
                 sidebarVisibility = destination == .planner
@@ -146,6 +180,11 @@ struct ATHLTHiPadStudioRootView: View {
             if inspectorShowsCoach {
                 RecoveryCoachInboxDestinationView()
                     .inspectorColumnWidth(min: 300, ideal: 370, max: 480)
+            } else if inspectorShowsInbox {
+                NavigationStack {
+                    MessageInboxDestinationView()
+                }
+                .inspectorColumnWidth(min: 320, ideal: 390, max: 480)
             } else if let selectedWorkout {
                 ATHLTHStudioWorkoutInspectionView(workout: selectedWorkout)
                     .inspectorColumnWidth(min: 270, ideal: 320, max: 400)
@@ -210,6 +249,46 @@ struct ATHLTHiPadStudioRootView: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
+
+                Menu {
+                    Button {
+                        openPersonalLibrary(.exercises)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "My exercises", norwegian: "Mine øvelser"
+                        ), systemImage: "dumbbell")
+                    }
+                    Button {
+                        openPersonalLibrary(.routes)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "My routes", norwegian: "Mine ruter"
+                        ), systemImage: "map")
+                    }
+                    Button {
+                        openPersonalLibrary(.trainingPlans)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "My training plans", norwegian: "Mine treningsplaner"
+                        ), systemImage: "calendar")
+                    }
+                    Button {
+                        openPersonalLibrary(.workouts)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "My workouts", norwegian: "Mine treningsøkter"
+                        ), systemImage: "bookmark")
+                    }
+                } label: {
+                    Image(systemName: "books.vertical")
+                        .font(.system(size: 18))
+                        .foregroundStyle(ink.opacity(0.7))
+                        .frame(width: 44, height: 44)
+                }
+                .help(ATHLTHLocalization.choose(
+                    english: "My training library", norwegian: "Mitt treningsbibliotek"
+                ))
+                .accessibilityIdentifier("athlth-ipad-library-rail")
             }
         }
         .background(canvas)
@@ -257,26 +336,144 @@ struct ATHLTHiPadStudioRootView: View {
                         }
                         .buttonStyle(.plain)
                         .accessibilityAddTraits(selection == destination ? .isSelected : [])
+
+                        if destination == .planner {
+                            trainingLibraryShortcut
+                        }
                     }
                 }
                 .padding(.horizontal, 11)
             }
 
-            VStack(alignment: .leading, spacing: 5) {
-                Text(session.profile.displayName.isEmpty ? "ATHLTH" : session.profile.displayName)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                Text(ATHLTHLocalization.choose(
-                    english: "Your body. Your data. Your progress.",
-                    norwegian: "Din kropp. Dine data. Din fremgang."
-                ))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(2)
+            Button {
+                showingProfile = true
+            } label: {
+                HStack(spacing: 11) {
+                    Group {
+                        if let avatarURL = session.profile.avatarURL {
+                            ATHLTHStorageImage(url: avatarURL, maxPixelSize: 140) { phase in
+                                if case .success(let image) = phase {
+                                    image.resizable().scaledToFill()
+                                } else {
+                                    profileFallback
+                                }
+                            }
+                        } else {
+                            profileFallback
+                        }
+                    }
+                    .frame(width: 46, height: 46)
+                    .clipShape(Circle())
+                    .overlay(Circle().stroke(gold.opacity(0.5)))
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(session.profile.displayName.isEmpty ? "ATHLTH" : session.profile.displayName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                            .lineLimit(1)
+                        Text(session.profile.username.isEmpty
+                             ? ATHLTHLocalization.choose(english: "My profile", norwegian: "Min profil")
+                             : "@\(session.profile.username)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.up.right")
+                        .font(.caption)
+                        .foregroundStyle(gold)
+                }
+                .padding(12)
+                .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 16))
+                .contentShape(Rectangle())
             }
-            .padding(20)
+            .buttonStyle(.plain)
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Open my profile", norwegian: "Åpne min profil"
+            ))
+            .accessibilityIdentifier("athlth-ipad-profile-footer")
+            .padding(.horizontal, 11)
+            .padding(.bottom, 12)
         }
         .background(canvas)
+    }
+
+    private var profileFallback: some View {
+        Circle()
+            .fill(ATHLTHStudioStyle.paper)
+            .overlay {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 26))
+                    .foregroundStyle(gold)
+            }
+    }
+
+    private var trainingLibraryShortcut: some View {
+        VStack(spacing: 1) {
+            HStack(spacing: 0) {
+                Button {
+                    trainRequest = .library
+                    showingTrain = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Training library", norwegian: "Treningsbibliotek"
+                    ), systemImage: "books.vertical")
+                        .font(.subheadline)
+                        .foregroundStyle(ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        libraryExpanded.toggle()
+                    }
+                } label: {
+                    Image(systemName: libraryExpanded ? "chevron.up" : "chevron.down")
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Expand personal library",
+                    norwegian: "Vis snarveier til mitt bibliotek"
+                ))
+                .accessibilityIdentifier("athlth-ipad-library-expand")
+            }
+            if libraryExpanded {
+                libraryLink(.exercises, "My exercises", "Mine øvelser", symbol: "dumbbell")
+                libraryLink(.routes, "My routes", "Mine ruter", symbol: "map")
+                libraryLink(.trainingPlans, "My training plans", "Mine treningsplaner", symbol: "calendar")
+                libraryLink(.workouts, "My workouts", "Mine treningsøkter", symbol: "bookmark")
+            }
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 5)
+    }
+
+    private func libraryLink(
+        _ section: ATHLTHPersonalLibrarySection,
+        _ english: String,
+        _ norwegian: String,
+        symbol: String
+    ) -> some View {
+        Button {
+            openPersonalLibrary(section)
+        } label: {
+            Label(ATHLTHLocalization.choose(english: english, norwegian: norwegian),
+                  systemImage: symbol)
+                .font(.subheadline)
+                .foregroundStyle(ink.opacity(0.77))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(minHeight: 44)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func openPersonalLibrary(_ section: ATHLTHPersonalLibrarySection) {
+        trainRequest = .personalLibrary(section)
+        showingTrain = true
     }
 
     @ViewBuilder
@@ -328,6 +525,7 @@ struct ATHLTHiPadStudioRootView: View {
     private func inspect(_ workout: WorkoutSummary) {
         selectedWorkout = workout
         inspectorShowsCoach = false
+        inspectorShowsInbox = false
         showingInspector = true
     }
 }
