@@ -36,6 +36,9 @@ enum ATHLTHWorkoutAudioDockPolicy {
 
 struct ATHLTHWorkoutAudioDock: View {
     @EnvironmentObject private var spotify: SpotifyPlaybackStore
+    @EnvironmentObject private var settings: AppSettingsStore
+    @State private var showingSpotifyPlaylists = false
+    @State private var selectedSpotifyPlaylist: SpotifyPlaylistReference?
     @State private var preferredMode: ATHLTHWorkoutAudioDockMode = .coach
     @State private var isExpanded = false
 
@@ -94,6 +97,9 @@ struct ATHLTHWorkoutAudioDock: View {
                     guard isExpanded && selectedMode == .spotify &&
                             spotify.isConnected else { return }
                     await spotify.handleIPhoneAudioDockCommand(.requestState)
+                    if spotify.playlists.isEmpty {
+                        await spotify.refreshPlaylists()
+                    }
                 }
                 .onChange(of: spotify.isConnected) { _, connected in
                     if !connected && preferredMode == .spotify {
@@ -101,6 +107,30 @@ struct ATHLTHWorkoutAudioDock: View {
                     }
                 }
                 .onDisappear { isExpanded = false }
+                .sheet(isPresented: $showingSpotifyPlaylists) {
+                    NavigationStack {
+                        SpotifyPlaylistPickerView(
+                            title: ATHLTHLocalization.choose(
+                                english: "Choose your music",
+                                norwegian: "Velg musikk"
+                            ),
+                            selection: $selectedSpotifyPlaylist
+                        )
+                    }
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                }
+                .onChange(of: selectedSpotifyPlaylist?.id) { _, newID in
+                    guard let selectedSpotifyPlaylist,
+                          newID == selectedSpotifyPlaylist.id else { return }
+                    Task { @MainActor in
+                        await spotify.startLinkedPlaylist(
+                            selectedSpotifyPlaylist,
+                            settings: settings,
+                            respectGlobalAutoplay: false
+                        )
+                    }
+                }
             }
         }
     }
@@ -210,6 +240,9 @@ struct ATHLTHWorkoutAudioDock: View {
                     )
                 }
             }
+            if selectedMode == .spotify {
+                spotifyPlaylistShortcuts
+            }
             if selectedMode == .coach {
                 HStack(spacing: 9) {
                     coachActions
@@ -243,7 +276,74 @@ struct ATHLTHWorkoutAudioDock: View {
             y: 5
         )
         .padding(.horizontal, 14)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .contain)
+    }
+
+    private var spotifyPlaylistShortcuts: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 7) {
+                Text(ATHLTHLocalization.choose(
+                    english: "PLAYLISTS", norwegian: "SPILLELISTER"
+                ))
+                .font(.caption2.weight(.bold))
+                .tracking(1.2)
+                .foregroundStyle(ATHLTHTheme.premiumGold)
+                Spacer(minLength: 4)
+                Button {
+                    showingSpotifyPlaylists = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "All playlists", norwegian: "Alle spillelister"
+                    ), systemImage: "square.grid.2x2")
+                    .font(.caption.weight(.semibold))
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(minHeight: 37)
+            }
+
+            if spotify.playlists.isEmpty {
+                Button {
+                    showingSpotifyPlaylists = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Find your playlists",
+                        norwegian: "Finn spillelistene dine"
+                    ), systemImage: "music.note.list")
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+            } else {
+                ScrollView(.horizontal) {
+                    HStack(spacing: 8) {
+                        ForEach(spotify.playlists.prefix(5)) { playlist in
+                            Button {
+                                Task { @MainActor in
+                                    await spotify.startLinkedPlaylist(
+                                        playlist,
+                                        settings: settings,
+                                        respectGlobalAutoplay: false
+                                    )
+                                }
+                            } label: {
+                                Label(playlist.name, systemImage: "music.note")
+                                    .font(.caption.weight(.semibold))
+                                    .lineLimit(1)
+                                    .frame(minHeight: 37)
+                                    .padding(.horizontal, 10)
+                                    .background(.white, in: Capsule())
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var title: String {
