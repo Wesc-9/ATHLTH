@@ -4457,7 +4457,8 @@ struct ATHLTHHomeView: View {
     }
 
     private func startHomePlannedWorkoutOnWatch(
-        _ workout: PlannedSession
+        _ workout: PlannedSession,
+        startMode: WatchWorkoutStartMode = .immediate
     ) {
         guard let watchKind = PlannedWorkoutWatchBuilder.watchKind(for: workout.kind),
               watchConnection.isReady
@@ -4534,6 +4535,65 @@ struct ATHLTHHomeView: View {
         } else {
             ghostRace.cancel()
             watchConnection.clearGhostRace()
+        }
+
+        // For send-to-Watch and countdown, prepare the complete recipe
+        // before asking HealthKit to start. A manual send never starts it.
+        if startMode != .immediate {
+            let coach = PlannedWorkoutWatchBuilder.audioCoachConfiguration(
+                for: workout,
+                selectedRoute: selectedRoute,
+                defaultConfiguration: settings.audioCoachConfiguration(
+                    enabled: settings.audioCoachEnabledByDefault
+                )
+            )
+            let autoPause = !treadmill &&
+                (workout.autoPauseEnabled ?? settings.autoPauseOutdoorWorkouts)
+            let running: WatchRunningWorkoutTransfer =
+                workout.kind == .running
+                    ? PlannedWorkoutWatchBuilder.runningTransfer(
+                        from: workout,
+                        routeAlerts: routeAlerts,
+                        autoPauseEnabled: autoPause
+                    )
+                    : WatchRunningWorkoutTransfer(
+                        title: workout.title,
+                        steps: [],
+                        routeAlerts: routeAlerts,
+                        targetAlerts: workout.targetAlertConfiguration,
+                        autoPauseEnabled: autoPause
+                    )
+
+            if let plannedGearIDs = workout.gearIDs {
+                gear.prepareNextWorkoutGear(Set(plannedGearIDs))
+            } else {
+                gear.clearPreparedWorkoutGear()
+            }
+
+            watchConnection.sendPreparedWorkout(
+                WatchPreparedWorkoutTransfer(
+                    id: workout.id,
+                    title: workout.title,
+                    summary: workout.title,
+                    kind: watchKind,
+                    routeID: selectedRoute?.id,
+                    runningWorkout: running,
+                    audioCoach: coach,
+                    ghostRace: treadmill ? nil :
+                        GhostRaceStartService.preparedTransfer(
+                            ghostRace: ghostRace,
+                            audio: workout.ghostUpdates ?? .disabled
+                        ),
+                    indoor: treadmill,
+                    startMode: startMode,
+                    updatedAt: Date()
+                )
+            )
+
+            if startMode == .onWatch {
+                homeWatchTransferMessage = startMode.confirmationText
+                return
+            }
         }
 
         homeDirectStartInProgress = true
