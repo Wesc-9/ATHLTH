@@ -1912,6 +1912,9 @@ struct AppRootView: View {
             lifecycleSocialContent
         .environment(\.athlthImageAccountID, signedInUserID)
         .onChange(of: signedInUserID, initial: true) { _, userID in
+            // Match queued Watch events to the signed-in account before
+            // acting on ActivityKit, pet participation or workout summaries.
+            watchConnection.setCurrentAccount(userID)
             // The companion must know which user owns a new Watch workout.
             // A delayed old result retains its session-start account.
             watchConnection.sendAccountIdentity(userID)
