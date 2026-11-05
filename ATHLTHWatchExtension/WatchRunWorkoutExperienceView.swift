@@ -2055,7 +2055,9 @@ struct WatchRunWorkoutExperienceView: View {
                         .frame(maxWidth: .infinity, minHeight: compact ? 31 : 39)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(WatchTheme.premiumGold)
+                    // Gold remains an accent; a dark action background keeps
+                    // white Watch button text readable outdoors.
+                    .tint(WatchTheme.liveAction)
                     .accessibilityHint(ATHLTHLocalization.choose(
                         english: "Requires confirmation; the workout does not end automatically",
                         norwegian: "Krever bekreftelse; økten avsluttes ikke automatisk"
