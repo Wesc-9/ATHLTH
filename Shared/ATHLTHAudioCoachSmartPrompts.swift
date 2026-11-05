@@ -157,16 +157,56 @@ struct ATHLTHAudioCoachSmartState {
     private(set) var nextRandomAt: Double = 0
     private(set) var lastSpokenAt: Double = -.infinity
     private(set) var priorMinutePace: Double?
-    private var recentPhraseIndices: [Int] = []
+    private var recentPhraseTexts: [String] = []
     private var announcedLandmarks: Set<UUID> = []
+    private var lastTerrainLocation: CLLocation?
+    private(set) var inferredTerrain: ATHLTHCoachTerrain?
+    private var lastTerrainPhraseAt: Double = -.infinity
+    private var announcedFinalStretch = false
 
     mutating func reset() { self = Self() }
+
+    /// Terrain cues use independently recorded, accurate, fresh GPS altitude.
+    /// Do not infer grade from one point or from horizontal GPS noise.
+    mutating func observeTerrain(location: CLLocation, now: Date = Date()) {
+        guard location.horizontalAccuracy >= 0,
+              location.horizontalAccuracy <= 25,
+              location.verticalAccuracy >= 0,
+              location.verticalAccuracy <= 8,
+              abs(now.timeIntervalSince(location.timestamp)) <= 12,
+              location.altitude.isFinite else {
+            inferredTerrain = nil
+            return
+        }
+        guard let anchor = lastTerrainLocation else {
+            lastTerrainLocation = location
+            return
+        }
+        guard location.timestamp > anchor.timestamp else { return }
+        let traveled = location.distance(from: anchor)
+        guard traveled.isFinite, traveled >= 70 else { return }
+        // Discontinuous samples require a new reliable anchor, not a guessed
+        // climb between two far-away fixes.
+        guard traveled <= 400 else {
+            lastTerrainLocation = location
+            inferredTerrain = nil
+            return
+        }
+        let climbed = location.altitude - anchor.altitude
+        let gradient = climbed / max(traveled, 1)
+        inferredTerrain = climbed >= 7 && gradient >= 0.035
+            ? .uphill
+            : climbed <= -7 && gradient <= -0.035
+                ? .downhill : nil
+        lastTerrainLocation = location
+    }
 
     mutating func nextMotivation(
         settings: ATHLTHAudioCoachSmartSettings,
         elapsed: Double,
         paceSecondsPerKilometer: Double?,
-        norwegian: Bool
+        norwegian: Bool,
+        environment: ATHLTHCoachEnvironmentalContext = .init()
     ) -> String? {
         guard elapsed.isFinite, elapsed >= 0 else { return nil }
 
@@ -178,27 +218,104 @@ struct ATHLTHAudioCoachSmartState {
                 let currentPace = validatedPace(paceSecondsPerKilometer)
                 let previousPace = priorMinutePace
                 priorMinutePace = currentPace
+
                 if elapsed - lastSpokenAt >= 35 {
-                    let context: String?
-                    if let currentPace, let previous = previousPace {
-                        let ratio = currentPace / previous
-                        if ratio < 0.94 {
-                            context = norwegian
-                                ? "Du har økt farten siden forrige oppdatering. Bra jobbet!"
-                                : "You've picked up the pace since the last update. Nice work!"
-                        } else if (0.94...1.06).contains(ratio) {
-                            context = norwegian
-                                ? "Du holder et jevnt tempo. Fortsett slik!"
-                                : "You're keeping a steady pace. Keep it up!"
-                        } else {
-                            context = nil
+                    let style = settings.encouragementStyle ?? .encouragement
+                    var proposed: String?
+
+                    if settings.isContextualFeedbackEnabled {
+                        if environment.nearVerifiedFinish && !announcedFinalStretch {
+                            announcedFinalStretch = true
+                            proposed = pickDistinct(norwegian
+                                ? [
+                                    "Nå er du på siste del av ruten! Bra jobbet – hold fokus helt inn.",
+                                    "Målet er like foran deg. Du har gjort jobben, finn en god avslutning!",
+                                    "Siste etappe! Behold flyten helt til du er fremme.",
+                                    "Du er nesten ved mål. Sterk innsats, avslutt kontrollert!",
+                                    "Det er kort igjen. God rytme – la deg selv fullføre sterkt."
+                                  ]
+                                : [
+                                    "You're on the final stretch! Great work — keep your focus.",
+                                    "The finish is close. You've done the work, finish well!",
+                                    "Last stretch! Keep your rhythm all the way.",
+                                    "You're almost at the finish. Strong effort, stay in control.",
+                                    "Not far to go. Keep your flow and finish strong."
+                                  ])
+                        } else if let terrain = environment.terrain,
+                                  elapsed - lastTerrainPhraseAt >= 240 {
+                            lastTerrainPhraseAt = elapsed
+                            switch terrain {
+                            case .uphill:
+                                proposed = pickDistinct(norwegian
+                                    ? [
+                                        "Du er i en bakke nå. Kortere steg og jevn innsats – dette klarer du!",
+                                        "Bra jobbet i stigningen. Finn din egen rytme oppover.",
+                                        "Det går oppover. Du bygger styrke for hvert steg – hold kontrollen.",
+                                        "Sterk innsats i bakken! Hold pusten rolig og jobb deg frem."
+                                      ]
+                                    : [
+                                        "You're climbing now. Shorter steps and a steady effort!",
+                                        "Nice work uphill. Find your own rhythm on the climb.",
+                                        "The route is rising. Keep your effort controlled and strong.",
+                                        "Solid work on this hill. Breathe steadily and keep moving."
+                                      ])
+                            case .downhill:
+                                proposed = pickDistinct(norwegian
+                                    ? [
+                                        "Nå går det nedover. Slapp av i skuldrene og finn god flyt.",
+                                        "Du er i en nedoverbakke. La beina flyte, men behold kontrollen.",
+                                        "Fin anledning til å finne rytmen igjen. Løp kontrollert nedover.",
+                                        "Godt jobbet oppover! Bruk nedoverbakken til å finne pusten."
+                                      ]
+                                    : [
+                                        "You're heading downhill. Relax your shoulders and flow.",
+                                        "On the descent, let your legs move while staying in control.",
+                                        "Use this downhill to settle into a good rhythm.",
+                                        "Good climbing work. Recover your breathing on the descent."
+                                      ])
+                            }
+                        } else if let currentPace, let previous {
+                            let ratio = currentPace / previous
+                            if ratio < 0.94 {
+                                proposed = pickDistinct(norwegian
+                                    ? [
+                                        "Du har økt farten siden sist. Flott jobbet!",
+                                        "Du har økt farten, og ser ut til å ha funnet flyten!",
+                                        "Du har økt farten. Sterkt! Behold kontrollen.",
+                                        "Du har økt farten siden forrige oppdatering – godt driv!",
+                                        "Du har økt farten. Fortsett med den gode rytmen."
+                                      ]
+                                    : [
+                                        "You've picked up the pace. Great work!",
+                                        "You've picked up the pace and found your flow!",
+                                        "You're moving faster. Strong work, stay in control.",
+                                        "You've increased your speed since the last update. Nice!",
+                                        "Your pace has improved. Keep that good rhythm!"
+                                      ])
+                            } else if (0.94...1.06).contains(ratio) {
+                                proposed = pickDistinct(norwegian
+                                    ? [
+                                        "Du holder et jevnt tempo. Godt jobbet!",
+                                        "Flott rytme! Du holder farten stabil.",
+                                        "Dette er stabilt og fint. Fortsett i din egen rytme.",
+                                        "Du holder godt på tempoet. Stødig innsats!",
+                                        "Jevn fart og godt fokus – sterk gjennomføring."
+                                      ]
+                                    : [
+                                        "You're holding a steady pace. Nice work!",
+                                        "Great rhythm — your pace is stable.",
+                                        "Good consistency. Keep your own rhythm.",
+                                        "You're holding your pace well. Strong effort!",
+                                        "Steady speed and good focus — keep going."
+                                      ])
+                            }
                         }
-                    } else {
-                        context = nil
                     }
+
                     lastSpokenAt = elapsed
-                    return context ?? selectPhrase(
-                        settings: settings, norwegian: norwegian
+                    return proposed ?? selectPhrase(
+                        settings: settings, norwegian: norwegian,
+                        style: style
                     )
                 }
             }
@@ -215,7 +332,10 @@ struct ATHLTHAudioCoachSmartState {
         let variation = Int.random(in: -(base / 4)...(base / 4))
         nextRandomAt = elapsed + Double(base + variation)
         lastSpokenAt = elapsed
-        return selectPhrase(settings: settings, norwegian: norwegian)
+        return selectPhrase(
+            settings: settings, norwegian: norwegian,
+            style: settings.encouragementStyle ?? .encouragement
+        )
     }
 
     mutating func nextLandmark(
@@ -252,9 +372,22 @@ struct ATHLTHAudioCoachSmartState {
         return pace
     }
 
+    /// Text-based anti-repeat memory covers metric, terrain and freeform
+    /// phrases together, even when the active motivational preset changes.
+    private mutating func pickDistinct(_ choices: [String]) -> String {
+        let available = choices.filter { !recentPhraseTexts.contains($0) }
+        let selected = (available.isEmpty ? choices : available).randomElement() ?? ""
+        recentPhraseTexts.append(selected)
+        if recentPhraseTexts.count > 14 {
+            recentPhraseTexts.removeFirst()
+        }
+        return selected
+    }
+
     private mutating func selectPhrase(
         settings: ATHLTHAudioCoachSmartSettings,
-        norwegian: Bool
+        norwegian: Bool,
+        style: ATHLTHCoachEncouragementStyle
     ) -> String {
         let builtInNO = [
             "Bra jobbet! Hold fokus på neste steg.",
@@ -343,21 +476,80 @@ struct ATHLTHAudioCoachSmartState {
         let custom = settings.customEncouragements.prefix(40)
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
-        let builtIn = norwegian ? builtInNO : builtInEN
-        let options = builtIn + custom
-        let eligible = options.indices.filter { !recentPhraseIndices.contains($0) }
-        let available = eligible.isEmpty ? Array(options.indices) : eligible
-        let customChoices = available.filter { $0 >= builtIn.count }
-        let builtInChoices = available.filter { $0 < builtIn.count }
-        // User-authored phrases should be heard, not drowned out by the
-        // much larger built-in bank. Alternate pools at random when possible.
-        let chosenPool = !customChoices.isEmpty &&
-            (builtInChoices.isEmpty || Bool.random())
-            ? customChoices : builtInChoices
-        let picked = (chosenPool.isEmpty ? available : chosenPool)
-            .randomElement() ?? 0
-        recentPhraseIndices.append(picked)
-        if recentPhraseIndices.count > 9 { recentPhraseIndices.removeFirst() }
-        return options[picked]
+        let phrases: [String]
+        switch style {
+        case .praise:
+            phrases = norwegian
+                ? [
+                    "Sterkt gjennomført så langt! Du fortjener ros for innsatsen.",
+                    "Godt jobbet! Du har virkelig lagt ned en fin innsats.",
+                    "Dette er solid trening. Du kan være stolt av jobben du gjør.",
+                    "Herlig innsats! Du finner stadig en god rytme.",
+                    "Veldig bra fokus. Du gjennomfører med kontroll.",
+                    "Bravo! Du investerer skikkelig i formen i dag.",
+                    "God flyt og godt jobbet. Fortsett på din måte.",
+                    "Du gjør fremskritt ved å møte opp og jobbe jevnt.",
+                    "Se hvor langt du allerede har kommet i dag. Sterkt!",
+                    "Flott at du holder det gående. Det er verdifull trening.",
+                    "Du bygger både kapasitet og selvtillit. Bra jobbet!",
+                    "Fin innsats! Du holder hodet kaldt og beina i gang."
+                  ]
+                : [
+                    "Strong effort so far! You deserve credit for your work.",
+                    "Nice work! You're putting in a solid effort.",
+                    "This is quality training. Be proud of the work you're doing.",
+                    "Great effort! You're finding a good rhythm.",
+                    "Excellent focus. You're moving with control.",
+                    "Bravo! You're investing in your fitness today.",
+                    "Nice flow and great work. Keep it your way.",
+                    "Showing up and keeping at it is real progress.",
+                    "Look how far you've come today. Strong work!",
+                    "Well done for keeping at it. Every step counts.",
+                    "You're building fitness and confidence. Good job!",
+                    "Solid work. Keep your head clear and legs moving."
+                  ]
+        case .encouragement:
+            phrases = norwegian ? builtInNO : builtInEN
+        case .push:
+            phrases = norwegian
+                ? [
+                    "Du har mer å gi. Finn rytmen og fokuser på neste etappe!",
+                    "Nå jobber vi! Hold fokus og gi en kontrollert innsats.",
+                    "Kom igjen! Bruk de neste minuttene godt.",
+                    "Du har kommet så langt. Fortsett med godt driv!",
+                    "Finn et tydelig mål foran deg, og jobb deg dit!",
+                    "Sterkt! Behold trykket, uten å miste kontrollen.",
+                    "Et steg av gangen, men med skikkelig vilje. Kjør på!",
+                    "Nå gjelder det å holde fokuset. Du klarer dette!",
+                    "Fint driv. Sjekk rytmen og jobb videre!",
+                    "Gi deg selv en god avslutning på denne delen!",
+                    "Du har en oppgave nå: Hold en god, jevn innsats!",
+                    "Kom igjen! Finn flyten og behold den gjennom neste del.",
+                    "Du har gjennomført mye. Bruk energien smart videre!",
+                    "Det er nå du kan vise hva du har jobbet for!",
+                    "Hold konsentrasjonen. Neste etappe er din!",
+                    "Du er på vei. Fortsett med besluttsomhet og kontroll."
+                  ]
+                : [
+                    "You've got more to give. Focus on the next stretch!",
+                    "Let's work! Keep your focus and a controlled effort.",
+                    "Come on! Make the next few minutes count.",
+                    "You've come this far. Keep that momentum!",
+                    "Pick a point ahead and work steadily towards it!",
+                    "Strong effort! Keep pushing without losing control.",
+                    "One step at a time with real determination. Go!",
+                    "Stay focused now. You've got this!",
+                    "Good drive. Find your rhythm and keep moving!",
+                    "Give this section a strong finish!",
+                    "Your task now: keep a good steady effort!",
+                    "Come on! Find your flow and own the next stretch!",
+                    "You've done plenty. Use your energy wisely now!",
+                    "This is a chance to show what you've trained for!",
+                    "Keep your concentration. The next stretch is yours!",
+                    "You're moving forward. Stay determined and in control."
+                  ]
+        }
+        let pool = !custom.isEmpty && Bool.random() ? custom : phrases
+        return pickDistinct(pool)
     }
 }
