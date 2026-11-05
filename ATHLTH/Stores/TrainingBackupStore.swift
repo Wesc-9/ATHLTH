@@ -84,12 +84,13 @@ struct TrainingBackupPayload: Codable, Equatable {
 }
 
 enum BackupError: LocalizedError {
-    case invalidBackup, tooLarge, accountChanged, consentRequired
+    case invalidBackup, tooLarge, accountChanged, consentRequired, activeWorkout
     var errorDescription: String? {
         switch self {
         case .invalidBackup: return "This backup is incompatible or belongs to another account. Nothing was restored."
         case .tooLarge: return "This backup is too large. Your local data is safe; contact support."
         case .accountChanged: return "Your account changed. Please try again."
+        case .activeWorkout: return "Finish your active iPhone or Apple Watch workout before restoring a backup."
         case .consentRequired: return "Enable cloud backup before uploading training data."
         }
     }
@@ -383,8 +384,12 @@ final class TrainingBackupStore: ObservableObject {
         } catch { if accountID == userID { status = error.localizedDescription } }
     }
 
-    func restore(_ row: TrainingBackupRow, userID: UUID) async -> Bool {
-        guard enabled, !isBusy else { return false }
+    func restore(
+        _ row: TrainingBackupRow,
+        userID: UUID,
+        canApply: @MainActor () -> Bool
+    ) async -> Bool {
+        guard enabled, !isBusy, canApply() else { return false }
         isBusy = true
         defer { isBusy = false }
         do {
@@ -394,6 +399,9 @@ final class TrainingBackupStore: ObservableObject {
             // A separate recovery slot keeps the pre-restore state available.
             try await upload(.capture(userID: userID), deviceID: UUID())
             try checkAccount(userID)
+            // The workout may have started while the recovery snapshot was
+            // uploading. Never overwrite its live persistence journal.
+            guard canApply() else { throw BackupError.activeWorkout }
             var restoredRecords = row.payload.records
             if let data = restoredRecords["training"] {
                 var training = try JSONDecoder().decode(AccountTrainingContent.self, from: data)
