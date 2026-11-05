@@ -213,7 +213,8 @@ struct TargetGhostRoutePickerView: View {
                                         .foregroundStyle(ATHLTHTheme.primaryText)
                                         .lineLimit(2)
                                     Label(
-                                        String(format: "%.1f km", route.distanceKilometers),
+                                        String(format: "%.1f km",
+                        GhostTargetRouteEligibility.geometryDistanceKilometers(route) ?? 0),
                                         systemImage: "point.topleft.down.to.point.bottomright.curvepath"
                                     )
                                     .font(.caption)
@@ -261,13 +262,13 @@ struct TargetGhostRoutePickerView: View {
 // Target Ghost needs real, continuous route geometry. Checking just a
 // saved route's reported distance would offer races that cannot start.
 enum GhostTargetRouteEligibility {
-    static func isUsable(_ route: TrainingRoute) -> Bool {
+    /// The Target Ghost's clock uses the actual route polyline, never the
+    /// potentially older/rounded distance displayed by a saved route.
+    static func geometryDistanceKilometers(_ route: TrainingRoute) -> Double? {
         let coordinates = route.coordinates.sorted {
             $0.sequence < $1.sequence
         }
-        guard coordinates.count >= 2,
-              route.distanceKilometers.isFinite else { return false }
-
+        guard coordinates.count >= 2 else { return nil }
         var previous: CLLocation?
         var totalMeters = 0.0
         for coordinate in coordinates {
@@ -275,18 +276,25 @@ enum GhostTargetRouteEligibility {
                   coordinate.longitude.isFinite,
                   (-90...90).contains(coordinate.latitude),
                   (-180...180).contains(coordinate.longitude) else {
-                return false
+                return nil
             }
             let location = CLLocation(
                 latitude: coordinate.latitude,
                 longitude: coordinate.longitude
             )
             if let previous {
-                totalMeters += location.distance(from: previous)
+                let increment = location.distance(from: previous)
+                guard increment.isFinite, increment >= 0 else { return nil }
+                totalMeters += increment
             }
             previous = location
         }
-        return totalMeters.isFinite && totalMeters >= 200
+        guard totalMeters.isFinite, totalMeters >= 200 else { return nil }
+        return totalMeters / 1_000
+    }
+
+    static func isUsable(_ route: TrainingRoute) -> Bool {
+        geometryDistanceKilometers(route) != nil
     }
 }
 
@@ -334,6 +342,10 @@ struct TargetGhostSetupView: View {
     private let suggestedBaselineDuration: TimeInterval
     private let routeReady: Bool
 
+    private var routeGeometryKilometers: Double {
+        GhostTargetRouteEligibility.geometryDistanceKilometers(route) ?? 0
+    }
+
     @State private var targetTimeText: String
     @State private var targetPaceText: String
     @State private var basicShowCustomTime = false
@@ -355,6 +367,8 @@ struct TargetGhostSetupView: View {
     ) {
         self.route = route
         self.challengeTitle = challengeTitle
+        let routeGeometryKilometers =
+            GhostTargetRouteEligibility.geometryDistanceKilometers(route) ?? 0
 
         // Arena can prefill a rival's voluntarily shared time. The user
         // may edit the target before starting; no opponent GPS is replayed.
@@ -362,9 +376,9 @@ struct TargetGhostSetupView: View {
             seconds.isFinite && (60...86_400).contains(seconds) ? seconds : nil
         }
         let distanceBasedSuggestion: TimeInterval =
-            route.distanceKilometers.isFinite &&
-            route.distanceKilometers > 0
-            ? min(max(route.distanceKilometers * 330, 300), 86_400)
+            routeGeometryKilometers.isFinite &&
+            routeGeometryKilometers > 0
+            ? min(max(routeGeometryKilometers * 330, 300), 86_400)
             : 1_800
         let rawSuggestion = sharedTime ??
             route.expectedTravelTimeSeconds ??
@@ -380,7 +394,7 @@ struct TargetGhostSetupView: View {
         )
         _targetPaceText = State(
             initialValue: GhostTargetPaceFormatter.text(
-                secondsPerKilometer: suggested / max(route.distanceKilometers, 0.1)
+                secondsPerKilometer: suggested / max(routeGeometryKilometers, 0.1)
             )
         )
     }
@@ -406,7 +420,7 @@ struct TargetGhostSetupView: View {
                 .secondsPerKilometer(from: targetPaceText) else { return nil }
             return GhostTargetPaceFormatter.duration(
                 paceSeconds: pace,
-                routeKilometers: route.distanceKilometers
+                routeKilometers: routeGeometryKilometers
             )
         }
     }
@@ -844,7 +858,7 @@ struct TargetGhostSetupView: View {
                     Spacer(minLength: 4)
 
                     Label(
-                        String(format: "%.1f km", route.distanceKilometers),
+                        String(format: "%.1f km", routeGeometryKilometers),
                         systemImage: "figure.run"
                     )
                     .font(.caption.weight(.semibold))
@@ -952,7 +966,7 @@ struct TargetGhostSetupView: View {
                         .foregroundStyle(ATHLTHTheme.mutedText)
                         Spacer()
                         Text(GhostTargetTimeFormatter.paceText(
-                            distanceKilometers: route.distanceKilometers,
+                            distanceKilometers: routeGeometryKilometers,
                             duration: targetDuration
                         ))
                         .font(.subheadline.weight(.semibold))
@@ -1105,7 +1119,7 @@ struct TargetGhostSetupView: View {
                             .lineLimit(2)
                             .foregroundStyle(ATHLTHTheme.primaryText)
                         Label(
-                            String(format: "%.1f km", route.distanceKilometers),
+                            String(format: "%.1f km", routeGeometryKilometers),
                             systemImage: "figure.run"
                         )
                         if let elevation = route.elevationGainMeters {
@@ -1115,7 +1129,7 @@ struct TargetGhostSetupView: View {
                         if let duration = targetDuration {
                             Label(
                                 GhostTargetTimeFormatter.paceText(
-                                    distanceKilometers: route.distanceKilometers,
+                                    distanceKilometers: routeGeometryKilometers,
                                     duration: duration
                                 ),
                                 systemImage: "speedometer"
@@ -1316,8 +1330,7 @@ struct TargetGhostSetupView: View {
                                 GhostTargetTimeFormatter
                                     .paceText(
                                         distanceKilometers:
-                                            route
-                                                .distanceKilometers,
+                                            routeGeometryKilometers,
                                         duration:
                                             targetDuration
                                     )
@@ -1751,7 +1764,7 @@ struct TargetGhostSetupView: View {
                 targetDuration ??
                 route.expectedTravelTimeSeconds ??
                 max(
-                    route.distanceKilometers *
+                    routeGeometryKilometers *
                         330,
                     5 * 60
                 )
@@ -1855,7 +1868,7 @@ struct TargetGhostSetupView: View {
         _ duration: TimeInterval
     ) {
         targetTimeText = GhostTargetTimeFormatter.string(duration)
-        let pace = duration / max(route.distanceKilometers, 0.1)
+        let pace = duration / max(routeGeometryKilometers, 0.1)
         targetPaceText = GhostTargetPaceFormatter.text(
             secondsPerKilometer: pace
         )
