@@ -6,6 +6,8 @@ final class ATHLTHWatchFinishAccessPolicyTests: XCTestCase {
         progress: Double? = 97,
         remaining: Double? = 70,
         finishDistance: Double? = 34,
+        recordedRoute: Double? = 4_600,
+        expectedRoute: Double? = 5_000,
         accuracy: Double? = 8,
         age: Double? = 2,
         elapsed: Double = 1_800,
@@ -15,6 +17,8 @@ final class ATHLTHWatchFinishAccessPolicyTests: XCTestCase {
         ATHLTHWatchFinishAccessPolicy.shouldShowRouteFinish(
             routeProgressPercent: progress,
             routeRemainingMeters: remaining,
+            recordedRouteMeters: recordedRoute,
+            expectedRouteMeters: expectedRoute,
             metersFromFinish: finishDistance,
             gpsHorizontalAccuracy: accuracy,
             gpsAgeSeconds: age,
@@ -31,6 +35,9 @@ final class ATHLTHWatchFinishAccessPolicyTests: XCTestCase {
         XCTAssertFalse(eligible(progress: 70))
         XCTAssertFalse(eligible(remaining: 240))
         XCTAssertFalse(eligible(finishDistance: 185))
+        XCTAssertFalse(eligible(recordedRoute: 500)) // Start/finish overlap.
+        XCTAssertFalse(eligible(recordedRoute: nil))
+        XCTAssertFalse(eligible(expectedRoute: nil))
     }
 
     func testGpsMustBeAccurateAndCurrent() {
