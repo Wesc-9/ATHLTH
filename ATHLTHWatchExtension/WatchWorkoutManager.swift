@@ -280,6 +280,32 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    /// A second, visible finish action is shown only near the real route
+    /// endpoint, with reliable GPS and meaningful course progression.
+    /// Never treat simply being near the starting location as completion.
+    var isNearVerifiedRouteFinish: Bool {
+        guard isActive, usesOutdoorGPS,
+              (state == .running || state == .paused),
+              let route = plannedRoute,
+              let finish = route.points.max(by: { $0.sequence < $1.sequence }),
+              let current = lastAcceptedOutdoorLocation
+        else { return false }
+        let finishLocation = CLLocation(
+            latitude: finish.latitude, longitude: finish.longitude
+        )
+        return ATHLTHWatchFinishAccessPolicy.shouldShowRouteFinish(
+            routeProgressPercent: routeProgressPercent,
+            routeRemainingMeters: routeRemainingMeters,
+            metersFromFinish: current.distance(from: finishLocation),
+            gpsHorizontalAccuracy: current.horizontalAccuracy,
+            gpsAgeSeconds: Date().timeIntervalSince(current.timestamp),
+            workoutElapsedSeconds: elapsedTime,
+            inWarmup: structuredRunningWorkout?.deferRouteUntilMain == true &&
+                structuredStepIndex == 0,
+            awaitingMainStart: awaitingMainStart
+        )
+    }
+
     var canRunBackToStart: Bool {
         guard isActive, !returningToRouteStart,
               let route = plannedRoute, route.points.count >= 2,
