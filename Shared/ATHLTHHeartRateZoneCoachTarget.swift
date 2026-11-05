@@ -61,6 +61,15 @@ enum ATHLTHHeartRateZoneCoachTarget {
                "Pulsen er over pulssone S\(zone). Senk intensiteten litt.")
     }
 
+    /// Positive affirmation is different from a recovery notification.
+    /// The Watch applies freshness, stable-duration and cooldown gates.
+    static func onTargetPhrase(
+        zone: Int
+    ) -> (english: String, norwegian: String) {
+        ("You're holding heart-rate zone Z\(zone). Good control.",
+         "Du holder deg i pulssone S\(zone). God kontroll.")
+    }
+
     static func backInTargetPhrase(
         zone: Int?
     ) -> (english: String, norwegian: String) {
