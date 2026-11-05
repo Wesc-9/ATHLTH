@@ -113,6 +113,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var workoutLocationMetadataAttached = false
     private var timer: Timer?
     private var startedAt: Date?
+    /// Immutable within one HealthKit workout, even if iPhone changes user.
+    private var workoutOwnerID: UUID?
     private var finishing = false
     private var mirroringActive = false
     private var mirroringRetryPending = false
@@ -3376,6 +3378,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             WatchPersistedWorkoutState(
                 kind: kind,
                 startedAt: startedAt,
+                accountOwnerID: workoutOwnerID,
                 plannedRoute: plannedRoute,
                 audioCoach:
                     audioCoachConfiguration,
@@ -3444,6 +3447,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         startedAt =
             startedAt ??
             snapshot.startedAt
+        workoutOwnerID = snapshot.accountOwnerID
         switchedIndoorVenue = snapshot.indoorVenue
         if let venue = snapshot.indoorVenue {
             indoorPromptedInThisWorkout = true
@@ -3654,6 +3658,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         workoutLocation = nil
         workoutLocationMetadataAttached = false
         startedAt = nil
+        workoutOwnerID = nil
         resetIndoorProbeForNewWorkout()
         finishing = false
         mirroringActive = false
@@ -3766,6 +3771,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     ) async {
         guard !isActive, state != .preparing, state != .ending else { return }
 
+        workoutOwnerID = WatchRouteStore.shared.companionAccountID
         let resolvedRoute = route ?? plannedRoute
         returningToRouteStart = false
         routeLegDistanceOffsetMeters = 0
@@ -7171,6 +7177,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 plannedRoute?.title
         )
 
+        result.accountOwnerID = workoutOwnerID
         result.petSegments = WatchRouteStore.shared.completedPetSegments()
         if kind == .running || kind == .walking {
             result.recordedRunningMinutes = recordedStructuredRunMinutes
