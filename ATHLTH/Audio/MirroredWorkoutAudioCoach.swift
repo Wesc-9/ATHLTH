@@ -531,7 +531,11 @@ final class MirroredWorkoutAudioCoach:
             settings: settings,
             elapsed: snapshot.elapsedTime,
             paceSecondsPerKilometer: resolvedPace(snapshot),
-            norwegian: norwegian
+            norwegian: norwegian,
+            environment: ATHLTHCoachEnvironmentalContext(
+                routeRemainingMeters: snapshot.routeRemainingMeters,
+                routeProgressPercent: snapshot.routeProgressPercent
+            )
         ) {
             speak(
                 message,
