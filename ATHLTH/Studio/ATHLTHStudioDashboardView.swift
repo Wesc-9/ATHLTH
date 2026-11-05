@@ -857,8 +857,11 @@ struct ATHLTHStudioDashboardView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHStudioStyle.ink)
-                    .disabled(Calendar.current.startOfDay(for: selected.date) <
-                              Calendar.current.startOfDay(for: .now))
+                    .disabled(
+                        !HomeWeeklyProgressCalendar.canScheduleStandalone(
+                            on: selected.date
+                        )
+                    )
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 9)
