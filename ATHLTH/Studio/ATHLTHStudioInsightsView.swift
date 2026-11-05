@@ -5,7 +5,7 @@ import Charts
 /// workout summaries from scheduled sessions and Apple Health's own scores.
 struct ATHLTHStudioInsightsView: View {
     @EnvironmentObject private var health: HealthKitManager
-    @State private var periodDays = 28
+    @SceneStorage("athlth.studio.insights.periodDays") private var periodDays = 28
     @State private var showingDetailedInsights = false
 
     private var result: ATHLTHStudioAnalytics.Snapshot {
@@ -26,9 +26,16 @@ struct ATHLTHStudioInsightsView: View {
     }
 
     var body: some View {
-        ScrollView {
+        GeometryReader { geometry in
+            let columns = Array(
+                repeating: GridItem(.flexible(), spacing: 12),
+                count: geometry.size.width >= 1130 ? 3 :
+                    geometry.size.width >= 670 ? 2 : 1
+            )
+            let sideBySideCharts = geometry.size.width >= 890
+            ScrollView {
             VStack(alignment: .leading, spacing: 22) {
-                HStack {
+                HStack(alignment: .top) {
                     VStack(alignment: .leading, spacing: 7) {
                         Text("Insights Lab")
                             .font(.system(size: 30, weight: .semibold, design: .rounded))
@@ -38,16 +45,16 @@ struct ATHLTHStudioInsightsView: View {
                         ))
                         .foregroundStyle(.secondary)
                     }
-                    Spacer()
+                    Spacer(minLength: 8)
                     Picker(ATHLTHLocalization.choose(english: "Days", norwegian: "Dager"), selection: $periodDays) {
                         Text("7").tag(7)
                         Text("28").tag(28)
                         Text("90").tag(90)
                     }
                     .pickerStyle(.segmented)
-                    .frame(width: 170)
+                    .frame(width: geometry.size.width < 480 ? 125 : 170)
                 }
-                HStack(spacing: 12) {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
                     ATHLTHStudioMetricCard(
                         title: ATHLTHLocalization.choose(english: "Total workouts", norwegian: "Totalt antall økter"),
                         value: "\(result.sessions)",
@@ -64,7 +71,7 @@ struct ATHLTHStudioInsightsView: View {
                         note: ATHLTHLocalization.choose(english: "sessions", norwegian: "økter")
                     )
                 }
-                HStack(spacing: 12) {
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
                     ATHLTHStudioMetricCard(
                         title: ATHLTHLocalization.choose(english: "Current duration", norwegian: "Nåværende varighet"),
                         value: String(format: "%.1f h", result.minutes / 60),
@@ -81,17 +88,46 @@ struct ATHLTHStudioInsightsView: View {
                         note: ATHLTHLocalization.choose(english: "Descriptive, not a readiness score", norwegian: "Beskrivende, ikke restitusjonsscore")
                     )
                 }
-                HStack(alignment: .top, spacing: 16) {
-                    chartCard(
-                        title: ATHLTHLocalization.choose(english: "Daily duration", norwegian: "Daglig varighet"),
-                        unit: ATHLTHLocalization.choose(english: "hours", norwegian: "timer"),
-                        distance: false
-                    )
-                    chartCard(
-                        title: ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse"),
-                        unit: "km",
-                        distance: true
-                    )
+                Group {
+                    if sideBySideCharts {
+                        HStack(alignment: .top, spacing: 16) {
+                            chartCard(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Daily duration", norwegian: "Daglig varighet"
+                                ),
+                                unit: ATHLTHLocalization.choose(
+                                    english: "hours", norwegian: "timer"
+                                ),
+                                distance: false
+                            )
+                            chartCard(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Distance", norwegian: "Distanse"
+                                ),
+                                unit: "km",
+                                distance: true
+                            )
+                        }
+                    } else {
+                        VStack(spacing: 15) {
+                            chartCard(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Daily duration", norwegian: "Daglig varighet"
+                                ),
+                                unit: ATHLTHLocalization.choose(
+                                    english: "hours", norwegian: "timer"
+                                ),
+                                distance: false
+                            )
+                            chartCard(
+                                title: ATHLTHLocalization.choose(
+                                    english: "Distance", norwegian: "Distanse"
+                                ),
+                                unit: "km",
+                                distance: true
+                            )
+                        }
+                    }
                 }
                 Button {
                     showingDetailedInsights = true
@@ -109,9 +145,10 @@ struct ATHLTHStudioInsightsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             }
-            .padding(26)
+            .padding(geometry.size.width < 660 ? 14 : 26)
             .frame(maxWidth: 1600)
             .frame(maxWidth: .infinity)
+            }
         }
         .sheet(isPresented: $showingDetailedInsights) {
             ATHLTHInsightsView()
