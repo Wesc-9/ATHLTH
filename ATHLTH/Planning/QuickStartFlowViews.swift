@@ -4340,12 +4340,12 @@ struct AudioCoachSetupCard: View {
                             .font(.subheadline.weight(.semibold))
                         Text(rule.trigger == .time
                             ? ATHLTHLocalization.choose(
-                                english: "Every \\(rule.validatedInterval) sec",
-                                norwegian: "Hvert \\(rule.validatedInterval). sekund"
+                                english: "Every \(rule.validatedInterval) sec",
+                                norwegian: "Hvert \(rule.validatedInterval). sekund"
                               )
                             : ATHLTHLocalization.choose(
-                                english: "Every \\(rule.validatedInterval) m",
-                                norwegian: "Hver \\(rule.validatedInterval). meter"
+                                english: "Every \(rule.validatedInterval) m",
+                                norwegian: "Hver \(rule.validatedInterval). meter"
                               ))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -4386,16 +4386,16 @@ struct AudioCoachSetupCard: View {
             if sequenceTrigger == .time {
                 Stepper(value: $sequenceSeconds, in: 15...7200, step: 15) {
                     Text(ATHLTHLocalization.choose(
-                        english: "Every \\(sequenceSeconds) seconds",
-                        norwegian: "Hvert \\(sequenceSeconds). sekund"
+                        english: "Every \(sequenceSeconds) seconds",
+                        norwegian: "Hvert \(sequenceSeconds). sekund"
                     ))
                     .font(.subheadline)
                 }
             } else {
                 Stepper(value: $sequenceMeters, in: 100...42000, step: 100) {
                     Text(ATHLTHLocalization.choose(
-                        english: "Every \\(sequenceMeters) metres",
-                        norwegian: "Hver \\(sequenceMeters). meter"
+                        english: "Every \(sequenceMeters) metres",
+                        norwegian: "Hver \(sequenceMeters). meter"
                     ))
                     .font(.subheadline)
                 }
