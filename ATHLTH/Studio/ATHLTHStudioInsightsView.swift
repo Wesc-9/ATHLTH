@@ -129,6 +129,7 @@ struct ATHLTHStudioInsightsView: View {
                         }
                     }
                 }
+                ATHLTHStudioProgressExplorerView()
                 Button {
                     showingDetailedInsights = true
                 } label: {
