@@ -3758,6 +3758,97 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    /// Historical personal bests earned *at the date of this run*.
+    /// Reuses the same accepted HealthKit workouts and cached, route-verified
+    /// segment times as the Profile records screen.
+    func runningAchievements(
+        for workoutID: UUID
+    ) async -> [ATHLTHRunningAchievement] {
+        guard let allWorkouts = try? await fetchAllWorkoutsCached(),
+              let current = allWorkouts.first(where: {
+                  $0.uuid == workoutID &&
+                  $0.workoutActivityType == .running &&
+                  $0.metadata?[HKMetadataKeyWasUserEntered] as? Bool != true
+              })
+        else { return [] }
+
+        let older = allWorkouts.filter {
+            $0.workoutActivityType == .running &&
+            $0.startDate < current.startDate &&
+            $0.metadata?[HKMetadataKeyWasUserEntered] as? Bool != true
+        }
+        guard !older.isEmpty else { return [] }
+
+        var records: [ATHLTHRunningAchievement] = []
+
+        // Distance is measured by HealthKit and is compared only with runs
+        // completed before this workout, never with future runs.
+        let earlierLongest = older.compactMap(\.athlthDistanceMeters)
+            .filter { $0.isFinite && $0 >= 1_000 }
+            .max()
+        if let record = ATHLTHRunningAchievementPolicy.longestRun(
+            currentMeters: current.athlthDistanceMeters,
+            previousBestMeters: earlierLongest
+        ) {
+            records.append(record)
+        }
+
+        // Calling this with the full accepted running population retains the
+        // integrity of HealthKitManager's account-wide GPS performance cache.
+        let routeCandidates = allWorkouts.filter {
+            $0.workoutActivityType == .running &&
+            $0.metadata?[HKMetadataKeyWasUserEntered] as? Bool != true &&
+            ($0.athlthDistanceMeters ?? 0) >= 400
+        }
+        let entries = await runningRoutePerformanceEntries(for: routeCandidates)
+        if let measured = entries.first(where: { $0.workoutID == workoutID }),
+           measured.routeAvailable {
+            let previous = entries.filter {
+                $0.startDate < current.startDate
+            }
+            if let record = ATHLTHRunningAchievementPolicy.fasterTime(
+                kind: .fastestKilometer,
+                current: measured.fastestOneK,
+                previousBest: previous.compactMap(\.fastestOneK).min(),
+                allowedRange: 150...1_200
+            ) {
+                records.append(record)
+            }
+            if let record = ATHLTHRunningAchievementPolicy.fasterTime(
+                kind: .fastestFiveKilometers,
+                current: measured.fastestFiveK,
+                previousBest: previous.compactMap(\.fastestFiveK).min(),
+                allowedRange: 750...9_000
+            ) {
+                records.append(record)
+            }
+        }
+
+        // A peak pulse is an observation, not an indication of improved
+        // fitness. Only compare actual per-workout statistics when present.
+        if let heartRateType = HKObjectType.quantityType(forIdentifier: .heartRate) {
+            let unit = HKUnit.count().unitDivided(by: .minute())
+            func measuredMaximum(_ workout: HKWorkout) -> Double? {
+                guard let quantity = workout.statistics(for: heartRateType)?
+                    .maximumQuantity(),
+                      let value = Self.safeDoubleValue(quantity, unit: unit),
+                      (40...240).contains(value)
+                else { return nil }
+                return value
+            }
+            let previousValues = older.compactMap(measuredMaximum)
+            if previousValues.count >= 2,
+               let record = ATHLTHRunningAchievementPolicy.maximumHeartRate(
+                    currentBPM: measuredMaximum(current),
+                    previousMaximumBPM: previousValues.max()
+               ) {
+                records.append(record)
+            }
+        }
+
+        return ATHLTHRunningAchievementPolicy.top(records, limit: 5)
+    }
+
     func personalRecords(
         forceRefresh: Bool = false
     ) async throws -> [HealthPersonalRecord] {
