@@ -970,6 +970,38 @@ struct TargetGhostSetupView: View {
         }
     }
 
+    /// The preview uses the same terrain integration as the race engine,
+    /// instead of incorrectly showing an even 50/50 split on hilly routes.
+    private var terrainHalfwayTimeFraction: Double {
+        let coordinates = route.coordinates.sorted { $0.sequence < $1.sequence }
+        guard coordinates.count >= 2 else { return 0.5 }
+        var cumulative = [Double](repeating: 0, count: coordinates.count)
+        for i in 1..<coordinates.count {
+            let a = CLLocation(
+                latitude: coordinates[i - 1].latitude,
+                longitude: coordinates[i - 1].longitude
+            )
+            let b = CLLocation(
+                latitude: coordinates[i].latitude,
+                longitude: coordinates[i].longitude
+            )
+            cumulative[i] = cumulative[i - 1] + a.distance(from: b)
+        }
+        guard let total = cumulative.last, total > 0 else { return 0.5 }
+        let fractions = GhostTargetPacingStrategy.terrainElapsedFractions(
+            coordinates: coordinates, cumulativeMeters: cumulative
+        )
+        let half = total / 2
+        guard let upper = cumulative.firstIndex(where: { $0 >= half }),
+              upper > 0 else { return 0.5 }
+        let lower = upper - 1
+        let span = cumulative[upper] - cumulative[lower]
+        guard span > 0 else { return fractions[upper] }
+        let ratio = (half - cumulative[lower]) / span
+        return fractions[lower] + ratio *
+            (fractions[upper] - fractions[lower])
+    }
+
     private var splitPreviewCard: some View {
         ATHLTHCard {
             VStack(alignment: .leading, spacing: 13) {
@@ -988,7 +1020,9 @@ struct TargetGhostSetupView: View {
 
                 if let targetDuration {
                     let halfway = targetDuration *
-                        pacingStrategy.elapsedFraction(at: 0.5)
+                        (pacingStrategy == .terrainAdaptive
+                            ? terrainHalfwayTimeFraction
+                            : pacingStrategy.elapsedFraction(at: 0.5))
 
                     HStack(spacing: 10) {
                         splitPreviewHalf(
@@ -1345,7 +1379,11 @@ struct TargetGhostSetupView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-                HStack(alignment: .top, spacing: 7) {
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: 8),
+                              GridItem(.flexible(), spacing: 8)],
+                    spacing: 8
+                ) {
                     ForEach(GhostTargetPacingStrategy.allCases) { strategy in
                         Button {
                             pacingStrategy = strategy
