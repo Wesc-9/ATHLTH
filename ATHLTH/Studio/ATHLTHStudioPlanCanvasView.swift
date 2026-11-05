@@ -26,6 +26,16 @@ struct ATHLTHStudioPlanCanvasView: View {
     /// The existing plan's workout edits in the right-hand Studio column.
     /// This references the same AppSessionStore session as the iPhone builder.
     @State private var inlineWorkout: InlineWorkoutDestination?
+    @State private var inlineNewWorkout: NewWorkoutDestination?
+    @State private var newWorkoutTime = Date.now
+
+    private struct NewWorkoutDestination: Identifiable {
+        let planID: UUID
+        let dayID: UUID
+        let expectedVersion: Int
+        let date: Date
+        var id: String { "\(planID.uuidString)-\(dayID.uuidString)" }
+    }
 
     private struct InlineWorkoutDestination: Identifiable {
         let planID: UUID
@@ -102,6 +112,7 @@ struct ATHLTHStudioPlanCanvasView: View {
             selectedWeekID = nil
             selectedDayID = nil
             inlineWorkout = nil
+            inlineNewWorkout = nil
             copyingWeekID = nil
             pendingWeekCopyTarget = nil
             lastWeekCopy = nil
@@ -109,15 +120,18 @@ struct ATHLTHStudioPlanCanvasView: View {
         }
         .onChange(of: selectedWeekID) { _, _ in
             inlineWorkout = nil
+            inlineNewWorkout = nil
         }
         .onChange(of: selectedDayID) { _, _ in
             inlineWorkout = nil
+            inlineNewWorkout = nil
         }
         .onChange(of: session.profile.userID) { _, _ in
             selectedPlanID = nil
             selectedWeekID = nil
             selectedDayID = nil
             inlineWorkout = nil
+            inlineNewWorkout = nil
             copyingWeekID = nil
             pendingWeekCopyTarget = nil
             lastWeekCopy = nil
@@ -230,13 +244,14 @@ struct ATHLTHStudioPlanCanvasView: View {
                 }
                 .padding(.horizontal, 7)
             }
-            if inlineWorkout == nil && viewMode == StudioPlanMode.week.rawValue {
+            if inlineWorkout == nil && inlineNewWorkout == nil &&
+               viewMode == StudioPlanMode.week.rawValue {
                 planMetrics(plan, selectedWeek: week)
             }
 
-            if inlineWorkout == nil,
+            if inlineWorkout == nil && inlineNewWorkout == nil,
                viewMode == StudioPlanMode.overview.rawValue ||
-               (inlineWorkout == nil &&
+               (inlineWorkout == nil && inlineNewWorkout == nil &&
                 viewMode == StudioPlanMode.progress.rawValue) {
                 ATHLTHStudioPlanOverviewView(
                     plan: plan,
@@ -313,6 +328,66 @@ struct ATHLTHStudioPlanCanvasView: View {
                     .background(ATHLTHStudioStyle.canvas)
                 }
                 .frame(maxHeight: .infinity)
+            } else if let fresh = inlineNewWorkout, fresh.planID == plan.id {
+                ATHLTHStudioAdaptiveWorkspace {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "YOUR TRAINING WEEK", norwegian: "DIN TRENINGSUKE"
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(ATHLTHStudioStyle.gold)
+                        Text(plan.title)
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHStudioStyle.ink)
+                            .lineLimit(2)
+                        compactWeekNavigation(plan, selectedIndex: weekIndex)
+                            .allowsHitTesting(false)
+                        weekCanvas(plan, week: week, weekIndex: weekIndex)
+                            .allowsHitTesting(false)
+                            .frame(maxHeight: .infinity)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Save or close your draft before changing day.",
+                            norwegian: "Lagre eller lukk utkastet før du bytter dag."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(ATHLTHStudioStyle.canvas)
+                } editor: {
+                    WorkoutTemplateBuilderView(
+                        draftContext: "ipad-plan-day-\(fresh.id)",
+                        plannedDate: newWorkoutTime,
+                        initialStudioAdvanced: true,
+                        onScheduledTimeChanged: { newWorkoutTime = $0 },
+                        onAddStandalone: { workout in
+                            saveInlineNewWorkout(workout, destination: fresh)
+                        },
+                        saveButtonTitle: ATHLTHLocalization.choose(
+                            english: "Save to training plan", norwegian: "Lagre i treningsplan"
+                        ),
+                        onCloseInline: { inlineNewWorkout = nil }
+                    )
+                    .environment(\.athlthStudioFullscreenEditing, true)
+                    .id(fresh.id)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } focusRail: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "calendar.badge.plus")
+                            .foregroundStyle(ATHLTHStudioStyle.gold)
+                        Text(ATHLTHLocalization.choose(
+                            english: "New workout", norwegian: "Ny økt"
+                        ))
+                        .font(.caption)
+                    }
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                    .padding(.top, 18)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .background(ATHLTHStudioStyle.canvas)
+                }
+                .frame(maxHeight: .infinity)
             } else if width >= 875 {
                 HStack(alignment: .top, spacing: 13) {
                     weekNavigation(plan, selectedIndex: weekIndex)
@@ -327,6 +402,9 @@ struct ATHLTHStudioPlanCanvasView: View {
                         date: dayDate,
                         onOpenAdvanced: { workoutID in
                             openFullWorkout(planID: plan.id, workoutID: workoutID)
+                        },
+                        onCreateAdvanced: {
+                            openNewWorkout(plan: plan, day: day, date: dayDate)
                         }
                     )
                     .id(day.id)
@@ -344,8 +422,11 @@ struct ATHLTHStudioPlanCanvasView: View {
                             day: day,
                             date: dayDate,
                             onOpenAdvanced: { workoutID in
-                                openFullWorkout(planID: plan.id, workoutID: workoutID)
-                            }
+                            openFullWorkout(planID: plan.id, workoutID: workoutID)
+                        },
+                        onCreateAdvanced: {
+                            openNewWorkout(plan: plan, day: day, date: dayDate)
+                        }
                         )
                         .id(day.id)
                         .frame(minHeight: 450)
@@ -1322,6 +1403,77 @@ struct ATHLTHStudioPlanCanvasView: View {
         selectedWeekID = plan.weeks.first?.id
         selectedDayID = nil
         creatingPlan = false
+    }
+
+    private func openNewWorkout(plan: TrainingPlan, day: TrainingPlanDay, date: Date?) {
+        guard let date,
+              Calendar.current.startOfDay(for: date) >= Calendar.current.startOfDay(for: .now),
+              !day.sessions.contains(where: \.isExplicitRestDay),
+              session.trainingPlan(withID: plan.id)?.version == plan.version
+        else {
+            warning = ATHLTHLocalization.choose(
+                english: "The day is unavailable or the plan changed. Reload the plan.",
+                norwegian: "Dagen er utilgjengelig eller planen er endret. Oppdater planen."
+            )
+            return
+        }
+        newWorkoutTime = Calendar.current.date(
+            bySettingHour: 18, minute: 0, second: 0, of: date
+        ) ?? date
+        inlineNewWorkout = NewWorkoutDestination(
+            planID: plan.id, dayID: day.id,
+            expectedVersion: plan.version, date: date
+        )
+        viewMode = StudioPlanMode.week.rawValue
+    }
+
+    private func saveInlineNewWorkout(
+        _ proposed: PlannedSession,
+        destination: NewWorkoutDestination
+    ) -> Bool {
+        guard let current = session.trainingPlan(withID: destination.planID),
+              current.version == destination.expectedVersion,
+              Calendar.current.startOfDay(for: destination.date) >=
+                Calendar.current.startOfDay(for: .now),
+              let day = current.weeks.flatMap(\.days).first(where: {
+                  $0.id == destination.dayID
+              }),
+              !day.sessions.contains(where: \.isExplicitRestDay)
+        else {
+            warning = ATHLTHLocalization.choose(
+                english: "The plan changed. Your workout draft is preserved.",
+                norwegian: "Planen ble endret. Øktutkastet er bevart."
+            )
+            return false
+        }
+
+        var workout = proposed
+        let time = Calendar.current.dateComponents(
+            [.hour, .minute, .second], from: newWorkoutTime
+        )
+        workout.scheduledStart = Calendar.current.date(
+            bySettingHour: time.hour ?? 18,
+            minute: time.minute ?? 0,
+            second: time.second ?? 0,
+            of: destination.date
+        ) ?? destination.date
+
+        let saved = session.savePlanStudioWorkout(
+            workout, inPlan: destination.planID,
+            dayID: destination.dayID, editingWorkoutID: nil,
+            expectedPlanVersion: destination.expectedVersion,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        if saved {
+            inlineNewWorkout = nil
+        } else {
+            warning = ATHLTHLocalization.choose(
+                english: "Could not save the workout. Your draft remains available.",
+                norwegian: "Kunne ikke lagre økten. Utkastet er fortsatt tilgjengelig."
+            )
+        }
+        return saved
     }
 
     private func inlineExistingWorkoutEditor(
