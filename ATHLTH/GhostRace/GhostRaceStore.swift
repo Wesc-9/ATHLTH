@@ -825,7 +825,10 @@ final class GhostRaceStore: ObservableObject {
         location: CLLocation?,
         elapsedTime: TimeInterval,
         state: WatchWorkoutMirrorState,
-        routeProgressPercent: Double? = nil
+        routeProgressPercent: Double? = nil,
+        routeWarmup: Bool = false,
+        awaitingMainStart: Bool = false,
+        mainStepElapsedSeconds: TimeInterval? = nil
     ) {
         let routeDistance = reference?.routeDistanceMeters ?? 0
         // Use measured distance along the shared course when available.
@@ -862,7 +865,14 @@ final class GhostRaceStore: ObservableObject {
                 routeDistanceMeters: routeDistance > 0 ? routeDistance : nil
             )
 
-        update(with: snapshot)
+        // iPhone-owned Quick Run uses the same Ghost clock boundary as
+        // the Watch mirror, including auto and manual warm-up handoffs.
+        var scoped = snapshot
+        scoped.runningRouteWarmup = routeWarmup
+        scoped.runningStepPhase = routeWarmup ? "warmup" : nil
+        scoped.runningAwaitingMainStart = awaitingMainStart
+        scoped.runningStepElapsedSeconds = mainStepElapsedSeconds
+        update(with: scoped)
     }
 
     func temporaryRoute(
