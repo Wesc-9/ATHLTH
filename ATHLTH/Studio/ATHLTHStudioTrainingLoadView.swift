@@ -6,7 +6,14 @@ import SwiftUI
 struct ATHLTHStudioTrainingLoadView: View {
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var strength: StrengthWorkoutStore
     @State private var showsTrainingSignals = false
+
+    private struct MuscleSetCount: Identifiable {
+        let name: String
+        let sets: Int
+        var id: String { name }
+    }
 
     private struct Volume: Identifiable {
         let kind: String
@@ -46,6 +53,35 @@ struct ATHLTHStudioTrainingLoadView: View {
         if kind == .running { return tr("Running", "Løping") }
         if kind == .strength { return tr("Strength", "Styrke") }
         return tr("Other", "Annet")
+    }
+
+    /// Only muscle labels backed by actual completed working sets are
+    /// counted. Unmapped legacy exercises are omitted, not invented.
+    private var completedPrimaryMuscleSets: [MuscleSetCount] {
+        let start = Calendar.current.date(
+            byAdding: .day, value: -7, to: .now
+        ) ?? .distantPast
+        var counts: [String: Int] = [:]
+        for workout in strength.workoutHistory where workout.isFinished &&
+            workout.startedAt >= start &&
+            workout.startedAt <= .now {
+            let evidence = StrengthMuscleProfileBuilder.make(
+                workout: workout, library: [],
+                completedWorkingSetsOnly: true
+            )
+            for exercise in evidence.exercises where exercise.completedSets > 0 {
+                for muscle in Set(exercise.primaryMuscles) {
+                    let key = muscle.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !key.isEmpty else { continue }
+                    counts[key, default: 0] += exercise.completedSets
+                }
+            }
+        }
+        return counts.map { MuscleSetCount(name: $0.key, sets: $0.value) }
+            .sorted {
+                $0.sets == $1.sets ? $0.name < $1.name : $0.sets > $1.sets
+            }
+            .prefix(6).map { $0 }
     }
 
     private var volumes: [Volume] {
@@ -128,6 +164,36 @@ struct ATHLTHStudioTrainingLoadView: View {
                 .foregroundStyle(ATHLTHStudioStyle.ink)
             }
             .font(.caption)
+            if !completedPrimaryMuscleSets.isEmpty {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(tr("COMPLETED WORKING SETS BY MUSCLE",
+                            "GJENNOMFØRTE ARBEIDSSETT PER MUSKEL"))
+                        .font(.caption.weight(.semibold))
+                        .tracking(1)
+                        .foregroundStyle(ATHLTHStudioStyle.gold)
+                    ForEach(completedPrimaryMuscleSets) { muscle in
+                        HStack {
+                            Text(muscle.name)
+                                .lineLimit(1)
+                            Spacer(minLength: 8)
+                            Text("\(muscle.sets) " + tr("sets", "sett"))
+                                .font(.subheadline.weight(.medium))
+                                .monospacedDigit()
+                        }
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHStudioStyle.ink)
+                    }
+                    Text(tr(
+                        "Muscle labels come from saved exercise metadata. These are completed working sets, not a recovery score or physiological muscle load.",
+                        "Muskelgruppene hentes fra lagrede øvelsesdata. Tallene er gjennomførte arbeidssett, ikke en restitusjonsscore eller fysiologisk muskelbelastning."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(14)
+                .background(ATHLTHStudioStyle.canvas,
+                            in: RoundedRectangle(cornerRadius: 14))
+            }
             Text(tr(
                 "Only recorded sessions count as completed. Planned durations may be missing. This is training volume, not muscular fatigue, clinical recovery, a readiness score or a forecast of injury.",
                 "Kun registrerte økter regnes som gjennomført. Varighet kan mangle i planlagte økter. Dette viser treningsmengde – ikke muskulær utmattelse, medisinsk restitusjon, beredskapsscore eller skaderisiko."
