@@ -7232,6 +7232,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guard coachAudioSessionIsActive else { return }
         audioCoachRestorationTask?.cancel()
         audioCoachRestorationTask = nil
+        // Remove ducking before requesting session deactivation. watchOS may
+        // refuse deactivation during AirPods handoff but can still accept a
+        // non-ducking category, restoring the athlete's music immediately.
+        try? AVAudioSession.sharedInstance().setCategory(
+            .playback, mode: .default, options: [.mixWithOthers]
+        )
         do {
             try AVAudioSession.sharedInstance().setActive(
                 false, options: .notifyOthersOnDeactivation)
