@@ -265,6 +265,12 @@ final class GhostRaceStore: ObservableObject {
     @Published var errorMessage: String?
 
     private var lastMatchedIndex: Int?
+    // Reuse the identical continuous-segment map matcher as navigation.
+    // Keep a geometry cache so 900 CLLocation allocations are not repeated
+    // for every location update.
+    private var cachedReferenceID: UUID?
+    private var cachedReferenceLocations: [CLLocation] = []
+    private var cachedReferenceDistances: [Double] = []
     private var routeMainStartElapsedSeconds: TimeInterval?
     private var observedDeferredWarmup = false
     // Independent from the time the user stops the workout.
@@ -638,6 +644,22 @@ final class GhostRaceStore: ObservableObject {
             return
         }
 
+        // A coordinate alone cannot justify a lead, overtake or win.
+        // HealthKit snapshots may keep the previous position after GPS
+        // drops out; reject it rather than awarding synthetic progress.
+        guard let accuracy = snapshot.currentHorizontalAccuracy,
+              accuracy.isFinite, (0...30).contains(accuracy),
+              let sampledAt = snapshot.currentLocationSampledAt,
+              abs(snapshot.capturedAt.timeIntervalSince(sampledAt)) <= 12
+        else {
+            comparison = nil
+            leadTracker.invalidatePending()
+            if snapshot.state == .completed {
+                complete(snapshot: snapshot, reference: reference)
+            }
+            return
+        }
+
         let currentLocation = CLLocation(
             latitude: latitude,
             longitude: longitude
@@ -689,14 +711,27 @@ final class GhostRaceStore: ObservableObject {
             return
         }
 
-        guard let matchedIndex =
-                nearestReferenceIndex(
-                    to: currentLocation,
-                    expectedDistanceMeters:
-                        expectedDistanceForMatching,
-                    elapsedSeconds: snapshot.elapsedTime,
-                    in: reference
-                )
+        if cachedReferenceID != reference.id {
+            cachedReferenceID = reference.id
+            cachedReferenceLocations = reference.points.map(\.location)
+            cachedReferenceDistances = reference.points.map(\.cumulativeMeters)
+        }
+
+        // Match against line segments, not isolated reference waypoints.
+        // Sparse GPX points previously made a runner who was actually on
+        // the course appear 50–180 metres away, hiding their Ghost position.
+        let courseAnchor = lastReliableCourseSample?.meters ?? 0
+        let anchorElapsed = lastReliableCourseSample?.elapsed ?? 0
+        guard let matchedCourse = ATHLTHRouteGuidanceEngine.state(
+            location: currentLocation,
+            routeLocations: cachedReferenceLocations,
+            cumulativeMeters: cachedReferenceDistances,
+            geometryTotalMeters: reference.routeDistanceMeters,
+            advertisedDistanceMeters: reference.routeDistanceMeters,
+            previousRouteMeters: courseAnchor,
+            courseAnchorMeters: courseAnchor,
+            secondsSinceCourseAnchor: max(snapshot.elapsedTime - anchorElapsed, 0)
+        )
         else {
             // The workout may end off-course. Report an incomplete race
             // rather than leaving the user waiting forever for a result.
@@ -707,13 +742,11 @@ final class GhostRaceStore: ObservableObject {
             return
         }
 
-        let matched =
-            reference.points[matchedIndex]
-        let ghost =
-            ghostPoint(
-                at: snapshot.elapsedTime,
-                in: reference
-            )
+        let matchedMeters = matchedCourse.traveledAlongRouteMeters
+        let ghost = ghostPoint(
+            at: snapshot.elapsedTime,
+            in: reference
+        )
 
         let routeDistance =
             max(
@@ -724,7 +757,7 @@ final class GhostRaceStore: ObservableObject {
         let userProgress =
             min(
                 max(
-                    matched.cumulativeMeters /
+                    matchedMeters /
                     routeDistance,
                     0
                 ),
@@ -741,10 +774,7 @@ final class GhostRaceStore: ObservableObject {
                 1
             )
 
-        let deviation =
-            currentLocation.distance(
-                from: matched.location
-            )
+        let deviation = matchedCourse.deviationMeters
 
         // A nearby route point may still be on a parallel path or a
         // shortcut. An unreliable map match never counts as a new lead.
@@ -760,7 +790,7 @@ final class GhostRaceStore: ObservableObject {
         guard ATHLTHGhostCourseProgressPolicy.plausibleCourseAdvance(
             previousMeters: lastReliableCourseSample?.meters,
             previousElapsed: lastReliableCourseSample?.elapsed,
-            candidateMeters: matched.cumulativeMeters,
+            candidateMeters: matchedMeters,
             elapsed: snapshot.elapsedTime
         ) else {
             comparison = nil
@@ -775,14 +805,21 @@ final class GhostRaceStore: ObservableObject {
         }
 
         // Rejecting an outlier must not reset the trusted route anchor.
-        lastMatchedIndex = matchedIndex
+        lastMatchedIndex = matchedCourse.nearestRoutePointIndex
 
         recordFinishCrossing(
-            courseMeters: matched.cumulativeMeters,
+            courseMeters: matchedMeters,
             deviationMeters: deviation,
             elapsed: snapshot.elapsedTime,
             routeMeters: reference.routeDistanceMeters
         )
+
+        let ghostAtCourseMeters = ATHLTHGhostTimeline.interpolate(
+            at: matchedMeters,
+            count: reference.points.count,
+            position: { reference.points[$0].cumulativeMeters },
+            value: { reference.points[$0].elapsedTime }
+        ) ?? 0
 
         let nextComparison =
             GhostRaceComparison(
@@ -797,10 +834,10 @@ final class GhostRaceStore: ObservableObject {
                 ghostProgress:
                     ghostProgress,
                 signedDistanceMeters:
-                    matched.cumulativeMeters -
+                    matchedMeters -
                     ghost.cumulativeMeters,
                 signedTimeSeconds:
-                    matched.elapsedTime -
+                    ghostAtCourseMeters -
                     snapshot.elapsedTime,
                 routeDeviationMeters:
                     deviation,
@@ -858,9 +895,11 @@ final class GhostRaceStore: ObservableObject {
                         .coordinate
                         .latitude,
                 currentLongitude:
-                    location?
-                        .coordinate
-                        .longitude,
+                    location?.coordinate.longitude,
+                currentHorizontalAccuracy:
+                    location?.horizontalAccuracy,
+                currentLocationSampledAt:
+                    location?.timestamp,
                 routeProgressPercent: routeProgressPercent,
                 routeDistanceMeters: routeDistance > 0 ? routeDistance : nil
             )
