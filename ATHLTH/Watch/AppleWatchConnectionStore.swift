@@ -1532,9 +1532,21 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             return
         }
 
-        // An old Watch result can arrive after the iPhone changed accounts.
-        // Queue it durably, but never update this account's pet selections,
-        // Live Activity or active-workout guard on the wrong user.
+        // Watch workout activity is a device-level lock, not an account's
+        // training history. Release the completed session even after an
+        // account switch, without clearing any newer active Watch session.
+        let activity = WatchWorkoutActivityState.afterCompletion(
+            current: watchWorkoutActivityState, endedAt: result.endedAt
+        )
+        watchWorkoutActivityState = activity
+        lastWatchWorkoutActivitySentAt = max(
+            lastWatchWorkoutActivitySentAt,
+            activity.updatedAt.timeIntervalSince1970
+        )
+
+        // A completed workout can belong to a different ATHLTH account.
+        // Queue it durably for its owner, but never touch the current
+        // account's pet participation or private Live Activity surface.
         if ATHLTHWatchWorkoutOwnershipPolicy.canApply(
             resultOwnerID: result.accountOwnerID,
             signedInUserID: currentATHLTHAccountID
@@ -1543,14 +1555,6 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 ATHLTHPetStore.shared.acceptCompletedWatchPetSegments(segments)
             }
             ATHLTHSurfaceCoordinator.completedWatchWorkoutDidArrive(result)
-            let activity = WatchWorkoutActivityState.afterCompletion(
-                current: watchWorkoutActivityState, endedAt: result.endedAt
-            )
-            watchWorkoutActivityState = activity
-            lastWatchWorkoutActivitySentAt = max(
-                lastWatchWorkoutActivitySentAt,
-                activity.updatedAt.timeIntervalSince1970
-            )
         }
 
         pendingWorkoutResults
