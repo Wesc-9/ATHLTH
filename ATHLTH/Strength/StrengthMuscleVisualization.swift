@@ -1304,6 +1304,8 @@ struct StrengthMuscleMapView: View {
             blue: 0.45
         )
     var regionTints: [StrengthMuscleRegion: Color] = [:]
+    /// Only used by the Home recent-activity strength card.
+    var warmIvoryBase = false
 
     var body: some View {
         HStack(spacing: compact ? 5 : 12) {
@@ -1345,7 +1347,8 @@ struct StrengthMuscleMapView: View {
                         profile: profile,
                         isFront: side == .front,
                         activationTint: activationTint,
-                        regionTints: regionTints
+                        regionTints: regionTints,
+                        warmIvoryBase: warmIvoryBase
                     )
                 } else {
                     StrengthBodyFigureCanvas(
