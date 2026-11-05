@@ -7054,6 +7054,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func shouldSpeakLocally(
         priority: ATHLTHGuidancePriority
     ) -> Bool {
+        // Ghost owns all its voices on Watch; never split routine coach
+        // commentary to the phone while route/lead alerts use the Watch.
+        if ghostRaceConfiguration != nil { return true }
+
         // Preserve legacy reachability routing with an older paired iPhone;
         // upgraded peers use a short, explicitly acknowledged mirror lease.
         let phoneOwnsRoutineSpeech: Bool
@@ -7861,6 +7865,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 currentStepProgress: awaitingMainStart ? 0 : progress
             )
         }
+        snapshot.watchOwnedAudioCoach =
+            ghostRaceConfiguration != nil ||
+            kind == .strength ||
+            !audioCoachConfiguration.enabled ||
+            !audioCoachConfiguration.shouldPreferIPhoneAudioWhenReachable
         snapshot.treadmillTargetPaceSecondsPerKilometer =
             treadmillTargetPaceSecondsPerKilometer
         snapshot.runningStepTargetTreadmillInclinePercent =
