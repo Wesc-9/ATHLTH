@@ -1896,8 +1896,11 @@ struct WatchRunWorkoutExperienceView: View {
 
     private var metricsPage: some View {
         GeometryReader { viewport in
+            // Preserve both main metrics and the optional confirmed finish
+            // action even on a small Watch without scrolling past the goal.
             let compact = viewport.size.height < 205 ||
-                viewport.size.width < 190
+                viewport.size.width < 190 ||
+                workoutManager.isNearVerifiedRouteFinish
 
             VStack(alignment: .leading, spacing: compact ? 4 : 7) {
                 HStack(spacing: 5) {
