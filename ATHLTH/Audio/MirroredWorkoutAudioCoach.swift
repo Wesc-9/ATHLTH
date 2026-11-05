@@ -864,6 +864,9 @@ final class MirroredWorkoutAudioCoach:
 
     private func speakFinishedWorkoutRecap(_ phrase: String) {
         guard configuration.enabled, !phrase.isEmpty else { return }
+        // The last announcement owns the remaining speaker time. Old
+        // kilometre, interval and motivation cues cannot play after finish.
+        cueQueue.reset()
         azureCoachSpeech.stop()
         synthesizer.stopSpeaking(at: .immediate)
         guidanceGate.reset()
@@ -891,7 +894,8 @@ final class MirroredWorkoutAudioCoach:
         rememberForReplay: Bool = true
     ) {
         guard !text.isEmpty,
-              configuration.enabled
+              configuration.enabled,
+              !finished
         else {
             return
         }
@@ -1035,7 +1039,7 @@ final class MirroredWorkoutAudioCoach:
     }
 
     private func deliverNextQueuedCue() {
-        guard !synthesizer.isSpeaking,
+        guard !finished, !synthesizer.isSpeaking,
               !azureCoachSpeech.isBusy,
               let next = cueQueue.popNext()
         else { return }
