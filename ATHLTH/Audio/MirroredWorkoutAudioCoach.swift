@@ -207,6 +207,13 @@ final class MirroredWorkoutAudioCoach:
 
         if snapshot.state == .completed {
             finished = true
+            // Updated Watch owns its own final recap after checking saved
+            // HealthKit running history. Never speak a second, competing
+            // finish from iPhone when the Watch supports voice ownership.
+            if snapshot.supportsAudioCoachVoiceLease == true {
+                cueQueue.reset()
+                return
+            }
             if configuration.shouldAnnounceWorkoutComplete {
                 let highlights = ATHLTHWorkoutCompletionSpokenSummary.make(
                     elapsedSeconds: snapshot.confirmedActiveDuration,
