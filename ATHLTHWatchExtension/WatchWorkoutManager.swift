@@ -7437,37 +7437,59 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.automaticPauseActive =
                 false
         }
-        // Completion is owned by Apple Watch, never its mirrored phone.
-        // The HealthKit record check runs after UI completion so it does not
-        // delay finishing/saving the workout.
+        // The metrics recap must be immediate and offline. A potentially
+        // slow HealthKit history query must never delay basic completion
+        // narration after the recording session ends.
         if audioCoachConfiguration.enabled,
            audioCoachConfiguration.shouldAnnounceWorkoutComplete {
             let savedResult = result
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                let records = await self.verifiedWatchRunningRecords(
-                    for: savedResult
-                )
-                guard self.state == .completed,
-                      self.completedResult?.id == savedResult.id,
-                      self.audioCoachConfiguration.enabled else { return }
-                let recap = ATHLTHWorkoutCompletionSpokenSummary.make(
-                    elapsedSeconds: savedResult.duration,
-                    distanceMeters: savedResult.distanceMeters,
-                    averageHeartRateBPM: savedResult.averageHeartRate,
-                    verifiedRecordEnglish: records?.english,
-                    verifiedRecordNorwegian: records?.norwegian
-                )
-                self.guidancePriorityGate.reset()
-                self.speak(
-                    self.coachPhrase(
-                        english: recap.english,
-                        norwegian: recap.norwegian
-                    ),
-                    priority: .structuredStep,
-                    forceLocal: true,
-                    rememberForReplay: false
-                )
+            let recap = ATHLTHWorkoutCompletionSpokenSummary.make(
+                elapsedSeconds: savedResult.duration,
+                distanceMeters: savedResult.distanceMeters,
+                averageHeartRateBPM: savedResult.averageHeartRate
+            )
+            guidancePriorityGate.reset()
+            speak(
+                coachPhrase(
+                    english: recap.english,
+                    norwegian: recap.norwegian
+                ),
+                priority: .structuredStep,
+                forceLocal: true,
+                rememberForReplay: false
+            )
+
+            // A separate, truthful PB addendum is spoken only after reading
+            // complete, older Apple Health workout evidence. Wait until the
+            // metrics narration finishes rather than talking over it.
+            if savedResult.kind == .running {
+                Task { @MainActor [weak self] in
+                    guard let self,
+                          let records = await self.verifiedWatchRunningRecords(
+                              for: savedResult
+                          )
+                    else { return }
+                    for _ in 0..<60 {
+                        guard self.state == .completed,
+                              self.completedResult?.id == savedResult.id,
+                              self.audioCoachConfiguration.enabled else { return }
+                        if !self.speechSynthesizer.isSpeaking &&
+                            self.audioCoachActivationTask == nil {
+                            self.speak(
+                                self.coachPhrase(
+                                    english: records.english,
+                                    norwegian: records.norwegian
+                                ),
+                                priority: .structuredStep,
+                                forceLocal: true,
+                                rememberForReplay: false
+                            )
+                            return
+                        }
+                        do { try await Task.sleep(for: .milliseconds(500)) }
+                        catch { return }
+                    }
+                }
             }
         }
 
