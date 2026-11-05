@@ -375,8 +375,15 @@ struct ATHLTHAudioCoachSmartState {
     /// Text-based anti-repeat memory covers metric, terrain and freeform
     /// phrases together, even when the active motivational preset changes.
     private mutating func pickDistinct(_ choices: [String]) -> String {
-        let available = choices.filter { !recentPhraseTexts.contains($0) }
-        let selected = (available.isEmpty ? choices : available).randomElement() ?? ""
+        let recentToAvoid = recentPhraseTexts.suffix(
+            max(0, min(10, choices.count - 1))
+        )
+        let available = choices.filter { !recentToAvoid.contains($0) }
+        // Prefer the longest possible novelty window. A small contextual
+        // phrase bank may recur after all its lines have been used, but never
+        // immediately while another option exists.
+        let selected = (available.isEmpty ? choices : available)
+            .randomElement() ?? ""
         recentPhraseTexts.append(selected)
         if recentPhraseTexts.count > 14 {
             recentPhraseTexts.removeFirst()
@@ -549,7 +556,11 @@ struct ATHLTHAudioCoachSmartState {
                     "You're moving forward. Stay determined and in control."
                   ]
         }
-        let pool = !custom.isEmpty && Bool.random() ? custom : phrases
+        let customEligible = custom.filter {
+            !recentPhraseTexts.suffix(10).contains($0)
+        }
+        let pool = !customEligible.isEmpty && Bool.random()
+            ? customEligible : phrases
         return pickDistinct(pool)
     }
 }
