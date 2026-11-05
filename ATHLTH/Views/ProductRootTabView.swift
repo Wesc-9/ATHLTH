@@ -7,6 +7,93 @@ import UIKit
 import UniformTypeIdentifiers
 import UserNotifications
 
+/// Explicit foreground-only delayed launch. A phone workout must never
+/// begin by itself while the user is in another app or after a relaunch.
+private struct ATHLTHHomeDeferredPhoneStartSheet: View {
+    let workoutTitle: String
+    let onStart: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var startAt = Date().addingTimeInterval(30)
+    @State private var started = false
+    @State private var wasBackgrounded = false
+
+    private func startIfEligible() {
+        guard !started, !wasBackgrounded, scenePhase == .active else { return }
+        started = true
+        dismiss()
+        onStart()
+    }
+
+    var body: some View {
+        VStack(spacing: 18) {
+            Image(systemName: "timer")
+                .font(.system(size: 30, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            Text(ATHLTHLocalization.choose(
+                english: "Start workout shortly",
+                norwegian: "Start økten om litt"
+            ))
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(ATHLTHTheme.primaryText)
+
+            Text(workoutTitle)
+                .font(.subheadline)
+                .foregroundStyle(ATHLTHTheme.mutedText)
+                .lineLimit(2)
+
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                Text("\(max(0, Int(ceil(startAt.timeIntervalSince(timeline.date))))) s")
+                    .font(.system(size: 42, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+
+            Button {
+                startIfEligible()
+            } label: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Start now", norwegian: "Start nå"
+                ))
+                .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
+
+            Button {
+                dismiss()
+            } label: {
+                Text(ATHLTHLocalization.choose(
+                    english: "Cancel countdown",
+                    norwegian: "Avbryt nedtellingen"
+                ))
+            }
+            .font(.subheadline)
+            .foregroundStyle(ATHLTHTheme.mutedText)
+        }
+        .padding(26)
+        .frame(maxWidth: .infinity)
+        .background(ATHLTHTheme.canvasTop.ignoresSafeArea())
+        .presentationDetents([.height(370)])
+        .presentationDragIndicator(.visible)
+        .task {
+            while !Task.isCancelled, Date() < startAt {
+                do { try await Task.sleep(for: .milliseconds(200)) }
+                catch { return }
+            }
+            guard !Task.isCancelled else { return }
+            startIfEligible()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active {
+                wasBackgrounded = true
+                dismiss()
+            }
+        }
+    }
+}
+
 struct ProductRootTabView: View {
     @ObservedObject private var pushManager = APNsPushManager.shared
     @EnvironmentObject private var settings: AppSettingsStore
@@ -865,6 +952,7 @@ struct ATHLTHHomeView: View {
     @State private var homeCalendarPendingKind: WorkoutKind?
     @State private var homeCalendarPendingCustom = false
     @State private var selectedHomeStandaloneWorkout: PlannedSession?
+    @State private var homeDeferredPhoneWorkout: PlannedSession?
     @State private var selectedHomeRecommendedWorkout: PlannedSession?
     @State private var selectedHomeRecommendationInfo: HomeDailyRecommendationInfo?
     @State private var homeRecommendedPlanID: UUID?
@@ -1346,6 +1434,15 @@ struct ATHLTHHomeView: View {
                 .presentationCornerRadius(28)
             }
             // Independent sessions share the calendar but not a plan ID.
+            .sheet(item: $homeDeferredPhoneWorkout) { workout in
+                ATHLTHHomeDeferredPhoneStartSheet(
+                    workoutTitle: workout.title,
+                    onStart: {
+                        homeDeferredPhoneWorkout = nil
+                        startHomeStandaloneWorkout(workout, device: .iPhone)
+                    }
+                )
+            }
             .sheet(item: $selectedHomeStandaloneWorkout) { workout in
                 NavigationStack {
                     HomeWeeklyStandaloneWorkoutDetailView(
@@ -2857,6 +2954,18 @@ struct ATHLTHHomeView: View {
                 .disabled(!watchConnection.isReady)
 
                 if workout.kind == .running || workout.kind == .walking {
+                    Button {
+                        showingHomeTodayCalendarAll = false
+                        homeDeferredPhoneWorkout = workout
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "iPhone · start in 30 sec",
+                                norwegian: "iPhone · start om 30 sek"
+                            ),
+                            systemImage: "timer"
+                        )
+                    }
                     Button {
                         showingHomeTodayCalendarAll = false
                         startHomeStandaloneWorkout(
