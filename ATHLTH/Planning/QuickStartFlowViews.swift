@@ -4345,6 +4345,43 @@ struct AudioCoachSetupCard: View {
 
     private var preWorkoutSequenceEditor: some View {
         VStack(alignment: .leading, spacing: 11) {
+            Text(ATHLTHLocalization.choose(
+                english: "Motivational style",
+                norwegian: "Motivasjonsstil"
+            ))
+            .font(.subheadline.weight(.semibold))
+
+            Picker(ATHLTHLocalization.choose(
+                english: "Motivational style",
+                norwegian: "Motivasjonsstil"
+            ), selection: Binding(
+                get: {
+                    draft.smartPrompts.encouragementStyle ?? .encouragement
+                },
+                set: { style in
+                    draft.smartPrompts.encouragementStyle = style
+                    draft.smartPrompts.motivationEnabled = true
+                }
+            )) {
+                ForEach(ATHLTHCoachEncouragementStyle.allCases) { style in
+                    Text(style.title).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            Toggle(ATHLTHLocalization.choose(
+                english: "Use verified hills and final stretch",
+                norwegian: "Bruk bekreftede bakker og siste etappe"
+            ), isOn: Binding(
+                get: {
+                    draft.smartPrompts.contextualFeedbackEnabled ?? true
+                },
+                set: {
+                    draft.smartPrompts.contextualFeedbackEnabled = $0
+                }
+            ))
+            .tint(ATHLTHTheme.accentDeep)
+
             ForEach(draft.customRules) { rule in
                 HStack(spacing: 10) {
                     Image(systemName: rule.trigger == .time ? "clock" : "point.topleft.down.to.point.bottomright.curvepath")
