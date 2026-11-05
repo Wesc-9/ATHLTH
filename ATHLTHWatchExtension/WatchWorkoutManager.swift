@@ -222,6 +222,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var targetZoneSettledAt: Date?
     private var lastPositiveZoneID: Int?
     private var lastPositiveZoneAnnouncementAt: Date?
+    private var measuredCoachZoneCandidate: Int?
+    private var measuredCoachZoneStartedAt: Date?
+    private var measuredCoachLastZoneAnnouncementAt: Date?
     private var lastLapElapsedTime: TimeInterval = 0
     private var lastLapDistanceMeters: Double = 0
 
@@ -4275,6 +4278,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 self.advanceEmbeddedHybridIntervalIfNeeded(at: Date())
                 self.evaluateStructuredRunningWorkout()
                 self.evaluateWorkoutTargetAlerts()
+                self.evaluateMeasuredHeartRateZoneCoach()
                 self.evaluateFuelAudioCoach()
                 self.evaluateAudioCoach()
                 await self.sendLiveSnapshot()
@@ -4284,6 +4288,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func resetAudioCoachThresholds() {
         lastGoalEncouragementAt = nil
+        measuredCoachZoneCandidate = nil
+        measuredCoachZoneStartedAt = nil
+        measuredCoachLastZoneAnnouncementAt = nil
         smartCoachState.reset()
         let configuration = audioCoachConfiguration
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
@@ -6349,6 +6356,62 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             haptic: .directionDown,
             priority:
                 .routeCritical
+        )
+    }
+
+    /// Speak the actually MEASURED zone during a free run, never the
+    /// prescribed zone. Explicit planned-zone alerts take priority and
+    /// already provide stronger in/out-of-range guidance.
+    private func evaluateMeasuredHeartRateZoneCoach() {
+        guard state == .running,
+              kind == .running || kind == .walking,
+              audioCoachConfiguration.enabled,
+              audioCoachConfiguration.announceHeartRate,
+              !coachSpeechPaused,
+              hasFreshHeartRate
+        else {
+            measuredCoachZoneCandidate = nil
+            measuredCoachZoneStartedAt = nil
+            return
+        }
+        let target = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: targetAlertConfiguration,
+            stepZone: awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRateZone,
+            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM
+        )
+        guard target?.heartRateEnabled != true,
+              let zone = ATHLTHHeartRateZones.measuredZone(
+                  heartRateBPM: heartRate,
+                  maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM
+              )
+        else {
+            measuredCoachZoneCandidate = nil
+            measuredCoachZoneStartedAt = nil
+            return
+        }
+
+        let now = Date()
+        if measuredCoachZoneCandidate != zone {
+            measuredCoachZoneCandidate = zone
+            measuredCoachZoneStartedAt = now
+            return
+        }
+        guard now.timeIntervalSince(measuredCoachZoneStartedAt ?? now) >= 15,
+              measuredCoachLastZoneAnnouncementAt.map({
+                  now.timeIntervalSince($0) >= 180
+              }) ?? true
+        else { return }
+
+        measuredCoachLastZoneAnnouncementAt = now
+        speak(
+            coachPhrase(
+                english: "Current heart-rate zone: Z\(zone).",
+                norwegian: "Nåværende pulssone: S\(zone)."
+            ),
+            priority: .targetCritical,
+            forceLocal: true,
+            rememberForReplay: false
         )
     }
 
