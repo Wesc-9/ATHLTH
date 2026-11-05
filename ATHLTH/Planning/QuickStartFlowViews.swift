@@ -3916,6 +3916,12 @@ struct AudioCoachSetupCard: View {
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
     @State private var showAdvancedSettings = false
+    @State private var showSequenceEditor = false
+    @State private var sequenceTrigger: ATHLTHAudioCoachRule.Trigger = .time
+    @State private var sequenceMetric: ATHLTHAudioCoachRule.Metric = .distance
+    @State private var sequenceSeconds = 60
+    @State private var sequenceMeters = 800
+    @State private var savedCoachName = ""
 
     var body: some View {
         ATHLTHCard {
@@ -4004,6 +4010,45 @@ struct AudioCoachSetupCard: View {
                         ), systemImage: "waveform.badge.mic")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHTheme.accentDeep)
+                    }
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.22)) {
+                            showSequenceEditor.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "waveform.badge.plus")
+                                .foregroundStyle(ATHLTHTheme.premiumGold)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "My announcements",
+                                    norwegian: "Mine beskjeder"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Different messages, at different intervals",
+                                    norwegian: "Ulike beskjeder med egne intervaller"
+                                ))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 4)
+                            Image(systemName: showSequenceEditor
+                                ? "chevron.up" : "chevron.down")
+                                .font(.caption.weight(.semibold))
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
+                        .padding(.horizontal, 12)
+                        .background(
+                            ATHLTHTheme.premiumGoldSoft.opacity(0.45),
+                            in: RoundedRectangle(cornerRadius: 15)
+                        )
+                    }
+                    .buttonStyle(.plain)
+
+                    if showSequenceEditor {
+                        preWorkoutSequenceEditor
                     }
 
                     Text(ATHLTHLocalization.choose(
@@ -4282,6 +4327,147 @@ struct AudioCoachSetupCard: View {
                 .padding(.top, 10)
             }
         }
+    }
+
+    private var preWorkoutSequenceEditor: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            ForEach(draft.customRules) { rule in
+                HStack(spacing: 10) {
+                    Image(systemName: rule.trigger == .time ? "clock" : "point.topleft.down.to.point.bottomright.curvepath")
+                        .foregroundStyle(ATHLTHTheme.premiumGold)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(rule.metric.title)
+                            .font(.subheadline.weight(.semibold))
+                        Text(rule.trigger == .time
+                            ? ATHLTHLocalization.choose(
+                                english: "Every \\(rule.validatedInterval) sec",
+                                norwegian: "Hvert \\(rule.validatedInterval). sekund"
+                              )
+                            : ATHLTHLocalization.choose(
+                                english: "Every \\(rule.validatedInterval) m",
+                                norwegian: "Hver \\(rule.validatedInterval). meter"
+                              ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button(role: .destructive) {
+                        draft.customRules.removeAll { $0.id == rule.id }
+                    } label: {
+                        Image(systemName: "minus.circle")
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Remove announcement",
+                        norwegian: "Fjern beskjed"
+                    ))
+                }
+            }
+
+            HStack(spacing: 9) {
+                Picker(ATHLTHLocalization.choose(
+                    english: "Announce", norwegian: "Si"
+                ), selection: $sequenceMetric) {
+                    ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
+                        Text(metric.title).tag(metric)
+                    }
+                }
+                Picker(ATHLTHLocalization.choose(
+                    english: "Trigger", norwegian: "Utløser"
+                ), selection: $sequenceTrigger) {
+                    ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
+                        Text(trigger.title).tag(trigger)
+                    }
+                }
+            }
+            .tint(ATHLTHTheme.accentDeep)
+
+            if sequenceTrigger == .time {
+                Stepper(value: $sequenceSeconds, in: 15...7200, step: 15) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Every \\(sequenceSeconds) seconds",
+                        norwegian: "Hvert \\(sequenceSeconds). sekund"
+                    ))
+                    .font(.subheadline)
+                }
+            } else {
+                Stepper(value: $sequenceMeters, in: 100...42000, step: 100) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Every \\(sequenceMeters) metres",
+                        norwegian: "Hver \\(sequenceMeters). meter"
+                    ))
+                    .font(.subheadline)
+                }
+            }
+
+            Button {
+                guard draft.customRules.count < 20 else { return }
+                draft.customRules.append(
+                    ATHLTHAudioCoachRule(
+                        trigger: sequenceTrigger,
+                        metric: sequenceMetric,
+                        interval: sequenceTrigger == .time
+                            ? sequenceSeconds : sequenceMeters
+                    )
+                )
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Add announcement",
+                    norwegian: "Legg til beskjed"
+                ), systemImage: "plus")
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+            .tint(ATHLTHTheme.accentDeep)
+            .disabled(draft.customRules.count >= 20)
+
+            Divider()
+            TextField(ATHLTHLocalization.choose(
+                english: "Profile name, e.g. Competition",
+                norwegian: "Navn på oppsett, f.eks. Konkurranse"
+            ), text: $savedCoachName)
+            .textFieldStyle(.roundedBorder)
+
+            Button {
+                let name = savedCoachName.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                )
+                guard !name.isEmpty, settings.audioCoachProfiles.count < 30 else {
+                    return
+                }
+                settings.audioCoachProfiles.append(
+                    ATHLTHAudioCoachProfile(
+                        name: String(name.prefix(60)),
+                        configuration: draft.configuration()
+                    )
+                )
+                savedCoachName = ""
+            } label: {
+                Label(ATHLTHLocalization.choose(
+                    english: "Save this coach for future workouts",
+                    norwegian: "Lagre denne coachen til senere økter"
+                ), systemImage: "square.and.arrow.down")
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(ATHLTHTheme.accentDeep)
+            .disabled(
+                savedCoachName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                settings.audioCoachProfiles.count >= 30
+            )
+            Text(ATHLTHLocalization.choose(
+                english: "Edits here affect this workout only unless you save a named profile.",
+                norwegian: "Endringer her gjelder bare denne økten, med mindre du lagrer en profil."
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(
+            ATHLTHTheme.accentSoft.opacity(0.4),
+            in: RoundedRectangle(cornerRadius: 16)
+        )
     }
 }
 
