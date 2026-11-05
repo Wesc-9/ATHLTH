@@ -2,6 +2,15 @@ import XCTest
 @testable import ATHLTH
 
 final class SpotifyWorkoutAutoplayGateTests: XCTestCase {
+    func testWatchOwnedWorkoutNeverStartsIPhoneSpotifyConnectSpeaker() {
+        XCTAssertTrue(ATHLTHSpotifyWorkoutOutputPolicy.mayAutoplayFromIPhone(
+            for: .iPhone
+        ))
+        XCTAssertFalse(ATHLTHSpotifyWorkoutOutputPolicy.mayAutoplayFromIPhone(
+            for: .appleWatch
+        ))
+    }
+
     @MainActor
     func testEnteringAppDoesNotReconnectAfterWorkoutEnds() {
         var gate = SpotifyWorkoutAutoplayGate()
