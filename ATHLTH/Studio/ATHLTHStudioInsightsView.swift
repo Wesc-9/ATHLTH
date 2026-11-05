@@ -130,6 +130,7 @@ struct ATHLTHStudioInsightsView: View {
                         }
                     }
                 }
+                ATHLTHStudioTrainingLoadView()
                 ATHLTHStudioProgressExplorerView()
                 Button {
                     showingSpecificProgress = true
