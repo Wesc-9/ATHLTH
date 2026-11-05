@@ -4744,33 +4744,40 @@ struct ATHLTHHomeView: View {
             watchConnection.clearGhostRace()
         }
 
-        // For send-to-Watch and countdown, prepare the complete recipe
-        // before asking HealthKit to start. A manual send never starts it.
-        if startMode != .immediate {
-            let coach = PlannedWorkoutWatchBuilder.audioCoachConfiguration(
-                for: workout,
-                selectedRoute: selectedRoute,
-                defaultConfiguration: settings.audioCoachConfiguration(
-                    enabled: settings.audioCoachEnabledByDefault
-                )
+        // Prepare the SAME Watch payload for immediate, manual and delayed
+        // starts. First HealthKit frame must already know coach/steps/HRmax.
+        var coachConfiguration = PlannedWorkoutWatchBuilder.audioCoachConfiguration(
+            for: workout,
+            selectedRoute: selectedRoute,
+            defaultConfiguration: settings.audioCoachConfiguration(
+                enabled: settings.audioCoachEnabledByDefault
             )
-            let autoPause = !treadmill &&
-                (workout.autoPauseEnabled ?? settings.autoPauseOutdoorWorkouts)
-            let running: WatchRunningWorkoutTransfer =
-                workout.kind == .running
-                    ? PlannedWorkoutWatchBuilder.runningTransfer(
-                        from: workout,
-                        routeAlerts: routeAlerts,
-                        autoPauseEnabled: autoPause
-                    )
-                    : WatchRunningWorkoutTransfer(
-                        title: workout.title,
-                        steps: [],
-                        routeAlerts: routeAlerts,
-                        targetAlerts: workout.targetAlertConfiguration,
-                        autoPauseEnabled: autoPause
-                    )
+        )
+        coachConfiguration.preferIPhoneAudioWhenReachable = false
+        coachConfiguration.useAcknowledgedVoiceLease = false
+        let autoPause = !treadmill &&
+            (workout.autoPauseEnabled ?? settings.autoPauseOutdoorWorkouts)
+        var runningTransfer: WatchRunningWorkoutTransfer =
+            workout.kind == .running
+                ? PlannedWorkoutWatchBuilder.runningTransfer(
+                    from: workout,
+                    routeAlerts: routeAlerts,
+                    autoPauseEnabled: autoPause
+                )
+                : WatchRunningWorkoutTransfer(
+                    title: workout.title,
+                    steps: [],
+                    routeAlerts: routeAlerts,
+                    targetAlerts: workout.targetAlertConfiguration,
+                    autoPauseEnabled: autoPause
+                )
+        runningTransfer.heartRateZoneMaximumBPM =
+            ATHLTHHeartRateZones.resolvedMaximumBPM(
+                configured: session.onboardingProfile?.maximumHeartRateBPM,
+                dateOfBirth: session.onboardingProfile?.dateOfBirth
+            )
 
+        if startMode != .immediate {
             if let plannedGearIDs = workout.gearIDs {
                 gear.prepareNextWorkoutGear(Set(plannedGearIDs))
             } else {
@@ -4784,8 +4791,8 @@ struct ATHLTHHomeView: View {
                     summary: workout.title,
                     kind: watchKind,
                     routeID: selectedRoute?.id,
-                    runningWorkout: running,
-                    audioCoach: coach,
+                    runningWorkout: runningTransfer,
+                    audioCoach: coachConfiguration,
                     ghostRace: treadmill ? nil :
                         GhostRaceStartService.preparedTransfer(
                             ghostRace: ghostRace,
@@ -4797,12 +4804,14 @@ struct ATHLTHHomeView: View {
                 )
             )
 
-            if startMode == .onWatch {
-                homeWatchTransferMessage = startMode.confirmationText
-                return
-            }
+            // The Watch itself performs the countdown. Never trigger a
+            // second immediate HealthKit start for delayed/manual payloads.
+            homeWatchTransferMessage = startMode.confirmationText
+            return
         }
 
+        watchConnection.sendAudioCoachConfiguration(coachConfiguration)
+        watchConnection.sendRunningWorkout(runningTransfer)
         homeDirectStartInProgress = true
         homeWatchTransferError = nil
 
@@ -4824,50 +4833,10 @@ struct ATHLTHHomeView: View {
                     gear.clearPreparedWorkoutGear()
                 }
 
-                let coachConfiguration =
-                    PlannedWorkoutWatchBuilder
-                        .audioCoachConfiguration(
-                            for: workout,
-                            selectedRoute: selectedRoute,
-                            defaultConfiguration:
-                                settings.audioCoachConfiguration(
-                                    enabled:
-                                        settings.audioCoachEnabledByDefault
-                                )
-                        )
-
-                watchConnection.sendAudioCoachConfiguration(
-                    coachConfiguration
-                )
-
-                if workout.kind == .running {
-                    watchConnection.sendRunningWorkout(
-                        PlannedWorkoutWatchBuilder.runningTransfer(
-                            from: workout,
-                            routeAlerts: routeAlerts,
-                            autoPauseEnabled: !treadmill &&
-                                (workout.autoPauseEnabled ??
-                                settings.autoPauseOutdoorWorkouts)
-                        )
-                    )
-                } else {
-                    // Clear any structured run left from an earlier session.
-                    watchConnection.sendRunningWorkout(
-                        WatchRunningWorkoutTransfer(
-                            title: workout.title,
-                            steps: [],
-                            routeAlerts:
-                                settings
-                                    .routeAlertConfiguration,
-                            targetAlerts:
-                                workout
-                                    .targetAlertConfiguration,
-                            autoPauseEnabled:
-                                workout.autoPauseEnabled ??
-                                settings.autoPauseOutdoorWorkouts
-                        )
-                    )
-                }
+                // Refresh idempotently after Watch remote launch; queued
+                // WCSession messages may arrive during route activation.
+                watchConnection.sendAudioCoachConfiguration(coachConfiguration)
+                watchConnection.sendRunningWorkout(runningTransfer)
 
                 session.beginTrainingStatus(for: workout)
                 WorkoutLaunchCoordinator.startLinkedSpotifyIfNeeded(
