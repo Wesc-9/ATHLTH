@@ -215,6 +215,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var targetViolationStartedAt: Date?
     private var lastTargetAlertAt: Date?
     private var targetWasOutside = false
+    private var targetZoneSettledAt: Date?
+    private var lastPositiveZoneID: Int?
+    private var lastPositiveZoneAnnouncementAt: Date?
     private var lastLapElapsedTime: TimeInterval = 0
     private var lastLapDistanceMeters: Double = 0
 
@@ -6343,6 +6346,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
             targetViolationStartedAt = nil
             targetWasOutside = false
+            targetZoneSettledAt = nil
+            lastPositiveZoneID = nil
             return
         }
 
@@ -6456,6 +6461,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
             targetViolationStartedAt = nil
             targetWasOutside = false
+            targetZoneSettledAt = nil
+            lastPositiveZoneID = nil
             return
         }
 
@@ -6466,17 +6473,61 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             publish { self.liveTargetStatus = nil }
             targetViolationStartedAt = nil
             targetWasOutside = false
+            targetZoneSettledAt = nil
+            lastPositiveZoneID = nil
             return
         }
 
         guard let violation else {
             publish {
-                self.liveTargetStatus = "On target"
+                self.liveTargetStatus = configuration.heartRateEnabled
+                    ? "Zone Z\(configuration.heartRateZone ?? 0) · on target"
+                    : "On target"
             }
             targetViolationStartedAt = nil
 
+            let now = Date()
+            if configuration.heartRateEnabled,
+               let zone = configuration.heartRateZone,
+               (1...5).contains(zone),
+               !missingHeartRateSample {
+                if lastPositiveZoneID != zone || targetZoneSettledAt == nil {
+                    targetZoneSettledAt = now
+                    lastPositiveZoneID = zone
+                }
+                // Confirm each new interval after consistently fresh HR.
+                // Do not nag: a steady in-zone reminder is at most once
+                // every five minutes, and never competes with recovery.
+                if !targetWasOutside,
+                   now.timeIntervalSince(targetZoneSettledAt ?? now) >= 12,
+                   lastPositiveZoneAnnouncementAt.map({
+                       now.timeIntervalSince($0) >= 300
+                   }) ?? true,
+                   audioCoachConfiguration.enabled {
+                    let confirmation = ATHLTHHeartRateZoneCoachTarget
+                        .onTargetPhrase(zone: zone)
+                    lastPositiveZoneAnnouncementAt = now
+                    deliverWorkoutAlert(
+                        english: confirmation.english,
+                        norwegian: confirmation.norwegian,
+                        delivery: ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
+                            configuration.delivery,
+                            coachEnabled: true
+                        ),
+                        haptic: .success,
+                        priority: .targetCritical
+                    )
+                }
+            } else {
+                targetZoneSettledAt = nil
+                lastPositiveZoneID = nil
+            }
+
             if targetWasOutside {
                 targetWasOutside = false
+                // Recovery already acknowledges the target. Avoid another
+                // positive announcement immediately after it.
+                lastPositiveZoneAnnouncementAt = Date()
 
                 if configuration.announceBackInTarget {
                     let recovery = ATHLTHHeartRateZoneCoachTarget
@@ -6500,6 +6551,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
+        // An off-target sample breaks the in-zone confirmation streak.
+        targetZoneSettledAt = nil
         publish {
             self.liveTargetStatus =
                 violation.english
