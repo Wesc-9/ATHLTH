@@ -11835,6 +11835,37 @@ struct ATHLTHTrainView: View {
                 selectedSection = .plan
             }
 
+        case let .startPlannedWorkout(planID, workoutID):
+            if let workout = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == workoutID }) {
+                openTodayPrimaryWorkout(
+                    workout, planID: planID, isHealthCompleted: false
+                )
+            } else {
+                selectedSection = .plan
+            }
+
+        case let .sendPlannedWorkoutToWatch(planID, workoutID):
+            if let workout = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == workoutID }) {
+                prepareTodayWorkoutForAppleWatch(workout, planID: planID)
+            } else {
+                selectedSection = .plan
+            }
+
+        case let .startPlannedWorkoutAfter(planID, workoutID, seconds):
+            if let workout = session.trainingPlan(withID: planID)?
+                .weeks.flatMap(\.days).flatMap(\.sessions)
+                .first(where: { $0.id == workoutID }) {
+                scheduleTodayWorkoutStart(
+                    workout, planID: planID, after: seconds
+                )
+            } else {
+                selectedSection = .plan
+            }
+
         case let .quick(kind):
             selectedSection = .today
             handleQuickStart(kind)
