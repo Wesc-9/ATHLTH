@@ -44,10 +44,18 @@ struct ATHLTHWorkoutSpotifyOptionsSheet: View {
                     .disabled(playlist == nil)
                     .tint(ATHLTHTrainDesign.bronze)
                 } footer: {
-                    Text(tr(
-                        "Spotify requires a connected account. Your music selection is saved with this workout, not played until the workout starts.",
-                        "Spotify krever en tilkoblet konto. Spillelisten lagres med økten og spilles først når økten starter."
-                    ))
+                    VStack(alignment: .leading, spacing: 7) {
+                        Text(tr(
+                            "Your playlist is saved with this workout. On iPhone it can play when the workout starts.",
+                            "Spillelisten lagres sammen med økten. På iPhone kan den starte når økten starter."
+                        ))
+                        Label(tr(
+                            "Apple Watch: Start Spotify directly on your Watch, using headphones paired with the Watch. ATHLTH won't autoplay on a previously used Spotify Connect speaker.",
+                            "Apple Watch: Start Spotify direkte på klokken, med hodetelefoner koblet til klokken. ATHLTH starter ikke musikk på en tidligere brukt Spotify Connect-høyttaler."
+                        ), systemImage: "applewatch")
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("Spotify")
