@@ -7429,31 +7429,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         sendToPhone(result)
         WatchRouteStore.shared.clearCompletedPetSelection()
 
-        // Mirrored iPhone speaks the recap when it owns the acknowledged
-        // voice lease. Do not speak the same finish twice in AirPods.
-        // Strength remains Watch-owned by design.
-        if audioCoachConfiguration.enabled,
-           audioCoachConfiguration.shouldAnnounceWorkoutComplete,
-           (kind == .strength || shouldSpeakLocally(priority: .structuredStep)) {
-            let recap = ATHLTHWorkoutCompletionSpokenSummary.make(
-                elapsedSeconds: result.duration,
-                distanceMeters: result.distanceMeters,
-                averageHeartRateBPM: result.averageHeartRate
-            )
-            // Completion is Watch-owned after HealthKit ends; do not wait
-            // for a mirrored iPhone that may have been disconnected.
-            guidancePriorityGate.reset()
-            speak(
-                coachPhrase(
-                    english: recap.english,
-                    norwegian: recap.norwegian
-                ),
-                priority: .structuredStep,
-                forceLocal: true,
-                rememberForReplay: false
-            )
-        }
-
         publish {
             self.completedResult = result
             self.elapsedTime =
@@ -7462,6 +7437,40 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.automaticPauseActive =
                 false
         }
+        // Completion is owned by Apple Watch, never its mirrored phone.
+        // The HealthKit record check runs after UI completion so it does not
+        // delay finishing/saving the workout.
+        if audioCoachConfiguration.enabled,
+           audioCoachConfiguration.shouldAnnounceWorkoutComplete {
+            let savedResult = result
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                let records = await self.verifiedWatchRunningRecords(
+                    for: savedResult
+                )
+                guard self.state == .completed,
+                      self.completedResult?.id == savedResult.id,
+                      self.audioCoachConfiguration.enabled else { return }
+                let recap = ATHLTHWorkoutCompletionSpokenSummary.make(
+                    elapsedSeconds: savedResult.duration,
+                    distanceMeters: savedResult.distanceMeters,
+                    averageHeartRateBPM: savedResult.averageHeartRate,
+                    verifiedRecordEnglish: records?.english,
+                    verifiedRecordNorwegian: records?.norwegian
+                )
+                self.guidancePriorityGate.reset()
+                self.speak(
+                    self.coachPhrase(
+                        english: recap.english,
+                        norwegian: recap.norwegian
+                    ),
+                    priority: .structuredStep,
+                    forceLocal: true,
+                    rememberForReplay: false
+                )
+            }
+        }
+
         WatchHomeAssistantBridge.shared
             .workoutStopped()
         clearPersistedWorkoutState()
@@ -7482,6 +7491,64 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 self.mirroringActive = false
             }
         }
+    }
+
+    /// Only a successful Apple Health history query can verify a new
+    /// Watch running record. The just-saved session is excluded by date.
+    private func verifiedWatchRunningRecords(
+        for completed: WatchWorkoutResult
+    ) async -> (english: String, norwegian: String)? {
+        guard completed.kind == .running,
+              completed.distanceMeters >= 1_000,
+              completed.duration > 0 else { return nil }
+
+        let predicate = HKQuery.predicateForSamples(
+            withEnd: completed.startedAt,
+            options: .strictEndDate
+        )
+        let previous: [ATHLTHVerifiedRunningEvidence]? =
+            await withCheckedContinuation { continuation in
+                let query = HKSampleQuery(
+                    sampleType: HKObjectType.workoutType(),
+                    predicate: predicate,
+                    limit: HKObjectQueryNoLimit,
+                    sortDescriptors: nil
+                ) { _, samples, error in
+                    guard error == nil, let workouts = samples as? [HKWorkout]
+                    else {
+                        continuation.resume(returning: nil)
+                        return
+                    }
+                    let evidence = workouts.compactMap {
+                        item -> ATHLTHVerifiedRunningEvidence? in
+                        guard item.workoutActivityType == .running,
+                              let distance = item.totalDistance?.doubleValue(
+                                  for: .meter()
+                              ), distance.isFinite,
+                              item.duration.isFinite
+                        else { return nil }
+                        return ATHLTHVerifiedRunningEvidence(
+                            distanceMeters: distance,
+                            activeSeconds: item.duration
+                        )
+                    }
+                    continuation.resume(returning: evidence)
+                }
+                healthStore.execute(query)
+            }
+        guard let previous else { return nil }
+        let records = ATHLTHVerifiedRunningRecordComparison.achievements(
+            current: ATHLTHVerifiedRunningEvidence(
+                distanceMeters: completed.distanceMeters,
+                activeSeconds: completed.duration
+            ),
+            previous: previous
+        )
+        return ATHLTHVerifiedRunningRecordComparison.phrase(
+            achievements: records,
+            sourceEnglish: "your Apple Health running history",
+            sourceNorwegian: "din Apple Health-løpehistorikk"
+        )
     }
 
     private func routeCompletionAnalysis()
