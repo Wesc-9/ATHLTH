@@ -87,7 +87,7 @@ struct ATHLTHRunningAchievementsCard: View {
         case .routePersonalBest:
             return tr("New route personal best", "Ny bestetid på rute")
         case .maximumRecordedHeartRate:
-            return tr("New recorded peak heart rate", "Ny registrert toppuls")
+            return tr("New running peak heart rate", "Ny registrert toppuls under løping")
         }
     }
 
