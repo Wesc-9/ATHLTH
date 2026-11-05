@@ -4,6 +4,9 @@ import SwiftUI
 /// Week navigation, seven real dates and the workout editor stay in view
 /// together. The shared AppSessionStore remains the single source of truth.
 struct ATHLTHStudioPlanCanvasView: View {
+    var onStartWorkout: ((UUID, UUID) -> Void)? = nil
+    var onSendToWatch: ((UUID, UUID) -> Void)? = nil
+    var onStartAfter: ((UUID, UUID, TimeInterval) -> Void)? = nil
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -415,7 +418,10 @@ struct ATHLTHStudioPlanCanvasView: View {
                         },
                         onCreateAdvanced: {
                             openNewWorkout(plan: plan, day: day, date: dayDate)
-                        }
+                        },
+                        onStartWorkout: onStartWorkout,
+                        onSendToWatch: onSendToWatch,
+                        onStartAfter: onStartAfter
                     )
                     .id(day.id)
                     .frame(width: min(344, max(286, width * 0.31)))
@@ -436,7 +442,10 @@ struct ATHLTHStudioPlanCanvasView: View {
                         },
                         onCreateAdvanced: {
                             openNewWorkout(plan: plan, day: day, date: dayDate)
-                        }
+                        },
+                        onStartWorkout: onStartWorkout,
+                        onSendToWatch: onSendToWatch,
+                        onStartAfter: onStartAfter
                         )
                         .id(day.id)
                         .frame(minHeight: 450)
