@@ -6541,6 +6541,54 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             }
         }
 
+        // HR-zone confirmation has its OWN status even when pace is
+        // outside its target. A slow interval cannot prevent the athlete
+        // from hearing that their measured pulse is back in the right zone.
+        let heartRateOnTarget: Bool = {
+            guard configuration.heartRateEnabled,
+                  ATHLTHCoachSensorFreshness.validHeartRate(
+                      heartRate, sampledAt: coachHeartRateSampleAt
+                  ),
+                  let lower = configuration.heartRateMinimumBPM,
+                  let upper = configuration.heartRateMaximumBPM
+            else { return false }
+            return heartRate >= lower && heartRate <= upper
+        }()
+        if heartRateOnTarget,
+           let zone = configuration.heartRateZone,
+           (1...5).contains(zone) {
+            let now = Date()
+            if lastPositiveZoneID != zone || targetZoneSettledAt == nil {
+                targetZoneSettledAt = now
+                lastPositiveZoneID = zone
+                // A new planned interval needs its own positive confirmation.
+                lastPositiveZoneAnnouncementAt = nil
+            }
+            if now.timeIntervalSince(targetZoneSettledAt ?? now) >= 12,
+               (lastPositiveZoneAnnouncementAt.map {
+                    now.timeIntervalSince($0) >= 300
+                } ?? true),
+               audioCoachConfiguration.enabled,
+               !coachSpeechPaused,
+               !targetWasOutside {
+                let confirmation =
+                    ATHLTHHeartRateZoneCoachTarget.onTargetPhrase(zone: zone)
+                lastPositiveZoneAnnouncementAt = now
+                deliverWorkoutAlert(
+                    english: confirmation.english,
+                    norwegian: confirmation.norwegian,
+                    delivery: ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
+                        configuration.delivery, coachEnabled: true
+                    ),
+                    haptic: .success,
+                    priority: .targetCritical
+                )
+            }
+        } else {
+            targetZoneSettledAt = nil
+            lastPositiveZoneID = nil
+        }
+
         guard hasEvaluableTarget else {
             publish {
                 self.liveTargetStatus = nil
@@ -6571,43 +6619,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     : "On target"
             }
             targetViolationStartedAt = nil
-
-            let now = Date()
-            if configuration.heartRateEnabled,
-               let zone = configuration.heartRateZone,
-               (1...5).contains(zone),
-               !missingHeartRateSample {
-                if lastPositiveZoneID != zone || targetZoneSettledAt == nil {
-                    targetZoneSettledAt = now
-                    lastPositiveZoneID = zone
-                }
-                // Confirm each new interval after consistently fresh HR.
-                // Do not nag: a steady in-zone reminder is at most once
-                // every five minutes, and never competes with recovery.
-                if !targetWasOutside,
-                   now.timeIntervalSince(targetZoneSettledAt ?? now) >= 12,
-                   lastPositiveZoneAnnouncementAt.map({
-                       now.timeIntervalSince($0) >= 300
-                   }) ?? true,
-                   audioCoachConfiguration.enabled {
-                    let confirmation = ATHLTHHeartRateZoneCoachTarget
-                        .onTargetPhrase(zone: zone)
-                    lastPositiveZoneAnnouncementAt = now
-                    deliverWorkoutAlert(
-                        english: confirmation.english,
-                        norwegian: confirmation.norwegian,
-                        delivery: ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
-                            configuration.delivery,
-                            coachEnabled: true
-                        ),
-                        haptic: .success,
-                        priority: .targetCritical
-                    )
-                }
-            } else {
-                targetZoneSettledAt = nil
-                lastPositiveZoneID = nil
-            }
 
             if targetWasOutside {
                 targetWasOutside = false
