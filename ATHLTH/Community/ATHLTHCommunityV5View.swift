@@ -143,6 +143,9 @@ private extension View {
 }
 
 struct ATHLTHCommunityV5View: View {
+    /// TabView may initialize non-selected views. Defer the Community refresh
+    /// until its tab is actually foregrounded, keeping its cached UI alive.
+    var isActive = true
     @EnvironmentObject private var groups: CommunityGroupStore
     @EnvironmentObject private var community: CommunityEventStore
     @EnvironmentObject private var weekly: OfficialWeeklyChallengeStore
@@ -157,13 +160,16 @@ struct ATHLTHCommunityV5View: View {
 
     /// A side-menu shortcut can open the existing Clubs tab directly;
     /// the main Community tab continues to default to Overview.
-    init(initialTab: ATHLTHCommunityMainTab = .overview) {
+    init(initialTab: ATHLTHCommunityMainTab = .overview, isActive: Bool = true) {
         _tab = State(initialValue: initialTab)
+        self.isActive = isActive
     }
     @State private var showSearch = false
     @FocusState private var searchFocused: Bool
     @State private var showCreateClub = false
     @State private var query = ""
+    @State private var lastBackgroundRefreshAt: Date?
+    @State private var lastBackgroundRefreshAccountID: UUID?
     @State private var clubInterest: CommunityInterest = .all
     @State private var selectedClubID: UUID?
     @State private var showAllRecommendedClubs = false
@@ -291,13 +297,28 @@ struct ATHLTHCommunityV5View: View {
             } message: {
                 Text(joinNotice)
             }
-            .task {
+            .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
+                guard isActive else { return }
+                // Rapid tab changes should never restart six backend refreshes.
+                // Explicit pull-to-refresh still bypasses this foreground gate.
+                let accountID = session.profile.userID
+                if lastBackgroundRefreshAccountID == accountID,
+                   let lastBackgroundRefreshAt,
+                   Date().timeIntervalSince(lastBackgroundRefreshAt) < 90 {
+                    return
+                }
                 await refreshContent(force: false)
+                guard !Task.isCancelled else { return }
+                lastBackgroundRefreshAccountID = accountID
+                lastBackgroundRefreshAt = Date()
             }
             .refreshable {
                 await refreshContent(force: true)
+                lastBackgroundRefreshAccountID = session.profile.userID
+                lastBackgroundRefreshAt = Date()
             }
-            .task(id: showSearch ? query : "") {
+            .task(id: "\(isActive)-\(showSearch ? query : "")") {
+                guard isActive else { return }
                 let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard tab == .clubs && showSearch && term.count >= 2 else {
                     groups.clearSearch()
