@@ -36,6 +36,10 @@ private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
 
 struct ATHLTHiPadStudioRootView: View {
     @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.scenePhase) private var scenePhase
+    @StateObject private var studioPlanSync = ATHLTHStudioPlanSyncStore()
+    @SceneStorage("athlth.studio.selectedDestination")
+    private var savedDestination = ATHLTHStudioDestination.overview.rawValue
     @State private var selection: ATHLTHStudioDestination = .overview
     @State private var selectedWorkout: WorkoutSummary?
     @State private var showingInspector = false
@@ -48,6 +52,7 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var trainRequest: ATHLTHTrainNavigationRequest?
     @State private var showingTrain = false
     @State private var selectedStandaloneWorkout: PlannedSession?
+    @State private var showingPlanSync = false
 
     private let canvas = Color(red: 0.985, green: 0.979, blue: 0.965)
     private let ink = Color(red: 0.19, green: 0.18, blue: 0.16)
@@ -144,6 +149,90 @@ struct ATHLTHiPadStudioRootView: View {
                                 norwegian: "Åpne meldinger ved siden av arbeidet"
                             ))
                             .accessibilityIdentifier("athlth-ipad-inbox-panel")
+
+                            Button {
+                                showingPlanSync = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Plan sync", norwegian: "Plansynkronisering"
+                                    ),
+                                    systemImage: !studioPlanSync.conflicts.isEmpty
+                                        ? "exclamationmark.icloud"
+                                        : studioPlanSync.enabled ? "checkmark.icloud" : "icloud.slash"
+                                )
+                            }
+                            .help(studioPlanSync.status)
+                            .accessibilityIdentifier("athlth-ipad-plan-sync")
+
+                            Menu {
+                                Button {
+                                    selection = .overview
+                                } label: { Label(ATHLTHStudioDestination.overview.label,
+                                                 systemImage: "square.grid.2x2") }
+                                    .keyboardShortcut("1", modifiers: [.command])
+                                Button {
+                                    selection = .planner
+                                } label: { Label(ATHLTHStudioDestination.planner.label,
+                                                 systemImage: "calendar") }
+                                    .keyboardShortcut("2", modifiers: [.command])
+                                Button {
+                                    selection = .insights
+                                } label: { Label(ATHLTHStudioDestination.insights.label,
+                                                 systemImage: "chart.xyaxis.line") }
+                                    .keyboardShortcut("3", modifiers: [.command])
+                                Button {
+                                    selection = .history
+                                } label: { Label(ATHLTHStudioDestination.history.label,
+                                                 systemImage: "clock.arrow.circlepath") }
+                                    .keyboardShortcut("4", modifiers: [.command])
+                                Button {
+                                    selection = .explore
+                                } label: { Label(ATHLTHStudioDestination.explore.label,
+                                                 systemImage: "map") }
+                                    .keyboardShortcut("5", modifiers: [.command])
+                                Button {
+                                    selection = .community
+                                } label: { Label(ATHLTHStudioDestination.community.label,
+                                                 systemImage: "person.3") }
+                                    .keyboardShortcut("6", modifiers: [.command])
+                                Button {
+                                    selection = .coach
+                                } label: { Label(ATHLTHStudioDestination.coach.label,
+                                                 systemImage: "sparkles") }
+                                    .keyboardShortcut("7", modifiers: [.command])
+                                Button {
+                                    selection = .settings
+                                } label: { Label(ATHLTHStudioDestination.settings.label,
+                                                 systemImage: "gearshape") }
+                                    .keyboardShortcut("8", modifiers: [.command])
+                                Divider()
+                                Button {
+                                    trainRequest = .customQuick
+                                    showingTrain = true
+                                } label: {
+                                    Label(
+                                        ATHLTHLocalization.choose(
+                                            english: "New quick workout",
+                                            norwegian: "Ny hurtigøkt"
+                                        ),
+                                        systemImage: "plus"
+                                    )
+                                }
+                                .keyboardShortcut("n", modifiers: [.command, .shift])
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Studio shortcuts",
+                                        norwegian: "Studio-hurtigtaster"
+                                    ),
+                                    systemImage: "keyboard"
+                                )
+                            }
+                            .help(ATHLTHLocalization.choose(
+                                english: "Navigate with Command 1–8",
+                                norwegian: "Naviger med Kommando 1–8"
+                            ))
                         }
                     }
             }
@@ -156,6 +245,10 @@ struct ATHLTHiPadStudioRootView: View {
         .fullScreenCover(isPresented: $showingTrain) {
             ATHLTHStudioTrainWorkspaceView(navigationRequest: $trainRequest)
         }
+        .sheet(isPresented: $showingPlanSync) {
+            ATHLTHStudioPlanSyncPanel(sync: studioPlanSync)
+                .environmentObject(session)
+        }
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
         }
@@ -167,7 +260,42 @@ struct ATHLTHiPadStudioRootView: View {
                 .presentationSizing(.fitted)
                 .presentationDetents([.large])
         }
+        .onAppear {
+            // Scene-local, not shared across windows: Stage Manager windows
+            // can keep different destinations without fighting each other.
+            let compatibilityLaunch = ProcessInfo.processInfo.arguments
+                .contains { $0.hasPrefix("--athlth-compatibility-tab=") }
+            if !compatibilityLaunch,
+               let restored = ATHLTHStudioDestination(rawValue: savedDestination) {
+                selection = restored
+            }
+            studioPlanSync.switchAccount(
+                session.signedIn ? session.profile.userID : nil
+            )
+            if studioPlanSync.enabled {
+                Task { await studioPlanSync.sync(session: session) }
+            }
+        }
+        .onChange(of: session.profile.userID) { _, _ in
+            studioPlanSync.switchAccount(
+                session.signedIn ? session.profile.userID : nil
+            )
+        }
+        .onChange(of: session.signedIn) { _, signedIn in
+            studioPlanSync.switchAccount(signedIn ? session.profile.userID : nil)
+        }
+        .onChange(of: session.trainingPlans) { _, _ in
+            // Saving the local plan remains immediate and independent of
+            // network; upload only follows explicit account-scoped consent.
+            studioPlanSync.scheduleSync(session: session)
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active && studioPlanSync.enabled {
+                Task { await studioPlanSync.sync(session: session) }
+            }
+        }
         .onChange(of: selection) { _, destination in
+            savedDestination = destination.rawValue
             // Keep Coach and Inbox docked while navigating Studio.
             if destination != .overview { focusedPlanningDate = nil }
             withAnimation(.easeInOut(duration: 0.18)) {
