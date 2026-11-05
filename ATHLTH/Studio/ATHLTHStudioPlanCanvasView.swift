@@ -14,6 +14,11 @@ struct ATHLTHStudioPlanCanvasView: View {
     @State private var selectedPlanID: UUID?
     @State private var selectedWeekID: UUID?
     @State private var selectedDayID: UUID?
+    // One selection per iPad window. Health data and plan content remain in
+    // their canonical stores; these tokens only restore the visible editor.
+    @SceneStorage("athlth.studio.canvas.planID") private var scenePlanID = ""
+    @SceneStorage("athlth.studio.canvas.weekID") private var sceneWeekID = ""
+    @SceneStorage("athlth.studio.canvas.dayID") private var sceneDayID = ""
     @SceneStorage("athlth.studio.plan.viewMode") private var viewMode = "overview"
     @State private var copyingWeekID: UUID?
     @State private var pendingWeekCopyTarget: UUID?
@@ -108,13 +113,33 @@ struct ATHLTHStudioPlanCanvasView: View {
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
         .onAppear {
             if selectedPlanID == nil {
-                selectedPlanID = selectedPlan?.id
+                let restoredPlanID = UUID(uuidString: scenePlanID)
+                let plan = restoredPlanID.flatMap {
+                    session.trainingPlan(withID: $0)
+                } ?? selectedPlan
+                selectedPlanID = plan?.id
+                if let plan,
+                   let savedWeek = UUID(uuidString: sceneWeekID),
+                   let week = plan.weeks.first(where: { $0.id == savedWeek }) {
+                    selectedWeekID = week.id
+                    if let savedDay = UUID(uuidString: sceneDayID),
+                       week.days.contains(where: { $0.id == savedDay }) {
+                        selectedDayID = savedDay
+                    }
+                }
             }
             newPlanStart = session.suggestedTrainingPlanStartDate
         }
-        .onChange(of: selectedPlanID) { _, _ in
-            selectedWeekID = nil
-            selectedDayID = nil
+        .onChange(of: selectedPlanID) { previous, selected in
+            scenePlanID = selected?.uuidString ?? ""
+            // Restoring the initial scene selection must not erase its week
+            // and day. Switching from an existing plan must clear them.
+            if previous != nil {
+                selectedWeekID = nil
+                selectedDayID = nil
+                sceneWeekID = ""
+                sceneDayID = ""
+            }
             inlineWorkout = nil
             inlineNewWorkout = nil
             newWorkoutActivity = nil
@@ -123,17 +148,22 @@ struct ATHLTHStudioPlanCanvasView: View {
             lastWeekCopy = nil
             copyMessage = nil
         }
-        .onChange(of: selectedWeekID) { _, _ in
+        .onChange(of: selectedWeekID) { _, selected in
+            sceneWeekID = selected?.uuidString ?? ""
             inlineWorkout = nil
             inlineNewWorkout = nil
             newWorkoutActivity = nil
         }
-        .onChange(of: selectedDayID) { _, _ in
+        .onChange(of: selectedDayID) { _, selected in
+            sceneDayID = selected?.uuidString ?? ""
             inlineWorkout = nil
             inlineNewWorkout = nil
             newWorkoutActivity = nil
         }
         .onChange(of: session.profile.userID) { _, _ in
+            scenePlanID = ""
+            sceneWeekID = ""
+            sceneDayID = ""
             selectedPlanID = nil
             selectedWeekID = nil
             selectedDayID = nil
