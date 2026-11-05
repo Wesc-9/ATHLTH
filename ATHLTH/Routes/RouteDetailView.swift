@@ -404,45 +404,123 @@ struct RouteDetailView: View {
     }
 
     private var mapCard: some View {
-        ATHLTHCard {
-            if currentRoute.coordinates.count >= 2 {
-                Map(
-                    initialPosition: .region(
-                        region(for: currentRoute)
-                    )
-                ) {
-                    MapPolyline(
-                        coordinates:
-                            currentRoute.coordinates.map(\.coordinate)
-                    )
-                    .stroke(
-                        ATHLTHTheme.accent,
-                        lineWidth: 6
-                    )
+        let coordinates = currentRoute.coordinates
+            .sorted { $0.sequence < $1.sequence }
+            .map(\.coordinate)
+        let turnaround = ATHLTHRouteDirectionGeometry.turnaroundIndex(coordinates)
 
-                    if let first = currentRoute.coordinates.first {
-                        Marker(
-                            currentRoute.startName ?? "Start",
-                            coordinate: first.coordinate
-                        )
-                        .tint(ATHLTHTheme.accent)
+        return ATHLTHCard {
+            if coordinates.count >= 2 {
+                VStack(alignment: .leading, spacing: 10) {
+                    Map(initialPosition: .region(region(for: currentRoute))) {
+                        if let turnaround {
+                            MapPolyline(coordinates: Array(coordinates[...turnaround]))
+                                .stroke(ATHLTHTheme.premiumGold, lineWidth: 6)
+                            MapPolyline(coordinates: Array(coordinates[turnaround...]))
+                                .stroke(ATHLTHTheme.accentDeep.opacity(0.9),
+                                        lineWidth: 4)
+
+                            Marker(
+                                ATHLTHLocalization.choose(
+                                    english: "Start / Finish",
+                                    norwegian: "Start / Mål"
+                                ),
+                                coordinate: coordinates[0]
+                            )
+                            .tint(ATHLTHTheme.accentDeep)
+
+                            Marker(
+                                ATHLTHLocalization.choose(
+                                    english: "Turn around", norwegian: "Vendepunkt"
+                                ),
+                                coordinate: coordinates[turnaround]
+                            )
+                            .tint(ATHLTHTheme.premiumGold)
+                        } else {
+                            MapPolyline(coordinates: coordinates)
+                                .stroke(ATHLTHTheme.accent, lineWidth: 6)
+                            if let first = coordinates.first {
+                                Marker(
+                                    currentRoute.startName ?? "Start",
+                                    coordinate: first
+                                )
+                                .tint(ATHLTHTheme.accent)
+                            }
+                            if let last = coordinates.last {
+                                Marker(
+                                    currentRoute.endName ?? "Finish",
+                                    coordinate: last
+                                )
+                                .tint(.red)
+                            }
+                        }
+
+                        ForEach(ATHLTHRouteDirectionGeometry.arrows(
+                            for: coordinates
+                        )) { arrow in
+                            Annotation(
+                                "",
+                                coordinate: arrow.coordinate,
+                                anchor: .center
+                            ) {
+                                Image(systemName: "arrow.up")
+                                    .font(.system(size: 13, weight: .bold))
+                                    .foregroundStyle(.white)
+                                    .frame(width: 29, height: 29)
+                                    .background(
+                                        arrow.returning
+                                            ? ATHLTHTheme.accentDeep
+                                            : ATHLTHTheme.premiumGold,
+                                        in: Circle()
+                                    )
+                                    .rotationEffect(.degrees(arrow.bearingDegrees))
+                                    .shadow(color: .black.opacity(0.16),
+                                            radius: 3, y: 2)
+                                    .accessibilityLabel(
+                                        arrow.returning
+                                            ? ATHLTHLocalization.choose(
+                                                english: "Return direction",
+                                                norwegian: "Returretning"
+                                            )
+                                            : ATHLTHLocalization.choose(
+                                                english: "Route direction",
+                                                norwegian: "Løpsretning"
+                                            )
+                                    )
+                            }
+                        }
                     }
+                    .frame(height: 270)
+                    .clipShape(RoundedRectangle(cornerRadius: 20,
+                                                style: .continuous))
 
-                    if let last = currentRoute.coordinates.last {
-                        Marker(
-                            currentRoute.endName ?? "Finish",
-                            coordinate: last.coordinate
-                        )
-                        .tint(.red)
+                    if turnaround != nil {
+                        HStack(spacing: 14) {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Outbound", norwegian: "Ut"
+                                ),
+                                systemImage: "arrow.up.right"
+                            )
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Return", norwegian: "Retur"
+                                ),
+                                systemImage: "arrow.down.left"
+                            )
+                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            Spacer(minLength: 4)
+                            Text(ATHLTHLocalization.choose(
+                                english: "Follow the arrows",
+                                norwegian: "Følg pilene"
+                            ))
+                            .foregroundStyle(.secondary)
+                        }
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 6)
                     }
                 }
-                .frame(height: 270)
-                .clipShape(
-                    RoundedRectangle(
-                        cornerRadius: 20,
-                        style: .continuous
-                    )
-                )
             }
         }
     }
