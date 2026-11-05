@@ -28,13 +28,33 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         )
     }
 
+    private func trusted(_ point: GhostRacePoint) -> CLLocation {
+        CLLocation(
+            coordinate: point.coordinate,
+            altitude: point.altitude ?? 0,
+            horizontalAccuracy: 5,
+            verticalAccuracy: 5,
+            timestamp: Date()
+        )
+    }
+
+    private func trustedOffRoute() -> CLLocation {
+        CLLocation(
+            coordinate: CLLocationCoordinate2D(latitude: 63.45, longitude: 10.45),
+            altitude: 0,
+            horizontalAccuracy: 5,
+            verticalAccuracy: 5,
+            timestamp: Date()
+        )
+    }
+
     @MainActor
     func testNetworkGapCannotTurnIncompleteRouteIntoVictory() throws {
         let route = reference()
         let store = GhostRaceStore()
         try store.prepare(reference: route)
         store.updatePhoneWorkout(
-            location: route.points[16].location,
+            location: trusted(route.points[16]),
             elapsedTime: 480, state: .running,
             routeProgressPercent: 80
         )
@@ -53,24 +73,24 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         let store = GhostRaceStore()
         try store.prepare(reference: route)
         store.updatePhoneWorkout(
-            location: route.points[15].location,
+            location: trusted(route.points[15]),
             elapsedTime: 450, state: .running,
             routeProgressPercent: 75
         )
         store.updatePhoneWorkout(
-            location: route.points[15].location,
+            location: trusted(route.points[15]),
             elapsedTime: 450, state: .paused,
             routeProgressPercent: 75
         )
         XCTAssertNil(store.comparison)
 
         store.updatePhoneWorkout(
-            location: route.points[19].location,
+            location: trusted(route.points[19]),
             elapsedTime: 540, state: .running,
             routeProgressPercent: 95
         )
         store.updatePhoneWorkout(
-            location: route.points[20].location,
+            location: trusted(route.points[20]),
             elapsedTime: 570, state: .completed,
             routeProgressPercent: 100
         )
@@ -85,12 +105,12 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         let store = GhostRaceStore()
         try store.prepare(reference: route)
         store.updatePhoneWorkout(
-            location: route.points[19].location,
+            location: trusted(route.points[19]),
             elapsedTime: 540, state: .running,
             routeProgressPercent: 95
         )
         store.updatePhoneWorkout(
-            location: route.points.last!.location,
+            location: trusted(route.points.last!),
             elapsedTime: 541, state: .completed,
             routeProgressPercent: 100
         )
@@ -106,12 +126,12 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         // The Watch ran far from the reference route for ten minutes.
         // Ghost has reached the finish; the runner has rejoined at the start.
         store.updatePhoneWorkout(
-            location: CLLocation(latitude: 63.45, longitude: 10.45),
+            location: trustedOffRoute(),
             elapsedTime: 550, state: .running
         )
         XCTAssertNil(store.comparison)
         store.updatePhoneWorkout(
-            location: route.points[0].location,
+            location: trusted(route.points[0]),
             elapsedTime: 605, state: .running
         )
         let match = try XCTUnwrap(store.comparison)
@@ -126,17 +146,17 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         let store = GhostRaceStore()
         try store.prepare(reference: route)
         store.updatePhoneWorkout(
-            location: route.points[4].location,
+            location: trusted(route.points[4]),
             elapsedTime: 120, state: .running
         )
         XCTAssertNotNil(store.comparison)
         store.updatePhoneWorkout(
-            location: CLLocation(latitude: 63.45, longitude: 10.45),
+            location: trustedOffRoute(),
             elapsedTime: 170, state: .running
         )
         XCTAssertNil(store.comparison)
         store.updatePhoneWorkout(
-            location: route.points[5].location,
+            location: trusted(route.points[5]),
             elapsedTime: 610, state: .running
         )
         let match = try XCTUnwrap(store.comparison)
@@ -184,7 +204,7 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         try store.prepare(reference: route)
 
         store.updatePhoneWorkout(
-            location: route.points[0].location,
+            location: trusted(route.points[0]),
             elapsedTime: 300,
             state: .running,
             routeProgressPercent: 0,
@@ -193,7 +213,7 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         XCTAssertNil(store.comparison)
 
         store.updatePhoneWorkout(
-            location: route.points[0].location,
+            location: trusted(route.points[0]),
             elapsedTime: 301,
             state: .running,
             routeProgressPercent: 0,
@@ -225,6 +245,8 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
             currentLatitude: route.points[0].latitude,
             currentLongitude: route.points[0].longitude
         )
+        snapshot.currentHorizontalAccuracy = 5
+        snapshot.currentLocationSampledAt = snapshot.capturedAt
         snapshot.runningStepPhase = "warmup"
         snapshot.runningRouteWarmup = true
         store.update(with: snapshot)
