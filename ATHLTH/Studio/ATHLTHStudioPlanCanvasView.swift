@@ -24,6 +24,8 @@ struct ATHLTHStudioPlanCanvasView: View {
     @State private var pendingWeekCopyTarget: UUID?
     @State private var lastWeekCopy: AppSessionStore.PlanStudioWeekCopyReceipt?
     @State private var copyMessage: String?
+    @SceneStorage("athlth.studio.canvas.draftOwnerID")
+    private var draftOwnerID = ""
     @SceneStorage("athlth.studio.canvas.creatingPlan")
     private var creatingPlan = false
     @SceneStorage("athlth.studio.canvas.newPlanName")
@@ -132,6 +134,17 @@ struct ATHLTHStudioPlanCanvasView: View {
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
         .onAppear {
+            // Scene storage is tied to an iPad window, not the signed-in
+            // account. Never display another account's unsaved plan details.
+            let owner = session.profile.userID.uuidString
+            if draftOwnerID != owner {
+                draftOwnerID = owner
+                creatingPlan = false
+                newPlanName = ""
+                newPlanSummary = ""
+                newPlanWeeks = 4
+                storedNewPlanStart = 0
+            }
             if selectedPlanID == nil {
                 let restoredPlanID = UUID(uuidString: scenePlanID)
                 let plan = restoredPlanID.flatMap {
@@ -193,6 +206,7 @@ struct ATHLTHStudioPlanCanvasView: View {
             scenePlanID = ""
             sceneWeekID = ""
             sceneDayID = ""
+            draftOwnerID = session.profile.userID.uuidString
             selectedPlanID = nil
             selectedWeekID = nil
             selectedDayID = nil
