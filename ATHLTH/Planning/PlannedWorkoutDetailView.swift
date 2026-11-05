@@ -25,6 +25,8 @@ struct PlannedWorkoutDetailView: View {
     @State private var showingHealthLinkPicker = false
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
+    @State private var showingRemovePlannedWorkoutConfirmation = false
+    @State private var removalError: String?
 
     private var currentWorkout: PlannedSession {
         guard let plan = session.trainingPlan(withID: planID) else {
@@ -260,6 +262,21 @@ struct PlannedWorkoutDetailView: View {
                     }
                 }
 
+                ToolbarItem(placement: .topBarTrailing) {
+                    if !isCompleted && !isSkipped {
+                        Button(role: .destructive) {
+                            showingRemovePlannedWorkoutConfirmation = true
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .accessibilityLabel(
+                            ATHLTHLocalization.choose(
+                                english: "Remove planned workout",
+                                norwegian: "Fjern planlagt økt"
+                            )
+                        )
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     if !currentWorkout.isExplicitRestDay {
                         Button(ATHLTHLocalization.choose(english: "Edit", norwegian: "Rediger")) {
@@ -267,6 +284,47 @@ struct PlannedWorkoutDetailView: View {
                         }
                     }
                 }
+            }
+            .confirmationDialog(
+                ATHLTHLocalization.choose(
+                    english: "Remove this planned workout?",
+                    norwegian: "Fjerne denne planlagte økten?"
+                ),
+                isPresented: $showingRemovePlannedWorkoutConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Remove workout",
+                        norwegian: "Fjern økten"
+                    ),
+                    role: .destructive
+                ) {
+                    removeCurrentPlannedWorkout()
+                }
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Cancel",
+                        norwegian: "Avbryt"
+                    ),
+                    role: .cancel
+                ) {}
+            } message: {
+                Text(currentWorkout.title)
+            }
+            .alert(
+                ATHLTHLocalization.choose(
+                    english: "Could not remove workout",
+                    norwegian: "Kunne ikke fjerne økten"
+                ),
+                isPresented: Binding(
+                    get: { removalError != nil },
+                    set: { if !$0 { removalError = nil } }
+                )
+            ) {
+                Button("OK", role: .cancel) {}
+            } message: {
+                Text(removalError ?? "")
             }
             .sheet(isPresented: $showingTrainingPlacePicker) {
                 ATHLTHPlanTrainingPlacePicker(
@@ -320,6 +378,37 @@ struct PlannedWorkoutDetailView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    private func removeCurrentPlannedWorkout() {
+        guard !isCompleted, !isSkipped,
+              let plan = session.trainingPlan(withID: planID),
+              let day = plan.weeks.flatMap(\.days).first(where: {
+                  $0.sessions.contains(where: { $0.id == currentWorkout.id })
+              })
+        else {
+            removalError = ATHLTHLocalization.choose(
+                english: "The workout is already completed or has changed.",
+                norwegian: "Økten er allerede fullført eller er endret."
+            )
+            return
+        }
+        let removed = session.removePlanStudioWorkout(
+            planID: planID,
+            workoutID: currentWorkout.id,
+            dayID: day.id,
+            expectedVersion: plan.version,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        if removed {
+            dismiss()
+        } else {
+            removalError = ATHLTHLocalization.choose(
+                english: "Could not remove the saved workout. Try again.",
+                norwegian: "Kunne ikke fjerne den lagrede økten. Prøv igjen."
+            )
+        }
     }
 
     // Keep the switch outside SwiftUI's ViewBuilder: assignments in a
