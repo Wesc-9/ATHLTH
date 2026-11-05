@@ -212,6 +212,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var offRouteStartedAt: Date?
     private var lastOffRouteAlertAt: Date?
     private var routeWasOff = false
+    private var routeAlertArmed = false
+    private var routeOnTrackSamples = 0
     private var targetViolationStartedAt: Date?
     private var lastTargetAlertAt: Date?
     private var targetWasOutside = false
@@ -548,6 +550,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
+        routeAlertArmed = false
+        routeOnTrackSamples = 0
         targetViolationStartedAt = nil
         lastTargetAlertAt = nil
         targetWasOutside = false
@@ -3728,6 +3732,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
+        routeAlertArmed = false
+        routeOnTrackSamples = 0
         targetViolationStartedAt = nil
         lastTargetAlertAt = nil
         targetWasOutside = false
@@ -3892,6 +3898,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         offRouteStartedAt = nil
         lastOffRouteAlertAt = nil
         routeWasOff = false
+        routeAlertArmed = false
+        routeOnTrackSamples = 0
         targetViolationStartedAt = nil
         lastTargetAlertAt = nil
         targetWasOutside = false
@@ -5165,10 +5173,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
 
         evaluateRouteAlert(
-            deviationMeters:
-                guidance.deviationMeters,
-            horizontalAccuracy:
-                location.horizontalAccuracy
+            deviationMeters: guidance.deviationMeters,
+            horizontalAccuracy: location.horizontalAccuracy,
+            locationAge: abs(location.timestamp.timeIntervalSinceNow)
         )
         evaluateUpcomingRouteTurn(
             location: location,
@@ -6251,23 +6258,37 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
 
     private func evaluateRouteAlert(
         deviationMeters: Double,
-        horizontalAccuracy: Double
+        horizontalAccuracy: Double,
+        locationAge: TimeInterval
     ) {
-        let configuration =
-            routeAlertConfiguration
-
+        let configuration = routeAlertConfiguration
         guard configuration.enabled,
-              horizontalAccuracy >= 0,
-              horizontalAccuracy <= 35
+              deviationMeters.isFinite, deviationMeters >= 0,
+              horizontalAccuracy.isFinite,
+              (0...25).contains(horizontalAccuracy),
+              (0...10).contains(locationAge)
         else {
             offRouteStartedAt = nil
+            routeOnTrackSamples = 0
             return
         }
 
         let now = Date()
-        let isOffRoute =
-            deviationMeters >
+        // Interpret deviation conservatively while the GPS position
+        // has its own horizontal uncertainty.
+        let isOffRoute = max(deviationMeters - horizontalAccuracy, 0) >
             configuration.deviationMeters
+
+        if !isOffRoute {
+            routeOnTrackSamples += 1
+            if routeOnTrackSamples >= 2 { routeAlertArmed = true }
+        } else {
+            routeOnTrackSamples = 0
+            guard routeAlertArmed else {
+                offRouteStartedAt = nil
+                return
+            }
+        }
 
         guard isOffRoute else {
             offRouteStartedAt = nil
