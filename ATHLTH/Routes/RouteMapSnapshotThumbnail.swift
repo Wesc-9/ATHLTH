@@ -2,6 +2,92 @@ import MapKit
 import SwiftUI
 import UIKit
 
+/// Shared, geometry-only route direction hints for maps and map thumbnails.
+/// A closed loop is NOT assumed to be an out-and-back: the return path must
+/// substantially overlap the outbound path before a turnaround is shown.
+enum ATHLTHRouteDirectionGeometry {
+    struct Arrow: Identifiable {
+        let id: Int
+        let coordinate: CLLocationCoordinate2D
+        let bearingDegrees: Double
+        let returning: Bool
+    }
+
+    static func turnaroundIndex(
+        _ coordinates: [CLLocationCoordinate2D]
+    ) -> Int? {
+        guard coordinates.count >= 6 else { return nil }
+        let locations = coordinates.map {
+            CLLocation(latitude: $0.latitude, longitude: $0.longitude)
+        }
+        guard let first = locations.first, let last = locations.last,
+              first.distance(from: last) <= 110 else { return nil }
+        var pathLength = 0.0
+        for i in 1..<locations.count {
+            pathLength += locations[i].distance(from: locations[i - 1])
+        }
+        guard pathLength >= 450 else { return nil }
+        guard let farthest = locations.indices.max(by: {
+            first.distance(from: locations[$0]) <
+            first.distance(from: locations[$1])
+        }), farthest > 2, farthest < locations.count - 3 else { return nil }
+        let farDistance = first.distance(from: locations[farthest])
+        guard farDistance >= 160 else { return nil }
+
+        // Compare a small number of outbound samples against the reverse
+        // leg, not against the entire path. Crossings in a loop do not count.
+        let strideOut = max(1, farthest / 12)
+        let strideReturn = max(1, (locations.count - farthest) / 180)
+        let samples = Array(stride(from: 1, through: farthest - 1, by: strideOut))
+        guard samples.count >= 3 else { return nil }
+        let overlaps = samples.filter { outboundIndex in
+            stride(from: farthest + 1, through: locations.count - 1,
+                   by: strideReturn).contains { returnIndex in
+                locations[outboundIndex].distance(from: locations[returnIndex]) <= 40
+            }
+        }
+        return Double(overlaps.count) / Double(samples.count) >= 0.6
+            ? farthest : nil
+    }
+
+    static func arrows(
+        for coordinates: [CLLocationCoordinate2D]
+    ) -> [Arrow] {
+        guard coordinates.count >= 3 else { return [] }
+        let turn = turnaroundIndex(coordinates)
+        let indices: [(Int, Bool)] = {
+            if let turn {
+                // Space the markers along different legs so two overlapping
+                // road geometries are still readable on a small preview.
+                return [
+                    (max(1, turn / 4), false),
+                    (min(coordinates.count - 2,
+                         turn + max(1, (coordinates.count - turn) / 3)), true)
+                ]
+            }
+            return [(max(1, coordinates.count / 3), false),
+                    (min(coordinates.count - 2, coordinates.count * 2 / 3), false)]
+        }()
+        return indices.enumerated().map { index, entry in
+            let position = entry.0
+            let from = coordinates[position]
+            let to = coordinates[min(position + 1, coordinates.count - 1)]
+            let fromLat = from.latitude * .pi / 180
+            let toLat = to.latitude * .pi / 180
+            let delta = (to.longitude - from.longitude) * .pi / 180
+            let y = sin(delta) * cos(toLat)
+            let x = cos(fromLat) * sin(toLat) -
+                sin(fromLat) * cos(toLat) * cos(delta)
+            return Arrow(
+                id: index,
+                coordinate: from,
+                bearingDegrees: atan2(y, x) * 180 / .pi,
+                returning: entry.1
+            )
+        }
+    }
+}
+
 @MainActor
 enum RouteMapSnapshotCache {
     private static let images: NSCache<NSString, UIImage> = {
@@ -263,6 +349,35 @@ enum RouteMapSnapshotCache {
             )
             context.setLineWidth(4)
             context.strokePath()
+
+            let turn = ATHLTHRouteDirectionGeometry.turnaroundIndex(coordinates)
+            for arrow in ATHLTHRouteDirectionGeometry.arrows(for: coordinates) {
+                let location = snapshot.point(for: arrow.coordinate)
+                guard location.x.isFinite, location.y.isFinite else { continue }
+                context.saveGState()
+                context.translateBy(x: location.x, y: location.y)
+                context.rotate(by: CGFloat(arrow.bearingDegrees * .pi / 180))
+                context.setFillColor(UIColor.white.cgColor)
+                context.fillEllipse(in: CGRect(x: -10, y: -10, width: 20, height: 20))
+                context.setFillColor(UIColor(
+                    arrow.returning ? ATHLTHTheme.accentDeep :
+                        ATHLTHTheme.premiumGold
+                ).cgColor)
+                context.move(to: CGPoint(x: 0, y: -7))
+                context.addLine(to: CGPoint(x: -5.5, y: 6))
+                context.addLine(to: CGPoint(x: 0, y: 3))
+                context.addLine(to: CGPoint(x: 5.5, y: 6))
+                context.closePath()
+                context.fillPath()
+                context.restoreGState()
+            }
+            if let turn {
+                drawMarker(
+                    at: points[turn],
+                    fill: UIColor(ATHLTHTheme.premiumGold),
+                    context: context
+                )
+            }
 
             if let start =
                     points.first,
