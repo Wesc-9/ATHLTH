@@ -16,6 +16,15 @@ struct SpotifyPlaylistReference: Identifiable, Codable, Hashable {
 /// Autoplay belongs to a specific workout request, not to a remembered
 /// playlist or to an App Remote reconnection. Kept independent of the SDK
 /// so pause, finish and delayed authorization can be regression-tested.
+/// An iPhone App Remote request cannot switch Spotify playback to a
+/// Watch headset. Watch-owned workouts must never issue this request,
+/// otherwise Spotify Connect may resume on the athlete's last speaker.
+enum ATHLTHSpotifyWorkoutOutputPolicy {
+    static func mayAutoplayFromIPhone(for device: WorkoutCaptureDevice) -> Bool {
+        device == .iPhone
+    }
+}
+
 struct SpotifyWorkoutAutoplayGate {
     private(set) var isWorkoutActive = false
     private(set) var wasManuallyPaused = false
