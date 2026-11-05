@@ -100,4 +100,41 @@ final class TrainingBackupRestoreJournalTests: XCTestCase {
         XCTAssertNil(defaults.data(forKey: ownerHistory))
         XCTAssertNotNil(defaults.data(forKey: otherHistory))
     }
+    func testBackupRestoreIsBlockedDuringAnyLiveWorkoutIncludingWatch() {
+        let safe = TrainingBackupRestoreSafetyPolicy.allowsRestore(
+            phoneActive: false,
+            strengthActive: false,
+            mirroredWatchActive: false,
+            watchReportedActive: false
+        )
+        XCTAssertTrue(safe)
+
+        // A Watch-only workout must block restore even if neither iPhone
+        // recorder has a local active workout.
+        XCTAssertFalse(TrainingBackupRestoreSafetyPolicy.allowsRestore(
+            phoneActive: false,
+            strengthActive: false,
+            mirroredWatchActive: false,
+            watchReportedActive: true
+        ))
+        XCTAssertFalse(TrainingBackupRestoreSafetyPolicy.allowsRestore(
+            phoneActive: false,
+            strengthActive: false,
+            mirroredWatchActive: true,
+            watchReportedActive: false
+        ))
+        XCTAssertFalse(TrainingBackupRestoreSafetyPolicy.allowsRestore(
+            phoneActive: true,
+            strengthActive: false,
+            mirroredWatchActive: false,
+            watchReportedActive: false
+        ))
+        XCTAssertFalse(TrainingBackupRestoreSafetyPolicy.allowsRestore(
+            phoneActive: false,
+            strengthActive: true,
+            mirroredWatchActive: false,
+            watchReportedActive: false
+        ))
+    }
+
 }
