@@ -113,6 +113,22 @@ struct ATHLTHStudioPlanningScenarioView: View {
                     ))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                    if let lastSkippedID {
+                        Button {
+                            session.setPlanSessionSkipped(
+                                planID: planID,
+                                sessionID: lastSkippedID,
+                                skipped: false
+                            )
+                            self.lastSkippedID = nil
+                        } label: {
+                            Label(tr("Undo skipped workout",
+                                     "Angre hoppet over økt"),
+                                  systemImage: "arrow.uturn.backward")
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("athlth-ipad-undo-skipped-workout")
+                    }
                     if let plan, !candidates.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
                             Picker(tr("Planned workout", "Planlagt økt"),
@@ -178,22 +194,6 @@ struct ATHLTHStudioPlanningScenarioView: View {
                                 .buttonStyle(.borderedProminent)
                                 .tint(ATHLTHStudioStyle.ink)
                                 .disabled(!validChange)
-
-                                if let lastSkippedID {
-                                    Button {
-                                        session.setPlanSessionSkipped(
-                                            planID: planID,
-                                            sessionID: lastSkippedID,
-                                            skipped: false
-                                        )
-                                        self.lastSkippedID = nil
-                                    } label: {
-                                        Label(tr("Undo skipped workout",
-                                                 "Angre hoppet over økt"),
-                                              systemImage: "arrow.uturn.backward")
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
 
                                 if let onAddWorkout {
                                     Button(action: onAddWorkout) {
