@@ -1950,6 +1950,31 @@ struct WatchRunWorkoutExperienceView: View {
                     )
                 }
 
+                if workoutManager.state == .running,
+                   (workoutManager.currentStructuredRunningStep?.phase == "warmup" ||
+                    workoutManager.awaitingMainStart),
+                   (workoutManager.nextStructuredRunningStep != nil ||
+                    workoutManager.awaitingMainStart) {
+                    Button {
+                        workoutManager.advanceStructuredRunningWorkoutManually()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Start main section",
+                                norwegian: "Start hoveddel"
+                            ),
+                            systemImage: "arrow.right.circle.fill"
+                        )
+                        .font(.system(size: compact ? 10 : 12, weight: .bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .frame(maxWidth: .infinity, minHeight: compact ? 30 : 38)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(WatchTheme.liveAction)
+                    .accessibilityIdentifier("athlth-watch-start-main-first-page")
+                }
+
                 Spacer(minLength: 0)
 
                 HStack(spacing: 5) {
