@@ -17,6 +17,34 @@ final class ATHLTHGhostCourseProgressPolicyTests: XCTestCase {
         ))
     }
 
+    func testFinalGhostCueRequiresFreshRouteProgressNotTotalWorkoutMeters() {
+        let onCourse = ATHLTHGhostCourseProgressPolicy.trustedCourseMeters(
+            routeLengthMeters: 8_000,
+            routeProgressPercent: 75,
+            horizontalAccuracy: 6,
+            positionAgeSeconds: 2,
+            deviationMeters: 12,
+            alertThresholdMeters: 80
+        )
+        XCTAssertEqual(onCourse ?? -1, 6_000, accuracy: 0.01)
+        XCTAssertNil(ATHLTHGhostCourseProgressPolicy.trustedCourseMeters(
+            routeLengthMeters: 8_000,
+            routeProgressPercent: 98,
+            horizontalAccuracy: 120,
+            positionAgeSeconds: 2,
+            deviationMeters: 12,
+            alertThresholdMeters: 80
+        ))
+        XCTAssertNil(ATHLTHGhostCourseProgressPolicy.trustedCourseMeters(
+            routeLengthMeters: 8_000,
+            routeProgressPercent: 98,
+            horizontalAccuracy: 4,
+            positionAgeSeconds: 45,
+            deviationMeters: 12,
+            alertThresholdMeters: 80
+        ))
+    }
+
     func testExtraDistanceOffRouteDoesNotChangeCourseGap() {
         // The runner added two kilometres on a detour but returned to
         // the original 2 km position of an 8 km course. The ghost has
