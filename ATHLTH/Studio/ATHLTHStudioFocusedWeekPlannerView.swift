@@ -299,7 +299,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
                 }
                 if let selectedActivity {
                     WorkoutTemplateBuilderView(
-                        draftContext: "ipad-focused-day-\(dateKey)-\(selectedActivity.rawValue)",
+                        draftContext: "ipad-focused-day-\(session.profile.userID.uuidString)-\(dateKey)-\(selectedActivity.rawValue)",
                         plannedDate: scheduledTime,
                         initialActivity: selectedActivity,
                         initialStudioAdvanced: selectedActivity != .running,
