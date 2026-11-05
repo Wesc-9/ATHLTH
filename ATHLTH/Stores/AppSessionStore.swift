@@ -4230,6 +4230,98 @@ final class AppSessionStore: ObservableObject {
         )
     }
 
+    /// Atomically move/copy several planned workouts from the iPad editor.
+    /// Every candidate and the exact plan version are validated before any
+    /// mutation. One persisted plan revision prevents half-applied batches.
+    @discardableResult
+    func batchTransferPlanStudioWorkouts(
+        planID: UUID,
+        workoutIDs: [UUID],
+        targetDayID: UUID,
+        copy: Bool,
+        expectedVersion: Int,
+        healthWorkouts: [WorkoutSummary],
+        strengthHistory: [StrengthWorkoutLog]
+    ) -> Bool {
+        let selectedIDs = Set(workoutIDs)
+        guard (2...16).contains(selectedIDs.count),
+              var plan = trainingPlan(withID: planID),
+              plan.version == expectedVersion,
+              let target = planStudioDayLocation(in: plan, dayID: targetDayID),
+              target.date >= Calendar.current.startOfDay(for: .now),
+              !plan.weeks[target.week].days[target.day]
+                  .sessions.contains(where: \.isExplicitRestDay)
+        else { return false }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        var sourceItems: [(week: Int, day: Int, workout: PlannedSession)] = []
+        for week in plan.weeks.indices {
+            for day in plan.weeks[week].days.indices {
+                let sourceDay = plan.weeks[week].days[day]
+                for workout in sourceDay.sessions where selectedIDs.contains(workout.id) {
+                    guard !workout.isExplicitRestDay,
+                          let location = planStudioDayLocation(
+                              in: plan, dayID: sourceDay.id
+                          ), location.date >= today,
+                          copy || sourceDay.id != targetDayID,
+                          !isPlanSessionSkipped(
+                              planID: planID, sessionID: workout.id
+                          ),
+                          !isPlanSessionCompleted(
+                              planID: planID, sessionID: workout.id,
+                              healthWorkouts: healthWorkouts,
+                              strengthHistory: strengthHistory
+                          )
+                    else { return false }
+                    sourceItems.append((week, day, workout))
+                }
+            }
+        }
+        guard sourceItems.count == selectedIDs.count else { return false }
+
+        let scheduled: [(PlannedSession)] = sourceItems.map { source in
+            let clock = source.workout.scheduledStart.map {
+                calendar.dateComponents([.hour, .minute, .second], from: $0)
+            }
+            let dayStart = calendar.startOfDay(for: target.date)
+            let start = calendar.date(
+                bySettingHour: clock?.hour ?? 18,
+                minute: clock?.minute ?? 0,
+                second: clock?.second ?? 0,
+                of: dayStart
+            ) ?? dayStart
+            if copy {
+                return makeIndependentPlanStudioCopy(
+                    source: source.workout, scheduled: start
+                )
+            }
+            var moved = source.workout
+            moved.scheduledStart = start
+            return moved
+        }
+
+        if !copy {
+            for week in plan.weeks.indices {
+                for day in plan.weeks[week].days.indices {
+                    plan.weeks[week].days[day].sessions.removeAll {
+                        selectedIDs.contains($0.id)
+                    }
+                }
+            }
+        }
+        plan.weeks[target.week].days[target.day].sessions.append(
+            contentsOf: scheduled
+        )
+        plan.version += 1
+        plan.updatedAt = Date()
+        replaceTrainingPlan(plan)
+        for workout in scheduled {
+            PlannedWorkoutReminderScheduler.sync(workout)
+        }
+        return true
+    }
+
     /// An uncompleted, unskipped planned workout may be removed even after
     /// its date has passed. The exact plan version is still checked and
     /// recorded workout results are never deleted.
