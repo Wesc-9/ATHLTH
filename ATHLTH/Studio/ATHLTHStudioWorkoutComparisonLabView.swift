@@ -11,6 +11,7 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var details: [UUID: WorkoutDetail] = [:]
+    @State private var cachedElevationPoints: [ElevationPoint] = []
     @State private var loading = false
     @State private var markerProgress = 50.0
 
@@ -25,9 +26,13 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
         ATHLTHLocalization.choose(english: en, norwegian: no)
     }
 
-    private var points: [ElevationPoint] {
+    private var points: [ElevationPoint] { cachedElevationPoints }
+
+    private func makeElevationPoints(
+        from loaded: [UUID: WorkoutDetail]
+    ) -> [ElevationPoint] {
         workouts.enumerated().flatMap { index, workout in
-            guard let route = details[workout.id]?.route, route.count >= 3 else {
+            guard let route = loaded[workout.id]?.route, route.count >= 3 else {
                 return [ElevationPoint]()
             }
             // Discard invalid altitude measurements and avoid gigantic
@@ -180,6 +185,7 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
             .task(id: workouts.map(\.id).map(\.uuidString).joined()) {
                 guard workouts.count == 2 else { return }
                 loading = true
+                cachedElevationPoints = []
                 defer { loading = false }
                 var loaded: [UUID: WorkoutDetail] = [:]
                 for workout in workouts {
@@ -187,6 +193,7 @@ struct ATHLTHStudioWorkoutComparisonLabView: View {
                     loaded[workout.id] = await health.workoutDetail(for: workout)
                 }
                 guard !Task.isCancelled else { return }
+                cachedElevationPoints = makeElevationPoints(from: loaded)
                 details = loaded
             }
             .accessibilityIdentifier("athlth-ipad-workout-lab")
