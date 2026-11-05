@@ -688,6 +688,11 @@ struct ATHLTHiPadStudioRootView: View {
                         planID: planID, workoutID: workoutID, seconds: seconds
                     )
                     showingTrain = true
+                },
+                onOpenCoach: {
+                    inspectorShowsCoach = true
+                    inspectorShowsInbox = false
+                    showingInspector = true
                 }
             )
         case .insights:
