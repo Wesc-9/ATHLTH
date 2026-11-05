@@ -177,6 +177,46 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
         XCTAssertTrue(tracker.observe(signedGapMeters: -30, elapsedSeconds: 15))
     }
 
+    @MainActor
+    func testWarmupDoesNotAdvanceGhostClockOrShowComparison() throws {
+        let route = reference()
+        let store = GhostRaceStore()
+        try store.prepare(reference: route)
+
+        var snapshot = WatchWorkoutLiveSnapshot(
+            kind: .running,
+            state: .running,
+            startedAt: nil,
+            capturedAt: Date(),
+            elapsedTime: 600,
+            heartRate: 140,
+            activeCalories: 60,
+            distanceMeters: 1_000,
+            averageHeartRate: nil,
+            maxHeartRate: nil,
+            routePointCount: 1,
+            currentLatitude: route.points[0].latitude,
+            currentLongitude: route.points[0].longitude
+        )
+        snapshot.runningStepPhase = "warmup"
+        snapshot.runningRouteWarmup = true
+        store.update(with: snapshot)
+        XCTAssertNil(store.comparison, "Ghost cannot move during warm-up.")
+
+        snapshot.runningStepPhase = "work"
+        snapshot.runningRouteWarmup = false
+        snapshot.runningStepElapsedSeconds = 1
+        snapshot.elapsedTime = 601
+        snapshot.distanceMeters = 1_005
+        snapshot.routeProgressPercent = 0
+        snapshot.routeDistanceMeters = 2_000
+        store.update(with: snapshot)
+
+        let comparison = try XCTUnwrap(store.comparison)
+        XCTAssertLessThan(comparison.ghostProgress, 0.02,
+                          "Main phase should start a new Ghost clock, not reuse warm-up time.")
+    }
+
     func testRaceCannotBeDeclaredFromStaleSharedTimestamps() {
         let start = Date(timeIntervalSince1970: 1_800_000_000)
         XCTAssertFalse(ATHLTHLiveGhostResultEvidence.bothFinishesPlausible(
