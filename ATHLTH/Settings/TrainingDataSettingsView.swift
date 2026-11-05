@@ -9,11 +9,22 @@ struct TrainingDataSettingsView: View {
     @EnvironmentObject private var exercises: ExerciseLibraryStore
     @EnvironmentObject private var running: RunningWorkoutLibraryStore
     @EnvironmentObject private var phone: IPhoneWorkoutStore
+    @EnvironmentObject private var watchConnection: AppleWatchConnectionStore
+    @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @State private var consent = false
     @State private var selectedBackup: TrainingBackupRow?
     @State private var confirmLegacy = false
     @State private var confirmDeleteBackups = false
     @State private var planConflictToResolve: ATHLTHStudioPlanSyncStore.Conflict?
+
+    private var mayRestoreBackup: Bool {
+        TrainingBackupRestoreSafetyPolicy.allowsRestore(
+            phoneActive: phone.active != nil,
+            strengthActive: strength.activeWorkout != nil,
+            mirroredWatchActive: workoutMirroring.hasActiveMirroredWorkout,
+            watchReportedActive: watchConnection.hasActiveWatchWorkout
+        )
+    }
 
     var body: some View {
         Form {
@@ -51,10 +62,14 @@ struct TrainingDataSettingsView: View {
                             Text("Backup · \(backup.updated_at.formatted(date: .abbreviated, time: .shortened))")
                             Text(backup.device_id == backups.deviceID ? "This phone" : "Another phone").font(.caption)
                         }
-                    }.disabled(!backups.enabled || strength.activeWorkout != nil || phone.active != nil)
+                    }.disabled(!backups.enabled || !mayRestoreBackup)
                 }
-                if strength.activeWorkout != nil || phone.active != nil {
-                    Text("Finish your active workout before restoring a backup.").font(.footnote)
+                if !mayRestoreBackup {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Finish the active iPhone or Apple Watch workout before restoring a backup.",
+                        norwegian: "Avslutt den aktive økten på iPhone eller Apple Watch før du gjenoppretter en sikkerhetskopi."
+                    ))
+                    .font(.footnote)
                 }
             }
             Section(ATHLTHLocalization.choose(
@@ -178,18 +193,32 @@ struct TrainingDataSettingsView: View {
         }
         .confirmationDialog("Replace this phone’s saved training data with the selected backup?", isPresented: Binding(get: { selectedBackup != nil }, set: { if !$0 { selectedBackup = nil } }), titleVisibility: .visible) {
             Button("Restore backup", role: .destructive) {
-                guard let backup = selectedBackup else { return }
+                guard let backup = selectedBackup,
+                      session.signedIn,
+                      backup.user_id == session.profile.userID,
+                      mayRestoreBackup else { return }
+                let ownerID = session.profile.userID
                 Task {
-                    if await backups.restore(backup, userID: session.profile.userID) {
+                    // Re-check immediately before async restore: an active
+                    // Watch workout may have started while the dialog was open.
+                    guard session.signedIn,
+                          session.profile.userID == ownerID,
+                          mayRestoreBackup else { return }
+                    if await backups.restore(backup, userID: ownerID) {
+                        guard session.signedIn,
+                              session.profile.userID == ownerID else { return }
+                        // All cached stores must see the restored snapshot now,
+                        // not only after the next cold launch.
                         session.reloadTrainingContent()
-                        phone.switchAccount(nil); phone.switchAccount(session.profile.userID)
-                        goals.switchAccount(nil); goals.switchAccount(session.profile.userID)
-                        strength.switchAccount(nil); strength.switchAccount(session.profile.userID)
-                        exercises.switchAccount(nil); exercises.switchAccount(session.profile.userID)
-                        running.switchAccount(nil); running.switchAccount(session.profile.userID)
+                        phone.switchAccount(nil); phone.switchAccount(ownerID)
+                        goals.switchAccount(nil); goals.switchAccount(ownerID)
+                        strength.switchAccount(nil); strength.switchAccount(ownerID)
+                        exercises.switchAccount(nil); exercises.switchAccount(ownerID)
+                        running.switchAccount(nil); running.switchAccount(ownerID)
                     }
                 }
             }
+            .disabled(!mayRestoreBackup)
         } message: {
             Text("Your current data is backed up first, using the same exclusions for recorded GPS traces, imported health readings and local photos. These excluded items cannot be recovered from cloud backup. Account settings and Coach history permission stay unchanged.")
         }
