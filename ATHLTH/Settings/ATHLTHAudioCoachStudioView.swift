@@ -14,6 +14,11 @@ private struct ATHLTHAudioCoachPlaceCandidate: Identifiable {
 struct ATHLTHAudioCoachStudioView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @State private var profileName = ""
+    @State private var ruleTrigger: ATHLTHAudioCoachRule.Trigger = .time
+    @State private var ruleMetric: ATHLTHAudioCoachRule.Metric = .distance
+    @State private var ruleSeconds = 60
+    @State private var ruleMeters = 800
+    @State private var encouragementDraft = ""
     @State private var customPhrase = ""
     @State private var placeSearch = ""
     @State private var placeSide: ATHLTHCoachLandmarkSide = .unspecified
@@ -25,6 +30,7 @@ struct ATHLTHAudioCoachStudioView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 introduction
+                announcementStudioCard
                 profilesCard
                 motivationCard
                 randomCard
@@ -75,6 +81,171 @@ struct ATHLTHAudioCoachStudioView: View {
             ),
             in: RoundedRectangle(cornerRadius: 28)
         )
+    }
+
+    /// One clear place to compose independent announcements. Every row
+    /// is already understood by both the iPhone and the Watch audio engine;
+    /// this screen changes only how existing settings are edited.
+    private var announcementStudioCard: some View {
+        studioCard(
+            title: ATHLTHLocalization.choose(
+                english: "Your announcement mix",
+                norwegian: "Dine beskjeder"
+            ),
+            subtitle: ATHLTHLocalization.choose(
+                english: "Mix distance, elapsed time, pace and heart rate at different intervals.",
+                norwegian: "Bland distanse, tid, tempo og puls med hver sin intervall."
+            ),
+            icon: "waveform.badge.plus"
+        ) {
+            VStack(alignment: .leading, spacing: 15) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "YOUR SEQUENCES", norwegian: "DINE SEKVENSER"
+                    ))
+                    .font(.caption2.weight(.bold))
+                    .tracking(1.3)
+                    .foregroundStyle(ATHLTHTheme.premiumGold)
+                    Spacer()
+                    Text("\(settings.audioCoachCustomRules.count) / 20")
+                        .font(.caption.weight(.medium))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+
+                if settings.audioCoachCustomRules.isEmpty {
+                    VStack(alignment: .leading, spacing: 7) {
+                        Image(systemName: "waveform")
+                            .font(.title2)
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Make the coach yours",
+                            norwegian: "Tilpass coachen til deg"
+                        ))
+                        .font(.headline)
+                        Text(ATHLTHLocalization.choose(
+                            english: "For example: announce distance every minute and elapsed time every 800 metres.",
+                            norwegian: "For eksempel: si distansen hvert minutt og medgått tid hver 800. meter."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(15)
+                    .background(ATHLTHTheme.premiumGoldSoft.opacity(0.35),
+                                in: RoundedRectangle(cornerRadius: 17))
+                } else {
+                    ForEach(settings.audioCoachCustomRules) { rule in
+                        HStack(spacing: 11) {
+                            Image(systemName: rule.trigger == .time
+                                  ? "clock" : "point.topleft.down.curvedto.point.bottomright.up")
+                                .foregroundStyle(ATHLTHTheme.premiumGold)
+                                .frame(width: 33, height: 33)
+                                .background(ATHLTHTheme.premiumGoldSoft,
+                                            in: RoundedRectangle(cornerRadius: 10))
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(rule.metric.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHTheme.primaryText)
+                                Text(rule.trigger == .time
+                                    ? ATHLTHLocalization.choose(
+                                        english: "Every \(rule.validatedInterval / 60) min \(rule.validatedInterval % 60) sec",
+                                        norwegian: "Hvert \(rule.validatedInterval / 60). minutt \(rule.validatedInterval % 60) sek"
+                                      )
+                                    : ATHLTHLocalization.choose(
+                                        english: "Every \(rule.validatedInterval) m",
+                                        norwegian: "Hver \(rule.validatedInterval). meter"
+                                      ))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHTheme.mutedText)
+                            }
+                            Spacer(minLength: 4)
+                            Button(role: .destructive) {
+                                settings.audioCoachCustomRules.removeAll {
+                                    $0.id == rule.id
+                                }
+                            } label: {
+                                Image(systemName: "minus.circle")
+                                    .frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Remove announcement", norwegian: "Fjern beskjed"
+                            ))
+                        }
+                        .padding(10)
+                        .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                    }
+                }
+
+                Divider().opacity(0.5)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "ADD AN ANNOUNCEMENT", norwegian: "LEGG TIL BESKJED"
+                ))
+                .font(.caption2.weight(.bold))
+                .tracking(1.0)
+                .foregroundStyle(ATHLTHTheme.premiumGold)
+
+                HStack(spacing: 8) {
+                    Picker(ATHLTHLocalization.choose(
+                        english: "Message", norwegian: "Beskjed"
+                    ), selection: $ruleMetric) {
+                        ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
+                            Text(metric.title).tag(metric)
+                        }
+                    }
+                    .tint(ATHLTHTheme.accentDeep)
+                    Picker(ATHLTHLocalization.choose(
+                        english: "Every", norwegian: "Hver"
+                    ), selection: $ruleTrigger) {
+                        ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { value in
+                            Text(value.title).tag(value)
+                        }
+                    }
+                    .tint(ATHLTHTheme.accentDeep)
+                }
+                .padding(.vertical, 5)
+
+                if ruleTrigger == .time {
+                    Stepper(value: $ruleSeconds, in: 15...7_200, step: 15) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Every \(ruleSeconds / 60) min \(ruleSeconds % 60) sec",
+                            norwegian: "Hvert \(ruleSeconds / 60). minutt \(ruleSeconds % 60) sek"
+                        ))
+                        .font(.subheadline)
+                    }
+                } else {
+                    Stepper(value: $ruleMeters, in: 100...42_000, step: 100) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Every \(ruleMeters) metres",
+                            norwegian: "Hver \(ruleMeters). meter"
+                        ))
+                        .font(.subheadline)
+                    }
+                }
+
+                Button {
+                    let interval = ruleTrigger == .time ? ruleSeconds : ruleMeters
+                    settings.audioCoachCustomRules.append(
+                        ATHLTHAudioCoachRule(
+                            trigger: ruleTrigger, metric: ruleMetric,
+                            interval: interval
+                        )
+                    )
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Add to my coach", norwegian: "Legg til i coachen"
+                    ), systemImage: "plus")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 46)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ATHLTHTheme.accentDeep)
+                .disabled(settings.audioCoachCustomRules.count >= 20)
+                .accessibilityIdentifier("athlth-audio-coach-add-sequence")
+            }
+        }
     }
 
     private var profilesCard: some View {
