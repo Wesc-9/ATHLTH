@@ -619,6 +619,8 @@ private struct QuickStartSpotifyCard: View {
     @EnvironmentObject private var spotify:
         SpotifyPlaybackStore
 
+    var captureDevice: WorkoutCaptureDevice = .iPhone
+
     @Binding var playlist:
         SpotifyPlaylistReference?
     @Binding var autoplay: Bool
@@ -683,7 +685,17 @@ private struct QuickStartSpotifyCard: View {
                         ),
                         isOn: $autoplay
                     )
-                    .disabled(playlist == nil)
+                    .disabled(playlist == nil || captureDevice == .appleWatch)
+
+                    if captureDevice == .appleWatch, playlist != nil {
+                        Label(ATHLTHLocalization.choose(
+                            english: "For a Watch workout, start Spotify on Apple Watch and choose your headphones there. ATHLTH will not resume an iPhone Spotify Connect speaker.",
+                            norwegian: "Ved økt på Apple Watch starter du Spotify på klokken og velger hodetelefonene der. ATHLTH vil ikke starte en tidligere Spotify Connect-høyttaler fra iPhone."
+                        ), systemImage: "applewatch")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
                 } else if spotify.isConfigured {
                     Button {
                         spotify.connect()
@@ -1455,6 +1467,7 @@ struct RunQuickStartSheet: View {
                             }
 
                             QuickStartSpotifyCard(
+                                captureDevice: captureDevice,
                                 playlist:
                                     $selectedSpotifyPlaylist,
                                 autoplay:
