@@ -2273,7 +2273,8 @@ final class IPhoneWorkoutStore:
         guard var workout = active,
               workout.resumedAt != nil,
               workout.structuredWorkoutComplete != true,
-              currentStructuredStep != nil else { return }
+              currentStructuredStep != nil,
+              (workout.awaitingMainStart == true || nextStructuredStep != nil) else { return }
         if workout.awaitingMainStart == true {
             // Waiting time/distance is not credited to the first interval.
             workout.structuredStepStartElapsedTime = workout.elapsed(at: Date())
