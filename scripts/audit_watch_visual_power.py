@@ -125,16 +125,19 @@ def main() -> int:
         failures,
     )
 
-    # White @ 0.47 on black is the least-contrasted plain AOD text.
-    # Verify it remains >= WCAG AA (4.5:1); not a claim about brightness,
-    # screen reflections or font legibility on a real watch.
+    # Test the real least-prominent AOD label's contrast, rather than
+    # pinning a previous strong-contrast opacity constant. A legibility
+    # improvement must never make this audit fail for the wrong reason.
+    # This is not a claim about device brightness or battery life.
     match = re.search(
-        r"Color\.white\.opacity\(strongContrast \? 0\.80 : ([\d.]+)\)",
+        r"private var quiet: Color\s*\{\s*"
+        r"Color\.white\.opacity\(strongContrast \? ([\d.]+) : ([\d.]+)\)",
         aod,
     )
-    minimum_alpha = float(match.group(1)) if match else -1
+    strong_alpha = float(match.group(1)) if match else -1
+    minimum_alpha = float(match.group(2)) if match else -1
     check(
-        minimum_alpha > 0
+        0 < minimum_alpha <= strong_alpha <= 1
         and white_text_on_black_contrast(minimum_alpha) >= 4.5,
         "Lowest static white-on-black AOD label passes 4.5:1 contrast",
         failures,
