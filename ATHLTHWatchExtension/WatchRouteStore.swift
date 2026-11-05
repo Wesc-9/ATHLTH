@@ -47,6 +47,10 @@ final class WatchRouteStore: NSObject, ObservableObject {
     @Published private(set) var preparedWorkout: WatchPreparedWorkoutTransfer?
     @Published private(set) var petCatalog: [WatchPetIdentity] = []
     @Published private(set) var selectedPetIDs: Set<UUID> = []
+    private(set) var companionAccountID: UUID?
+    private var latestCompanionAccountUpdatedAt = Date.distantPast
+    private let accountIdentityDefaultsKey =
+        "athlth.watch.accountIdentity.v1"
     private var petOwnerID: UUID?
     private var petSegments: [WatchPetParticipationSegment] = []
     private let petCatalogDefaultsKey = "athlth.watch.pet-catalog.v1"
@@ -72,7 +76,33 @@ final class WatchRouteStore: NSObject, ObservableObject {
         loadTodayWorkouts()
         loadPreparedWorkout()
         restorePetCatalog()
+        restoreCompanionAccountIdentity()
         activateConnectivity()
+    }
+
+    private func restoreCompanionAccountIdentity() {
+        guard let data = UserDefaults.standard.data(
+            forKey: accountIdentityDefaultsKey
+        ),
+        let transfer = try? JSONDecoder().decode(
+            WatchAccountIdentityTransfer.self, from: data
+        ) else { return }
+        companionAccountID = transfer.ownerID
+        latestCompanionAccountUpdatedAt = transfer.updatedAt
+    }
+
+    private func applyCompanionAccountIdentity(
+        _ transfer: WatchAccountIdentityTransfer
+    ) {
+        guard transfer.updatedAt >= latestCompanionAccountUpdatedAt else {
+            return
+        }
+        // Do not alter the account captured by an already-running workout.
+        companionAccountID = transfer.ownerID
+        latestCompanionAccountUpdatedAt = transfer.updatedAt
+        if let data = try? JSONEncoder().encode(transfer) {
+            UserDefaults.standard.set(data, forKey: accountIdentityDefaultsKey)
+        }
     }
 
     private func restorePetCatalog() {
@@ -565,6 +595,12 @@ final class WatchRouteStore: NSObject, ObservableObject {
         }
 
         switch kind {
+        case .accountIdentity:
+            guard let transfer = try? JSONDecoder().decode(
+                WatchAccountIdentityTransfer.self, from: data
+            ) else { return }
+            applyCompanionAccountIdentity(transfer)
+
         case .aiCoachConversationState:
             guard let active = try? JSONDecoder().decode(Bool.self, from: data)
             else { return }
@@ -1076,6 +1112,7 @@ final class WatchRouteStore: NSObject, ObservableObject {
            transferKind == .todayWorkout ||
            transferKind == .strengthSnapshot ||
            transferKind == .petCatalog ||
+           transferKind == .accountIdentity ||
            transferKind == .workoutActivityState ||
            transferKind == .spotifyPlaybackState ||
            transferKind == .homeAssistantConfiguration {
