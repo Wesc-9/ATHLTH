@@ -12,6 +12,9 @@ struct ATHLTHPremiumMuscleFigure: View {
     let activationTint: Color
     /// Optional per-region comparison shades; nil preserves all existing maps.
     var regionTints: [StrengthMuscleRegion: Color] = [:]
+    /// A subtle warm ivory finish for the Home recent-activity card only.
+    /// The vector paths and workout-backed muscle colors do not change.
+    var warmIvoryBase = false
 
     var body: some View {
         Canvas(opaque: false, rendersAsynchronously: false) { context, size in
@@ -21,7 +24,8 @@ struct ATHLTHPremiumMuscleFigure: View {
                 profile: profile,
                 isFront: isFront,
                 tint: activationTint,
-                regionTints: regionTints
+                regionTints: regionTints,
+                warmIvoryBase: warmIvoryBase
             )
         }
         .aspectRatio(0.57, contentMode: .fit)
@@ -53,7 +57,8 @@ enum ATHLTHPremiumMuscleAtlas {
         profile: StrengthMuscleProfile,
         isFront: Bool,
         tint: Color,
-        regionTints: [StrengthMuscleRegion: Color] = [:]
+        regionTints: [StrengthMuscleRegion: Color] = [:],
+        warmIvoryBase: Bool = false
     ) {
         guard size.width > 0, size.height > 0 else { return }
         let scale = min(size.width / baseWidth, size.height / baseHeight)
@@ -63,6 +68,21 @@ enum ATHLTHPremiumMuscleAtlas {
             ty: (size.height - baseHeight * scale) / 2
         )
 
+        // Keep the existing atlas shapes and activation highlights. The Home
+        // activity strip gets warmer ivory inactive plates for added depth.
+        let figureSkin = warmIvoryBase
+            ? Color(red: 0.935, green: 0.910, blue: 0.868)
+            : skin
+        let figureWarm = warmIvoryBase
+            ? Color(red: 0.994, green: 0.979, blue: 0.955)
+            : warm
+        let figureNeutral = warmIvoryBase
+            ? Color(red: 0.866, green: 0.834, blue: 0.790)
+            : neutral
+        let inactiveHighlight = warmIvoryBase
+            ? Color(red: 0.979, green: 0.956, blue: 0.924)
+            : Color.white
+
         // Limbs behind torso, softly shaded. The atlas itself has no backdrop;
         // this lets Home/Details supply their own light premium background.
         for silhouette in body {
@@ -70,7 +90,7 @@ enum ATHLTHPremiumMuscleAtlas {
             context.fill(
                 shape,
                 with: .linearGradient(
-                    Gradient(colors: [skin, warm, skin]),
+                    Gradient(colors: [figureSkin, figureWarm, figureSkin]),
                     startPoint: CGPoint(x: 0, y: size.height * 0.20),
                     endPoint: CGPoint(x: size.width, y: size.height * 0.73)
                 )
@@ -122,9 +142,9 @@ enum ATHLTHPremiumMuscleAtlas {
                     path,
                     with: .linearGradient(
                         Gradient(colors: [
-                            Color.white.opacity(0.89),
-                            neutral.opacity(0.74),
-                            Color.white.opacity(0.80)
+                            inactiveHighlight.opacity(warmIvoryBase ? 0.95 : 0.89),
+                            figureNeutral.opacity(warmIvoryBase ? 0.92 : 0.74),
+                            inactiveHighlight.opacity(warmIvoryBase ? 0.91 : 0.80)
                         ]),
                         startPoint: CGPoint(x: size.width * 0.23, y: size.height * 0.13),
                         endPoint: CGPoint(x: size.width * 0.75, y: size.height * 0.85)
