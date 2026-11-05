@@ -869,6 +869,8 @@ struct ATHLTHHomeView: View {
     @State private var selectedHomeRecommendationInfo: HomeDailyRecommendationInfo?
     @State private var homeRecommendedPlanID: UUID?
     @State private var selectedHomeAllStandaloneWorkout: PlannedSession?
+    @State private var homeWorkoutPendingRemoval: PlannedSession?
+    @State private var showingHomeWorkoutRemovalConfirmation = false
     @State private var selectedHomeStrengthSession: PlannedSession?
     @State private var selectedHomeStructuredWorkout: PlannedSession?
     @State private var pendingHomeQuickStartKind: WorkoutKind?
@@ -1378,6 +1380,36 @@ struct ATHLTHHomeView: View {
                     .presentationDragIndicator(.visible)
                     .presentationCornerRadius(28)
             }
+            .confirmationDialog(
+                        ATHLTHLocalization.choose(
+                            english: "Remove this planned workout?",
+                            norwegian: "Fjerne denne planlagte økten?"
+                        ),
+                        isPresented: $showingHomeWorkoutRemovalConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Remove workout", norwegian: "Fjern økt"
+                            ),
+                            role: .destructive
+                        ) {
+                            if let workout = homeWorkoutPendingRemoval {
+                                removeHomeCalendarWorkout(workout)
+                            }
+                            homeWorkoutPendingRemoval = nil
+                        }
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Cancel", norwegian: "Avbryt"
+                            ),
+                            role: .cancel
+                        ) {
+                            homeWorkoutPendingRemoval = nil
+                        }
+                    } message: {
+                        Text(homeWorkoutPendingRemoval?.title ?? "")
+                    }
             .athlthStablePresentationBoundary()
             .onAppear {
                 syncHomeTodayWorkoutToWatch()
@@ -2243,30 +2275,31 @@ struct ATHLTHHomeView: View {
                 !tournamentItems.isEmpty {
                 VStack(spacing: 7) {
                     ForEach(Array(todayWorkouts.prefix(visibleWorkoutCount))) { workout in
-                        Button {
-                            if let planID =
-                                HomeWeeklyProgressCalendar.containingPlanID(
-                                    for: workout, in: plan
-                                ) {
-                                onOpenTrain(
-                                    .workout(
-                                        planID: planID,
-                                        workoutID: workout.id
-                                    )
+                        HStack(spacing: 5) {
+                            Button {
+                                if let planID =
+                                    HomeWeeklyProgressCalendar.containingPlanID(
+                                        for: workout, in: plan
+                                    ) {
+                                    onOpenTrain(.workout(
+                                        planID: planID, workoutID: workout.id
+                                    ))
+                                } else {
+                                    selectedHomeStandaloneWorkout = workout
+                                }
+                            } label: {
+                                homeCompactCalendarRow(
+                                    time: workout.scheduledStart,
+                                    title: workout.title,
+                                    icon: workout.kind.systemImage,
+                                    isTrainTogether: workout.trainTogetherMode != nil,
+                                    trainingPartner: homeTrainTogetherPartner(for: workout)
                                 )
-                            } else {
-                                selectedHomeStandaloneWorkout = workout
                             }
-                        } label: {
-                            homeCompactCalendarRow(
-                                time: workout.scheduledStart,
-                                title: workout.title,
-                                icon: workout.kind.systemImage,
-                                isTrainTogether: workout.trainTogetherMode != nil,
-                                trainingPartner: homeTrainTogetherPartner(for: workout)
-                            )
+                            .buttonStyle(.plain)
+
+                            homeCalendarWorkoutActions(workout)
                         }
-                        .buttonStyle(.plain)
                     }
 
                     ForEach(Array(
@@ -2605,29 +2638,32 @@ struct ATHLTHHomeView: View {
                     }
 
                     ForEach(workouts) { workout in
-                        Button {
-                            if let planID =
-                                HomeWeeklyProgressCalendar.containingPlanID(
-                                    for: workout, in: activePlan
-                                ) {
-                                showingHomeTodayCalendarAll = false
-                                onOpenTrain(.workout(
-                                    planID: planID,
-                                    workoutID: workout.id
-                                ))
-                            } else {
-                                selectedHomeAllStandaloneWorkout = workout
+                        HStack(spacing: 8) {
+                            Button {
+                                if let planID =
+                                    HomeWeeklyProgressCalendar.containingPlanID(
+                                        for: workout, in: activePlan
+                                    ) {
+                                    showingHomeTodayCalendarAll = false
+                                    onOpenTrain(.workout(
+                                        planID: planID, workoutID: workout.id
+                                    ))
+                                } else {
+                                    selectedHomeAllStandaloneWorkout = workout
+                                }
+                            } label: {
+                                homeCalendarPlanRow(workout)
+                                    .padding(13)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(
+                                        ATHLTHPlanDesign.surface,
+                                        in: RoundedRectangle(cornerRadius: 16)
+                                    )
                             }
-                        } label: {
-                            homeCalendarPlanRow(workout)
-                                .padding(13)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    ATHLTHPlanDesign.surface,
-                                    in: RoundedRectangle(cornerRadius: 16)
-                                )
+                            .buttonStyle(.plain)
+
+                            homeCalendarWorkoutActions(workout)
                         }
-                        .buttonStyle(.plain)
                     }
 
                     ForEach(tournamentItems) { item in
@@ -2729,6 +2765,36 @@ struct ATHLTHHomeView: View {
                 }
             }
         }
+        .confirmationDialog(
+                    ATHLTHLocalization.choose(
+                        english: "Remove this planned workout?",
+                        norwegian: "Fjerne denne planlagte økten?"
+                    ),
+                    isPresented: $showingHomeWorkoutRemovalConfirmation,
+                    titleVisibility: .visible
+                ) {
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Remove workout", norwegian: "Fjern økt"
+                        ),
+                        role: .destructive
+                    ) {
+                        if let workout = homeWorkoutPendingRemoval {
+                            removeHomeCalendarWorkout(workout)
+                        }
+                        homeWorkoutPendingRemoval = nil
+                    }
+                    Button(
+                        ATHLTHLocalization.choose(
+                            english: "Cancel", norwegian: "Avbryt"
+                        ),
+                        role: .cancel
+                    ) {
+                        homeWorkoutPendingRemoval = nil
+                    }
+                } message: {
+                    Text(homeWorkoutPendingRemoval?.title ?? "")
+                }
         .sheet(item: $selectedHomeAllStandaloneWorkout) { workout in
             NavigationStack {
                 HomeWeeklyStandaloneWorkoutDetailView(
@@ -2744,6 +2810,147 @@ struct ATHLTHHomeView: View {
             .presentationDragIndicator(.visible)
             .presentationCornerRadius(28)
         }
+    }
+
+    /// The calendar's trailing menu is usable without opening a separate
+    /// workout editor. Only sessions not already completed can be launched
+    /// or removed. Watch manual start is not an automatic HealthKit start.
+    private func homeCalendarWorkoutActions(
+        _ workout: PlannedSession
+    ) -> some View {
+        let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: session.activePlan
+        )
+        let isCompleted = planID.map {
+            homeIsPlanSessionCompleted(planID: $0, workout: workout)
+        } ?? false
+        let isSkipped = planID.map {
+            session.isPlanSessionSkipped(planID: $0, sessionID: workout.id)
+        } ?? false
+        let canStart = !workout.isExplicitRestDay && !isCompleted && !isSkipped
+
+        return Menu {
+            if canStart {
+                Button {
+                    showingHomeTodayCalendarAll = false
+                    startHomeStandaloneWorkout(workout, device: .iPhone)
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Start on iPhone", norwegian: "Start på iPhone"
+                        ),
+                        systemImage: "iphone"
+                    )
+                }
+                Button {
+                    showingHomeTodayCalendarAll = false
+                    startHomeStandaloneWorkout(workout, device: .appleWatch)
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Start on Apple Watch",
+                            norwegian: "Start på Apple Watch"
+                        ),
+                        systemImage: "applewatch"
+                    )
+                }
+                .disabled(!watchConnection.isReady)
+
+                if workout.kind == .running || workout.kind == .walking {
+                    Button {
+                        showingHomeTodayCalendarAll = false
+                        startHomeStandaloneWorkout(
+                            workout,
+                            device: .appleWatch,
+                            watchStartMode: .onWatch
+                        )
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Send to Watch · start there",
+                                norwegian: "Send til klokken · start der"
+                            ),
+                            systemImage: "arrow.up.right"
+                        )
+                    }
+                    .disabled(!watchConnection.isReady)
+
+                    Button {
+                        showingHomeTodayCalendarAll = false
+                        startHomeStandaloneWorkout(
+                            workout,
+                            device: .appleWatch,
+                            watchStartMode: .afterThirtySeconds
+                        )
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Watch · start in 30 sec",
+                                norwegian: "Klokken · start om 30 sek"
+                            ),
+                            systemImage: "timer"
+                        )
+                    }
+                    .disabled(!watchConnection.isReady)
+                }
+            }
+
+            if !isCompleted {
+                Divider()
+                Button(role: .destructive) {
+                    homeWorkoutPendingRemoval = workout
+                    showingHomeWorkoutRemovalConfirmation = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Remove from calendar",
+                            norwegian: "Fjern fra kalender"
+                        ),
+                        systemImage: "trash"
+                    )
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+                .frame(width: 33, height: 46)
+                .contentShape(Rectangle())
+                .accessibilityLabel(
+                    ATHLTHLocalization.choose(
+                        english: "Workout actions",
+                        norwegian: "Øktalternativer"
+                    )
+                )
+        }
+        .menuStyle(.borderlessButton)
+    }
+
+    private func removeHomeCalendarWorkout(_ workout: PlannedSession) {
+        if let planID = HomeWeeklyProgressCalendar.containingPlanID(
+            for: workout, in: session.activePlan
+        ), let plan = session.trainingPlan(withID: planID) {
+            guard let day = plan.weeks.flatMap(\.days).first(where: {
+                $0.sessions.contains(where: { $0.id == workout.id })
+            }) else { return }
+            let removed = session.removePlanStudioWorkout(
+                planID: planID,
+                workoutID: workout.id,
+                dayID: day.id,
+                expectedVersion: plan.version,
+                healthWorkouts: health.workouts,
+                strengthHistory: strengthWorkout.workoutHistory
+            )
+            if !removed {
+                homeWatchTransferError = ATHLTHLocalization.choose(
+                    english: "This workout has changed or is already completed.",
+                    norwegian: "Økten er endret eller allerede fullført."
+                )
+            }
+        } else {
+            session.removeStandalonePlannedSession(workout.id)
+        }
+        syncHomeTodayWorkoutToWatch()
     }
 
     private func homeCalendarPlanRow(
