@@ -728,12 +728,15 @@ struct ATHLTHWorkoutLiveActivity: Widget {
 
             HStack(spacing: 12) {
                 Label {
-                    if paused {
+                    if paused || state.phase != "running" {
                         Text(duration(state.elapsedTime))
-                    } else if let startedAt = context.attributes.startedAt {
-                        Text(startedAt, style: .timer)
                     } else {
-                        Text(duration(state.elapsedTime))
+                        // Workout start includes pauses; anchor to active elapsed
+                        // from the latest HealthKit snapshot instead.
+                        Text(
+                            state.updatedAt.addingTimeInterval(-max(state.elapsedTime, 0)),
+                            style: .timer
+                        )
                     }
                 } icon: {
                     Image(systemName: "clock")
@@ -893,12 +896,15 @@ struct ATHLTHWorkoutLiveActivity: Widget {
 
             HStack(spacing: 10) {
                 Label {
-                    if isPaused {
+                    if isPaused || context.state.phase != "running" {
                         Text(duration(context.state.elapsedTime))
-                    } else if let started = context.attributes.startedAt {
-                        Text(started, style: .timer)
                     } else {
-                        Text(duration(context.state.elapsedTime))
+                        Text(
+                            context.state.updatedAt.addingTimeInterval(
+                                -max(context.state.elapsedTime, 0)
+                            ),
+                            style: .timer
+                        )
                     }
                 } icon: {
                     Image(systemName: "clock")
@@ -1267,11 +1273,24 @@ struct ATHLTHWorkoutLiveActivity: Widget {
         // anchored system timer renders its digits independently of network
         // and Watch snapshot delivery, without requiring a new HK update.
         TimelineView(.periodic(from: .now, by: 1)) { tick in
-            if ATHLTHLiveActivityDisplayPolicy.isRecent(
-                updatedAt: context.state.updatedAt,
-                now: tick.date
-            ), context.state.elapsedTime.isFinite,
-               context.state.elapsedTime >= 0 {
+            if context.state.phase == "paused" ||
+               context.state.phase == "ending" ||
+               context.state.phase == "completed" {
+                // Never leave a system timer running after pause or finish.
+                compactIslandText(
+                    ATHLTHLiveActivityDisplayPolicy.compactDuration(
+                        context.state.elapsedTime
+                    ),
+                    condensed: ATHLTHLiveActivityDisplayPolicy.compactDuration(
+                        context.state.elapsedTime
+                    )
+                )
+            } else if context.state.phase == "running",
+                      ATHLTHLiveActivityDisplayPolicy.isRecent(
+                          updatedAt: context.state.updatedAt,
+                          now: tick.date
+                      ), context.state.elapsedTime.isFinite,
+                      context.state.elapsedTime >= 0 {
                 // Anchored to the latest captured workout elapsed time, not
                 // wall-clock workout start (which can include paused time).
                 let anchor = context.state.updatedAt.addingTimeInterval(
