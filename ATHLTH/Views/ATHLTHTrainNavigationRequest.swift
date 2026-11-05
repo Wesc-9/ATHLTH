@@ -4,10 +4,6 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
     case today
     case plan
     case workout(planID: UUID, workoutID: UUID)
-    // iPad Studio shortcuts reuse Train's existing validated launch actions.
-    case startPlannedWorkout(planID: UUID, workoutID: UUID)
-    case sendPlannedWorkoutToWatch(planID: UUID, workoutID: UUID)
-    case delayPlannedWorkout(planID: UUID, workoutID: UUID, seconds: TimeInterval)
     case startPlannedWorkout(planID: UUID, workoutID: UUID)
     case sendPlannedWorkoutToWatch(planID: UUID, workoutID: UUID)
     case startPlannedWorkoutAfter(planID: UUID, workoutID: UUID, seconds: TimeInterval)
@@ -25,12 +21,6 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
             return "plan"
         case let .workout(planID, workoutID):
             return "workout:\(planID.uuidString):\(workoutID.uuidString)"
-        case let .startPlannedWorkout(planID, workoutID):
-            return "start:\(planID.uuidString):\(workoutID.uuidString)"
-        case let .sendPlannedWorkoutToWatch(planID, workoutID):
-            return "send-watch:\(planID.uuidString):\(workoutID.uuidString)"
-        case let .delayPlannedWorkout(planID, workoutID, seconds):
-            return "delay:\(planID.uuidString):\(workoutID.uuidString):\(seconds)"
         case let .startPlannedWorkout(planID, workoutID):
             return "start:\(planID.uuidString):\(workoutID.uuidString)"
         case let .sendPlannedWorkoutToWatch(planID, workoutID):
