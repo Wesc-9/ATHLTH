@@ -464,6 +464,7 @@ struct RunQuickStartConfiguration {
     var petIDs: Set<UUID> = []
     var watchStartMode: WatchWorkoutStartMode = .immediate
     var routeWarmup: ATHLTHRouteWarmupConfiguration = .disabled
+    var ghostPacingStrategy: GhostTargetPacingStrategy = .even
     var customWorkoutTitle: String? = nil
     /// Shared Plan timeline from the Advanced Quick Train composer.
     var advancedWorkout: PlannedSession? = nil
@@ -2549,6 +2550,7 @@ struct RunQuickStartSheet: View {
         configuration.petIDs = selectedPetIDs
         configuration.advancedWorkout = mode == .structured ? advancedWorkout : nil
         configuration.routeWarmup = mode == .route ? routeWarmup : .disabled
+        configuration.ghostPacingStrategy = ghostDraft.pacingStrategy
         launchInProgress = true
         Task { @MainActor in
             let failure = await onStart(configuration)
