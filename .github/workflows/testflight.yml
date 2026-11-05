@@ -229,9 +229,28 @@ jobs:
       # Fail early on missing signing rights, identifiers or certificates,
       # instead of compiling for 40 minutes before discovering the problem.
       # Every embedded app/extension needs its own distribution profile.
+      # The encrypted P12 is recovered from an earlier release run. A fresh
+      # Apple Distribution certificate is NOT created when this succeeds.
+      - name: Restore reusable encrypted signing identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: bash scripts/restore_reusable_app_store_signing.sh
+
       - name: Prepare explicit App Store signing for all four bundles
         shell: bash
         run: bash scripts/prepare_ephemeral_app_store_signing.sh
+
+      # Only authenticated AES-GCM ciphertext is uploaded. The Apple private
+      # key and its P12 password are NEVER uploaded in plaintext. Re-uploading
+      # on every run refreshes the artifact retention (max 90 days).
+      - name: Preserve reusable encrypted signing identity
+        uses: actions/upload-artifact@v4
+        with:
+          name: athlth-ci-signing-v1
+          path: ${{ runner.temp }}/athlth-ci-signing-output/signing-envelope.json
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Archive without creating development certificates
         shell: bash
