@@ -217,6 +217,9 @@ private struct ATHLTHSceneRootView: View {
         }
         .onAppear {
             installBackgroundRefreshHandlersIfNeeded()
+            watchConnection.setCurrentAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
             studioPlanSync.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
@@ -252,6 +255,13 @@ private struct ATHLTHSceneRootView: View {
             }
         }
         .onChange(of: appSession.signedIn) { _, signedIn in
+            if !signedIn {
+                // The signed-in AppRootView may disappear before its account
+                // observer runs. Never let a late Watch completion use the
+                // previous account's receiver-side effects after sign-out.
+                watchConnection.setCurrentAccount(nil)
+                watchConnection.sendAccountIdentity(nil)
+            }
             studioPlanSync.switchAccount(
                 signedIn ? appSession.profile.userID : nil
             )
