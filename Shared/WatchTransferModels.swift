@@ -1507,6 +1507,19 @@ struct WatchWorkoutResult: Identifiable, Codable, Hashable {
     var accountOwnerID: UUID? = nil
 }
 
+/// Fail closed when WatchConnectivity delivers a completed workout to
+/// a different signed-in ATHLTH account. Legacy (unowned) results stay in
+/// the pending queue for explicit review rather than being silently assigned.
+enum ATHLTHWatchWorkoutOwnershipPolicy {
+    static func canApply(
+        resultOwnerID: UUID?,
+        signedInUserID: UUID?
+    ) -> Bool {
+        guard let resultOwnerID, let signedInUserID else { return false }
+        return resultOwnerID == signedInUserID
+    }
+}
+
 enum WatchWorkoutMirrorState: String, Codable, Hashable {
     case preparing
     case running
