@@ -2057,9 +2057,12 @@ struct GhostRaceHubView: View {
                 ghostRace: ghostRace,
                 watchConnection: watchConnection,
                 phoneWorkout: phoneWorkout,
-                captureDevice:
-                    captureDevice,
-                settings: settings
+                captureDevice: captureDevice,
+                settings: settings,
+                maximumHeartRateBPM: ATHLTHHeartRateZones.resolvedMaximumBPM(
+                    configured: session.onboardingProfile?.maximumHeartRateBPM,
+                    dateOfBirth: session.onboardingProfile?.dateOfBirth
+                )
             )
         } catch {
             errorMessage = error.localizedDescription
@@ -2106,10 +2109,12 @@ struct GhostRaceHubView: View {
                         watchConnection,
                     phoneWorkout:
                         phoneWorkout,
-                    captureDevice:
-                        captureDevice,
-                    settings:
-                        settings
+                    captureDevice: captureDevice,
+                    settings: settings,
+                    maximumHeartRateBPM: ATHLTHHeartRateZones.resolvedMaximumBPM(
+                        configured: session.onboardingProfile?.maximumHeartRateBPM,
+                        dateOfBirth: session.onboardingProfile?.dateOfBirth
+                    )
                 )
         } catch {
             realtime.selectLiveGhost(
