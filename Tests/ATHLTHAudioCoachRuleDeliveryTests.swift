@@ -86,6 +86,93 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertTrue(stale.isEmpty)
     }
 
+    func testCompetitionCoachProfileCanBeLoadedBeforeRunWithoutLosingRuleCadences() throws {
+        let distanceEveryMinute = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .distance, interval: 60
+        )
+        let timeEvery800Metres = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .elapsedTime, interval: 800
+        )
+
+        var config = WatchAudioCoachConfiguration.disabled
+        config.enabled = true
+        config.language = .norwegian
+        config.customRules = [distanceEveryMinute, timeEvery800Metres]
+        config.smartPrompts = ATHLTHAudioCoachSmartSettings(
+            motivationEnabled: true,
+            motivationIntervalSeconds: 60,
+            randomEncouragementEnabled: true,
+            randomIntervalSeconds: 180
+        )
+        config.announceDistance = true
+        config.announceElapsedTime = true
+        config.speechStyle = .motivating
+
+        let profile = ATHLTHAudioCoachProfile(
+            name: "Konkurranse", configuration: config
+        )
+        let restored = try JSONDecoder().decode(
+            ATHLTHAudioCoachProfile.self,
+            from: JSONEncoder().encode(profile)
+        )
+
+        var preStart = AudioCoachDraft()
+        preStart.load(profile: restored)
+        let transfer = preStart.configuration()
+        XCTAssertTrue(transfer.enabled)
+        XCTAssertEqual(transfer.customRules?.map(\.validatedInterval),
+                       [60, 800])
+        XCTAssertNil(transfer.distanceIntervalMeters)
+        XCTAssertNil(transfer.timeIntervalSeconds)
+        XCTAssertEqual(transfer.speechStyle, .motivating)
+        XCTAssertEqual(transfer.smartPrompts?.motivationIntervalSeconds, 60)
+        XCTAssertEqual(transfer.smartPrompts?.randomIntervalSeconds, 180)
+    }
+
+    func testDistanceEachMinuteAndTimeEach800MetresBothFireOnce() {
+        let distanceUpdate = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .distance, interval: 60
+        )
+        let elapsedUpdate = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .elapsedTime, interval: 800
+        )
+        var slots: [UUID: Int] = [:]
+        let atMinute = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [distanceUpdate, elapsedUpdate],
+            distanceMeters: 400,
+            elapsedSeconds: 60,
+            paceSecondsPerKilometer: 300,
+            heartRateBPM: nil,
+            norwegian: true,
+            lastSlots: &slots
+        )
+        XCTAssertEqual(atMinute.count, 1)
+        XCTAssertTrue(atMinute[0].contains("Distanse"))
+
+        let at800m = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [distanceUpdate, elapsedUpdate],
+            distanceMeters: 800,
+            elapsedSeconds: 100,
+            paceSecondsPerKilometer: 300,
+            heartRateBPM: nil,
+            norwegian: true,
+            lastSlots: &slots
+        )
+        XCTAssertEqual(at800m.count, 1)
+        XCTAssertTrue(at800m[0].contains("Tid"))
+
+        let repeats = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [distanceUpdate, elapsedUpdate],
+            distanceMeters: 810,
+            elapsedSeconds: 101,
+            paceSecondsPerKilometer: 300,
+            heartRateBPM: nil,
+            norwegian: true,
+            lastSlots: &slots
+        )
+        XCTAssertTrue(repeats.isEmpty)
+    }
+
     func testSavedRuleListPreservesIndividualIntervals() throws {
         let saved = ATHLTHAudioCoachRuleSet(
             title: "Løp og tempo",
