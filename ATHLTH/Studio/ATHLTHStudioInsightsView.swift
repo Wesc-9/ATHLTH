@@ -8,6 +8,7 @@ struct ATHLTHStudioInsightsView: View {
     @SceneStorage("athlth.studio.insights.periodDays") private var periodDays = 28
     @State private var showingDetailedInsights = false
     @State private var showingSpecificProgress = false
+    @State private var showingReportExport = false
 
     private var result: ATHLTHStudioAnalytics.Snapshot {
         ATHLTHStudioAnalytics.snapshot(from: health.workouts, days: periodDays)
@@ -133,6 +134,16 @@ struct ATHLTHStudioInsightsView: View {
                 ATHLTHStudioTrainingLoadView()
                 ATHLTHStudioProgressExplorerView()
                 Button {
+                    showingReportExport = true
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Create a personal training PDF report",
+                        norwegian: "Lag personlig treningsrapport som PDF"
+                    ), systemImage: "doc.richtext")
+                }
+                .buttonStyle(.bordered)
+                .accessibilityIdentifier("athlth-ipad-create-report")
+                Button {
                     showingSpecificProgress = true
                 } label: {
                     Label(ATHLTHLocalization.choose(
@@ -161,6 +172,10 @@ struct ATHLTHStudioInsightsView: View {
             .frame(maxWidth: 1600)
             .frame(maxWidth: .infinity)
             }
+        }
+        .sheet(isPresented: $showingReportExport) {
+            ATHLTHStudioReportExportView()
+                .presentationDetents([.large])
         }
         .sheet(isPresented: $showingDetailedInsights) {
             ATHLTHInsightsView()
