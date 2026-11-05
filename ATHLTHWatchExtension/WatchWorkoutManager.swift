@@ -7697,8 +7697,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        let latestRoutePoint =
-            routePoints.last
         let currentRunningStep =
             structuredWorkoutComplete ? nil : currentStructuredRunningStep
         let runningStepReadout = currentRunningStep.map {
@@ -7740,10 +7738,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             averageHeartRate: averageHeartRate,
             maxHeartRate: maxHeartRate,
             routePointCount: routePoints.count,
+            // A buffered route point is not necessarily the most recent
+            // GPS fix. Coordinates, accuracy and timestamp must be from
+            // the SAME accepted sample or Ghost can claim false progress.
             currentLatitude:
-                latestRoutePoint?.latitude,
+                lastAcceptedOutdoorLocation?.coordinate.latitude,
             currentLongitude:
-                latestRoutePoint?.longitude,
+                lastAcceptedOutdoorLocation?.coordinate.longitude,
             currentHorizontalAccuracy:
                 lastAcceptedOutdoorLocation?.horizontalAccuracy,
             currentLocationSampledAt:
