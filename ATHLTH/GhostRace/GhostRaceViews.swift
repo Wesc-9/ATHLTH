@@ -3312,7 +3312,18 @@ struct ATHLTHGhostRuntimeObserver: View {
                             ? .paused
                             : .running,
                     routeProgressPercent:
-                        workout.routeProgressPercent
+                        workout.routeProgressPercent,
+                    routeWarmup:
+                        workout.structuredRunningWorkout?.deferRouteUntilMain == true &&
+                        (workout.structuredStepIndex ?? 0) == 0,
+                    awaitingMainStart:
+                        workout.awaitingMainStart == true,
+                    mainStepElapsedSeconds:
+                        workout.structuredRunningWorkout?.deferRouteUntilMain == true &&
+                        (workout.structuredStepIndex ?? 0) > 0 &&
+                        workout.awaitingMainStart != true
+                            ? max(0, elapsed - (workout.structuredStepStartElapsedTime ?? elapsed))
+                            : nil
                 )
 
             phoneWorkout
@@ -3737,7 +3748,19 @@ struct ATHLTHGhostRuntimeObserver: View {
                     ),
                 state: .completed,
                 routeProgressPercent:
-                    workout.routeProgressPercent
+                    workout.routeProgressPercent,
+                routeWarmup:
+                    workout.structuredRunningWorkout?.deferRouteUntilMain == true &&
+                    (workout.structuredStepIndex ?? 0) == 0,
+                awaitingMainStart:
+                    workout.awaitingMainStart == true,
+                mainStepElapsedSeconds:
+                    workout.structuredRunningWorkout?.deferRouteUntilMain == true &&
+                    (workout.structuredStepIndex ?? 0) > 0 &&
+                    workout.awaitingMainStart != true
+                        ? max(0, workout.accumulatedSeconds -
+                            (workout.structuredStepStartElapsedTime ?? workout.accumulatedSeconds))
+                        : nil
             )
     }
 
