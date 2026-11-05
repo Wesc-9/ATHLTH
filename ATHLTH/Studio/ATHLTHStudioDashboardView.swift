@@ -650,15 +650,20 @@ struct ATHLTHStudioDashboardView: View {
         return VStack(alignment: .leading, spacing: 15) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(ATHLTHStudioHomeWeek.weekRange(
-                        containing: selectedWeekDate
-                    ).start.formatted(.dateTime.day().month(.abbreviated)) +
-                         " – " +
-                         ATHLTHStudioHomeWeek.weekRange(
-                            containing: selectedWeekDate
-                         ).end.formatted(.dateTime.day().month(.abbreviated)))
+                    Text(tr("This week", "Denne uken"))
                         .font(.title3.weight(.semibold))
                         .foregroundStyle(ATHLTHStudioStyle.ink)
+                    Text(
+                        ATHLTHStudioHomeWeek.weekRange(
+                            containing: selectedWeekDate
+                        ).start.formatted(.dateTime.day().month(.abbreviated)) +
+                        " – " +
+                        ATHLTHStudioHomeWeek.weekRange(
+                            containing: selectedWeekDate
+                        ).end.formatted(.dateTime.day().month(.abbreviated))
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     Text(healthHasDataAccess
                          ? "\(currentWeek.plannedCount) " +
                             tr("planned", "planlagte") + " · " +
