@@ -3764,7 +3764,8 @@ final class HealthKitManager: ObservableObject {
     func runningAchievements(
         for workoutID: UUID
     ) async -> [ATHLTHRunningAchievement] {
-        guard let allWorkouts = try? await fetchAllWorkoutsCached(),
+        guard integrationEnabled,
+              let allWorkouts = try? await fetchAllWorkoutsCached(),
               let current = allWorkouts.first(where: {
                   $0.uuid == workoutID &&
                   $0.workoutActivityType == .running &&
