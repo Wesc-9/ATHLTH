@@ -4216,13 +4216,27 @@ struct ATHLTHHomeView: View {
     // Allow the detail sheet to close before showing a recorder cover.
     private func startHomeStandaloneWorkout(
         _ workout: PlannedSession,
-        device: WorkoutCaptureDevice
+        device: WorkoutCaptureDevice,
+        watchStartMode: WatchWorkoutStartMode = .immediate
     ) {
         Task { @MainActor in
             try? await Task.sleep(for: .milliseconds(450))
-            guard let persisted = session.standalonePlannedSessions.first(
+            let planID = HomeWeeklyProgressCalendar.containingPlanID(
+                for: workout, in: session.activePlan
+            )
+            let persisted = session.standalonePlannedSessions.first(
                 where: { $0.id == workout.id }
-            ), !persisted.isExplicitRestDay else {
+            ) ?? session.activePlan?.weeks.flatMap(\.days)
+                .flatMap(\.sessions).first(where: { $0.id == workout.id })
+            guard let persisted, !persisted.isExplicitRestDay,
+                  planID.map({ !session.isPlanSessionSkipped(
+                      planID: $0, sessionID: persisted.id
+                  ) && !session.isPlanSessionCompleted(
+                      planID: $0, sessionID: persisted.id,
+                      healthWorkouts: health.workouts,
+                      strengthHistory: strengthWorkout.workoutHistory
+                  ) }) ?? true
+            else {
                 await social.markCurrentJoinedWorkoutLaunchFailed()
                 homeWatchTransferError = ATHLTHLocalization.choose(
                     english: "This scheduled workout is no longer available.",
@@ -4287,9 +4301,9 @@ struct ATHLTHHomeView: View {
                 }
             case .running, .walking:
                 if device == .appleWatch {
-                    startHomePlannedWorkoutOnWatch(persisted)
+                    startHomePlannedWorkoutOnWatch(persisted, startMode: watchStartMode)
                 } else {
-                    startHomeStandalonePhoneEndurance(persisted)
+                    startHomeStandalonePhoneEndurance(persisted, planID: planID)
                 }
             case .mobility, .recovery, .custom:
                 await social.markCurrentJoinedWorkoutLaunchFailed()
@@ -4302,7 +4316,8 @@ struct ATHLTHHomeView: View {
     }
 
     private func startHomeStandalonePhoneEndurance(
-        _ workout: PlannedSession
+        _ workout: PlannedSession,
+        planID: UUID? = nil
     ) {
         let treadmill = RunEnvironment.forPlannedSession(workout) == .treadmill
         let selectedRoute = treadmill ? nil : PlannedWorkoutWatchBuilder.route(
@@ -4367,7 +4382,9 @@ struct ATHLTHHomeView: View {
             structuredWorkout: runTransfer,
             routeAlerts: routeAlerts,
             ghostUpdates: treadmill ? nil : workout.ghostUpdates,
-            autoPauseEnabled: autoPause
+            autoPauseEnabled: autoPause,
+            plannedPlanID: planID,
+            plannedSessionID: planID == nil ? nil : workout.id
         )
         // The coordinated lobby authorizes this individual recording.
         // Only acknowledge the start after the real iPhone engine begins.
