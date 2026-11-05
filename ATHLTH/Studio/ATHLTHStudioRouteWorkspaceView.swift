@@ -210,6 +210,10 @@ struct ATHLTHStudioRouteWorkspaceView: View {
                             .buttonStyle(.bordered)
                         }
                         routeMap(route)
+                            // Map(initialPosition:) is a one-time initializer.
+                            // Recreate the map when selecting another route
+                            // so it never remains zoomed to the old location.
+                            .id(route.id)
                             .frame(height: narrow ? 235 : 320)
                             .clipShape(RoundedRectangle(cornerRadius: 20))
                             .accessibilityIdentifier("athlth-ipad-route-preview")
