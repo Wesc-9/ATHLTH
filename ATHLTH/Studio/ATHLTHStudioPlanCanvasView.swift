@@ -364,7 +364,7 @@ struct ATHLTHStudioPlanCanvasView: View {
                 } editor: {
                     if let newWorkoutActivity {
                         WorkoutTemplateBuilderView(
-                            draftContext: "ipad-plan-day-\(fresh.id)-\(newWorkoutActivity.rawValue)",
+                            draftContext: "ipad-plan-day-\(session.profile.userID.uuidString)-\(fresh.id)-\(newWorkoutActivity.rawValue)",
                             plannedDate: newWorkoutTime,
                             initialActivity: newWorkoutActivity,
                             initialStudioAdvanced: newWorkoutActivity != .running,
