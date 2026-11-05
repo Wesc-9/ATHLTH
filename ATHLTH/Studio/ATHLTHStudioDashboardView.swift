@@ -921,6 +921,11 @@ struct ATHLTHStudioDashboardView: View {
                 Label(tr("Start later", "Start senere"), systemImage: "clock")
             }
         }
+        Button {
+            onOpenWorkout(entry)
+        } label: {
+            Label(tr("Workout details", "Øktdetaljer"), systemImage: "info.circle")
+        }
     }
 
     private func weekDayButton(
