@@ -23,6 +23,14 @@ struct ATHLTHApp: App {
     private var appDelegate
 
     init() {
+        // Complete any interrupted account-scoped backup restore before
+        // SwiftUI constructs stores and reads locally persisted training data.
+        // Failure leaves the protected journal intact for the next launch.
+        do {
+            try TrainingBackupRestoreJournal.finishPending()
+        } catch {
+            ATHLTHPerformance.event("BackupRestoreReplayDeferred")
+        }
         // Scene state is deliberately owned by a View rather than captured by
         // WindowGroup. SwiftUI may evaluate the WindowGroup content closure
         // on its AsyncRenderer executor.
