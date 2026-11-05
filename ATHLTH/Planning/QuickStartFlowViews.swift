@@ -233,15 +233,15 @@ struct AudioCoachDraft {
         announceCurrentWorkoutStep = config.announceCurrentWorkoutStep
         announceRemainingStepTime = config.announceRemainingStepTime
         announceRemainingStepDistance = config.announceRemainingStepDistance
-        duckOtherAudio = config.duckOtherAudio
-        guidanceQuietPeriodSeconds = config.guidanceQuietPeriodSeconds
+        duckOtherAudio = config.duckOtherAudio ?? true
+        guidanceQuietPeriodSeconds = config.guidanceQuietPeriodSeconds ?? 10
         voiceIdentifier = config.voiceIdentifier
-        speechRate = Double(config.speechRate)
-        speechVolume = Double(config.speechVolume)
+        speechRate = Double(config.speechRate ?? 0.48)
+        speechVolume = Double(config.speechVolume ?? 1.0)
         speechStyle = config.speechStyle ?? .balanced
-        announceWorkoutStart = config.announceWorkoutStart
-        announcePauseResume = config.announcePauseResume
-        announceWorkoutComplete = config.announceWorkoutComplete
+        announceWorkoutStart = config.announceWorkoutStart ?? true
+        announcePauseResume = config.announcePauseResume ?? true
+        announceWorkoutComplete = config.announceWorkoutComplete ?? true
     }
 
     func configuration(
