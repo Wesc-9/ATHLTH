@@ -458,7 +458,11 @@ struct ATHLTHStudioDashboardView: View {
             HStack(spacing: 10) {
                 Button {
                     if let next {
-                        onStartWorkout(next)
+                        if canStartFromStudio(next) {
+                            onStartWorkout(next)
+                        } else {
+                            onOpenWorkout(next)
+                        }
                     } else {
                         focusedPlanningDate = Calendar.current.startOfDay(for: .now)
                     }
@@ -466,8 +470,12 @@ struct ATHLTHStudioDashboardView: View {
                     Label(
                         next == nil
                             ? tr("Plan a workout", "Planlegg en økt")
-                            : tr("Open workout", "Åpne økten"),
-                        systemImage: next == nil ? "calendar.badge.plus" : "arrow.up.right"
+                            : next.map(canStartFromStudio) == true
+                                ? tr("Start workout", "Start økt")
+                                : tr("Open workout", "Åpne økten"),
+                        systemImage: next == nil ? "calendar.badge.plus"
+                            : next.map(canStartFromStudio) == true
+                                ? "play.fill" : "arrow.up.right"
                     )
                     .frame(maxWidth: .infinity)
                 }
@@ -742,7 +750,11 @@ struct ATHLTHStudioDashboardView: View {
                     } else {
                         ForEach(selected.planned.prefix(3)) { entry in
                             Button {
-                                onStartWorkout(entry)
+                                if canStartFromStudio(entry) {
+                                    onStartWorkout(entry)
+                                } else {
+                                    onOpenWorkout(entry)
+                                }
                             } label: {
                                 HStack(spacing: 10) {
                                     Image(systemName: entry.workout.kind.systemImage)
@@ -765,18 +777,25 @@ struct ATHLTHStudioDashboardView: View {
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                     }
-                                    Image(systemName: "arrow.up.right")
+                                    if canStartFromStudio(entry) {
+                                        Text(tr("Start", "Start"))
+                                            .font(.caption.weight(.semibold))
+                                            .foregroundStyle(ATHLTHStudioStyle.gold)
+                                    }
+                                    Image(systemName: canStartFromStudio(entry)
+                                          ? "play.circle.fill" : "arrow.up.right")
                                         .font(.caption.weight(.semibold))
                                         .foregroundStyle(ATHLTHStudioStyle.gold)
                                 }
-                                .frame(minHeight: 42)
+                                .frame(minHeight: 44)
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain)
-                            .accessibilityHint(tr(
-                                "Start the planned workout. Hold to choose Watch or a delayed start.",
-                                "Start den planlagte økten. Hold inne for Watch eller utsatt start."
-                            ))
+                            .accessibilityHint(canStartFromStudio(entry)
+                                ? tr("Tap to start; hold for Watch or delayed start",
+                                     "Trykk for å starte; hold for Watch eller utsatt start")
+                                : tr("Open workout details", "Åpne øktdetaljer")
+                            )
                             .contextMenu {
                                 plannedWorkoutContextActions(entry)
                             }
@@ -857,28 +876,36 @@ struct ATHLTHStudioDashboardView: View {
         }
     }
 
+    private func canStartFromStudio(
+        _ entry: ATHLTHStudioSchedule.Occurrence
+    ) -> Bool {
+        guard let planID = entry.planID,
+              !entry.workout.isExplicitRestDay,
+              !session.isPlanSessionSkipped(
+                  planID: planID, sessionID: entry.workout.id
+              ),
+              !isRecordedCompleted(entry)
+        else { return false }
+        return true
+    }
+
     @ViewBuilder
     private func plannedWorkoutContextActions(
         _ entry: ATHLTHStudioSchedule.Occurrence
     ) -> some View {
-        Button {
-            onStartWorkout(entry)
-        } label: {
-            Label(tr("Start workout", "Start økt"), systemImage: "play.fill")
-        }
-
-        Button {
-            onOpenWorkout(entry)
-        } label: {
-            Label(tr("Workout details", "Øktdetaljer"), systemImage: "info.circle")
-        }
-
-        if entry.planID != nil {
+        if canStartFromStudio(entry) {
             Button {
-                onSendToWatch(entry)
+                onStartWorkout(entry)
             } label: {
-                Label(tr("Send to Apple Watch", "Send til Apple Watch"),
-                      systemImage: "applewatch")
+                Label(tr("Start workout", "Start økt"), systemImage: "play.fill")
+            }
+            if [.running, .walking, .strength].contains(entry.workout.kind) {
+                Button {
+                    onSendToWatch(entry)
+                } label: {
+                    Label(tr("Send to Apple Watch", "Send til Apple Watch"),
+                          systemImage: "applewatch")
+                }
             }
             Menu {
                 Button(tr("In 5 minutes", "Om 5 minutter")) {
