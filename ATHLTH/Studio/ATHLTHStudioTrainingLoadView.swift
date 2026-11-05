@@ -42,7 +42,7 @@ struct ATHLTHStudioTrainingLoadView: View {
         return tr("Other", "Annet")
     }
 
-    private func category(_ kind: ATHLTHPlannedWorkoutType) -> String {
+    private func category(_ kind: WorkoutKind) -> String {
         if kind == .running { return tr("Running", "Løping") }
         if kind == .strength { return tr("Strength", "Styrke") }
         return tr("Other", "Annet")
