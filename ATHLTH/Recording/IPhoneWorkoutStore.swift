@@ -3139,6 +3139,29 @@ final class IPhoneWorkoutStore:
             return
         }
 
+        // A fixed Ghost follows a course, not the total distance the runner
+        // happened to record after shortcuts or detours. Live Ghost without
+        // a selected course continues to use measured workout kilometres.
+        let courseDistance = workout.plannedRouteDistanceKilometers
+            .flatMap { kilometers -> Double? in
+                guard let latest = workout.points.last else { return nil }
+                return ATHLTHGhostCourseProgressPolicy.trustedCourseMeters(
+                    routeLengthMeters: kilometers * 1_000,
+                    routeProgressPercent: workout.routeProgressPercent,
+                    horizontalAccuracy: latest.accuracy,
+                    positionAgeSeconds: abs(latest.timestamp.timeIntervalSinceNow),
+                    deviationMeters: workout.routeDeviationMeters,
+                    alertThresholdMeters:
+                        workout.routeAlertConfiguration?.deviationMeters ?? 80
+                )
+            }
+        if workout.plannedRouteDistanceKilometers != nil &&
+           courseDistance == nil {
+            // Never read stale pace/lead messages from an unverified course
+            // position after GPS loss. Recording and music continue normally.
+            return
+        }
+        let ghostCourseMeters = courseDistance ?? workout.distanceMeters
         var periodic = false
 
         if let interval =
@@ -3146,15 +3169,13 @@ final class IPhoneWorkoutStore:
            interval > 0,
            let next =
                 nextGhostDistanceAnnouncementMeters,
-           workout.distanceMeters >= next {
+           ghostCourseMeters >= next {
             periodic = true
             var updatedNext = next
             repeat {
                 updatedNext += interval
-            } while workout.distanceMeters >=
-                updatedNext
-            nextGhostDistanceAnnouncementMeters =
-                updatedNext
+            } while ghostCourseMeters >= updatedNext
+            nextGhostDistanceAnnouncementMeters = updatedNext
         }
 
         let elapsed =
@@ -3178,25 +3199,13 @@ final class IPhoneWorkoutStore:
         var finalPhaseRemainingMeters:
             Double?
 
-        if configuration
-                .shouldAnnounceFinalPhase,
+        if configuration.shouldAnnounceFinalPhase,
            !ghostFinalPhaseAnnounced,
-           let totalDistance =
-                workout
-                    .plannedRouteDistanceKilometers
-                    .map({
-                        max(
-                            $0 * 1_000,
-                            0
-                        )
-                    }),
+           let totalDistance = workout.plannedRouteDistanceKilometers
+               .map({ max($0 * 1_000, 0) }),
+           let courseDistance,
            totalDistance > 0 {
-            let remaining =
-                max(
-                    totalDistance -
-                        workout.distanceMeters,
-                    0
-                )
+            let remaining = max(totalDistance - courseDistance, 0)
 
             if remaining > 0 &&
                 remaining <=
@@ -3204,9 +3213,7 @@ final class IPhoneWorkoutStore:
                         .resolvedFinalPhaseStartMeters {
                 ghostFinalPhaseAnnounced =
                     true
-                finalPhaseRemainingMeters =
-                    configuration
-                        .resolvedFinalPhaseStartMeters
+                finalPhaseRemainingMeters = remaining
             }
         }
 
