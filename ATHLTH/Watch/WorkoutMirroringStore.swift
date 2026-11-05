@@ -45,6 +45,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
     var isIPhoneCoachVoiceOwner: Bool {
         mirroredIPhoneCoachAvailable &&
+        snapshot?.watchOwnedAudioCoach != true &&
         (snapshot?.supportsAudioCoachVoiceLease != true ||
             hasAcknowledgedVoiceLease)
     }
@@ -98,6 +99,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
     ) {
         guard iPhoneAudioCoachAttached,
               iPhoneAudioCoach.isEnabled,
+              snapshot.watchOwnedAudioCoach != true,
               snapshot.supportsAudioCoachVoiceLease == true,
               snapshot.kind == .running ||
                 snapshot.kind == .walking,
@@ -152,6 +154,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
                 latestVoiceLeaseRequestID,
               let current = latestSnapshot ?? snapshot,
               current.supportsAudioCoachVoiceLease == true,
+              current.watchOwnedAudioCoach != true,
               current.state == .running ||
                 current.state == .paused ||
                 current.state == .preparing,
@@ -687,7 +690,11 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
         guard let latestSnapshot else { return }
 
         if iPhoneAudioCoachAttached {
-            if aiConversationActive {
+            if latestSnapshot.watchOwnedAudioCoach == true {
+                // A new Watch-owned workout (including Ghost) revokes the
+                // iPhone voice lease immediately. No dual AirPods speeches.
+                resetVoiceLease()
+            } else if aiConversationActive {
                 // Already muted when AI conversation began. Never deactivate
                 // the audio session again while AI uses the microphone.
             } else if latestSnapshot.supportsAudioCoachVoiceLease != true {
@@ -825,6 +832,7 @@ final class WorkoutMirroringStore: NSObject, ObservableObject {
 
         if iPhoneAudioCoachAttached {
             if !aiConversationActive &&
+               snapshot.watchOwnedAudioCoach != true &&
                (snapshot.supportsAudioCoachVoiceLease != true ||
                 hasAcknowledgedVoiceLease) {
                 iPhoneAudioCoach.handle(snapshot)
@@ -938,6 +946,7 @@ extension WorkoutMirroringStore: HKWorkoutSessionDelegate {
 
             if self.iPhoneAudioCoachAttached {
                 if !self.aiConversationActive &&
+                   snapshot.watchOwnedAudioCoach != true &&
                    (snapshot.supportsAudioCoachVoiceLease != true ||
                     self.hasAcknowledgedVoiceLease) {
                     self.iPhoneAudioCoach.handle(snapshot)
