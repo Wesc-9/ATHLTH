@@ -5,6 +5,7 @@ import SwiftUI
 struct ATHLTHStudioPlanningScenarioView: View {
     let planID: UUID
     var onAskCoach: (() -> Void)?
+    var onAddWorkout: (() -> Void)?
 
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
@@ -14,6 +15,8 @@ struct ATHLTHStudioPlanningScenarioView: View {
     @State private var selectedWorkoutID: UUID?
     @State private var targetDayID: UUID?
     @State private var showingApproval = false
+    @State private var scenarioAction = "move"
+    @State private var lastSkippedID: UUID?
     @State private var errorText: String?
 
     private struct Candidate: Identifiable {
@@ -82,7 +85,9 @@ struct ATHLTHStudioPlanningScenarioView: View {
         targets.first(where: { $0.id == targetDayID })
     }
     private var validChange: Bool {
-        guard let chosen, let destination else { return false }
+        guard let chosen else { return false }
+        if scenarioAction == "skip" { return true }
+        guard let destination else { return false }
         return chosen.dayID != destination.id
     }
     private func tr(_ en: String, _ no: String) -> String {
@@ -126,6 +131,14 @@ struct ATHLTHStudioPlanningScenarioView: View {
                             .pickerStyle(.menu)
                             .accessibilityIdentifier("studio-scenario-workout")
 
+                            Picker(tr("What would you like to test?",
+                                        "Hva vil du prøve?"),
+                                   selection: $scenarioAction) {
+                                Text(tr("Move workout", "Flytt økt")).tag("move")
+                                Text(tr("Skip workout", "Hopp over økt")).tag("skip")
+                            }
+                            .pickerStyle(.segmented)
+                            if scenarioAction == "move" {
                             Picker(tr("Try another date", "Prøv en annen dato"),
                                    selection: $targetDayID) {
                                 Text(tr("Choose a date", "Velg dato"))
@@ -139,8 +152,11 @@ struct ATHLTHStudioPlanningScenarioView: View {
                             }
                             .pickerStyle(.menu)
                             .accessibilityIdentifier("studio-scenario-target")
+                            }
 
-                            if let chosen, let destination, validChange {
+                            if let chosen, scenarioAction == "skip" {
+                                skippedProjection(plan: plan, chosen: chosen)
+                            } else if let chosen, let destination, validChange {
                                 projection(plan: plan, chosen: chosen,
                                            destination: destination)
                             } else {
@@ -162,6 +178,31 @@ struct ATHLTHStudioPlanningScenarioView: View {
                                 .buttonStyle(.borderedProminent)
                                 .tint(ATHLTHStudioStyle.ink)
                                 .disabled(!validChange)
+
+                                if let lastSkippedID {
+                                    Button {
+                                        session.setPlanSessionSkipped(
+                                            planID: planID,
+                                            sessionID: lastSkippedID,
+                                            skipped: false
+                                        )
+                                        self.lastSkippedID = nil
+                                    } label: {
+                                        Label(tr("Undo skipped workout",
+                                                 "Angre hoppet over økt"),
+                                              systemImage: "arrow.uturn.backward")
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
+
+                                if let onAddWorkout {
+                                    Button(action: onAddWorkout) {
+                                        Label(tr("Add workout in plan editor",
+                                                 "Legg til økt i planbygger"),
+                                              systemImage: "plus.circle")
+                                    }
+                                    .buttonStyle(.bordered)
+                                }
 
                                 if let onAskCoach {
                                     Button(action: onAskCoach) {
@@ -208,11 +249,17 @@ struct ATHLTHStudioPlanningScenarioView: View {
             }
         }
         .confirmationDialog(
-            tr("Move this planned workout?", "Flytte denne planlagte økten?"),
+            scenarioAction == "skip"
+                ? tr("Skip this planned workout?", "Hoppe over denne økten?")
+                : tr("Move this planned workout?", "Flytte denne planlagte økten?"),
             isPresented: $showingApproval,
             titleVisibility: .visible
         ) {
-            Button(tr("Move workout", "Flytt økten")) { applyChange() }
+            Button(
+                scenarioAction == "skip"
+                    ? tr("Skip workout", "Hopp over økten")
+                    : tr("Move workout", "Flytt økten")
+            ) { applyChange() }
             Button(tr("Cancel", "Avbryt"), role: .cancel) {}
         } message: {
             Text(tr(
@@ -230,6 +277,33 @@ struct ATHLTHStudioPlanningScenarioView: View {
             Button("OK", role: .cancel) {}
         } message: {
             Text(errorText ?? "")
+        }
+    }
+
+    private func skippedProjection(
+        plan: TrainingPlan, chosen: Candidate
+    ) -> some View {
+        let week = plan.weeks[chosen.weekIndex]
+        let summary = ATHLTHStudioPlanWeekSummary.calculate(week)
+        let minutes = max(0, chosen.workout.durationMinutes ?? 0)
+        return VStack(alignment: .leading, spacing: 12) {
+            Text(tr("BEFORE → AFTER", "FØR → ETTER"))
+                .font(.caption.weight(.bold))
+                .foregroundStyle(ATHLTHStudioStyle.gold)
+            ATHLTHStudioMetricCard(
+                title: tr("Week \(week.weekNumber)", "Uke \(week.weekNumber)"),
+                value: "\(summary.knownMinutes) → \(max(0, summary.knownMinutes - minutes)) min",
+                note: tr(
+                    "Planned duration if you skip this workout",
+                    "Planlagt varighet hvis du hopper over økten"
+                )
+            )
+            Text(tr(
+                "The workout remains in the plan with a skipped status. Completed Health recordings are not changed.",
+                "Økten blir liggende i planen, men markeres som hoppet over. Gjennomførte Health-målinger endres ikke."
+            ))
+            .font(.caption)
+            .foregroundStyle(.secondary)
         }
     }
 
@@ -295,8 +369,7 @@ struct ATHLTHStudioPlanningScenarioView: View {
     }
 
     private func applyChange() {
-        guard validChange, let plan, let chosen,
-              let target = destination else { return }
+        guard validChange, let plan, let chosen else { return }
         guard session.trainingPlan(withID: planID)?.version == plan.version
         else {
             errorText = tr(
@@ -305,6 +378,28 @@ struct ATHLTHStudioPlanningScenarioView: View {
             )
             return
         }
+        if scenarioAction == "skip" {
+            guard !session.isPlanSessionCompleted(
+                planID: planID, sessionID: chosen.id,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            ), !session.isPlanSessionSkipped(
+                planID: planID, sessionID: chosen.id
+            ) else {
+                errorText = tr(
+                    "The workout is no longer eligible for skipping.",
+                    "Økten kan ikke lenger markeres som hoppet over."
+                )
+                return
+            }
+            session.setPlanSessionSkipped(
+                planID: planID, sessionID: chosen.id, skipped: true
+            )
+            lastSkippedID = chosen.id
+            selectedWorkoutID = nil
+            return
+        }
+        guard let target = destination else { return }
         let success = session.movePlanStudioWorkout(
             planID: planID, workoutID: chosen.id,
             targetDate: target.date, expectedVersion: plan.version,
