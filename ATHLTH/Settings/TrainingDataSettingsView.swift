@@ -13,6 +13,7 @@ struct TrainingDataSettingsView: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
     @State private var consent = false
     @State private var selectedBackup: TrainingBackupRow?
+    @State private var legacyWatchResultToClaim: WatchWorkoutResult?
     @State private var confirmLegacy = false
     @State private var confirmDeleteBackups = false
     @State private var planConflictToResolve: ATHLTHStudioPlanSyncStore.Conflict?
@@ -70,6 +71,33 @@ struct TrainingDataSettingsView: View {
                         norwegian: "Avslutt den aktive økten på iPhone eller Apple Watch før du gjenoppretter en sikkerhetskopi."
                     ))
                     .font(.footnote)
+                }
+            }
+            if session.signedIn {
+                let legacyWatchResults = watchConnection.pendingWorkoutResults
+                    .filter { $0.accountOwnerID == nil }
+                if !legacyWatchResults.isEmpty {
+                    Section(ATHLTHLocalization.choose(
+                        english: "Older Apple Watch workouts",
+                        norwegian: "Eldre Apple Watch-økter"
+                    )) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "These completed workouts were received without an ATHLTH account ID. They were not assigned automatically. Only claim workouts that belong to your current account.",
+                            norwegian: "Disse fullførte øktene kom uten ATHLTH-konto-ID og er ikke tilordnet automatisk. Bekreft bare økter som tilhører kontoen du er logget inn på."
+                        ))
+                        .font(.footnote)
+
+                        ForEach(legacyWatchResults, id: \.id) { result in
+                            Button {
+                                legacyWatchResultToClaim = result
+                            } label: {
+                                Label(
+                                    "\(result.kind.title) · \(result.endedAt.formatted(date: .abbreviated, time: .shortened))",
+                                    systemImage: "applewatch"
+                                )
+                            }
+                        }
+                    }
                 }
             }
             Section(ATHLTHLocalization.choose(
@@ -190,6 +218,34 @@ struct TrainingDataSettingsView: View {
         }
         .confirmationDialog("Restore older data to this account?", isPresented: $confirmLegacy, titleVisibility: .visible) {
             Button("Restore my data") { goals.restoreLegacyGoals(); strength.restoreLegacyHistory() }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Import this older Watch workout to your current account?",
+                norwegian: "Importer denne eldre Watch-økten til kontoen du bruker nå?"
+            ),
+            isPresented: Binding(
+                get: { legacyWatchResultToClaim != nil },
+                set: { if !$0 { legacyWatchResultToClaim = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Yes, this workout is mine",
+                norwegian: "Ja, denne økten er min"
+            )) {
+                guard session.signedIn,
+                      let result = legacyWatchResultToClaim else { return }
+                legacyWatchResultToClaim = nil
+                _ = watchConnection.claimLegacyCompletedWorkout(
+                    result.id, for: session.profile.userID
+                )
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Only confirm a workout you recorded. Watch results already linked to a different account cannot be reassigned.",
+                norwegian: "Bekreft bare en økt du selv har registrert. Watch-økter som allerede er knyttet til en annen konto, kan ikke flyttes."
+            ))
         }
         .confirmationDialog("Replace this phone’s saved training data with the selected backup?", isPresented: Binding(get: { selectedBackup != nil }, set: { if !$0 { selectedBackup = nil } }), titleVisibility: .visible) {
             Button("Restore backup", role: .destructive) {
