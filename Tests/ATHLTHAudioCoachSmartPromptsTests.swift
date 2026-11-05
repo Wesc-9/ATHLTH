@@ -242,9 +242,20 @@ final class ATHLTHAudioCoachSmartPromptsTests: XCTestCase {
             settings: config, latitude: 63.43, longitude: 10.4,
             horizontalAccuracy: 5, locationAge: 1, norwegian: true
         ))
+        XCTAssertNil(state.nextLandmark(
+            settings: config, latitude: 63.44, longitude: 10.4,
+            horizontalAccuracy: 5, locationAge: 1, norwegian: true,
+            elapsedSeconds: 60, routeProgressPercent: 3
+        ))
+        XCTAssertNil(state.nextLandmark(
+            settings: config, latitude: 63.44, longitude: 10.4,
+            horizontalAccuracy: 5, locationAge: 1, norwegian: true,
+            elapsedSeconds: 1_200, routeProgressPercent: 40
+        ))
         XCTAssertTrue(state.nextLandmark(
             settings: config, latitude: 63.44, longitude: 10.4,
-            horizontalAccuracy: 5, locationAge: 1, norwegian: true
+            horizontalAccuracy: 5, locationAge: 1, norwegian: true,
+            elapsedSeconds: 1_200, routeProgressPercent: 97
         )?.contains("hjemme") == true)
     }
 
