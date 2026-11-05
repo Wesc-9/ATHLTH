@@ -39,8 +39,7 @@ struct ATHLTHStudioFocusedWeekPlannerView: View {
     }
 
     private var editable: Bool {
-        Calendar.current.startOfDay(for: selectedDate) >=
-            Calendar.current.startOfDay(for: .now)
+        HomeWeeklyProgressCalendar.canScheduleStandalone(on: selectedDate)
     }
 
     var body: some View {
