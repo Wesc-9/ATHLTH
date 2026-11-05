@@ -1241,6 +1241,7 @@ struct AroundYouExploreView: View {
                Date().timeIntervalSince(lastMapRefreshAt) < 90 {
                 return
             }
+            let signpost = ATHLTHPerformance.begin("ExploreTabRefresh")
             async let routesRefresh: Void =
                 routeDiscovery.refresh()
             async let eventsRefresh: Void =
@@ -1252,6 +1253,7 @@ struct AroundYouExploreView: View {
                 eventsRefresh,
                 publicWorkoutsRefresh
             )
+            ATHLTHPerformance.end("ExploreTabRefresh", id: signpost)
             guard !Task.isCancelled else { return }
             lastMapRefreshAccountID = accountID
             lastMapRefreshAt = Date()
