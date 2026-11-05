@@ -5949,7 +5949,8 @@ struct ATHLTHTrainView: View {
                             ghostRace: ghostRace,
                             workoutMirroring: workoutMirroring,
                             plannedPlanID: planOrigin?.planID,
-                            plannedSessionID: planOrigin?.workout.id
+                            plannedSessionID: planOrigin?.workout.id,
+                            session: session
                         )
                         _ = await social.confirmCurrentJoinedWorkoutStarted()
                         if configuration.captureDevice == .appleWatch {
