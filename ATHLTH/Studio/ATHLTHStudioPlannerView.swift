@@ -4,6 +4,9 @@ import SwiftUI
 /// All edits are delegated to the existing training plan editor; a Studio
 /// preview must never silently rewrite scheduled dates or recorded workouts.
 struct ATHLTHStudioPlannerView: View {
+    var onStartWorkout: ((UUID, UUID) -> Void)? = nil
+    var onSendToWatch: ((UUID, UUID) -> Void)? = nil
+    var onStartAfter: ((UUID, UUID, TimeInterval) -> Void)? = nil
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -62,7 +65,11 @@ struct ATHLTHStudioPlannerView: View {
             if showingLegacyOverview {
                 legacyOverview
             } else {
-                ATHLTHStudioPlanCanvasView()
+                ATHLTHStudioPlanCanvasView(
+                    onStartWorkout: onStartWorkout,
+                    onSendToWatch: onSendToWatch,
+                    onStartAfter: onStartAfter
+                )
             }
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
