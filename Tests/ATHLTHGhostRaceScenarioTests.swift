@@ -217,6 +217,47 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
                           "Main phase should start a new Ghost clock, not reuse warm-up time.")
     }
 
+    func testTerrainGhostPreservesFinishTimeAndSlowsOnUphill() {
+        let altitudes: [Double] = [0, 0, 5, 17, 25, 24, 10, 0, 0]
+        let coordinates = altitudes.enumerated().map { i, altitude in
+            RouteCoordinate(
+                latitude: 63.43 + Double(i) * 0.0002,
+                longitude: 10.40,
+                altitude: altitude,
+                sequence: i
+            )
+        }
+        let distances = coordinates.indices.map { Double($0) * 22.2 }
+        let fractions = GhostTargetPacingStrategy.terrainElapsedFractions(
+            coordinates: coordinates, cumulativeMeters: distances
+        )
+        XCTAssertEqual(fractions.count, coordinates.count)
+        XCTAssertEqual(fractions.first, 0)
+        XCTAssertEqual(fractions.last, 1)
+        for i in 1..<fractions.count {
+            XCTAssertGreaterThanOrEqual(fractions[i], fractions[i - 1])
+        }
+        XCTAssertGreaterThan(fractions[4], 0.5,
+                             "Uphill half should use more than half the target time.")
+    }
+
+    func testTerrainGhostHasEvenFallbackWithoutElevation() {
+        let coordinates = (0...8).map { i in
+            RouteCoordinate(
+                latitude: 63.43 + Double(i) * 0.0002,
+                longitude: 10.4,
+                altitude: nil,
+                sequence: i
+            )
+        }
+        let distances = coordinates.indices.map { Double($0) * 25 }
+        let fractions = GhostTargetPacingStrategy.terrainElapsedFractions(
+            coordinates: coordinates, cumulativeMeters: distances
+        )
+        XCTAssertEqual(fractions[4], 0.5, accuracy: 0.001)
+        XCTAssertEqual(fractions.last, 1)
+    }
+
     func testRaceCannotBeDeclaredFromStaleSharedTimestamps() {
         let start = Date(timeIntervalSince1970: 1_800_000_000)
         XCTAssertFalse(ATHLTHLiveGhostResultEvidence.bothFinishesPlausible(
