@@ -19,12 +19,68 @@ enum ATHLTHCoachLandmarkSide: String, Codable, CaseIterable, Identifiable {
     }
 }
 
+enum ATHLTHCoachLandmarkKind: String, Codable, CaseIterable, Identifiable {
+    case ordinary
+    case waterfront
+    case home
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .ordinary:
+            return ATHLTHLocalization.choose(english: "Place", norwegian: "Sted")
+        case .waterfront:
+            return ATHLTHLocalization.choose(english: "Waterfront", norwegian: "Ved sjøen")
+        case .home:
+            return ATHLTHLocalization.choose(english: "Home", norwegian: "Hjemme")
+        }
+    }
+}
+
+enum ATHLTHCoachEncouragementStyle: String, Codable, CaseIterable, Identifiable {
+    case praise
+    case encouragement
+    case push
+
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .praise: return ATHLTHLocalization.choose(english: "Praise", norwegian: "Gi skryt")
+        case .encouragement: return ATHLTHLocalization.choose(english: "Encourage", norwegian: "Oppmuntre")
+        case .push: return ATHLTHLocalization.choose(english: "More push", norwegian: "Mer push")
+        }
+    }
+}
+
+/// Only verified route progress and sampled terrain may feed environmental
+/// coaching. No reverse geocoding, location guessing or mandatory network.
+struct ATHLTHCoachEnvironmentalContext {
+    var routeRemainingMeters: Double? = nil
+    var routeProgressPercent: Double? = nil
+    var terrain: ATHLTHCoachTerrain? = nil
+
+    var nearVerifiedFinish: Bool {
+        guard let remaining = routeRemainingMeters,
+              let progress = routeProgressPercent,
+              remaining.isFinite, progress.isFinite else { return false }
+        return (0...200).contains(remaining) && (90...100).contains(progress)
+    }
+}
+
+enum ATHLTHCoachTerrain: String {
+    case uphill
+    case downhill
+}
+
 struct ATHLTHCoachLandmark: Codable, Hashable, Identifiable {
     var id = UUID()
     var name: String
     var latitude: Double
     var longitude: Double
     var side: ATHLTHCoachLandmarkSide
+    // Optional to keep previously saved landmarks decodable.
+    var kind: ATHLTHCoachLandmarkKind? = nil
 
     var isValid: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
@@ -33,6 +89,20 @@ struct ATHLTHCoachLandmark: Codable, Hashable, Identifiable {
     }
 
     func spokenPhrase(norwegian: Bool) -> String {
+        // Named, manually selected geographic evidence. Never infer
+        // 'by the sea' or 'at home' from arbitrary GPS coordinates.
+        switch kind {
+        case .waterfront:
+            return norwegian
+                ? "Sjøen er like ved deg nå. Nyt omgivelsene og hold rytmen!"
+                : "You're close to the water. Enjoy the view and keep your rhythm!"
+        case .home:
+            return norwegian
+                ? "Du er snart hjemme! Sterk innsats – finn kreftene til den siste biten."
+                : "You're almost home! Great effort — finish this last stretch."
+        case .ordinary, .none:
+            break
+        }
         switch side {
         case .left:
             return norwegian ? "Nå passerer du \(name) på venstre side"
@@ -55,6 +125,13 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     var randomIntervalSeconds = 240
     var customEncouragements: [String] = []
     var landmarks: [ATHLTHCoachLandmark] = []
+    // Optional so already stored profiles and old Watch transfers still decode.
+    var encouragementStyle: ATHLTHCoachEncouragementStyle? = nil
+    var contextualFeedbackEnabled: Bool? = nil
+
+    var isContextualFeedbackEnabled: Bool {
+        contextualFeedbackEnabled ?? true
+    }
 
     var validatedMotivationInterval: Double {
         Double(min(max(motivationIntervalSeconds, 30), 600))
