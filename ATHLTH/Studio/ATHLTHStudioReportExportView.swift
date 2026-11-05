@@ -54,7 +54,8 @@ enum ATHLTHStudioReportRenderer {
         return renderer.pdfData { context in
             func put(_ value: String, _ x: CGFloat, _ y: CGFloat,
                      width: CGFloat = 500, size: CGFloat = 11,
-                     color: UIColor = ink, bold: Bool = false) {
+                     color: UIColor? = nil, bold: Bool = false) {
+                let foreground = color ?? ink
                 let font = bold
                     ? UIFont.systemFont(ofSize: size, weight: .semibold)
                     : UIFont.systemFont(ofSize: size)
@@ -62,7 +63,7 @@ enum ATHLTHStudioReportRenderer {
                     in: CGRect(x: x, y: y, width: width, height: size * 2.3),
                     withAttributes: [
                         .font: font,
-                        .foregroundColor: color
+                        .foregroundColor: foreground
                     ]
                 )
             }
