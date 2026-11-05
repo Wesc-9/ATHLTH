@@ -510,7 +510,9 @@ final class MirroredWorkoutAudioCoach:
             locationAge: Date().timeIntervalSince(
                 snapshot.currentLocationSampledAt ?? .distantPast
             ),
-            norwegian: norwegian
+            norwegian: norwegian,
+            elapsedSeconds: snapshot.elapsedTime,
+            routeProgressPercent: snapshot.routeProgressPercent
         )
         if let positionCue {
             speak(
