@@ -673,7 +673,7 @@ final class GhostRaceStore: ObservableObject {
         if let routeDeviation = snapshot.routeDeviationMeters,
            let tolerance = snapshot.routeDeviationThresholdMeters,
            !ATHLTHGhostCourseProgressPolicy.isReliableOnRoute(
-                horizontalAccuracy: 0,
+                horizontalAccuracy: accuracy,
                 deviationMeters: routeDeviation,
                 alertThresholdMeters: tolerance
            ) {
