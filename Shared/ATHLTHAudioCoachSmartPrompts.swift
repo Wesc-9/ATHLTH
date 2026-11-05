@@ -275,7 +275,7 @@ struct ATHLTHAudioCoachSmartState {
                                         "Good climbing work. Recover your breathing on the descent."
                                       ])
                             }
-                    } else if let currentPace, let previous {
+                    } else if let currentPace, let previous = previousPace, previous > 0 {
                             let ratio = currentPace / previous
                             if ratio < 0.94 {
                                 proposed = pickDistinct(norwegian
