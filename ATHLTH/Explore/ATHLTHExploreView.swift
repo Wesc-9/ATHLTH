@@ -1,13 +1,17 @@
 import SwiftUI
 
 struct ATHLTHExploreView: View {
+    /// Keep the MapKit view and camera in memory between tabs, but only run
+    /// location/network refreshes while Explore is actually selected.
+    var isActive = true
     @StateObject private var locationStore = HomeLocationStore()
 
     var body: some View {
         NavigationStack {
             AroundYouExploreView(
                 locationStore: locationStore,
-                embeddedInTab: true
+                embeddedInTab: true,
+                isActive: isActive
             )
         }
     }
