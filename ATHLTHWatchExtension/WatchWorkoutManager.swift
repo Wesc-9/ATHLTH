@@ -7353,15 +7353,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         WatchRouteStore.shared.clearCompletedPetSelection()
 
         if audioCoachConfiguration.enabled,
-           audioCoachConfiguration
-            .shouldAnnounceWorkoutComplete {
+           audioCoachConfiguration.shouldAnnounceWorkoutComplete {
+            let recap = ATHLTHWorkoutCompletionSpokenSummary.make(
+                elapsedSeconds: result.duration,
+                distanceMeters: result.distanceMeters,
+                averageHeartRateBPM: result.averageHeartRate
+            )
+            // Completion is Watch-owned after HealthKit ends; do not wait
+            // for a mirrored iPhone that may have been disconnected.
+            guidancePriorityGate.reset()
             speak(
                 coachPhrase(
-                    english: "Workout complete.",
-                    norwegian: "Økten er fullført."
+                    english: recap.english,
+                    norwegian: recap.norwegian
                 ),
-                priority:
-                    .structuredStep
+                priority: .structuredStep,
+                forceLocal: true,
+                rememberForReplay: false
             )
         }
 
