@@ -1,6 +1,20 @@
 import Foundation
 import Supabase
 
+/// A restore must never replace the persisted workout journal while any
+/// recorder owns an active or terminating workout, including a Watch-only one.
+enum TrainingBackupRestoreSafetyPolicy {
+    static func allowsRestore(
+        phoneActive: Bool,
+        strengthActive: Bool,
+        mirroredWatchActive: Bool,
+        watchReportedActive: Bool
+    ) -> Bool {
+        !phoneActive && !strengthActive &&
+            !mirroredWatchActive && !watchReportedActive
+    }
+}
+
 struct TrainingBackupChangeTracker {
     private(set) var revision: UInt64 = 0
     var isDirty = false
