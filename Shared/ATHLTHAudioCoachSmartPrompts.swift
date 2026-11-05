@@ -223,8 +223,8 @@ struct ATHLTHAudioCoachSmartState {
                     let style = settings.encouragementStyle ?? .encouragement
                     var proposed: String?
 
-                    if settings.isContextualFeedbackEnabled {
-                        if environment.nearVerifiedFinish && !announcedFinalStretch {
+                    if settings.isContextualFeedbackEnabled &&
+                       environment.nearVerifiedFinish && !announcedFinalStretch {
                             announcedFinalStretch = true
                             proposed = pickDistinct(norwegian
                                 ? [
@@ -241,8 +241,9 @@ struct ATHLTHAudioCoachSmartState {
                                     "You're almost at the finish. Strong effort, stay in control.",
                                     "Not far to go. Keep your flow and finish strong."
                                   ])
-                        } else if let terrain = environment.terrain,
-                                  elapsed - lastTerrainPhraseAt >= 240 {
+                    } else if settings.isContextualFeedbackEnabled,
+                              let terrain = environment.terrain,
+                              elapsed - lastTerrainPhraseAt >= 240 {
                             lastTerrainPhraseAt = elapsed
                             switch terrain {
                             case .uphill:
@@ -274,7 +275,7 @@ struct ATHLTHAudioCoachSmartState {
                                         "Good climbing work. Recover your breathing on the descent."
                                       ])
                             }
-                        } else if let currentPace, let previous {
+                    } else if let currentPace, let previous {
                             let ratio = currentPace / previous
                             if ratio < 0.94 {
                                 proposed = pickDistinct(norwegian
@@ -309,7 +310,6 @@ struct ATHLTHAudioCoachSmartState {
                                         "Steady speed and good focus — keep going."
                                       ])
                             }
-                        }
                     }
 
                     lastSpokenAt = elapsed
