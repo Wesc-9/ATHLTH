@@ -7503,7 +7503,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               completed.duration > 0 else { return nil }
 
         let predicate = HKQuery.predicateForSamples(
-            withEnd: completed.startedAt,
+            withStart: nil,
+            end: completed.startedAt,
             options: .strictEndDate
         )
         let previous: [ATHLTHVerifiedRunningEvidence]? =
