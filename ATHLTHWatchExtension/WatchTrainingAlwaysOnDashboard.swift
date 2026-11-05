@@ -21,13 +21,13 @@ struct WatchTrainingAlwaysOnDashboard: View {
     }
 
     private var primary: Color {
-        Color.white.opacity(strongContrast ? 1 : 0.88)
+        Color.white.opacity(strongContrast ? 1 : 0.95)
     }
     private var secondary: Color {
-        Color.white.opacity(strongContrast ? 0.93 : 0.64)
+        Color.white.opacity(strongContrast ? 0.94 : 0.78)
     }
     private var quiet: Color {
-        Color.white.opacity(strongContrast ? 0.80 : 0.47)
+        Color.white.opacity(strongContrast ? 0.82 : 0.59)
     }
     private let accent = Color(red: 0.48, green: 0.77, blue: 0.78)
 
