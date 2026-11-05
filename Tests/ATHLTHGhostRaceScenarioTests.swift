@@ -267,6 +267,41 @@ final class ATHLTHGhostRaceScenarioTests: XCTestCase {
     }
 
     @MainActor
+    func testSparseGhostPolylineMatchesRunnerBetweenTwoWaypoints() throws {
+        let points = [
+            GhostRacePoint(
+                id: 0, latitude: 63.4305, longitude: 10.3900,
+                altitude: nil, elapsedTime: 0, cumulativeMeters: 0
+            ),
+            GhostRacePoint(
+                id: 1, latitude: 63.4305, longitude: 10.3970,
+                altitude: nil, elapsedTime: 420, cumulativeMeters: 350
+            )
+        ]
+        let reference = GhostRaceReference(
+            id: UUID(), sourceWorkoutID: UUID(), title: "Sparse course",
+            startedAt: Date(), durationSeconds: 420,
+            distanceMeters: 350, points: points
+        )
+        let location = CLLocation(
+            coordinate: CLLocationCoordinate2D(
+                latitude: 63.4305, longitude: 10.3935
+            ),
+            altitude: 0, horizontalAccuracy: 5,
+            verticalAccuracy: 5, timestamp: Date()
+        )
+        let store = GhostRaceStore()
+        try store.prepare(reference: reference)
+        store.updatePhoneWorkout(
+            location: location, elapsedTime: 210, state: .running
+        )
+        let match = try XCTUnwrap(store.comparison)
+        XCTAssertLessThan(match.routeDeviationMeters, 8)
+        XCTAssertEqual(match.userProgress, 0.5, accuracy: 0.05)
+        XCTAssertEqual(match.ghostProgress, 0.5, accuracy: 0.05)
+    }
+
+    @MainActor
     func testBadAccuracyOrOldGPSCannotCreateGhostLead() throws {
         let route = reference()
         let store = GhostRaceStore()
