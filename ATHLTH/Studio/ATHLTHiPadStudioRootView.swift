@@ -342,10 +342,12 @@ struct ATHLTHiPadStudioRootView: View {
                         .buttonStyle(.plain)
                         .accessibilityAddTraits(selection == destination ? .isSelected : [])
 
-                        if destination == .planner {
-                            trainingLibraryShortcut
-                        }
                     }
+                    Divider()
+                        .padding(.vertical, 9)
+                        .padding(.horizontal, 12)
+
+                    trainingLibraryShortcut
                 }
                 .padding(.horizontal, 11)
             }
