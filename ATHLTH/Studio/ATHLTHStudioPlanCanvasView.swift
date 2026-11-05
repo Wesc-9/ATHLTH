@@ -28,6 +28,7 @@ struct ATHLTHStudioPlanCanvasView: View {
     @State private var inlineWorkout: InlineWorkoutDestination?
     @State private var inlineNewWorkout: NewWorkoutDestination?
     @State private var newWorkoutTime = Date.now
+    @State private var newWorkoutActivity: ATHLTHPlannedWorkoutType?
 
     private struct NewWorkoutDestination: Identifiable {
         let planID: UUID
@@ -113,6 +114,7 @@ struct ATHLTHStudioPlanCanvasView: View {
             selectedDayID = nil
             inlineWorkout = nil
             inlineNewWorkout = nil
+            newWorkoutActivity = nil
             copyingWeekID = nil
             pendingWeekCopyTarget = nil
             lastWeekCopy = nil
@@ -121,10 +123,12 @@ struct ATHLTHStudioPlanCanvasView: View {
         .onChange(of: selectedWeekID) { _, _ in
             inlineWorkout = nil
             inlineNewWorkout = nil
+            newWorkoutActivity = nil
         }
         .onChange(of: selectedDayID) { _, _ in
             inlineWorkout = nil
             inlineNewWorkout = nil
+            newWorkoutActivity = nil
         }
         .onChange(of: session.profile.userID) { _, _ in
             selectedPlanID = nil
@@ -132,6 +136,7 @@ struct ATHLTHStudioPlanCanvasView: View {
             selectedDayID = nil
             inlineWorkout = nil
             inlineNewWorkout = nil
+            newWorkoutActivity = nil
             copyingWeekID = nil
             pendingWeekCopyTarget = nil
             lastWeekCopy = nil
@@ -357,22 +362,27 @@ struct ATHLTHStudioPlanCanvasView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(ATHLTHStudioStyle.canvas)
                 } editor: {
-                    WorkoutTemplateBuilderView(
-                        draftContext: "ipad-plan-day-\(fresh.id)",
-                        plannedDate: newWorkoutTime,
-                        initialStudioAdvanced: true,
-                        onScheduledTimeChanged: { newWorkoutTime = $0 },
-                        onAddStandalone: { workout in
-                            saveInlineNewWorkout(workout, destination: fresh)
-                        },
-                        saveButtonTitle: ATHLTHLocalization.choose(
-                            english: "Save to training plan", norwegian: "Lagre i treningsplan"
-                        ),
-                        onCloseInline: { inlineNewWorkout = nil }
-                    )
-                    .environment(\.athlthStudioFullscreenEditing, true)
-                    .id(fresh.id)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if let newWorkoutActivity {
+                        WorkoutTemplateBuilderView(
+                            draftContext: "ipad-plan-day-\(fresh.id)-\(newWorkoutActivity.rawValue)",
+                            plannedDate: newWorkoutTime,
+                            initialActivity: newWorkoutActivity,
+                            initialStudioAdvanced: newWorkoutActivity != .running,
+                            onScheduledTimeChanged: { newWorkoutTime = $0 },
+                            onAddStandalone: { workout in
+                                saveInlineNewWorkout(workout, destination: fresh)
+                            },
+                            saveButtonTitle: ATHLTHLocalization.choose(
+                                english: "Save to training plan", norwegian: "Lagre i treningsplan"
+                            ),
+                            onCloseInline: { self.newWorkoutActivity = nil }
+                        )
+                        .environment(\.athlthStudioFullscreenEditing, true)
+                        .id("\(fresh.id)-\(newWorkoutActivity.rawValue)")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else {
+                        newWorkoutActivitySelection
+                    }
                 } focusRail: {
                     VStack(spacing: 8) {
                         Image(systemName: "calendar.badge.plus")
@@ -1405,6 +1415,75 @@ struct ATHLTHStudioPlanCanvasView: View {
         creatingPlan = false
     }
 
+    private var newWorkoutActivitySelection: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(ATHLTHLocalization.choose(
+                    english: "CREATE A WORKOUT", norwegian: "OPPRETT EN ØKT"
+                ))
+                .font(.caption.weight(.semibold))
+                .tracking(1.6)
+                .foregroundStyle(ATHLTHStudioStyle.gold)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose your activity",
+                    norwegian: "Velg aktivitet"
+                ))
+                .font(.system(.title2, design: .rounded, weight: .semibold))
+                .foregroundStyle(ATHLTHStudioStyle.ink)
+
+                Text(ATHLTHLocalization.choose(
+                    english: "Use the same exercises, intervals and phase editor as on iPhone.",
+                    norwegian: "Bruk de samme øvelsene, intervallene og øktdelene som på iPhone."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 190), spacing: 12)],
+                    spacing: 12
+                ) {
+                    ForEach(ATHLTHPlannedWorkoutType.defaultOrder) { activity in
+                        Button {
+                            newWorkoutActivity = activity
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: activity.symbol)
+                                    .font(.title3)
+                                    .foregroundStyle(ATHLTHStudioStyle.gold)
+                                    .frame(width: 36, height: 36)
+                                    .background(
+                                        ATHLTHStudioStyle.canvas,
+                                        in: RoundedRectangle(cornerRadius: 10)
+                                    )
+                                Text(activity.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                                Spacer(minLength: 0)
+                                Image(systemName: "arrow.up.right")
+                                    .font(.caption)
+                                    .foregroundStyle(ATHLTHStudioStyle.gold)
+                            }
+                            .padding(13)
+                            .frame(maxWidth: .infinity, minHeight: 78)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 15))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 15)
+                                    .stroke(ATHLTHStudioStyle.outline.opacity(0.7))
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: 850)
+            .frame(maxWidth: .infinity)
+        }
+        .scrollIndicators(.hidden)
+    }
+
     private func openNewWorkout(plan: TrainingPlan, day: TrainingPlanDay, date: Date?) {
         guard let date,
               Calendar.current.startOfDay(for: date) >= Calendar.current.startOfDay(for: .now),
@@ -1420,6 +1499,7 @@ struct ATHLTHStudioPlanCanvasView: View {
         newWorkoutTime = Calendar.current.date(
             bySettingHour: 18, minute: 0, second: 0, of: date
         ) ?? date
+        newWorkoutActivity = nil
         inlineNewWorkout = NewWorkoutDestination(
             planID: plan.id, dayID: day.id,
             expectedVersion: plan.version, date: date
@@ -1467,6 +1547,7 @@ struct ATHLTHStudioPlanCanvasView: View {
         )
         if saved {
             inlineNewWorkout = nil
+            newWorkoutActivity = nil
         } else {
             warning = ATHLTHLocalization.choose(
                 english: "Could not save the workout. Your draft remains available.",
