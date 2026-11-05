@@ -272,19 +272,23 @@ enum ATHLTHPhoneRunningRecordEvidence {
 
         var english: [String] = []
         var norwegian: [String] = []
-        if let farthest = previous.map(\.distanceMeters).max(),
-           current.distanceMeters >= farthest + 10 {
+        let achievements = ATHLTHVerifiedRunningRecordComparison.achievements(
+            current: ATHLTHVerifiedRunningEvidence(
+                distanceMeters: current.distanceMeters,
+                activeSeconds: currentSeconds
+            ),
+            previous: previous.map {
+                ATHLTHVerifiedRunningEvidence(
+                    distanceMeters: $0.distanceMeters,
+                    activeSeconds: $0.elapsed(at: $0.end!)
+                )
+            }
+        )
+        if achievements.contains(.longestDistance) {
             english.append("longest recorded run")
             norwegian.append("lengste registrerte løpetur")
         }
-
-        let previousPaces = previous.map {
-            $0.elapsed(at: $0.end!) / ($0.distanceMeters / 1_000)
-        }.filter { $0.isFinite && (120...3_600).contains($0) }
-        let pace = currentSeconds / (current.distanceMeters / 1_000)
-        if let best = previousPaces.min(),
-           (120...3_600).contains(pace),
-           pace <= best - 2 {
+        if achievements.contains(.fastestAveragePace) {
             english.append("fastest average pace on an iPhone run")
             norwegian.append("beste gjennomsnittstempo på en iPhone-løpetur")
         }
