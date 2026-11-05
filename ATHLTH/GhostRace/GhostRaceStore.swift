@@ -32,6 +32,7 @@ enum GhostTargetPacingStrategy: String, CaseIterable, Identifiable, Codable {
     case even
     case negativeSplit
     case progressive
+    case terrainAdaptive
 
     var id: String { rawValue }
     var icon: String {
@@ -39,6 +40,7 @@ enum GhostTargetPacingStrategy: String, CaseIterable, Identifiable, Codable {
         case .even: return "equal"
         case .negativeSplit: return "arrow.down.right"
         case .progressive: return "arrow.up.right"
+        case .terrainAdaptive: return "mountain.2"
         }
     }
     var title: String {
@@ -49,6 +51,8 @@ enum GhostTargetPacingStrategy: String, CaseIterable, Identifiable, Codable {
             return ATHLTHLocalization.choose(english: "Negative split", norwegian: "Negativ splitt")
         case .progressive:
             return ATHLTHLocalization.choose(english: "Progressive", norwegian: "Progressiv")
+        case .terrainAdaptive:
+            return ATHLTHLocalization.choose(english: "Human / hills", norwegian: "Naturlig / bakker")
         }
     }
     var subtitle: String {
@@ -59,6 +63,11 @@ enum GhostTargetPacingStrategy: String, CaseIterable, Identifiable, Codable {
             return ATHLTHLocalization.choose(english: "Faster second half", norwegian: "Raskere andre halvdel")
         case .progressive:
             return ATHLTHLocalization.choose(english: "Build speed gradually", norwegian: "Øk farten gradvis")
+        case .terrainAdaptive:
+            return ATHLTHLocalization.choose(
+                english: "Slower uphill, faster downhill; same finish time",
+                norwegian: "Tregere oppover, raskere nedover – samme sluttid"
+            )
         }
     }
 
@@ -72,7 +81,60 @@ enum GhostTargetPacingStrategy: String, CaseIterable, Identifiable, Codable {
             return p + 0.18 * p * (1 - p)
         case .progressive:
             return p + 0.30 * p * (1 - p) * (1 - p)
+        case .terrainAdaptive:
+            // Without route elevation this is an even pace.
+            return p
         }
+    }
+
+    /// Fraction of target finish time consumed at each input route point.
+    /// Smoothing prevents GPS elevation jitter from producing wild speeds.
+    /// Integration + normalization preserve the EXACT selected finish time.
+    static func terrainElapsedFractions(
+        coordinates: [RouteCoordinate],
+        cumulativeMeters: [Double]
+    ) -> [Double] {
+        guard coordinates.count >= 2,
+              coordinates.count == cumulativeMeters.count,
+              let distance = cumulativeMeters.last,
+              distance.isFinite, distance > 0 else {
+            return coordinates.map { _ in 0 }
+        }
+
+        let altitudes: [Double?] = coordinates.indices.map { index in
+            let nearby = (max(0, index - 2)...min(coordinates.count - 1, index + 2))
+                .compactMap { candidate -> Double? in
+                    guard let altitude = coordinates[candidate].altitude,
+                          altitude.isFinite, (-500...9000).contains(altitude)
+                    else { return nil }
+                    return altitude
+                }
+            return nearby.isEmpty ? nil :
+                nearby.reduce(0, +) / Double(nearby.count)
+        }
+
+        var accumulated = [Double](repeating: 0, count: coordinates.count)
+        for i in 1..<coordinates.count {
+            let segment = max(0, cumulativeMeters[i] - cumulativeMeters[i - 1])
+            guard segment.isFinite else {
+                accumulated[i] = accumulated[i - 1]
+                continue
+            }
+            let grade: Double = {
+                guard segment >= 7, let a = altitudes[i - 1],
+                      let b = altitudes[i] else { return 0 }
+                return min(max((b - a) / max(12, segment), -0.15), 0.15)
+            }()
+            // Gentle uphill penalty and restrained downhill recovery.
+            // Never produce an impossible 0-time segment or sprint spike.
+            let effort = min(max(1 + grade * (grade >= 0 ? 3.1 : 1.25),
+                                 0.78), 1.48)
+            accumulated[i] = accumulated[i - 1] + segment * effort
+        }
+        guard let total = accumulated.last, total.isFinite, total > 0 else {
+            return cumulativeMeters.map { min(max($0 / distance, 0), 1) }
+        }
+        return accumulated.map { min(max($0 / total, 0), 1) }
     }
 }
 
@@ -410,6 +472,11 @@ final class GhostRaceStore: ObservableObject {
                     routeCoordinates.count,
                 maximumPoints: 900
             )
+        let terrainFractions = strategy == .terrainAdaptive
+            ? GhostTargetPacingStrategy.terrainElapsedFractions(
+                coordinates: routeCoordinates,
+                cumulativeMeters: cumulative
+            ) : nil
 
         let points =
             sampledIndices.map {
@@ -435,7 +502,8 @@ final class GhostRaceStore: ObservableObject {
                         coordinate.altitude,
                     elapsedTime:
                         targetDurationSeconds *
-                        strategy.elapsedFraction(at: progress),
+                        (terrainFractions?[index] ??
+                         strategy.elapsedFraction(at: progress)),
                     cumulativeMeters:
                         distance
                 )
