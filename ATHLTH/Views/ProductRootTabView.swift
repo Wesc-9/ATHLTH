@@ -355,6 +355,16 @@ struct ProductRootTabView: View {
             openPendingDailyCheckInIfNeeded()
         }
         .onChange(of: selectedTab) { previous, next in
+            // Instruments signposts let us correlate a perceived tab stall
+            // with HealthKit, MapKit and Community refreshes on a real device.
+            switch next {
+            case 0: ATHLTHPerformance.event("TabHome")
+            case 1: ATHLTHPerformance.event("TabTrain")
+            case 2: ATHLTHPerformance.event("TabInsights")
+            case 3: ATHLTHPerformance.event("TabExplore")
+            case 4: ATHLTHPerformance.event("TabCommunity")
+            default: break
+            }
             // Never reschedule notifications synchronously on a tab tap.
             // Finish the tab's first animation frame before doing the
             // account-local read + notification reconciliation. Only leaving
