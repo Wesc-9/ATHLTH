@@ -655,6 +655,18 @@ struct AppRootView: View {
             : nil
     }
 
+    /// Ignore legacy/unowned and other-account results without consuming
+    /// them. A later owned result must not be blocked by a different owner
+    /// at the front of the durable Watch completion queue.
+    private var nextOwnedWatchResult: WatchWorkoutResult? {
+        watchConnection.pendingWorkoutResults.first {
+            ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+                resultOwnerID: $0.accountOwnerID,
+                signedInUserID: signedInUserID
+            )
+        }
+    }
+
     @MainActor
     private func processWorkoutDeviceRelayCommand(
         _ command: WorkoutDeviceRelayCommand
@@ -1666,23 +1678,11 @@ struct AppRootView: View {
         }
         .task(
             id:
-                "\(watchConnection.pendingWorkoutResults.first(where: {
-                    ATHLTHWatchWorkoutOwnershipPolicy.canApply(
-                        resultOwnerID: $0.accountOwnerID,
-                        signedInUserID: signedInUserID
-                    )
-                })?.id.uuidString ?? "none")-\(startupAuthenticationResolved)-\(signedInUserID?.uuidString ?? "none")"
+                "\(nextOwnedWatchResult?.id.uuidString ?? "none")-\(startupAuthenticationResolved)-\(signedInUserID?.uuidString ?? "none")"
         ) {
             guard startupAuthenticationResolved,
                   appSession.signedIn,
-                  let result = watchConnection.pendingWorkoutResults.first(
-                    where: {
-                        ATHLTHWatchWorkoutOwnershipPolicy.canApply(
-                            resultOwnerID: $0.accountOwnerID,
-                            signedInUserID: signedInUserID
-                        )
-                    }
-                  ) else { return }
+                  let result = nextOwnedWatchResult else { return }
             handleWatchWorkoutCompletion(result)
         }
         .onChange(of: phoneWorkout.completionStartedWorkout?.id) { _, _ in
