@@ -309,6 +309,66 @@ struct ATHLTHStudioPlannerView: View {
                             Text("\(minutes) min").font(.caption2).foregroundStyle(.secondary)
                         }
                         if !item.isExplicitRestDay {
+                            let canStart = !session.isPlanSessionSkipped(
+                                planID: plan.id, sessionID: item.id
+                            ) && !session.isPlanSessionCompleted(
+                                planID: plan.id, sessionID: item.id,
+                                healthWorkouts: health.workouts,
+                                strengthHistory: strength.workoutHistory
+                            )
+                            if canStart, let onStartWorkout {
+                                Button {
+                                    onStartWorkout(plan.id, item.id)
+                                } label: {
+                                    Label(ATHLTHLocalization.choose(
+                                        english: "Start", norwegian: "Start"
+                                    ), systemImage: "play.fill")
+                                    .font(.caption.weight(.semibold))
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                }
+                                .buttonStyle(.borderedProminent)
+                                .tint(ATHLTHStudioStyle.ink)
+                                .contextMenu {
+                                    Button {
+                                        onStartWorkout(plan.id, item.id)
+                                    } label: {
+                                        Label(ATHLTHLocalization.choose(
+                                            english: "Start workout", norwegian: "Start økt"
+                                        ), systemImage: "play.fill")
+                                    }
+                                    if let onSendToWatch {
+                                        Button {
+                                            onSendToWatch(plan.id, item.id)
+                                        } label: {
+                                            Label(ATHLTHLocalization.choose(
+                                                english: "Send to Apple Watch",
+                                                norwegian: "Send til Apple Watch"
+                                            ), systemImage: "applewatch")
+                                        }
+                                    }
+                                    if let onStartAfter {
+                                        Menu {
+                                            Button(ATHLTHLocalization.choose(
+                                                english: "In 5 minutes", norwegian: "Om 5 minutter"
+                                            )) { onStartAfter(plan.id, item.id, 300) }
+                                            Button(ATHLTHLocalization.choose(
+                                                english: "In 15 minutes", norwegian: "Om 15 minutter"
+                                            )) { onStartAfter(plan.id, item.id, 900) }
+                                            Button(ATHLTHLocalization.choose(
+                                                english: "In 30 minutes", norwegian: "Om 30 minutter"
+                                            )) { onStartAfter(plan.id, item.id, 1800) }
+                                        } label: {
+                                            Label(ATHLTHLocalization.choose(
+                                                english: "Start later", norwegian: "Start senere"
+                                            ), systemImage: "clock")
+                                        }
+                                    }
+                                }
+                                .accessibilityHint(ATHLTHLocalization.choose(
+                                    english: "Hold to choose Apple Watch or a delayed start",
+                                    norwegian: "Hold inne for Apple Watch eller utsatt start"
+                                ))
+                            }
                             Button {
                                 trainRequest = .workout(planID: plan.id, workoutID: item.id)
                                 showingTrainingEditor = true
@@ -316,8 +376,9 @@ struct ATHLTHStudioPlannerView: View {
                                 Label(ATHLTHLocalization.choose(
                                     english: "Details", norwegian: "Detaljer"
                                 ), systemImage: "arrow.up.right")
-                                .font(.caption2.weight(.semibold))
+                                .font(.caption.weight(.semibold))
                                 .foregroundStyle(ATHLTHStudioStyle.gold)
+                                .frame(minHeight: 44, alignment: .leading)
                             }
                             .buttonStyle(.plain)
                         }
