@@ -23,6 +23,32 @@ enum ATHLTHGhostCourseProgressPolicy {
             )).contains(deviationMeters)
     }
 
+    /// Only map-matched, accurate GPS course position may trigger final
+    /// Ghost milestones. Extra metres from a detour never shorten the course.
+    static func trustedCourseMeters(
+        routeLengthMeters: Double,
+        routeProgressPercent: Double?,
+        horizontalAccuracy: Double?,
+        positionAgeSeconds: TimeInterval?,
+        deviationMeters: Double?,
+        alertThresholdMeters: Double
+    ) -> Double? {
+        guard routeLengthMeters.isFinite, routeLengthMeters >= 200,
+              let progress = routeProgressPercent, progress.isFinite,
+              (0...100).contains(progress),
+              let accuracy = horizontalAccuracy,
+              let age = positionAgeSeconds, age.isFinite,
+              (0...12).contains(age),
+              let deviation = deviationMeters,
+              isReliableOnRoute(
+                  horizontalAccuracy: accuracy,
+                  deviationMeters: deviation,
+                  alertThresholdMeters: alertThresholdMeters
+              )
+        else { return nil }
+        return routeLengthMeters * progress / 100
+    }
+
     /// Prevent impossible progress teleports after GPS loss, crossings or
     /// off-route detours. The elapsed interval permits a genuine later rejoin
     /// without mistaking unrecorded route distance for a completed lap.
