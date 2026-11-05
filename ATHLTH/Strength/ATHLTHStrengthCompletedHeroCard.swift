@@ -100,7 +100,10 @@ struct ATHLTHStrengthCompletedHeroCard: View {
             let footerHeight: CGFloat = displaysMetrics ? (small ? 46 : 75) : 0
 
             ZStack(alignment: .topLeading) {
-                Image("StrengthFeedGym")
+                // Use a bundled strength-specific hero on the Home strip;
+                // keep the existing studio artwork everywhere else.
+                // The muscle dolls are native vectors drawn separately above it.
+                Image(recentActivityStrip ? "StrengthPostWorkoutHero" : "StrengthFeedGym")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFill()
@@ -157,7 +160,8 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         style: .activation,
                         presentation: .home,
                         activationTint: muscleAccent,
-                        regionTints: sessionRegionTints
+                        regionTints: sessionRegionTints,
+                        warmIvoryBase: recentActivityStrip
                     )
                     .frame(
                         width: trainDetailStyle
