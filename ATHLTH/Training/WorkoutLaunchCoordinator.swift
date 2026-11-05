@@ -1156,7 +1156,8 @@ enum WorkoutLaunchCoordinator {
         workoutMirroring:
             WorkoutMirroringStore? = nil,
         plannedPlanID: UUID? = nil,
-        plannedSessionID: UUID? = nil
+        plannedSessionID: UUID? = nil,
+        session: AppSessionStore? = nil
     ) async throws {
         if ATHLTHDeviceRole.isIPad {
             let envelope =
@@ -1265,8 +1266,8 @@ enum WorkoutLaunchCoordinator {
         )
         watchWorkout.heartRateZoneMaximumBPM =
             ATHLTHHeartRateZones.resolvedMaximumBPM(
-                configured: session.onboardingProfile?.maximumHeartRateBPM,
-                dateOfBirth: session.onboardingProfile?.dateOfBirth
+                configured: session?.onboardingProfile?.maximumHeartRateBPM,
+                dateOfBirth: session?.onboardingProfile?.dateOfBirth
             )
 
         watchConnection
