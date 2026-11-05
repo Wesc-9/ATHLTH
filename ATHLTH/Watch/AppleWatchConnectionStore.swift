@@ -1517,6 +1517,21 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             return
         }
 
+        // Watch sends a fast message AND a durable transfer for the same
+        // completion. De-duplicate before touching pet participation, current
+        // workout state or Live Activity, not only before queue insertion.
+        guard !handledWorkoutResultIDs
+                .contains(result.id),
+              !pendingWorkoutResults
+                .contains(
+                    where: {
+                        $0.id == result.id
+                    }
+                )
+        else {
+            return
+        }
+
         // An old Watch result can arrive after the iPhone changed accounts.
         // Queue it durably, but never update this account's pet selections,
         // Live Activity or active-workout guard on the wrong user.
@@ -1536,18 +1551,6 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
                 lastWatchWorkoutActivitySentAt,
                 activity.updatedAt.timeIntervalSince1970
             )
-        }
-
-        guard !handledWorkoutResultIDs
-                .contains(result.id),
-              !pendingWorkoutResults
-                .contains(
-                    where: {
-                        $0.id == result.id
-                    }
-                )
-        else {
-            return
         }
 
         pendingWorkoutResults
