@@ -815,7 +815,11 @@ struct AroundYouExploreView: View {
 
     @ObservedObject var locationStore: HomeLocationStore
     var embeddedInTab: Bool = false
+    /// Prevent offscreen MapKit refreshes while preserving route/camera state.
+    var isActive = true
 
+    @State private var lastMapRefreshAt: Date?
+    @State private var lastMapRefreshAccountID: UUID?
     @StateObject private var routeAttempts = RouteAttemptStore()
     @StateObject private var publicTrailAttempts =
         PublicTrailAttemptStore()
@@ -1229,7 +1233,14 @@ struct AroundYouExploreView: View {
             embeddedInTab ? .visible : .hidden,
             for: .tabBar
         )
-        .task {
+        .task(id: "\(isActive)-\(session.profile.userID.uuidString)") {
+            guard isActive else { return }
+            let accountID = session.profile.userID
+            if lastMapRefreshAccountID == accountID,
+               let lastMapRefreshAt,
+               Date().timeIntervalSince(lastMapRefreshAt) < 90 {
+                return
+            }
             async let routesRefresh: Void =
                 routeDiscovery.refresh()
             async let eventsRefresh: Void =
@@ -1241,9 +1252,12 @@ struct AroundYouExploreView: View {
                 eventsRefresh,
                 publicWorkoutsRefresh
             )
+            guard !Task.isCancelled else { return }
+            lastMapRefreshAccountID = accountID
+            lastMapRefreshAt = Date()
         }
-        .task(id: locationStore.location?.timestamp) {
-            guard let location = locationStore.location
+        .task(id: "\(isActive)-\(locationStore.location?.timestamp.timeIntervalSince1970 ?? 0)") {
+            guard isActive, let location = locationStore.location
             else {
                 return
             }
@@ -1256,11 +1270,12 @@ struct AroundYouExploreView: View {
                 near: location
             )
         }
-        .task(id: publicWorkoutLookupKey) {
+        .task(id: "\(isActive)-\(publicWorkoutLookupKey)") {
+            guard isActive else { return }
             await resolvePublicWorkoutAreas()
         }
-        .task(id: selectedRoute?.id) {
-            guard let selectedRoute else {
+        .task(id: "\(isActive)-\(selectedRoute?.id.uuidString ?? "")") {
+            guard isActive, let selectedRoute else {
                 return
             }
 
@@ -1284,11 +1299,20 @@ struct AroundYouExploreView: View {
     var body: some View {
         mapAndLifecycleContent
         .onAppear {
+            guard isActive else { return }
             locationStore.start()
             centerOnUser()
         }
         .onDisappear {
             locationStore.stop()
+        }
+        .onChange(of: isActive) { _, active in
+            if active {
+                locationStore.start()
+                if !hasCenteredOnUser { centerOnUser() }
+            } else {
+                locationStore.stop()
+            }
         }
         .onChange(of: locationStore.location?.timestamp) { _, _ in
             if !hasCenteredOnUser {
