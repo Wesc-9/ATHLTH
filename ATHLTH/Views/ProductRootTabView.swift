@@ -4590,7 +4590,8 @@ struct ATHLTHHomeView: View {
                         workout: workout,
                         session: session,
                         settings: settings,
-                        spotify: spotifyPlayback
+                        spotify: spotifyPlayback,
+                        captureDevice: .appleWatch
                     )
 
                 // An authorized coordinated start only becomes "started"
@@ -4679,7 +4680,8 @@ struct ATHLTHHomeView: View {
                         workout: workout,
                         session: session,
                         settings: settings,
-                        spotify: spotifyPlayback
+                        spotify: spotifyPlayback,
+                        captureDevice: .appleWatch
                     )
                     showingHomeStrengthWorkout = true
                 } catch {
