@@ -122,6 +122,14 @@ struct ATHLTHStudioPlannerView: View {
                             try? await Task.sleep(for: .milliseconds(350))
                             onOpenCoach?()
                         }
+                    },
+                    onAddWorkout: {
+                        showingScenarioPreview = false
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(350))
+                            trainRequest = .plan
+                            showingTrainingEditor = true
+                        }
                     }
                 )
                 .presentationDetents([.large])
