@@ -535,19 +535,54 @@ struct ATHLTHStudioDashboardView: View {
                 .frame(maxWidth: .infinity, minHeight: 140)
                 Spacer(minLength: 0)
             } else if healthHasDataAccess, let score = health.recovery.score {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text("\(score)")
-                        .font(.system(size: 54, weight: .light, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundStyle(ATHLTHStudioStyle.ink)
-                    Text("/ 100")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
+                HStack(alignment: .center, spacing: 19) {
+                    ZStack {
+                        Circle()
+                            .stroke(ATHLTHStudioStyle.gold.opacity(0.12), lineWidth: 7)
 
-                Text(readinessTitle)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                        Circle()
+                            .trim(
+                                from: 0,
+                                to: CGFloat(max(0, min(score, 100))) / 100
+                            )
+                            .stroke(
+                                ATHLTHStudioStyle.gold,
+                                style: StrokeStyle(lineWidth: 7, lineCap: .round)
+                            )
+                            .rotationEffect(.degrees(-90))
+
+                        VStack(spacing: 1) {
+                            Text("\(score)")
+                                .font(.system(size: 34, weight: .medium, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(ATHLTHStudioStyle.ink)
+                            Text("/ 100")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(width: 118, height: 118)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel(tr(
+                        "Training signal \(score) of 100",
+                        "Treningssignal \(score) av 100"
+                    ))
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(readinessTitle)
+                            .font(.title3.weight(.semibold))
+                            .foregroundStyle(ATHLTHStudioStyle.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Label(
+                            tr("Sleep · HRV · Resting heart rate",
+                               "Søvn · HRV · Hvilepuls"),
+                            systemImage: "waveform.path.ecg"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
 
                 Text(tr(
                     "A locally calculated signal from sleep, HRV and resting heart rate. Not a medical assessment.",
@@ -613,10 +648,19 @@ struct ATHLTHStudioDashboardView: View {
         }
         .padding(21)
         .frame(maxWidth: .infinity, minHeight: 267, alignment: .leading)
-        .background(ATHLTHStudioStyle.paper, in: RoundedRectangle(cornerRadius: 22))
+        .background {
+            RoundedRectangle(cornerRadius: 22)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.white, ATHLTHStudioStyle.paper],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
         .overlay {
             RoundedRectangle(cornerRadius: 22)
-                .stroke(ATHLTHStudioStyle.outline.opacity(0.55))
+                .stroke(ATHLTHStudioStyle.gold.opacity(0.24))
         }
     }
 
