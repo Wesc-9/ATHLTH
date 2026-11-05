@@ -9,6 +9,7 @@ struct ATHLTHRunningResultAnalysisCard: View {
     let activeEnergyKilocalories: Double?
     let maxHeartRateBPM: Double?
     var pulseSamples: [ATHLTHRunningHeartRatePoint] = []
+    var achievements: [ATHLTHRunningAchievement] = []
 
     private func splitPulse(_ split: ATHLTHRunningResultInsights.KilometerSplit) -> String {
         guard let start = split.startedAt, let end = split.endedAt,
@@ -97,6 +98,12 @@ struct ATHLTHRunningResultAnalysisCard: View {
                         }
                     }
                 }
+            }
+
+            // Place records immediately below the highlights and before
+            // the kilometre table, without changing existing result sections.
+            if !achievements.isEmpty {
+                ATHLTHRunningAchievementsCard(achievements: achievements)
             }
 
             if !splits.isEmpty {
