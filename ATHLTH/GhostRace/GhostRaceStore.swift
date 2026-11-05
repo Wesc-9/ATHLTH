@@ -203,6 +203,8 @@ final class GhostRaceStore: ObservableObject {
     @Published var errorMessage: String?
 
     private var lastMatchedIndex: Int?
+    private var routeMainStartElapsedSeconds: TimeInterval?
+    private var observedDeferredWarmup = false
     // Independent from the time the user stops the workout.
     private var finishCrossingElapsed: TimeInterval?
     private var lastReliableCourseSample: (meters: Double, elapsed: TimeInterval)?
@@ -500,9 +502,34 @@ final class GhostRaceStore: ObservableObject {
         with snapshot: WatchWorkoutLiveSnapshot?
     ) {
         guard let reference,
-              let snapshot
+              var snapshot = snapshot
         else {
             return
+        }
+
+        // A route warm-up records genuine HealthKit activity, but it is not
+        // part of the Ghost race. Defer comparisons, speech and finishing
+        // until the first actual main-section GPS position.
+        let inRouteWarmup = snapshot.runningRouteWarmup == true ||
+            snapshot.runningStepPhase == "warmup" ||
+            snapshot.runningAwaitingMainStart == true
+        if inRouteWarmup {
+            observedDeferredWarmup = true
+            comparison = nil
+            return
+        }
+        if observedDeferredWarmup {
+            if routeMainStartElapsedSeconds == nil {
+                routeMainStartElapsedSeconds = max(
+                    0,
+                    snapshot.elapsedTime -
+                        max(snapshot.runningStepElapsedSeconds ?? 0, 0)
+                )
+            }
+            snapshot.elapsedTime = max(
+                0, snapshot.elapsedTime -
+                    (routeMainStartElapsedSeconds ?? 0)
+            )
         }
 
         if snapshot.state == .failed {
@@ -889,6 +916,8 @@ final class GhostRaceStore: ObservableObject {
     }
 
     private func resetRaceDynamics() {
+        routeMainStartElapsedSeconds = nil
+        observedDeferredWarmup = false
         finishCrossingElapsed = nil
         lastReliableCourseSample = nil
         maximumLeadMeters = 0
