@@ -1,3 +1,4 @@
+import CoreLocation
 import XCTest
 @testable import ATHLTH
 
@@ -89,6 +90,162 @@ final class ATHLTHAudioCoachSmartPromptsTests: XCTestCase {
         XCTAssertTrue(message(accuracy: 5, age: 1)?
             .contains("venstre side") == true)
         XCTAssertNil(message(accuracy: 5, age: 1))
+    }
+
+    func testPraisePushAndEncouragementHaveDistinctVariedBanks() {
+        for style in ATHLTHCoachEncouragementStyle.allCases {
+            var state = ATHLTHAudioCoachSmartState()
+            var config = ATHLTHAudioCoachSmartSettings()
+            config.motivationEnabled = true
+            config.motivationIntervalSeconds = 60
+            config.encouragementStyle = style
+            config.contextualFeedbackEnabled = false
+            var spoken: [String] = []
+            for minute in 1...12 {
+                let result = state.nextMotivation(
+                    settings: config,
+                    elapsed: Double(minute * 60),
+                    paceSecondsPerKilometer: nil,
+                    norwegian: true
+                )
+                if let result { spoken.append(result) }
+            }
+            XCTAssertEqual(spoken.count, 12)
+            for index in spoken.indices {
+                XCTAssertFalse(
+                    spoken[max(0, index - 8)..<index].contains(spoken[index]),
+                    "Style \(style) repeated a phrase too early"
+                )
+            }
+        }
+    }
+
+    func testMeasuredFasterPaceHasDifferentFeedbackEachMinute() {
+        var state = ATHLTHAudioCoachSmartState()
+        var config = ATHLTHAudioCoachSmartSettings()
+        config.motivationEnabled = true
+        let paceValues: [Double] = [360, 330, 300, 275, 250]
+        let spoken = paceValues.enumerated().compactMap { index, pace in
+            state.nextMotivation(
+                settings: config,
+                elapsed: Double((index + 1) * 60),
+                paceSecondsPerKilometer: pace,
+                norwegian: true
+            )
+        }
+        XCTAssertEqual(spoken.count, 5)
+        XCTAssertTrue(spoken.dropFirst().allSatisfy {
+            $0.contains("økt farten")
+        })
+        XCTAssertEqual(Set(spoken.dropFirst()).count, 4)
+    }
+
+    func testLastStretchUsesVerifiedRouteProgressNotJustDistance() {
+        var state = ATHLTHAudioCoachSmartState()
+        var config = ATHLTHAudioCoachSmartSettings()
+        config.motivationEnabled = true
+
+        let early = state.nextMotivation(
+            settings: config, elapsed: 60,
+            paceSecondsPerKilometer: nil, norwegian: true,
+            environment: .init(
+                routeRemainingMeters: 80, routeProgressPercent: 4
+            )
+        )
+        XCTAssertFalse(early?.contains("siste del av ruten") == true)
+
+        let finish = state.nextMotivation(
+            settings: config, elapsed: 120,
+            paceSecondsPerKilometer: nil, norwegian: true,
+            environment: .init(
+                routeRemainingMeters: 80, routeProgressPercent: 97
+            )
+        )
+        XCTAssertTrue(
+            ["mål", "siste", "fremme"].contains {
+                finish?.localizedCaseInsensitiveContains($0) == true
+            }
+        )
+        let second = state.nextMotivation(
+            settings: config, elapsed: 180,
+            paceSecondsPerKilometer: nil, norwegian: true,
+            environment: .init(
+                routeRemainingMeters: 50, routeProgressPercent: 98
+            )
+        )
+        XCTAssertNotEqual(finish, second)
+    }
+
+    func testRealUphillRequiresFreshAccurateElevationAndDistance() {
+        var state = ATHLTHAudioCoachSmartState()
+        let base = Date(timeIntervalSince1970: 1_790_000_000)
+        func sample(
+            latitude: Double, altitude: Double,
+            verticalAccuracy: Double, time: TimeInterval
+        ) -> CLLocation {
+            CLLocation(
+                coordinate: CLLocationCoordinate2D(
+                    latitude: latitude, longitude: 10.4
+                ),
+                altitude: altitude,
+                horizontalAccuracy: 6,
+                verticalAccuracy: verticalAccuracy,
+                timestamp: base.addingTimeInterval(time)
+            )
+        }
+        state.observeTerrain(
+            location: sample(latitude: 63.43, altitude: 12,
+                             verticalAccuracy: 3, time: 0),
+            now: base.addingTimeInterval(1)
+        )
+        state.observeTerrain(
+            location: sample(latitude: 63.431, altitude: 35,
+                             verticalAccuracy: 3, time: 10),
+            now: base.addingTimeInterval(11)
+        )
+        XCTAssertEqual(state.inferredTerrain, .uphill)
+
+        state.observeTerrain(
+            location: sample(latitude: 63.432, altitude: 8,
+                             verticalAccuracy: 50, time: 20),
+            now: base.addingTimeInterval(21)
+        )
+        XCTAssertNil(state.inferredTerrain)
+    }
+
+    func testHomeAndSeaAreOnlySpokenForExplicitPinnedLocations() {
+        var state = ATHLTHAudioCoachSmartState()
+        var config = ATHLTHAudioCoachSmartSettings()
+        config.landmarks = [
+            ATHLTHCoachLandmark(
+                name: "Bryggen", latitude: 63.43,
+                longitude: 10.4, side: .unspecified,
+                kind: .waterfront
+            )
+        ]
+        let nearWater = state.nextLandmark(
+            settings: config, latitude: 63.43, longitude: 10.4,
+            horizontalAccuracy: 5, locationAge: 1, norwegian: true
+        )
+        XCTAssertTrue(nearWater?.contains("Sjøen") == true)
+        XCTAssertNil(state.nextLandmark(
+            settings: config, latitude: 63.43, longitude: 10.4,
+            horizontalAccuracy: 5, locationAge: 1, norwegian: true
+        ))
+        config.landmarks = [
+            ATHLTHCoachLandmark(
+                name: "Hjem", latitude: 63.44, longitude: 10.4,
+                side: .unspecified, kind: .home
+            )
+        ]
+        XCTAssertNil(state.nextLandmark(
+            settings: config, latitude: 63.43, longitude: 10.4,
+            horizontalAccuracy: 5, locationAge: 1, norwegian: true
+        ))
+        XCTAssertTrue(state.nextLandmark(
+            settings: config, latitude: 63.44, longitude: 10.4,
+            horizontalAccuracy: 5, locationAge: 1, norwegian: true
+        )?.contains("hjemme") == true)
     }
 
     func testFullCoachProfileSurvivesEncoding() throws {
