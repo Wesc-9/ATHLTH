@@ -242,6 +242,77 @@ struct PhoneWorkout: Codable, Identifiable {
     }
 }
 
+/// Verified against previously saved ATHLTH iPhone workouts only.
+/// The coach must not describe these as lifetime Apple Health records.
+enum ATHLTHPhoneRunningRecordEvidence {
+    static func announcement(
+        current: PhoneWorkout,
+        history: [PhoneWorkout]
+    ) -> (english: String, norwegian: String)? {
+        guard !current.walking,
+              current.end != nil,
+              current.distanceMeters.isFinite,
+              current.distanceMeters >= 1_000 else { return nil }
+
+        let previous = history.filter {
+            !$0.walking &&
+            $0.end != nil &&
+            $0.end! <= current.start &&
+            $0.runEnvironment == current.runEnvironment &&
+            $0.distanceMeters.isFinite &&
+            $0.distanceMeters >= 1_000 &&
+            $0.elapsed(at: $0.end!).isFinite &&
+            $0.elapsed(at: $0.end!) > 0
+        }
+        // A first recorded activity is not evidence of beating a record.
+        guard !previous.isEmpty else { return nil }
+
+        let currentSeconds = current.elapsed(at: current.end!)
+        guard currentSeconds.isFinite, currentSeconds > 0 else { return nil }
+
+        var english: [String] = []
+        var norwegian: [String] = []
+        if let farthest = previous.map(\.distanceMeters).max(),
+           current.distanceMeters >= farthest + 10 {
+            english.append("longest recorded run")
+            norwegian.append("lengste registrerte løpetur")
+        }
+
+        let previousPaces = previous.map {
+            $0.elapsed(at: $0.end!) / ($0.distanceMeters / 1_000)
+        }.filter { $0.isFinite && (120...3_600).contains($0) }
+        let pace = currentSeconds / (current.distanceMeters / 1_000)
+        if let best = previousPaces.min(),
+           (120...3_600).contains(pace),
+           pace <= best - 2 {
+            english.append("fastest average pace on an iPhone run")
+            norwegian.append("beste gjennomsnittstempo på en iPhone-løpetur")
+        }
+
+        if current.finalLeaderboardEligible == true,
+           let routeID = current.plannedComparisonRouteID ?? current.plannedRouteID {
+            let sameRoute = previous.filter {
+                $0.finalLeaderboardEligible == true &&
+                ($0.plannedComparisonRouteID ?? $0.plannedRouteID) == routeID
+            }
+            if let previousBest = sameRoute.map({
+                $0.elapsed(at: $0.end!)
+            }).min(), currentSeconds < previousBest - 1 {
+                english.append("new personal best on this verified route")
+                norwegian.append("ny personlig bestetid på denne bekreftede ruten")
+            }
+        }
+
+        guard !english.isEmpty else { return nil }
+        return (
+            english: "New ATHLTH iPhone record: " +
+                english.joined(separator: ", ") + ".",
+            norwegian: "Ny ATHLTH-rekord fra iPhone: " +
+                norwegian.joined(separator: ", ") + "."
+        )
+    }
+}
+
 @MainActor
 final class IPhoneWorkoutStore:
     NSObject,
@@ -1546,9 +1617,15 @@ final class IPhoneWorkoutStore:
         // speak(), so its voice policy silently rejected the announcement.
         if let coach = workout.audioCoachConfiguration,
            coach.enabled, coach.shouldAnnounceWorkoutComplete {
+            let records = ATHLTHPhoneRunningRecordEvidence.announcement(
+                current: workout,
+                history: history
+            )
             let highlights = ATHLTHWorkoutCompletionSpokenSummary.make(
                 elapsedSeconds: workout.elapsed(at: workout.end ?? Date()),
-                distanceMeters: workout.distanceMeters
+                distanceMeters: workout.distanceMeters,
+                verifiedRecordEnglish: records?.english,
+                verifiedRecordNorwegian: records?.norwegian
             )
             deactivateCoachAudioSession()
             // Local playback is deliberate here: an asynchronous Azure
