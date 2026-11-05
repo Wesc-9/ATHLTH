@@ -4379,6 +4379,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               let settings = audioCoachConfiguration.smartPrompts
         else { return }
         let norwegian = coachPhrase(english: "en", norwegian: "no") == "no"
+        if usesOutdoorGPS, let location = lastAcceptedOutdoorLocation {
+            smartCoachState.observeTerrain(location: location)
+        }
         if usesOutdoorGPS, let location = lastAcceptedOutdoorLocation,
            let message = smartCoachState.nextLandmark(
                settings: settings,
@@ -4405,7 +4408,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             settings: settings,
             elapsed: elapsedTime,
             paceSecondsPerKilometer: currentPaceSecondsPerKilometer,
-            norwegian: norwegian
+            norwegian: norwegian,
+            environment: ATHLTHCoachEnvironmentalContext(
+                routeRemainingMeters: usesOutdoorGPS
+                    ? routeRemainingMeters : nil,
+                routeProgressPercent: usesOutdoorGPS
+                    ? routeProgressPercent : nil,
+                terrain: usesOutdoorGPS
+                    ? smartCoachState.inferredTerrain : nil
+            )
         ) {
             speak(
                 message,
