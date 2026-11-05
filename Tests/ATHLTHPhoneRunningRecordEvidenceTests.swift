@@ -14,6 +14,19 @@ final class ATHLTHPhoneRunningRecordEvidenceTests: XCTestCase {
         return workout
     }
 
+    func testCompletedZeroDurationCannotClaimRecord() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let previous = run(
+            start: now.addingTimeInterval(-86_400),
+            seconds: 1900, meters: 4800
+        )
+        var incomplete = run(start: now, seconds: 1500, meters: 5000)
+        incomplete.accumulatedSeconds = 0
+        XCTAssertNil(ATHLTHPhoneRunningRecordEvidence.announcement(
+            current: incomplete, history: [previous]
+        ))
+    }
+
     func testFirstRunDoesNotClaimPersonalRecord() {
         let now = Date(timeIntervalSince1970: 1_800_000_000)
         let first = run(start: now, seconds: 1500, meters: 5000)
