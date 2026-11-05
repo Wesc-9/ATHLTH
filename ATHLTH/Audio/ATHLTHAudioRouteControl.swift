@@ -254,16 +254,19 @@ enum ATHLTHSpokenAudioSession {
         delayedRestoreTask = nil
 
         let session = AVAudioSession.sharedInstance()
+        // Removing duckOthers before deactivating is essential even if
+        // notifyOthersOnDeactivation succeeds: Bluetooth handoffs can retain
+        // the previous category while the music owner is transitioning.
+        // Only do this when all ATHLTH speakers have released their leases.
+        try? session.setCategory(
+            .playback, mode: .default, options: [.mixWithOthers]
+        )
         do {
             try session.setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            // When iOS rejects deactivation during a Bluetooth/Spotify route
-            // handoff, remove duckOthers first. Otherwise the music can
-            // remain quiet until the asynchronous deactivation finally works.
-            // This is only safe with no remaining speech owners.
-            try? session.setCategory(
-                .playback, mode: .default, options: [.mixWithOthers]
-            )
+            // Keep retrying deactivation after route transitions. No retry
+            // can remove a new cue's mixing/duck policy: it re-checks revision.
+
             // Retry notifyOthersOnDeactivation without interrupting a new cue.
             delayedRestoreTask = Task { @MainActor in
                 let delays: [Duration] = [
