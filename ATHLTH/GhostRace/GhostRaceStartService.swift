@@ -78,7 +78,8 @@ enum GhostRaceStartService {
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore? = nil,
         captureDevice: WorkoutCaptureDevice = .appleWatch,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        maximumHeartRateBPM: Double? = nil
     ) async throws {
         try ghostRace.prepareTarget(
             route: route,
@@ -95,7 +96,8 @@ enum GhostRaceStartService {
                 watchConnection,
             phoneWorkout: phoneWorkout,
             captureDevice: captureDevice,
-            settings: settings
+            settings: settings,
+            maximumHeartRateBPM: maximumHeartRateBPM
         )
     }
 
@@ -201,7 +203,8 @@ enum GhostRaceStartService {
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore? = nil,
         captureDevice: WorkoutCaptureDevice = .appleWatch,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        maximumHeartRateBPM: Double? = nil
     ) async throws {
         // Live Ghost compares a fresh cloud opponent instead of a fixed
         // timing profile. When both athletes share a stable route key, load
@@ -316,22 +319,17 @@ enum GhostRaceStartService {
                     )
             }
 
-            let liveCoach =
-                settings.audioCoachConfiguration(
-                    enabled:
-                        settings
-                            .audioCoachEnabledByDefault,
-                    routeDistanceMeters:
-                        route.map {
-                            max(
-                                $0.distanceKilometers *
-                                    1_000,
-                                0
-                            )
-                        }
-                )
+            var liveCoach = settings.audioCoachConfiguration(
+                enabled: settings.audioCoachEnabledByDefault,
+                routeDistanceMeters: route.map {
+                    max($0.distanceKilometers * 1_000, 0)
+                }
+            )
+            // Watch-owned Ghost voices must not be split between speakers.
+            liveCoach.preferIPhoneAudioWhenReachable = false
+            liveCoach.useAcknowledgedVoiceLease = false
 
-            let runningTransfer =
+            var runningTransfer =
                 WatchRunningWorkoutTransfer(
                     title:
                         "Live Ghost · \(title)",
@@ -340,6 +338,8 @@ enum GhostRaceStartService {
                         settings
                             .routeAlertConfiguration
                 )
+
+            runningTransfer.heartRateZoneMaximumBPM = maximumHeartRateBPM
 
             // Send ATHLTH guidance before HealthKit starts the Watch session.
             // This removes the launch race where the first kilometre could
@@ -488,7 +488,8 @@ enum GhostRaceStartService {
         watchConnection: AppleWatchConnectionStore,
         phoneWorkout: IPhoneWorkoutStore?,
         captureDevice: WorkoutCaptureDevice,
-        settings: AppSettingsStore
+        settings: AppSettingsStore,
+        maximumHeartRateBPM: Double? = nil
     ) async throws {
         guard let raceRoute =
                 ghostRace.temporaryRoute(
@@ -505,7 +506,7 @@ enum GhostRaceStartService {
         }
 
         do {
-            let standardAudioCoach =
+            var standardAudioCoach =
                 settings.audioCoachConfiguration(
                     enabled:
                         settings
@@ -515,6 +516,10 @@ enum GhostRaceStartService {
                             .distanceKilometers *
                             1_000
                 )
+            if captureDevice == .appleWatch {
+                standardAudioCoach.preferIPhoneAudioWhenReachable = false
+                standardAudioCoach.useAcknowledgedVoiceLease = false
+            }
             let ghostAudio =
                 coexistingGhostAudio(
                     settings
@@ -652,15 +657,13 @@ enum GhostRaceStartService {
                 )
             watchConnection.sendGhostRace(ghostTransfer)
 
-            let runningTransfer =
+            var runningTransfer =
                 WatchRunningWorkoutTransfer(
-                    title:
-                        "Ghost Race · \(title)",
+                    title: "Ghost Race · \(title)",
                     steps: [],
-                    routeAlerts:
-                        settings
-                            .routeAlertConfiguration
+                    routeAlerts: settings.routeAlertConfiguration
                 )
+            runningTransfer.heartRateZoneMaximumBPM = maximumHeartRateBPM
 
             // Audio Coach owns the user's requested periodic metric cadence.
             // Ghost keeps haptic periodic status plus important lead-change
