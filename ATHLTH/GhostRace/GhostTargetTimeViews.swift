@@ -1959,10 +1959,12 @@ struct TargetGhostSetupView: View {
                         watchConnection,
                     phoneWorkout:
                         phoneWorkout,
-                    captureDevice:
-                        captureDevice,
-                    settings:
-                        settings
+                    captureDevice: captureDevice,
+                    settings: settings,
+                    maximumHeartRateBPM: ATHLTHHeartRateZones.resolvedMaximumBPM(
+                        configured: session.onboardingProfile?.maximumHeartRateBPM,
+                        dateOfBirth: session.onboardingProfile?.dateOfBirth
+                    )
                 )
 
             dismiss()
