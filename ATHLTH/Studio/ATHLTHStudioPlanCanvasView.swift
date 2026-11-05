@@ -57,6 +57,9 @@ struct ATHLTHStudioPlanCanvasView: View {
     @State private var warning: String?
     @State private var actionToUndo: StudioAction?
     @State private var actionToRedo: StudioAction?
+    @State private var batchWorkoutIDs = Set<UUID>()
+    @State private var batchDestinationDayID: UUID?
+    @State private var batchCopy = false
 
     /// Only the most recent drag-and-drop change can be undone safely.
     /// Its stored plan version prevents reversing another device's edits.
@@ -160,6 +163,8 @@ struct ATHLTHStudioPlanCanvasView: View {
             copyMessage = nil
             actionToUndo = nil
             actionToRedo = nil
+            batchWorkoutIDs = []
+            batchDestinationDayID = nil
         }
         .onChange(of: selectedWeekID) { _, selected in
             sceneWeekID = selected?.uuidString ?? ""
@@ -209,6 +214,37 @@ struct ATHLTHStudioPlanCanvasView: View {
                 }
             )
             .environment(\.athlthStudioFullscreenEditing, true)
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Apply to \(batchWorkoutIDs.count) planned workouts?",
+                norwegian: "Endre \(batchWorkoutIDs.count) planlagte økter?"
+            ),
+            isPresented: Binding(
+                get: { batchDestinationDayID != nil },
+                set: { if !$0 { batchDestinationDayID = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(
+                batchCopy
+                    ? ATHLTHLocalization.choose(
+                        english: "Copy workouts", norwegian: "Kopier øktene"
+                    )
+                    : ATHLTHLocalization.choose(
+                        english: "Move workouts", norwegian: "Flytt øktene"
+                    )
+            ) {
+                applyBatchTransfer()
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) { batchDestinationDayID = nil }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "All selected workouts are checked before any plan changes. Completed workouts cannot be moved.",
+                norwegian: "Alle valgte økter kontrolleres før planen endres. Fullførte økter kan ikke flyttes."
+            ))
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
@@ -526,6 +562,60 @@ struct ATHLTHStudioPlanCanvasView: View {
             .disabled(inlineWorkout != nil)
 
             Spacer(minLength: 2)
+
+            if batchWorkoutIDs.count >= 2 && inlineWorkout == nil {
+                Menu {
+                    ForEach(plan.weeks) { week in
+                        Menu(ATHLTHLocalization.choose(
+                            english: "Move · week \(week.weekNumber)",
+                            norwegian: "Flytt · uke \(week.weekNumber)"
+                        )) {
+                            ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                                Button(ATHLTHLocalization.choose(
+                                    english: "Day \(day.dayIndex)",
+                                    norwegian: "Dag \(day.dayIndex)"
+                                )) {
+                                    batchCopy = false
+                                    batchDestinationDayID = day.id
+                                }
+                                .disabled(day.sessions.contains(where: \.isExplicitRestDay))
+                            }
+                        }
+                        Menu(ATHLTHLocalization.choose(
+                            english: "Copy · week \(week.weekNumber)",
+                            norwegian: "Kopier · uke \(week.weekNumber)"
+                        )) {
+                            ForEach(week.days.sorted(by: { $0.dayIndex < $1.dayIndex })) { day in
+                                Button(ATHLTHLocalization.choose(
+                                    english: "Day \(day.dayIndex)",
+                                    norwegian: "Dag \(day.dayIndex)"
+                                )) {
+                                    batchCopy = true
+                                    batchDestinationDayID = day.id
+                                }
+                                .disabled(day.sessions.contains(where: \.isExplicitRestDay))
+                            }
+                        }
+                    }
+                    Divider()
+                    Button(ATHLTHLocalization.choose(
+                        english: "Clear selection",
+                        norwegian: "Nullstill valg"
+                    )) {
+                        batchWorkoutIDs = []
+                    }
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "\(batchWorkoutIDs.count) selected",
+                            norwegian: "\(batchWorkoutIDs.count) valgte"
+                        ),
+                        systemImage: "checkmark.circle"
+                    )
+                }
+                .tint(ATHLTHStudioStyle.gold)
+                .accessibilityIdentifier("athlth-ipad-plan-batch-actions")
+            }
 
             if inlineWorkout == nil && inlineNewWorkout == nil {
                 if actionToUndo != nil {
@@ -1144,6 +1234,30 @@ struct ATHLTHStudioPlanCanvasView: View {
                 } else {
                     ForEach(day.sessions) { workout in
                         HStack(spacing: 8) {
+                            if !workout.isExplicitRestDay {
+                                Button {
+                                    if batchWorkoutIDs.contains(workout.id) {
+                                        batchWorkoutIDs.remove(workout.id)
+                                    } else {
+                                        batchWorkoutIDs.insert(workout.id)
+                                    }
+                                } label: {
+                                    Image(systemName:
+                                        batchWorkoutIDs.contains(workout.id)
+                                            ? "checkmark.square.fill" : "square"
+                                    )
+                                    .font(.system(size: 18))
+                                    .foregroundStyle(ATHLTHStudioStyle.gold)
+                                    .frame(width: 30, height: 36)
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel(
+                                    ATHLTHLocalization.choose(
+                                        english: "Select workout for batch actions",
+                                        norwegian: "Velg økt for gruppehandling"
+                                    )
+                                )
+                            }
                             Image(systemName: workout.isExplicitRestDay
                                   ? "moon.zzz" : workout.kind.systemImage)
                                 .foregroundStyle(ATHLTHStudioStyle.gold)
@@ -1401,6 +1515,36 @@ struct ATHLTHStudioPlanCanvasView: View {
                     expectedVersion: version
                 )
             }
+        }
+    }
+
+    private func applyBatchTransfer() {
+        guard let dayID = batchDestinationDayID,
+              let plan = selectedPlan else {
+            batchDestinationDayID = nil
+            return
+        }
+        batchDestinationDayID = nil
+        let copied = batchCopy
+        let succeeded = session.batchTransferPlanStudioWorkouts(
+            planID: plan.id,
+            workoutIDs: Array(batchWorkoutIDs),
+            targetDayID: dayID,
+            copy: copied,
+            expectedVersion: plan.version,
+            healthWorkouts: health.workouts,
+            strengthHistory: strength.workoutHistory
+        )
+        if succeeded {
+            batchWorkoutIDs = []
+            actionToUndo = nil
+            actionToRedo = nil
+            selectedDayID = dayID
+        } else {
+            warning = ATHLTHLocalization.choose(
+                english: "No workouts were changed. Verify dates, completion status and the newest plan version.",
+                norwegian: "Ingen økter ble endret. Kontroller datoer, fullføringsstatus og siste planversjon."
+            )
         }
     }
 
