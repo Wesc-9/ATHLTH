@@ -18,7 +18,7 @@ struct ATHLTHAudioCoachStudioView: View {
     @State private var ruleMetric: ATHLTHAudioCoachRule.Metric = .distance
     @State private var ruleSeconds = 60
     @State private var ruleMeters = 800
-    @State private var encouragementDraft = ""
+    @State private var ruleSetName = ""
     @State private var customPhrase = ""
     @State private var placeSearch = ""
     @State private var placeSide: ATHLTHCoachLandmarkSide = .unspecified
@@ -244,6 +244,94 @@ struct ATHLTHAudioCoachStudioView: View {
                 .tint(ATHLTHTheme.accentDeep)
                 .disabled(settings.audioCoachCustomRules.count >= 20)
                 .accessibilityIdentifier("athlth-audio-coach-add-sequence")
+
+                if !settings.audioCoachCustomRules.isEmpty {
+                    Divider().opacity(0.5)
+                    TextField(ATHLTHLocalization.choose(
+                        english: "Name this announcement set (e.g. Competition)",
+                        norwegian: "Navn på oppsettet (f.eks. Konkurranse)"
+                    ), text: $ruleSetName)
+                    .textInputAutocapitalization(.sentences)
+                    .textFieldStyle(.roundedBorder)
+
+                    Button {
+                        let name = ruleSetName.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                        guard !name.isEmpty,
+                              settings.audioCoachSavedRuleSets.count < 30 else { return }
+                        settings.audioCoachSavedRuleSets.append(
+                            ATHLTHAudioCoachRuleSet(
+                                title: String(name.prefix(60)),
+                                rules: settings.audioCoachCustomRules
+                            )
+                        )
+                        ruleSetName = ""
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Save these announcements",
+                            norwegian: "Lagre disse beskjedene"
+                        ), systemImage: "square.and.arrow.down")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(
+                        ruleSetName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+                        settings.audioCoachSavedRuleSets.count >= 30
+                    )
+                }
+
+                if !settings.audioCoachSavedRuleSets.isEmpty {
+                    Menu {
+                        ForEach(settings.audioCoachSavedRuleSets) { saved in
+                            Button(saved.title) {
+                                settings.audioCoachCustomRules = saved.rules
+                            }
+                        }
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Load saved announcements",
+                            norwegian: "Hent lagrede beskjeder"
+                        ), systemImage: "folder")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+
+                    ForEach(settings.audioCoachSavedRuleSets) { saved in
+                        HStack {
+                            Button {
+                                settings.audioCoachCustomRules = saved.rules
+                            } label: {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(saved.title)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHTheme.primaryText)
+                                    Text("\(saved.rules.count) " +
+                                         ATHLTHLocalization.choose(
+                                            english: "sequences",
+                                            norwegian: "beskjeder"
+                                         ))
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                            Button(role: .destructive) {
+                                settings.audioCoachSavedRuleSets.removeAll {
+                                    $0.id == saved.id
+                                }
+                            } label: {
+                                Image(systemName: "trash")
+                                    .frame(width: 44, height: 44)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Delete saved announcements",
+                                norwegian: "Slett lagrede beskjeder"
+                            ))
+                        }
+                    }
+                }
             }
         }
     }
