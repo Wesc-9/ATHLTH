@@ -111,14 +111,26 @@ struct WatchRunWorkoutExperienceView: View {
             WatchTheme.textPrimary
         )
         .onAppear {
-            selectedPage = ATHLTHWatchDisplayPreferences.startingRunPage(
-                configuration: workoutManager.liveSurfaceConfiguration,
-                audioCoachAvailable: workoutManager.audioCoachConfigured
-            )
+            selectedPage =
+                workoutManager.structuredRunningWorkout?.deferRouteUntilMain == true &&
+                workoutManager.currentStructuredRunningStep?.phase == "warmup"
+                ? 0
+                : ATHLTHWatchDisplayPreferences.startingRunPage(
+                    configuration: workoutManager.liveSurfaceConfiguration,
+                    audioCoachAvailable: workoutManager.audioCoachConfigured
+                )
             coachOutputName = AVAudioSession.sharedInstance()
                 .currentRoute.outputs.first?.portName
             if workoutManager.indoorSuggestionAvailable {
                 showingAutomaticIndoorSuggestion = true
+            }
+        }
+        .onChange(of: workoutManager.currentStructuredRunningStep?.phase) { _, phase in
+            // Always reveal the prominent Start Main control when a saved
+            // route begins in its warm-up, regardless of a preferred page.
+            if phase == "warmup",
+               workoutManager.structuredRunningWorkout?.deferRouteUntilMain == true {
+                selectedPage = 0
             }
         }
         .onChange(of: workoutManager.indoorSuggestionAvailable) { _, available in
