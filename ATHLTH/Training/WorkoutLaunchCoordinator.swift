@@ -1018,20 +1018,10 @@ enum WorkoutLaunchCoordinator {
         // Use the athlete's entered HRmax where available. Otherwise the
         // same adult age-based fallback as Plan's zone editor applies.
         // This is a target reference, never a measured live pulse.
-        let knownMaximum = session.onboardingProfile?.maximumHeartRateBPM
-        let resolvedMaximumBPM: Double? = {
-            if let knownMaximum, (100...240).contains(knownMaximum) {
-                return Double(knownMaximum)
-            }
-            guard let dateOfBirth = session.onboardingProfile?.dateOfBirth else {
-                return nil
-            }
-            let age = Calendar.current.dateComponents(
-                [.year], from: dateOfBirth, to: Date()
-            ).year ?? 0
-            guard (18...100).contains(age) else { return nil }
-            return max(100, 208 - (0.7 * Double(age)))
-        }()
+        let resolvedMaximumBPM = ATHLTHHeartRateZones.resolvedMaximumBPM(
+            configured: session.onboardingProfile?.maximumHeartRateBPM,
+            dateOfBirth: session.onboardingProfile?.dateOfBirth
+        )
         watchRunningWorkout.heartRateZoneMaximumBPM = resolvedMaximumBPM
 
         watchRunningWorkout
@@ -1267,14 +1257,16 @@ enum WorkoutLaunchCoordinator {
             )
         }
 
-        let watchWorkout =
-            WatchRunningWorkoutTransfer(
-                title: "",
-                steps: [],
-                routeAlerts:
-                    settings.routeAlertConfiguration,
-                autoPauseEnabled:
-                    configuration.autoPauseEnabled
+        var watchWorkout = WatchRunningWorkoutTransfer(
+            title: "",
+            steps: [],
+            routeAlerts: settings.routeAlertConfiguration,
+            autoPauseEnabled: configuration.autoPauseEnabled
+        )
+        watchWorkout.heartRateZoneMaximumBPM =
+            ATHLTHHeartRateZones.resolvedMaximumBPM(
+                configured: session.onboardingProfile?.maximumHeartRateBPM,
+                dateOfBirth: session.onboardingProfile?.dateOfBirth
             )
 
         watchConnection
