@@ -38,12 +38,15 @@ enum ATHLTHStudioHomeWeek {
     ) -> (start: Date, end: Date) {
         var calendar = source
         calendar.firstWeekday = 2
-        let startDay = calendar.startOfDay(for: date)
-        let days = (calendar.component(.weekday, from: startDay) + 5) % 7
-        let start = calendar.date(byAdding: .day, value: -days, to: startDay)
-            ?? startDay
-        let end = calendar.date(byAdding: .day, value: 6, to: start) ?? start
-        return (start, end)
+        // Share iPhone Home's calendar interval calculation, including
+        // local timezone and daylight-saving transitions.
+        let interval = HomeWeeklyProgressCalendar.weekInterval(
+            offset: 0, referenceDate: date, calendar: calendar
+        )
+        let lastDay = calendar.date(
+            byAdding: .day, value: -1, to: interval.end
+        ) ?? interval.start
+        return (interval.start, lastDay)
     }
 
     static func make(
@@ -57,11 +60,12 @@ enum ATHLTHStudioHomeWeek {
     ) -> Snapshot {
         var calendar = sourceCalendar
         calendar.firstWeekday = 2
-        let referenceDay = calendar.startOfDay(for: now)
-        let daysSinceMonday = (calendar.component(.weekday, from: referenceDay) + 5) % 7
-        let monday = calendar.date(
-            byAdding: .day, value: -daysSinceMonday, to: referenceDay
-        ) ?? referenceDay
+        // Both iPhone's weekly progress calendar and iPad's Studio now
+        // obtain their seven-day boundary from the same pure date engine.
+        let weekInterval = HomeWeeklyProgressCalendar.weekInterval(
+            offset: 0, referenceDate: now, calendar: calendar
+        )
+        let monday = weekInterval.start
 
         let planned = ATHLTHStudioSchedule.window(
             plans: plans,
@@ -75,7 +79,7 @@ enum ATHLTHStudioHomeWeek {
         let groupedPlanned = Dictionary(grouping: planned) {
             calendar.startOfDay(for: $0.date)
         }
-        let until = calendar.date(byAdding: .day, value: 7, to: monday) ?? monday
+        let until = weekInterval.end
         let includedRecorded = recorded.filter {
             $0.startDate >= monday && $0.startDate < until &&
             $0.duration.isFinite && $0.duration >= 0
