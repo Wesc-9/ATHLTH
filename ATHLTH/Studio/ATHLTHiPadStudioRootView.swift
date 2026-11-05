@@ -486,6 +486,10 @@ struct ATHLTHiPadStudioRootView: View {
                 onOpenInsights: { selection = .insights },
                 onOpenHistory: { selection = .history },
                 onOpenSettings: { selection = .settings },
+                onOpenLibrary: {
+                    trainRequest = .library
+                    showingTrain = true
+                },
                 onOpenWorkout: { entry in
                     if let planID = entry.planID {
                         trainRequest = .workout(
