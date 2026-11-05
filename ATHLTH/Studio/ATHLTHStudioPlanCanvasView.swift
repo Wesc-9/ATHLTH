@@ -24,11 +24,17 @@ struct ATHLTHStudioPlanCanvasView: View {
     @State private var pendingWeekCopyTarget: UUID?
     @State private var lastWeekCopy: AppSessionStore.PlanStudioWeekCopyReceipt?
     @State private var copyMessage: String?
-    @State private var creatingPlan = false
-    @State private var newPlanName = ""
-    @State private var newPlanSummary = ""
+    @SceneStorage("athlth.studio.canvas.creatingPlan")
+    private var creatingPlan = false
+    @SceneStorage("athlth.studio.canvas.newPlanName")
+    private var newPlanName = ""
+    @SceneStorage("athlth.studio.canvas.newPlanSummary")
+    private var newPlanSummary = ""
     @State private var newPlanStart = Date.now
-    @State private var newPlanWeeks = 4
+    @SceneStorage("athlth.studio.canvas.newPlanStart")
+    private var storedNewPlanStart: Double = 0
+    @SceneStorage("athlth.studio.canvas.newPlanWeeks")
+    private var newPlanWeeks = 4
     @State private var showingAdvancedBuilder = false
     @State private var showingPlanMetadata = false
     /// The existing plan's workout edits in the right-hand Studio column.
@@ -142,7 +148,12 @@ struct ATHLTHStudioPlanCanvasView: View {
                     }
                 }
             }
-            newPlanStart = session.suggestedTrainingPlanStartDate
+            newPlanStart = storedNewPlanStart > 0
+                ? Date(timeIntervalSince1970: storedNewPlanStart)
+                : session.suggestedTrainingPlanStartDate
+        }
+        .onChange(of: newPlanStart) { _, date in
+            storedNewPlanStart = date.timeIntervalSince1970
         }
         .onChange(of: selectedPlanID) { previous, selected in
             scenePlanID = selected?.uuidString ?? ""
@@ -193,6 +204,10 @@ struct ATHLTHStudioPlanCanvasView: View {
             lastWeekCopy = nil
             copyMessage = nil
             creatingPlan = false
+            newPlanName = ""
+            newPlanSummary = ""
+            newPlanWeeks = 4
+            storedNewPlanStart = 0
         }
         .sheet(isPresented: $showingPlanMetadata) {
             if let plan = selectedPlan {
@@ -1797,6 +1812,10 @@ struct ATHLTHStudioPlanCanvasView: View {
         selectedWeekID = plan.weeks.first?.id
         selectedDayID = nil
         creatingPlan = false
+        newPlanName = ""
+        newPlanSummary = ""
+        newPlanWeeks = 4
+        storedNewPlanStart = 0
     }
 
     private var newWorkoutActivitySelection: some View {
