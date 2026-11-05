@@ -264,7 +264,6 @@ final class GhostRaceStore: ObservableObject {
     @Published private(set) var result: GhostRaceResult?
     @Published var errorMessage: String?
 
-    private var lastMatchedIndex: Int?
     // Reuse the identical continuous-segment map matcher as navigation.
     // Keep a geometry cache so 900 CLLocation allocations are not repeated
     // for every location update.
@@ -426,7 +425,6 @@ final class GhostRaceStore: ObservableObject {
         comparison = nil
         result = nil
         errorMessage = nil
-        lastMatchedIndex = nil
         resetRaceDynamics()
     }
 
@@ -536,7 +534,6 @@ final class GhostRaceStore: ObservableObject {
         comparison = nil
         result = nil
         errorMessage = nil
-        lastMatchedIndex = nil
         resetRaceDynamics()
     }
 
@@ -555,16 +552,17 @@ final class GhostRaceStore: ObservableObject {
         comparison = nil
         result = nil
         errorMessage = nil
-        lastMatchedIndex = nil
         resetRaceDynamics()
     }
 
     func cancel() {
         reference = nil
+        cachedReferenceID = nil
+        cachedReferenceLocations.removeAll(keepingCapacity: false)
+        cachedReferenceDistances.removeAll(keepingCapacity: false)
         comparison = nil
         result = nil
         errorMessage = nil
-        lastMatchedIndex = nil
         resetRaceDynamics()
     }
 
@@ -672,33 +670,6 @@ final class GhostRaceStore: ObservableObject {
             return
         }
 
-        // A detour may add kilometres to the HealthKit distance without
-        // moving the runner along the planned course. Never use the workout's
-        // total distance as an expected Ghost-route position.
-        // Prefer the Watch's route-progress match when the chosen course has
-        // the same geometry length, otherwise anchor to the last reliable
-        // position on this particular reference.
-        let plannedDistance = snapshot.routeDistanceMeters ?? 0
-        let sameCourseLength = plannedDistance.isFinite &&
-            plannedDistance > 0 &&
-            abs(plannedDistance - reference.routeDistanceMeters) <=
-                max(75, reference.routeDistanceMeters * 0.10)
-        let measuredCoursePosition: Double? = {
-            guard sameCourseLength,
-                  let percent = snapshot.routeProgressPercent,
-                  percent.isFinite, (0...100).contains(percent) else {
-                return nil
-            }
-            return reference.routeDistanceMeters * percent / 100
-        }()
-        let expectedDistanceForMatching =
-            measuredCoursePosition ??
-            lastReliableCourseSample?.meters ??
-            0
-        // Never seed the athlete's position using Ghost's own elapsed-time
-        // position. After a detour that made the two appear side by side
-        // even though they had followed completely different paths.
-
         if let routeDeviation = snapshot.routeDeviationMeters,
            let tolerance = snapshot.routeDeviationThresholdMeters,
            !ATHLTHGhostCourseProgressPolicy.isReliableOnRoute(
@@ -805,8 +776,6 @@ final class GhostRaceStore: ObservableObject {
         }
 
         // Rejecting an outlier must not reset the trusted route anchor.
-        lastMatchedIndex = matchedCourse.nearestRoutePointIndex
-
         recordFinishCrossing(
             courseMeters: matchedMeters,
             deviationMeters: deviation,
@@ -1064,222 +1033,6 @@ final class GhostRaceStore: ObservableObject {
 
         maximumLeadMeters = max(maximumLeadMeters, signedDistanceMeters)
         maximumDeficitMeters = max(maximumDeficitMeters, -signedDistanceMeters)
-    }
-
-    private func nearestReferenceIndex(
-        to location: CLLocation,
-        expectedDistanceMeters: Double,
-        elapsedSeconds: TimeInterval,
-        in reference: GhostRaceReference
-    ) -> Int? {
-        guard !reference.points.isEmpty else {
-            return nil
-        }
-
-        let routeDistance =
-            max(
-                reference.routeDistanceMeters,
-                1
-            )
-        let expectedDistance =
-            min(
-                max(
-                    expectedDistanceMeters,
-                    0
-                ),
-                routeDistance
-            )
-        let progressWindow =
-            max(
-                280,
-                min(
-                    routeDistance * 0.12,
-                    900
-                )
-            )
-
-        if let lastMatchedIndex {
-            let lower =
-                max(lastMatchedIndex - 30, 0)
-            let upper =
-                min(
-                    lastMatchedIndex + 180,
-                    reference.points.count - 1
-                )
-
-            if let local =
-                nearestIndex(
-                    to: location,
-                    points: reference.points,
-                    range: lower...upper,
-                    expectedDistanceMeters:
-                        expectedDistance,
-                    maximumProgressDriftMeters:
-                        progressWindow
-                ) {
-                let localDistance =
-                    location.distance(
-                        from:
-                            reference.points[
-                                local
-                            ].location
-                    )
-
-                if localDistance <= 50 {
-                    return local
-                }
-                // The old local window can point to a previous crossing.
-                // Keep looking for a reachable later course section.
-            }
-        }
-
-        // If the very first course fix arrives after a long off-route run,
-        // don't assume the runner has reached Ghost's predicted position.
-        // Search every physically reachable part of the REFERENCE route,
-        // then require a close GPS match before awarding any course progress.
-        if lastReliableCourseSample == nil {
-            let upperMeters = min(
-                routeDistance,
-                max(85, elapsedSeconds * 9 + 35)
-            )
-            let center = upperMeters / 2
-            if let reached = nearestIndex(
-                to: location,
-                points: reference.points,
-                range: 0...(reference.points.count - 1),
-                expectedDistanceMeters: center,
-                maximumProgressDriftMeters: center + 1
-            ), location.distance(
-                from: reference.points[reached].location
-            ) <= 50 {
-                return reached
-            }
-        }
-
-        // An athlete who leaves the course for several minutes may rejoin
-        // more than the usual 900 m continuity window farther down it.
-        // Search the full geometry only inside a physically reachable route
-        // interval. This recovers genuine reentries without treating skipped
-        // course or a nearby start/finish crossing as instant progress.
-        if let previous = lastReliableCourseSample,
-           elapsedSeconds.isFinite,
-           elapsedSeconds >= previous.elapsed {
-            let lowerMeters = max(previous.meters - 35, 0)
-            let upperMeters = min(
-                routeDistance,
-                previous.meters + 35 +
-                    (elapsedSeconds - previous.elapsed) * 9
-            )
-            if upperMeters >= lowerMeters {
-                let center = (lowerMeters + upperMeters) / 2
-                let radius = (upperMeters - lowerMeters) / 2 + 1
-                if let reachable = nearestIndex(
-                    to: location,
-                    points: reference.points,
-                    range: 0...(reference.points.count - 1),
-                    expectedDistanceMeters: center,
-                    maximumProgressDriftMeters: radius
-                ), location.distance(
-                    from: reference.points[reachable].location
-                ) <= 50 {
-                    return reachable
-                }
-            }
-        }
-
-        let expectedProgress =
-            expectedDistance /
-            routeDistance
-        // Recorded GPS timestamps are not uniformly spaced by route metre.
-        let expectedIndex = ATHLTHGhostTimeline.bracket(
-            at: expectedDistance,
-            count: reference.points.count,
-            position: { reference.points[$0].cumulativeMeters }
-        )?.lower ?? Int(
-            (expectedProgress * Double(reference.points.count - 1)).rounded()
-        )
-        let indexRadius =
-            max(
-                30,
-                Int(
-                    Double(reference.points.count) *
-                    0.14
-                )
-            )
-        let lower =
-            max(
-                expectedIndex - indexRadius,
-                0
-            )
-        let upper =
-            min(
-                expectedIndex + indexRadius,
-                reference.points.count - 1
-            )
-
-        guard let matched =
-                nearestIndex(
-                    to: location,
-                    points: reference.points,
-                    range: lower...upper,
-                    expectedDistanceMeters:
-                        expectedDistance,
-                    maximumProgressDriftMeters:
-                        progressWindow
-                )
-        else {
-            return nil
-        }
-
-        let matchedDistance =
-            location.distance(
-                from:
-                    reference.points[
-                        matched
-                    ].location
-            )
-
-        return matchedDistance <= 250
-            ? matched
-            : nil
-    }
-
-    private func nearestIndex(
-        to location: CLLocation,
-        points: [GhostRacePoint],
-        range: ClosedRange<Int>,
-        expectedDistanceMeters: Double? = nil,
-        maximumProgressDriftMeters: Double? = nil
-    ) -> Int? {
-        var bestIndex: Int?
-        var bestDistance =
-            Double.greatestFiniteMagnitude
-
-        for index in range {
-            if let expectedDistanceMeters,
-               let maximumProgressDriftMeters,
-               abs(
-                    points[index]
-                        .cumulativeMeters -
-                    expectedDistanceMeters
-               ) >
-                maximumProgressDriftMeters {
-                continue
-            }
-
-            let distance =
-                location.distance(
-                    from:
-                        points[index].location
-                )
-
-            if distance < bestDistance {
-                bestDistance = distance
-                bestIndex = index
-            }
-        }
-
-        return bestIndex
     }
 
     private func ghostPoint(
