@@ -243,6 +243,11 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         IPhoneWorkoutActivityLock()
     private var lastWatchWorkoutActivitySentAt:
         TimeInterval = 0
+    private var currentATHLTHAccountID: UUID?
+
+    func setCurrentAccount(_ userID: UUID?) {
+        currentATHLTHAccountID = userID
+    }
 
     // Diagnostics are intentionally separate from isReady. Apple's
     // isReachable only means the counterpart app is currently active;
@@ -1512,26 +1517,26 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
             return
         }
 
-        // This summary is embedded in the completed result, so selections
-        // made offline reach the same workout even if a live message was lost.
-        if let segments = result.petSegments {
-            ATHLTHPetStore.shared.acceptCompletedWatchPetSegments(segments)
+        // An old Watch result can arrive after the iPhone changed accounts.
+        // Queue it durably, but never update this account's pet selections,
+        // Live Activity or active-workout guard on the wrong user.
+        if ATHLTHWatchWorkoutOwnershipPolicy.canApply(
+            resultOwnerID: result.accountOwnerID,
+            signedInUserID: currentATHLTHAccountID
+        ) {
+            if let segments = result.petSegments {
+                ATHLTHPetStore.shared.acceptCompletedWatchPetSegments(segments)
+            }
+            ATHLTHSurfaceCoordinator.completedWatchWorkoutDidArrive(result)
+            let activity = WatchWorkoutActivityState.afterCompletion(
+                current: watchWorkoutActivityState, endedAt: result.endedAt
+            )
+            watchWorkoutActivityState = activity
+            lastWatchWorkoutActivitySentAt = max(
+                lastWatchWorkoutActivitySentAt,
+                activity.updatedAt.timeIntervalSince1970
+            )
         }
-
-        // A completed Watch result can arrive while AppRoot's view
-        // observers are not mounted. Terminate only that Watch session's
-        // ActivityKit card and matching widget snapshot immediately.
-        ATHLTHSurfaceCoordinator.completedWatchWorkoutDidArrive(result)
-
-        // Release the start guard as soon as the completed result arrives,
-        // independently of sign-in, Health import or summary dismissal.
-        let activity = WatchWorkoutActivityState.afterCompletion(
-            current: watchWorkoutActivityState, endedAt: result.endedAt
-        )
-        watchWorkoutActivityState = activity
-        lastWatchWorkoutActivitySentAt = max(
-            lastWatchWorkoutActivitySentAt, activity.updatedAt.timeIntervalSince1970
-        )
 
         guard !handledWorkoutResultIDs
                 .contains(result.id),
