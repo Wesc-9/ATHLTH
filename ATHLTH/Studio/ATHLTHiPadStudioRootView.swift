@@ -695,7 +695,7 @@ struct ATHLTHiPadStudioRootView: View {
         case .history:
             ATHLTHStudioHistoryView(onInspect: inspect)
         case .explore:
-            ATHLTHExploreView()
+            ATHLTHStudioRouteWorkspaceView()
         case .community:
             ATHLTHCommunityV5View()
         case .coach:
