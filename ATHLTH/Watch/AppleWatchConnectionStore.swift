@@ -1081,6 +1081,23 @@ final class AppleWatchConnectionStore: NSObject, ObservableObject, @unchecked Se
         }
     }
 
+    /// Legacy Watch results predate session-owner metadata. Keep them
+    /// durable until a signed-in athlete explicitly confirms ownership in
+    /// Training Data settings. This never claims an already-owned result.
+    @discardableResult
+    func claimLegacyCompletedWorkout(
+        _ id: UUID,
+        for userID: UUID
+    ) -> Bool {
+        guard let index = pendingWorkoutResults.firstIndex(where: {
+            $0.id == id && $0.accountOwnerID == nil
+        }) else { return false }
+        pendingWorkoutResults[index].accountOwnerID = userID
+        persistWorkoutResultState()
+        lastCompletedWorkout = pendingWorkoutResults.first
+        return true
+    }
+
     func clearCompletedWorkout() {
         guard let id =
                 lastCompletedWorkout?.id
