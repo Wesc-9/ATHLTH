@@ -83,6 +83,8 @@ final class WatchStartGuardContinuation: @unchecked Sendable {
 struct WatchPersistedWorkoutState: Codable {
     var kind: WatchWorkoutKind
     var startedAt: Date?
+    /// Stable owner captured at session start; optional for older snapshots.
+    var accountOwnerID: UUID? = nil
     var plannedRoute: WatchRouteTransfer?
     var audioCoach: WatchAudioCoachConfiguration
     var structuredRunningWorkout: WatchRunningWorkoutTransfer?
