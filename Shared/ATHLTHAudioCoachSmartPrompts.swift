@@ -344,7 +344,9 @@ struct ATHLTHAudioCoachSmartState {
         longitude: Double?,
         horizontalAccuracy: Double?,
         locationAge: TimeInterval,
-        norwegian: Bool
+        norwegian: Bool,
+        elapsedSeconds: TimeInterval? = nil,
+        routeProgressPercent: Double? = nil
     ) -> String? {
         guard let latitude, let longitude, let horizontalAccuracy,
               latitude.isFinite, longitude.isFinite,
@@ -356,6 +358,17 @@ struct ATHLTHAudioCoachSmartState {
         let here = CLLocation(latitude: latitude, longitude: longitude)
         for landmark in settings.landmarks.prefix(30) where
             landmark.isValid && !announcedLandmarks.contains(landmark.id) {
+            // Starting near the athlete's saved home must not trigger
+            // a deceptive "almost home" announcement at minute zero.
+            if landmark.kind == .home {
+                guard let elapsedSeconds,
+                      elapsedSeconds.isFinite,
+                      elapsedSeconds >= 600 else { continue }
+                if let routeProgressPercent {
+                    guard routeProgressPercent.isFinite,
+                          routeProgressPercent >= 85 else { continue }
+                }
+            }
             let there = CLLocation(latitude: landmark.latitude,
                                    longitude: landmark.longitude)
             // Close enough to describe as passing, not simply "nearby".
