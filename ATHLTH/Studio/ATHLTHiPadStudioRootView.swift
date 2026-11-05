@@ -86,8 +86,13 @@ struct ATHLTHiPadStudioRootView: View {
                     // that previously consumed substantial iPad space.
                     .navigationTitle(selection == .overview ? "" : selection.label)
                     .navigationBarTitleDisplayMode(.inline)
+                    // Keep the Overview scroll edge clean: a visible bar
+                    // previously rendered as an empty translucent title tile.
                     .toolbarBackground(canvas, for: .navigationBar)
-                    .toolbarBackground(.visible, for: .navigationBar)
+                    .toolbarBackground(
+                        selection == .overview ? .hidden : .visible,
+                        for: .navigationBar
+                    )
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
                             Button {
