@@ -308,11 +308,11 @@ struct ProductRootTabView: View {
                 }
                 .tag(2)
 
-            ATHLTHExploreView()
+            ATHLTHExploreView(isActive: selectedTab == 3)
                 .tabItem { Label("Explore", systemImage: "map.fill") }
                 .tag(3)
 
-            ATHLTHCommunityV5View()
+            ATHLTHCommunityV5View(isActive: selectedTab == 4)
                 .tabItem { Label("Community", systemImage: "person.3.fill") }
                 .tag(4)
         }
