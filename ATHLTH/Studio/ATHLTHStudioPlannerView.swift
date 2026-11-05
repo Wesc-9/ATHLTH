@@ -7,6 +7,7 @@ struct ATHLTHStudioPlannerView: View {
     var onStartWorkout: ((UUID, UUID) -> Void)? = nil
     var onSendToWatch: ((UUID, UUID) -> Void)? = nil
     var onStartAfter: ((UUID, UUID, TimeInterval) -> Void)? = nil
+    var onOpenCoach: (() -> Void)? = nil
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
@@ -19,6 +20,7 @@ struct ATHLTHStudioPlannerView: View {
     @State private var dragMode: DragMode = .move
     @State private var moveError: String?
     @State private var showingLegacyOverview = false
+    @State private var showingScenarioPreview = false
 
     private enum DragMode: String, CaseIterable, Identifiable {
         case move, copy
@@ -44,7 +46,24 @@ struct ATHLTHStudioPlannerView: View {
                     .font(.headline)
                     .foregroundStyle(ATHLTHStudioStyle.ink)
                 }
-                Spacer()
+                Spacer(minLength: 4)
+                if plan != nil {
+                    Button {
+                        showingScenarioPreview = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Plan what-if", norwegian: "Prøv planendring"
+                        ), systemImage: "arrow.left.arrow.right")
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("athlth-ipad-scenario-preview")
+                    if let onOpenCoach {
+                        Button(action: onOpenCoach) {
+                            Label("ATHLTH Coach", systemImage: "sparkles")
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                }
                 Picker(ATHLTHLocalization.choose(
                     english: "Layout", norwegian: "Visning"
                 ), selection: $showingLegacyOverview) {
@@ -73,6 +92,22 @@ struct ATHLTHStudioPlannerView: View {
             }
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
+        .sheet(isPresented: $showingScenarioPreview) {
+            if let plan {
+                ATHLTHStudioPlanningScenarioView(
+                    planID: plan.id,
+                    onAskCoach: {
+                        showingScenarioPreview = false
+                        Task { @MainActor in
+                            try? await Task.sleep(for: .milliseconds(350))
+                            onOpenCoach?()
+                        }
+                    }
+                )
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+            }
+        }
     }
 
     private var legacyOverview: some View {
