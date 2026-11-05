@@ -1084,12 +1084,13 @@ private struct IPhoneStructuredStepCard: View {
                                         .font(.subheadline.weight(.semibold))
                                     }
 
-                                    if workout.awaitingMainStart == true ||
+                                    if (workout.awaitingMainStart == true || recorder.nextStructuredStep != nil) &&
+                                       (workout.awaitingMainStart == true ||
                                        (step.phase == "warmup" &&
                                         workout.structuredRunningWorkout?.autoStartMainAfterWarmup != true) ||
                                        step.phase == "cooldown" ||
                                        step.measure == .open ||
-                                       workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false {
+                                       workout.structuredRunningWorkout?.autoAdvanceTimedSteps == false) {
                                         HStack(spacing: 12) {
                                             if let next = recorder.nextStructuredStep {
                                                 Label(
