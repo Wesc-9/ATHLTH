@@ -1155,7 +1155,11 @@ final class StrengthWorkoutStore: ObservableObject {
 
     var currentExerciseAllSetsCompleted: Bool {
         guard let exercise = currentExercise else { return false }
-        return !exercise.sets.isEmpty && exercise.sets.allSatisfy(\.isCompleted)
+        // An exercise with every pending set explicitly skipped has no
+        // completed set rows, but its completedAt marks a deliberate
+        // transition. Without this check the Watch remains stuck on it.
+        return exercise.isCompleted ||
+            (!exercise.sets.isEmpty && exercise.sets.allSatisfy(\.isCompleted))
     }
 
     var hasNextExercise: Bool {
