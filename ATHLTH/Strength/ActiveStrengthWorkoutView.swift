@@ -2077,6 +2077,7 @@ struct ActiveStrengthWorkoutView: View {
         .accessibilityIdentifier("athlth-watch-finish-pending-summary")
     }
 
+    @ViewBuilder
     private var strengthFinishConfirmationSheet: some View {
         if let workout = strength.activeWorkout {
             let plannedSetCount = workout.exercises.reduce(0) {
