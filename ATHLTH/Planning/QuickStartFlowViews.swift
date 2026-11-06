@@ -2582,10 +2582,10 @@ struct RunQuickStartSheet: View {
                     isAdvancedSetup &&
                     guidanceRoute != nil &&
                     ghostDraft.enabled &&
-                    ghostDraft.targetDuration != nil &&
-                    ghostDraft.updatesEnabled
-                        ? settings
-                            .ghostRaceAudioConfiguration
+                    ghostDraft.targetDuration != nil
+                        ? ghostDraft.resolvedUpdates(
+                            fallback: settings.ghostRaceAudioConfiguration
+                          )
                         : nil,
                 autoPauseEnabled:
                     runEnvironment == .outdoor &&
