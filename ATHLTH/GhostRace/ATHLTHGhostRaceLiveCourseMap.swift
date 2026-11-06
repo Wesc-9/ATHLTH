@@ -44,11 +44,9 @@ struct ATHLTHGhostRaceLiveCourseMap: View {
     }
 
     private func freshComparison(at date: Date) -> GhostRaceComparison? {
-        guard !paused, let comparison,
-              date.timeIntervalSince(comparison.updatedAt) >= -5,
-              date.timeIntervalSince(comparison.updatedAt) <= 18
-        else { return nil }
-        return comparison
+        ATHLTHGhostRaceLiveMapPolicy.acceptedComparison(
+            comparison, paused: paused, at: date
+        )
     }
 
     private func ghostTrail(for comparison: GhostRaceComparison) -> [CLLocationCoordinate2D] {
@@ -66,7 +64,9 @@ struct ATHLTHGhostRaceLiveCourseMap: View {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(spacing: 10) {
                     Label(
-                        tr("GHOST RACE LIVE", "GHOST RACE LIVE"),
+                        reference.title.hasPrefix("Target ·")
+                            ? tr("SIMULATED GHOST", "SIMULERT GHOST")
+                            : tr("GHOST RACE LIVE", "GHOST RACE LIVE"),
                         systemImage: "figure.run"
                     )
                     .font(.caption.weight(.bold))
@@ -136,21 +136,35 @@ struct ATHLTHGhostRaceLiveCourseMap: View {
                 .frame(height: mapHeight)
                 .clipShape(RoundedRectangle(cornerRadius: 20))
                 .overlay(alignment: .topTrailing) {
-                    Button {
-                        following = true
-                        centerMap(on: live)
+                    Menu {
+                        Button {
+                            following = true
+                            centerMap(on: live)
+                        } label: {
+                            Label(
+                                tr("Follow runners", "Følg løperne"),
+                                systemImage: "location.north.line.fill"
+                            )
+                        }
+
+                        Button {
+                            following = false
+                            camera = .region(Self.courseRegion(reference))
+                        } label: {
+                            Label(
+                                tr("Show full course", "Vis hele løypen"),
+                                systemImage: "map"
+                            )
+                        }
                     } label: {
-                        Label(
-                            tr("Follow runners", "Følg løperne"),
-                            systemImage: "location.north.line.fill"
-                        )
-                        .font(.caption.weight(.semibold))
-                        .labelStyle(.iconOnly)
-                        .foregroundStyle(runnerInk)
-                        .frame(width: 42, height: 42)
-                        .background(.regularMaterial, in: Circle())
+                        Image(systemName: following
+                            ? "location.north.line.fill" : "map")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(runnerInk)
+                            .frame(width: 42, height: 42)
+                            .background(.regularMaterial, in: Circle())
                     }
-                    .accessibilityLabel(tr("Follow both runners", "Følg begge løperne"))
+                    .accessibilityLabel(tr("Map camera options", "Kartvalg"))
                     .padding(12)
                 }
                 .overlay {
