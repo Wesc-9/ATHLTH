@@ -8020,6 +8020,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 ghostDistanceDeltaMeters,
             ghostTimeDeltaSeconds:
                 ghostTimeDeltaSeconds,
+            workoutAutoPaused: automaticPauseActive,
             strengthExerciseName:
                 strengthSession?.exerciseName,
             strengthSetIndex:
