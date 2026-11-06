@@ -427,6 +427,22 @@ struct ATHLTHAudioCoachSettingsView: View {
         }
     }
 
+    private var manualCoachMaximumEnabled: Binding<Bool> {
+        Binding(
+            get: { settings.audioCoachSmartSettings.maximumHeartRateBPM != nil },
+            set: { settings.audioCoachSmartSettings.maximumHeartRateBPM = $0 ? 185 : nil }
+        )
+    }
+
+    private var manualCoachMaximum: Binding<Int> {
+        Binding(
+            get: {
+                Int((settings.audioCoachSmartSettings.maximumHeartRateBPM ?? 185).rounded())
+            },
+            set: { settings.audioCoachSmartSettings.maximumHeartRateBPM = Double($0) }
+        )
+    }
+
     /// Formerly hidden inside Coach Studio. Keep the most important
     /// motivation and measured-zone controls immediately accessible from
     /// standard workout guidance.
@@ -534,6 +550,25 @@ struct ATHLTHAudioCoachSettingsView: View {
                         )
                     )
                     .tint(ATHLTHTheme.accentDeep)
+                    if settings.audioCoachSmartSettings.announceCurrentHeartRateZone ?? false {
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Override maximum heart rate",
+                                norwegian: "Overstyr makspuls"
+                            ),
+                            isOn: manualCoachMaximumEnabled
+                        )
+                        .tint(ATHLTHTheme.accentDeep)
+                        if manualCoachMaximumEnabled.wrappedValue {
+                            Stepper(value: manualCoachMaximum, in: 100...240) {
+                                Text(ATHLTHLocalization.choose(
+                                    english: "Maximum: \(manualCoachMaximum.wrappedValue) bpm",
+                                    norwegian: "Makspuls: \(manualCoachMaximum.wrappedValue) slag/min"
+                                ))
+                                .monospacedDigit()
+                            }
+                        }
+                    }
                     Text(ATHLTHLocalization.choose(
                         english: "Uses current measured heart rate and a valid maximum heart rate. Target-zone warnings take priority.",
                         norwegian: "Bruker målt puls og gyldig makspuls. Varsler om målsone prioriteres."
