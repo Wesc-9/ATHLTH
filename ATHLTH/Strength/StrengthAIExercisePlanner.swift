@@ -612,175 +612,226 @@ struct StrengthAIExercisePlannerView: View {
     }
 
     private var resultCard: some View {
-        ATHLTHCard {
+        VStack(alignment: .leading, spacing: 17) {
             if let plan {
-                VStack(
-                    alignment: .leading,
-                    spacing: 12
-                ) {
-                    HStack(
-                        alignment: .top
-                    ) {
-                        VStack(
-                            alignment:
-                                .leading,
-                            spacing: 3
-                        ) {
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack(alignment: .top, spacing: 10) {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "YOUR WORKOUT", norwegian: "DITT ØKTFORSLAG"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            .tracking(0.8)
+                            .foregroundStyle(accent)
+
                             Text(plan.title)
-                                .font(
-                                    .headline
-                                        .weight(
-                                            .bold
-                                        )
-                                )
-
-                            Text(
-                                ATHLTHLocalization.format(
-                                    english:
-                                        "About %d min",
-                                    norwegian:
-                                        "Ca. %d min",
-                                    plan
-                                        .estimatedMinutes
-                                )
-                            )
-                            .font(.caption)
-                            .foregroundStyle(
-                                .secondary
-                            )
+                                .font(.title2.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-
-                        Spacer()
-
-                        Image(
-                            systemName:
-                                "sparkles"
-                        )
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .premiumGold
-                        )
+                        Spacer(minLength: 4)
+                        Image(systemName: "checkmark.shield")
+                            .font(.title3)
+                            .foregroundStyle(accent)
+                            .accessibilityHidden(true)
                     }
 
-                    if !plan.summary
-                        .isEmpty {
+                    HStack(spacing: 8) {
+                        Label(
+                            "\(resolvedSuggestions.count) " +
+                                ATHLTHLocalization.choose(
+                                    english: "exercises", norwegian: "øvelser"
+                                ),
+                            systemImage: "dumbbell"
+                        )
+                        Text("·")
+                        Label("Ca. \(plan.estimatedMinutes) min", systemImage: "clock")
+                    }
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                    Label(
+                        sourceFilter.title,
+                        systemImage: "books.vertical"
+                    )
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(accent)
+
+                    if !plan.summary.isEmpty {
                         Text(plan.summary)
-                            .font(.caption)
-                            .foregroundStyle(
-                                .secondary
-                            )
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
+                }
 
-                    Divider()
+                Divider().overlay(separator)
 
-                    ForEach(
-                        Array(
-                            resolvedSuggestions
-                                .enumerated()
+                if resolvedSuggestions.isEmpty {
+                    ContentUnavailableView(
+                        ATHLTHLocalization.choose(
+                            english: "No exercises remain",
+                            norwegian: "Ingen øvelser igjen"
                         ),
+                        systemImage: "dumbbell",
+                        description: Text(ATHLTHLocalization.choose(
+                            english: "Adjust your choices or generate a new suggestion.",
+                            norwegian: "Juster valgene eller generer et nytt forslag."
+                        ))
+                    )
+                } else {
+                    ForEach(
+                        Array(resolvedSuggestions.enumerated()),
                         id: \.offset
-                    ) {
-                        index,
-                        resolved in
+                    ) { index, pair in
+                        let suggestion = pair.0
+                        let entry = pair.1
 
-                        let suggestion =
-                            resolved.0
-                        let entry =
-                            resolved.1
-
-                        HStack(
-                            alignment: .top,
-                            spacing: 11
-                        ) {
+                        HStack(alignment: .top, spacing: 12) {
                             ATHLTHAIExerciseSuggestionImage(entry: entry)
                                 .overlay(alignment: .topLeading) {
                                     Text("\(index + 1)")
-                                        .font(.system(size: 10, weight: .bold))
-                                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                                        .frame(width: 22, height: 22)
+                                        .font(.caption.weight(.semibold))
+                                        .foregroundStyle(ink)
+                                        .frame(width: 24, height: 24)
                                         .background(.regularMaterial, in: Circle())
-                                        .padding(5)
+                                        .padding(3)
                                 }
 
-                            VStack(
-                                alignment:
-                                    .leading,
-                                spacing: 3
-                            ) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(exerciseLibrary.localizedExerciseName(entry))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                    .fixedSize(horizontal: false, vertical: true)
+
                                 Text(
-                                    entry.name
-                                )
-                                .font(
-                                    .subheadline
-                                        .weight(
-                                            .semibold
+                                    "\(suggestion.sets) × \(suggestion.reps) · " +
+                                        "\(suggestion.restSeconds) s " +
+                                        ATHLTHLocalization.choose(
+                                            english: "rest", norwegian: "pause"
                                         )
                                 )
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
 
-                                Text(
-                                    "\(suggestion.sets) × \(suggestion.reps) · \(suggestion.restSeconds) s"
-                                )
-                                .font(.caption)
-                                .foregroundStyle(
-                                    .secondary
-                                )
-
-                                if !suggestion
-                                    .reason
-                                    .isEmpty {
-                                    Text(
-                                        suggestion
-                                            .reason
-                                    )
-                                    .font(
-                                        .caption2
-                                    )
-                                    .foregroundStyle(
-                                        ATHLTHTheme
-                                            .mutedText
-                                    )
+                                if !suggestion.reason.isEmpty {
+                                    Text(suggestion.reason)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
                                 }
-                            }
 
-                            Spacer()
+                                HStack(spacing: 13) {
+                                    Button {
+                                        replacingSuggestion = suggestion
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "Replace", norwegian: "Bytt"
+                                            ),
+                                            systemImage: "arrow.triangle.2.circlepath"
+                                        )
+                                    }
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(accent)
+
+                                    Menu {
+                                        Button {
+                                            inspectingEntry = entry
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "View exercise", norwegian: "Se øvelse"
+                                                ),
+                                                systemImage: "info.circle"
+                                            )
+                                        }
+
+                                        if index > 0 {
+                                            Button {
+                                                move(suggestion.exerciseID, by: -1)
+                                            } label: {
+                                                Label(
+                                                    ATHLTHLocalization.choose(
+                                                        english: "Move up", norwegian: "Flytt opp"
+                                                    ),
+                                                    systemImage: "arrow.up"
+                                                )
+                                            }
+                                        }
+                                        if index + 1 < resolvedSuggestions.count {
+                                            Button {
+                                                move(suggestion.exerciseID, by: 1)
+                                            } label: {
+                                                Label(
+                                                    ATHLTHLocalization.choose(
+                                                        english: "Move down", norwegian: "Flytt ned"
+                                                    ),
+                                                    systemImage: "arrow.down"
+                                                )
+                                            }
+                                        }
+                                        Divider()
+                                        Button(role: .destructive) {
+                                            remove(suggestion.exerciseID)
+                                        } label: {
+                                            Label(
+                                                ATHLTHLocalization.choose(
+                                                    english: "Remove", norwegian: "Fjern"
+                                                ),
+                                                systemImage: "trash"
+                                            )
+                                        }
+                                    } label: {
+                                        Label(
+                                            ATHLTHLocalization.choose(
+                                                english: "More", norwegian: "Flere valg"
+                                            ),
+                                            systemImage: "ellipsis.circle"
+                                        )
+                                    }
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .frame(minHeight: 32, alignment: .leading)
+                            }
+                            Spacer(minLength: 0)
+                        }
+                        .padding(.vertical, 7)
+
+                        if index < resolvedSuggestions.count - 1 {
+                            Divider().overlay(separator)
                         }
                     }
-
-                    Button {
-                        applyPlan()
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Add to workout",
-                                norwegian:
-                                    "Legg til i økten"
-                            ),
-                            systemImage:
-                                "plus.circle.fill"
-                        )
-                        .font(
-                            .headline
-                        )
-                        .frame(
-                            maxWidth:
-                                .infinity
-                        )
-                        .frame(height: 46)
-                    }
-                    .buttonStyle(
-                        .borderedProminent
-                    )
-                    .tint(
-                        ATHLTHTheme.accentDeep
-                    )
-                    .disabled(
-                        resolvedSuggestions
-                            .isEmpty
-                    )
                 }
+
+                Button {
+                    applyPlan()
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Add all to workout",
+                            norwegian: "Legg til i økten"
+                        ),
+                        systemImage: "plus.circle.fill"
+                    )
+                    .font(.headline)
+                    .frame(maxWidth: .infinity, minHeight: 53)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(ink)
+                .disabled(
+                    isGenerating || resolvedSuggestions.isEmpty ||
+                    resolvedSuggestions.count != editedSuggestions.count
+                )
+                .accessibilityIdentifier("athlth-ai-apply-library-exercises")
             }
         }
+        .padding(20)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(separator))
     }
 
     private var singleSuggestionCard: some View {
