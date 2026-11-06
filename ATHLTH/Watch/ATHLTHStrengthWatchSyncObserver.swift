@@ -4,6 +4,16 @@ import SwiftUI
 /// resistance, repetitions and timing settings. This permission boundary
 /// must not allow Watch-originated edits to the athlete's prescribed values.
 enum ATHLTHStrengthWatchControlPolicy {
+    static func acceptsSetCommands(
+        captureDevice: WorkoutCaptureDevice,
+        inputMode: WatchStrengthInputMode
+    ) -> Bool {
+        // The HealthKit recording device is not the set-logging authority.
+        // Users selecting Both or Watch must still log from Watch when the
+        // iPhone owns the workout recording session.
+        captureDevice == .appleWatch || inputMode == .both || inputMode == .appleWatch
+    }
+
     static func permits(
         _ command: WatchStrengthCommandKind,
         whenIPhoneControls: Bool
@@ -194,9 +204,10 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         // when the athlete chose "Both". Capture device denotes who owns
         // the HealthKit workout, not which device can record sets.
         let inputMode = workout.advancedConfiguration?.inputMode ?? .both
-        let watchMayRecordSets =
-            workout.captureDevice == .appleWatch ||
-            inputMode == .both || inputMode == .appleWatch
+        let watchMayRecordSets = ATHLTHStrengthWatchControlPolicy.acceptsSetCommands(
+            captureDevice: workout.captureDevice,
+            inputMode: inputMode
+        )
         guard watchMayRecordSets else {
             sendSnapshotNow()
             return true
