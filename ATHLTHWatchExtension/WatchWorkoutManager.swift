@@ -3060,6 +3060,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         let plan = plans[setIndex]
+        snapshot.isOpenEndedTimedSet = plan.openEndedTime == true
+        snapshot.setEffortStartedAt = nil
+        if plan.openEndedTime == true {
+            snapshot.targetKindRaw = "time"
+        }
         snapshot.isEmbeddedRunningInterval = exercise.isEmbeddedRunningInterval
         snapshot.embeddedRunningPhaseTitle = plan.hybridPhaseTitle
         snapshot.embeddedRunningPhaseKind = plan.hybridPhaseKind
