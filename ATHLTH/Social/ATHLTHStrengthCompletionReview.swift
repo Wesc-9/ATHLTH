@@ -69,20 +69,30 @@ struct ATHLTHStrengthCompletionReview: View {
 
     private var heaviestLift: Double? {
         if let log {
-            return log.exercises
-                .filter {
-                    !$0.exercise.isTimeOnlyBodyweightStrength &&
-                        !StrengthCardioExercisePolicy.isCardio($0.exercise.name)
+            var heaviest: Double?
+
+            // Iterate explicitly to avoid an expensive nested inference chain
+            // in Release builds. Only completed, eligible weighted rep sets
+            // contribute to the strength summary.
+            for exerciseLog in log.exercises {
+                let exercise = exerciseLog.exercise
+                guard !exercise.isTimeOnlyBodyweightStrength,
+                      !StrengthCardioExercisePolicy.isCardio(exercise.name)
+                else { continue }
+
+                for set in exerciseLog.sets {
+                    guard set.countsTowardTrainingLoad,
+                          set.recordsWeight != false,
+                          set.resolvedTargetKind == .reps,
+                          let completedWeight = set.completedWeightKilograms,
+                          completedWeight > 0
+                    else { continue }
+
+                    heaviest = max(heaviest ?? 0, completedWeight)
                 }
-                .flatMap(\.sets)
-                .filter {
-                    $0.countsTowardTrainingLoad &&
-                    $0.recordsWeight != false &&
-                    $0.resolvedTargetKind == .reps
-                }
-                .compactMap(\.completedWeightKilograms)
-                .filter { $0 > 0 }
-                .max()
+            }
+
+            return heaviest
         }
         return workout.strengthHeaviestWeightKilograms
     }
