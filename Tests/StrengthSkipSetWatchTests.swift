@@ -117,6 +117,8 @@ final class StrengthSkipSetWatchTests: XCTestCase {
         XCTAssertEqual(sets[1].setNumber, 2)
         XCTAssertEqual(sets[1].plannedReps, 10)
         XCTAssertNil(sets[1].completedReps)
+        XCTAssertEqual(store.currentSet?.id, sets[1].id)
+        XCTAssertEqual(store.watchSnapshot?.setNumber, 2)
         XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
         XCTAssertFalse(store.currentExerciseAllSetsCompleted)
     }
