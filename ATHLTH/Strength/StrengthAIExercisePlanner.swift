@@ -80,6 +80,7 @@ private struct StrengthAIExerciseRequest:
     let durationMinutes: Int
     let exerciseCount: Int
     let focusBodyPart: String?
+    let focusBodyParts: [String]?
     let personalize: Bool
     let language: String
     let existingExerciseIDs: [UUID]
@@ -156,7 +157,7 @@ struct StrengthAIExercisePlannerView: View {
         StrengthAIWorkoutGoal = .general
     @State private var durationMinutes = 45
     @State private var exerciseCount = 5
-    @State private var focusBodyPart: String?
+    @State private var focusBodyParts: Set<String> = []
     @State private var personalize = true
     @State private var sourceFilter: StrengthAIExerciseSourceFilter = .library
     @State private var equipmentFilter: String?
@@ -190,7 +191,7 @@ struct StrengthAIExercisePlannerView: View {
             from: exerciseLibrary.allExercises,
             excluding: existingIDs,
             source: sourceFilter,
-            focus: focusBodyPart,
+            focuses: Array(focusBodyParts),
             equipment: equipmentFilter
         ).prefix(80))
     }
@@ -200,7 +201,7 @@ struct StrengthAIExercisePlannerView: View {
             from: exerciseLibrary.allExercises,
             excluding: existingIDs,
             source: sourceFilter,
-            focus: focusBodyPart,
+            focuses: Array(focusBodyParts),
             equipment: nil
         )
         return Array(Set(matching.flatMap { $0.exercise.equipment }))
@@ -475,27 +476,51 @@ struct StrengthAIExercisePlannerView: View {
             Divider()
 
             settingsRow(title: ATHLTHLocalization.choose(
-                english: "Focus", norwegian: "Fokus"
+                english: "Muscle focus", norwegian: "Muskelgrupper"
             )) {
                 Menu {
-                    Button(ATHLTHLocalization.choose(
-                        english: "Whole body", norwegian: "Hele kroppen"
-                    )) { focusBodyPart = nil }
-
+                    Button {
+                        focusBodyParts = []
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Let AI decide",
+                                norwegian: "La AI bestemme"
+                            ),
+                            systemImage: focusBodyParts.isEmpty
+                                ? "checkmark.circle.fill" : "sparkles"
+                        )
+                    }
                     Divider()
-
                     ForEach(availableBodyParts, id: \.self) { part in
-                        Button(exerciseLibrary.localizedBodyPartTitle(part)) {
-                            focusBodyPart = part
+                        Button {
+                            if focusBodyParts.contains(part) {
+                                focusBodyParts.remove(part)
+                            } else {
+                                focusBodyParts.insert(part)
+                            }
+                        } label: {
+                            Label(
+                                exerciseLibrary.localizedBodyPartTitle(part),
+                                systemImage: focusBodyParts.contains(part)
+                                    ? "checkmark.circle.fill" : "circle"
+                            )
                         }
                     }
                 } label: {
-                    HStack(spacing: 6) {
-                        Text(focusBodyPart.map {
-                            exerciseLibrary.localizedBodyPartTitle($0)
-                        } ?? ATHLTHLocalization.choose(
-                            english: "Whole body", norwegian: "Hele kroppen"
-                        ))
+                    HStack(spacing: 7) {
+                        Text(
+                            focusBodyParts.isEmpty
+                                ? ATHLTHLocalization.choose(
+                                    english: "AI decides",
+                                    norwegian: "AI bestemmer"
+                                )
+                                : focusBodyParts.sorted().map {
+                                    exerciseLibrary.localizedBodyPartTitle($0)
+                                }.joined(separator: " + ")
+                        )
+                        .lineLimit(2)
+                        .multilineTextAlignment(.trailing)
                         Image(systemName: "chevron.up.chevron.down")
                             .font(.caption)
                     }
@@ -1048,7 +1073,9 @@ struct StrengthAIExercisePlannerView: View {
                     durationMinutes,
                 exerciseCount: requiredCount,
                 focusBodyPart:
-                    focusBodyPart,
+                    focusBodyParts.count == 1 ? focusBodyParts.first : nil,
+                focusBodyParts: focusBodyParts.isEmpty
+                    ? nil : focusBodyParts.sorted(),
                 personalize:
                     personalize,
                 language:
