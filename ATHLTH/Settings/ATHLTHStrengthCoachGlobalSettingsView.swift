@@ -3,6 +3,8 @@ import SwiftUI
 /// Strength Audio Coach defaults shared by planned and quick strength sessions.
 /// Existing per-session configuration still takes precedence once training starts.
 struct ATHLTHStrengthCoachGlobalSettingsView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @State private var shareActiveWorkoutWithIPad = false
     @State private var configuration = StrengthAdvancedConfiguration.savedDefaults()
 
     private let ink = Color(red: 0.18, green: 0.19, blue: 0.21)
@@ -143,6 +145,27 @@ struct ATHLTHStrengthCoachGlobalSettingsView: View {
                     }
                 }
 
+                group {
+                    Text(tr("MY DEVICES", "MINE ENHETER"))
+                        .font(.caption.weight(.semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(.secondary)
+
+                    Toggle(
+                        tr("Show active strength workout on my iPad",
+                           "Vis pågående styrkeøkt på min iPad"),
+                        isOn: $shareActiveWorkoutWithIPad
+                    )
+                    .tint(ink)
+
+                    Text(tr(
+                        "Optional private account sync. Shares exercise names, sets, rest timer and progress with your own signed-in iPad; no GPS, heart-rate or HealthKit samples. Training continues normally without a connection.",
+                        "Valgfri privat kontosynk. Viser øvelsesnavn, sett, pausetid og fremdrift på din egen innloggede iPad; ingen GPS-, puls- eller HealthKit-målinger. Treningen fungerer som før uten nett."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+
                 Text(tr(
                     "These are default settings. You can change Audio Coach for an individual workout before starting.",
                     "Dette er standardinnstillinger. Du kan tilpasse Audio Coach for den enkelte økten før start."
@@ -159,6 +182,25 @@ struct ATHLTHStrengthCoachGlobalSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: configuration) { _, newValue in
             newValue.saveAsDefaults()
+        }
+        .onAppear {
+            shareActiveWorkoutWithIPad =
+                ATHLTHPrivateLiveStrengthStatusStore.isEnabled(
+                    for: session.profile.userID
+                )
+        }
+        .onChange(of: shareActiveWorkoutWithIPad) { _, newValue in
+            let userID = session.profile.userID
+            ATHLTHPrivateLiveStrengthStatusStore.setEnabled(
+                newValue, for: userID
+            )
+            if !newValue {
+                Task {
+                    await ATHLTHPrivateLiveStrengthStatusStore.clear(
+                        for: userID
+                    )
+                }
+            }
         }
     }
 
