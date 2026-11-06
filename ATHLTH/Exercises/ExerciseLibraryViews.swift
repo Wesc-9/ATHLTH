@@ -487,83 +487,83 @@ struct ExerciseLibraryView: View {
                                             onSelect: onSelect
                                         )
                                     } else {
-                                ZStack(
-                                    alignment:
-                                        .topTrailing
-                                ) {
-                                    NavigationLink {
-                                        ExerciseDetailView(
-                                            entry: entry,
-                                            selectionTitle:
-                                                selectionTitle,
-                                            onSelect:
-                                                onSelect
-                                        )
-                                    } label: {
-                                        if displayMode == .grid {
-                                            exerciseGridCard(entry)
-                                        } else {
-                                            exerciseRow(entry)
-                                        }
-                                    }
-                                    .buttonStyle(.plain)
-                                    .simultaneousGesture(
-                                        TapGesture().onEnded {
-                                            recordExerciseSelection(entry)
-                                        }
-                                    )
+                                        ZStack(
+                                            alignment:
+                                                .topTrailing
+                                        ) {
+                                            NavigationLink {
+                                                ExerciseDetailView(
+                                                    entry: entry,
+                                                    selectionTitle:
+                                                        selectionTitle,
+                                                    onSelect:
+                                                        onSelect
+                                                )
+                                            } label: {
+                                                if displayMode == .grid {
+                                                    exerciseGridCard(entry)
+                                                } else {
+                                                    exerciseRow(entry)
+                                                }
+                                            }
+                                            .buttonStyle(.plain)
+                                            .simultaneousGesture(
+                                                TapGesture().onEnded {
+                                                    recordExerciseSelection(entry)
+                                                }
+                                            )
 
-                                    if let onSelect {
-                                        Button {
-                                            recordExerciseSelection(entry)
-                                            onSelect(entry)
-                                        } label: {
-                                            VStack(spacing: 3) {
-                                                Image(systemName: "plus")
-                                                    .font(.system(size: 18, weight: .bold))
-                                                Text(
+                                            if let onSelect {
+                                                Button {
+                                                    recordExerciseSelection(entry)
+                                                    onSelect(entry)
+                                                } label: {
+                                                    VStack(spacing: 3) {
+                                                        Image(systemName: "plus")
+                                                            .font(.system(size: 18, weight: .bold))
+                                                        Text(
+                                                            ATHLTHLocalization.choose(
+                                                                english: "Add",
+                                                                norwegian: "Legg til"
+                                                            )
+                                                        )
+                                                        .font(.system(size: 10, weight: .semibold))
+                                                    }
+                                                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                                                    .frame(width: 62, height: 53)
+                                                    .background(
+                                                        Color.white.opacity(0.90),
+                                                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                    )
+                                                    .overlay {
+                                                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                                            .stroke(ATHLTHTheme.accent.opacity(0.20), lineWidth: 0.8)
+                                                    }
+                                                }
+                                                .buttonStyle(.plain)
+                                                .accessibilityLabel(
                                                     ATHLTHLocalization.choose(
-                                                        english: "Add",
-                                                        norwegian: "Legg til"
+                                                        english: "Add " + library.localizedExerciseName(entry) + " to workout",
+                                                        norwegian: "Legg til " + library.localizedExerciseName(entry) + " i økten"
                                                     )
                                                 )
-                                                .font(.system(size: 10, weight: .semibold))
-                                            }
-                                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                                            .frame(width: 62, height: 53)
-                                            .background(
-                                                Color.white.opacity(0.90),
-                                                in: RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                            )
-                                            .overlay {
-                                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                                    .stroke(ATHLTHTheme.accent.opacity(0.20), lineWidth: 0.8)
+                                                .padding(8)
+                                            } else {
+                                                LibraryFavoriteButton(
+                                                    kind: .exercise,
+                                                    itemID: entry.id.uuidString,
+                                                    title: library.localizedExerciseName(entry),
+                                                    subtitle: [
+                                                        entry.bodyPart.map(library.localizedBodyPartTitle),
+                                                        entry.exercise.equipment.first.map(library.localizedEquipmentTitle)
+                                                    ]
+                                                    .compactMap { $0 }
+                                                    .joined(separator: " · "),
+                                                    icon: "dumbbell.fill"
+                                                )
+                                                .padding(8)
                                             }
                                         }
-                                        .buttonStyle(.plain)
-                                        .accessibilityLabel(
-                                            ATHLTHLocalization.choose(
-                                                english: "Add " + library.localizedExerciseName(entry) + " to workout",
-                                                norwegian: "Legg til " + library.localizedExerciseName(entry) + " i økten"
-                                            )
-                                        )
-                                        .padding(8)
-                                    } else {
-                                        LibraryFavoriteButton(
-                                            kind: .exercise,
-                                            itemID: entry.id.uuidString,
-                                            title: library.localizedExerciseName(entry),
-                                            subtitle: [
-                                                entry.bodyPart.map(library.localizedBodyPartTitle),
-                                                entry.exercise.equipment.first.map(library.localizedEquipmentTitle)
-                                            ]
-                                            .compactMap { $0 }
-                                            .joined(separator: " · "),
-                                            icon: "dumbbell.fill"
-                                        )
-                                        .padding(8)
-                                    }
-                                }
                                     }
                                 }
                                 .id(entry.id)
@@ -1323,7 +1323,7 @@ struct ExerciseLibraryView: View {
                     lineWidth: 0.8
                 )
         }
-        .accessibilityIdentifier("exercise-grid-selection-card")
+        .accessibilityIdentifier("exercise-grid-selection-card-" + entry.id.uuidString)
     }
 
     private func exerciseGridContent(
