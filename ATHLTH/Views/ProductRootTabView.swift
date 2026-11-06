@@ -13205,10 +13205,6 @@ struct ATHLTHProgressView: View {
         }
     }
 
-    private func formattedSteps(_ value: Double?) -> String {
-        guard let value else { return "—" }
-        return Int(value.rounded()).formatted()
-    }
 
     private var overviewTitle: String {
         switch period {
@@ -13252,27 +13248,7 @@ struct ATHLTHProgressView: View {
         return max(10_000, rounded)
     }
 
-    private func bucketAxisLabel(_ date: Date) -> String {
-        switch period {
-        case .week:
-            return date.formatted(.dateTime.weekday(.narrow))
-        case .month, .threeMonths:
-            return date.formatted(.dateTime.month(.abbreviated).day())
-        case .year:
-            return date.formatted(.dateTime.month(.abbreviated))
-        }
-    }
 
-    @ViewBuilder
-    private func chartPlaceholder(icon: String) -> some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .fill(Color.black.opacity(0.025))
-            .frame(height: 120)
-            .overlay {
-                Image(systemName: icon)
-                    .foregroundStyle(.secondary.opacity(0.5))
-            }
-    }
 
     private var progressGrouping: HealthProgressGrouping {
         switch period {
