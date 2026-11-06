@@ -29,6 +29,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     @State private var periodDays = 28
     @State private var showingReadinessExplanation = false
     @State private var remoteStrengthStatus: ATHLTHPrivateLiveStrengthSnapshot?
+    @State private var remoteGhostStatus: ATHLTHPrivateGhostSpectatorSnapshot?
 
     private let cream = Color(red: 0.984, green: 0.978, blue: 0.966)
     private let ink = Color(red: 0.18, green: 0.17, blue: 0.16)
@@ -99,6 +100,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         titleRow(expanded: split)
 
+                        // The other device owns Ghost Race recording.
+                        // iPad offers a wide, read-only live course surface.
+                        if let remoteGhostStatus, remoteGhostStatus.isFresh() {
+                            ATHLTHStudioPrivateGhostSpectatorCard(
+                                snapshot: remoteGhostStatus
+                            )
+                        }
+
                         // Live workout data is displayed, never edited, on iPad.
                         if strength.activeWorkout != nil {
                             ATHLTHStudioLiveStrengthReadOnlyCard()
@@ -162,6 +171,22 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     remoteStrengthStatus = nil
                 }
                 try? await Task.sleep(for: .seconds(12))
+            }
+        }
+        .task(id: session.profile.userID) {
+            guard ATHLTHDeviceRole.isIPad else { return }
+            while !Task.isCancelled {
+                if session.signedIn, scenePhase == .active {
+                    remoteGhostStatus =
+                        await ATHLTHPrivateGhostSpectatorStore.fetch(
+                            for: session.profile.userID
+                        )
+                } else {
+                    remoteGhostStatus = nil
+                }
+                try? await Task.sleep(
+                    for: .seconds(remoteGhostStatus == nil ? 8 : 3)
+                )
             }
         }
         .onChange(of: scenePhase) { _, phase in
