@@ -151,12 +151,24 @@ struct ATHLTHStrengthCoachGlobalSettingsView: View {
                         .tracking(0.8)
                         .foregroundStyle(.secondary)
 
-                    Toggle(
-                        tr("Show active strength workout on my iPad",
-                           "Vis pågående styrkeøkt på min iPad"),
-                        isOn: $shareActiveWorkoutWithIPad
-                    )
-                    .tint(ink)
+                    if ATHLTHDeviceRole.isIPad {
+                        Label(
+                            tr(
+                                "Enable private live workout sharing from ATHLTH on your iPhone.",
+                                "Slå på privat deling av pågående økt fra ATHLTH på iPhone."
+                            ),
+                            systemImage: "iphone.gen3"
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    } else {
+                        Toggle(
+                            tr("Show active strength workout on my iPad",
+                               "Vis pågående styrkeøkt på min iPad"),
+                            isOn: $shareActiveWorkoutWithIPad
+                        )
+                        .tint(ink)
+                    }
 
                     Text(tr(
                         "Optional private account sync. Shares exercise names, sets, rest timer and progress with your own signed-in iPad; no GPS, heart-rate or HealthKit samples. Training continues normally without a connection.",
