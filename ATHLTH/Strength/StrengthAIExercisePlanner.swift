@@ -984,53 +984,6 @@ struct StrengthAIExercisePlannerView: View {
         }
     }
 
-    private func focusScore(
-        _ entry:
-            ExerciseLibraryEntry
-    ) -> Int {
-        guard let focusBodyPart else {
-            return entry.source ==
-                .athlthCatalog
-                ? 2
-                : 0
-        }
-
-        let target =
-            focusBodyPart
-                .lowercased()
-
-        if entry.bodyPart?
-            .lowercased() ==
-            target {
-            return 10
-        }
-
-        let muscles =
-            entry.exercise
-                .primaryMuscles +
-            entry.exercise
-                .secondaryMuscles
-
-        if muscles.contains(
-            where: {
-                $0.lowercased()
-                    .contains(
-                        target
-                    ) ||
-                target.contains(
-                    $0.lowercased()
-                )
-            }
-        ) {
-            return 8
-        }
-
-        return entry.source ==
-            .athlthCatalog
-            ? 1
-            : 0
-    }
-
     private func generate() {
         guard !isGenerating else {
             return
@@ -1078,27 +1031,22 @@ struct StrengthAIExercisePlannerView: View {
                     )
                 }
 
-        guard !candidates.isEmpty else {
-            errorMessage =
-                ATHLTHLocalization.choose(
-                    english:
-                        "No compatible strength exercises are available yet.",
-                    norwegian:
-                        "Ingen kompatible styrkeøvelser er tilgjengelige ennå."
-                )
+        let requiredCount = quickSuggestion ? 1 : exerciseCount
+        guard candidates.count >= requiredCount else {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Found \(candidates.count) eligible library exercises, but you requested \(requiredCount). Adjust the count, source, focus or equipment.",
+                norwegian: "Fant \(candidates.count) passende øvelser i biblioteket, men du ønsker \(requiredCount). Endre antall, kilde, fokus eller utstyr."
+            )
             return
         }
+        let allowedIDs = Set(candidates.map(\.exerciseID))
 
         let request =
             StrengthAIExerciseRequest(
                 goal: goal.rawValue,
                 durationMinutes:
                     durationMinutes,
-                exerciseCount:
-                    min(
-                        quickSuggestion ? 1 : exerciseCount,
-                        candidates.count
-                    ),
+                exerciseCount: requiredCount,
                 focusBodyPart:
                     focusBodyPart,
                 personalize:
@@ -1142,14 +1090,16 @@ struct StrengthAIExercisePlannerView: View {
                             request
                         )
 
-                guard !generated
-                    .exercises
-                    .isEmpty
-                else {
-                    throw StrengthAIExercisePlannerError
-                        .emptyResult
+                guard StrengthAIExerciseSelectionPolicy.verified(
+                    generated.exercises,
+                    allowedIDs: allowedIDs,
+                    existingIDs: existingIDs,
+                    requiredCount: requiredCount
+                ) else {
+                    throw StrengthAIExercisePlannerError.invalidResult
                 }
 
+                editedSuggestions = generated.exercises
                 plan = generated
             } catch {
                 errorMessage =
@@ -1222,6 +1172,21 @@ struct StrengthAIExercisePlannerView: View {
     }
 
     private func applyPlan() {
+        // Revalidate at the last possible moment, including after the user
+        // replaces or removes rows or the account-local library changes.
+        let allowedIDs = Set(candidateEntries.map(\.id))
+        guard StrengthAIExerciseSelectionPolicy.verified(
+            editedSuggestions,
+            allowedIDs: allowedIDs,
+            existingIDs: existingIDs,
+            requiredCount: editedSuggestions.count
+        ), resolvedSuggestions.count == editedSuggestions.count else {
+            errorMessage = ATHLTHLocalization.choose(
+                english: "Some exercises are no longer in the selected library. Review the suggestion again.",
+                norwegian: "En eller flere øvelser finnes ikke lenger i det valgte biblioteket. Se over forslaget på nytt."
+            )
+            return
+        }
         let additions =
             resolvedSuggestions
                 .map {
@@ -1301,6 +1266,37 @@ struct StrengthAIExercisePlannerView: View {
 
         onApply(additions)
         dismiss()
+    }
+
+    private func replace(_ id: UUID, with entry: ExerciseLibraryEntry) {
+        // The picker is read-only, but validate again if library contents
+        // changed while it was open.
+        guard availableReplacements.contains(where: { $0.id == entry.id }),
+              let index = editedSuggestions.firstIndex(where: {
+                  $0.exerciseID == id
+              }) else { return }
+        let current = editedSuggestions[index]
+        editedSuggestions[index] = StrengthAIExerciseSuggestion(
+            exerciseID: entry.id,
+            sets: current.sets,
+            reps: current.reps,
+            restSeconds: current.restSeconds,
+            targetRPE: current.targetRPE,
+            reason: ""
+        )
+    }
+
+    private func move(_ id: UUID, by offset: Int) {
+        guard let index = editedSuggestions.firstIndex(where: {
+            $0.exerciseID == id
+        }) else { return }
+        let destination = index + offset
+        guard editedSuggestions.indices.contains(destination) else { return }
+        editedSuggestions.swapAt(index, destination)
+    }
+
+    private func remove(_ id: UUID) {
+        editedSuggestions.removeAll { $0.exerciseID == id }
     }
 
     private func resolvedErrorMessage(
@@ -1446,8 +1442,14 @@ private enum StrengthAIExercisePlannerError:
     LocalizedError
 {
     case emptyResult
+    case invalidResult
 
     var errorDescription: String? {
-        "ATHLTH AI returned no valid exercises."
+        switch self {
+        case .emptyResult:
+            return "ATHLTH AI returned no exercises."
+        case .invalidResult:
+            return "ATHLTH AI returned an exercise outside the allowed library selection."
+        }
     }
 }
