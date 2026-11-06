@@ -2334,18 +2334,14 @@ struct GhostRaceLivePanel: View {
                     reference: reference
                 )
 
-                if let comparison =
-                    ghostRace.comparison {
-                    mapCard(
-                        reference: reference,
-                        comparison: comparison
-                    )
-                    metrics(
-                        comparison: comparison
-                    )
-                    progressCard(
-                        comparison: comparison
-                    )
+                mapCard(
+                    reference: reference,
+                    comparison: ghostRace.comparison
+                )
+
+                if let comparison = ghostRace.comparison {
+                    metrics(comparison: comparison)
+                    progressCard(comparison: comparison)
                 } else if ghostRace.result == nil {
                     ATHLTHUnifiedCard {
                         HStack(spacing: 12) {
@@ -2457,7 +2453,7 @@ struct GhostRaceLivePanel: View {
 
     private func mapCard(
         reference: GhostRaceReference,
-        comparison: GhostRaceComparison
+        comparison: GhostRaceComparison?
     ) -> some View {
         ATHLTHGhostRaceLiveCourseMap(
             reference: reference,
