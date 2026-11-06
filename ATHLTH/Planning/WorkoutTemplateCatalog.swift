@@ -3737,14 +3737,6 @@ struct WorkoutTemplateBuilderView: View {
             gearIDs: gearSelectionTouched ? Array(selectedWorkoutGearIDs) : nil,
             spotifyPlaylist: selectedSpotifyPlaylist,
             spotifyAutoplayOnStart: spotifyAutoplayOnStart,
-            audioCoachConfiguration: currentAudioCoachConfiguration,
-            routeAlertConfiguration: routeIsCustomized
-                ? routeGuardianDraft.configuration : nil,
-            ghostTargetDurationSeconds: ghostDraft.targetDuration,
-            ghostUpdates: ghostDraft.enabled
-                ? ghostDraft.resolvedUpdates(
-                    fallback: settings.ghostRaceAudioConfiguration
-                  ) : nil,
             pendingCopyDayIDs: Array(pendingCopyDayIDs).sorted(),
             updatedAt: Date(),
             sourceTitle: initialSourceTitle,
@@ -3757,6 +3749,14 @@ struct WorkoutTemplateBuilderView: View {
             studioDate: studioBasicDate,
             pendingExercisePicker: showingExercisePicker || resumeExercisePickerAfterWake,
             pendingRunningPicker: showingRunningExercisePicker || resumeRunningPickerAfterWake
+            audioCoachConfiguration: currentAudioCoachConfiguration,
+            routeAlertConfiguration: routeIsCustomized
+                ? routeGuardianDraft.configuration : nil,
+            ghostTargetDurationSeconds: ghostDraft.targetDuration,
+            ghostUpdates: ghostDraft.enabled
+                ? ghostDraft.resolvedUpdates(
+                    fallback: settings.ghostRaceAudioConfiguration
+                  ) : nil,
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: draftStorageKey)
