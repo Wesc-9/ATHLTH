@@ -52,6 +52,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingSpotifyControls = false
     @State private var showingNextExerciseDetails = false
     @State private var showingOmitRemainingSetsConfirmation = false
+    @State private var showingSkipCurrentSetConfirmation = false
     @State private var showingTrainingPlacePicker = false
 
     var body: some View {
@@ -6331,6 +6332,48 @@ struct ActiveStrengthWorkoutView: View {
                     }
                     .buttonStyle(.bordered)
                     .controlSize(.small)
+                }
+
+                if strength.currentSet?.isCompleted == false &&
+                   !strength.isResting {
+                    Button {
+                        showingSkipCurrentSetConfirmation = true
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Skip this set",
+                                norwegian: "Hopp over dette settet"
+                            ),
+                            systemImage: "forward.end"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(ATHLTHPlanDesign.ink)
+                    .confirmationDialog(
+                        ATHLTHLocalization.choose(
+                            english: "Skip the current set?",
+                            norwegian: "Hoppe over dette settet?"
+                        ),
+                        isPresented: $showingSkipCurrentSetConfirmation,
+                        titleVisibility: .visible
+                    ) {
+                        Button(
+                            ATHLTHLocalization.choose(
+                                english: "Skip set",
+                                norwegian: "Hopp over sett"
+                            ),
+                            role: .destructive
+                        ) {
+                            _ = strength.skipCurrentSet()
+                        }
+                    } message: {
+                        Text(ATHLTHLocalization.choose(
+                            english: "The set will be omitted, not marked completed. Your training volume and records remain correct.",
+                            norwegian: "Sett hoppes over og blir ikke registrert som utført. Treningsvolum og rekorder blir ikke påvirket."
+                        ))
+                    }
                 }
 
                 if exercise.sets.contains(where: { $0.isCompleted }) &&
