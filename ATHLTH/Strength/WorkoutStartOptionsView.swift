@@ -111,12 +111,10 @@ struct WorkoutStartOptionsView: View {
                         : savedAdvanced.spotifyAutoplay
                 )
         )
-        // Preserve the saved voice and cue preferences, but require an
-        // explicit opt-in to spoken coaching for every new strength session.
-        var sessionCoach = savedAdvanced.audioCoach
-        sessionCoach.enabled = false
+        // Respect the athlete's explicitly chosen global default for voice
+        // coaching. Quick sessions can still override this before launch.
         _strengthAudioCoach = State(
-            initialValue: sessionCoach
+            initialValue: savedAdvanced.audioCoach
         )
         _restCues = State(
             initialValue:
