@@ -57,6 +57,7 @@ struct WatchGhostRaceMiniMap: View {
         ghost: CLLocationCoordinate2D
     )? {
         guard workoutManager.state == .running,
+              !workoutManager.automaticPauseActive,
               let updated = workoutManager.ghostMapUpdatedAt,
               now.timeIntervalSince(updated) >= -5,
               now.timeIntervalSince(updated) <= 12,
@@ -79,6 +80,7 @@ struct WatchGhostRaceMiniMap: View {
 
     private func freshLead(at now: Date) -> Double? {
         guard workoutManager.state == .running,
+              !workoutManager.automaticPauseActive,
               let updated = workoutManager.ghostComparisonUpdatedAt,
               now.timeIntervalSince(updated) >= -5,
               now.timeIntervalSince(updated) <= 12,
