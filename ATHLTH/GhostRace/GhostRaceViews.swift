@@ -2534,7 +2534,8 @@ struct GhostRaceLivePanel: View {
         ATHLTHGhostRaceLiveCourseMap(
             reference: reference,
             comparison: comparison,
-            paused: snapshot.state == .paused,
+            paused: snapshot.state == .paused ||
+                snapshot.workoutAutoPaused == true,
             mapHeight: 260
         )
     }
@@ -3255,7 +3256,8 @@ struct ATHLTHGhostRuntimeObserver: View {
                 reference: reference,
                 comparison: ghostRace.comparison,
                 sourceDevice: "Apple Watch",
-                paused: snapshot.state == .paused,
+                paused: snapshot.state == .paused ||
+                    snapshot.workoutAutoPaused == true,
                 userID: appSession.profile.userID
             )
         }
@@ -3271,7 +3273,13 @@ struct ATHLTHGhostRuntimeObserver: View {
 
         if ghostRace.reference != nil,
            snapshot.kind == .running {
-            ghostRace.update(with: snapshot)
+            // Automatic pause is not always represented by the older
+            // mirror-state enum. Never report stale positions as live.
+            var comparisonSnapshot = snapshot
+            if snapshot.workoutAutoPaused == true {
+                comparisonSnapshot.state = .paused
+            }
+            ghostRace.update(with: comparisonSnapshot)
 
             if appSession.signedIn,
                let reference = ghostRace.reference,
@@ -3281,7 +3289,8 @@ struct ATHLTHGhostRuntimeObserver: View {
                         reference: reference,
                         comparison: ghostRace.comparison,
                         sourceDevice: "Apple Watch",
-                        paused: snapshot.state == .paused,
+                        paused: snapshot.state == .paused ||
+                            snapshot.workoutAutoPaused == true,
                         userID: appSession.profile.userID
                     )
                 } else if snapshot.state == .completed ||
