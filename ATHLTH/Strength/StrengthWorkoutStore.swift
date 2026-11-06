@@ -4270,6 +4270,45 @@ final class StrengthWorkoutStore: ObservableObject {
         activeWorkout = workout
     }
 
+    /// Skip exactly the selected pending set without recording a completed
+    /// effort. Plan provenance is preserved by skippedPlannedSetCount; volume,
+    /// PRs and completed-set counts never increase. Safe for offline Watch
+    /// replay because duplicate/stale commands are rejected by set indices.
+    @discardableResult
+    func skipCurrentSet() -> Bool {
+        guard var workout = activeWorkout,
+              workout.exercises.indices.contains(currentExerciseIndex),
+              workout.exercises[currentExerciseIndex].sets.indices.contains(currentSetIndex),
+              !workout.exercises[currentExerciseIndex].sets[currentSetIndex].isCompleted
+        else { return false }
+
+        var exercise = workout.exercises[currentExerciseIndex]
+        let skipped = exercise.sets.remove(at: currentSetIndex)
+        cardioWatchCaptures.removeValue(forKey: skipped.id)
+        watchCaptureNeedsBaseline.remove(skipped.id)
+        exercise.skippedPlannedSetCount = (exercise.skippedPlannedSetCount ?? 0) + 1
+        timedSetCountdown = nil
+        setEffortClock = nil
+        restStartedAt = nil
+        restEndsAt = nil
+
+        let nextPending = exercise.sets.firstIndex { !$0.isCompleted }
+        if let nextPending {
+            currentSetIndex = nextPending
+            exercise.completedAt = nil
+        } else {
+            // The exercise is finished or explicitly omitted. Do not count
+            // an omitted set as a training effort.
+            exercise.completedAt = Date()
+            currentSetIndex = max(exercise.sets.count - 1, 0)
+        }
+        workout.exercises[currentExerciseIndex] = exercise
+        activeWorkout = workout
+        reloadDraftFromCurrentSet()
+        persistCheckpointNow()
+        return true
+    }
+
     /// End a partially completed exercise without inventing completed
     /// repetitions or touching the scheduled plan. Only pending sets vanish
     /// from this active execution and their count remains auditable.
