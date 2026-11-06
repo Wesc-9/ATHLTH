@@ -2371,6 +2371,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 exercise.setPlans = plans
             }
             exercise.setCount = max(exercise.setCount - 1, 0)
+            exercise.skippedSets = (exercise.skippedSets ?? 0) + 1
             exercise.isCompleted = exercise.setCount == 0
             exercise.firstPendingSetIndex = exercise.setCount > 0
                 ? min(snapshot.setIndex, exercise.setCount - 1)
