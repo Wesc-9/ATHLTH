@@ -32,7 +32,29 @@ final class AthleteOfflinePackStore: ObservableObject {
         accountID = userID; packs = []; error = nil
         do {
             let folder = try root(userID)
-            for child in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil) {
+            let children = try FileManager.default.contentsOfDirectory(
+                at: folder, includingPropertiesForKeys: nil
+            )
+            // Recover a previous pack after a process kill between moving
+            // the old directory aside and installing the new directory.
+            for child in children where child.lastPathComponent.hasPrefix("previous-") {
+                let metadata = child.appendingPathComponent("pack.json")
+                guard let bytes = try? Data(contentsOf: metadata),
+                      let previousPack = try? JSONDecoder().decode(
+                        AthleteOfflinePack.self, from: bytes
+                      ) else { continue }
+                let destination = folder.appendingPathComponent(
+                    previousPack.id.uuidString, isDirectory: true
+                )
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try? FileManager.default.removeItem(at: child)
+                } else {
+                    try? FileManager.default.moveItem(at: child, to: destination)
+                }
+            }
+            for child in try FileManager.default.contentsOfDirectory(
+                at: folder, includingPropertiesForKeys: nil
+            ) {
                 guard UUID(uuidString: child.lastPathComponent) != nil else { continue }
                 let file = child.appendingPathComponent("pack.json")
                 if let data = try? Data(contentsOf: file), let pack = try? JSONDecoder().decode(AthleteOfflinePack.self, from: data) { packs.append(pack) }
