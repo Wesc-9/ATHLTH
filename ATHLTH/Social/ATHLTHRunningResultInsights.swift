@@ -19,6 +19,114 @@ enum ATHLTHRunningResultInsights {
         var id: Double { distanceKilometers }
     }
 
+    /// A single workout-associated HealthKit walking/running distance sample.
+    /// The HealthKit adapter lives in HealthKitManager; this calculation can
+    /// be unit-tested without a health store or a device.
+    struct HealthDistanceInterval: Equatable {
+        let startDate: Date
+        let endDate: Date
+        let distanceMeters: Double
+    }
+
+    /// Prefer the Watch's workout-associated distance timeline for retrospective
+    /// kilometre pace. Raw GPS geometry can disagree with the Watch's fused
+    /// distance sensor, shifting the point at which each km is completed.
+    /// Return [] if the Health samples are incomplete/condensed/contradictory;
+    /// callers must then use the already-verified route-based fallback.
+    static func healthDistanceKilometerSplits(
+        from samples: [HealthDistanceInterval],
+        workoutStart: Date,
+        workoutEnd: Date,
+        reportedDistanceMeters: Double?,
+        pausedIntervals: [DateInterval] = []
+    ) -> [KilometerSplit] {
+        guard workoutEnd > workoutStart,
+              samples.count >= 3, samples.count < 12_000 else { return [] }
+        let ordered = samples.sorted { $0.startDate < $1.startDate }
+        let pauses = pausedIntervals.sorted { $0.start < $1.start }
+        guard pauses.allSatisfy({
+            $0.start >= workoutStart && $0.end <= workoutEnd && $0.end > $0.start
+        }) else { return [] }
+        for index in 1..<pauses.count {
+            guard pauses[index].start >= pauses[index - 1].end else { return [] }
+        }
+
+        var totalDistance = 0.0
+        var previousEnd = workoutStart
+        for interval in ordered {
+            let seconds = interval.endDate.timeIntervalSince(interval.startDate)
+            guard seconds.isFinite, seconds > 0, seconds <= 180,
+                  interval.startDate >= workoutStart.addingTimeInterval(-2),
+                  interval.endDate <= workoutEnd.addingTimeInterval(2),
+                  interval.startDate >= previousEnd.addingTimeInterval(-0.25),
+                  interval.distanceMeters.isFinite,
+                  (0...600).contains(interval.distanceMeters),
+                  interval.distanceMeters / seconds <= 9.8
+            else { return [] }
+            previousEnd = interval.endDate
+            totalDistance += interval.distanceMeters
+        }
+        guard totalDistance >= 1_000 else { return [] }
+
+        // Only use HealthKit's independent distance timeline if its total
+        // agrees with the workout's recorded distance, not an unrelated walk.
+        if let reportedDistanceMeters, reportedDistanceMeters.isFinite,
+           reportedDistanceMeters > 0 {
+            guard abs(totalDistance - reportedDistanceMeters) /
+                  reportedDistanceMeters <= 0.04 else { return [] }
+        }
+
+        func movingSeconds(_ start: Date, _ end: Date) -> Double {
+            var seconds = end.timeIntervalSince(start)
+            for pause in pauses where pause.start < end && pause.end > start {
+                let overlapStart = max(start, pause.start)
+                let overlapEnd = min(end, pause.end)
+                seconds -= max(0, overlapEnd.timeIntervalSince(overlapStart))
+            }
+            return seconds
+        }
+
+        var completed: [KilometerSplit] = []
+        var accumulated = 0.0
+        var start = workoutStart
+        var pointsInKilometer = 0
+
+        for sample in ordered {
+            let meters = sample.distanceMeters
+            guard meters > 0 else { continue }
+            pointsInKilometer += 1
+            let before = accumulated
+            let after = accumulated + meters
+
+            if after >= 999.999 {
+                // Avoid interpolating a split from one very coarse sample.
+                guard pointsInKilometer >= 2 else { return [] }
+                let fraction = min(1, max(0, (1_000 - before) / meters))
+                let boundary = sample.startDate.addingTimeInterval(
+                    sample.endDate.timeIntervalSince(sample.startDate) * fraction
+                )
+                let elapsed = movingSeconds(start, boundary)
+                guard (50...2_400).contains(elapsed) else { return [] }
+                completed.append(KilometerSplit(
+                    kilometer: completed.count + 1,
+                    durationSeconds: elapsed,
+                    startedAt: start,
+                    endedAt: boundary
+                ))
+                start = boundary
+                accumulated = after - 1_000
+                pointsInKilometer = accumulated > 0.001 ? 1 : 0
+
+                // An associated sample should never span an entire km;
+                // reject a pathological sample rather than inventing splits.
+                guard accumulated < 999.999 else { return [] }
+            } else {
+                accumulated = after
+            }
+        }
+        return completed
+    }
+
     static func kilometerSplits(
         from route: [CLLocation],
         reportedDistanceMeters: Double?
