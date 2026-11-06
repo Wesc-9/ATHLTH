@@ -235,6 +235,10 @@ private struct ATHLTHSceneRootView: View {
                 isForeground: newPhase == .active && appSession.signedIn
             )
             if newPhase == .active && appSession.signedIn {
+                // Both iPhone and iPad must durably checkpoint local edits
+                // before attempting to reconcile with the cloud after
+                // returning from an offline period.
+                appSession.checkpointTrainingContent()
                 studioPlanSync.scheduleSync(session: appSession)
             }
         }
