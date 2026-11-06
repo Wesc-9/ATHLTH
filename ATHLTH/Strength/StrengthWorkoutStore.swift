@@ -213,6 +213,9 @@ final class StrengthWorkoutStore: ObservableObject {
             workoutHistory.sort { $0.startedAt > $1.startedAt }
             persistWorkoutHistory()
         }
+        if let userID {
+            repairInvalidTimedCoreHistory(for: userID)
+        }
         let checkpoint = userID.flatMap { AccountLocalStorage.read(Checkpoint.self, name: "strengthActive", userID: $0) }
         activeWorkout = checkpoint?.workout
         cardioWatchCaptures = checkpoint?.cardioWatchCaptures ?? [:]
@@ -267,9 +270,30 @@ final class StrengthWorkoutStore: ObservableObject {
         let ids = Set(workoutHistory.map(\.id))
         workoutHistory += Self.loadWorkoutHistory().filter { !ids.contains($0.id) }
         workoutHistory.sort { $0.startedAt > $1.startedAt }
+        repairInvalidTimedCoreHistory(for: accountID)
         persistWorkoutHistory()
         UserDefaults.standard.set(accountID.uuidString, forKey: "legacy.strengthClaimedBy")
         hasLegacyHistory = false
+    }
+
+    private func repairInvalidTimedCoreHistory(for userID: UUID) {
+        let repaired = StrengthTimedHistoryRepair.clean(workoutHistory)
+        guard repaired.changed else { return }
+        // Keep a private, per-account original copy so a mistaken
+        // classification can be reviewed without irreversible data loss.
+        if AccountLocalStorage.read(
+            [StrengthWorkoutLog].self,
+            name: "strengthHistoryBeforeTimedFixV1",
+            userID: userID
+        ) == nil {
+            AccountLocalStorage.write(
+                workoutHistory,
+                name: "strengthHistoryBeforeTimedFixV1",
+                userID: userID
+            )
+        }
+        workoutHistory = repaired.history
+        persistWorkoutHistory()
     }
 
     private func scheduleCheckpointPersist() {
