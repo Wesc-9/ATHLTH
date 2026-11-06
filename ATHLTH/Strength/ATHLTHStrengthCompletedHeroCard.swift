@@ -7,11 +7,11 @@ enum ATHLTHStrengthFocusTint {
         let normalized = intensity.isFinite ? min(max(intensity, 0), 1) : 0
         switch normalized {
         case 0.85...:
-            return Color(red: 0.85, green: 0.28, blue: 0.30)
+            return Color(red: 0.80, green: 0.27, blue: 0.23)
         case 0.55..<0.85:
-            return Color(red: 0.92, green: 0.54, blue: 0.27)
+            return Color(red: 0.91, green: 0.47, blue: 0.20)
         default:
-            return Color(red: 0.36, green: 0.64, blue: 0.48)
+            return Color(red: 0.79, green: 0.60, blue: 0.32)
         }
     }
 }
@@ -39,7 +39,7 @@ struct ATHLTHStrengthCompletedHeroCard: View {
     private let ink = Color(red: 0.14, green: 0.15, blue: 0.16)
     private let secondaryInk = Color(red: 0.35, green: 0.38, blue: 0.42)
     private let warmAccent = Color(red: 0.48, green: 0.34, blue: 0.21)
-    private let muscleAccent = Color(red: 0.34, green: 0.63, blue: 0.48)
+    private let muscleAccent = Color(red: 0.82, green: 0.44, blue: 0.22)
 
     private var focus: String {
         let top = profile.topActivations
@@ -55,12 +55,15 @@ struct ATHLTHStrengthCompletedHeroCard: View {
     }
 
     private var sessionRegionTints: [StrengthMuscleRegion: Color] {
-        guard trainDetailStyle else { return [:] }
-        return Dictionary(uniqueKeysWithValues: profile.activations.map { activation in
-            (activation.region, ATHLTHStrengthFocusTint.color(
+        // All strength summary surfaces share the same warm, intensity-based
+        // visualization. Never use the old green default on this hero.
+        var tints: [StrengthMuscleRegion: Color] = [:]
+        for activation in profile.activations {
+            tints[activation.region] = ATHLTHStrengthFocusTint.color(
                 for: profile.intensity(for: activation.region)
-            ))
-        })
+            )
+        }
+        return tints
     }
 
     private var compactDurationLabel: String {
@@ -100,10 +103,10 @@ struct ATHLTHStrengthCompletedHeroCard: View {
             let footerHeight: CGFloat = displaysMetrics ? (small ? 46 : 75) : 0
 
             ZStack(alignment: .topLeading) {
-                // Use a bundled strength-specific hero on the Home strip;
-                // keep the existing studio artwork everywhere else.
-                // The muscle dolls are native vectors drawn separately above it.
-                Image(recentActivityStrip ? "StrengthPostWorkoutHero" : "StrengthFeedGym")
+                // Reuse the original user-supplied barbell photograph on every
+                // strength-completion surface (never the treadmill photo).
+                // The anatomical figures are drawn as separate native vectors.
+                Image("StrengthQuickHero")
                     .resizable()
                     .interpolation(.high)
                     .scaledToFill()
@@ -161,21 +164,17 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                         presentation: .home,
                         activationTint: muscleAccent,
                         regionTints: sessionRegionTints,
-                        warmIvoryBase: recentActivityStrip
+                        warmIvoryBase: true
                     )
                     .frame(
-                        width: trainDetailStyle
-                            ? min(cardWidth * 0.56, 240)
-                            : (tight ? min(cardWidth * 0.60, 210) : min(cardWidth * 0.88, 390)),
-                        height: cardHeight * (trainDetailStyle ? 0.72 : (tight ? 0.94 : 0.98))
+                        width: min(cardWidth * (tight ? 0.52 : 0.43), tight ? 175 : 245),
+                        height: min(cardHeight * (trainDetailStyle ? 0.76 : 0.81), 255)
                     )
                     // The slightly narrower silhouettes leave a clear space for
                     // the title, focus label and two information tiles.
-                    .scaleEffect(x: trainDetailStyle ? 0.81 : 1, y: 1, anchor: .trailing)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity,
-                           alignment: trainDetailStyle ? .bottomTrailing : .topTrailing)
-                    .padding(.trailing, trainDetailStyle ? 10 : (tight ? 6 : (small ? 2 : 12)))
-                    .offset(y: trainDetailStyle ? -cardHeight * 0.10 : 0)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                    .padding(.trailing, tight ? 6 : 13)
+                    .padding(.bottom, displaysMetrics ? footerHeight + 5 : 11)
                     .allowsHitTesting(false)
                 }
 
