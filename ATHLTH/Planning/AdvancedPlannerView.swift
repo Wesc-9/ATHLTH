@@ -8829,7 +8829,7 @@ struct SessionEditorView: View {
                             PerWorkoutRouteGuardianView(draft: $routeGuardianDraft)
                         } label: {
                             guidancePlannerRow(
-                                title: "Route Guardian",
+                                title: ATHLTHLocalization.choose(english: "Navigation", norwegian: "Navigasjon"),
                                 subtitle: ATHLTHLocalization.choose(
                                     english: "Route deviation alerts", norwegian: "Varsler ved avvik fra ruten"),
                                 icon: "location.fill", tint: ATHLTHTheme.vitality)
