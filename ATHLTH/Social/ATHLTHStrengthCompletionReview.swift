@@ -626,13 +626,8 @@ struct ATHLTHStrengthCompletionReview: View {
                          symbol: "figure.strengthtraining.traditional")
 
             HStack(alignment: .center, spacing: 15) {
-                StrengthMuscleMapView(
-                    profile: muscleProfile,
-                    compact: true
-                )
-                .frame(width: 145, height: 173)
-                .accessibilityHidden(true)
-
+                // Results stay on the left; both anatomical figures are
+                // consistently anchored on the right in all strength cards.
                 VStack(alignment: .leading, spacing: 13) {
                     ForEach(Array(muscleProfile.topActivations.prefix(3))) { activation in
                         VStack(alignment: .leading, spacing: 6) {
@@ -661,6 +656,18 @@ struct ATHLTHStrengthCompletionReview: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
+
+                StrengthMuscleMapView(
+                    profile: muscleProfile,
+                    compact: true,
+                    style: .activation,
+                    presentation: .home,
+                    activationTint: Color(red: 0.85, green: 0.46, blue: 0.22),
+                    regionTints: sessionMuscleTints,
+                    warmIvoryBase: true
+                )
+                .frame(width: 145, height: 173)
+                .accessibilityHidden(true)
             }
 
             Text(tr(
