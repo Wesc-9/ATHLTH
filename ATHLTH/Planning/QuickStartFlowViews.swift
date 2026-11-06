@@ -244,10 +244,64 @@ struct AudioCoachDraft {
         announceWorkoutComplete = config.announceWorkoutComplete ?? true
     }
 
-    func configuration(
-        routeDistanceMeters: Double? = nil
+    /// Shared by planned-workout editing, including old saved sessions.
+    /// Preserve every existing setting when loading a session override.
+    mutating func load(configuration config: WatchAudioCoachConfiguration) {
+        load(profile: ATHLTHAudioCoachProfile(
+            name: "Workout", configuration: config
+        ))
+        enabled = config.enabled
+    }
+
+    /// Apply just the options surfaced by the premium studio. Do not lose
+    /// fuel, strength, voice lease or other settings held by older workouts.
+    func applying(
+        to original: WatchAudioCoachConfiguration,
+        maximumHeartRateBPM: Double? = nil
     ) -> WatchAudioCoachConfiguration {
-        WatchAudioCoachConfiguration(
+        let values = configuration(
+            routeDistanceMeters: original.routeDistanceMeters,
+            maximumHeartRateBPM: maximumHeartRateBPM
+        )
+        var saved = original
+        saved.enabled = values.enabled
+        saved.language = values.language
+        saved.distanceIntervalMeters = values.distanceIntervalMeters
+        saved.timeIntervalSeconds = values.timeIntervalSeconds
+        saved.customRules = values.customRules
+        saved.smartPrompts = values.smartPrompts
+        saved.announceDistance = values.announceDistance
+        saved.announceElapsedTime = values.announceElapsedTime
+        saved.announceAveragePace = values.announceAveragePace
+        saved.announceClockTime = values.announceClockTime
+        saved.announceHeartRate = values.announceHeartRate
+        saved.announceRemainingRouteDistance = values.announceRemainingRouteDistance
+        saved.announceEstimatedRemainingRouteTime = values.announceEstimatedRemainingRouteTime
+        saved.announceCurrentWorkoutStep = values.announceCurrentWorkoutStep
+        saved.announceRemainingStepTime = values.announceRemainingStepTime
+        saved.announceRemainingStepDistance = values.announceRemainingStepDistance
+        saved.duckOtherAudio = values.duckOtherAudio
+        saved.guidanceQuietPeriodSeconds = values.guidanceQuietPeriodSeconds
+        saved.voiceIdentifier = values.voiceIdentifier
+        saved.speechRate = values.speechRate
+        saved.speechVolume = values.speechVolume
+        saved.speechStyle = values.speechStyle
+        saved.announceWorkoutStart = values.announceWorkoutStart
+        saved.announcePauseResume = values.announcePauseResume
+        saved.announceWorkoutComplete = values.announceWorkoutComplete
+        return saved
+    }
+
+    func configuration(
+        routeDistanceMeters: Double? = nil,
+        maximumHeartRateBPM: Double? = nil
+    ) -> WatchAudioCoachConfiguration {
+        var prompts = smartPrompts
+        if let maximumHeartRateBPM, maximumHeartRateBPM.isFinite,
+           (100...240).contains(maximumHeartRateBPM) {
+            prompts.maximumHeartRateBPM = maximumHeartRateBPM
+        }
+        return WatchAudioCoachConfiguration(
             enabled: enabled,
             language: language,
             distanceIntervalMeters:
@@ -260,7 +314,7 @@ struct AudioCoachDraft {
                     : nil,
             customRules: enabled && !customRules.isEmpty
                 ? Array(customRules.prefix(20)) : nil,
-            smartPrompts: enabled ? smartPrompts : nil,
+            smartPrompts: enabled ? prompts : nil,
             announceDistance: enabled && announceDistance,
             announceElapsedTime:
                 enabled && announceElapsedTime,
@@ -3015,7 +3069,9 @@ struct RunQuickStartSheet: View {
             }
 
         return audioCoachDraft.configuration(
-            routeDistanceMeters: routeDistanceMeters
+            routeDistanceMeters: routeDistanceMeters,
+            maximumHeartRateBPM:
+                session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
         )
     }
 
