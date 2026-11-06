@@ -1451,6 +1451,40 @@ final class StrengthWorkoutStore: ObservableObject {
         return true
     }
 
+    func suggestedBarWeight(for exercise: StrengthExerciseLog) -> Double {
+        StrengthBarWeightPreferences.mass(
+            for: exercise.exercise.name, userID: accountID
+        )
+    }
+
+    @discardableResult
+    func rememberBarWeightForExercise(_ id: UUID, kilograms: Double) -> Bool {
+        guard let accountID,
+              let exercise = activeWorkout?.exercises.first(where: {
+                  $0.id == id
+              }),
+              StrengthBarbellExercisePolicy.usesBar(exercise),
+              kilograms.isFinite, (0...40).contains(kilograms)
+        else { return false }
+        StrengthBarWeightPreferences.setExerciseMass(
+            kilograms,
+            for: exercise.exercise.name,
+            userID: accountID
+        )
+        return setActiveExerciseBarWeight(id, kilograms: kilograms)
+    }
+
+    private func applyBarDefaults(_ logs: inout [StrengthExerciseLog]) {
+        for index in logs.indices where
+            StrengthBarbellExercisePolicy.usesBar(logs[index]) {
+            logs[index].barWeightKilograms =
+                StrengthBarWeightPreferences.mass(
+                    for: logs[index].exercise.name,
+                    userID: accountID
+                )
+        }
+    }
+
     /// Current-set-only timer; never changes the workout or advances sets by itself.
     var currentTimedSetCountdown: StrengthTimedSetCountdown? {
         guard let timedSetCountdown,
@@ -2544,7 +2578,9 @@ final class StrengthWorkoutStore: ObservableObject {
             name: exercise.snapshot.name,
             equipment: exercise.snapshot.equipment
         ) {
-            log.barWeightKilograms = 20
+            log.barWeightKilograms = StrengthBarWeightPreferences.mass(
+                for: log.exercise.name, userID: accountID
+            )
         }
         workout.exercises.append(log)
         activeWorkout = workout
@@ -2632,12 +2668,7 @@ final class StrengthWorkoutStore: ObservableObject {
                 targetHeartRateZone:
                     planned.targetHeartRateZone
             )
-            if StrengthBarbellExercisePolicy.usesBarEquipment(
-                name: planned.embeddedExercise.name,
-                equipment: planned.embeddedExercise.equipment
-            ) {
-                log.barWeightKilograms = 20
-            }
+            // Apply account-specific bar defaults after converting the plan.
             return log
         }
 
@@ -2794,6 +2825,7 @@ final class StrengthWorkoutStore: ObservableObject {
         }
 
         guard !additions.isEmpty else { return false }
+        applyBarDefaults(&additions)
         finalizeActualRestIfNeeded()
         let shouldFocus = workout.exercises.isEmpty ||
             workout.exercises.allSatisfy(\.isCompleted)
@@ -2906,7 +2938,8 @@ final class StrengthWorkoutStore: ObservableObject {
         setEffortClock = nil
         cardioWatchCaptures = [:]
         watchCaptureNeedsBaseline = []
-        let exerciseLogs = Self.strengthExerciseLogs(from: session)
+        var exerciseLogs = Self.strengthExerciseLogs(from: session)
+        applyBarDefaults(&exerciseLogs)
 
         var launchedWorkout = StrengthWorkoutLog(
             id: UUID(),
