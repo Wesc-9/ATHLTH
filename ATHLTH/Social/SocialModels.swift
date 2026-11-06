@@ -1438,8 +1438,19 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         workout.exercises.compactMap { exercise in
             let sets = exercise.sets.filter(\.isCompleted)
             guard !sets.isEmpty else { return nil }
-            let totalSeconds = sets.compactMap(\.resolvedCompletedDurationSeconds)
-                .reduce(0, +)
+            let totalSeconds = sets.compactMap { set -> Int? in
+                if let recorded = set.resolvedCompletedDurationSeconds, recorded > 0 {
+                    return recorded
+                }
+                // Timed sets can record actual elapsed effort independently
+                // of a planned duration. Never invent a missing measurement.
+                guard exercise.exercise.isTimeOnlyBodyweightStrength ||
+                      set.resolvedTargetKind == .time
+                else { return nil }
+                return set.actualSetElapsedSeconds.flatMap {
+                    $0.isFinite && $0 > 0 ? Int($0.rounded()) : nil
+                }
+            }.reduce(0, +)
             let name = exercise.exercise.displayName
             var details = ["\(name) · \(sets.count) sett"]
             if totalSeconds > 0 {
@@ -1475,8 +1486,11 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
                 if sets.count == 1, let heartRate = sets[0].watchAverageHeartRateBPM {
                     details.append(String(format: "Øktpuls %.0f bpm (Watch)", heartRate))
                 }
-            } else if let weight = sets.filter(\.countsTowardTrainingLoad)
-                .compactMap(\.completedWeightKilograms).max(), weight > 0 {
+            } else if let weight = sets.filter({
+                $0.countsTowardTrainingLoad &&
+                $0.recordsWeight != false &&
+                $0.resolvedTargetKind == .reps
+            }).compactMap(\.completedWeightKilograms).max(), weight > 0 {
                 details.append(String(format: "opptil %.1f kg", weight))
             }
             return details.joined(separator: " · ")
@@ -1578,7 +1592,11 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         let workingSets = performedExercises.flatMap { exercise in
             (StrengthCardioExercisePolicy.isCardio(exercise.exercise.name) ||
                 exercise.exercise.isTimeOnlyBodyweightStrength)
-                ? [] : exercise.sets.filter(\.countsTowardTrainingLoad)
+                ? [] : exercise.sets.filter {
+                    $0.countsTowardTrainingLoad &&
+                    $0.recordsWeight != false &&
+                    $0.resolvedTargetKind == .reps
+                }
         }
         let totalVolume = workingSets.reduce(0.0) {
             $0 + $1.volumeKilograms
