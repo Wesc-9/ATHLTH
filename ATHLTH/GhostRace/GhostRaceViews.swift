@@ -3028,6 +3028,7 @@ struct ATHLTHGhostRuntimeObserver: View {
         AppleWatchConnectionStore
     @EnvironmentObject private var settings:
         AppSettingsStore
+    @EnvironmentObject private var appSession: AppSessionStore
     @EnvironmentObject private var social:
         SocialStore
 
@@ -3035,6 +3036,27 @@ struct ATHLTHGhostRuntimeObserver: View {
         Color.clear
             .frame(width: 0, height: 0)
             .allowsHitTesting(false)
+            // Keep a short-lived private iPad spectator status alive through
+            // long intervals without GPS updates. GPS/Watch events also
+            // publish immediately through the existing runtime handlers.
+            .task(id: appSession.profile.userID) {
+                guard !ATHLTHDeviceRole.isIPad else { return }
+                while !Task.isCancelled {
+                    if appSession.signedIn {
+                        await publishPrivateGhostHeartbeat()
+                    }
+                    try? await Task.sleep(for: .seconds(9))
+                }
+            }
+            .onChange(of: ghostRace.reference?.id) { _, latest in
+                if latest == nil, appSession.signedIn {
+                    Task {
+                        await ATHLTHPrivateGhostSpectatorStore.clear(
+                            for: appSession.profile.userID
+                        )
+                    }
+                }
+            }
             .onChange(
                 of:
                     mirroring
@@ -3126,8 +3148,41 @@ struct ATHLTHGhostRuntimeObserver: View {
                     clearLiveGhostContext(
                         sendToWatch: false
                     )
+                    if appSession.signedIn {
+                        await ATHLTHPrivateGhostSpectatorStore.clear(
+                            for: appSession.profile.userID
+                        )
+                    }
                 }
             }
+    }
+
+    /// One account-scoped heartbeat, never public live sharing.
+    @MainActor
+    private func publishPrivateGhostHeartbeat() async {
+        guard !ATHLTHDeviceRole.isIPad, appSession.signedIn,
+              let reference = ghostRace.reference else { return }
+
+        if let workout = phoneWorkout.active, !workout.walking {
+            await ATHLTHPrivateGhostSpectatorStore.publish(
+                reference: reference,
+                comparison: ghostRace.comparison,
+                sourceDevice: "iPhone",
+                paused: workout.resumedAt == nil,
+                userID: appSession.profile.userID
+            )
+        } else if mirroring.hasActiveMirroredWorkout,
+                  let snapshot = mirroring.snapshot,
+                  snapshot.kind == .running,
+                  snapshot.state == .running || snapshot.state == .paused {
+            await ATHLTHPrivateGhostSpectatorStore.publish(
+                reference: reference,
+                comparison: ghostRace.comparison,
+                sourceDevice: "Apple Watch",
+                paused: snapshot.state == .paused,
+                userID: appSession.profile.userID
+            )
+        }
     }
 
     @MainActor
@@ -3140,9 +3195,26 @@ struct ATHLTHGhostRuntimeObserver: View {
 
         if ghostRace.reference != nil,
            snapshot.kind == .running {
-            ghostRace.update(
-                with: snapshot
-            )
+            ghostRace.update(with: snapshot)
+
+            if appSession.signedIn,
+               let reference = ghostRace.reference,
+               phoneWorkout.active == nil {
+                if snapshot.state == .running || snapshot.state == .paused {
+                    await ATHLTHPrivateGhostSpectatorStore.publish(
+                        reference: reference,
+                        comparison: ghostRace.comparison,
+                        sourceDevice: "Apple Watch",
+                        paused: snapshot.state == .paused,
+                        userID: appSession.profile.userID
+                    )
+                } else if snapshot.state == .completed ||
+                            snapshot.state == .failed {
+                    await ATHLTHPrivateGhostSpectatorStore.clear(
+                        for: appSession.profile.userID
+                    )
+                }
+            }
         }
 
         if snapshot.state == .completed ||
@@ -3247,6 +3319,17 @@ struct ATHLTHGhostRuntimeObserver: View {
                         settings
                             .ghostRaceAudioConfiguration
                 )
+
+            if appSession.signedIn,
+               let reference = ghostRace.reference {
+                await ATHLTHPrivateGhostSpectatorStore.publish(
+                    reference: reference,
+                    comparison: ghostRace.comparison,
+                    sourceDevice: "iPhone",
+                    paused: workout.resumedAt == nil,
+                    userID: appSession.profile.userID
+                )
+            }
 
             clearLiveGhostContext(
                 sendToWatch: false
