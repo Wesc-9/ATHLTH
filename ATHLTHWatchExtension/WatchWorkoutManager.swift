@@ -2520,6 +2520,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
         updated.updatedAt = now
         publish { self.strengthSession = updated }
+        scheduleStrengthRestHaptic(updated)
         refreshStrengthTimedGoalHaptic()
         persistWorkoutRecoveryState()
     }
@@ -2559,6 +2560,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 updated.restEndsAt = nil
                 updated.updatedAt = Date()
                 self.strengthSession = updated
+            }
+            if let updated = strengthSession {
+                scheduleStrengthRestHaptic(updated)
             }
             persistWorkoutRecoveryState()
         }
@@ -2608,6 +2612,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         : nil
                 updated.updatedAt = Date()
                 self.strengthSession = updated
+            }
+            if let updated = strengthSession {
+                scheduleStrengthRestHaptic(updated)
             }
             persistWorkoutRecoveryState()
         }
@@ -2722,6 +2729,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.strengthActionPending =
                 false
         }
+        // The local Watch rest begins immediately, even offline. Do not
+        // wait for the iPhone round trip to schedule the completion haptic.
+        scheduleStrengthRestHaptic(updated)
         persistWorkoutRecoveryState()
     }
 
