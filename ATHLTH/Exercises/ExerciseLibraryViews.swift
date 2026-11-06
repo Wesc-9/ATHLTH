@@ -476,9 +476,17 @@ struct ExerciseLibraryView: View {
                             ),
                             spacing: 10
                         ) {
-                            ForEach(
-                                entries
-                            ) { entry in
+                            ForEach(entries) { entry in
+                                Group {
+                                    if displayMode == .grid, let onSelect {
+                                        // A dedicated footer keeps the entire
+                                        // illustration and title unobstructed
+                                        // in a three-column workout picker.
+                                        selectableExerciseGridCard(
+                                            entry,
+                                            onSelect: onSelect
+                                        )
+                                    } else {
                                 ZStack(
                                     alignment:
                                         .topTrailing
@@ -554,6 +562,8 @@ struct ExerciseLibraryView: View {
                                             icon: "dumbbell.fill"
                                         )
                                         .padding(8)
+                                    }
+                                }
                                     }
                                 }
                                 .id(entry.id)
@@ -1231,21 +1241,126 @@ struct ExerciseLibraryView: View {
 
     /// Image-first compact card; list and grid open the same detail and
     /// preserve the existing favorites/add controls on each exercise.
-    private func exerciseGridCard(_ entry: ExerciseLibraryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ExerciseArtwork(entry: entry, size: 64)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            Text(ATHLTHLibraryName.exerciseCard(library.localizedExerciseName(entry), grid: true))
-                .font(.subheadline.weight(.semibold))
+    /// Dedicated grid tile for selection mode. The image, exercise name and
+    /// action each have their own space, rather than overlaying the image
+    /// with a large button on narrow three-column grids.
+    private func selectableExerciseGridCard(
+        _ entry: ExerciseLibraryEntry,
+        onSelect: @escaping (ExerciseLibraryEntry) -> Void
+    ) -> some View {
+        VStack(spacing: 0) {
+            NavigationLink {
+                ExerciseDetailView(
+                    entry: entry,
+                    selectionTitle: selectionTitle,
+                    onSelect: onSelect
+                )
+            } label: {
+                exerciseGridContent(entry, compact: true)
+                    .frame(
+                        maxWidth: .infinity,
+                        minHeight: 157,
+                        alignment: .topLeading
+                    )
+                    .padding(11)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(
+                TapGesture().onEnded {
+                    recordExerciseSelection(entry)
+                }
+            )
+            .accessibilityHint(
+                ATHLTHLocalization.choose(
+                    english: "Open exercise details",
+                    norwegian: "Åpne øvelsesdetaljer"
+                )
+            )
+
+            Rectangle()
+                .fill(ATHLTHPlanDesign.outline.opacity(0.7))
+                .frame(height: 0.7)
+
+            Button {
+                recordExerciseSelection(entry)
+                onSelect(entry)
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 17, weight: .medium))
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Add",
+                            norwegian: "Legg til"
+                        )
+                    )
+                    .font(.system(size: 11, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
+                }
                 .foregroundStyle(ATHLTHPlanDesign.ink)
-                .lineLimit(2)
-                .accessibilityLabel(library.localizedExerciseName(entry))
-                .multilineTextAlignment(.leading)
-            Text(entry.bodyPart.map(library.localizedBodyPartTitle)
-                ?? entry.category ?? "")
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: 46)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .background(ATHLTHTheme.cardWarm.opacity(0.5))
+            .accessibilityLabel(
+                ATHLTHLocalization.choose(
+                    english: "Add " + library.localizedExerciseName(entry) + " to workout",
+                    norwegian: "Legg til " + library.localizedExerciseName(entry) + " i økten"
+                )
+            )
+            .accessibilityIdentifier("exercise-grid-add-" + entry.id.uuidString)
+        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+        .background(ATHLTHTheme.card)
+        .clipShape(RoundedRectangle(cornerRadius: 19, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 19, style: .continuous)
+                .strokeBorder(
+                    ATHLTHPlanDesign.outline,
+                    lineWidth: 0.8
+                )
+        }
+        .accessibilityIdentifier("exercise-grid-selection-card")
+    }
+
+    private func exerciseGridContent(
+        _ entry: ExerciseLibraryEntry,
+        compact: Bool = false
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 7) {
+            ExerciseArtwork(entry: entry, size: compact ? 72 : 64)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, 3)
+
+            Text(
+                ATHLTHLibraryName.exerciseCard(
+                    library.localizedExerciseName(entry),
+                    grid: true
+                )
+            )
+            .font(
+                compact
+                    ? .system(size: 12.5, weight: .semibold)
+                    : .subheadline.weight(.semibold)
+            )
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .lineLimit(2)
+            .minimumScaleFactor(0.87)
+            .truncationMode(.tail)
+            .accessibilityLabel(library.localizedExerciseName(entry))
+            .multilineTextAlignment(.leading)
+
+            Text(
+                entry.bodyPart.map(library.localizedBodyPartTitle)
+                    ?? entry.category ?? ""
+            )
+            .font(compact ? .caption2 : .caption)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            .lineLimit(1)
+
             if let attribution = entry.exercise.sharedAttributionText {
                 Text(attribution)
                     .font(.system(size: 9, weight: .regular))
@@ -1253,15 +1368,21 @@ struct ExerciseLibraryView: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.75)
             }
+
             Spacer(minLength: 0)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 161, alignment: .topLeading)
-        .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 20))
-        .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
-        }
+        .frame(maxWidth: .infinity, alignment: .topLeading)
+    }
+
+    private func exerciseGridCard(_ entry: ExerciseLibraryEntry) -> some View {
+        exerciseGridContent(entry)
+            .padding(12)
+            .frame(maxWidth: .infinity, minHeight: 161, alignment: .topLeading)
+            .background(ATHLTHTheme.card, in: RoundedRectangle(cornerRadius: 20))
+            .overlay {
+                RoundedRectangle(cornerRadius: 20)
+                    .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.8)
+            }
     }
 
     private func exerciseRow(_ entry: ExerciseLibraryEntry) -> some View {
