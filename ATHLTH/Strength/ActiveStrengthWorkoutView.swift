@@ -12479,6 +12479,10 @@ private struct StrengthActiveExerciseQueueView: View {
     @State private var pendingRemovalID: UUID?
     @State private var editingTargetWeight: StrengthSetTargetWeightEdit?
     @State private var showingRemovalBlocked = false
+    @State private var pendingSetCountCorrection:
+        (exerciseID: UUID, targetCount: Int, correctedSets: Int)?
+    @State private var showingSetCountCorrection = false
+    @State private var showingSetCountEditBlocked = false
 
     private var exercisePendingRemovalName: String {
         guard let id = pendingRemovalID,
@@ -12566,6 +12570,148 @@ private struct StrengthActiveExerciseQueueView: View {
             return
         }
         pendingRemovalID = id
+    }
+
+    private func requestSetCount(
+        for exercise: StrengthExerciseLog,
+        count: Int
+    ) {
+        guard (1...20).contains(count), count != exercise.sets.count
+        else { return }
+
+        let recorded = exercise.sets.filter(\.isCompleted).count
+        if count < recorded {
+            pendingSetCountCorrection = (
+                exerciseID: exercise.id,
+                targetCount: count,
+                correctedSets: recorded - count
+            )
+            showingSetCountCorrection = true
+        } else if !strength.adjustActiveExerciseSetCount(
+            exercise.id, to: count
+        ) {
+            showingSetCountEditBlocked = true
+        }
+    }
+
+    private func setCountEditor(_ exercise: StrengthExerciseLog) -> some View {
+        let count = exercise.sets.count
+        let completed = exercise.sets.filter(\.isCompleted).count
+        let remaining = count - completed
+
+        return VStack(alignment: .leading, spacing: 9) {
+            HStack(spacing: 10) {
+                Image(systemName: "square.stack.3d.up")
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Number of sets",
+                        norwegian: "Antall sett"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(completed) completed · \(remaining) remaining",
+                        norwegian: "\(completed) utført · \(remaining) gjenstår"
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+
+                Spacer(minLength: 3)
+
+                HStack(spacing: 2) {
+                    Button {
+                        requestSetCount(for: exercise, count: count - 1)
+                    } label: {
+                        Image(systemName: "minus")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(width: 39, height: 42)
+                            .contentShape(Rectangle())
+                    }
+                    .disabled(count <= 1)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Reduce number of sets",
+                        norwegian: "Reduser antall sett"
+                    ))
+
+                    Text("\(count)")
+                        .font(.subheadline.weight(.bold).monospacedDigit())
+                        .frame(minWidth: 20)
+                        .accessibilityLabel(ATHLTHLocalization.choose(
+                            english: "\(count) planned sets",
+                            norwegian: "\(count) planlagte sett"
+                        ))
+
+                    Button {
+                        requestSetCount(for: exercise, count: count + 1)
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(width: 39, height: 42)
+                            .contentShape(Rectangle())
+                    }
+                    .disabled(count >= 20)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Increase number of sets",
+                        norwegian: "Øk antall sett"
+                    ))
+                }
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                .background(
+                    ATHLTHPlanDesign.warmSurface,
+                    in: Capsule()
+                )
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("strength-live-set-count-stepper")
+            }
+
+            if completed > 0 && remaining > 0 {
+                Button {
+                    requestSetCount(
+                        for: exercise,
+                        count: completed
+                    )
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Keep \(completed) completed sets · remove \(remaining) remaining",
+                            norwegian: "Behold \(completed) utført · fjern \(remaining) gjenstående"
+                        ),
+                        systemImage: "minus.circle"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(maxWidth: .infinity, minHeight: 39, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("strength-live-remove-pending-sets")
+            } else if completed > 1 && remaining == 0 {
+                Button {
+                    requestSetCount(for: exercise, count: 1)
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Correct the log to 1 actually performed set…",
+                            norwegian: "Korriger til 1 faktisk utført sett …"
+                        ),
+                        systemImage: "pencil.circle"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    .frame(maxWidth: .infinity, minHeight: 39, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("strength-live-correct-recorded-sets")
+            }
+        }
+        .padding(.vertical, 10)
+        .accessibilityIdentifier("strength-live-set-count-editor")
     }
 
     var body: some View {
@@ -12731,6 +12877,8 @@ private struct StrengthActiveExerciseQueueView: View {
                                     }
                                 }
 
+                                setCountEditor(exercise)
+
                                 DisclosureGroup(
                                     ATHLTHLocalization.choose(
                                         english: "View planned sets",
@@ -12894,8 +13042,8 @@ private struct StrengthActiveExerciseQueueView: View {
                         } footer: {
                             Text(
                                 ATHLTHLocalization.choose(
-                                    english: "Press and drag an exercise to change order, or swipe left to delete an unrecorded exercise. Completed sets are protected.",
-                                    norwegian: "Hold og dra en øvelse for å endre rekkefølgen, eller sveip mot venstre for å slette en øvelse uten registrerte sett. Fullførte sett beholdes."
+                                    english: "Adjust the set count here without changing your saved training plan. Completed sets are kept unless you explicitly correct an incorrect recording. Hold and drag to change the exercise order.",
+                                    norwegian: "Juster antall sett her uten å endre treningsplanen. Utførte sett beholdes, med mindre du bekrefter at registreringen var feil. Hold og dra for å endre rekkefølge."
                                 )
                             )
                         }
@@ -12981,7 +13129,7 @@ private struct StrengthActiveExerciseQueueView: View {
         .presentationDetents([
             .height(
                 min(
-                    CGFloat((strength.activeWorkout?.exercises.count ?? 1) * 150 + 205),
+                    CGFloat((strength.activeWorkout?.exercises.count ?? 1) * 220 + 205),
                     660
                 )
             ),
@@ -13065,6 +13213,49 @@ private struct StrengthActiveExerciseQueueView: View {
             exerciseRemovalSheet
                 .presentationDetents([.height(342)])
                 .presentationDragIndicator(.visible)
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Correct recorded sets?",
+                norwegian: "Korrigere registrerte sett?"
+            ),
+            isPresented: $showingSetCountCorrection,
+            titleVisibility: .visible
+        ) {
+            if let pending = pendingSetCountCorrection {
+                Button(
+                    ATHLTHLocalization.choose(
+                        english: "Remove \(pending.correctedSets) incorrectly recorded sets",
+                        norwegian: "Slett \(pending.correctedSets) feilregistrerte sett"
+                    ),
+                    role: .destructive
+                ) {
+                    if !strength.adjustActiveExerciseSetCount(
+                        pending.exerciseID,
+                        to: pending.targetCount,
+                        correctRecordedSets: true
+                    ) {
+                        showingSetCountEditBlocked = true
+                    }
+                    pendingSetCountCorrection = nil
+                }
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "This also removes saved results from the most recently listed sets in the active session. Only confirm if those sets were NOT actually performed. Your saved training plan stays unchanged.",
+                norwegian: "Dette sletter også registrerte resultater fra de siste settene i den pågående økten. Bekreft kun dersom settene IKKE faktisk ble utført. Den lagrede treningsplanen endres ikke."
+            ))
+        }
+        .alert(ATHLTHLocalization.choose(
+            english: "Finish the current set first",
+            norwegian: "Avslutt pågående sett først"
+        ), isPresented: $showingSetCountEditBlocked) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "A running set cannot be removed. Complete or stop its timer and then adjust the number of sets.",
+                norwegian: "Et pågående sett kan ikke fjernes. Fullfør eller stopp tidtakingen og juster deretter antall sett."
+            ))
         }
         .alert(ATHLTHLocalization.choose(
             english: "Recorded sets are protected",
