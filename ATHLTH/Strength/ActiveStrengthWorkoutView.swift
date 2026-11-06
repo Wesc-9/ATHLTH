@@ -9633,7 +9633,8 @@ private struct FreestyleExercisePrescriptionView: View {
             Double?,
             Int?,
             Int?,
-            Int
+            Int,
+            Bool
         ) -> Void
     ) {
         self.entry = entry
