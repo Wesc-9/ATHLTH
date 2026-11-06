@@ -2370,21 +2370,24 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 plans.remove(at: snapshot.setIndex)
                 exercise.setPlans = plans
             }
+            let skippedLastPending =
+                exercise.firstPendingSetIndex == snapshot.setIndex &&
+                snapshot.setIndex == snapshot.setCount - 1
             exercise.setCount = max(exercise.setCount - 1, 0)
             exercise.skippedSets = (exercise.skippedSets ?? 0) + 1
-            exercise.isCompleted = exercise.setCount == 0
-            exercise.firstPendingSetIndex = exercise.setCount > 0
-                ? min(snapshot.setIndex, exercise.setCount - 1)
-                : nil
+            exercise.isCompleted = skippedLastPending || exercise.setCount == 0
+            exercise.firstPendingSetIndex = exercise.isCompleted == true
+                ? nil
+                : min(snapshot.setIndex, max(exercise.setCount - 1, 0))
             queue[exercisePosition] = exercise
             updated.exerciseQueue = queue
+            updated.currentExerciseComplete = exercise.isCompleted == true
         }
 
         updated.setIndex = updated.setCount > 0
             ? min(snapshot.setIndex, updated.setCount - 1) : 0
-        updated.setNumber = updated.setCount > 0
-            ? updated.setIndex + 1 : nil
-        updated.currentExerciseComplete = updated.setCount == 0
+        updated.setNumber = updated.currentExerciseComplete
+            ? nil : updated.setIndex + 1
         updated.allExercisesComplete =
             updated.completedSets + (updated.skippedSets ?? 0) >= updated.totalSets
         updated.updatedAt = Date()
