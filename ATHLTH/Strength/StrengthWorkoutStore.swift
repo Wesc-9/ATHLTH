@@ -2170,6 +2170,24 @@ final class StrengthWorkoutStore: ObservableObject {
             case .requestSnapshot:
                 continue
 
+            case .startSetEffort:
+                guard (command.exerciseIndex == nil ||
+                       command.exerciseIndex == currentExerciseIndex),
+                      (command.setIndex == nil ||
+                       command.setIndex == currentSetIndex),
+                      currentSet?.isCompleted == false
+                else { continue }
+                startCurrentSetEffort(at: command.sentAt)
+
+            case .skipSet:
+                guard (command.exerciseIndex == nil ||
+                       command.exerciseIndex == currentExerciseIndex),
+                      (command.setIndex == nil ||
+                       command.setIndex == currentSetIndex),
+                      currentSet?.isCompleted == false
+                else { continue }
+                _ = skipCurrentSet()
+
             case .startTimedSet:
                 // An offline Watch request targets only its original
                 // exercise/set; never restart the timer on a later set.
