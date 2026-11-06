@@ -2307,6 +2307,39 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    /// Explicit start for the first newly appended repetition exercise.
+    /// Optimistic display works without iPhone reachability; the journal
+    /// replays the same scoped command when devices reconnect.
+    func startStrengthSet() {
+        guard !strengthActionPending,
+              var snapshot = strengthSession,
+              !snapshot.isResting,
+              !snapshot.currentExerciseComplete,
+              snapshot.targetKindRaw != "time",
+              snapshot.setEffortStartedAt == nil,
+              snapshot.setCount > 0
+        else { return }
+        let now = Date()
+        guard sendStrengthCommand(
+            WatchStrengthCommand(
+                id: UUID(),
+                workoutID: snapshot.workoutID,
+                kind: .startSetEffort,
+                reps: nil,
+                weightKilograms: nil,
+                restSeconds: nil,
+                addRestSeconds: nil,
+                sentAt: now,
+                exerciseIndex: snapshot.exerciseIndex,
+                setIndex: snapshot.setIndex
+            )
+        ) else { return }
+        snapshot.setEffortStartedAt = now
+        snapshot.updatedAt = now
+        publish { self.strengthSession = snapshot }
+        persistWorkoutRecoveryState()
+    }
+
     func completeStrengthSet() {
         guard !strengthActionPending,
               let snapshot =
@@ -2629,6 +2662,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
 
         updated.timedSetCountdown = nil
+        updated.setEffortStartedAt = nil
 
         let nextSetIndex =
             snapshot.setIndex + 1
@@ -2707,6 +2741,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         var updated = snapshot
+        updated.setEffortStartedAt = nil
         updated.timedSetCountdown = nil
         updated.exerciseIndex =
             next.index
