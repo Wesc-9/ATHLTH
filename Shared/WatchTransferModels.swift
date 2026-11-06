@@ -1663,6 +1663,9 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var ghostRaceTitle: String? = nil
     var ghostDistanceDeltaMeters: Double? = nil
     var ghostTimeDeltaSeconds: TimeInterval? = nil
+    // Newer Watch builds explicitly report workout auto-pause. This optional
+    // value remains decodable from older Watch/iPhone combinations.
+    var workoutAutoPaused: Bool? = nil
 
     var strengthExerciseName: String? = nil
     var strengthSetIndex: Int? = nil
