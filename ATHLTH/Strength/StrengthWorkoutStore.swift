@@ -4381,6 +4381,139 @@ final class StrengthWorkoutStore: ObservableObject {
         activeWorkout = workout
     }
 
+    /// Change the number of sets in this *active* workout only. A reduction
+    /// removes unfinished planned sets, not fake "skipped" performances.
+    /// Recorded efforts are protected unless the athlete explicitly confirms
+    /// that the last recorded set(s) were logged by mistake.
+    @discardableResult
+    func adjustActiveExerciseSetCount(
+        _ exerciseID: UUID,
+        to requestedCount: Int,
+        correctRecordedSets: Bool = false
+    ) -> Bool {
+        guard (1...20).contains(requestedCount),
+              var workout = activeWorkout,
+              let exerciseIndex = workout.exercises.firstIndex(where: {
+                  $0.id == exerciseID
+              })
+        else { return false }
+
+        var exercise = workout.exercises[exerciseIndex]
+        let original = exercise.sets
+        guard !original.isEmpty, requestedCount != original.count
+        else { return false }
+
+        let completed = original.filter(\.isCompleted)
+        guard requestedCount >= completed.count || correctRecordedSets
+        else { return false }
+
+        let selectedExerciseID = currentExercise?.id
+        let selectedSetID = currentSet?.id
+        var updated: [StrengthSetLog]
+
+        if requestedCount < original.count {
+            // Keep every actual performance first. Any remaining capacity is
+            // filled by the earliest pending sets, preserving their IDs and
+            // ordering. Correcting false completed sets is a separate,
+            // deliberately confirmed action.
+            let keptCompleted = Array(completed.prefix(requestedCount))
+            let available = max(requestedCount - keptCompleted.count, 0)
+            let keptPending = Array(original.filter {
+                !$0.isCompleted
+            }.prefix(available))
+            let keptIDs = Set((keptCompleted + keptPending).map(\.id))
+            let removed = original.filter { !keptIDs.contains($0.id) }
+            guard removed.count == original.count - requestedCount else {
+                return false
+            }
+
+            // A currently running timed/effort set must be completed or
+            // stopped before it can be deleted from the workout.
+            if selectedExerciseID == exerciseID,
+               let selectedSetID, !keptIDs.contains(selectedSetID),
+               currentTimedSetCountdown?.isRunning == true ||
+                   currentSetEffortClock != nil {
+                return false
+            }
+
+            for set in removed {
+                cardioWatchCaptures.removeValue(forKey: set.id)
+                watchCaptureNeedsBaseline.remove(set.id)
+            }
+            updated = original.filter { keptIDs.contains($0.id) }
+        } else {
+            // An increase reuses *planning* metadata only; never duplicate
+            // the previous set's recorded performance or historical ID.
+            guard let template = original.last else { return false }
+            updated = original
+            for number in (original.count + 1)...requestedCount {
+                var pending = StrengthSetLog(
+                    id: UUID(),
+                    setNumber: number,
+                    plannedReps: template.plannedReps,
+                    plannedWeightKilograms: template.plannedWeightKilograms,
+                    completedReps: nil,
+                    completedWeightKilograms: nil,
+                    rpe: nil,
+                    completedAt: nil,
+                    restSeconds: template.restSeconds
+                )
+                pending.plannedRPE = template.plannedRPE
+                pending.plannedRIR = template.plannedRIR
+                pending.plannedSetType = template.plannedSetType
+                pending.plannedTempo = template.plannedTempo
+                pending.plannedNote = template.plannedNote
+                pending.isWarmUp = exercise.isWarmUpExercise
+                    ? true : nil
+                pending.targetKind = template.targetKind
+                pending.plannedDurationSeconds = template.plannedDurationSeconds
+                pending.recordsWeight = template.recordsWeight
+                pending.loadKind = template.loadKind
+                pending.plannedResistanceLevel = template.plannedResistanceLevel
+                pending.hybridPhaseTitle = template.hybridPhaseTitle
+                pending.hybridPhaseKind = template.hybridPhaseKind
+                pending.hybridTargetHeartRateZone =
+                    template.hybridTargetHeartRateZone
+                pending.hybridTargetPaceSecondsPerKilometer =
+                    template.hybridTargetPaceSecondsPerKilometer
+                updated.append(pending)
+            }
+        }
+
+        // Renumber only within this live exercise. Stable set IDs preserve
+        // historical completion data, progress and any actual load records.
+        for index in updated.indices {
+            updated[index].setNumber = index + 1
+        }
+        exercise.sets = updated
+        exercise.completedAt = updated.allSatisfy(\.isCompleted)
+            ? (exercise.completedAt ?? Date())
+            : nil
+        workout.exercises[exerciseIndex] = exercise
+
+        if selectedExerciseID == exerciseID {
+            currentSetIndex = updated.firstIndex(where: {
+                $0.id == selectedSetID
+            }) ?? updated.firstIndex(where: {
+                !$0.isCompleted
+            }) ?? max(updated.count - 1, 0)
+
+            if updated.allSatisfy(\.isCompleted) {
+                timedSetCountdown = nil
+                setEffortClock = nil
+                restStartedAt = nil
+                restEndsAt = nil
+            }
+        }
+
+        activeWorkout = workout
+        if selectedExerciseID == exerciseID {
+            reloadDraftFromCurrentSet()
+        }
+        persistCheckpointNow()
+        return true
+    }
+
     /// Skip exactly the selected pending set without recording a completed
     /// effort. Plan provenance is preserved by skippedPlannedSetCount; volume,
     /// PRs and completed-set counts never increase. Safe for offline Watch
