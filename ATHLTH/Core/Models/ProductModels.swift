@@ -467,15 +467,21 @@ extension ExerciseSnapshot {
         let title = name.folding(
             options: [.caseInsensitive, .diacriticInsensitive],
             locale: .current
-        ).lowercased()
-        return [
+        ).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // Exact exercise variants only. "Plank shoulder taps", "plank
+        // walkouts" and similar repetition movements are NOT timed holds.
+        let exactHolds: Set<String> = [
             "six inch hold", "six-inch hold", "6 inch hold",
+            "six inch leg hold", "beinhold",
             "hollow hold", "hollow body hold",
-            "plank", "side plank", "sideplanke",
-            "rkc plank", "wall sit", "dead hang",
+            "plank", "planke", "side plank", "sideplanke",
+            "rkc plank", "rkc-planke", "wall sit", "dead hang",
             "l-sit", "l sit", "isometric hold",
             "fri styrketrening", "free strength training"
-        ].contains(where: title.contains)
+        ]
+        return exactHolds.contains(title) ||
+            title.hasPrefix("six inch hold ") ||
+            title.hasPrefix("six-inch hold ")
     }
 
     var isFreeStrengthTimer: Bool {
@@ -509,7 +515,6 @@ extension ExerciseSnapshot {
             "stair climber",
             "stairmaster",
             "battle rope",
-            "plank",
             "six inch hold",
             "six-inch hold",
             "6 inch hold",
@@ -526,7 +531,7 @@ extension ExerciseSnapshot {
             "90/90 stretch hold"
         ]
 
-        return timeBasedKeywords.contains {
+        return isTimeOnlyBodyweightStrength || timeBasedKeywords.contains {
             normalized.contains($0)
         }
             ? .time
