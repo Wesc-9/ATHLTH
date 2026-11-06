@@ -2356,7 +2356,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         updated.timedSetCountdown = nil
         updated.restEndsAt = nil
         updated.isResting = false
-        updated.totalSets = max(0, snapshot.totalSets - 1)
+        // Keep planned total stable and mark the omission separately.
+        updated.skippedSets = (snapshot.skippedSets ?? 0) + 1
         updated.setCount = max(0, snapshot.setCount - 1)
 
         if var queue = updated.exerciseQueue,
@@ -2383,7 +2384,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         updated.setNumber = updated.setCount > 0
             ? updated.setIndex + 1 : nil
         updated.currentExerciseComplete = updated.setCount == 0
-        updated.allExercisesComplete = updated.totalSets == updated.completedSets
+        updated.allExercisesComplete =
+            updated.completedSets + (updated.skippedSets ?? 0) >= updated.totalSets
         updated.updatedAt = Date()
         if !updated.currentExerciseComplete {
             applyStrengthPlanDefaults(
