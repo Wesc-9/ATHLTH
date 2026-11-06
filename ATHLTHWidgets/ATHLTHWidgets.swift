@@ -613,11 +613,95 @@ struct ATHLTHWorkoutLiveActivity: Widget {
     /// Running and other sports keep their existing display unchanged.
     @ViewBuilder
     private func unifiedLightLockScreenContent(_ context: Context) -> some View {
-        if context.state.workoutKindRaw == "strength" {
+        if context.state.workoutKindRaw == "strength",
+           context.state.strengthRestEndsAt != nil,
+           context.state.phase == "running" {
+            expandedStrengthRestLockScreenContent(context)
+        } else if context.state.workoutKindRaw == "strength" {
             compactStrengthLockScreenContent(context)
         } else {
             generalLockScreenContent(context)
         }
+    }
+
+    /// During rest the countdown is the entire primary Lock Screen metric.
+    /// The next action and heart rate remain legible but never compete with it.
+    private func expandedStrengthRestLockScreenContent(
+        _ context: Context
+    ) -> some View {
+        let state = context.state
+        let end = state.strengthRestEndsAt ?? .now
+        let remaining = end.timeIntervalSinceNow
+        let nextTitle = state.strengthNextExerciseName
+        let exercise = state.strengthExerciseName
+            ?? localized("Strength", "Styrke")
+        let setIndex = max(state.strengthSetIndex ?? 0, 0)
+        let setCount = max(state.strengthSetCount ?? 0, 0)
+
+        return VStack(alignment: .leading, spacing: 5) {
+            HStack {
+                ATHLTHMarkShape()
+                    .fill(ATHLTHWidgetPalette.ink)
+                    .frame(width: 19, height: 16)
+                    .accessibilityHidden(true)
+                Text("ATHLTH")
+                    .font(.system(size: 12, weight: .semibold))
+                    .tracking(2)
+                Spacer()
+                Text(localized("REST", "PAUSE"))
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+            }
+
+            HStack(alignment: .center, spacing: 10) {
+                if remaining > 0 {
+                    Text(
+                        timerInterval: Date()...end,
+                        countsDown: true,
+                        showsHours: false
+                    )
+                    .font(.system(size: 61, weight: .bold, design: .rounded))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.65)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .accessibilityLabel(localized("Rest time remaining", "Gjenstående pause"))
+                } else {
+                    Text(localized("READY", "KLAR"))
+                        .font(.system(size: 43, weight: .bold, design: .rounded))
+                        .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                }
+            }
+            .frame(maxHeight: .infinity)
+
+            HStack(spacing: 7) {
+                Image(systemName: "arrow.right.circle.fill")
+                    .foregroundStyle(ATHLTHWidgetPalette.brandGold)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(localized("UP NEXT", "ETTER PAUSEN"))
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                    Text(
+                        setCount > 0 && setIndex < setCount
+                            ? "\(exercise) · \(setIndex + 1)/\(setCount)"
+                            : (nextTitle ?? exercise)
+                    )
+                    .font(.system(size: 15, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                }
+                Spacer(minLength: 6)
+                if state.heartRate.isFinite, state.heartRate > 0 {
+                    Text("\(Int(state.heartRate.rounded())) bpm")
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(ATHLTHWidgetPalette.muted)
+                }
+            }
+        }
+        .foregroundStyle(ATHLTHWidgetPalette.ink)
+        .padding(.vertical, 2)
+        .accessibilityElement(children: .contain)
     }
 
     private func compactStrengthLockScreenContent(_ context: Context) -> some View {
