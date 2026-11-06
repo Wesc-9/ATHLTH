@@ -10265,14 +10265,9 @@ struct SessionEditorView: View {
                     : nil,
             ghostUpdates:
                 kind == .running && runEnvironment == .outdoor &&
-                selectedRoute != nil &&
-                ghostDraft.enabled
-                    ? (
-                        ghostDraft
-                            .updatesEnabled
-                            ? settings
-                                .ghostRaceAudioConfiguration
-                            : .disabled
+                selectedRoute != nil && ghostDraft.enabled
+                    ? ghostDraft.resolvedUpdates(
+                        fallback: settings.ghostRaceAudioConfiguration
                     )
                     : nil,
             workoutTemplateID:
