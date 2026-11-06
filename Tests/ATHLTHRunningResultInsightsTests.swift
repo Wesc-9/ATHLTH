@@ -76,6 +76,105 @@ final class ATHLTHRunningResultInsightsTests: XCTestCase {
         ), 13)
     }
 
+    func testHealthKitDistanceReconstructsAppleStyleKilometerBoundaries() {
+        typealias Interval = ATHLTHRunningResultInsights.HealthDistanceInterval
+        let started = Date(timeIntervalSince1970: 1_800_000_000)
+        var cursor = started
+        var intervals: [Interval] = []
+        for (duration, count) in [(326.0, 10), (301.0, 10),
+                                  (300.0, 10), (193.0, 6)] {
+            for _ in 0..<count {
+                let next = cursor.addingTimeInterval(duration / Double(count))
+                intervals.append(Interval(
+                    startDate: cursor, endDate: next, distanceMeters: 100
+                ))
+                cursor = next
+            }
+        }
+        let splits = ATHLTHRunningResultInsights.healthDistanceKilometerSplits(
+            from: intervals,
+            workoutStart: started,
+            workoutEnd: cursor,
+            reportedDistanceMeters: 3_600
+        )
+        XCTAssertEqual(splits.count, 3, "Partial final kilometre is not a PB")
+        XCTAssertEqual(splits.map(\.kilometer), [1, 2, 3])
+        XCTAssertEqual(splits[0].durationSeconds, 326, accuracy: 0.01)
+        XCTAssertEqual(splits[1].durationSeconds, 301, accuracy: 0.01)
+        XCTAssertEqual(splits[2].durationSeconds, 300, accuracy: 0.01)
+        XCTAssertEqual(splits[1].startedAt, splits[0].endedAt)
+        XCTAssertEqual(splits[2].startedAt, splits[1].endedAt)
+    }
+
+    func testHealthKitDistanceRejectsMismatchOrOverlappingSamples() {
+        typealias Interval = ATHLTHRunningResultInsights.HealthDistanceInterval
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let samples = (0..<10).map { index in
+            Interval(
+                startDate: start.addingTimeInterval(Double(index * 30)),
+                endDate: start.addingTimeInterval(Double((index + 1) * 30)),
+                distanceMeters: 100
+            )
+        }
+        XCTAssertTrue(ATHLTHRunningResultInsights.healthDistanceKilometerSplits(
+            from: samples, workoutStart: start,
+            workoutEnd: start.addingTimeInterval(300),
+            reportedDistanceMeters: 1_400
+        ).isEmpty)
+        XCTAssertTrue(ATHLTHRunningResultInsights.healthDistanceKilometerSplits(
+            from: samples + [samples[4]], workoutStart: start,
+            workoutEnd: start.addingTimeInterval(300),
+            reportedDistanceMeters: 1_100
+        ).isEmpty)
+    }
+
+    func testHealthKitDistanceExcludesConfirmedWorkoutPause() {
+        typealias Interval = ATHLTHRunningResultInsights.HealthDistanceInterval
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let samples = (0..<10).map { index -> Interval in
+            let pauseOffset = index >= 5 ? 40.0 : 0
+            let begin = start.addingTimeInterval(
+                Double(index * 30) + pauseOffset
+            )
+            return Interval(
+                startDate: begin,
+                endDate: begin.addingTimeInterval(30),
+                distanceMeters: 100
+            )
+        }
+        let splits = ATHLTHRunningResultInsights.healthDistanceKilometerSplits(
+            from: samples, workoutStart: start,
+            workoutEnd: start.addingTimeInterval(340),
+            reportedDistanceMeters: 1_000,
+            pausedIntervals: [
+                DateInterval(
+                    start: start.addingTimeInterval(150),
+                    end: start.addingTimeInterval(190)
+                )
+            ]
+        )
+        XCTAssertEqual(splits.count, 1)
+        XCTAssertEqual(splits[0].durationSeconds, 300, accuracy: 0.01)
+        XCTAssertEqual(splits[0].endedAt, start.addingTimeInterval(340))
+    }
+
+    func testHealthKitDistanceRejectsCoalescedLowResolutionData() {
+        typealias Interval = ATHLTHRunningResultInsights.HealthDistanceInterval
+        let start = Date(timeIntervalSince1970: 1_800_000_000)
+        let samples = (0..<3).map { index in
+            Interval(
+                startDate: start.addingTimeInterval(Double(index * 250)),
+                endDate: start.addingTimeInterval(Double((index + 1) * 250)),
+                distanceMeters: 350
+            )
+        }
+        XCTAssertTrue(ATHLTHRunningResultInsights.healthDistanceKilometerSplits(
+            from: samples, workoutStart: start,
+            workoutEnd: start.addingTimeInterval(750),
+            reportedDistanceMeters: 1_050
+        ).isEmpty)
+    }
+
     func testElevationRequiresQualifiedSamples() {
         let valid = ATHLTHRunningResultInsights.elevationProfile(from: route())
         XCTAssertGreaterThan(valid.count, 4)
