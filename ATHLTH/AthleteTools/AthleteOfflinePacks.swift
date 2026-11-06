@@ -248,7 +248,39 @@ struct AthleteOfflineView: View {
                 Text("Downloaded plans, embedded exercise instructions, images and route snapshots work without a connection. Maps cover only the downloaded route area and are static snapshots; navigation, streamed video, AI and social features require a connection. Existing local workout logging and cloud-backup settings continue to control workout syncing.")
             }
         }.navigationTitle("Offline packs")
-            .task(id: session.profile.userID) { offline.load(userID: session.profile.userID) }
+            .task(id: session.profile.userID) {
+                offline.load(userID: session.profile.userID)
+                // Resume missing media when the offline library is reopened.
+                // This is best-effort: the locally saved plan is always usable.
+                for saved in offline.packs {
+                    guard !Task.isCancelled else { return }
+                    guard let current = session.trainingPlans.first(where: {
+                        $0.id == saved.plan.id
+                    }) else { continue }
+                    let sessions = current.weeks.flatMap(\.days)
+                        .flatMap(\.sessions)
+                    let routeIDs = Set(
+                        sessions.compactMap(\.routeID) +
+                        sessions.compactMap { $0.runningWorkout?.routeID } +
+                        sessions.flatMap { $0.runningWorkouts ?? [] }
+                            .compactMap(\.routeID)
+                    )
+                    let expectedRoutes = session.savedRoutes.filter {
+                        routeIDs.contains($0.id) && $0.coordinates.count >= 2
+                    }.count
+                    let expectedImages = Set(sessions.flatMap(\.exercises)
+                        .filter { $0.embeddedExercise.imageURL?.scheme == "https" }
+                        .map(\.id)).count
+                    guard saved.mapRouteIDs.count < expectedRoutes ||
+                          saved.exerciseImageIDs.count < expectedImages else {
+                        continue
+                    }
+                    await offline.download(
+                        plan: current, routes: session.savedRoutes,
+                        userID: session.profile.userID, includeMedia: true
+                    )
+                }
+            }
             .alert("Offline packs", isPresented: Binding(get: { offline.error != nil }, set: { if !$0 { offline.error = nil } })) {
                 Button("OK") { offline.error = nil }
             } message: { Text(offline.error ?? "") }
