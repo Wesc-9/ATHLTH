@@ -15,6 +15,7 @@ struct HomeActivityRunDetailView: View {
     @State private var detail: WorkoutDetail?
     @State private var routeAnalysis: HomeActivityRunRouteAnalysis
     @State private var measuredPulse: [ATHLTHRunningHeartRatePoint] = []
+    @State private var watchDistanceSplits: [ATHLTHRunningResultInsights.KilometerSplit] = []
     @State private var completedIntervalHistory: [ATHLTHCompletedRunningPerformance] = []
     @State private var aiInsight: WorkoutAIInsight?
     @State private var isLoadingDetail = false
@@ -101,7 +102,7 @@ struct HomeActivityRunDetailView: View {
     private var paceSegments: [HomeActivityPaceSegment] { routeAnalysis.segments }
     private var paceBounds: (fast: Double, slow: Double) { routeAnalysis.paceBounds }
     private var verifiedSplits: [ATHLTHRunningResultInsights.KilometerSplit] {
-        routeAnalysis.splits
+        watchDistanceSplits.isEmpty ? routeAnalysis.splits : watchDistanceSplits
     }
     private var elevationProfile: [ATHLTHRunningResultInsights.ElevationPoint] {
         routeAnalysis.elevation
@@ -291,7 +292,8 @@ struct HomeActivityRunDetailView: View {
                         activeEnergyKilocalories: workout.activeEnergyKilocalories,
                         maxHeartRateBPM: detail?.maxHeartRate,
                         pulseSamples: measuredPulse,
-                        achievements: newAchievements
+                        achievements: newAchievements,
+                        hasHealthDistanceSplits: !watchDistanceSplits.isEmpty
                     )
                 }
 
@@ -359,6 +361,15 @@ struct HomeActivityRunDetailView: View {
                 userID: session.profile.userID
             )
             await loadDetailAndCoach()
+        }
+        .task(id: workout.id) {
+            watchDistanceSplits = []
+            guard !isIndoorActivity else { return }
+            let measured = await health.runningDistanceKilometerSplits(
+                for: workout.id
+            )
+            guard !Task.isCancelled else { return }
+            watchDistanceSplits = measured
         }
         .task(id: session.profile.userID.uuidString + ":" + workout.id.uuidString) {
             // Reuse HealthKit's account-wide verified route performance cache;
