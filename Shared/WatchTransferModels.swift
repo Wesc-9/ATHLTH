@@ -1358,6 +1358,9 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
 
     /// Optional: older Watch versions receive the planned duration only.
     var timedSetCountdown: WatchTimedStrengthCountdown? = nil
+    /// Optional so older Watch builds can still decode the workout.
+    /// Repetition sets can start a count-up effort clock from the Watch.
+    var setEffortStartedAt: Date? = nil
     /// Empty/free sessions carry draft defaults, not an exercise to perform.
     var hasExercisePrescription: Bool { exerciseCount > 0 }
 
@@ -1423,6 +1426,7 @@ enum ATHLTHStrengthWatchSnapshotAcceptance {
 enum WatchStrengthCommandKind: String, Codable, Hashable {
     case updateDraft
     case completeSet
+    case startSetEffort
     /// Explicit omission: never record zero reps as a completed effort.
     case skipSet
     case completeSetWithoutDetails
