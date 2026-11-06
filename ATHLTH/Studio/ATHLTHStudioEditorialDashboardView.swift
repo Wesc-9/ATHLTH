@@ -28,6 +28,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     @State private var selectedDate = Date.now
     @State private var periodDays = 28
     @State private var showingReadinessExplanation = false
+    @State private var remoteStrengthStatus: ATHLTHPrivateLiveStrengthSnapshot?
 
     private let cream = Color(red: 0.984, green: 0.978, blue: 0.966)
     private let ink = Color(red: 0.18, green: 0.17, blue: 0.16)
@@ -101,6 +102,11 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         // Live workout data is displayed, never edited, on iPad.
                         if strength.activeWorkout != nil {
                             ATHLTHStudioLiveStrengthReadOnlyCard()
+                        } else if let remoteStrengthStatus,
+                                  remoteStrengthStatus.isFresh() {
+                            ATHLTHStudioRemoteStrengthStatusCard(
+                                snapshot: remoteStrengthStatus
+                            )
                         }
 
                         if split {
@@ -144,6 +150,20 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
         }
         .background(cream.ignoresSafeArea())
+        .task(id: session.profile.userID) {
+            guard ATHLTHDeviceRole.isIPad else { return }
+            while !Task.isCancelled {
+                if session.signedIn, scenePhase == .active {
+                    remoteStrengthStatus =
+                        await ATHLTHPrivateLiveStrengthStatusStore.fetch(
+                            for: session.profile.userID
+                        )
+                } else {
+                    remoteStrengthStatus = nil
+                }
+                try? await Task.sleep(for: .seconds(12))
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active,
                focusedPlanningDate == nil,
