@@ -73,6 +73,8 @@ final class AthleteOfflinePackStore: ObservableObject {
     }
     func download(plan: TrainingPlan, routes: [TrainingRoute], userID: UUID, includeMedia: Bool = true) async {
         guard !downloading else { return }
+        // A previous network failure must not block a new local-first save.
+        error = nil
         downloading = true; defer { downloading = false }
         var staging: URL?
         do {
