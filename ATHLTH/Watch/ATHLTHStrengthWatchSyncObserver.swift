@@ -196,7 +196,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         let inputMode = workout.advancedConfiguration?.inputMode ?? .both
         let watchMayRecordSets =
             workout.captureDevice == .appleWatch ||
-            inputMode == .both
+            inputMode == .both || inputMode == .appleWatch
         guard watchMayRecordSets else {
             sendSnapshotNow()
             return true
