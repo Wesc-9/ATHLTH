@@ -60,7 +60,9 @@ struct ActiveStrengthWorkoutView: View {
         NavigationStack {
             Group {
                 if let workout = strength.activeWorkout {
-                    if workout.exercises.isEmpty {
+                    if finishInProgress && workout.captureDevice == .appleWatch {
+                        awaitingWatchFinishPreview(workout)
+                    } else if workout.exercises.isEmpty {
                         ScrollView {
                             VStack(spacing: 18) {
                                 workoutHeader(workout)
@@ -1974,6 +1976,107 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     @ViewBuilder
+    /// This is a live preview, NOT a false completed workout. The Watch
+    /// still owns HealthKit recording until it reports a confirmed finish.
+    /// The athlete sees useful results immediately rather than a blank
+    /// spinner while durable HealthKit and connectivity finish their work.
+    private func awaitingWatchFinishPreview(
+        _ workout: StrengthWorkoutLog
+    ) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 21) {
+                HStack(spacing: 12) {
+                    Image(systemName: "checkmark.shield")
+                        .font(.title2)
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .frame(width: 52, height: 52)
+                        .background(
+                            ATHLTHTrainDesign.paleGold,
+                            in: RoundedRectangle(cornerRadius: 16)
+                        )
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Workout summary",
+                            norwegian: "Øktoppsummering"
+                        ))
+                        .font(.system(.largeTitle, design: .serif))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        Text(workout.title)
+                            .font(.subheadline)
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    }
+                }
+
+                HStack(spacing: 15) {
+                    finishMetric(
+                        title: ATHLTHLocalization.choose(
+                            english: "Sets recorded", norwegian: "Sett registrert"
+                        ),
+                        value: "\(workout.totalCompletedSets)",
+                        symbol: "dumbbell"
+                    )
+                    finishMetric(
+                        title: ATHLTHLocalization.choose(
+                            english: "Training volume", norwegian: "Treningsvolum"
+                        ),
+                        value: String(format: "%.1f kg",
+                                      workout.totalVolumeKilograms),
+                        symbol: "scalemass"
+                    )
+                }
+                .padding(18)
+                .athlthTrainPaper()
+
+                HStack(spacing: 14) {
+                    ProgressView()
+                        .tint(ATHLTHTrainDesign.ink)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Confirming finish with Apple Watch",
+                            norwegian: "Bekrefter avslutning fra Apple Watch"
+                        ))
+                        .font(.headline)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Your recorded sets are safe. The completed workout will appear as soon as Watch confirms the HealthKit recording. This preview does not claim the Watch has stopped.",
+                            norwegian: "De registrerte settene er bevart. Ferdig økt vises når klokken bekrefter HealthKit-registreringen. Denne forhåndsvisningen betyr ikke at klokken allerede er stoppet."
+                        ))
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .padding(18)
+                .athlthTrainPaper()
+
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Exercises",
+                        norwegian: "Øvelser"
+                    ))
+                    .font(.headline)
+                    ForEach(workout.exercises) { item in
+                        HStack {
+                            Text(item.exercise.name)
+                                .font(.subheadline)
+                            Spacer(minLength: 6)
+                            Text("\(item.sets.filter(\.isCompleted).count) " +
+                                 ATHLTHLocalization.choose(
+                                    english: "sets", norwegian: "sett"
+                                 ))
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ATHLTHTrainDesign.secondary)
+                        }
+                    }
+                }
+                .padding(18)
+                .athlthTrainPaper()
+            }
+            .padding(20)
+        }
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+        .accessibilityIdentifier("athlth-watch-finish-pending-summary")
+    }
+
     private var strengthFinishConfirmationSheet: some View {
         if let workout = strength.activeWorkout {
             let plannedSetCount = workout.exercises.reduce(0) {
