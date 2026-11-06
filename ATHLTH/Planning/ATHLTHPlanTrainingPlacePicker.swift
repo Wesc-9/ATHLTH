@@ -160,7 +160,7 @@ struct ATHLTHPlanTrainingPlacePicker: View {
                                     .background(
                                         kind == option
                                             ? ATHLTHPlanDesign.ink
-                                            : ATHLTHPlanDesign.selectedSurface,
+                                            : Color(red: 0.954, green: 0.952, blue: 0.947),
                                         in: RoundedRectangle(cornerRadius: 14)
                                     )
                                 }
