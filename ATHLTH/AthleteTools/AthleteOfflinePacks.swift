@@ -160,14 +160,32 @@ struct AthleteOfflineView: View {
     }
 }
 private struct AthleteOfflinePackView: View {
+    @EnvironmentObject private var appSession: AppSessionStore
     let pack: AthleteOfflinePack
     @ObservedObject var offline: AthleteOfflinePackStore
     var body: some View {
         List {
             ForEach(pack.plan.weeks.flatMap(\.days).flatMap(\.sessions)) { session in
                 Section(session.title) {
-                    NavigationLink("Open workout controls") {
-                        PlannedWorkoutDetailView(planID: pack.plan.id, workout: session, isHealthCompleted: false)
+                    // A downloaded snapshot can outlive a deleted or edited
+                    // live plan. Only offer live controls for the matching
+                    // current session; never silently open stale workout data.
+                    if let currentPlan = appSession.trainingPlans.first(where: {
+                        $0.id == pack.plan.id
+                    }),
+                    let currentSession = currentPlan.weeks.flatMap(\.days)
+                        .flatMap(\.sessions).first(where: { $0.id == session.id }) {
+                        NavigationLink("Open workout controls") {
+                            PlannedWorkoutDetailView(
+                                planID: currentPlan.id,
+                                workout: currentSession,
+                                isHealthCompleted: false
+                            )
+                        }
+                    } else {
+                        Text("Saved offline copy · read-only")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                     if let notes = session.notes { Text(notes) }
                     if let duration = session.durationMinutes { Text("\(duration) min") }
