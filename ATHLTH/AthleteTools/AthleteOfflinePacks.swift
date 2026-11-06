@@ -268,7 +268,13 @@ final class AthleteOfflinePackStore: ObservableObject {
             }
             guard accountID == userID else { return }
             load(userID: userID)
-        } catch { if !Task.isCancelled { self.error = "The download could not be completed. Your existing pack has been preserved." } }
+        } catch is CancellationError {
+            // An obsolete enrichment task must not surface as a save error.
+        } catch {
+            if !Task.isCancelled {
+                self.error = "The download could not be completed. Your existing pack has been preserved."
+            }
+        }
         if let staging { try? FileManager.default.removeItem(at: staging) }
     }
 }
