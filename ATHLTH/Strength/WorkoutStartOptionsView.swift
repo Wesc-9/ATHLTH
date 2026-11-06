@@ -1497,6 +1497,55 @@ private struct StrengthAudioCoachSettingsView: View {
                 }
 
                 Section {
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Tell me when rest is over",
+                            norwegian: "Si fra når pausen er over"
+                        ),
+                        isOn: $configuration.announceRestComplete
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Announce the next exercise and goal",
+                            norwegian: "Si neste øvelse og mål"
+                        ),
+                        isOn: $configuration.announceNextExercise
+                    )
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Announce the next set, reps and weight",
+                            norwegian: "Si neste sett, reps og vekt"
+                        ),
+                        isOn: Binding(
+                            get: { configuration.shouldAnnounceNextSetDetails },
+                            set: { configuration.announceNextSetDetails = $0 }
+                        )
+                    )
+                    if configuration.announceRestCountdown {
+                        Stepper(
+                            value: $configuration.restCountdownSeconds,
+                            in: 3...30
+                        ) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Countdown \(configuration.restCountdownSeconds) s before",
+                                norwegian: "Nedtelling \(configuration.restCountdownSeconds) s før"
+                            ))
+                        }
+                    }
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "During a strength session",
+                        norwegian: "Under styrkeøkten"
+                    ))
+                } footer: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "These messages work on the device recording the workout and respect music ducking.",
+                        norwegian: "Meldingene brukes på enheten som registrerer økten, og tar hensyn til musikkvolum."
+                    ))
+                }
+
+
+                Section {
                     HStack(spacing: 7) {
                         ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
                             Button {
@@ -1646,46 +1695,6 @@ private struct StrengthAudioCoachSettingsView: View {
                     )
                     Toggle(
                         ATHLTHLocalization.choose(
-                            english: "Rest complete",
-                            norwegian: "Hvile ferdig"
-                        ),
-                        isOn:
-                            $configuration
-                                .announceRestComplete
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Next exercise + target",
-                            norwegian:
-                                "Neste øvelse + mål"
-                        ),
-                        isOn:
-                            $configuration
-                                .announceNextExercise
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Next set + target",
-                            norwegian:
-                                "Neste sett + mål"
-                        ),
-                        isOn:
-                            Binding(
-                                get: {
-                                    configuration
-                                        .shouldAnnounceNextSetDetails
-                                },
-                                set: {
-                                    configuration
-                                        .announceNextSetDetails =
-                                        $0
-                                }
-                            )
-                    )
-                    Toggle(
-                        ATHLTHLocalization.choose(
                             english:
                                 "Exercise progress",
                             norwegian:
@@ -1729,32 +1738,6 @@ private struct StrengthAudioCoachSettingsView: View {
                                 "Neste øvelse sier navn og første mål. Neste sett kan si reps, vekt, tid eller maskinnivå når det finnes. Øktfremdrift legger til hvor langt du har kommet i økta."
                         )
                     )
-                }
-
-                if configuration.announceRestCountdown {
-                    Section(
-                        ATHLTHLocalization.choose(
-                            english: "Rest countdown",
-                            norwegian: "Hvilenedtelling"
-                        )
-                    ) {
-                        Stepper(
-                            value:
-                                $configuration
-                                    .restCountdownSeconds,
-                            in: 3...30,
-                            step: 1
-                        ) {
-                            Text(
-                                ATHLTHLocalization.format(
-                                    english: "%d seconds before",
-                                    norwegian: "%d sekunder før",
-                                    configuration
-                                        .restCountdownSeconds
-                                )
-                            )
-                        }
-                    }
                 }
 
                 if configuration.announceWorkoutStatus {
