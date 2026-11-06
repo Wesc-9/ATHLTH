@@ -83,7 +83,7 @@ struct ATHLTHGhostRaceLiveCourseMap: View {
                             : "dot.radiowaves.left.and.right"
                     )
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(live == nil ? .secondary : ghostGold)
+                    .foregroundStyle(live == nil ? Color.secondary : ghostGold)
                 }
 
                 Map(position: $camera) {
