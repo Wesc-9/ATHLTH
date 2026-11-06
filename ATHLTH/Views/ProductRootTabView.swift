@@ -6798,24 +6798,28 @@ struct ATHLTHTrainView: View {
     /// Only *completed* sessions from the last month may steer the
     /// no-plan recommendation; never infer an activity from an active recording.
     private var lastCompletedTrainKind: WorkoutKind? {
-        let earliest = Date().addingTimeInterval(-30 * 86_400)
-        var completed: [(date: Date, kind: WorkoutKind)] = []
+        // Scan histories once without allocating/sorting a combined array.
+        // This is evaluated while SwiftUI builds the Train Today screen.
+        let now = Date()
+        let earliest = now.addingTimeInterval(-30 * 86_400)
+        var latestDate = earliest
+        var latestKind: WorkoutKind?
 
         for workout in phoneWorkout.history {
-            guard let end = workout.end, end >= earliest, end <= Date() else {
-                continue
-            }
-            completed.append((end, workout.walking ? .walking : .running))
+            guard let end = workout.end, end >= latestDate,
+                  end <= now else { continue }
+            latestDate = end
+            latestKind = workout.walking ? .walking : .running
         }
         for workout in strengthWorkout.workoutHistory {
-            guard let end = workout.endedAt, end >= earliest, end <= Date() else {
-                continue
-            }
-            completed.append((end, .strength))
+            guard let end = workout.endedAt, end >= latestDate,
+                  end <= now else { continue }
+            latestDate = end
+            latestKind = .strength
         }
         for workout in health.workouts {
-            guard workout.startDate >= earliest,
-                  workout.startDate <= Date() else { continue }
+            let date = workout.startDate
+            guard date >= latestDate, date <= now else { continue }
             let kind: WorkoutKind
             if workout.activity == .running {
                 kind = .running
@@ -6826,10 +6830,10 @@ struct ATHLTHTrainView: View {
             } else {
                 continue
             }
-            completed.append((workout.startDate, kind))
+            latestDate = date
+            latestKind = kind
         }
-
-        return completed.max(by: { $0.date < $1.date })?.kind
+        return latestKind
     }
 
     @ViewBuilder
