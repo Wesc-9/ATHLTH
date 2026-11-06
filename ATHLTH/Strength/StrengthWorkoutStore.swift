@@ -1963,7 +1963,8 @@ final class StrengthWorkoutStore: ObservableObject {
                     secondsAtPause: $0.secondsAtPause,
                     resumedAt: $0.resumedAt
                 )
-            }
+            },
+            setEffortStartedAt: currentSetEffortClock?.startedAt
         )
     }
 
