@@ -9505,7 +9505,8 @@ private struct FreestyleExercisePrescriptionView: View {
         let isTreadmill =
             StrengthTreadmillWarmUpDefaults.isTreadmill(snapshot.name) ||
             StrengthTreadmillWarmUpDefaults.isTreadmill(snapshot.displayName)
-        let bodyweightHold = StrengthTimedBodyweightDefaults.isBodyweightHold(snapshot.name) ||
+        let bodyweightHold = snapshot.isTimeOnlyBodyweightStrength ||
+            StrengthTimedBodyweightDefaults.isBodyweightHold(snapshot.name) ||
             StrengthTimedBodyweightDefaults.isBodyweightHold(snapshot.displayName)
         let initialTarget: StrengthExerciseTargetKind =
             isTreadmill || bodyweightHold ? .time : snapshot.defaultStrengthTargetKind
@@ -9513,25 +9514,27 @@ private struct FreestyleExercisePrescriptionView: View {
 
         // Each newly added treadmill warm-up has an editable prescription.
         // Start at 1 × 10 minutes, not three five-minute sets.
-        _sets = State(
-            initialValue: isTreadmill
-                ? StrengthTreadmillWarmUpDefaults.sets : 3
+        _sets = State(initialValue:
+            initialWarmUp || isTreadmill || snapshot.isTimeOnlyBodyweightStrength
+                ? 1 : 3
         )
-        _warmUpSets = State(initialValue:
-            initialWarmUp ? (isTreadmill ? 1 : 3) :
-                (isTreadmill ? 1 : 0)
-        )
+        // Enabling warm-up proposes ONE warm-up set. Athletes may add as
+        // many as they need without making all 3 working sets warm-ups.
+        _warmUpSets = State(initialValue: initialWarmUp || isTreadmill ? 1 : 0)
         _targetKind = State(initialValue: initialTarget)
         _durationSeconds = State(
             initialValue: isTreadmill
                 ? StrengthTreadmillWarmUpDefaults.durationSeconds
-                : bodyweightHold
-                    ? StrengthTimedBodyweightDefaults.durationSeconds
-                    : snapshot.defaultStrengthTargetDurationSeconds
+                : snapshot.isTimeOnlyBodyweightStrength
+                    ? snapshot.defaultStrengthTargetDurationSeconds
+                    : bodyweightHold
+                        ? StrengthTimedBodyweightDefaults.durationSeconds
+                        : snapshot.defaultStrengthTargetDurationSeconds
         )
         _loadKind = State(initialValue: initialLoad)
         _useLoadTarget = State(
-            initialValue: (isTreadmill || bodyweightHold)
+            initialValue: (isTreadmill || bodyweightHold ||
+                           snapshot.isTimeOnlyBodyweightStrength)
                 ? false : initialLoad == .resistanceLevel
         )
         _restSeconds = State(initialValue: isTreadmill ? 0 : 90)
@@ -9605,8 +9608,8 @@ private struct FreestyleExercisePrescriptionView: View {
                                 norwegian: "Oppvarmingsøvelse"
                             ),
                             isOn: Binding(
-                                get: { warmUpSets == sets },
-                                set: { warmUpSets = $0 ? sets : 0 }
+                                get: { warmUpSets > 0 },
+                                set: { warmUpSets = $0 ? 1 : 0 }
                             )
                         )
                         .labelsHidden()
@@ -9633,6 +9636,7 @@ private struct FreestyleExercisePrescriptionView: View {
 
                     targetRow
 
+                    if !entry.exercise.snapshot.isTimeOnlyBodyweightStrength {
                     Toggle(
                         loadKind == .resistanceLevel
                             ? ATHLTHLocalization.choose(
@@ -9648,6 +9652,7 @@ private struct FreestyleExercisePrescriptionView: View {
 
                     if useLoadTarget {
                         loadTargetRow
+                    }
                     }
 
                     Stepper(
@@ -9670,10 +9675,8 @@ private struct FreestyleExercisePrescriptionView: View {
                         value: $warmUpSets,
                         in: 0...sets
                     )
-                    .onChange(of: sets) { oldValue, newValue in
-                        warmUpSets = warmUpSets == oldValue
-                            ? newValue
-                            : min(warmUpSets, newValue)
+                    .onChange(of: sets) { _, newValue in
+                        warmUpSets = min(warmUpSets, newValue)
                     }
                 }
 
@@ -9795,18 +9798,11 @@ private struct FreestyleExercisePrescriptionView: View {
 
                     Spacer()
 
-                    TextField(
-                        "kg",
+                    StrengthClearableNumericField(
                         value: $weightKilograms,
-                        format:
-                            .number
-                            .precision(
-                                .fractionLength(0...2)
-                            )
+                        allowsDecimal: true
                     )
-                    .keyboardType(.decimalPad)
-                    .multilineTextAlignment(.trailing)
-                    .frame(width: 90)
+                    .frame(width: 100)
 
                     Text("kg")
                         .foregroundStyle(.secondary)
