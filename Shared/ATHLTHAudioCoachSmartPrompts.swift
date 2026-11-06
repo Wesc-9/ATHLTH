@@ -128,6 +128,12 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     // Optional so already stored profiles and old Watch transfers still decode.
     var encouragementStyle: ATHLTHCoachEncouragementStyle? = nil
     var contextualFeedbackEnabled: Bool? = nil
+    // Separate from spoken BPM: athletes can hear the measured zone without
+    // requiring raw heart-rate announcements. Optional for old workouts.
+    var announceCurrentHeartRateZone: Bool? = nil
+    // Supplied from the athlete profile when the workout is launched; never
+    // infer a zone without a valid configured/estimated HR maximum.
+    var maximumHeartRateBPM: Double? = nil
 
     var isContextualFeedbackEnabled: Bool {
         contextualFeedbackEnabled ?? true
