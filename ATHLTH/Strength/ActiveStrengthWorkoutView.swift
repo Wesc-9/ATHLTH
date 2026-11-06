@@ -9719,6 +9719,7 @@ private struct FreestyleExercisePrescriptionView: View {
         StrengthExerciseLoadKind
     @State private var restSeconds = 90
     @State private var warmUpSets = 0
+    @State private var wholeExerciseWarmUp = false
     @State private var hasTimeGoal = true
     @State private var useLoadTarget: Bool
     @State private var weightKilograms = 20.0
@@ -9763,6 +9764,7 @@ private struct FreestyleExercisePrescriptionView: View {
         // Enabling warm-up proposes ONE warm-up set. Athletes may add as
         // many as they need without making all 3 working sets warm-ups.
         _warmUpSets = State(initialValue: initialWarmUp || isTreadmill ? 1 : 0)
+        _wholeExerciseWarmUp = State(initialValue: initialWarmUp || isTreadmill)
         _targetKind = State(initialValue: initialTarget)
         _hasTimeGoal = State(initialValue: !snapshot.isFreeStrengthTimer)
         _durationSeconds = State(
@@ -9851,8 +9853,19 @@ private struct FreestyleExercisePrescriptionView: View {
                                 norwegian: "Oppvarmingsøvelse"
                             ),
                             isOn: Binding(
-                                get: { warmUpSets > 0 },
-                                set: { warmUpSets = $0 ? 1 : 0 }
+                                get: { wholeExerciseWarmUp },
+                                set: { enabled in
+                                    wholeExerciseWarmUp = enabled
+                                    if enabled {
+                                        // Selecting a warm-up starts at ONE
+                                        // whole warm-up set, not three. The
+                                        // count can then be raised freely.
+                                        sets = 1
+                                        warmUpSets = 1
+                                    } else {
+                                        warmUpSets = 0
+                                    }
+                                }
                             )
                         )
                         .labelsHidden()
@@ -9932,17 +9945,30 @@ private struct FreestyleExercisePrescriptionView: View {
                         step: 15
                     )
 
-                    Stepper(
-                        ATHLTHLocalization.format(
-                            english: "Warm-up sets: %d",
-                            norwegian: "Oppvarmingssett: %d",
-                            warmUpSets
-                        ),
-                        value: $warmUpSets,
-                        in: 0...sets
-                    )
+                    if wholeExerciseWarmUp {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "All \(sets) sets are warm-up",
+                                norwegian: "Alle \(sets) sett er oppvarming"
+                            ),
+                            systemImage: "flame"
+                        )
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    } else {
+                        Stepper(
+                            ATHLTHLocalization.format(
+                                english: "Warm-up sets: %d",
+                                norwegian: "Oppvarmingssett: %d",
+                                warmUpSets
+                            ),
+                            value: $warmUpSets,
+                            in: 0...sets
+                        )
+                    }
                     .onChange(of: sets) { _, newValue in
-                        warmUpSets = min(warmUpSets, newValue)
+                        warmUpSets = wholeExerciseWarmUp
+                            ? newValue : min(warmUpSets, newValue)
                     }
                 }
 
