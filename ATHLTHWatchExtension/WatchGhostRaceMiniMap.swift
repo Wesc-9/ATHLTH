@@ -93,7 +93,8 @@ struct WatchGhostRaceMiniMap: View {
             let positions = freshPositions(at: timeline.date)
             let lead = freshLead(at: timeline.date)
             VStack(alignment: .leading, spacing: 6) {
-                Map(position: $camera, interactionModes: []) {
+                if plannedRoute.count >= 2 || liveTrail.count >= 2 {
+                    Map(position: $camera, interactionModes: []) {
                     if plannedRoute.count >= 2 {
                         MapPolyline(coordinates: plannedRoute)
                             .stroke(runnerInk.opacity(0.40), lineWidth: 3)
@@ -150,6 +151,23 @@ struct WatchGhostRaceMiniMap: View {
                     lastFollowUpdate = nil
                     camera = .region(fallbackRegion)
                     centerIfPossible(at: .now, force: true)
+                }
+                } else {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Preparing Ghost course",
+                            norwegian: "Klargjør Ghost-løypen"
+                        ),
+                        systemImage: "map"
+                    )
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(WatchTheme.muted)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: height)
+                    .background(
+                        WatchTheme.canvas,
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
                 }
 
                 HStack(spacing: 6) {
