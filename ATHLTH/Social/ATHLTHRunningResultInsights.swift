@@ -72,11 +72,11 @@ enum ATHLTHRunningResultInsights {
 
         // Only use HealthKit's independent distance timeline if its total
         // agrees with the workout's recorded distance, not an unrelated walk.
-        if let reportedDistanceMeters, reportedDistanceMeters.isFinite,
-           reportedDistanceMeters > 0 {
-            guard abs(totalDistance - reportedDistanceMeters) /
-                  reportedDistanceMeters <= 0.04 else { return [] }
-        }
+        guard let reportedDistanceMeters,
+              reportedDistanceMeters.isFinite, reportedDistanceMeters > 0,
+              abs(totalDistance - reportedDistanceMeters) /
+                reportedDistanceMeters <= 0.04
+        else { return [] }
 
         func movingSeconds(_ start: Date, _ end: Date) -> Double {
             var seconds = end.timeIntervalSince(start)
