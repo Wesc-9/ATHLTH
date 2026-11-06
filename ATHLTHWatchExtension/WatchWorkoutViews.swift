@@ -4275,12 +4275,18 @@ private struct WatchRunWalkWorkoutPager: View {
 
     @ViewBuilder
     private var routeMap: some View {
-        let planned =
-            workoutManager.plannedRoute?
-                .points
-                .sorted {
-                    $0.sequence < $1.sequence
-                }
+        if workoutManager.ghostRaceTitle != nil {
+            // Both the main running screen and the route page show the
+            // same real-time race camera. The finish/pause controls remain
+            // on their existing, separate controls page.
+            WatchGhostRaceMiniMap(
+                workoutManager: workoutManager,
+                height: 150
+            )
+        } else {
+            // Do not affect ordinary outdoor running and walking maps.
+            let planned = workoutManager.plannedRoute?.points
+                .sorted { $0.sequence < $1.sequence }
                 .map {
                     CLLocationCoordinate2D(
                         latitude: $0.latitude,
@@ -4288,11 +4294,8 @@ private struct WatchRunWalkWorkoutPager: View {
                     )
                 } ?? []
 
-        let live =
-            workoutManager.routePoints
-                .sorted {
-                    $0.sequence < $1.sequence
-                }
+            let live = workoutManager.routePoints
+                .sorted { $0.sequence < $1.sequence }
                 .map {
                     CLLocationCoordinate2D(
                         latitude: $0.latitude,
@@ -4300,96 +4303,19 @@ private struct WatchRunWalkWorkoutPager: View {
                     )
                 }
 
-        let freshPositions = workoutManager.ghostRaceTitle != nil &&
-            workoutManager.state == .running &&
-            workoutManager.ghostMapUpdatedAt.map {
-                Date().timeIntervalSince($0) >= -5 &&
-                Date().timeIntervalSince($0) < 18
-            } == true
-
-        if planned.count >= 2 || live.count >= 2 {
-            Map {
-                if planned.count >= 2 {
-                    MapPolyline(
-                        coordinates: planned
-                    )
-                    .stroke(
-                        WatchTheme.muted.opacity(0.55),
-                        lineWidth: 3
-                    )
-                }
-
-                if freshPositions,
-                   let runnerLatitude = workoutManager.ghostMapUserLatitude,
-                   let runnerLongitude = workoutManager.ghostMapUserLongitude,
-                   let ghostLatitude = workoutManager.ghostMapLatitude,
-                   let ghostLongitude = workoutManager.ghostMapLongitude {
-                    Annotation(
-                        ATHLTHLocalization.choose(
-                            english: "You", norwegian: "Du"
-                        ),
-                        coordinate: CLLocationCoordinate2D(
-                            latitude: runnerLatitude,
-                            longitude: runnerLongitude
-                        )
-                    ) {
-                        Image(systemName: "figure.run")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 23, height: 23)
-                            .background(
-                                Color(red: 0.16, green: 0.27, blue: 0.40),
-                                in: Circle()
-                            )
+            if planned.count >= 2 || live.count >= 2 {
+                Map {
+                    if planned.count >= 2 {
+                        MapPolyline(coordinates: planned)
+                            .stroke(WatchTheme.muted.opacity(0.55), lineWidth: 3)
                     }
-
-                    Annotation(
-                        "Ghost",
-                        coordinate: CLLocationCoordinate2D(
-                            latitude: ghostLatitude,
-                            longitude: ghostLongitude
-                        )
-                    ) {
-                        Image(systemName: "figure.run")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 23, height: 23)
-                            .background(
-                                Color(red: 0.79, green: 0.47, blue: 0.20),
-                                in: Circle()
-                            )
+                    if live.count >= 2 {
+                        MapPolyline(coordinates: live)
+                            .stroke(WatchTheme.green, lineWidth: 4)
                     }
                 }
-
-                if live.count >= 2 {
-                    MapPolyline(
-                        coordinates: live
-                    )
-                    .stroke(
-                        WatchTheme.green,
-                        lineWidth: 4
-                    )
-                }
-            }
-            .frame(height: workoutManager.ghostRaceTitle == nil ? 116 : 151)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 15,
-                    style: .continuous
-                )
-            )
-            .overlay(alignment: .bottomLeading) {
-                if workoutManager.ghostRaceTitle != nil,
-                   !freshPositions {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Waiting for reliable GPS",
-                        norwegian: "Venter på god GPS"
-                    ))
-                    .font(.system(size: 9, weight: .semibold))
-                    .padding(6)
-                    .background(.regularMaterial, in: Capsule())
-                    .padding(6)
-                }
+                .frame(height: 116)
+                .clipShape(RoundedRectangle(cornerRadius: 15))
             }
         }
     }
