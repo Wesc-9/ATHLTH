@@ -76,6 +76,7 @@ final class AthleteOfflinePackStore: ObservableObject {
         // A previous network failure must not block a new local-first save.
         error = nil
         downloading = true; defer { downloading = false }
+        let startedAt = Date()
         var staging: URL?
         do {
             let folder = try root(userID)
@@ -234,6 +235,16 @@ final class AthleteOfflinePackStore: ObservableObject {
             try Task.checkCancellation()
             try JSONEncoder().encode(pack).write(to: temporary.appendingPathComponent("pack.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             let destination = folder.appendingPathComponent(plan.id.uuidString)
+            // A media refresh can take minutes. Never let an older in-flight
+            // snapshot overwrite a newer local save on iPhone or iPad.
+            let latestMetadata = destination.appendingPathComponent("pack.json")
+            if let latestBytes = try? Data(contentsOf: latestMetadata),
+               let latest = try? JSONDecoder().decode(
+                AthleteOfflinePack.self, from: latestBytes
+               ),
+               latest.downloadedAt > startedAt {
+                throw CancellationError()
+            }
             // Replace directory packs with a rollback path. A failed update
             // must not destroy the last usable offline plan and media.
             let previous = folder.appendingPathComponent(
