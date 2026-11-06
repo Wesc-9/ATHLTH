@@ -4056,15 +4056,23 @@ struct ActiveStrengthWorkoutView: View {
             Spacer(minLength: 2)
 
             VStack(alignment: .trailing, spacing: 3) {
-                Text(observed.map {
-                    ATHLTHLocalization.choose(
-                        english: "Zone \($0)", norwegian: "Sone \($0)"
-                    )
-                } ?? ATHLTHLocalization.choose(
-                    english: "Zone unavailable", norwegian: "Sone ikke tilgjengelig"
-                ))
-                .font(.caption.weight(.bold))
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                if let observed {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Zone \(observed)",
+                        norwegian: "Sone \(observed)"
+                    ))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                } else {
+                    // Give useful progress when the athlete has no reliable
+                    // maximum heart rate, instead of displaying an error.
+                    Text(ATHLTHLocalization.choose(
+                        english: "\(workout.totalCompletedSets) sets logged",
+                        norwegian: "\(workout.totalCompletedSets) sett registrert"
+                    ))
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
 
                 if let target {
                     Text(ATHLTHLocalization.choose(
