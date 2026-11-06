@@ -9786,281 +9786,446 @@ private struct FreestyleExercisePrescriptionView: View {
         _restSeconds = State(initialValue: isTreadmill ? 0 : 90)
     }
 
+    private var premiumInk: Color {
+        Color(red: 0.20, green: 0.21, blue: 0.23)
+    }
+
+    private var premiumBronze: Color {
+        Color(red: 0.63, green: 0.47, blue: 0.27)
+    }
+
+    private var premiumCanvas: Color {
+        Color(red: 0.974, green: 0.969, blue: 0.962)
+    }
+
+    private var premiumOutline: Color {
+        Color(red: 0.88, green: 0.86, blue: 0.83)
+    }
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    HStack(spacing: 12) {
-                        ExerciseArtwork(
-                            entry: entry,
-                            size: 62
-                        )
+            ScrollView {
+                VStack(alignment: .leading, spacing: 23) {
+                    selectedExerciseCard
+                    warmUpOptionsCard
 
-                        VStack(
-                            alignment: .leading,
-                            spacing: 3
-                        ) {
-                            Text(entry.name)
-                                .font(.headline)
-
-                            Text(
-                                entry.exercise
-                                    .primaryMuscles
-                                    .prefix(3)
-                                    .joined(
-                                        separator: " · "
-                                    )
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-
-                Section {
-                    HStack(spacing: 12) {
-                        Image(systemName: "flame.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.premiumGold)
-                            .frame(width: 44, height: 44)
-                            .background(
-                                ATHLTHTheme.premiumGoldSoft,
-                                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            )
-
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Warm-up exercise",
-                                    norwegian: "Oppvarmingsøvelse"
-                                )
-                            )
-                            .font(.subheadline.weight(.bold))
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "All sets become warm-up and won't count toward volume or PRs.",
-                                    norwegian: "Alle sett blir oppvarming og teller ikke mot volum eller PR."
-                                )
-                            )
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer(minLength: 4)
-                        Toggle(
-                            ATHLTHLocalization.choose(
-                                english: "Warm-up exercise",
-                                norwegian: "Oppvarmingsøvelse"
-                            ),
-                            isOn: Binding(
-                                get: { wholeExerciseWarmUp },
-                                set: { enabled in
-                                    wholeExerciseWarmUp = enabled
-                                    if enabled {
-                                        // Selecting a warm-up starts at ONE
-                                        // whole warm-up set, not three. The
-                                        // count can then be raised freely.
-                                        sets = 1
-                                        warmUpSets = 1
-                                    } else {
-                                        warmUpSets = 0
-                                    }
-                                }
-                            )
-                        )
-                        .labelsHidden()
-                        .tint(ATHLTHTheme.premiumGold)
-                    }
-                    .padding(.vertical, 5)
-                }
-
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Planned setup",
-                        norwegian: "Planlagt oppsett"
-                    )
-                ) {
-                    Stepper(
-                        ATHLTHLocalization.format(
-                            english: "Sets: %d",
-                            norwegian: "Sett: %d",
-                            sets
-                        ),
-                        value: $sets,
-                        in: 1...20
-                    )
-                    .onChange(of: sets) { _, newValue in
-                        warmUpSets = wholeExerciseWarmUp
-                            ? newValue : min(warmUpSets, newValue)
-                    }
-
-                    if targetKind == .time &&
-                        entry.exercise.snapshot.isTimeOnlyBodyweightStrength {
-                        Toggle(
-                            ATHLTHLocalization.choose(
-                                english: "Set a time goal",
-                                norwegian: "Angi tidsmål"
-                            ),
-                            isOn: $hasTimeGoal
-                        )
-                        .tint(ATHLTHTheme.accentDeep)
-                    }
-                    if targetKind != .time || hasTimeGoal {
-                        targetRow
-                    } else {
+                    VStack(alignment: .leading, spacing: 13) {
                         Label(
-                            ATHLTHLocalization.choose(
-                                english: "Start a stopwatch and finish when ready.",
-                                norwegian: "Start tidtakingen og avslutt når du er ferdig."
-                            ),
-                            systemImage: "stopwatch"
+                            tr("PLANNED SETUP", "PLANLAGT OPPSETT"),
+                            systemImage: "layers"
                         )
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(premiumInk)
+                        .padding(.leading, 4)
+
+                        plannedSetupCard
+                    }
+
+                    Label {
+                        Text(tr(
+                            "These are only targets. You can edit the actual result during the workout, including split loads such as 8 × 10 kg + 2 × 8 kg.",
+                            "Dette er bare planen. Under økten kan du endre faktisk resultat, også delt belastning som 8 × 10 kg + 2 × 8 kg."
+                        ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    } icon: {
+                        Image(systemName: "info.circle")
+                            .foregroundStyle(premiumBronze)
                     }
-
-                    if !entry.exercise.snapshot.isTimeOnlyBodyweightStrength {
-                    Toggle(
-                        loadKind == .resistanceLevel
-                            ? ATHLTHLocalization.choose(
-                                english: "Resistance target",
-                                norwegian: "Motstandsmål"
-                            )
-                            : ATHLTHLocalization.choose(
-                                english: "Target weight",
-                                norwegian: "Målvekt"
-                            ),
-                        isOn: $useLoadTarget
-                    )
-
-                    if useLoadTarget {
-                        loadTargetRow
+                    .padding(17)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 18))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18)
+                            .stroke(premiumOutline.opacity(0.75), lineWidth: 0.8)
                     }
-                    }
-
-                    Stepper(
-                        ATHLTHLocalization.format(
-                            english: "Rest: %d sec",
-                            norwegian: "Hvile: %d sek",
-                            restSeconds
-                        ),
-                        value: $restSeconds,
-                        in: 0...600,
-                        step: 15
-                    )
-
-                    if wholeExerciseWarmUp {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "All \(sets) sets are warm-up",
-                                norwegian: "Alle \(sets) sett er oppvarming"
-                            ),
-                            systemImage: "flame"
-                        )
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    } else {
-                        Stepper(
-                            ATHLTHLocalization.format(
-                                english: "Warm-up sets: %d",
-                                norwegian: "Oppvarmingssett: %d",
-                                warmUpSets
-                            ),
-                            value: $warmUpSets,
-                            in: 0...sets
-                        )
-                    }
+                    .accessibilityIdentifier("strength-add-exercise-targets-note")
                 }
-
-                if entry.exercise.snapshot
-                    .supportsStrengthDistanceResult {
-                    Section {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Rowed distance is entered immediately after the set or from the completed set row.",
-                                norwegian:
-                                    "Rodd distanse legges inn rett etter settet eller ved å trykke på det fullførte settet."
-                            ),
-                            systemImage:
-                                "ruler"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-                }
-
-                Section {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Targets are only the plan. During the workout you can edit the actual result, including split loads such as 8 × 10 kg + 2 × 8 kg.",
-                            norwegian:
-                                "Målene er bare planen. Under økten kan du redigere faktisk resultat, også delt belastning som 8 × 10 kg + 2 × 8 kg."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+                .frame(maxWidth: 720)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 18)
+                .padding(.top, 26)
+                .padding(.bottom, 42)
             }
-            .navigationTitle(
-                ATHLTHLocalization.choose(
-                    english: "Add Exercise",
-                    norwegian: "Legg til øvelse"
-                )
-            )
+            .scrollDismissesKeyboard(.interactively)
+            .background(premiumCanvas.ignoresSafeArea())
+            .navigationTitle(tr("Add exercise", "Legg til øvelse"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(
-                    placement: .cancellationAction
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Cancel",
-                            norwegian: "Avbryt"
-                        )
-                    ) {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(tr("Cancel", "Avbryt")) {
                         dismiss()
                     }
+                    .foregroundStyle(premiumInk)
                 }
-
-                ToolbarItem(
-                    placement: .confirmationAction
-                ) {
-                    Button(
-                        ATHLTHLocalization.choose(
-                            english: "Add",
-                            norwegian: "Legg til"
-                        )
-                    ) {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(tr("Add", "Legg til")) {
                         onAdd(
                             sets,
-                            targetKind == .reps
-                                ? reps
-                                : nil,
+                            targetKind == .reps ? reps : nil,
                             targetKind,
                             targetKind == .time && hasTimeGoal
-                                ? durationSeconds
-                                : nil,
+                                ? durationSeconds : nil,
                             loadKind,
-                            useLoadTarget &&
-                            loadKind == .weightKilograms
-                                ? weightKilograms
-                                : nil,
-                            useLoadTarget &&
-                            loadKind == .resistanceLevel
-                                ? resistanceLevel
-                                : nil,
+                            useLoadTarget && loadKind == .weightKilograms
+                                ? weightKilograms : nil,
+                            useLoadTarget && loadKind == .resistanceLevel
+                                ? resistanceLevel : nil,
                             restSeconds,
                             warmUpSets,
                             targetKind == .time && !hasTimeGoal
                         )
                         dismiss()
                     }
+                    .font(.subheadline.weight(.semibold))
+                    .buttonStyle(.borderedProminent)
+                    .tint(premiumBronze)
                 }
             }
         }
+    }
+
+    private var selectedExerciseCard: some View {
+        HStack(spacing: 15) {
+            ExerciseArtwork(entry: entry, size: 70)
+                .frame(width: 76, height: 76)
+                .background(premiumCanvas, in: RoundedRectangle(cornerRadius: 16))
+
+            Rectangle()
+                .fill(premiumOutline)
+                .frame(width: 1, height: 61)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text(entry.name)
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(premiumInk)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text(
+                    entry.exercise.primaryMuscles
+                        .prefix(3).joined(separator: " · ")
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, minHeight: 102, alignment: .leading)
+        .padding(18)
+        .background(.white, in: RoundedRectangle(cornerRadius: 23))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23)
+                .stroke(premiumOutline.opacity(0.75), lineWidth: 0.8)
+        }
+        .accessibilityIdentifier("strength-add-exercise-selected")
+    }
+
+    private var warmUpOptionsCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "flame.fill")
+                    .font(.title3)
+                    .foregroundStyle(premiumBronze)
+                    .frame(width: 48, height: 48)
+                    .background(
+                        premiumCanvas,
+                        in: RoundedRectangle(cornerRadius: 14)
+                    )
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tr("Warm-up exercise", "Oppvarmingsøvelse"))
+                        .font(.headline)
+                        .foregroundStyle(premiumInk)
+                    Text(tr(
+                        "All sets count as warm-up, not as training volume or personal records.",
+                        "Alle sett blir oppvarming og teller ikke som treningsvolum eller personlig rekord."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Toggle(
+                    tr("Warm-up exercise", "Oppvarmingsøvelse"),
+                    isOn: Binding(
+                        get: { wholeExerciseWarmUp },
+                        set: { enabled in
+                            wholeExerciseWarmUp = enabled
+                            if enabled {
+                                sets = 1
+                                warmUpSets = 1
+                            } else {
+                                warmUpSets = 0
+                            }
+                        }
+                    )
+                )
+                .labelsHidden()
+                .tint(premiumBronze)
+            }
+
+            if !wholeExerciseWarmUp {
+                Divider()
+                    .overlay(premiumOutline)
+                    .padding(.vertical, 15)
+
+                Toggle(
+                    tr("Add warm-up sets before working sets",
+                       "Legg til oppvarmingssett før arbeidssett"),
+                    isOn: Binding(
+                        get: { warmUpSets > 0 },
+                        set: { enabled in
+                            warmUpSets = enabled ? 1 : 0
+                        }
+                    )
+                )
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(premiumInk)
+                .tint(premiumBronze)
+            }
+
+            if wholeExerciseWarmUp || warmUpSets > 0 {
+                Divider()
+                    .overlay(premiumOutline)
+                    .padding(.vertical, 15)
+
+                HStack(spacing: 12) {
+                    Image(systemName: "flame")
+                        .font(.subheadline)
+                        .foregroundStyle(premiumBronze)
+                        .frame(width: 28)
+
+                    Text(tr("Warm-up sets", "Oppvarmingssett"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(premiumInk)
+
+                    Spacer(minLength: 0)
+
+                    Text("\(warmUpSets)")
+                        .font(.subheadline.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(premiumInk)
+
+                    countControl(
+                        title: tr("Warm-up sets", "Oppvarmingssett"),
+                        value: warmUpSets,
+                        minimum: 1,
+                        maximum: wholeExerciseWarmUp ? 20 : sets
+                    ) { newValue in
+                        if wholeExerciseWarmUp {
+                            sets = newValue
+                        }
+                        warmUpSets = newValue
+                    }
+                }
+                .accessibilityIdentifier("strength-add-exercise-warm-up-set-count")
+            }
+        }
+        .padding(19)
+        .background(.white, in: RoundedRectangle(cornerRadius: 23))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23)
+                .stroke(premiumOutline.opacity(0.75), lineWidth: 0.8)
+        }
+        .accessibilityIdentifier("strength-add-exercise-warm-up")
+    }
+
+    private var plannedSetupCard: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            setupCountRow(
+                icon: "square.stack.3d.up",
+                title: tr("Sets", "Sett"),
+                value: sets,
+                minimum: 1,
+                maximum: 20
+            ) { newValue in
+                sets = newValue
+                warmUpSets = wholeExerciseWarmUp
+                    ? newValue : min(warmUpSets, newValue)
+            }
+
+            setupDivider
+
+            if targetKind == .time &&
+                entry.exercise.snapshot.isTimeOnlyBodyweightStrength {
+                Toggle(
+                    tr("Use a time goal", "Bruk tidsmål"),
+                    isOn: $hasTimeGoal
+                )
+                .font(.subheadline)
+                .tint(premiumBronze)
+                .padding(.vertical, 15)
+
+                setupDivider
+            }
+
+            if targetKind != .time || hasTimeGoal {
+                targetRow
+            } else {
+                Label(
+                    tr(
+                        "Start the stopwatch and finish whenever you are ready.",
+                        "Start stoppeklokken og avslutt når du er ferdig."
+                    ),
+                    systemImage: "stopwatch"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .padding(.vertical, 20)
+            }
+
+            if !entry.exercise.snapshot.isTimeOnlyBodyweightStrength {
+                setupDivider
+
+                HStack(spacing: 12) {
+                    setupIcon("dumbbell")
+                    Text(
+                        loadKind == .resistanceLevel
+                            ? tr("Resistance target", "Motstandsmål")
+                            : tr("Target weight", "Målvekt")
+                    )
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(premiumInk)
+
+                    Spacer(minLength: 4)
+
+                    Toggle(
+                        tr("Target weight", "Målvekt"),
+                        isOn: $useLoadTarget
+                    )
+                    .labelsHidden()
+                    .tint(premiumBronze)
+                }
+                .frame(minHeight: 67)
+
+                if useLoadTarget {
+                    loadTargetRow
+                        .padding(.leading, 38)
+                        .padding(.bottom, 12)
+                }
+            }
+
+            setupDivider
+
+            setupCountRow(
+                icon: "timer",
+                title: tr("Rest", "Hvile"),
+                value: restSeconds,
+                suffix: tr("sec", "sek"),
+                minimum: 0,
+                maximum: 600,
+                step: 15
+            ) { restSeconds = $0 }
+        }
+        .padding(.horizontal, 19)
+        .padding(.vertical, 4)
+        .background(.white, in: RoundedRectangle(cornerRadius: 23))
+        .overlay {
+            RoundedRectangle(cornerRadius: 23)
+                .stroke(premiumOutline.opacity(0.75), lineWidth: 0.8)
+        }
+        .accessibilityIdentifier("strength-add-exercise-planned-setup")
+    }
+
+    private var setupDivider: some View {
+        Rectangle()
+            .fill(premiumOutline.opacity(0.86))
+            .frame(height: 0.7)
+    }
+
+    private func setupIcon(_ name: String) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 18, weight: .medium))
+            .foregroundStyle(premiumBronze)
+            .frame(width: 27)
+            .accessibilityHidden(true)
+    }
+
+    private func setupCountRow(
+        icon: String,
+        title: String,
+        value: Int,
+        suffix: String = "",
+        minimum: Int,
+        maximum: Int,
+        step: Int = 1,
+        onChange: @escaping (Int) -> Void
+    ) -> some View {
+        HStack(spacing: 12) {
+            setupIcon(icon)
+            Text(title + ": " + String(value) +
+                 (suffix.isEmpty ? "" : " " + suffix))
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(premiumInk)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+
+            Spacer(minLength: 4)
+
+            countControl(
+                title: title,
+                value: value,
+                minimum: minimum,
+                maximum: maximum,
+                step: step,
+                onChange: onChange
+            )
+        }
+        .frame(minHeight: 73)
+    }
+
+    private func countControl(
+        title: String,
+        value: Int,
+        minimum: Int,
+        maximum: Int,
+        step: Int = 1,
+        onChange: @escaping (Int) -> Void
+    ) -> some View {
+        HStack(spacing: 0) {
+            Button {
+                onChange(max(minimum, value - step))
+            } label: {
+                Image(systemName: "minus")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 46, height: 42)
+                    .contentShape(Rectangle())
+            }
+            .disabled(value <= minimum)
+            .accessibilityLabel(
+                tr("Decrease", "Reduser") + " " + title
+            )
+
+            Rectangle()
+                .fill(premiumOutline)
+                .frame(width: 1, height: 25)
+
+            Button {
+                onChange(min(maximum, value + step))
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 17, weight: .semibold))
+                    .frame(width: 46, height: 42)
+                    .contentShape(Rectangle())
+            }
+            .disabled(value >= maximum)
+            .accessibilityLabel(
+                tr("Increase", "Øk") + " " + title
+            )
+        }
+        .foregroundStyle(premiumInk)
+        .background(premiumCanvas, in: Capsule())
+        .overlay {
+            Capsule()
+                .stroke(premiumOutline.opacity(0.75), lineWidth: 0.75)
+        }
+        .buttonStyle(.plain)
     }
 
     private var loadTargetRow:
