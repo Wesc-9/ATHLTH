@@ -362,8 +362,8 @@ struct RunGuidanceSetupView: View {
                             Image(systemName: "map")
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
                             Text(ATHLTHLocalization.choose(
-                                english: "Select a route to set up Ghost Race and Route Guardian.",
-                                norwegian: "Velg en rute for å tilpasse Ghost Race og ruteveiledning."
+                                english: "Select a route to set up Ghost Race and Navigation.",
+                                norwegian: "Velg en rute for å tilpasse Ghost Race og navigasjon."
                             ))
                             .font(.caption)
                             .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
@@ -940,7 +940,7 @@ struct PerWorkoutGhostView: View {
                     ATHLTHPlanSurface(ghost: false) {
                         Toggle(isOn: $draft.updatesEnabled) {
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Ghost Updates")
+                                Text(ATHLTHLocalization.choose(english: "Ghost updates", norwegian: "Ghost-oppdateringer"))
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundStyle(ATHLTHPlanDesign.ink)
                                 Text(ATHLTHLocalization.choose(
