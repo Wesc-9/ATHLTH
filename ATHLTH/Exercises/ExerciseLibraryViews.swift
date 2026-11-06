@@ -145,6 +145,43 @@ struct ExerciseLibraryView: View {
         }
     }
 
+    private var freeStrengthShortcutLabel: some View {
+        HStack(spacing: 13) {
+            Image(systemName: "stopwatch")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.white)
+                .frame(width: 42, height: 42)
+                .background(
+                    ATHLTHPlanDesign.ink,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Free strength training",
+                    norwegian: "Fri styrketrening"
+                ))
+                .font(.subheadline.weight(.semibold))
+                Text(ATHLTHLocalization.choose(
+                    english: "Start a workout timer without selecting individual exercises",
+                    norwegian: "Registrer aktivitetstid uten å legge inn øvelser én og én"
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+            Image(systemName: "plus.circle")
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+        }
+        .foregroundStyle(ATHLTHPlanDesign.ink)
+        .padding(13)
+        .background(.white, in: RoundedRectangle(cornerRadius: 17))
+        .overlay(
+            RoundedRectangle(cornerRadius: 17)
+                .stroke(ATHLTHPlanDesign.outline, lineWidth: 1)
+        )
+    }
+
     // Search now returns an alphabetized cached result. Avoid repeating
     // an expensive localized name sort on every SwiftUI state publication.
     private var displayedResults: [ExerciseLibraryEntry] {
@@ -210,6 +247,35 @@ struct ExerciseLibraryView: View {
 
             filters
             translationAvailabilityBanner
+
+            if selectedSection == .library,
+               let free = library.athlthCatalogExercises.first(where: {
+                   $0.sourceIdentifier == "athlth-native-free-strength-training"
+               }) {
+                if let onSelect {
+                    Button {
+                        onSelect(free)
+                    } label: {
+                        freeStrengthShortcutLabel
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
+                } else {
+                    NavigationLink {
+                        ExerciseDetailView(
+                            entry: free,
+                            selectionTitle: selectionTitle,
+                            onSelect: onSelect
+                        )
+                    } label: {
+                        freeStrengthShortcutLabel
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 6)
+                }
+            }
 
             Button {
                 beginEquipmentScan()
