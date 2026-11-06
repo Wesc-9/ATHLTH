@@ -3630,6 +3630,10 @@ private struct WatchRunWalkWorkoutPager: View {
                             .font(.system(size: 9, weight: .semibold))
                             .foregroundStyle(WatchTheme.muted)
                     }
+
+                    // Keep an immediately visible moving map on the workout
+                    // page. The separate route page shows the larger version.
+                    routeMap
                 }
                 .padding(10)
                 .watchSurface()
@@ -4296,8 +4300,14 @@ private struct WatchRunWalkWorkoutPager: View {
                     )
                 }
 
-        if planned.count >= 2 ||
-            live.count >= 2 {
+        let freshPositions = workoutManager.ghostRaceTitle != nil &&
+            workoutManager.state == .running &&
+            workoutManager.ghostMapUpdatedAt.map {
+                Date().timeIntervalSince($0) >= -5 &&
+                Date().timeIntervalSince($0) < 18
+            } == true
+
+        if planned.count >= 2 || live.count >= 2 {
             Map {
                 if planned.count >= 2 {
                     MapPolyline(
@@ -4307,6 +4317,48 @@ private struct WatchRunWalkWorkoutPager: View {
                         WatchTheme.muted.opacity(0.55),
                         lineWidth: 3
                     )
+                }
+
+                if freshPositions,
+                   let runnerLatitude = workoutManager.ghostMapUserLatitude,
+                   let runnerLongitude = workoutManager.ghostMapUserLongitude,
+                   let ghostLatitude = workoutManager.ghostMapLatitude,
+                   let ghostLongitude = workoutManager.ghostMapLongitude {
+                    Annotation(
+                        ATHLTHLocalization.choose(
+                            english: "You", norwegian: "Du"
+                        ),
+                        coordinate: CLLocationCoordinate2D(
+                            latitude: runnerLatitude,
+                            longitude: runnerLongitude
+                        )
+                    ) {
+                        Image(systemName: "figure.run")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 23, height: 23)
+                            .background(
+                                Color(red: 0.16, green: 0.27, blue: 0.40),
+                                in: Circle()
+                            )
+                    }
+
+                    Annotation(
+                        "Ghost",
+                        coordinate: CLLocationCoordinate2D(
+                            latitude: ghostLatitude,
+                            longitude: ghostLongitude
+                        )
+                    ) {
+                        Image(systemName: "figure.run")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 23, height: 23)
+                            .background(
+                                Color(red: 0.79, green: 0.47, blue: 0.20),
+                                in: Circle()
+                            )
+                    }
                 }
 
                 if live.count >= 2 {
@@ -4319,13 +4371,26 @@ private struct WatchRunWalkWorkoutPager: View {
                     )
                 }
             }
-            .frame(height: 116)
+            .frame(height: workoutManager.ghostRaceTitle == nil ? 116 : 151)
             .clipShape(
                 RoundedRectangle(
                     cornerRadius: 15,
                     style: .continuous
                 )
             )
+            .overlay(alignment: .bottomLeading) {
+                if workoutManager.ghostRaceTitle != nil,
+                   !freshPositions {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Waiting for reliable GPS",
+                        norwegian: "Venter på god GPS"
+                    ))
+                    .font(.system(size: 9, weight: .semibold))
+                    .padding(6)
+                    .background(.regularMaterial, in: Capsule())
+                    .padding(6)
+                }
+            }
         }
     }
 
