@@ -195,6 +195,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     var ghostIsOffPlannedRoute: Bool {
         ghostRaceConfiguration != nil && ghostOffRoute
     }
+
+    /// Fixed Replay/Target Ghost has route geometry on the Watch. Cloud-based
+    /// Live Ghost uses a separate telemetry stream and must not show a
+    /// fabricated second map marker at an unavailable location.
+    var hasFixedGhostRace: Bool {
+        guard let ghostRaceConfiguration else { return false }
+        return ghostRaceConfiguration.points.count >= 2 &&
+            ghostRaceConfiguration.routeDistanceMeters > 0
+    }
     private var nextGhostDistanceAnnouncementMeters: Double?
     private var nextGhostTimeAnnouncementSeconds: TimeInterval?
     private var lastGhostAnnouncedLeadMeters: Double?
