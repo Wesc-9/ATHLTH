@@ -753,11 +753,18 @@ final class StrengthWorkoutStore: ObservableObject {
             in exercise:
                 StrengthExerciseLog
         ) -> [Effort] {
-            exercise.sets.flatMap {
+            // A historical dummy load on a timed hold must never produce
+            // a lifting PR, even when old sets still contain kilograms.
+            guard !exercise.exercise.isTimeOnlyBodyweightStrength,
+                  !StrengthCardioExercisePolicy.isCardio(exercise.exercise.name)
+            else { return [] }
+
+            return exercise.sets.flatMap {
                 set -> [Effort] in
 
-                guard
-                    set.countsTowardTrainingLoad
+                guard set.countsTowardTrainingLoad,
+                      set.recordsWeight != false,
+                      set.resolvedTargetKind == .reps
                 else {
                     return []
                 }
