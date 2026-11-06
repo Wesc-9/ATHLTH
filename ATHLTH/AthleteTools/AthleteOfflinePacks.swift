@@ -129,6 +129,30 @@ final class AthleteOfflinePackStore: ObservableObject {
                 } catch { if Task.isCancelled { throw CancellationError() }; pack.missingAssets += 1 }
             }
             }
+            if !includeMedia {
+                // Saving a fresh plan snapshot must not discard media already
+                // downloaded for the same plan.
+                let existing = folder.appendingPathComponent(
+                    plan.id.uuidString, isDirectory: true
+                )
+                let metadata = existing.appendingPathComponent("pack.json")
+                if let data = try? Data(contentsOf: metadata),
+                   let previous = try? JSONDecoder().decode(
+                    AthleteOfflinePack.self, from: data
+                   ) {
+                    for assetID in Set(previous.mapRouteIDs + previous.exerciseImageIDs) {
+                        let name = assetID.uuidString + ".png"
+                        let source = existing.appendingPathComponent(name)
+                        let target = temporary.appendingPathComponent(name)
+                        if FileManager.default.fileExists(atPath: source.path) {
+                            try FileManager.default.copyItem(at: source, to: target)
+                        }
+                    }
+                    pack.mapRouteIDs = previous.mapRouteIDs
+                    pack.exerciseImageIDs = previous.exerciseImageIDs
+                    pack.missingAssets = previous.missingAssets
+                }
+            }
             try Task.checkCancellation()
             try JSONEncoder().encode(pack).write(to: temporary.appendingPathComponent("pack.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             let destination = folder.appendingPathComponent(plan.id.uuidString)
