@@ -6369,28 +6369,39 @@ struct ATHLTHTrainView: View {
                 // Retain the prepared catalog and plan state across quick
                 // Today/Plan/tab transitions. On account switch a new owner
                 // gets a full refresh rather than another owner's cache.
+                // Resolve navigation first so the selected tab can render
+                // before expensive plan reconciliation and catalog refresh.
+                handleNavigationRequest()
                 if preparedTrainUserID != session.profile.userID {
+                    let userID = session.profile.userID
+                    // Yield the first Train frame to SwiftUI on cold entry.
+                    try? await Task.sleep(for: .milliseconds(160))
+                    guard !Task.isCancelled, isActive,
+                          session.profile.userID == userID else { return }
                     session.refreshActivePlanForToday()
                     session.reconcilePlanLinkedPhoneWorkouts(
                         phoneWorkout.history, healthWorkouts: health.workouts
                     )
-                    // Route immediately. Opening Plan or a scheduled session
-                    // must not wait for the exercise catalog's network load.
-                    handleNavigationRequest()
                     await exerciseLibrary.refresh()
-                    guard !Task.isCancelled else { return }
-                    preparedTrainUserID = session.profile.userID
+                    guard !Task.isCancelled, isActive,
+                          session.profile.userID == userID else { return }
+                    preparedTrainUserID = userID
                 } else {
                     refreshTrainDayIfChanged()
-                    handleNavigationRequest()
+                    // Catch changes received while Train was off-screen.
+                    session.reconcilePlanLinkedPhoneWorkouts(
+                        phoneWorkout.history, healthWorkouts: health.workouts
+                    )
                 }
             }
             .onReceive(phoneWorkout.$history) { history in
+                guard isActive, preparedTrainUserID == session.profile.userID else { return }
                 session.reconcilePlanLinkedPhoneWorkouts(
                     history, healthWorkouts: health.workouts
                 )
             }
             .onReceive(health.$workouts) { workouts in
+                guard isActive, preparedTrainUserID == session.profile.userID else { return }
                 session.reconcilePlanLinkedPhoneWorkouts(
                     phoneWorkout.history, healthWorkouts: workouts
                 )
@@ -6427,11 +6438,9 @@ struct ATHLTHTrainView: View {
                     refreshTrainDayIfChanged()
                     return
                 }
-                // Reset *only* the viewport on leaving Train. Drafts,
-                // plan edits and any active workout remain untouched.
-                todayScrollPosition.scrollTo(edge: .top)
-                planScrollPosition.scrollTo(edge: .top)
-                progressScrollPosition.scrollTo(edge: .top)
+                // Preserve the viewport when leaving Train. Resetting three
+                // ScrollPositions during a tab transition can force layout
+                // work on the main thread and cause a visible hitch.
             }
             .alert("ATHLTH", isPresented: Binding(
                 get: {
