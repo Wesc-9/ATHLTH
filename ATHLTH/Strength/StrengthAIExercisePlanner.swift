@@ -351,293 +351,264 @@ struct StrengthAIExercisePlannerView: View {
     }
 
     private var introCard: some View {
-        ATHLTHCard {
-            HStack(
-                alignment: .top,
-                spacing: 12
-            ) {
-                Image(
-                    systemName:
-                        "sparkles"
-                )
-                .font(
-                    .title2.weight(
-                        .semibold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .premiumGold
-                )
-                .frame(
-                    width: 42,
-                    height: 42
-                )
-                .background(
-                    ATHLTHTheme
-                        .premiumGold
-                        .opacity(0.12),
-                    in: Circle()
-                )
+        VStack(alignment: .leading, spacing: 15) {
+            HStack(alignment: .center, spacing: 13) {
+                Image(systemName: "sparkles")
+                    .font(.title2)
+                    .foregroundStyle(accent)
+                    .frame(width: 45, height: 45)
+                    .background(canvas, in: RoundedRectangle(cornerRadius: 13))
 
-                VStack(
-                    alignment: .leading,
-                    spacing: 5
-                ) {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Let ATHLTH build this session",
-                            norwegian:
-                                "La ATHLTH bygge økten"
-                        )
-                    )
-                    .font(
-                        .headline.weight(
-                            .bold
-                        )
-                    )
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Build a workout with ATHLTH",
+                        norwegian: "La ATHLTH bygge økten"
+                    ))
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(ink)
 
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "AI only chooses exercises that already exist in your ATHLTH library. You review everything before it is added.",
-                            norwegian:
-                                "AI velger kun øvelser som allerede finnes i ATHLTH-biblioteket. Du ser gjennom alt før det legges til."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(
-                        .secondary
-                    )
+                    Text(ATHLTHLocalization.choose(
+                        english: "Only exercises already in the library you select.",
+                        norwegian: "Kun øvelser som finnes i biblioteket du velger."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                 }
             }
+
+            Divider().overlay(separator)
+
+            HStack(spacing: 10) {
+                Label(
+                    sourceFilter.title,
+                    systemImage: "books.vertical"
+                )
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ink)
+                Spacer(minLength: 4)
+                Button {
+                    showingLibrary = true
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Open library", norwegian: "Åpne bibliotek"
+                        ),
+                        systemImage: "arrow.up.right"
+                    )
+                    .font(.subheadline.weight(.medium))
+                }
+                .buttonStyle(.plain)
+                .tint(accent)
+            }
         }
+        .padding(20)
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(separator))
     }
 
     private var setupCard: some View {
-        ATHLTHCard {
-            VStack(spacing: 14) {
-                settingsRow(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Goal",
-                            norwegian: "Mål"
-                        )
-                ) {
-                    Picker(
-                        "",
-                        selection: $goal
-                    ) {
-                        ForEach(
-                            StrengthAIWorkoutGoal
-                                .allCases
-                        ) {
-                            option in
+        VStack(alignment: .leading, spacing: 18) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Set up your workout", norwegian: "Tilpass økten"
+                ))
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(ink)
 
-                            Text(
-                                option.title
-                            )
-                            .tag(option)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                }
+                Text(ATHLTHLocalization.choose(
+                    english: "Choose the criteria. Review every exercise before adding it.",
+                    norwegian: "Velg kriterier. Du godkjenner alle øvelsene før de legges til."
+                ))
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
 
-                Divider()
+            VStack(alignment: .leading, spacing: 9) {
+                Text(ATHLTHLocalization.choose(
+                    english: "EXERCISE SOURCE", norwegian: "ØVELSESKILDE"
+                ))
+                .font(.caption.weight(.semibold))
+                .tracking(0.8)
+                .foregroundStyle(.secondary)
 
-                settingsRow(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Time",
-                            norwegian: "Tid"
-                        )
-                ) {
-                    Picker(
-                        "",
-                        selection:
-                            $durationMinutes
-                    ) {
-                        ForEach(
-                            [20, 30, 45, 60, 75],
-                            id: \.self
-                        ) {
-                            value in
-
-                            Text(
-                                "\(value) min"
-                            )
-                            .tag(value)
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                }
-
-                Divider()
-
-                settingsRow(
-                    title:
-                        ATHLTHLocalization.choose(
-                            english: "Focus",
-                            norwegian: "Fokus"
-                        )
-                ) {
-                    Menu {
-                        Button(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Automatic",
-                                norwegian:
-                                    "Automatisk"
-                            )
-                        ) {
-                            focusBodyPart =
-                                nil
-                        }
-
-                        Divider()
-
-                        ForEach(
-                            availableBodyParts,
-                            id: \.self
-                        ) {
-                            part in
-
-                            Button(
-                                exerciseLibrary
-                                    .localizedBodyPartTitle(
-                                        part
-                                    )
-                            ) {
-                                focusBodyPart =
-                                    part
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 5) {
-                            Text(
-                                focusBodyPart
-                                    .map {
-                                        exerciseLibrary
-                                            .localizedBodyPartTitle(
-                                                $0
-                                            )
-                                    } ??
-                                ATHLTHLocalization.choose(
-                                    english:
-                                        "Automatic",
-                                    norwegian:
-                                        "Automatisk"
-                                )
-                            )
-
-                            Image(
-                                systemName:
-                                    "chevron.up.chevron.down"
-                            )
-                            .font(.caption2)
-                        }
+                Picker(ATHLTHLocalization.choose(
+                    english: "Exercise source", norwegian: "Velg øvelseskilde"
+                ), selection: $sourceFilter) {
+                    ForEach(StrengthAIExerciseSourceFilter.allCases) { item in
+                        Text(item.title).tag(item)
                     }
                 }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("athlth-ai-library-source")
+            }
 
-                Divider()
+            Divider()
 
-                Stepper(
-                    value: $exerciseCount,
-                    in: 1...8
-                ) {
-                    HStack {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Exercises",
-                                norwegian:
-                                    "Øvelser"
-                            )
-                        )
-                        .font(
-                            .subheadline
-                                .weight(
-                                    .semibold
-                                )
-                        )
-
-                        Spacer()
-
-                        Text(
-                            "\(exerciseCount)"
-                        )
-                        .foregroundStyle(
-                            .secondary
-                        )
+            settingsRow(title: ATHLTHLocalization.choose(
+                english: "Goal", norwegian: "Mål"
+            )) {
+                Picker("", selection: $goal) {
+                    ForEach(StrengthAIWorkoutGoal.allCases) { option in
+                        Text(option.title).tag(option)
                     }
                 }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .tint(ink)
+            }
 
-                Divider()
+            Divider()
 
-                Toggle(
-                    isOn: $personalize
-                ) {
-                    VStack(
-                        alignment: .leading,
-                        spacing: 3
-                    ) {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Use ATHLTH history",
-                                norwegian:
-                                    "Bruk ATHLTH-historikk"
-                            )
-                        )
-                        .font(
-                            .subheadline
-                                .weight(
-                                    .semibold
-                                )
-                        )
-
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english:
-                                    "Uses your recent strength exercise and muscle-group history to reduce unnecessary repetition.",
-                                norwegian:
-                                    "Bruker nylige styrkeøvelser og muskelgrupper for å unngå unødvendig gjentakelse."
-                            )
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(
-                            .secondary
-                        )
+            settingsRow(title: ATHLTHLocalization.choose(
+                english: "Time", norwegian: "Tid"
+            )) {
+                Picker("", selection: $durationMinutes) {
+                    ForEach([20, 30, 45, 60, 75], id: \.self) { value in
+                        Text("\(value) min").tag(value)
                     }
                 }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .tint(ink)
+            }
 
-                if !existingExercises
-                    .isEmpty {
+            Divider()
+
+            settingsRow(title: ATHLTHLocalization.choose(
+                english: "Focus", norwegian: "Fokus"
+            )) {
+                Menu {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Whole body", norwegian: "Hele kroppen"
+                    )) { focusBodyPart = nil }
+
                     Divider()
 
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "AI will complement the exercises you already selected, not replace them.",
-                            norwegian:
-                                "AI supplerer øvelsene du allerede har valgt, og erstatter dem ikke."
-                        )
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(
-                        .secondary
-                    )
-                    .frame(
-                        maxWidth:
-                            .infinity,
-                        alignment: .leading
-                    )
+                    ForEach(availableBodyParts, id: \.self) { part in
+                        Button(exerciseLibrary.localizedBodyPartTitle(part)) {
+                            focusBodyPart = part
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(focusBodyPart.map {
+                            exerciseLibrary.localizedBodyPartTitle($0)
+                        } ?? ATHLTHLocalization.choose(
+                            english: "Whole body", norwegian: "Hele kroppen"
+                        ))
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(ink)
                 }
             }
+
+            Divider()
+
+            settingsRow(title: ATHLTHLocalization.choose(
+                english: "Equipment", norwegian: "Utstyr"
+            )) {
+                Menu {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Any equipment", norwegian: "Alt utstyr"
+                    )) { equipmentFilter = nil }
+
+                    Divider()
+
+                    ForEach(availableEquipment, id: \.self) { equipment in
+                        Button(exerciseLibrary.localizedEquipmentTitle(equipment)) {
+                            equipmentFilter = equipment
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Text(equipmentFilter.map {
+                            exerciseLibrary.localizedEquipmentTitle($0)
+                        } ?? ATHLTHLocalization.choose(
+                            english: "Any equipment", norwegian: "Alt utstyr"
+                        ))
+                        .lineLimit(1)
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.caption)
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(ink)
+                }
+            }
+
+            Divider()
+
+            Stepper(value: $exerciseCount, in: 1...8) {
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Exercises", norwegian: "Antall øvelser"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text("\(exerciseCount)")
+                        .monospacedDigit()
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ink)
+                }
+            }
+            .tint(ink)
+
+            Divider()
+
+            Toggle(isOn: $personalize) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Consider training history",
+                        norwegian: "Ta hensyn til treningshistorikk"
+                    ))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Use recently trained exercises and muscle groups to vary the selection.",
+                        norwegian: "Bruk tidligere øvelser og muskelgrupper for å unngå unødvendig gjentakelse."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .tint(ink)
+
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: hasEnoughExercises
+                      ? "checkmark.seal" : "exclamationmark.circle")
+                    .foregroundStyle(hasEnoughExercises ? accent : Color.orange)
+                Text(hasEnoughExercises
+                     ? ATHLTHLocalization.choose(
+                        english: "\(candidateEntries.count) compatible library exercises available.",
+                        norwegian: "\(candidateEntries.count) passende øvelser tilgjengelig i biblioteket."
+                     )
+                     : ATHLTHLocalization.choose(
+                        english: "Found \(candidateEntries.count) matching exercises, but you requested \(exerciseCount). Reduce the count, change the focus/equipment or add exercises.",
+                        norwegian: "Fant \(candidateEntries.count) passende øvelser, men du har valgt \(exerciseCount). Reduser antallet, endre fokus/utstyr eller legg til øvelser."
+                     ))
+                    .font(.caption)
+                    .foregroundStyle(ink)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(13)
+            .background(canvas, in: RoundedRectangle(cornerRadius: 13))
+
+            if !existingExercises.isEmpty {
+                Text(ATHLTHLocalization.choose(
+                    english: "The suggestion adds to your existing exercises; it does not replace them.",
+                    norwegian: "Forslaget supplerer øvelsene som allerede ligger i økten."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
         }
+        .padding(20)
+        .background(.white, in: RoundedRectangle(cornerRadius: 22))
+        .overlay(RoundedRectangle(cornerRadius: 22).stroke(separator))
     }
 
     private var resultCard: some View {
