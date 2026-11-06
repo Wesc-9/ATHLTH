@@ -1015,7 +1015,7 @@ struct PlannedWorkoutMeetingPoint: Codable, Hashable {
 /// The workout's private, user-selected training location; separate from
 /// Train Together meeting points, which require an explicit shared pin.
 enum ATHLTHTrainingPlaceKind: String, Codable, CaseIterable, Identifiable {
-    case gym, hotel, sportsGround, address, other
+    case gym, hotel, park, school, athleticsTrack, sportsGround, address, other
 
     var id: String { rawValue }
 
@@ -1023,6 +1023,9 @@ enum ATHLTHTrainingPlaceKind: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .gym: return ATHLTHLocalization.choose(english: "Gym", norwegian: "Treningssenter")
         case .hotel: return ATHLTHLocalization.choose(english: "Hotel", norwegian: "Hotell")
+        case .park: return ATHLTHLocalization.choose(english: "Park", norwegian: "Park")
+        case .school: return ATHLTHLocalization.choose(english: "School", norwegian: "Skole")
+        case .athleticsTrack: return ATHLTHLocalization.choose(english: "Athletics track", norwegian: "Friidrettsanlegg")
         case .sportsGround: return ATHLTHLocalization.choose(english: "Sports ground", norwegian: "Idrettsanlegg")
         case .address: return ATHLTHLocalization.choose(english: "Address", norwegian: "Adresse")
         case .other: return ATHLTHLocalization.choose(english: "Other", norwegian: "Annet sted")
@@ -1033,6 +1036,9 @@ enum ATHLTHTrainingPlaceKind: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .gym: return "dumbbell.fill"
         case .hotel: return "building.2"
+        case .park: return "leaf"
+        case .school: return "building.2.crop.circle"
+        case .athleticsTrack: return "figure.run"
         case .sportsGround: return "sportscourt"
         case .address: return "mappin"
         case .other: return "location"
