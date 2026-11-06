@@ -39,6 +39,7 @@ struct ActiveStrengthWorkoutView: View {
     @State private var showingExerciseGroupBuilder = false
     @State private var showingExerciseRestEditor = false
     @State private var showingPlateCalculator = false
+    @State private var editingBarMass: StrengthBarMassEditTarget?
     @StateObject private var strengthCoach =
         StrengthAudioCoachSpeaker()
     @State private var restCueTask:
@@ -474,6 +475,22 @@ struct ActiveStrengthWorkoutView: View {
                         }
                     }
                 )
+            }
+            .sheet(item: $editingBarMass) { edit in
+                StrengthBarMassEditor(
+                    initialKilograms: edit.kilograms
+                ) { kilograms, remember in
+                    if remember {
+                        _ = strength.rememberBarWeightForExercise(
+                            edit.exerciseID, kilograms: kilograms
+                        )
+                    } else {
+                        _ = strength.setActiveExerciseBarWeight(
+                            edit.exerciseID, kilograms: kilograms
+                        )
+                    }
+                }
+                .presentationDetents([.height(350)])
             }
             .sheet(isPresented: $showingFinishConfirmation) {
                 strengthFinishConfirmationSheet
@@ -5779,16 +5796,35 @@ struct ActiveStrengthWorkoutView: View {
                     if StrengthBarbellExercisePolicy.usesBar(exercise),
                        currentStrengthLoadKind == .weightKilograms {
                         Menu {
-                            ForEach([0.0, 5.0, 10.0, 15.0, 20.0, 25.0],
-                                    id: \.self) { mass in
-                                Button(String(format: "%.0f kg", mass)) {
+                            Button {
+                                editingBarMass = StrengthBarMassEditTarget(
+                                    exerciseID: exercise.id,
+                                    kilograms: exercise.barWeightKilograms ??
+                                        strength.suggestedBarWeight(for: exercise)
+                                )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Custom bar weight",
+                                        norwegian: "Egendefinert stangvekt"
+                                    ),
+                                    systemImage: "pencil"
+                                )
+                            }
+                            Divider()
+                            ForEach(
+                                StrengthBarWeightPreferences.supportedMasses,
+                                id: \.self
+                            ) { mass in
+                                Button(String(format: "%g kg", mass)) {
                                     _ = strength.setActiveExerciseBarWeight(
                                         exercise.id, kilograms: mass
                                     )
                                 }
                             }
                         } label: {
-                            Label(String(format: "%g kg", exercise.barWeightKilograms ?? 20),
+                            Label(String(format: "%g kg", exercise.barWeightKilograms ??
+                                strength.suggestedBarWeight(for: exercise)),
                                   systemImage: "scalemass")
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
@@ -6210,16 +6246,42 @@ struct ActiveStrengthWorkoutView: View {
                         }
                         Spacer()
                         Menu {
-                            Button(ATHLTHLocalization.choose(
-                                english: "Not set", norwegian: "Ikke valgt"
-                            )) {
-                                _ = strength.setActiveExerciseBarWeight(
-                                    active.id, kilograms: nil
+                            Button {
+                                editingBarMass = StrengthBarMassEditTarget(
+                                    exerciseID: active.id,
+                                    kilograms: active.barWeightKilograms ??
+                                        strength.suggestedBarWeight(for: active)
+                                )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Enter bar weight",
+                                        norwegian: "Angi stangvekt"
+                                    ),
+                                    systemImage: "pencil"
                                 )
                             }
-                            ForEach([0.0, 5.0, 10.0, 15.0, 20.0, 25.0],
-                                    id: \.self) { kg in
-                                Button(String(format: "%.0f kg", kg)) {
+                            Button {
+                                _ = strength.rememberBarWeightForExercise(
+                                    active.id,
+                                    kilograms: active.barWeightKilograms ??
+                                        strength.suggestedBarWeight(for: active)
+                                )
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Save as exercise default",
+                                        norwegian: "Lagre som standard for øvelsen"
+                                    ),
+                                    systemImage: "bookmark"
+                                )
+                            }
+                            Divider()
+                            ForEach(
+                                StrengthBarWeightPreferences.supportedMasses,
+                                id: \.self
+                            ) { kg in
+                                Button(String(format: "%g kg", kg)) {
                                     _ = strength.setActiveExerciseBarWeight(
                                         active.id, kilograms: kg
                                     )
@@ -6229,7 +6291,8 @@ struct ActiveStrengthWorkoutView: View {
                             HStack(spacing: 5) {
                                 Text(String(
                                     format: "%.0f kg",
-                                    active.barWeightKilograms ?? 20
+                                    active.barWeightKilograms ??
+                                        strength.suggestedBarWeight(for: active)
                                 ))
                                 Image(systemName: "chevron.up.chevron.down")
                             }
@@ -12630,6 +12693,73 @@ private struct StrengthActiveExerciseQueueView: View {
                 english: "An exercise with completed sets or a running timed set cannot be deleted. Finish the active timer before removing an unrecorded exercise.",
                 norwegian: "Øvelser med fullførte sett eller et pågående tidssett kan ikke slettes. Avslutt tidtakingen før du fjerner en øvelse uten registrerte sett."
             ))
+        }
+    }
+}
+
+private struct StrengthBarMassEditTarget: Identifiable {
+    let exerciseID: UUID
+    let kilograms: Double
+    var id: UUID { exerciseID }
+}
+
+private struct StrengthBarMassEditor: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var kilograms: Double
+    @State private var remember = false
+    let onSave: (Double, Bool) -> Void
+
+    init(
+        initialKilograms: Double,
+        onSave: @escaping (Double, Bool) -> Void
+    ) {
+        _kilograms = State(initialValue: initialKilograms)
+        self.onSave = onSave
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    HStack(spacing: 9) {
+                        StrengthClearableNumericField(
+                            value: $kilograms, allowsDecimal: true
+                        )
+                        Text("kg")
+                    }
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Remember for this exercise",
+                            norwegian: "Husk som standard for denne øvelsen"
+                        ),
+                        isOn: $remember
+                    )
+                    Text(ATHLTHLocalization.choose(
+                        english: "The value is already part of total weight. No additional kilograms are added to volume.",
+                        norwegian: "Vekten er inkludert i totalvekten. Den legges ikke til på nytt i treningsvolumet."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+            }
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Bar weight", norwegian: "Stangvekt"
+            ))
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Save", norwegian: "Lagre"
+                    )) {
+                        onSave(min(max(kilograms, 0), 40), remember)
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
+                }
+            }
         }
     }
 }
