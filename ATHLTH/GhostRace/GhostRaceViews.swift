@@ -185,6 +185,8 @@ struct GhostRaceHubView: View {
     @State private var errorMessage: String?
     @State private var captureDevice:
         WorkoutCaptureDevice = .iPhone
+    @State private var shareWithOwnIPad = false
+    @State private var remoteOwnGhostStatus: ATHLTHPrivateGhostSpectatorSnapshot?
 
     private var canStartRace: Bool {
         switch captureDevice {
@@ -208,6 +210,19 @@ struct GhostRaceHubView: View {
                 hero
                 modeOverview
                 ghostExperiencePicker
+
+                if ATHLTHDeviceRole.isIPad,
+                   let remoteOwnGhostStatus,
+                   remoteOwnGhostStatus.isFresh() {
+                    ATHLTHStudioPrivateGhostSpectatorCard(
+                        snapshot: remoteOwnGhostStatus
+                    )
+                }
+
+                if !ATHLTHDeviceRole.isIPad,
+                   selectedMode != .live, session.signedIn {
+                    ownIPadSpectatorSettings
+                }
                 modeContent
                 if selectedMode != .target && advancedMode {
                     workoutDeviceCard
@@ -234,6 +249,24 @@ struct GhostRaceHubView: View {
         )
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: session.profile.userID) {
+            if ATHLTHDeviceRole.isIPad {
+                while !Task.isCancelled {
+                    remoteOwnGhostStatus = session.signedIn
+                        ? await ATHLTHPrivateGhostSpectatorStore.fetch(
+                            for: session.profile.userID
+                        )
+                        : nil
+                    try? await Task.sleep(
+                        for: .seconds(remoteOwnGhostStatus == nil ? 8 : 3)
+                    )
+                }
+            } else {
+                shareWithOwnIPad = ATHLTHPrivateGhostSpectatorStore.isEnabled(
+                    for: session.profile.userID
+                )
+            }
+        }
         .task {
             loadReplayFavorites()
             async let runs: Void =
@@ -403,6 +436,42 @@ struct GhostRaceHubView: View {
                 .stroke(Color.white.opacity(0.86), lineWidth: 1)
         }
         .accessibilityElement(children: .combine)
+    }
+
+    private var ownIPadSpectatorSettings: some View {
+        ATHLTHUnifiedCard {
+            Toggle(isOn: Binding(
+                get: { shareWithOwnIPad },
+                set: { enabled in
+                    shareWithOwnIPad = enabled
+                    ATHLTHPrivateGhostSpectatorStore.setEnabled(
+                        enabled, for: session.profile.userID
+                    )
+                }
+            )) {
+                VStack(alignment: .leading, spacing: 5) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Show this Ghost Race live on my iPad",
+                            norwegian: "Vis dette Ghost Race-løpet direkte på iPad"
+                        ),
+                        systemImage: "ipad.landscape"
+                    )
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.primaryText)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Optional, private same-account sync. A sampled course and two current positions are relayed for up to 65 seconds after the last update. Never shared with clubs or followers.",
+                        norwegian: "Valgfri, privat synk mellom dine innloggede enheter. Et forenklet løypekart og de to posisjonene deles midlertidig. Ingenting deles med klubber eller følgere."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .tint(ATHLTHTheme.accentDeep)
+            .accessibilityIdentifier("ghost-private-ipad-spectator-opt-in")
+        }
     }
 
     private var workoutDeviceCard: some View {
