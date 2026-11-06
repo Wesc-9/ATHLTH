@@ -909,84 +909,59 @@ struct StrengthAIExercisePlannerView: View {
     }
 
     private var generateButton: some View {
-        Button {
-            generate()
-        } label: {
-            HStack(spacing: 9) {
-                if isGenerating {
-                    ProgressView()
-                        .tint(.white)
-                } else {
-                    Image(
-                        systemName:
-                            "sparkles"
+        VStack(spacing: 12) {
+            Button {
+                generate()
+            } label: {
+                HStack(spacing: 10) {
+                    if isGenerating {
+                        ProgressView()
+                            .tint(.white)
+                    } else {
+                        Image(systemName: "sparkles")
+                    }
+                    Text(
+                        plan == nil
+                            ? ATHLTHLocalization.choose(
+                                english: "Build my workout", norwegian: "Bygg øktforslag"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Generate another", norwegian: "Lag et nytt forslag"
+                            )
                     )
                 }
-
-                Text(
-                    plan == nil
-                        ? ATHLTHLocalization.choose(
-                            english:
-                                "Generate exercises",
-                            norwegian:
-                                "Foreslå øvelser"
-                        )
-                        : ATHLTHLocalization.choose(
-                            english:
-                                "Generate another",
-                            norwegian:
-                                "Lag et nytt forslag"
-                        )
+                .font(.headline)
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 54)
+                .background(
+                    ink,
+                    in: RoundedRectangle(cornerRadius: 15)
                 )
             }
-            .font(
-                .headline.weight(
-                    .semibold
-                )
-            )
-            .foregroundStyle(
-                .white
-            )
-            .frame(
-                maxWidth: .infinity
-            )
-            .frame(height: 50)
-            .background(
-                LinearGradient(
-                    colors: [
-                        ATHLTHTheme
-                            .accentDeep,
-                        ATHLTHTheme
-                            .premiumGold
-                    ],
-                    startPoint:
-                        .leading,
-                    endPoint:
-                        .trailing
-                ),
-                in:
-                    RoundedRectangle(
-                        cornerRadius: 16,
-                        style:
-                            .continuous
+            .buttonStyle(.plain)
+            .disabled(isGenerating || !hasEnoughExercises)
+            .opacity(isGenerating ? 0.72 : 1)
+            .accessibilityIdentifier("athlth-ai-build-from-library")
+
+            if plan != nil && !quickSuggestion {
+                Button {
+                    editedSuggestions = []
+                    plan = nil
+                    errorMessage = nil
+                } label: {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Adjust criteria", norwegian: "Juster kriterier"
+                        ),
+                        systemImage: "slider.horizontal.3"
                     )
-            )
+                    .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(ink)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(
-            isGenerating ||
-            candidateEntries
-                .count <
-                min(
-                    quickSuggestion ? 1 : exerciseCount,
-                    1
-                )
-        )
-        .opacity(
-            isGenerating
-                ? 0.76
-                : 1
-        )
     }
 
     private func settingsRow<Content: View>(
