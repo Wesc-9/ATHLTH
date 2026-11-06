@@ -56,6 +56,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var ghostMapLatitude: Double?
     @Published private(set) var ghostMapLongitude: Double?
     @Published private(set) var ghostMapRevision = 0
+    @Published private(set) var ghostMapUpdatedAt: Date?
     @Published private(set) var lapCount = 0
     @Published private(set) var currentLapElapsedTime: TimeInterval = 0
     @Published private(set) var currentLapDistanceMeters: Double = 0
@@ -705,6 +706,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.ghostMapLatitude = nil
             self.ghostMapLongitude = nil
             self.ghostMapRevision = 0
+            self.ghostMapUpdatedAt = nil
             self.ghostComparisonUpdatedAt = nil
         }
 
@@ -3811,6 +3813,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.ghostMapLatitude = nil
             self.ghostMapLongitude = nil
             self.ghostMapRevision = 0
+            self.ghostMapUpdatedAt = nil
             self.ghostComparisonUpdatedAt = nil
         }
 
@@ -5602,6 +5605,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 ghostLocation.coordinate.latitude
             self.ghostMapLongitude =
                 ghostLocation.coordinate.longitude
+            self.ghostMapUpdatedAt = now
             self.ghostMapRevision &+= 1
         }
     }
