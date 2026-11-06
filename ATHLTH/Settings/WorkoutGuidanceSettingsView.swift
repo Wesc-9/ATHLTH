@@ -351,6 +351,36 @@ struct ATHLTHRouteGuardianSettingsView: View {
             .font(.system(size: 19, weight: .semibold, design: .serif))
             .foregroundStyle(ATHLTHPlanDesign.ink)
     }
+
+    private func routePreset(
+        _ title: String, distance: Double, grace: Int
+    ) -> some View {
+        let selected = settings.routeAlertsEnabled &&
+            settings.routeAlertDeviationMeters == distance &&
+            settings.routeAlertGraceSeconds == grace
+        return Button {
+            settings.routeAlertDeviationMeters = distance
+            settings.routeAlertGraceSeconds = grace
+            settings.routeAlertsEnabled = true
+        } label: {
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text("\(Int(distance)) m · \(grace) s")
+                    .font(.caption)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .background(
+                selected
+                    ? Color(red: 0.20, green: 0.21, blue: 0.24)
+                    : Color(red: 0.95, green: 0.95, blue: 0.94),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
 }
 
 private enum GhostRaceUpdatePreset:
@@ -390,35 +420,7 @@ private enum GhostRaceUpdatePreset:
         }
     }
 
-    private func routePreset(
-        _ title: String, distance: Double, grace: Int
-    ) -> some View {
-        let selected = settings.routeAlertsEnabled &&
-            settings.routeAlertDeviationMeters == distance &&
-            settings.routeAlertGraceSeconds == grace
-        return Button {
-            settings.routeAlertDeviationMeters = distance
-            settings.routeAlertGraceSeconds = grace
-            settings.routeAlertsEnabled = true
-        } label: {
-            VStack(spacing: 6) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                Text("\(Int(distance)) m · \(grace) s")
-                    .font(.caption)
-            }
-            .frame(maxWidth: .infinity, minHeight: 58)
-            .foregroundStyle(selected ? Color.white : Color.primary)
-            .background(
-                selected
-                    ? Color(red: 0.20, green: 0.21, blue: 0.24)
-                    : Color(red: 0.95, green: 0.95, blue: 0.94),
-                in: RoundedRectangle(cornerRadius: 14)
-            )
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
+
 }
 
 struct ATHLTHGhostUpdatesSettingsView: View {
