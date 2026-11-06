@@ -707,7 +707,7 @@ struct ATHLTHGuidancePrioritySettingsView: View {
                 )
 
                 Text(
-                    "These master switches control Route Guardian, target and Ghost alerts. Routine Audio Coach has its own on/off setting."
+                    "These master switches control Navigation, target and Ghost alerts. Routine Audio Coach has its own on/off setting."
                 )
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -716,7 +716,7 @@ struct ATHLTHGuidancePrioritySettingsView: View {
             Section("Priority order") {
                 priorityRow(
                     "1",
-                    "Route Guardian",
+                    ATHLTHLocalization.choose(english: "Navigation", norwegian: "Navigasjon"),
                     "Off-route and return-to-route"
                 )
                 priorityRow(
