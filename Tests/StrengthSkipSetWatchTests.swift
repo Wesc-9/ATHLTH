@@ -82,4 +82,90 @@ final class StrengthSkipSetWatchTests: XCTestCase {
             captureDevice: .appleWatch, inputMode: .both
         ))
     }
+    @MainActor
+    func testSixInchHoldUsesUnweightedOpenEndedStopwatch() {
+        var hold = exercise()
+        hold.name = "Six Inch Hold"
+        hold.equipment = ["Bodyweight"]
+        XCTAssertEqual(hold.snapshot.defaultStrengthTargetKind, .time)
+        XCTAssertTrue(hold.snapshot.isTimeOnlyBodyweightStrength)
+
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
+        store.appendExercise(
+            hold, sets: 1, reps: nil, targetKind: .time,
+            targetDurationSeconds: nil, restSeconds: 0,
+            openEndedTime: true
+        )
+
+        XCTAssertEqual(store.currentSet?.targetKind, .time)
+        XCTAssertNil(store.currentSet?.plannedDurationSeconds)
+        XCTAssertEqual(store.currentSet?.recordsWeight, false)
+        XCTAssertEqual(store.watchSnapshot?.isOpenEndedTimedSet, true)
+
+        store.startOrResumeTimedSet(at: Date(timeIntervalSinceNow: -11))
+        XCTAssertNotNil(store.currentSetEffortClock)
+        XCTAssertNil(store.currentTimedSetCountdown)
+        store.completeCurrentDraftSet()
+        XCTAssertEqual(store.activeWorkout?.totalVolumeKilograms, 0)
+        XCTAssertGreaterThanOrEqual(
+            store.currentSet?.completedDurationSeconds ?? 0, 10
+        )
+    }
+
+    @MainActor
+    func testDynamicPlankRemainsRepBasedAndHistoryIsNotReinterpreted() {
+        var dynamic = exercise()
+        dynamic.name = "Plank Shoulder Taps"
+        dynamic.equipment = ["Bodyweight"]
+        XCTAssertFalse(dynamic.snapshot.isTimeOnlyBodyweightStrength)
+        XCTAssertEqual(dynamic.snapshot.defaultStrengthTargetKind, .reps)
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        store.appendExercise(dynamic, sets: 1, reps: 12)
+        let original = try? XCTUnwrap(store.activeWorkout)
+        let repaired = StrengthTimedHistoryRepair.clean(original.map { [$0] } ?? [])
+        XCTAssertFalse(repaired.changed)
+    }
+
+    @MainActor
+    func testHistoricFalseCoreWeightIsNotTurnedIntoInventedTime() {
+        var hold = exercise()
+        hold.name = "Six Inch Hold"
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: nil, captureDevice: .iPhone)
+        store.appendExercise(hold, sets: 1, reps: 12)
+        guard var log = store.activeWorkout else {
+            return XCTFail("Expected active workout")
+        }
+        log.exercises[0].sets[0].completedAt = Date()
+        log.exercises[0].sets[0].completedReps = 12
+        log.exercises[0].sets[0].completedWeightKilograms = 20
+        log.exercises[0].sets[0].actualSetElapsedSeconds = nil
+        let removed = StrengthTimedHistoryRepair.clean([log])
+        XCTAssertTrue(removed.changed)
+        XCTAssertTrue(removed.history[0].exercises.isEmpty)
+
+        log.exercises[0].sets[0].actualSetElapsedSeconds = 42
+        let preserved = StrengthTimedHistoryRepair.clean([log])
+        XCTAssertTrue(preserved.changed)
+        XCTAssertEqual(
+            preserved.history[0].exercises[0].sets[0].completedDurationSeconds,
+            42
+        )
+        XCTAssertNil(preserved.history[0].exercises[0].sets[0].completedReps)
+        XCTAssertNil(
+            preserved.history[0].exercises[0].sets[0].completedWeightKilograms
+        )
+    }
+
+    func testStartSetCommandWorksWithBothDevicesAndIPhoneControlledDraft() {
+        XCTAssertTrue(ATHLTHStrengthWatchControlPolicy.permits(
+            .startSetEffort, whenIPhoneControls: true
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchControlPolicy.permits(
+            .updateDraft, whenIPhoneControls: true
+        ))
+    }
+
 }
