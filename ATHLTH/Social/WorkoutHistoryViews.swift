@@ -1511,7 +1511,8 @@ struct PostWorkoutReviewView: View {
                 log: completedStrengthLog,
                 personalRecords: completedStrengthLog.map {
                     strengthWorkoutStore.workoutPersonalRecords(for: $0)
-                } ?? []
+                } ?? [],
+                muscleProfile: completionMuscleProfile
             )
         } else {
             nonStrengthSummaryCard
