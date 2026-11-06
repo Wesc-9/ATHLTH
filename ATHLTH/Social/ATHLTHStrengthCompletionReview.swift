@@ -6,6 +6,7 @@ struct ATHLTHStrengthCompletionReview: View {
     let workout: SocialPublishableWorkout
     let log: StrengthWorkoutLog?
     let personalRecords: [StrengthWorkoutPersonalRecord]
+    let muscleProfile: StrengthMuscleProfile
 
     @State private var expandedExerciseIDs: Set<UUID> = []
 
@@ -23,8 +24,16 @@ struct ATHLTHStrengthCompletionReview: View {
         log?.exercises.filter { $0.sets.contains(where: \.isCompleted) } ?? []
     }
 
-    private var completedSets: [StrengthSetLog] {
-        completedExercises.flatMap(\.sets).filter(\.isCompleted)
+    private var liftingExercises: [StrengthExerciseLog] {
+        completedExercises.filter {
+            !StrengthCardioExercisePolicy.isCardio($0.exercise.name)
+        }
+    }
+
+    private var conditioningExercises: [StrengthExerciseLog] {
+        completedExercises.filter {
+            StrengthCardioExercisePolicy.isCardio($0.exercise.name)
+        }
     }
 
     private var completedCount: Int {
@@ -47,7 +56,9 @@ struct ATHLTHStrengthCompletionReview: View {
                 guard !item.exercise.isTimeOnlyBodyweightStrength,
                       !StrengthCardioExercisePolicy.isCardio(item.exercise.name)
                 else { return sum }
-                return sum + item.sets.reduce(0) {
+                return sum + item.sets.filter {
+                    $0.recordsWeight != false && $0.resolvedTargetKind == .reps
+                }.reduce(0) {
                     $0 + $1.volumeKilograms
                 }
             }
@@ -64,7 +75,11 @@ struct ATHLTHStrengthCompletionReview: View {
                         !StrengthCardioExercisePolicy.isCardio($0.exercise.name)
                 }
                 .flatMap(\.sets)
-                .filter { $0.countsTowardTrainingLoad && $0.resolvedTargetKind == .reps }
+                .filter {
+                    $0.countsTowardTrainingLoad &&
+                    $0.recordsWeight != false &&
+                    $0.resolvedTargetKind == .reps
+                }
                 .compactMap(\.completedWeightKilograms)
                 .filter { $0 > 0 }
                 .max()
@@ -77,10 +92,15 @@ struct ATHLTHStrengthCompletionReview: View {
             completionHero
             resultsCard
             if !personalRecords.isEmpty { recordsCard }
-            if workout.strengthCardioDurationSeconds != nil {
+            if workout.strengthCardioDurationSeconds != nil ||
+               !conditioningExercises.isEmpty ||
+               workout.strengthCardioExerciseCount != nil {
                 cardioCard
             }
             exerciseCard
+            if !muscleProfile.topActivations.isEmpty {
+                muscleFocusCard
+            }
             recoveryCard
         }
         .accessibilityElement(children: .contain)
@@ -188,7 +208,10 @@ struct ATHLTHStrengthCompletionReview: View {
             sectionTitle(tr("The session at a glance", "Økten i korte trekk"),
                          symbol: "chart.bar.xaxis")
 
-            HStack(alignment: .firstTextBaseline, spacing: 14) {
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: 11),
+                GridItem(.flexible(), spacing: 11)
+            ], spacing: 11) {
                 if let reps = log?.totalCompletedReps, reps > 0 {
                     smallResult(
                         tr("Repetitions", "Repetisjoner"),
@@ -292,7 +315,11 @@ struct ATHLTHStrengthCompletionReview: View {
             sectionTitle(tr("Conditioning in this workout",
                             "Kondisjon i styrkeøkten"), symbol: "figure.rower")
             HStack(alignment: .firstTextBaseline) {
-                Text(duration(Double(workout.strengthCardioDurationSeconds ?? 0)))
+                Text(
+                    workout.strengthCardioDurationSeconds.flatMap { $0 > 0 ? $0 : nil }
+                        .map { duration(Double($0)) }
+                        ?? "—"
+                )
                     .font(.system(size: 29, weight: .semibold, design: .rounded))
                     .foregroundStyle(ink)
                     .monospacedDigit()
@@ -308,6 +335,34 @@ struct ATHLTHStrengthCompletionReview: View {
                         .foregroundStyle(muted)
                 }
             }
+            if !conditioningExercises.isEmpty {
+                Divider().overlay(border)
+                ForEach(conditioningExercises) { exercise in
+                    let sets = exercise.sets.filter(\.isCompleted)
+                    let seconds = sets.compactMap { set -> Int? in
+                        if let value = set.resolvedCompletedDurationSeconds, value > 0 {
+                            return value
+                        }
+                        return set.actualSetElapsedSeconds.flatMap {
+                            $0.isFinite && $0 > 0 ? Int($0.rounded()) : nil
+                        }
+                    }.reduce(0, +)
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(exercise.exercise.displayName)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(ink)
+                        Spacer(minLength: 4)
+                        Text(
+                            "\(sets.count) " + tr("sets", "sett") +
+                            (seconds > 0 ? " · " + duration(Double(seconds)) : "")
+                        )
+                        .font(.caption)
+                        .foregroundStyle(muted)
+                        .multilineTextAlignment(.trailing)
+                    }
+                }
+            }
+
             Text(tr(
                 "Conditioning is shown separately and does not count toward strength tonnage or lifting records.",
                 "Kondisjonsdelen vises separat og teller ikke som styrkevolum eller løfterekord."
@@ -324,7 +379,7 @@ struct ATHLTHStrengthCompletionReview: View {
         VStack(alignment: .leading, spacing: 14) {
             sectionTitle(tr("Exercises performed", "Gjennomførte øvelser"),
                          symbol: "list.number")
-            if completedExercises.isEmpty {
+            if log == nil {
                 ForEach(
                     Array((workout.strengthPerformedExerciseSummaries ?? []).enumerated()),
                     id: \.offset
@@ -336,10 +391,14 @@ struct ATHLTHStrengthCompletionReview: View {
                         .padding(.vertical, 8)
                     Divider().overlay(border)
                 }
+            } else if liftingExercises.isEmpty {
+                Text(tr("No lifting exercises were logged.", "Ingen styrkeøvelser ble registrert."))
+                    .font(.subheadline)
+                    .foregroundStyle(muted)
             } else {
-                ForEach(Array(completedExercises.enumerated()), id: \.element.id) { index, exercise in
+                ForEach(Array(liftingExercises.enumerated()), id: \.element.id) { index, exercise in
                     exerciseRow(exercise, number: index + 1)
-                    if index < completedExercises.count - 1 {
+                    if index < liftingExercises.count - 1 {
                         Divider().overlay(border)
                     }
                 }
@@ -473,6 +532,61 @@ struct ATHLTHStrengthCompletionReview: View {
         }
         if let reps { return "\(reps) " + tr("reps", "reps") }
         return tr("Recorded", "Registrert")
+    }
+
+    private var muscleFocusCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            sectionTitle(tr("Muscle focus", "Muskelbelastning"),
+                         symbol: "figure.strengthtraining.traditional")
+
+            HStack(alignment: .center, spacing: 15) {
+                StrengthMuscleMapView(
+                    profile: muscleProfile,
+                    compact: true
+                )
+                .frame(width: 145, height: 173)
+                .accessibilityHidden(true)
+
+                VStack(alignment: .leading, spacing: 13) {
+                    ForEach(Array(muscleProfile.topActivations.prefix(3))) { activation in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(activation.region.activityDisplayTitle)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(ink)
+                                .lineLimit(2)
+                            GeometryReader { geometry in
+                                Capsule()
+                                    .fill(soft)
+                                    .overlay(alignment: .leading) {
+                                        Capsule()
+                                            .fill(bronze)
+                                            .frame(
+                                                width: max(
+                                                    0,
+                                                    geometry.size.width *
+                                                        muscleProfile.intensity(for: activation.region)
+                                                )
+                                            )
+                                    }
+                            }
+                            .frame(height: 6)
+                            .accessibilityHidden(true)
+                        }
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            Text(tr(
+                "Relative muscle focus estimated from logged exercises, not a direct physiological measurement.",
+                "Relativ muskelbelastning er anslått fra registrerte øvelser, ikke målt direkte i musklene."
+            ))
+            .font(.caption)
+            .foregroundStyle(muted)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(20)
+        .reviewSurface(border: border)
     }
 
     private var recoveryCard: some View {
