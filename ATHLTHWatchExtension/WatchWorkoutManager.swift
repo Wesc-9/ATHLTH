@@ -2315,7 +2315,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
               var snapshot = strengthSession,
               !snapshot.isResting,
               !snapshot.currentExerciseComplete,
-              snapshot.targetKindRaw != "time",
+              (snapshot.targetKindRaw != "time" ||
+               snapshot.isOpenEndedTimedSet == true),
               snapshot.setEffortStartedAt == nil,
               snapshot.setCount > 0
         else { return }
@@ -2349,11 +2350,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         let completedAt = Date()
-        let actualDuration = snapshot.targetKindRaw == "time"
-            ? snapshot.timedSetCountdown.map {
-                Int(min(max($0.elapsed(at: completedAt).rounded(), 0), 7_200))
-            } ?? snapshot.draftDurationSeconds
-            : snapshot.draftDurationSeconds
+        let actualDuration = snapshot.isOpenEndedTimedSet == true
+            ? snapshot.setEffortStartedAt.map {
+                Int(min(max(completedAt.timeIntervalSince($0).rounded(), 0), 7_200))
+            }
+            : snapshot.targetKindRaw == "time"
+                ? snapshot.timedSetCountdown.map {
+                    Int(min(max($0.elapsed(at: completedAt).rounded(), 0), 7_200))
+                } ?? snapshot.draftDurationSeconds
+                : snapshot.draftDurationSeconds
         let sent =
             sendStrengthCommand(
                 WatchStrengthCommand(
