@@ -6,6 +6,8 @@ struct ATHLTHStrengthCoachGlobalSettingsView: View {
     @EnvironmentObject private var session: AppSessionStore
     @State private var shareActiveWorkoutWithIPad = false
     @State private var configuration = StrengthAdvancedConfiguration.savedDefaults()
+    @State private var standardBarWeight = 20.0
+    @State private var exerciseBarDefaults: [String: Double] = [:]
 
     private let ink = Color(red: 0.18, green: 0.19, blue: 0.21)
     private let border = Color(red: 0.89, green: 0.89, blue: 0.88)
@@ -146,6 +148,83 @@ struct ATHLTHStrengthCoachGlobalSettingsView: View {
                 }
 
                 group {
+                    Text(tr("BAR & LOAD", "STANG OG BELASTNING"))
+                        .font(.caption.weight(.semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(.secondary)
+
+                    Picker(
+                        tr("Standard empty-bar weight",
+                           "Standard stangvekt"),
+                        selection: $standardBarWeight
+                    ) {
+                        ForEach(
+                            StrengthBarWeightPreferences.supportedMasses,
+                            id: \.self
+                        ) { mass in
+                            Text(String(format: "%g kg", mass)).tag(mass)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .tint(ink)
+
+                    Text(tr(
+                        "This is included in the total kilograms, never added twice. A specific exercise can have its own remembered bar mass. Each new workout can override it.",
+                        "Stangvekten inngår i den totale belastningen og legges aldri til to ganger. Hver øvelse kan ha egen husket stangvekt, og du kan overstyre den i enhver økt."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    if !exerciseBarDefaults.isEmpty {
+                        Divider()
+                        Text(tr("EXERCISE DEFAULTS", "STANDARD PER ØVELSE"))
+                            .font(.caption.weight(.semibold))
+                            .tracking(0.8)
+                            .foregroundStyle(.secondary)
+                        ForEach(exerciseBarDefaults.keys.sorted(), id: \.self) { name in
+                            HStack(spacing: 9) {
+                                Text(name.capitalized)
+                                    .font(.subheadline)
+                                    .lineLimit(2)
+                                Spacer(minLength: 4)
+                                Menu {
+                                    Button(
+                                        tr("Use global default", "Bruk generell standard")
+                                    ) {
+                                        StrengthBarWeightPreferences.setExerciseMass(
+                                            nil,
+                                            for: name,
+                                            userID: session.profile.userID
+                                        )
+                                        reloadBarSettings()
+                                    }
+                                    ForEach(
+                                        StrengthBarWeightPreferences.supportedMasses,
+                                        id: \.self
+                                    ) { kg in
+                                        Button(String(format: "%g kg", kg)) {
+                                            StrengthBarWeightPreferences.setExerciseMass(
+                                                kg,
+                                                for: name,
+                                                userID: session.profile.userID
+                                            )
+                                            reloadBarSettings()
+                                        }
+                                    }
+                                } label: {
+                                    Text(String(
+                                        format: "%g kg",
+                                        exerciseBarDefaults[name] ?? standardBarWeight
+                                    ))
+                                    .foregroundStyle(ink)
+                                }
+                            }
+                            .frame(minHeight: 40)
+                        }
+                    }
+                }
+
+                group {
                     Text(tr("MY DEVICES", "MINE ENHETER"))
                         .font(.caption.weight(.semibold))
                         .tracking(0.8)
@@ -196,10 +275,16 @@ struct ATHLTHStrengthCoachGlobalSettingsView: View {
             newValue.saveAsDefaults()
         }
         .onAppear {
+            reloadBarSettings()
             shareActiveWorkoutWithIPad =
                 ATHLTHPrivateLiveStrengthStatusStore.isEnabled(
                     for: session.profile.userID
                 )
+        }
+        .onChange(of: standardBarWeight) { _, newValue in
+            StrengthBarWeightPreferences.setDefaultMass(
+                newValue, userID: session.profile.userID
+            )
         }
         .onChange(of: shareActiveWorkoutWithIPad) { _, newValue in
             let userID = session.profile.userID
@@ -214,6 +299,15 @@ struct ATHLTHStrengthCoachGlobalSettingsView: View {
                 }
             }
         }
+    }
+
+    private func reloadBarSettings() {
+        standardBarWeight = StrengthBarWeightPreferences.defaultMass(
+            userID: session.profile.userID
+        )
+        exerciseBarDefaults = StrengthBarWeightPreferences.overrides(
+            userID: session.profile.userID
+        )
     }
 
     private func group<Content: View>(
