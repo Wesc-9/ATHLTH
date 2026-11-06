@@ -6061,7 +6061,7 @@ struct ATHLTHTrainView: View {
                     let planOrigin = matchedPlanOriginForRun(
                         pendingPlannedEnduranceWorkout, configuration: configuration
                     )
-                    guard await social.beginWorkoutWithFriends(
+                    // Solo workouts are local-first and must never require a\n                    // social backend connection to begin recording.\n                    let needsSocialLobby = !configuration.friends.isEmpty\n                    guard !needsSocialLobby || await social.beginWorkoutWithFriends(
                         title: configuration.title,
                         kind: .running,
                         friends: configuration.friends,
@@ -6091,14 +6091,14 @@ struct ATHLTHTrainView: View {
                             plannedPlanID: planOrigin?.planID,
                             plannedSessionID: planOrigin?.workout.id
                         )
-                        _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        if needsSocialLobby {\n                            _ = await social.confirmCurrentJoinedWorkoutStarted()\n                        }
                         if configuration.captureDevice == .appleWatch {
                             watchTransferMessage = configuration.watchStartMode == .onWatch
                                 ? configuration.watchStartMode.confirmationText : nil
                         }
                         return nil
                     } catch {
-                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                        if needsSocialLobby {\n                            await social.markCurrentJoinedWorkoutLaunchFailed()\n                        }
                         return error.localizedDescription
                     }
                 }
@@ -6220,7 +6220,7 @@ struct ATHLTHTrainView: View {
                     let planOrigin = matchedPlanOriginForRun(
                         pendingPlannedEnduranceWorkout, configuration: configuration
                     )
-                    guard await social.beginWorkoutWithFriends(
+                    // Solo workouts are local-first and must never require a\n                    // social backend connection to begin recording.\n                    let needsSocialLobby = !configuration.friends.isEmpty\n                    guard !needsSocialLobby || await social.beginWorkoutWithFriends(
                         title: configuration.title,
                         kind: .running,
                         friends: configuration.friends,
@@ -6250,14 +6250,14 @@ struct ATHLTHTrainView: View {
                             plannedPlanID: planOrigin?.planID,
                             plannedSessionID: planOrigin?.workout.id
                         )
-                        _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        if needsSocialLobby {\n                            _ = await social.confirmCurrentJoinedWorkoutStarted()\n                        }
                         if configuration.captureDevice == .appleWatch {
                             watchTransferMessage = configuration.watchStartMode == .onWatch
                                 ? configuration.watchStartMode.confirmationText : nil
                         }
                         return nil
                     } catch {
-                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                        if needsSocialLobby {\n                            await social.markCurrentJoinedWorkoutLaunchFailed()\n                        }
                         return error.localizedDescription
                     }
                 }
