@@ -6061,7 +6061,10 @@ struct ATHLTHTrainView: View {
                     let planOrigin = matchedPlanOriginForRun(
                         pendingPlannedEnduranceWorkout, configuration: configuration
                     )
-                    // Solo workouts are local-first and must never require a\n                    // social backend connection to begin recording.\n                    let needsSocialLobby = !configuration.friends.isEmpty\n                    let lobbyReady: Bool
+                    // Solo workouts are local-first and must never require a
+                    // social backend connection to begin recording.
+                    let needsSocialLobby = !configuration.friends.isEmpty
+                    let lobbyReady: Bool
                     if needsSocialLobby {
                         lobbyReady = await social.beginWorkoutWithFriends(
                         title: configuration.title,
@@ -6097,14 +6100,18 @@ struct ATHLTHTrainView: View {
                             plannedPlanID: planOrigin?.planID,
                             plannedSessionID: planOrigin?.workout.id
                         )
-                        if needsSocialLobby {\n                            _ = await social.confirmCurrentJoinedWorkoutStarted()\n                        }
+                        if needsSocialLobby {
+                            _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        }
                         if configuration.captureDevice == .appleWatch {
                             watchTransferMessage = configuration.watchStartMode == .onWatch
                                 ? configuration.watchStartMode.confirmationText : nil
                         }
                         return nil
                     } catch {
-                        if needsSocialLobby {\n                            await social.markCurrentJoinedWorkoutLaunchFailed()\n                        }
+                        if needsSocialLobby {
+                            await social.markCurrentJoinedWorkoutLaunchFailed()
+                        }
                         return error.localizedDescription
                     }
                 }
@@ -6233,7 +6240,10 @@ struct ATHLTHTrainView: View {
                     let planOrigin = matchedPlanOriginForRun(
                         pendingPlannedEnduranceWorkout, configuration: configuration
                     )
-                    // Solo workouts are local-first and must never require a\n                    // social backend connection to begin recording.\n                    let needsSocialLobby = !configuration.friends.isEmpty\n                    let lobbyReady: Bool
+                    // Solo workouts are local-first and must never require a
+                    // social backend connection to begin recording.
+                    let needsSocialLobby = !configuration.friends.isEmpty
+                    let lobbyReady: Bool
                     if needsSocialLobby {
                         lobbyReady = await social.beginWorkoutWithFriends(
                         title: configuration.title,
@@ -6265,14 +6275,18 @@ struct ATHLTHTrainView: View {
                             plannedPlanID: planOrigin?.planID,
                             plannedSessionID: planOrigin?.workout.id
                         )
-                        if needsSocialLobby {\n                            _ = await social.confirmCurrentJoinedWorkoutStarted()\n                        }
+                        if needsSocialLobby {
+                            _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        }
                         if configuration.captureDevice == .appleWatch {
                             watchTransferMessage = configuration.watchStartMode == .onWatch
                                 ? configuration.watchStartMode.confirmationText : nil
                         }
                         return nil
                     } catch {
-                        if needsSocialLobby {\n                            await social.markCurrentJoinedWorkoutLaunchFailed()\n                        }
+                        if needsSocialLobby {
+                            await social.markCurrentJoinedWorkoutLaunchFailed()
+                        }
                         return error.localizedDescription
                     }
                 }
