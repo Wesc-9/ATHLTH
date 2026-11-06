@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Share an existing personal item with one explicitly selected mutual friend.
 /// Reuses the messaging library picker and its privacy-safe payload factory.
-enum ATHLTHFriendQuickShareKind: String, Identifiable {
+enum ATHLTHFriendQuickShareKind: String, CaseIterable, Identifiable {
     case plan, workout, route, exercise
 
     var id: String { rawValue }
@@ -28,6 +28,26 @@ enum ATHLTHFriendQuickShareKind: String, Identifiable {
             ATHLTHLocalization.choose(english: "Send exercise", norwegian: "Send øvelse")
         }
     }
+
+    var sentConfirmation: String {
+        switch self {
+        case .plan:
+            ATHLTHLocalization.choose(english: "Plan sent", norwegian: "Planen er sendt")
+        case .workout:
+            ATHLTHLocalization.choose(english: "Workout sent", norwegian: "Treningsøkten er sendt")
+        case .route:
+            ATHLTHLocalization.choose(english: "Route sent", norwegian: "Ruten er sendt")
+        case .exercise:
+            ATHLTHLocalization.choose(english: "Exercise sent", norwegian: "Øvelsen er sendt")
+        }
+    }
+}
+
+/// Published only after the messaging backend confirms a successful send.
+extension Notification.Name {
+    static let athlthFriendQuickShareDidSucceed = Notification.Name(
+        "athlth.friendQuickShareDidSucceed"
+    )
 }
 
 struct ATHLTHFriendQuickShareRequest: Identifiable {
@@ -116,28 +136,21 @@ struct ATHLTHFriendQuickShareFlow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(.white, in: RoundedRectangle(cornerRadius: 20))
 
-                    if sent {
-                        Label(tr("Sent to the recipient's inbox", "Sendt til mottakerens innboks"),
-                              systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(ATHLTHTheme.premiumGold)
-                            .font(.subheadline.weight(.semibold))
-                    } else {
-                        TextField(
-                            tr("Personal message (optional)", "Personlig melding (valgfritt)"),
-                            text: $note, axis: .vertical
-                        )
-                        .lineLimit(2...4)
-                        .padding(14)
-                        .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                    TextField(
+                        tr("Personal message (optional)", "Personlig melding (valgfritt)"),
+                        text: $note, axis: .vertical
+                    )
+                    .lineLimit(2...4)
+                    .padding(14)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 16))
 
-                        Label(
-                            tr("Only this friend will receive the selected item.",
-                               "Kun denne vennen får innholdet du har valgt."),
-                            systemImage: "lock.shield"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
+                    Label(
+                        tr("Only this friend will receive the selected item.",
+                           "Kun denne vennen får innholdet du har valgt."),
+                        systemImage: "lock.shield"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
                     if let errorMessage {
                         Label(errorMessage, systemImage: "exclamationmark.triangle")
@@ -154,12 +167,10 @@ struct ATHLTHFriendQuickShareFlow: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    if !sent {
-                        Button(tr("Back", "Tilbake")) {
-                            selectedDraft = nil
-                        }
-                        .disabled(sending)
+                    Button(tr("Back", "Tilbake")) {
+                        selectedDraft = nil
                     }
+                    .disabled(sending)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button(tr("Close", "Lukk")) { dismiss() }
@@ -167,11 +178,7 @@ struct ATHLTHFriendQuickShareFlow: View {
             }
             .safeAreaInset(edge: .bottom) {
                 Button {
-                    if sent {
-                        dismiss()
-                    } else {
-                        Task { await send(draft) }
-                    }
+                    Task { await send(draft) }
                 } label: {
                     if sending {
                         ProgressView()
@@ -179,10 +186,9 @@ struct ATHLTHFriendQuickShareFlow: View {
                             .frame(maxWidth: .infinity, minHeight: 48)
                     } else {
                         Label(
-                            sent ? tr("Done", "Ferdig") :
-                                tr("Send to \(request.friend.resolvedName)",
-                                   "Send til \(request.friend.resolvedName)"),
-                            systemImage: sent ? "checkmark.circle.fill" : "paperplane.fill"
+                            tr("Send to \(request.friend.resolvedName)",
+                               "Send til \(request.friend.resolvedName)"),
+                            systemImage: "paperplane.fill"
                         )
                         .font(.subheadline.weight(.semibold))
                         .frame(maxWidth: .infinity, minHeight: 48)
@@ -190,7 +196,7 @@ struct ATHLTHFriendQuickShareFlow: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(ATHLTHTheme.premiumGold)
-                .disabled(sending)
+                .disabled(sending || sent)
                 .padding(.horizontal, 18)
                 .padding(.vertical, 10)
                 .background(.regularMaterial)
@@ -223,6 +229,11 @@ struct ATHLTHFriendQuickShareFlow: View {
             )
             if success {
                 sent = true
+                dismiss()
+                NotificationCenter.default.post(
+                    name: .athlthFriendQuickShareDidSucceed,
+                    object: request.kind
+                )
             } else {
                 errorMessage = messaging.errorMessage ?? tr(
                     "Could not send the item.", "Kunne ikke sende innholdet."

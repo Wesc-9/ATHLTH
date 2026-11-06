@@ -244,10 +244,67 @@ struct AudioCoachDraft {
         announceWorkoutComplete = config.announceWorkoutComplete ?? true
     }
 
-    func configuration(
-        routeDistanceMeters: Double? = nil
+    /// Shared by planned-workout editing, including old saved sessions.
+    /// Preserve every existing setting when loading a session override.
+    mutating func load(configuration config: WatchAudioCoachConfiguration) {
+        load(profile: ATHLTHAudioCoachProfile(
+            name: "Workout", configuration: config
+        ))
+        enabled = config.enabled
+    }
+
+    /// Apply just the options surfaced by the premium studio. Do not lose
+    /// fuel, strength, voice lease or other settings held by older workouts.
+    func applying(
+        to original: WatchAudioCoachConfiguration,
+        maximumHeartRateBPM: Double? = nil
     ) -> WatchAudioCoachConfiguration {
-        WatchAudioCoachConfiguration(
+        let values = configuration(
+            routeDistanceMeters: original.routeDistanceMeters,
+            maximumHeartRateBPM: maximumHeartRateBPM
+        )
+        var saved = original
+        saved.enabled = values.enabled
+        saved.language = values.language
+        saved.distanceIntervalMeters = values.distanceIntervalMeters
+        saved.timeIntervalSeconds = values.timeIntervalSeconds
+        saved.customRules = values.customRules
+        saved.smartPrompts = values.smartPrompts
+        saved.announceDistance = values.announceDistance
+        saved.announceElapsedTime = values.announceElapsedTime
+        saved.announceAveragePace = values.announceAveragePace
+        saved.announceClockTime = values.announceClockTime
+        saved.announceHeartRate = values.announceHeartRate
+        saved.announceRemainingRouteDistance = values.announceRemainingRouteDistance
+        saved.announceEstimatedRemainingRouteTime = values.announceEstimatedRemainingRouteTime
+        saved.announceCurrentWorkoutStep = values.announceCurrentWorkoutStep
+        saved.announceRemainingStepTime = values.announceRemainingStepTime
+        saved.announceRemainingStepDistance = values.announceRemainingStepDistance
+        saved.duckOtherAudio = values.duckOtherAudio
+        saved.guidanceQuietPeriodSeconds = values.guidanceQuietPeriodSeconds
+        saved.voiceIdentifier = values.voiceIdentifier
+        saved.speechRate = values.speechRate
+        saved.speechVolume = values.speechVolume
+        saved.speechStyle = values.speechStyle
+        saved.announceWorkoutStart = values.announceWorkoutStart
+        saved.announcePauseResume = values.announcePauseResume
+        saved.announceWorkoutComplete = values.announceWorkoutComplete
+        return saved
+    }
+
+    func configuration(
+        routeDistanceMeters: Double? = nil,
+        maximumHeartRateBPM: Double? = nil
+    ) -> WatchAudioCoachConfiguration {
+        var prompts = smartPrompts
+        // An explicit per-workout HRmax overrides the profile estimate.
+        // Otherwise use the athlete's configured maximum, never a guess.
+        if prompts.maximumHeartRateBPM == nil,
+           let maximumHeartRateBPM, maximumHeartRateBPM.isFinite,
+           (100...240).contains(maximumHeartRateBPM) {
+            prompts.maximumHeartRateBPM = maximumHeartRateBPM
+        }
+        return WatchAudioCoachConfiguration(
             enabled: enabled,
             language: language,
             distanceIntervalMeters:
@@ -260,7 +317,7 @@ struct AudioCoachDraft {
                     : nil,
             customRules: enabled && !customRules.isEmpty
                 ? Array(customRules.prefix(20)) : nil,
-            smartPrompts: enabled ? smartPrompts : nil,
+            smartPrompts: enabled ? prompts : nil,
             announceDistance: enabled && announceDistance,
             announceElapsedTime:
                 enabled && announceElapsedTime,
@@ -2528,10 +2585,10 @@ struct RunQuickStartSheet: View {
                     isAdvancedSetup &&
                     guidanceRoute != nil &&
                     ghostDraft.enabled &&
-                    ghostDraft.targetDuration != nil &&
-                    ghostDraft.updatesEnabled
-                        ? settings
-                            .ghostRaceAudioConfiguration
+                    ghostDraft.targetDuration != nil
+                        ? ghostDraft.resolvedUpdates(
+                            fallback: settings.ghostRaceAudioConfiguration
+                          )
                         : nil,
                 autoPauseEnabled:
                     runEnvironment == .outdoor &&
@@ -2986,12 +3043,12 @@ struct RunQuickStartSheet: View {
 
         if routeGuardianDraft.enabled,
            guidanceRoute != nil {
-            parts.append("Route Guardian")
+            parts.append(ATHLTHLocalization.choose(english: "Navigation", norwegian: "Navigasjon"))
         }
 
         if ghostDraft.enabled,
            guidanceRoute != nil {
-            parts.append("Ghost Updates")
+            parts.append("Ghost Race")
         }
 
         return parts.isEmpty
@@ -3015,7 +3072,9 @@ struct RunQuickStartSheet: View {
             }
 
         return audioCoachDraft.configuration(
-            routeDistanceMeters: routeDistanceMeters
+            routeDistanceMeters: routeDistanceMeters,
+            maximumHeartRateBPM:
+                session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
         )
     }
 
@@ -3924,600 +3983,17 @@ struct StrengthQuickBuilderView: View {
     }
 }
 
+/// A compatibility entry point for Quick Train and Run Tools.
 struct AudioCoachSetupCard: View {
-    @EnvironmentObject private var settings: AppSettingsStore
     @Binding var draft: AudioCoachDraft
     let showRouteOptions: Bool
     let showStructuredOptions: Bool
-    @State private var showAdvancedSettings = false
-    @State private var showSequenceEditor = false
-    @State private var sequenceTrigger: ATHLTHAudioCoachRule.Trigger = .time
-    @State private var sequenceMetric: ATHLTHAudioCoachRule.Metric = .distance
-    @State private var sequenceSeconds = 60
-    @State private var sequenceMeters = 800
-    @State private var savedCoachName = ""
 
     var body: some View {
-        ATHLTHCard {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    HStack(spacing: 7) {
-                        Text("Audio Coach")
-                            .font(.headline)
-
-                        Text("ATHLTH+")
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(
-                                ATHLTHTheme.premiumGold
-                            )
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(
-                                ATHLTHTheme.premiumGoldSoft,
-                                in: Capsule()
-                            )
-                    }
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Choose how much guidance you want during your workout.",
-                            norwegian: "Velg hvor mye veiledning du ønsker under økten."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Toggle("", isOn: $draft.enabled)
-                    .labelsHidden()
-            }
-
-            if draft.enabled {
-                VStack(alignment: .leading, spacing: 14) {
-                    Divider()
-
-                    if !settings.audioCoachProfiles.isEmpty {
-                        Menu {
-                            ForEach(settings.audioCoachProfiles) { profile in
-                                Button {
-                                    draft.load(profile: profile)
-                                } label: {
-                                    Label(profile.name, systemImage: "waveform")
-                                }
-                            }
-                        } label: {
-                            HStack(spacing: 10) {
-                                Image(systemName: "square.stack.3d.up")
-                                    .foregroundStyle(ATHLTHTheme.premiumGold)
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "Load saved Audio Coach",
-                                        norwegian: "Hent lagret Audio Coach"
-                                    ))
-                                    .font(.subheadline.weight(.semibold))
-                                    Text(ATHLTHLocalization.choose(
-                                        english: "Competition, intervals or easy run",
-                                        norwegian: "Konkurranse, intervaller eller rolig tur"
-                                    ))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                }
-                                Spacer(minLength: 4)
-                                Image(systemName: "chevron.down")
-                            }
-                            .frame(maxWidth: .infinity, minHeight: 54)
-                            .padding(11)
-                            .background(
-                                ATHLTHTheme.premiumGoldSoft.opacity(0.55),
-                                in: RoundedRectangle(cornerRadius: 15)
-                            )
-                        }
-                        .accessibilityIdentifier("athlth-preworkout-coach-presets")
-                    }
-
-                    if !draft.customRules.isEmpty {
-                        Label(ATHLTHLocalization.choose(
-                            english: "\(draft.customRules.count) custom announcements active",
-                            norwegian: "\(draft.customRules.count) tilpassede beskjeder aktive"
-                        ), systemImage: "waveform.badge.mic")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
-                    }
-
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.22)) {
-                            showSequenceEditor.toggle()
-                        }
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: "waveform.badge.plus")
-                                .foregroundStyle(ATHLTHTheme.premiumGold)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "My announcements",
-                                    norwegian: "Mine beskjeder"
-                                ))
-                                .font(.subheadline.weight(.semibold))
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Different messages, at different intervals",
-                                    norwegian: "Ulike beskjeder med egne intervaller"
-                                ))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 4)
-                            Image(systemName: showSequenceEditor
-                                ? "chevron.up" : "chevron.down")
-                                .font(.caption.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-                        .padding(.horizontal, 12)
-                        .background(
-                            ATHLTHTheme.premiumGoldSoft.opacity(0.45),
-                            in: RoundedRectangle(cornerRadius: 15)
-                        )
-                    }
-                    .buttonStyle(.plain)
-
-                    if showSequenceEditor {
-                        preWorkoutSequenceEditor
-                    }
-
-                    Text(ATHLTHLocalization.choose(
-                        english: "How much guidance?",
-                        norwegian: "Hvor mye veiledning?"
-                    ))
-                    .font(.subheadline.weight(.semibold))
-
-                    HStack(spacing: 7) {
-                        ForEach(ATHLTHCoachExperiencePreset.allCases) { preset in
-                            Button {
-                                draft.applyExperience(preset)
-                            } label: {
-                                VStack(spacing: 5) {
-                                    Text(preset.title)
-                                        .font(.subheadline.weight(.semibold))
-                                    Text(preset.subtitle)
-                                        .font(.caption2)
-                                        .multilineTextAlignment(.center)
-                                        .lineLimit(2)
-                                        .minimumScaleFactor(0.85)
-                                }
-                                .frame(maxWidth: .infinity, minHeight: 69)
-                                .padding(.horizontal, 5)
-                                .foregroundStyle(draft.experiencePreset == preset
-                                    ? Color.white : ATHLTHTheme.primaryText)
-                                .background(draft.experiencePreset == preset
-                                    ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
-                                    in: RoundedRectangle(cornerRadius: 14))
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityAddTraits(
-                                draft.experiencePreset == preset ? .isSelected : []
-                            )
-                        }
-                    }
-
-                    if draft.experiencePreset == nil {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Your custom setup is preserved until you select a level.",
-                            norwegian: "Ditt tilpassede oppsett beholdes til du velger et nivå."
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
-
-                    HStack(spacing: 8) {
-                        ForEach([
-                            ATHLTHCoachSpeechStyle.balanced,
-                            .motivating
-                        ]) { style in
-                            Button {
-                                draft.speechStyle = style
-                            } label: {
-                                Label(style.title, systemImage: style == .motivating
-                                    ? "flame.fill" : "waveform")
-                                    .font(.caption.weight(.semibold))
-                                    .frame(maxWidth: .infinity, minHeight: 42)
-                                    .foregroundStyle(draft.speechStyle == style
-                                        ? Color.white : ATHLTHTheme.primaryText)
-                                    .background(draft.speechStyle == style
-                                        ? ATHLTHTheme.accentDeep : ATHLTHTheme.accentSoft,
-                                        in: RoundedRectangle(cornerRadius: 13))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            showAdvancedSettings.toggle()
-                        }
-                    } label: {
-                        HStack {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "More settings", norwegian: "Flere innstillinger"
-                                ),
-                                systemImage: "slider.horizontal.3"
-                            )
-                            Spacer()
-                            Image(systemName: showAdvancedSettings
-                                ? "chevron.up" : "chevron.down")
-                        }
-                        .font(.subheadline.weight(.semibold))
-                    }
-                    .buttonStyle(.plain)
-
-                    if showAdvancedSettings {
-                    Divider()
-
-                    Text("WHEN TO SPEAK")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.0)
-                        .foregroundStyle(.secondary)
-
-                    Toggle(
-                        "Distance updates",
-                        isOn: $draft.distanceTriggerEnabled
-                    )
-
-                    if draft.distanceTriggerEnabled {
-                        HStack {
-                            Text("Every")
-                            Spacer()
-                            Picker(
-                                "Distance interval",
-                                selection:
-                                    $draft.distanceIntervalKilometers
-                            ) {
-                                Text("0.5 km").tag(0.5)
-                                Text("1 km").tag(1.0)
-                                Text("2 km").tag(2.0)
-                                Text("5 km").tag(5.0)
-                            }
-                            .pickerStyle(.menu)
-                        }
-                    }
-
-                    Toggle(
-                        "Time updates",
-                        isOn: $draft.timeTriggerEnabled
-                    )
-
-                    if draft.timeTriggerEnabled {
-                        HStack {
-                            Text("Every")
-                            Spacer()
-                            Picker(
-                                "Time interval",
-                                selection:
-                                    $draft.timeIntervalMinutes
-                            ) {
-                                Text("5 min").tag(5)
-                                Text("10 min").tag(10)
-                                Text("15 min").tag(15)
-                                Text("30 min").tag(30)
-                            }
-                            .pickerStyle(.menu)
-                        }
-                    }
-
-                    Divider()
-
-                    Text("WHAT TO ANNOUNCE")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.0)
-                        .foregroundStyle(.secondary)
-
-                    Toggle(
-                        "Distance",
-                        isOn: $draft.announceDistance
-                    )
-                    Toggle(
-                        "Elapsed time",
-                        isOn: $draft.announceElapsedTime
-                    )
-                    Toggle(
-                        "Average pace",
-                        isOn: $draft.announceAveragePace
-                    )
-                    Toggle(
-                        "Current time",
-                        isOn: $draft.announceClockTime
-                    )
-                    Toggle(
-                        "Heart rate",
-                        isOn: $draft.announceHeartRate
-                    )
-
-                    if showRouteOptions {
-                        Divider()
-
-                        Text("ROUTE")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.0)
-                            .foregroundStyle(.secondary)
-
-                        Toggle(
-                            "Remaining distance",
-                            isOn:
-                                $draft
-                                    .announceRemainingRouteDistance
-                        )
-                        Toggle(
-                            "Estimated time remaining",
-                            isOn:
-                                $draft
-                                    .announceEstimatedRemainingRouteTime
-                        )
-                    }
-
-                    if showStructuredOptions {
-                        Divider()
-
-                        Text("STRUCTURED WORKOUT")
-                            .font(.caption2.weight(.bold))
-                            .tracking(1.0)
-                            .foregroundStyle(.secondary)
-
-                        Toggle(
-                            "Current / next step",
-                            isOn:
-                                $draft
-                                    .announceCurrentWorkoutStep
-                        )
-                        Toggle(
-                            "Remaining step time",
-                            isOn:
-                                $draft
-                                    .announceRemainingStepTime
-                        )
-                        Toggle(
-                            "Remaining step distance",
-                            isOn:
-                                $draft
-                                    .announceRemainingStepDistance
-                        )
-                    }
-
-                    Divider()
-
-                    Text("MUSIC & OTHER AUDIO")
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.0)
-                        .foregroundStyle(.secondary)
-
-                    Toggle(
-                        "Lower music while coach speaks",
-                        isOn: $draft.duckOtherAudio
-                    )
-
-                    Text(
-                        draft.duckOtherAudio
-                            ? "Spotify and other audio are reduced only while the coach is speaking."
-                            : "Coach speech mixes with music at its current level."
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-
-                    Divider()
-
-                    HStack {
-                        Text("Language")
-                        Spacer()
-                        Picker(
-                            "Language",
-                            selection: $draft.language
-                        ) {
-                            ForEach(
-                                WatchAudioCoachLanguage.allCases,
-                                id: \.rawValue
-                            ) { language in
-                                Text(language.title)
-                                    .tag(language)
-                            }
-                        }
-                        .pickerStyle(.menu)
-                        .onChange(
-                            of: draft.language
-                        ) { _, _ in
-                            draft.voiceIdentifier = nil
-                        }
-                    }
-
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english: "Settings defaults are loaded automatically. Changes here affect only this workout.",
-                            norwegian: "Standardinnstillingene lastes automatisk. Endringer her gjelder bare denne økten."
-                        )
-                    )
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    }
-                }
-                .padding(.top, 10)
-            }
-        }
-    }
-
-    private var preWorkoutSequenceEditor: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            Text(ATHLTHLocalization.choose(
-                english: "Motivational style",
-                norwegian: "Motivasjonsstil"
-            ))
-            .font(.subheadline.weight(.semibold))
-
-            Picker(ATHLTHLocalization.choose(
-                english: "Motivational style",
-                norwegian: "Motivasjonsstil"
-            ), selection: Binding(
-                get: {
-                    draft.smartPrompts.encouragementStyle ?? .encouragement
-                },
-                set: { style in
-                    draft.smartPrompts.encouragementStyle = style
-                    draft.smartPrompts.motivationEnabled = true
-                }
-            )) {
-                ForEach(ATHLTHCoachEncouragementStyle.allCases) { style in
-                    Text(style.title).tag(style)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            Toggle(ATHLTHLocalization.choose(
-                english: "Use verified hills and final stretch",
-                norwegian: "Bruk bekreftede bakker og siste etappe"
-            ), isOn: Binding(
-                get: {
-                    draft.smartPrompts.contextualFeedbackEnabled ?? true
-                },
-                set: {
-                    draft.smartPrompts.contextualFeedbackEnabled = $0
-                }
-            ))
-            .tint(ATHLTHTheme.accentDeep)
-
-            ForEach(draft.customRules) { rule in
-                HStack(spacing: 10) {
-                    Image(systemName: rule.trigger == .time ? "clock" : "point.topleft.down.to.point.bottomright.curvepath")
-                        .foregroundStyle(ATHLTHTheme.premiumGold)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(rule.metric.title)
-                            .font(.subheadline.weight(.semibold))
-                        Text(rule.trigger == .time
-                            ? ATHLTHLocalization.choose(
-                                english: "Every \(rule.validatedInterval) sec",
-                                norwegian: "Hvert \(rule.validatedInterval). sekund"
-                              )
-                            : ATHLTHLocalization.choose(
-                                english: "Every \(rule.validatedInterval) m",
-                                norwegian: "Hver \(rule.validatedInterval). meter"
-                              ))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Button(role: .destructive) {
-                        draft.customRules.removeAll { $0.id == rule.id }
-                    } label: {
-                        Image(systemName: "minus.circle")
-                            .frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Remove announcement",
-                        norwegian: "Fjern beskjed"
-                    ))
-                }
-            }
-
-            HStack(spacing: 9) {
-                Picker(ATHLTHLocalization.choose(
-                    english: "Announce", norwegian: "Si"
-                ), selection: $sequenceMetric) {
-                    ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
-                        Text(metric.title).tag(metric)
-                    }
-                }
-                Picker(ATHLTHLocalization.choose(
-                    english: "Trigger", norwegian: "Utløser"
-                ), selection: $sequenceTrigger) {
-                    ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
-                        Text(trigger.title).tag(trigger)
-                    }
-                }
-            }
-            .tint(ATHLTHTheme.accentDeep)
-
-            if sequenceTrigger == .time {
-                Stepper(value: $sequenceSeconds, in: 15...7200, step: 15) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Every \(sequenceSeconds) seconds",
-                        norwegian: "Hvert \(sequenceSeconds). sekund"
-                    ))
-                    .font(.subheadline)
-                }
-            } else {
-                Stepper(value: $sequenceMeters, in: 100...42000, step: 100) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Every \(sequenceMeters) metres",
-                        norwegian: "Hver \(sequenceMeters). meter"
-                    ))
-                    .font(.subheadline)
-                }
-            }
-
-            Button {
-                guard draft.customRules.count < 20 else { return }
-                draft.customRules.append(
-                    ATHLTHAudioCoachRule(
-                        trigger: sequenceTrigger,
-                        metric: sequenceMetric,
-                        interval: sequenceTrigger == .time
-                            ? sequenceSeconds : sequenceMeters
-                    )
-                )
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Add announcement",
-                    norwegian: "Legg til beskjed"
-                ), systemImage: "plus")
-                .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.bordered)
-            .tint(ATHLTHTheme.accentDeep)
-            .disabled(draft.customRules.count >= 20)
-
-            Divider()
-            TextField(ATHLTHLocalization.choose(
-                english: "Profile name, e.g. Competition",
-                norwegian: "Navn på oppsett, f.eks. Konkurranse"
-            ), text: $savedCoachName)
-            .textFieldStyle(.roundedBorder)
-
-            Button {
-                let name = savedCoachName.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                )
-                guard !name.isEmpty, settings.audioCoachProfiles.count < 30 else {
-                    return
-                }
-                settings.audioCoachProfiles.append(
-                    ATHLTHAudioCoachProfile(
-                        name: String(name.prefix(60)),
-                        configuration: draft.configuration()
-                    )
-                )
-                savedCoachName = ""
-            } label: {
-                Label(ATHLTHLocalization.choose(
-                    english: "Save this coach for future workouts",
-                    norwegian: "Lagre denne coachen til senere økter"
-                ), systemImage: "square.and.arrow.down")
-                .frame(maxWidth: .infinity, minHeight: 44)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHTheme.accentDeep)
-            .disabled(
-                savedCoachName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
-                settings.audioCoachProfiles.count >= 30
-            )
-            Text(ATHLTHLocalization.choose(
-                english: "Edits here affect this workout only unless you save a named profile.",
-                norwegian: "Endringer her gjelder bare denne økten, med mindre du lagrer en profil."
-            ))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-        }
-        .padding(12)
-        .background(
-            ATHLTHTheme.accentSoft.opacity(0.4),
-            in: RoundedRectangle(cornerRadius: 16)
+        ATHLTHAudioCoachSessionStudio(
+            draft: $draft,
+            showRouteOptions: showRouteOptions,
+            showStructuredOptions: showStructuredOptions
         )
     }
 }

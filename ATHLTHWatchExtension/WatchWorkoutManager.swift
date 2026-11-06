@@ -6366,7 +6366,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         guard state == .running,
               kind == .running || kind == .walking,
               audioCoachConfiguration.enabled,
-              audioCoachConfiguration.announceHeartRate,
+              (audioCoachConfiguration.smartPrompts?.announceCurrentHeartRateZone ??
+                  audioCoachConfiguration.announceHeartRate),
               !coachSpeechPaused,
               hasFreshHeartRate
         else {
@@ -6374,16 +6375,23 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             measuredCoachZoneStartedAt = nil
             return
         }
+        // A deliberately chosen Coach maximum takes precedence for the
+        // measured-zone announcement. Structured target-zone boundaries
+        // continue to use their own configured training-plan maximum.
+        let resolvedMaximumBPM =
+            audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM ??
+            structuredRunningWorkout?.heartRateZoneMaximumBPM
         let target = ATHLTHHeartRateZoneCoachTarget.configuration(
             configured: targetAlertConfiguration,
             stepZone: awaitingMainStart ? nil :
                 currentStructuredRunningStep?.targetHeartRateZone,
-            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM
+            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
+                resolvedMaximumBPM
         )
         guard target?.heartRateEnabled != true,
               let zone = ATHLTHHeartRateZones.measuredZone(
                   heartRateBPM: heartRate,
-                  maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM
+                  maximumBPM: resolvedMaximumBPM
               )
         else {
             measuredCoachZoneCandidate = nil

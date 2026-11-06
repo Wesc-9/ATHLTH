@@ -121,6 +121,8 @@ struct ProductRootTabView: View {
     @State private var sideMenuModalDestination: ATHLTHSideMenuDestination?
     @State private var sideMenuUtilityDestination: ATHLTHSideMenuDestination?
     @State private var sideMenuFullScreenDestination: ATHLTHSideMenuDestination?
+    @State private var friendShareToast: ATHLTHFriendQuickShareKind?
+    @State private var friendShareToastDismissTask: Task<Void, Never>?
     @Environment(\.accessibilityReduceMotion) private var reduceSideMenuMotion
 
     private func openPendingDailyCheckInIfNeeded() {
@@ -174,6 +176,34 @@ struct ProductRootTabView: View {
             ) {
                 selectedTab = destination
             }
+    }
+
+    /// A completed direct share returns to Home without an extra Done screen.
+    /// Only a confirmed backend send triggers this root-level navigation.
+    private func handleFriendQuickShareSuccess(_ notification: Notification) {
+        guard let kind = notification.object as? ATHLTHFriendQuickShareKind else {
+            return
+        }
+        selectedTab = 0
+        showingSideMenu = false
+        sideMenuModalDestination = nil
+        sideMenuUtilityDestination = nil
+        sideMenuFullScreenDestination = nil
+
+        friendShareToastDismissTask?.cancel()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            friendShareToast = kind
+        }
+        friendShareToastDismissTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .seconds(2.5))
+            } catch {
+                return
+            }
+            withAnimation(.easeOut(duration: 0.2)) {
+                friendShareToast = nil
+            }
+        }
     }
 
     private func updateDailyCheckInReminder() {
@@ -338,6 +368,11 @@ struct ProductRootTabView: View {
         ) { notification in
             handleRemoteNotification(notification)
         }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .athlthFriendQuickShareDidSucceed
+        )) { notification in
+            handleFriendQuickShareSuccess(notification)
+        }
         .task {
             updateDailyCheckInReminder()
             updateBodyGoalCheckInReminders()
@@ -454,6 +489,26 @@ struct ProductRootTabView: View {
         }
         .overlay(alignment: .top) {
             VStack(spacing: 8) {
+                if let friendShareToast {
+                    Label(friendShareToast.sentConfirmation,
+                          systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 13)
+                        .background(.regularMaterial, in: Capsule())
+                        .overlay {
+                            Capsule().stroke(
+                                ATHLTHTheme.premiumGold.opacity(0.24),
+                                lineWidth: 1
+                            )
+                        }
+                        .shadow(color: .black.opacity(0.10), radius: 12, y: 5)
+                        .padding(.horizontal, 20)
+                        .transition(.move(edge: .top).combined(with: .opacity))
+                        .allowsHitTesting(false)
+                }
+
                 if social
                         .isCoordinatedLobbyMinimized,
                    social

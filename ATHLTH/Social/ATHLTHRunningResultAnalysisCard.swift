@@ -10,6 +10,7 @@ struct ATHLTHRunningResultAnalysisCard: View {
     let maxHeartRateBPM: Double?
     var pulseSamples: [ATHLTHRunningHeartRatePoint] = []
     var achievements: [ATHLTHRunningAchievement] = []
+    var hasHealthDistanceSplits = false
 
     private func splitPulse(_ split: ATHLTHRunningResultInsights.KilometerSplit) -> String {
         guard let start = split.startedAt, let end = split.endedAt,
@@ -114,10 +115,12 @@ struct ATHLTHRunningResultAnalysisCard: View {
                                 Text(tr("Your kilometre rhythm", "Rytmen per kilometer"))
                                     .font(.system(size: 21, weight: .semibold, design: .serif))
                                     .foregroundStyle(ATHLTHPlanDesign.ink)
-                                Text(tr(
-                                    "Complete, verified outdoor kilometres.",
-                                    "Hele, kvalitetssikrede kilometer utendørs."
-                                ))
+                                Text(hasHealthDistanceSplits
+                                    ? tr("Kilometres measured from Apple Health.",
+                                         "Kilometer basert på Apple Health.")
+                                    : tr("Complete, verified outdoor kilometres.",
+                                         "Hele, kvalitetssikrede kilometer utendørs.")
+                                )
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                             }

@@ -1184,7 +1184,11 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                 initialExtras: ATHLTHWorkoutPlannerExtras(
                     gearIDs: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.gearIDs,
                     spotifyPlaylist: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.spotifyPlaylist,
-                    spotifyAutoplayOnStart: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.spotifyAutoplayOnStart
+                    spotifyAutoplayOnStart: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.spotifyAutoplayOnStart,
+                    audioCoachConfiguration: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.audioCoachConfiguration,
+                    routeAlertConfiguration: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.routeAlertConfiguration,
+                    ghostTargetDurationSeconds: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.ghostTargetDurationSeconds,
+                    ghostUpdates: addingExtraWorkout ? nil : selectedWorkoutForEditor(day: selection.id)?.ghostUpdates
                 ),
                 draftContext: "new-program-week-\(selectedPlanWeekIndex)-day-\(selection.id)-workout-\(addingExtraWorkout ? "new" : String(editingWorkoutIndex))",
                 plannedDate: dateForWeekDay(selection.id, weekIndex: selectedPlanWeekIndex),
@@ -1212,6 +1216,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
                     proposed.gearIDs = extras.gearIDs
                     proposed.spotifyPlaylist = extras.spotifyPlaylist
                     proposed.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
+        proposed.audioCoachConfiguration = extras.audioCoachConfiguration
+        proposed.routeAlertConfiguration = extras.routeAlertConfiguration
+        proposed.ghostTargetDurationSeconds = extras.ghostTargetDurationSeconds
+        proposed.ghostUpdates = extras.ghostUpdates
                     guard proposed.isValid else { return false }
                     updateWeekDay(selection.id) { edit in
                         edit.isRestDay = false
@@ -4170,6 +4178,10 @@ struct ATHLTHTrainingPlanBuilderFlow: View {
         proposed.gearIDs = extras.gearIDs
         proposed.spotifyPlaylist = extras.spotifyPlaylist
         proposed.spotifyAutoplayOnStart = extras.spotifyAutoplayOnStart
+        proposed.audioCoachConfiguration = extras.audioCoachConfiguration
+        proposed.routeAlertConfiguration = extras.routeAlertConfiguration
+        proposed.ghostTargetDurationSeconds = extras.ghostTargetDurationSeconds
+        proposed.ghostUpdates = extras.ghostUpdates
         guard proposed.isValid else { return false }
         let sourceKey = weekDayKey(sourceDay, weekIndex: sourceWeek)
         guard targets.allSatisfy({

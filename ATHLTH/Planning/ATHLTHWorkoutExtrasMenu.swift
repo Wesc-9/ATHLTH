@@ -9,6 +9,7 @@ struct ATHLTHWorkoutExtrasMenu: View {
     let onHeartRateAndPace: () -> Void
     let onAudioCoach: () -> Void
     let onGhostRace: () -> Void
+    let onNavigation: () -> Void
 
     private func tr(_ en: String, _ no: String) -> String {
         ATHLTHLocalization.choose(english: en, norwegian: no)
@@ -35,6 +36,10 @@ struct ATHLTHWorkoutExtrasMenu: View {
             }
             Button(action: onGhostRace) {
                 Label("Ghost Race", systemImage: "figure.run")
+            }
+            Button(action: onNavigation) {
+                Label(tr("Navigation", "Navigasjon"),
+                      systemImage: "location.north.line")
             }
         } label: {
             Image(systemName: "gearshape")

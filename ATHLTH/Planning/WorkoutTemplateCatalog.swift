@@ -3372,6 +3372,7 @@ private enum ATHLTHWorkoutExtraDestination: String, Identifiable {
     case heartRateAndPace
     case audioCoach
     case ghostRace
+    case navigation
 
     var id: String { rawValue }
 }
@@ -3421,6 +3422,7 @@ struct WorkoutTemplateBuilderView: View {
     @Environment(\.athlthStudioFullscreenEditing) private var studioFullscreenEditing
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
+    @EnvironmentObject private var settings: AppSettingsStore
 
     @State private var title = ""
     @State private var blocks: [WorkoutTemplateBlock] = []
@@ -3454,6 +3456,12 @@ struct WorkoutTemplateBuilderView: View {
     @State private var showingStudioRouteBuilder = false
     @State private var studioStepEditorSelection: ATHLTHWorkoutStudioStepEditorSelection?
     @State private var selectedWorkoutExtra: ATHLTHWorkoutExtraDestination?
+    @State private var audioCoachDraft: AudioCoachDraft
+    @State private var routeGuardianDraft: RouteGuardianDraft
+    @State private var ghostDraft: GhostQuickStartDraft
+    @State private var coachIsCustomized: Bool
+    @State private var routeIsCustomized: Bool
+    @State private var guidanceDefaultsLoaded = false
     @State private var selectedWorkoutGearIDs: Set<UUID> = []
     @State private var gearSelectionTouched = false
     @State private var selectedSpotifyPlaylist: SpotifyPlaylistReference?
@@ -3557,6 +3565,34 @@ struct WorkoutTemplateBuilderView: View {
         _gearSelectionTouched = State(initialValue: initialExtras.gearIDs != nil)
         _selectedSpotifyPlaylist = State(initialValue: initialExtras.spotifyPlaylist)
         _spotifyAutoplayOnStart = State(initialValue: initialExtras.spotifyAutoplayOnStart)
+        var initialCoachDraft = AudioCoachDraft()
+        if let coach = initialExtras.audioCoachConfiguration {
+            initialCoachDraft.load(configuration: coach)
+        }
+        _audioCoachDraft = State(initialValue: initialCoachDraft)
+        _coachIsCustomized = State(
+            initialValue: initialExtras.audioCoachConfiguration != nil
+        )
+        var initialNavigationDraft = RouteGuardianDraft()
+        if let nav = initialExtras.routeAlertConfiguration {
+            initialNavigationDraft.load(configuration: nav)
+        }
+        _routeGuardianDraft = State(initialValue: initialNavigationDraft)
+        _routeIsCustomized = State(
+            initialValue: initialExtras.routeAlertConfiguration != nil
+        )
+        var initialGhostDraft = GhostQuickStartDraft()
+        if let duration = initialExtras.ghostTargetDurationSeconds,
+           duration > 0 {
+            initialGhostDraft.enabled = true
+            initialGhostDraft.targetTimeText =
+                GhostTargetTimeFormatter.string(duration)
+        }
+        if let updates = initialExtras.ghostUpdates {
+            initialGhostDraft.updatesEnabled = updates.enabled
+            initialGhostDraft.updatesConfiguration = updates
+        }
+        _ghostDraft = State(initialValue: initialGhostDraft)
         _manualDurationMinutes = State(initialValue: initialMinutes)
         _durationInputText = State(initialValue: (initialMinutes ??
             ATHLTHWorkoutDurationEstimator.minutes(for: initialRecipe)).map(String.init) ?? "")
@@ -3619,6 +3655,10 @@ struct WorkoutTemplateBuilderView: View {
         // Optional to keep all existing workout drafts compatible.
         let pendingExercisePicker: Bool?
         let pendingRunningPicker: Bool?
+        let audioCoachConfiguration: WatchAudioCoachConfiguration?
+        let routeAlertConfiguration: WatchRouteAlertConfiguration?
+        let ghostTargetDurationSeconds: TimeInterval?
+        let ghostUpdates: WatchGhostRaceAudioConfiguration?
     }
 
     private var draftStorageKey: String {
@@ -3649,6 +3689,22 @@ struct WorkoutTemplateBuilderView: View {
         gearSelectionTouched = stored.gearIDs != nil
         selectedSpotifyPlaylist = stored.spotifyPlaylist
         spotifyAutoplayOnStart = stored.spotifyAutoplayOnStart
+        if let config = stored.audioCoachConfiguration {
+            audioCoachDraft.load(configuration: config)
+            coachIsCustomized = true
+        }
+        if let config = stored.routeAlertConfiguration {
+            routeGuardianDraft.load(configuration: config)
+            routeIsCustomized = true
+        }
+        if let duration = stored.ghostTargetDurationSeconds, duration > 0 {
+            ghostDraft.enabled = true
+            ghostDraft.targetTimeText = GhostTargetTimeFormatter.string(duration)
+        }
+        if let updates = stored.ghostUpdates {
+            ghostDraft.updatesConfiguration = updates
+            ghostDraft.updatesEnabled = updates.enabled
+        }
         manualDurationMinutes = stored.manualMinutes
         durationInputText = (stored.manualMinutes ??
             ATHLTHWorkoutDurationEstimator.minutes(for: stored.blocks)).map(String.init) ?? ""
@@ -3692,7 +3748,15 @@ struct WorkoutTemplateBuilderView: View {
             studioAdvanced: studioAdvanced,
             studioDate: studioBasicDate,
             pendingExercisePicker: showingExercisePicker || resumeExercisePickerAfterWake,
-            pendingRunningPicker: showingRunningExercisePicker || resumeRunningPickerAfterWake
+            pendingRunningPicker: showingRunningExercisePicker || resumeRunningPickerAfterWake,
+            audioCoachConfiguration: currentAudioCoachConfiguration,
+            routeAlertConfiguration: routeIsCustomized
+                ? routeGuardianDraft.configuration : nil,
+            ghostTargetDurationSeconds: ghostDraft.targetDuration,
+            ghostUpdates: ghostDraft.enabled
+                ? ghostDraft.resolvedUpdates(
+                    fallback: settings.ghostRaceAudioConfiguration
+                  ) : nil
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: draftStorageKey)
@@ -3911,6 +3975,34 @@ struct WorkoutTemplateBuilderView: View {
         manualDurationMinutes ?? knownDurationMinutes
     }
 
+    /// Populate default settings only once; opening another editor does not
+    /// overwrite choices already made in this workout draft.
+    private func loadGuidanceDefaultsIfNeeded() {
+        guard !guidanceDefaultsLoaded else { return }
+        guidanceDefaultsLoaded = true
+        if !coachIsCustomized {
+            audioCoachDraft.load(from: settings)
+        }
+        if !routeIsCustomized {
+            routeGuardianDraft.load(from: settings)
+        }
+        if ghostDraft.updatesConfiguration == nil {
+            ghostDraft.updatesConfiguration = settings.ghostRaceAudioConfiguration
+            ghostDraft.updatesEnabled = settings.ghostRaceAudioEnabled
+        }
+    }
+
+    private var currentAudioCoachConfiguration: WatchAudioCoachConfiguration? {
+        guard coachIsCustomized else { return nil }
+        return audioCoachDraft.configuration(
+            routeDistanceMeters: activeRoute.map {
+                $0.distanceKilometers * 1_000
+            },
+            maximumHeartRateBPM:
+                session.onboardingProfile?.maximumHeartRateBPM.map(Double.init)
+        )
+    }
+
     private var workoutExtrasMenu: some View {
         ATHLTHWorkoutExtrasMenu(
             onGear: { selectedWorkoutExtra = .gear },
@@ -3920,8 +4012,23 @@ struct WorkoutTemplateBuilderView: View {
             },
             onSpotify: { selectedWorkoutExtra = .spotify },
             onHeartRateAndPace: { selectedWorkoutExtra = .heartRateAndPace },
-            onAudioCoach: { selectedWorkoutExtra = .audioCoach },
-            onGhostRace: { selectedWorkoutExtra = .ghostRace }
+            onAudioCoach: {
+                loadGuidanceDefaultsIfNeeded()
+                coachIsCustomized = true
+                selectedWorkoutExtra = .audioCoach
+            },
+            onGhostRace: {
+                loadGuidanceDefaultsIfNeeded()
+                if ghostDraft.targetTimeText.isEmpty {
+                    ghostDraft.load(route: activeRoute, settings: settings)
+                }
+                selectedWorkoutExtra = .ghostRace
+            },
+            onNavigation: {
+                loadGuidanceDefaultsIfNeeded()
+                routeIsCustomized = true
+                selectedWorkoutExtra = .navigation
+            }
         )
     }
 
@@ -4432,21 +4539,41 @@ struct WorkoutTemplateBuilderView: View {
                     ATHLTHWorkoutTargetsQuickSheet(blocks: $blocks)
                 case .audioCoach:
                     NavigationStack {
-                        ATHLTHAudioCoachSettingsView()
+                        ScrollView {
+                            PerWorkoutAudioCoachView(
+                                draft: $audioCoachDraft,
+                                showRouteOptions: activeRoute != nil,
+                                showStructuredOptions: !blocks.isEmpty
+                            )
+                        }
+                        .toolbar {
+                            ToolbarItem(placement: .confirmationAction) {
+                                Button(tr("Done", "Ferdig")) {
+                                    persistWorkoutDraft()
+                                    selectedWorkoutExtra = nil
+                                }
+                            }
+                        }
+                    }
+                case .ghostRace:
+                    NavigationStack {
+                        PerWorkoutGhostView(draft: $ghostDraft, route: activeRoute)
                             .toolbar {
-                                ToolbarItem(placement: .cancellationAction) {
+                                ToolbarItem(placement: .confirmationAction) {
                                     Button(tr("Done", "Ferdig")) {
+                                        persistWorkoutDraft()
                                         selectedWorkoutExtra = nil
                                     }
                                 }
                             }
                     }
-                case .ghostRace:
+                case .navigation:
                     NavigationStack {
-                        GhostRaceHubView()
+                        PerWorkoutRouteGuardianView(draft: $routeGuardianDraft)
                             .toolbar {
-                                ToolbarItem(placement: .cancellationAction) {
+                                ToolbarItem(placement: .confirmationAction) {
                                     Button(tr("Done", "Ferdig")) {
+                                        persistWorkoutDraft()
                                         selectedWorkoutExtra = nil
                                     }
                                 }
@@ -6603,6 +6730,16 @@ struct WorkoutTemplateBuilderView: View {
         }
         workout.spotifyPlaylist = selectedSpotifyPlaylist
         workout.spotifyAutoplayOnStart = spotifyAutoplayOnStart
+        workout.audioCoachConfiguration = currentAudioCoachConfiguration
+        workout.routeAlertConfiguration = hasOutdoorCardio && routeIsCustomized &&
+            activeRoute != nil ? routeGuardianDraft.configuration : nil
+        workout.ghostTargetDurationSeconds = hasOutdoorCardio &&
+            activeRoute != nil ? ghostDraft.targetDuration : nil
+        workout.ghostUpdates = workout.ghostTargetDurationSeconds != nil
+            ? ghostDraft.resolvedUpdates(
+                fallback: settings.ghostRaceAudioConfiguration
+              )
+            : nil
         if isPlannedWorkout, initialActivity == .running, !studioAdvanced {
             switch studioBasicRunEnvironment {
             case .outdoor: workout.workoutCategory = "running"
@@ -6626,7 +6763,11 @@ struct WorkoutTemplateBuilderView: View {
         let extras = ATHLTHWorkoutPlannerExtras(
             gearIDs: workout.gearIDs,
             spotifyPlaylist: workout.spotifyPlaylist,
-            spotifyAutoplayOnStart: workout.spotifyAutoplayOnStart
+            spotifyAutoplayOnStart: workout.spotifyAutoplayOnStart,
+            audioCoachConfiguration: workout.audioCoachConfiguration,
+            routeAlertConfiguration: workout.routeAlertConfiguration,
+            ghostTargetDurationSeconds: workout.ghostTargetDurationSeconds,
+            ghostUpdates: workout.ghostUpdates
         )
         if let onAddStandalone {
             guard onAddStandalone(workout) else {

@@ -1019,6 +1019,7 @@ struct PostWorkoutReviewView: View {
     @State private var replayContext: WorkoutAIInsightContext?
     @State private var completionWaitingSeconds: TimeInterval?
     @State private var completionRoute: [CLLocation] = []
+    @State private var completionHealthDistanceSplits: [ATHLTHRunningResultInsights.KilometerSplit] = []
     @State private var completionMeasuredPulse: [ATHLTHRunningHeartRatePoint] = []
     @State private var isAdvancedReview = false
     @State private var showingKilometerDetails = false
@@ -1258,6 +1259,8 @@ struct PostWorkoutReviewView: View {
                     loadCompletionRoute()
                 async let pulseLoad: Void =
                     loadCompletionPulse()
+                async let distanceSplitLoad: Void =
+                    loadCompletionHealthDistanceSplits()
                 async let mediaLoad: Void =
                     social.refreshWorkoutMedia()
 
@@ -1266,6 +1269,7 @@ struct PostWorkoutReviewView: View {
                     replayLoad,
                     routeLoad,
                     pulseLoad,
+                    distanceSplitLoad,
                     mediaLoad
                 )
             }
@@ -1281,9 +1285,12 @@ struct PostWorkoutReviewView: View {
         }
     }
 
-    /// Prefer genuine GPS kilometre markers outdoors. On a treadmill use
-    /// recorded Watch/iPhone minute distance, never planned target speed.
+    /// Prefer workout-associated HealthKit distance over route geometry;
+    /// preserve the existing GPS and indoor recorded-minute fallbacks.
     private var reviewedKilometerSplits: [ATHLTHRunningResultInsights.KilometerSplit] {
+        if !completionHealthDistanceSplits.isEmpty {
+            return completionHealthDistanceSplits
+        }
         let routeSplits = ATHLTHRunningResultInsights.kilometerSplits(
             from: completionRoute, reportedDistanceMeters: workout.distanceMeters)
         if !routeSplits.isEmpty { return routeSplits }
@@ -4266,6 +4273,16 @@ struct PostWorkoutReviewView: View {
             maximumHeartRateBPM:
                 session.onboardingProfile?.maximumHeartRateBPM
         )
+    }
+
+    @MainActor
+    private func loadCompletionHealthDistanceSplits() async {
+        completionHealthDistanceSplits = []
+        guard (workout.activity == .running || workout.activity == .walking),
+              workout.isIndoor != true else { return }
+        let splits = await health.runningDistanceKilometerSplits(for: workout.id)
+        guard !Task.isCancelled else { return }
+        completionHealthDistanceSplits = splits
     }
 
     @MainActor

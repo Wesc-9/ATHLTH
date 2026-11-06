@@ -4,6 +4,27 @@ import XCTest
 
 final class ATHLTHDirectTrainingShareTests: XCTestCase {
     @MainActor
+    func testHomeFriendQuickShareIncludesAllFourActions() {
+        // The Home friend popover and success handler must support exactly
+        // these four types, including both saved workout formats.
+        XCTAssertEqual(
+            ATHLTHFriendQuickShareKind.allCases.map(\.rawValue),
+            ["plan", "workout", "route", "exercise"]
+        )
+        XCTAssertEqual(ATHLTHFriendQuickShareKind.plan.allowedKinds, [.trainingPlan])
+        XCTAssertEqual(
+            ATHLTHFriendQuickShareKind.workout.allowedKinds,
+            [.workout, .runningWorkout]
+        )
+        XCTAssertEqual(ATHLTHFriendQuickShareKind.route.allowedKinds, [.route])
+        XCTAssertEqual(ATHLTHFriendQuickShareKind.exercise.allowedKinds, [.exercise])
+
+        let messages = ATHLTHFriendQuickShareKind.allCases.map(\.sentConfirmation)
+        XCTAssertTrue(messages.allSatisfy { !$0.isEmpty })
+        XCTAssertEqual(Set(messages).count, 4)
+    }
+
+    @MainActor
     func testExerciseIsValidMessagingKind() throws {
         XCTAssertEqual(MessageShareKind.exercise.rawValue, "exercise")
         let exercise = ExerciseSnapshot(
