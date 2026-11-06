@@ -296,338 +296,193 @@ struct ATHLTHGhostUpdatesSettingsView: View {
     @EnvironmentObject private var settings:
         AppSettingsStore
 
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
+
     var body: some View {
-        Form {
-            Section {
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Ghost Updates",
-                        norwegian: "Ghost-oppdateringer"
+        ScrollView {
+            VStack(alignment: .leading, spacing: 15) {
+                ATHLTHPlanSectionIntro(
+                    eyebrow: tr("RACE EXPERIENCE", "KONKURRANSEOPPLEVELSE"),
+                    title: "Ghost Race",
+                    subtitle: tr(
+                        "Race a target with useful updates, not constant interruptions.",
+                        "Konkurrer mot et mål med nyttige oppdateringer, ikke stadige avbrytelser."
                     ),
-                    isOn:
-                        $settings
-                            .ghostRaceAudioEnabled
+                    icon: "figure.run.circle"
                 )
-            } footer: {
-                Text(
-                    ATHLTHLocalization.choose(
-                        english:
-                            "Ghost remains visible even when updates are off. These settings apply to iPhone and Apple Watch.",
-                        norwegian:
-                            "Ghost er fortsatt synlig selv om oppdateringer er av. Innstillingene gjelder både iPhone og Apple Watch."
-                    )
-                )
+
+                ATHLTHPlanSurface(ghost: false) {
+                    Toggle(isOn: $settings.ghostRaceAudioEnabled) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(tr("Spoken Ghost updates", "Oppleste Ghost-oppdateringer"))
+                                .font(.headline)
+                            Text(tr("The on-screen Ghost stays visible if voice is off.",
+                                    "Ghost vises fortsatt på skjermen når lyd er av."))
+                                .font(.caption)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                    .tint(ATHLTHPlanDesign.accentInk)
+                }
+
+                if settings.ghostRaceAudioEnabled {
+                    presetCard
+                    cadenceCard
+                    eventCard
+                    advancedCard
+                }
+
+                Text(tr(
+                    "These are defaults. Target time, pacing strategy and spoken updates can also be tailored to each workout.",
+                    "Dette er standardvalg. Måltid, tempotaktikk og taleoppdateringer kan også tilpasses hver enkelt økt."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .padding(.horizontal, 4)
             }
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
+            .padding(16)
+        }
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
+        .navigationTitle("Ghost Race")
+        .navigationBarTitleDisplayMode(.inline)
+    }
 
-            if settings.ghostRaceAudioEnabled {
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Update style",
-                        norwegian: "Oppdateringsstil"
-                    )
-                ) {
-                    Picker(
-                        ATHLTHLocalization.choose(
-                            english: "Preset",
-                            norwegian: "Oppsett"
-                        ),
-                        selection: presetBinding
-                    ) {
-                        ForEach(
-                            GhostRaceUpdatePreset
-                                .allCases
-                        ) { preset in
-                            Text(preset.title)
-                                .tag(preset)
-                        }
-                    }
-
-                    Text(presetDescription)
-                        .font(.caption)
-                        .foregroundStyle(
-                            .secondary
-                        )
+    private var presetCard: some View {
+        ATHLTHPlanSurface(ghost: false) {
+            heading(tr("Choose intensity", "Velg intensitet"), "slider.horizontal.3")
+            Picker(tr("Update preset", "Oppdateringsnivå"), selection: presetBinding) {
+                ForEach(GhostRaceUpdatePreset.allCases) { preset in
+                    Text(preset.title).tag(preset)
                 }
+            }
+            .pickerStyle(.segmented)
+            Text(presetDescription)
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+        }
+    }
 
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Periodic race status",
-                        norwegian: "Fast løpsstatus"
-                    )
-                ) {
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Every distance interval",
-                            norwegian: "Etter fast avstand"
-                        ),
-                        isOn:
-                            $settings
-                                .ghostRaceAudioUseDistance
-                    )
+    private var cadenceCard: some View {
+        ATHLTHPlanSurface(ghost: false) {
+            heading(tr("Live comparison", "Sammenligning underveis"), "stopwatch")
+            Toggle(tr("Status after distance", "Status etter distanse"),
+                   isOn: $settings.ghostRaceAudioUseDistance)
+            if settings.ghostRaceAudioUseDistance {
+                Picker(tr("Distance interval", "Distanseintervall"),
+                       selection: $settings.ghostRaceAudioDistanceIntervalKilometers) {
+                    Text("250 m").tag(0.25)
+                    Text("500 m").tag(0.5)
+                    Text("1 km").tag(1.0)
+                    Text("2 km").tag(2.0)
+                    Text("5 km").tag(5.0)
+                }
+                .pickerStyle(.menu)
+            }
+            Toggle(tr("Status after time", "Status etter tid"),
+                   isOn: $settings.ghostRaceAudioUseTime)
+            if settings.ghostRaceAudioUseTime {
+                Picker(tr("Time interval", "Tidsintervall"),
+                       selection: $settings.ghostRaceAudioTimeIntervalMinutes) {
+                    Text("2 min").tag(2)
+                    Text("5 min").tag(5)
+                    Text("10 min").tag(10)
+                    Text("15 min").tag(15)
+                }
+                .pickerStyle(.menu)
+            }
+            Picker(tr("Status includes", "Status inneholder"),
+                   selection: $settings.ghostRaceStatusDetailMode) {
+                ForEach(GhostRaceStatusDetailMode.allCases) { mode in
+                    Text(mode.title).tag(mode)
+                }
+            }
+            .pickerStyle(.menu)
+            Picker(tr("Status delivery", "Status varsles med"),
+                   selection: $settings.ghostRaceAudioDelivery) {
+                ForEach(WatchAlertDelivery.allCases) { delivery in
+                    Text(delivery.title).tag(delivery)
+                }
+            }
+            .pickerStyle(.menu)
+        }
+    }
 
-                    if settings
-                        .ghostRaceAudioUseDistance {
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "Distance interval",
-                                norwegian: "Avstandsintervall"
-                            ),
-                            selection:
-                                $settings
-                                    .ghostRaceAudioDistanceIntervalKilometers
-                        ) {
-                            Text("0.5 km")
-                                .tag(0.5)
-                            Text("1 km")
-                                .tag(1.0)
-                            Text("2 km")
-                                .tag(2.0)
-                            Text("5 km")
-                                .tag(5.0)
+    private var eventCard: some View {
+        ATHLTHPlanSurface(ghost: false) {
+            heading(tr("Race moments", "Løpsøyeblikk"), "flag.checkered")
+            Toggle(tr("Overtaking alerts", "Forbikjøringsvarsler"),
+                   isOn: $settings.ghostRaceAnnounceOvertakes)
+            Toggle(tr("Final stretch", "Siste etappe"),
+                   isOn: $settings.ghostRaceFinalPhaseEnabled)
+            if settings.ghostRaceFinalPhaseEnabled {
+                Picker(tr("Final stretch begins", "Start siste etappe"),
+                       selection: $settings.ghostRaceFinalPhaseStartMeters) {
+                    Text("200 m").tag(200.0)
+                    Text("500 m").tag(500.0)
+                    Text("1 km").tag(1_000.0)
+                }
+                .pickerStyle(.menu)
+            }
+            Toggle(tr("Live connection alerts", "Varsler om live-tilkobling"),
+                   isOn: $settings.ghostRaceLiveConnectionAlerts)
+        }
+    }
+
+    private var advancedCard: some View {
+        ATHLTHPlanSurface(ghost: false) {
+            DisclosureGroup {
+                Toggle(tr("Extra lead changes", "Ekstra ledelsesendringer"),
+                       isOn: $settings.ghostRaceAudioAnnounceLeadChanges)
+                if settings.ghostRaceAudioAnnounceLeadChanges {
+                    Picker(tr("Lead-change threshold", "Terskel for endring"),
+                           selection: $settings.ghostRaceAudioLeadChangeMeters) {
+                        Text("15 m").tag(15.0)
+                        Text("25 m").tag(25.0)
+                        Text("50 m").tag(50.0)
+                        Text("100 m").tag(100.0)
+                    }
+                    Picker(tr("Normal change delivery", "Vanlige endringer"),
+                           selection: $settings.ghostRaceAudioLeadChangeDelivery) {
+                        ForEach(WatchAlertDelivery.allCases) { delivery in
+                            Text(delivery.title).tag(delivery)
                         }
                     }
-
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Every time interval",
-                            norwegian: "Etter fast tid"
-                        ),
-                        isOn:
-                            $settings
-                                .ghostRaceAudioUseTime
-                    )
-
-                    if settings
-                        .ghostRaceAudioUseTime {
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "Time interval",
-                                norwegian: "Tidsintervall"
-                            ),
-                            selection:
-                                $settings
-                                    .ghostRaceAudioTimeIntervalMinutes
-                        ) {
-                            Text("2 min")
-                                .tag(2)
-                            Text("5 min")
-                                .tag(5)
-                            Text("10 min")
-                                .tag(10)
-                            Text("15 min")
-                                .tag(15)
-                        }
+                    Picker(tr("Important change threshold", "Stor endring"),
+                           selection: $settings.ghostRaceAudioImportantLeadChangeMeters) {
+                        Text("50 m").tag(50.0)
+                        Text("75 m").tag(75.0)
+                        Text("100 m").tag(100.0)
+                        Text("150 m").tag(150.0)
                     }
-
-                    Picker(
-                        ATHLTHLocalization.choose(
-                            english: "Status includes",
-                            norwegian: "Status inneholder"
-                        ),
-                        selection:
-                            $settings
-                                .ghostRaceStatusDetailMode
-                    ) {
-                        ForEach(
-                            GhostRaceStatusDetailMode
-                                .allCases
-                        ) { mode in
-                            Text(mode.title)
-                                .tag(mode)
-                        }
-                    }
-
-                    Picker(
-                        ATHLTHLocalization.choose(
-                            english: "Periodic delivery",
-                            norwegian: "Levering"
-                        ),
-                        selection:
-                            $settings
-                                .ghostRaceAudioDelivery
-                    ) {
-                        ForEach(
-                            WatchAlertDelivery
-                                .allCases
-                        ) { delivery in
-                            Text(delivery.title)
-                                .tag(delivery)
+                    Picker(tr("Important change delivery", "Viktig endring varsles med"),
+                           selection: $settings.ghostRaceAudioImportantLeadChangeDelivery) {
+                        ForEach(WatchAlertDelivery.allCases) { delivery in
+                            Text(delivery.title).tag(delivery)
                         }
                     }
                 }
-
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Race events",
-                        norwegian: "Løpshendelser"
-                    )
-                ) {
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Overtake alerts",
-                            norwegian: "Forbikjøringsvarsler"
-                        ),
-                        isOn:
-                            $settings
-                                .ghostRaceAnnounceOvertakes
-                    )
-
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Final phase alert",
-                            norwegian: "Sluttfasevarsel"
-                        ),
-                        isOn:
-                            $settings
-                                .ghostRaceFinalPhaseEnabled
-                    )
-
-                    if settings
-                        .ghostRaceFinalPhaseEnabled {
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "Final phase starts",
-                                norwegian: "Sluttfasen starter"
-                            ),
-                            selection:
-                                $settings
-                                    .ghostRaceFinalPhaseStartMeters
-                        ) {
-                            Text("200 m")
-                                .tag(200.0)
-                            Text("500 m")
-                                .tag(500.0)
-                            Text("1 km")
-                                .tag(1_000.0)
-                        }
-                    }
-
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Live connection alerts",
-                            norwegian: "Live-tilkoblingsvarsler"
-                        ),
-                        isOn:
-                            $settings
-                                .ghostRaceLiveConnectionAlerts
-                    )
-                }
-
-                Section(
-                    ATHLTHLocalization.choose(
-                        english: "Advanced lead changes",
-                        norwegian: "Avanserte ledelsesendringer"
-                    )
-                ) {
-                    Toggle(
-                        ATHLTHLocalization.choose(
-                            english: "Extra lead-change alerts",
-                            norwegian: "Ekstra ledelsesvarsler"
-                        ),
-                        isOn:
-                            $settings
-                                .ghostRaceAudioAnnounceLeadChanges
-                    )
-
-                    if settings
-                        .ghostRaceAudioAnnounceLeadChanges {
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "Change threshold",
-                                norwegian: "Endringsterskel"
-                            ),
-                            selection:
-                                $settings
-                                    .ghostRaceAudioLeadChangeMeters
-                        ) {
-                            Text("15 m")
-                                .tag(15.0)
-                            Text("25 m")
-                                .tag(25.0)
-                            Text("50 m")
-                                .tag(50.0)
-                            Text("100 m")
-                                .tag(100.0)
-                        }
-
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "Normal lead change",
-                                norwegian: "Normal ledelsesendring"
-                            ),
-                            selection:
-                                $settings
-                                    .ghostRaceAudioLeadChangeDelivery
-                        ) {
-                            ForEach(
-                                WatchAlertDelivery
-                                    .allCases
-                            ) { delivery in
-                                Text(delivery.title)
-                                    .tag(delivery)
-                            }
-                        }
-
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "Important change",
-                                norwegian: "Viktig endring"
-                            ),
-                            selection:
-                                $settings
-                                    .ghostRaceAudioImportantLeadChangeMeters
-                        ) {
-                            Text("50 m")
-                                .tag(50.0)
-                            Text("75 m")
-                                .tag(75.0)
-                            Text("100 m")
-                                .tag(100.0)
-                            Text("150 m")
-                                .tag(150.0)
-                        }
-
-                        Picker(
-                            ATHLTHLocalization.choose(
-                                english: "Important delivery",
-                                norwegian: "Viktig levering"
-                            ),
-                            selection:
-                                $settings
-                                    .ghostRaceAudioImportantLeadChangeDelivery
-                        ) {
-                            ForEach(
-                                WatchAlertDelivery
-                                    .allCases
-                            ) { delivery in
-                                Text(delivery.title)
-                                    .tag(delivery)
-                            }
-                        }
-                    }
-                }
-
-                Section {
-                    Text(
-                        ATHLTHLocalization.choose(
-                            english:
-                                "Distance/time is the normal cadence. Overtakes, final phase and optional lead changes are separate events between those updates. Small GPS movement around neck-and-neck is filtered automatically.",
-                            norwegian:
-                                "Avstand/tid er den normale rytmen. Forbikjøring, sluttfase og valgfrie ledelsesendringer er egne hendelser mellom disse oppdateringene. Små GPS-svingninger rundt helt jevnt filtreres automatisk."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+                Text(tr(
+                    "Small GPS variations around equal pace are automatically filtered.",
+                    "Små GPS-variasjoner ved jevn konkurranse filtreres automatisk."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            } label: {
+                heading(tr("Advanced race alerts", "Avanserte konkurransevarsler"),
+                        "slider.horizontal.3")
             }
         }
-        .navigationTitle(
-            ATHLTHLocalization.choose(
-                english: "Ghost Updates",
-                norwegian: "Ghost-oppdateringer"
-            )
-        )
-        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func heading(_ title: String, _ icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.system(size: 19, weight: .semibold, design: .serif))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
     }
 
     private var presetBinding:
