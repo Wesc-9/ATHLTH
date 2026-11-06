@@ -126,10 +126,10 @@ struct WorkoutStartOptionsView: View {
             initialValue:
                 savedAdvanced.keepScreenAwake
         )
-        _inputMode = State(
-            initialValue:
-                savedAdvanced.inputMode
-        )
+        // Each new session starts with Watch and iPhone both editable.
+        // A previously saved iPhone-only choice must not silently disable
+        // set registration on Apple Watch in the next workout.
+        _inputMode = State(initialValue: .both)
         _effortMetric = State(
             initialValue:
                 savedAdvanced.effortMetric ??
