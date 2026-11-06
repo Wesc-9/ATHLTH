@@ -88,11 +88,13 @@ struct ATHLTHStrengthCompletionReview: View {
 
     private var completionHero: some View {
         VStack(spacing: 0) {
-            ZStack(alignment: .bottomLeading) {
-                Image("StrengthPostWorkoutHero")
+            GeometryReader { viewport in
+                ZStack(alignment: .bottomLeading) {
+                    Image("StrengthPostWorkoutHero")
                     .resizable()
                     .scaledToFill()
-                    .frame(height: 190)
+                    .athlthBoundedFill()
+                    .frame(width: viewport.size.width, height: 190)
                     .clipped()
                 LinearGradient(
                     colors: [
@@ -120,6 +122,8 @@ struct ATHLTHStrengthCompletionReview: View {
                     .foregroundStyle(.white.opacity(0.84))
                 }
                 .padding(21)
+                }
+                .frame(width: viewport.size.width, height: 190)
             }
             .frame(height: 190)
 
