@@ -6813,7 +6813,10 @@ struct SessionEditorView: View {
                         settings.audioCoachConfiguration(
                             enabled:
                                 settings.audioCoachEnabledByDefault
-                        )
+                        ),
+                    showRouteOptions: runEnvironment == .outdoor &&
+                        selectedRoute != nil,
+                    showStructuredOptions: true
                 )
             }
             .sheet(
@@ -10659,335 +10662,131 @@ struct SessionEditorView: View {
     }
 }
 
+/// The advanced planned-workout editor shares the full Quick Train Coach
+/// studio. Save writes a snapshot to this workout, never to app defaults.
 private struct PlannedAudioCoachEditorView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSessionStore
 
-    @Binding var configuration:
-        WatchAudioCoachConfiguration?
-
-    let defaultConfiguration:
-        WatchAudioCoachConfiguration
+    @Binding var configuration: WatchAudioCoachConfiguration?
+    let defaultConfiguration: WatchAudioCoachConfiguration
+    let showRouteOptions: Bool
+    let showStructuredOptions: Bool
 
     @State private var usesCustomSettings: Bool
-    @State private var draft:
-        WatchAudioCoachConfiguration
+    @State private var coachDraft: AudioCoachDraft
 
     init(
-        configuration:
-            Binding<WatchAudioCoachConfiguration?>,
-        defaultConfiguration:
-            WatchAudioCoachConfiguration
+        configuration: Binding<WatchAudioCoachConfiguration?>,
+        defaultConfiguration: WatchAudioCoachConfiguration,
+        showRouteOptions: Bool,
+        showStructuredOptions: Bool
     ) {
         _configuration = configuration
-        self.defaultConfiguration =
-            defaultConfiguration
-
-        let existing =
-            configuration.wrappedValue
-
-        _usesCustomSettings = State(
-            initialValue: existing != nil
-        )
-        _draft = State(
-            initialValue:
-                existing ??
-                defaultConfiguration
-        )
+        self.defaultConfiguration = defaultConfiguration
+        self.showRouteOptions = showRouteOptions
+        self.showStructuredOptions = showStructuredOptions
+        _usesCustomSettings = State(initialValue: configuration.wrappedValue != nil)
+        var initial = AudioCoachDraft()
+        initial.load(configuration: configuration.wrappedValue ?? defaultConfiguration)
+        _coachDraft = State(initialValue: initial)
     }
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    Toggle(
-                        "Customize for this workout",
-                        isOn: $usesCustomSettings
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    ATHLTHPlanSectionIntro(
+                        eyebrow: ATHLTHLocalization.choose(
+                            english: "WORKOUT-SPECIFIC GUIDANCE",
+                            norwegian: "VEILEDNING FOR DENNE ØKTEN"
+                        ),
+                        title: "Audio Coach",
+                        subtitle: ATHLTHLocalization.choose(
+                            english: "Build your own coaching experience. Every choice is saved with this workout.",
+                            norwegian: "Sett opp din egen coach. Alle valgene lagres med denne økten."
+                        ),
+                        icon: "waveform.and.mic"
                     )
 
-                    Text(
-                        usesCustomSettings
-                            ? "These settings apply only to this planned workout."
-                            : "ATHLTH will use your Audio Coach defaults from Settings."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-
-                if usesCustomSettings {
-                    Section("Audio Coach") {
+                    ATHLTHPlanSurface(ghost: false) {
                         Toggle(
-                            "Audio Coach",
-                            isOn: $draft.enabled
+                            ATHLTHLocalization.choose(
+                                english: "Customize this workout",
+                                norwegian: "Egne innstillinger for denne økten"
+                            ),
+                            isOn: $usesCustomSettings
                         )
-
-                        Picker(
-                            "Language",
-                            selection: $draft.language
-                        ) {
-                            ForEach(
-                                WatchAudioCoachLanguage
-                                    .allCases,
-                                id: \.self
-                            ) { language in
-                                Text(language.title)
-                                    .tag(language)
-                            }
-                        }
+                        .tint(ATHLTHPlanDesign.accentInk)
+                        Text(ATHLTHLocalization.choose(
+                            english: usesCustomSettings
+                                ? "Overrides only this planned workout."
+                                : "Uses your default settings; nothing is overwritten.",
+                            norwegian: usesCustomSettings
+                                ? "Overstyrer innstillingene bare for denne økten."
+                                : "Bruker standardinnstillinger uten å overskrive dem."
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     }
 
-                    if draft.enabled {
-                        Section("When to speak") {
-                            Toggle(
-                                "Distance interval",
-                                isOn:
-                                    distanceTriggerBinding
+                    if usesCustomSettings {
+                        ATHLTHPlusFeatureGate(
+                            feature: .audioCoach,
+                            title: "Audio Coach · ATHLTH+",
+                            message: "Spoken workout guidance is available with ATHLTH+."
+                        ) {
+                            ATHLTHAudioCoachSessionStudio(
+                                draft: $coachDraft,
+                                showRouteOptions: showRouteOptions,
+                                showStructuredOptions: showStructuredOptions
                             )
-
-                            if draft
-                                .distanceIntervalMeters != nil {
-                                Stepper(
-                                    distanceIntervalLabel,
-                                    value:
-                                        distanceIntervalBinding,
-                                    in: 250...10_000,
-                                    step: 250
-                                )
-                            }
-
-                            Toggle(
-                                "Time interval",
-                                isOn: timeTriggerBinding
-                            )
-
-                            if draft
-                                .timeIntervalSeconds != nil {
-                                Stepper(
-                                    timeIntervalLabel,
-                                    value:
-                                        timeIntervalBinding,
-                                    in: 60...3_600,
-                                    step: 60
-                                )
-                            }
-                        }
-
-                        Section("Announcements") {
-                            Toggle(
-                                "Distance",
-                                isOn:
-                                    $draft
-                                        .announceDistance
-                            )
-                            Toggle(
-                                "Elapsed time",
-                                isOn:
-                                    $draft
-                                        .announceElapsedTime
-                            )
-                            Toggle(
-                                "Average pace",
-                                isOn:
-                                    $draft
-                                        .announceAveragePace
-                            )
-                            Toggle(
-                                "Clock time",
-                                isOn:
-                                    $draft
-                                        .announceClockTime
-                            )
-                            Toggle(
-                                "Heart rate",
-                                isOn:
-                                    $draft
-                                        .announceHeartRate
-                            )
-                            Toggle(
-                                "Remaining route distance",
-                                isOn:
-                                    $draft
-                                        .announceRemainingRouteDistance
-                            )
-                            Toggle(
-                                "Estimated route time left",
-                                isOn:
-                                    $draft
-                                        .announceEstimatedRemainingRouteTime
-                            )
-                            Toggle(
-                                "Current workout step",
-                                isOn:
-                                    $draft
-                                        .announceCurrentWorkoutStep
-                            )
-                            Toggle(
-                                "Remaining step time",
-                                isOn:
-                                    $draft
-                                        .announceRemainingStepTime
-                            )
-                            Toggle(
-                                "Remaining step distance",
-                                isOn:
-                                    $draft
-                                        .announceRemainingStepDistance
-                            )
-                        }
-
-                        Section("Music & other audio") {
-                            Toggle(
-                                "Lower music while coach speaks",
-                                isOn: Binding(
-                                    get: {
-                                        draft.shouldDuckOtherAudio
-                                    },
-                                    set: { enabled in
-                                        draft.duckOtherAudio = enabled
-                                    }
-                                )
-                            )
-
-                            Text(
-                                draft.shouldDuckOtherAudio
-                                    ? "Spotify and other audio are reduced only while the coach is speaking."
-                                    : "Coach speech mixes with other audio at its current level."
-                            )
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                         }
                     }
                 }
+                .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+                .frame(maxWidth: .infinity)
+                .padding(16)
+                .padding(.bottom, 18)
             }
+            .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
             .navigationTitle("Audio Coach")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(
-                    placement: .cancellationAction
-                ) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Cancel", norwegian: "Avbryt"
+                    )) { dismiss() }
                 }
-
-                ToolbarItem(
-                    placement: .confirmationAction
-                ) {
-                    Button("Save") {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Save", norwegian: "Lagre"
+                    )) {
                         if usesCustomSettings {
-                            var saved = draft
-                            saved.routeDistanceMeters = nil
-                            configuration = saved
+                            var updated = coachDraft.applying(
+                                to: configuration ?? defaultConfiguration,
+                                maximumHeartRateBPM:
+                                    session.onboardingProfile?.maximumHeartRateBPM
+                                        .map(Double.init)
+                            )
+                            // Route metadata is refreshed when the workout
+                            // starts; do not persist a stale route length.
+                            updated.routeDistanceMeters = nil
+                            configuration = updated
                         } else {
                             configuration = nil
                         }
-
                         dismiss()
                     }
+                    .fontWeight(.semibold)
                 }
             }
-            .onChange(
-                of: usesCustomSettings
-            ) { _, enabled in
-                if enabled &&
-                    configuration == nil {
-                    draft = defaultConfiguration
+            .onChange(of: usesCustomSettings) { _, enabled in
+                if enabled && configuration == nil {
+                    coachDraft.load(configuration: defaultConfiguration)
                 }
             }
         }
-    }
-
-    private var distanceTriggerBinding:
-        Binding<Bool> {
-        Binding(
-            get: {
-                draft.distanceIntervalMeters != nil
-            },
-            set: { enabled in
-                draft.distanceIntervalMeters =
-                    enabled
-                        ? (
-                            draft
-                                .distanceIntervalMeters ??
-                            defaultConfiguration
-                                .distanceIntervalMeters ??
-                            1_000
-                        )
-                        : nil
-            }
-        )
-    }
-
-    private var timeTriggerBinding:
-        Binding<Bool> {
-        Binding(
-            get: {
-                draft.timeIntervalSeconds != nil
-            },
-            set: { enabled in
-                draft.timeIntervalSeconds =
-                    enabled
-                        ? (
-                            draft
-                                .timeIntervalSeconds ??
-                            defaultConfiguration
-                                .timeIntervalSeconds ??
-                            600
-                        )
-                        : nil
-            }
-        )
-    }
-
-    private var distanceIntervalBinding:
-        Binding<Double> {
-        Binding(
-            get: {
-                draft.distanceIntervalMeters ??
-                1_000
-            },
-            set: {
-                draft.distanceIntervalMeters = $0
-            }
-        )
-    }
-
-    private var timeIntervalBinding:
-        Binding<Double> {
-        Binding(
-            get: {
-                draft.timeIntervalSeconds ??
-                600
-            },
-            set: {
-                draft.timeIntervalSeconds = $0
-            }
-        )
-    }
-
-    private var distanceIntervalLabel: String {
-        let meters =
-            draft.distanceIntervalMeters ??
-            1_000
-
-        if meters >= 1_000 {
-            return String(
-                format:
-                    "Every %.2g km",
-                meters / 1_000
-            )
-        }
-
-        return
-            "Every \(Int(meters.rounded())) m"
-    }
-
-    private var timeIntervalLabel: String {
-        let seconds =
-            draft.timeIntervalSeconds ??
-            600
-
-        return
-            "Every \(max(Int((seconds / 60).rounded()), 1)) min"
     }
 }
 
