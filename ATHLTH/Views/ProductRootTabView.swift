@@ -6383,10 +6383,11 @@ struct ATHLTHTrainView: View {
                     session.reconcilePlanLinkedPhoneWorkouts(
                         phoneWorkout.history, healthWorkouts: health.workouts
                     )
-                    await exerciseLibrary.refresh()
-                    guard !Task.isCancelled, isActive,
-                          session.profile.userID == userID else { return }
+                    // Local plan and workout state is ready even if the
+                    // remote exercise catalog is slow or unavailable.
+                    // Never tie Train's prepared state to network success.
                     preparedTrainUserID = userID
+                    await exerciseLibrary.refresh()
                 } else {
                     refreshTrainDayIfChanged()
                     // Catch changes received while Train was off-screen.
