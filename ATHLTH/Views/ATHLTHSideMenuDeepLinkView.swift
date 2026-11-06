@@ -13,8 +13,8 @@ struct ATHLTHSideMenuDeepLinkView: View {
             // Keep the *existing* profile appearance edge-to-edge. The only
             // new control is a floating close affordance above the hero.
             NavigationStack {
-                ATHLTHProfileView()
-                    .overlay(alignment: .topLeading) {
+                ATHLTHProfileView(showsSideMenuCloseButton: true)
+                    .overlay(alignment: .topTrailing) {
                         Button {
                             dismiss()
                         } label: {
@@ -32,8 +32,8 @@ struct ATHLTHSideMenuDeepLinkView: View {
                             english: "Close profile",
                             norwegian: "Lukk profil"
                         ))
-                        .padding(.leading, 14)
-                        .padding(.top, 14)
+                        .padding(.trailing, 18)
+                        .padding(.top, 84)
                     }
             }
         } else {
