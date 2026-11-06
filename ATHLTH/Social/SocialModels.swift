@@ -1620,9 +1620,21 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
                 ? totalReps
                 : nil
 
+        // Muscle focus represents actual completed strength work, not
+        // the first warm-up rower or treadmill interval in the queue.
+        // Give exercises with more recorded sets priority while retaining
+        // time-only core holds as legitimate strength/core work.
+        let focusExercises = performedExercises.filter { exercise in
+            !StrengthCardioExercisePolicy.isCardio(exercise.exercise.name) &&
+            exercise.sets.contains(where: \.isCompleted)
+        }.sorted {
+            $0.sets.filter(\.isCompleted).count >
+            $1.sets.filter(\.isCompleted).count
+        }
+
         var muscleGroups: [String] = []
         let recordedMuscles =
-            performedExercises.flatMap {
+            focusExercises.flatMap {
                 $0.exercise.primaryMuscles +
                 (
                     $0.exercise
@@ -1653,7 +1665,7 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         }
 
         if muscleGroups.isEmpty {
-            for exercise in performedExercises {
+            for exercise in focusExercises {
                 for region in
                     StrengthMuscleResolver
                         .fallbackRegions(
