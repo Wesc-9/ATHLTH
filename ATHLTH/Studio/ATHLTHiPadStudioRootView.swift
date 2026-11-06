@@ -636,7 +636,7 @@ struct ATHLTHiPadStudioRootView: View {
     private var page: some View {
         switch selection {
         case .overview:
-            ATHLTHStudioDashboardView(
+            ATHLTHStudioEditorialDashboardView(
                 onInspect: inspect,
                 onOpenPlanner: { selection = .planner },
                 onOpenInsights: { selection = .insights },
@@ -687,6 +687,11 @@ struct ATHLTHiPadStudioRootView: View {
                         seconds: seconds
                     )
                     showingTrain = true
+                },
+                onOpenCoach: {
+                    inspectorShowsCoach = true
+                    inspectorShowsInbox = false
+                    showingInspector = true
                 },
                 focusedPlanningDate: $focusedPlanningDate
             )
