@@ -11905,86 +11905,6 @@ struct ATHLTHTrainView: View {
         }
     }
 
-    @ViewBuilder
-    private func todaysPlanCard(_ plan: TrainingPlan) -> some View {
-        let sessions = todaySessions(in: plan)
-        let healthCompletedIDs = healthCompletedTodaySessionIDs(
-            planID: plan.id,
-            sessions: sessions
-        )
-        let manuallyCompletedIDs = manuallyCompletedTodaySessionIDs(
-            planID: plan.id,
-            sessions: sessions
-        )
-
-        ATHLTHCard {
-            HStack(spacing: 10) {
-                Text("Today's Plan")
-                    .font(.title3.weight(.semibold))
-
-                Spacer()
-
-                Button {
-                    selectedSection = .plan
-                } label: {
-                    HStack(spacing: 5) {
-                        Text("View Plan")
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.semibold))
-                    }
-                    .font(.subheadline)
-                    .foregroundStyle(ATHLTHTheme.mutedText)
-                }
-                .buttonStyle(.plain)
-            }
-
-            if sessions.isEmpty {
-                HStack(spacing: 12) {
-                    Image(systemName: "moon.stars")
-                        .font(.title3)
-                        .foregroundStyle(ATHLTHTheme.accent)
-                        .frame(width: 40, height: 40)
-                        .background(
-                            ATHLTHTheme.accentSoft,
-                            in: RoundedRectangle(cornerRadius: 13)
-                        )
-
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Recovery day")
-                            .font(.subheadline.weight(.semibold))
-
-                        Text(
-                            ATHLTHLocalization.format(
-                                "Nothing is scheduled in %@ today.",
-                                plan.title
-                            )
-                        )
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                    }
-
-                    Spacer()
-                }
-                .padding(.top, 12)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(Array(sessions.enumerated()), id: \.element.id) { index, workout in
-                        todayPlanRow(
-                            workout,
-                            planID: plan.id,
-                            isHealthCompleted:
-                                healthCompletedIDs.contains(workout.id),
-                            isManuallyCompleted:
-                                manuallyCompletedIDs.contains(workout.id),
-                            isFirst: index == 0,
-                            isLast: index == sessions.count - 1
-                        )
-                    }
-                }
-                .padding(.top, 8)
-            }
-        }
-    }
 
     private var noActivePlanCard: some View {
         ATHLTHCard {
@@ -12287,37 +12207,6 @@ struct ATHLTHTrainView: View {
             : parts.joined(separator: " · ")
     }
 
-    @ViewBuilder
-    private func builderTile(
-        title: String,
-        subtitle: String,
-        icon: String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(ATHLTHTheme.accent)
-
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-
-            Text(subtitle)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .padding(14)
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 100,
-            alignment: .leading
-        )
-        .background(
-            .ultraThinMaterial,
-            in: RoundedRectangle(cornerRadius: 16)
-        )
-    }
 
 
 
@@ -13139,16 +13028,6 @@ struct ATHLTHProgressView: View {
             .frame(width: 1, height: 100)
     }
 
-    private func compactHeader(_ title: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.headline)
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
-        }
-    }
 
     private func overviewMetric(
         icon: String,
@@ -13502,119 +13381,8 @@ struct ATHLTHProgressView: View {
         }
     }
 
-    private func statTile(
-        icon: String,
-        tint: Color,
-        value: String,
-        label: String,
-        change: Double?
-    ) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Image(systemName: icon)
-                .foregroundStyle(tint)
-                .font(.system(size: 17, weight: .semibold))
-                .frame(width: 26)
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(value)
-                    .font(.subheadline.weight(.bold))
-                    .minimumScaleFactor(0.72)
-                    .lineLimit(1)
-                Text(label)
-                    .font(.system(size: 9))
-                    .foregroundStyle(.secondary)
 
-                if let change {
-                    HStack(spacing: 2) {
-                        Image(systemName: change >= 0 ? "arrow.up" : "arrow.down")
-                        Text("\(abs(change), specifier: "%.0f")%")
-                    }
-                    .font(.caption2.weight(.bold))
-                    .foregroundStyle(change >= 0 ? green : Color.orange)
-                } else {
-                    Text("—")
-                        .font(.caption2.weight(.bold))
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            Spacer(minLength: 0)
-        }
-    }
-
-    private func achievementBadge(
-        icon: String,
-        tint: Color,
-        title: String,
-        detail: String
-    ) -> some View {
-        VStack(spacing: 6) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(tint.gradient)
-                    .frame(width: 52, height: 52)
-                    .rotationEffect(.degrees(45))
-
-                Image(systemName: icon)
-                    .font(.system(size: 18, weight: .bold))
-                    .foregroundStyle(.white)
-            }
-            .frame(height: 58)
-
-            Text(title)
-                .font(.caption.weight(.bold))
-                .lineLimit(1)
-            Text(detail)
-                .font(.system(size: 9))
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func goalRow(
-        icon: String,
-        title: String,
-        detail: String,
-        progress: Double,
-        progressText: String
-    ) -> some View {
-        HStack(spacing: 12) {
-            Image(systemName: icon)
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(green)
-                .frame(width: 34, height: 34)
-                .background(green.opacity(0.09), in: RoundedRectangle(cornerRadius: 10, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text(title)
-                            .font(.subheadline.weight(.semibold))
-                        Text(detail)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    }
-
-                    Spacer()
-
-                    Text(progressText)
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(green)
-                }
-
-                GeometryReader { proxy in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(Color.black.opacity(0.055))
-                        Capsule()
-                            .fill(green)
-                            .frame(width: proxy.size.width * min(max(progress, 0), 1))
-                    }
-                }
-                .frame(height: 6)
-            }
-        }
-    }
 }
 
 extension View {
@@ -14920,88 +14688,6 @@ struct ATHLTHProfileView: View {
         )
     }
 
-    private func trophyBadge(
-        _ trophy: TrophyProgressItem
-    ) -> some View {
-        let tint =
-            trophyTint(
-                trophy.displayRarity
-            )
-
-        return VStack(spacing: 7) {
-            ZStack {
-                ProfileHexagonBadgeShape()
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                tint.opacity(0.95),
-                                tint.opacity(0.58)
-                            ],
-                            startPoint:
-                                .topLeading,
-                            endPoint:
-                                .bottomTrailing
-                        )
-                    )
-
-                ProfileHexagonBadgeShape()
-                    .stroke(
-                        Color.white
-                            .opacity(0.56),
-                        lineWidth: 1
-                    )
-
-                Image(
-                    systemName:
-                        trophy.systemImage
-                )
-                .font(
-                    .system(
-                        size: 19,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(.white)
-            }
-            .frame(
-                width: 66,
-                height: 72
-            )
-            .shadow(
-                color:
-                    tint.opacity(0.20),
-                radius: 8,
-                y: 4
-            )
-
-            Text(trophy.title)
-                .font(
-                    .system(
-                        size: 10.5,
-                        weight: .bold
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.primaryText
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.70)
-
-            Text(trophy.stageLabel)
-                .font(
-                    .system(
-                        size: 9,
-                        weight: .medium
-                    )
-                )
-                .foregroundStyle(
-                    ATHLTHTheme.mutedText
-                )
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-        }
-        .frame(maxWidth: .infinity)
-    }
 
     private var featuredRecordKinds:
         [ProfileFeaturedRecordKind] {
