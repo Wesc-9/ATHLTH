@@ -6840,16 +6840,17 @@ struct ATHLTHTrainView: View {
     private var premiumTodayScreen: some View {
         let active = session.activePlan
         let sessions = active.map { todaySessions(in: $0) } ?? []
-        let healthIDs: Set<UUID> = active.map {
-            healthCompletedTodaySessionIDs(
-                planID: $0.id,
-                sessions: sessions
-            )
-        } ?? []
         let completedIDs: Set<UUID> = active.map {
             completedTodaySessionIDs(
                 planID: $0.id,
                 sessions: sessions
+            )
+        } ?? []
+        let healthIDs: Set<UUID> = active.map {
+            healthCompletedTodaySessionIDs(
+                planID: $0.id,
+                sessions: sessions,
+                completedIDs: completedIDs
             )
         } ?? []
         let progress = active.map {
@@ -12159,12 +12160,15 @@ struct ATHLTHTrainView: View {
 
     private func healthCompletedTodaySessionIDs(
         planID: UUID,
-        sessions: [PlannedSession]
+        sessions: [PlannedSession],
+        completedIDs: Set<UUID>
     ) -> Set<UUID> {
-        // Display the Health label only for a valid, explicitly linked workout.
-        // Never infer that today's unrelated run completed a scheduled one.
+        // Only completed sessions can have a Health completion badge.
+        // Reuse the already computed completion set to avoid repeating
+        // expensive history checks for every unfinished session.
         Set(
-            sessions.filter {
+            sessions.lazy.filter {
+                completedIDs.contains($0.id) &&
                 !session.isPlanSessionManuallyCompleted(
                     planID: planID,
                     sessionID: $0.id
