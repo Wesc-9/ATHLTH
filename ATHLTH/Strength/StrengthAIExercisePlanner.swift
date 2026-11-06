@@ -187,13 +187,43 @@ struct StrengthAIExercisePlannerView: View {
     }
 
     private var candidateEntries: [ExerciseLibraryEntry] {
-        Array(StrengthAIExerciseSelectionPolicy.available(
+        let available = StrengthAIExerciseSelectionPolicy.available(
             from: exerciseLibrary.allExercises,
             excluding: existingIDs,
             source: sourceFilter,
             focuses: Array(focusBodyParts),
             equipment: equipmentFilter
-        ).prefix(80))
+        )
+        // With multiple focus groups, a plain alphabetical prefix can
+        // accidentally fill all 80 AI candidates from just one muscle.
+        // Reserve equal space for each selected group first, then fill any
+        // remaining slots without duplicating IDs.
+        guard focusBodyParts.count > 1 else {
+            return Array(available.prefix(80))
+        }
+        var result: [ExerciseLibraryEntry] = []
+        var included = Set<UUID>()
+        let targetGroups = focusBodyParts.sorted()
+        let reservation = max(1, 80 / targetGroups.count)
+        for group in targetGroups {
+            let canonical = ExerciseLibraryStore.canonicalMuscleFilter(group)
+            let matches = available.filter { entry in
+                ([entry.bodyPart].compactMap { $0 } +
+                 entry.exercise.primaryMuscles +
+                 entry.exercise.secondaryMuscles).contains {
+                    ExerciseLibraryStore.canonicalMuscleFilter($0) == canonical
+                }
+            }
+            for candidate in matches.prefix(reservation)
+                where included.insert(candidate.id).inserted {
+                result.append(candidate)
+            }
+        }
+        for candidate in available
+            where result.count < 80 && included.insert(candidate.id).inserted {
+            result.append(candidate)
+        }
+        return Array(result.prefix(80))
     }
 
     private var availableEquipment: [String] {
