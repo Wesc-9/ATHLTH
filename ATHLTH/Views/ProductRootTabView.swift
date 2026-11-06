@@ -11236,13 +11236,48 @@ struct ATHLTHTrainView: View {
     }
 
     private var libraryContent: some View {
-        TrainingLibraryHomeView(
-            onStartRunning: { workout in
-                pendingPlannedEnduranceWorkout = nil
-                pendingRunningTemplate = workout
-            },
-            onOpenPlan: openPlanFromTrainingLibrary
-        )
+        VStack(alignment: .leading, spacing: 16) {
+            TrainingLibraryHomeView(
+                onStartRunning: { workout in
+                    pendingPlannedEnduranceWorkout = nil
+                    pendingRunningTemplate = workout
+                },
+                onOpenPlan: openPlanFromTrainingLibrary
+            )
+
+            // Plans and route/exercise media can be saved ahead of a trip.
+            // Keep offline packs discoverable from the main Train library.
+            NavigationLink {
+                AthleteOfflineView()
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "arrow.down.circle")
+                        .font(.title3)
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Offline training plans",
+                            norwegian: "Treningsplaner uten nett"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Save plans, routes and exercise images to this device",
+                            norwegian: "Lagre planer, ruter og øvelsesbilder på enheten"
+                        ))
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    }
+                    Spacer(minLength: 4)
+                    Image(systemName: "chevron.right")
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                }
+                .padding(16)
+                .background(ATHLTHTheme.champagneSoft.opacity(0.55),
+                            in: RoundedRectangle(cornerRadius: 16))
+            }
+            .buttonStyle(.plain)
+        }
     }
 
     private func quickStartTile(
