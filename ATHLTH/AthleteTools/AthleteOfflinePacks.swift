@@ -71,7 +71,7 @@ final class AthleteOfflinePackStore: ObservableObject {
         do { try FileManager.default.removeItem(at: root(accountID).appendingPathComponent(pack.id.uuidString)); packs.removeAll { $0.id == pack.id } }
         catch { self.error = "The offline pack could not be deleted." }
     }
-    func download(plan: TrainingPlan, routes: [TrainingRoute], userID: UUID) async {
+    func download(plan: TrainingPlan, routes: [TrainingRoute], userID: UUID, includeMedia: Bool = true) async {
         guard !downloading else { return }
         downloading = true; defer { downloading = false }
         var staging: URL?
@@ -84,7 +84,7 @@ final class AthleteOfflinePackStore: ObservableObject {
             let routeIDs = Set(sessions.compactMap(\.routeID) + sessions.compactMap { $0.runningWorkout?.routeID } + sessions.flatMap { $0.runningWorkouts ?? [] }.compactMap(\.routeID))
             let selectedRoutes = routes.filter { routeIDs.contains($0.id) }
             var pack = AthleteOfflinePack(plan: plan, routes: selectedRoutes, downloadedAt: Date(), mapRouteIDs: [], exerciseImageIDs: [], missingAssets: 0)
-            for route in selectedRoutes {
+            if includeMedia { for route in selectedRoutes {
                 try Task.checkCancellation()
                 let coordinates = route.coordinates.map(\.coordinate).filter(CLLocationCoordinate2DIsValid)
                 guard coordinates.count >= 2 else { pack.missingAssets += 1; continue }
@@ -110,8 +110,9 @@ final class AthleteOfflinePackStore: ObservableObject {
                     pack.mapRouteIDs.append(route.id)
                 } catch { if Task.isCancelled { throw CancellationError() }; pack.missingAssets += 1 }
             }
+            }
             var seen = Set<UUID>()
-            for exercise in sessions.flatMap(\.exercises) where seen.insert(exercise.id).inserted {
+            if includeMedia { for exercise in sessions.flatMap(\.exercises) where seen.insert(exercise.id).inserted {
                 try Task.checkCancellation()
                 guard let url = exercise.embeddedExercise.imageURL, url.scheme == "https" else { continue }
                 do {
@@ -126,6 +127,7 @@ final class AthleteOfflinePackStore: ObservableObject {
                     try png.write(to: temporary.appendingPathComponent(exercise.id.uuidString + ".png"), options: .atomic)
                     pack.exerciseImageIDs.append(exercise.id)
                 } catch { if Task.isCancelled { throw CancellationError() }; pack.missingAssets += 1 }
+            }
             }
             try Task.checkCancellation()
             try JSONEncoder().encode(pack).write(to: temporary.appendingPathComponent("pack.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
@@ -174,7 +176,23 @@ struct AthleteOfflineView: View {
                     let userID = session.profile.userID
                     Task { await offline.download(plan: plan, routes: session.savedRoutes, userID: userID) }
                 }.disabled(offline.downloading || selectedPlanID == nil)
-                if offline.downloading { ProgressView("Downloading plan, instructions, images and route snapshots…") }
+                Button(ATHLTHLocalization.choose(
+                    english: "Save plan now (no internet required)",
+                    norwegian: "Lagre plan nå (uten internett)"
+                )) {
+                    guard let plan = session.trainingPlans.first(where: {
+                        $0.id == selectedPlanID
+                    }) else { return }
+                    let userID = session.profile.userID
+                    Task {
+                        await offline.download(
+                            plan: plan, routes: session.savedRoutes,
+                            userID: userID, includeMedia: false
+                        )
+                    }
+                }
+                .disabled(offline.downloading || selectedPlanID == nil)
+                if offline.downloading { ProgressView("Saving offline plan…") }
             }
             Section("On this device") {
                 ForEach(offline.packs) { pack in
