@@ -1769,6 +1769,9 @@ final class StrengthWorkoutStore: ObservableObject {
             setNumber: set?.setNumber,
             completedSets: workout.totalCompletedSets,
             totalSets: totalSets,
+            skippedSets: workout.exercises.reduce(0) {
+                $0 + ($1.skippedPlannedSetCount ?? 0)
+            },
             draftReps: draftReps,
             draftWeightKilograms: currentSetRecordsWeight ? draftWeightKilograms : 0,
             draftRestSeconds: draftRestSeconds,
