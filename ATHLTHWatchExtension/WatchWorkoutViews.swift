@@ -4275,7 +4275,7 @@ private struct WatchRunWalkWorkoutPager: View {
 
     @ViewBuilder
     private var routeMap: some View {
-        if workoutManager.ghostRaceTitle != nil {
+        if workoutManager.hasFixedGhostRace {
             // Both the main running screen and the route page show the
             // same real-time race camera. The finish/pause controls remain
             // on their existing, separate controls page.
