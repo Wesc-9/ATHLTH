@@ -47,8 +47,10 @@ enum ATHLTHRunningResultInsights {
         guard pauses.allSatisfy({
             $0.start >= workoutStart && $0.end <= workoutEnd && $0.end > $0.start
         }) else { return [] }
-        for index in 1..<pauses.count {
-            guard pauses[index].start >= pauses[index - 1].end else { return [] }
+        if pauses.count > 1 {
+            for index in 1..<pauses.count {
+                guard pauses[index].start >= pauses[index - 1].end else { return [] }
+            }
         }
 
         var totalDistance = 0.0
