@@ -83,9 +83,13 @@ struct ATHLTHStudioRemoteStrengthStatusCard: View {
 
             HStack(spacing: 17) {
                 metric(tr("Done", "Utført"), "\(snapshot.completedSets)")
-                metric(tr("Remaining", "Gjenstår"),
-                       "\(max(snapshot.totalPlannedSets -
-                               snapshot.completedSets - snapshot.skippedSets, 0))")
+                metric(
+                    tr("Remaining", "Gjenstår"),
+                    String(max(
+                        snapshot.totalPlannedSets - snapshot.completedSets - snapshot.skippedSets,
+                        0
+                    ))
+                )
                 if snapshot.skippedSets > 0 {
                     metric(tr("Skipped", "Hoppet over"), "\(snapshot.skippedSets)")
                 }
