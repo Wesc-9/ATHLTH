@@ -45,6 +45,9 @@ final class MirroredWorkoutAudioCoach:
     private var nextFuelSeconds: TimeInterval?
     private var customAudioCoachLastSlots: [UUID: Int] = [:]
     private var smartCoachState = ATHLTHAudioCoachSmartState()
+    private var measuredZoneCandidate: Int?
+    private var measuredZoneFirstSeenAt: TimeInterval?
+    private var lastMeasuredZoneAnnouncementAt: TimeInterval = -.infinity
     private var lastState:
         WatchWorkoutMirrorState?
     private var lastStepIndex: Int?
@@ -81,6 +84,9 @@ final class MirroredWorkoutAudioCoach:
         finished = false
         workoutStartedAt = nil
         smartCoachState.reset()
+        measuredZoneCandidate = nil
+        measuredZoneFirstSeenAt = nil
+        lastMeasuredZoneAnnouncementAt = -.infinity
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
             rules: configuration.customRules ?? [],
             distanceMeters: 0,
@@ -201,6 +207,7 @@ final class MirroredWorkoutAudioCoach:
             announceIntervalProgressIfDue(snapshot)
             announceFuelIfNeeded(snapshot)
             announceCustomAudioCoachRules(snapshot)
+            announceMeasuredZoneIfNeeded(snapshot)
             announceSmartCoachIfNeeded(snapshot)
             announceRoutineIfNeeded(snapshot)
         }
@@ -245,6 +252,9 @@ final class MirroredWorkoutAudioCoach:
         announcedStart =
             snapshot.state != .preparing
         lastStepIndex = snapshot.runningStepIndex
+        measuredZoneCandidate = nil
+        measuredZoneFirstSeenAt = nil
+        lastMeasuredZoneAnnouncementAt = snapshot.elapsedTime
 
         if let interval = configuration.distanceIntervalMeters,
            interval > 0 {
@@ -499,6 +509,54 @@ final class MirroredWorkoutAudioCoach:
                 priority: .routineCoach,
                 createdAt: snapshot.capturedAt,
                 validFor: 10
+            )
+        )
+    }
+
+    /// Keep iPhone voice ownership in sync with the Watch's measured-zone
+    /// coaching. An actual pulse and a valid athlete HRmax are mandatory.
+    private func announceMeasuredZoneIfNeeded(
+        _ snapshot: WatchWorkoutLiveSnapshot
+    ) {
+        guard (snapshot.kind == .running || snapshot.kind == .walking),
+              (configuration.smartPrompts?.announceCurrentHeartRateZone ??
+                configuration.announceHeartRate),
+              snapshot.runningStepTargetHeartRateZone == nil,
+              ATHLTHCoachSensorFreshness.validHeartRate(
+                  snapshot.heartRate,
+                  sampledAt: snapshot.coachHeartRateSampleAt
+              ),
+              let zone = ATHLTHHeartRateZones.measuredZone(
+                  heartRateBPM: snapshot.heartRate,
+                  maximumBPM: configuration.smartPrompts?.maximumHeartRateBPM
+              )
+        else {
+            measuredZoneCandidate = nil
+            measuredZoneFirstSeenAt = nil
+            return
+        }
+
+        if measuredZoneCandidate != zone {
+            measuredZoneCandidate = zone
+            measuredZoneFirstSeenAt = snapshot.elapsedTime
+            return
+        }
+        guard snapshot.elapsedTime - (measuredZoneFirstSeenAt ?? snapshot.elapsedTime) >= 15,
+              snapshot.elapsedTime - lastMeasuredZoneAnnouncementAt >= 180
+        else { return }
+        lastMeasuredZoneAnnouncementAt = snapshot.elapsedTime
+        speak(
+            phrase(
+                english: "Current heart-rate zone: Z\(zone).",
+                norwegian: "Nåværende pulssone: S\(zone)."
+            ),
+            priority: .routineCoach,
+            event: ATHLTHCoachEvent(
+                kind: .routineMilestone,
+                key: "measured-zone-\(zone):\(Int(snapshot.elapsedTime))",
+                priority: .routineCoach,
+                createdAt: snapshot.capturedAt,
+                validFor: 12
             )
         )
     }
