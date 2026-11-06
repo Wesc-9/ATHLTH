@@ -2,7 +2,6 @@ import Foundation
 import XCTest
 @testable import ATHLTH
 
-@MainActor
 final class StrengthAIExerciseSelectionPolicyTests: XCTestCase {
     private func entry(
         _ name: String,
@@ -48,6 +47,7 @@ final class StrengthAIExerciseSelectionPolicyTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testMineOnlyIncludesCustomExercisesAndRespectsFilters() {
         let catalog = entry("Catalog chest", custom: false)
         let own = entry("My chest", custom: true)
@@ -62,6 +62,7 @@ final class StrengthAIExerciseSelectionPolicyTests: XCTestCase {
         XCTAssertEqual(filtered.map(\.id), [own.id])
     }
 
+    @MainActor
     func testEntireLibraryIncludesCatalogAndMineButExcludesExistingWorkout() {
         let catalog = entry("Catalog", custom: false)
         let own = entry("Mine", custom: true)
@@ -72,6 +73,7 @@ final class StrengthAIExerciseSelectionPolicyTests: XCTestCase {
         XCTAssertEqual(filtered.map(\.id), [catalog.id])
     }
 
+    @MainActor
     func testOnlyExactUniqueAllowedExerciseIDsCanBeApplied() {
         let allowed = UUID()
         let second = UUID()
