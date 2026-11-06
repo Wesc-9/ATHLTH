@@ -1883,6 +1883,7 @@ final class StrengthWorkoutStore: ObservableObject {
                                             !$0.isCompleted
                                         }
                                     ),
+                            skippedSets: item.skippedPlannedSetCount,
                             isEmbeddedRunningInterval:
                                 item.isEmbeddedRunningInterval
                         )
