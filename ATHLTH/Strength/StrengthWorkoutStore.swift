@@ -2017,7 +2017,8 @@ final class StrengthWorkoutStore: ObservableObject {
                                             : nil
                                 )
                             },
-                        completedAt: nil
+                        completedAt: nil,
+                        skippedPlannedSetCount: item.skippedSets
                     )
                 }
 
