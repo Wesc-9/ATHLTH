@@ -13580,6 +13580,7 @@ struct ATHLTHSwipeBackEnabler: UIViewControllerRepresentable {
 }
 
 struct ATHLTHProfileView: View {
+    var showsSideMenuCloseButton: Bool = false
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var accountService:
@@ -14176,7 +14177,7 @@ struct ATHLTHProfileView: View {
             // Follow the lowered profile identity while keeping the hero
             // height and statistics card positions unchanged.
             .padding(.top, 84)
-            .padding(.trailing, 18)
+            .padding(.trailing, showsSideMenuCloseButton ? 72 : 18)
         }
         .frame(height: 236)
         .clipped()
