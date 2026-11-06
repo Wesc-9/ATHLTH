@@ -151,6 +151,7 @@ struct WatchActiveWorkoutView: View {
     private var isLuminanceReduced
     @State private var selectedNonRunningPage = 0
     @State private var showingStrengthSetOptions = false
+    @State private var showingStrengthSkipConfirmation = false
 
     var body: some View {
         Group {
@@ -269,6 +270,30 @@ struct WatchActiveWorkoutView: View {
                 $showingStrengthSetOptions
         ) {
             strengthSetOptionsSheet
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Skip this set?",
+                norwegian: "Hoppe over dette settet?"
+            ),
+            isPresented: $showingStrengthSkipConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button(
+                ATHLTHLocalization.choose(
+                    english: "Skip set",
+                    norwegian: "Hopp over sett"
+                ),
+                role: .destructive
+            ) {
+                workoutManager.skipStrengthSet()
+                showingStrengthSetOptions = false
+            }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "The set will not count as completed or contribute to training volume.",
+                norwegian: "Sett blir ikke registrert som fullført og teller ikke med i treningsvolumet."
+            ))
         }
     }
 
@@ -1380,6 +1405,26 @@ struct WatchActiveWorkoutView: View {
                         .buttonStyle(
                             .bordered
                         )
+
+                        if !snapshot.isResting &&
+                            !snapshot.currentExerciseComplete &&
+                            snapshot.setCount > 0 {
+                            Button(role: .destructive) {
+                                showingStrengthSkipConfirmation = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Skip this set",
+                                        norwegian: "Hopp over sett"
+                                    ),
+                                    systemImage: "forward.end"
+                                )
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(maxWidth: .infinity, minHeight: 40)
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(workoutManager.strengthActionPending)
+                        }
                     }
                     .padding(8)
                 }
