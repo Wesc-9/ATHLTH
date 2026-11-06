@@ -263,7 +263,10 @@ final class StrengthAudioCoachSpeaker:
     /// callback after a route change or interruption.
     private func watchLocalSpeech(_ utterance: AVSpeechUtterance) {
         localSpeechWatchdog?.cancel()
-        let seconds = max(60, min(150, Double(utterance.speechString.count) / 3 + 20))
+        // A missed synthesizer callback should not keep Spotify / Music
+        // ducked for a full minute after a short strength announcement.
+        // Allow enough time for longer localized descriptions.
+        let seconds = min(120, max(18, Double(utterance.speechString.count) / 2.5 + 16))
         localSpeechWatchdog = Task { @MainActor [weak self] in
             for _ in 0..<Int(ceil(seconds / 2)) {
                 do { try await Task.sleep(for: .seconds(2)) }
