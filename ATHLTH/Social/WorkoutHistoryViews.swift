@@ -990,6 +990,7 @@ struct PostWorkoutReviewView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var phoneWorkout: IPhoneWorkoutStore
+    @EnvironmentObject private var strengthWorkoutStore: StrengthWorkoutStore
     @EnvironmentObject private var workoutCompletion: WorkoutCompletionCoordinator
     @EnvironmentObject private var ghostRace:
         GhostRaceStore
@@ -1161,11 +1162,13 @@ struct PostWorkoutReviewView: View {
                                 ? ATHLTHLocalization
                                     .choose(
                                         english:
-                                            "Advanced",
+                                            "Less",
                                         norwegian:
-                                            "Avansert"
+                                            "Mindre"
                                     )
-                                : "Basic"
+                                : ATHLTHLocalization.choose(
+                                    english: "More", norwegian: "Mer"
+                                )
                         )
                         .font(
                             .caption.weight(
@@ -1489,15 +1492,26 @@ struct PostWorkoutReviewView: View {
         .athlthPlanCard(radius: 19)
     }
 
+    /// Workout social IDs may refer to the HealthKit workout rather than
+    /// the internal strength journal. Match either ID; never use an unrelated
+    /// previous session's sets to populate a new completion review.
+    private var completedStrengthLog: StrengthWorkoutLog? {
+        guard workout.activity == .strength else { return nil }
+        return strengthWorkoutStore.workoutHistory.first {
+            $0.id == workout.id ||
+            $0.healthMetrics.healthKitWorkoutUUID == workout.id
+        }
+    }
+
     @ViewBuilder
     private var summaryCard: some View {
         if workout.activity == .strength {
-            ATHLTHStrengthCompletedHeroCard(
-                profile: completionMuscleProfile,
-                duration: workout.duration,
-                exerciseCount: workout.strengthExerciseCount,
-                volumeKilograms: workout.strengthTotalVolumeKilograms,
-                height: 300
+            ATHLTHStrengthCompletionReview(
+                workout: workout,
+                log: completedStrengthLog,
+                personalRecords: completedStrengthLog.map {
+                    strengthWorkoutStore.workoutPersonalRecords(for: $0)
+                } ?? []
             )
         } else {
             nonStrengthSummaryCard
