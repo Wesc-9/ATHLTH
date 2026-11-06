@@ -325,7 +325,10 @@ struct ATHLTHStrengthCompletionReview: View {
             sectionTitle(tr("Exercises performed", "Gjennomførte øvelser"),
                          symbol: "list.number")
             if completedExercises.isEmpty {
-                ForEach(workout.strengthPerformedExerciseSummaries ?? [], id: \.self) { line in
+                ForEach(
+                    Array((workout.strengthPerformedExerciseSummaries ?? []).enumerated()),
+                    id: \.offset
+                ) { _, line in
                     Text(safeLegacySummary(line))
                         .font(.subheadline)
                         .foregroundStyle(ink)
@@ -357,11 +360,21 @@ struct ATHLTHStrengthCompletionReview: View {
         let isCardio = StrengthCardioExercisePolicy.isCardio(exercise.exercise.name)
         let isTimed = exercise.exercise.isTimeOnlyBodyweightStrength ||
             sets.contains(where: { $0.resolvedTargetKind == .time })
-        let measuredSeconds = sets.compactMap { $0.resolvedCompletedDurationSeconds }
-            .reduce(0, +)
+        let measuredSeconds = sets.compactMap { set -> Int? in
+            if let recorded = set.resolvedCompletedDurationSeconds,
+               recorded > 0 { return recorded }
+            guard isTimed || isCardio,
+                  let actual = set.actualSetElapsedSeconds,
+                  actual.isFinite, actual > 0 else { return nil }
+            return Int(actual.rounded())
+        }.reduce(0, +)
         let maxLoad = (!isTimed && !isCardio)
-            ? sets.filter(\.countsTowardTrainingLoad)
-                .compactMap(\.completedWeightKilograms).filter { $0 > 0 }.max()
+            ? sets.filter {
+                $0.countsTowardTrainingLoad &&
+                $0.recordsWeight != false &&
+                $0.resolvedTargetKind == .reps
+            }
+            .compactMap(\.completedWeightKilograms).filter { $0 > 0 }.max()
             : nil
         let summary: String = {
             if isTimed {
@@ -445,11 +458,16 @@ struct ATHLTHStrengthCompletionReview: View {
             if let seconds = set.resolvedCompletedDurationSeconds, seconds > 0 {
                 return duration(Double(seconds))
             }
+            if let measured = set.actualSetElapsedSeconds,
+               measured.isFinite, measured > 0 {
+                return duration(measured)
+            }
             return tr("Duration not recorded", "Varighet ikke registrert")
         }
         let reps = set.resolvedCompletedReps
         let weight = set.completedWeightKilograms
-        if let reps, let weight, weight > 0, set.countsTowardTrainingLoad {
+        if let reps, let weight, weight > 0, set.countsTowardTrainingLoad,
+           set.recordsWeight != false, set.resolvedTargetKind == .reps {
             return "\(reps) " + tr("reps", "reps") +
                 String(format: " · %.1f kg", weight)
         }
