@@ -26,6 +26,7 @@ enum StrengthAIExerciseSourceFilter: String, CaseIterable, Identifiable {
 /// Pure, testable allow-list policy used at request, preview and apply time.
 /// The service also validates model IDs against the submitted candidates.
 /// A renamed exercise never acquires identity by matching its display name.
+@MainActor
 enum StrengthAIExerciseSelectionPolicy {
     static func available(
         from library: [ExerciseLibraryEntry],
