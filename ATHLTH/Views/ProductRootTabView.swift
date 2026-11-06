@@ -6247,19 +6247,19 @@ struct ATHLTHTrainView: View {
                     // Solo workouts are local-first and must never require a
                     // social backend connection to begin recording.
                     let needsSocialLobby = !configuration.friends.isEmpty
-                    let lobbyReady: Bool
                     if needsSocialLobby {
-                        lobbyReady = await social.beginWorkoutWithFriends(
-                        title: configuration.title,
-                        kind: .running,
-                        friends: configuration.friends,
-                        creatorName: session.profile.displayName,
-                        creatorUsername: session.profile.username,
-                        invitePayload: configuration.trainTogetherInvitePayload(
-                            savedRoutes: session.savedRoutes
-                        ),
-                        creatorCaptureDevice: configuration.captureDevice
-                    ) else {
+                        let lobbyReady = await social.beginWorkoutWithFriends(
+                            title: configuration.title,
+                            kind: .running,
+                            friends: configuration.friends,
+                            creatorName: session.profile.displayName,
+                            creatorUsername: session.profile.username,
+                            invitePayload: configuration.trainTogetherInvitePayload(
+                                savedRoutes: session.savedRoutes
+                            ),
+                            creatorCaptureDevice: configuration.captureDevice
+                        )
+                        guard lobbyReady else {
                         return social.errorMessage ?? ATHLTHLocalization.choose(
                             english: "Workout could not start. Unlock Apple Watch and try again.",
                             norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
