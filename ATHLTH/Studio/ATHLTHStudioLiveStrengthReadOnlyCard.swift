@@ -64,10 +64,12 @@ struct ATHLTHStudioLiveStrengthReadOnlyCard: View {
     }
 
     private func sessionMetrics(_ workout: StrengthWorkoutLog) -> some View {
-        let setCount = workout.exercises.reduce(0) { $0 + $1.sets.count }
         let completed = workout.totalCompletedSets
         let skipped = workout.exercises.reduce(0) {
             $0 + ($1.skippedPlannedSetCount ?? 0)
+        }
+        let totalPlanned = workout.exercises.reduce(0) {
+            $0 + $1.sets.count + ($1.skippedPlannedSetCount ?? 0)
         }
 
         return VStack(alignment: .leading, spacing: 14) {
@@ -91,13 +93,17 @@ struct ATHLTHStudioLiveStrengthReadOnlyCard: View {
             HStack(spacing: 18) {
                 metric(tr("Completed", "Utførte"), value: "\(completed)")
                 metric(tr("Remaining", "Gjenstår"),
-                       value: "\(max(setCount - completed, 0))")
+                       value: "\(max(totalPlanned - completed - skipped, 0))")
                 if skipped > 0 {
                     metric(tr("Skipped", "Hoppet over"), value: "\(skipped)")
                 }
             }
 
-            ProgressView(value: setCount > 0 ? Double(completed) / Double(setCount) : 0)
+            ProgressView(
+                value: totalPlanned > 0
+                    ? Double(completed + skipped) / Double(totalPlanned)
+                    : 0
+            )
                 .tint(ink)
 
             if let restEndsAt = strength.restEndsAt {
@@ -147,9 +153,13 @@ struct ATHLTHStudioLiveStrengthReadOnlyCard: View {
                                                   ? .semibold : .regular))
                         .lineLimit(1)
                     Spacer(minLength: 0)
-                    Text("\(exercise.sets.filter(\.isCompleted).count)/\(exercise.sets.count)")
-                        .font(.caption.monospacedDigit())
-                        .foregroundStyle(.secondary)
+                    let omitted = exercise.skippedPlannedSetCount ?? 0
+                    Text(
+                        "\(exercise.sets.filter(\.isCompleted).count)/\(exercise.sets.count + omitted)"
+                        + (omitted > 0 ? " · −\(omitted)" : "")
+                    )
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
                 }
                 .foregroundStyle(ink)
             }
