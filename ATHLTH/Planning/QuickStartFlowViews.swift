@@ -297,7 +297,10 @@ struct AudioCoachDraft {
         maximumHeartRateBPM: Double? = nil
     ) -> WatchAudioCoachConfiguration {
         var prompts = smartPrompts
-        if let maximumHeartRateBPM, maximumHeartRateBPM.isFinite,
+        // An explicit per-workout HRmax overrides the profile estimate.
+        // Otherwise use the athlete's configured maximum, never a guess.
+        if prompts.maximumHeartRateBPM == nil,
+           let maximumHeartRateBPM, maximumHeartRateBPM.isFinite,
            (100...240).contains(maximumHeartRateBPM) {
             prompts.maximumHeartRateBPM = maximumHeartRateBPM
         }
