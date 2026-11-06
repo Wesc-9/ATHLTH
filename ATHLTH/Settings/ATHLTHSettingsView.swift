@@ -1372,7 +1372,7 @@ settingsSection("Preferences") {
                                         ATHLTHTheme.premiumGoldSoft,
                                     title: "Workout Guidance",
                                     subtitle:
-                                        "Audio Coach · Route Guardian · Ghost Updates"
+                                        "Audio Coach · Ghost Race · Navigation"
                                 ) {
                                     Image(systemName: "chevron.right")
                                         .foregroundStyle(
@@ -3661,7 +3661,7 @@ private struct ATHLTHTrainingSettingsView: View {
                             )
 
                         Text(
-                            "Audio Coach, Route Guardian, Ghost Updates and alert priority"
+                            "Audio Coach, Ghost Race, Navigation and alert priority"
                         )
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -3672,7 +3672,7 @@ private struct ATHLTHTrainingSettingsView: View {
                     ATHLTHRouteGuardianSettingsView()
                 } label: {
                     HStack {
-                        Text("Route Guardian")
+                        Text(ATHLTHLocalization.choose(english: "Navigation", norwegian: "Navigasjon"))
                         Spacer()
                         Text(
                             settings.routeAlertsEnabled
