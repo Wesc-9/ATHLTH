@@ -99,6 +99,8 @@ struct GhostQuickStartDraft {
     var targetTimeText = ""
     var targetPaceText = ""
     var updatesEnabled = true
+    // Complete workout-scoped update snapshot, never a direct write to Settings.
+    var updatesConfiguration: WatchGhostRaceAudioConfiguration?
     private var loadedRouteID: UUID?
 
     init() {}
@@ -108,9 +110,10 @@ struct GhostQuickStartDraft {
         route: TrainingRoute?,
         settings: AppSettingsStore
     ) {
-        updatesEnabled =
-            settings
-                .ghostRaceAudioEnabled
+        if updatesConfiguration == nil {
+            updatesConfiguration = settings.ghostRaceAudioConfiguration
+            updatesEnabled = settings.ghostRaceAudioEnabled
+        }
 
         guard let route else {
             loadedRouteID = nil
@@ -175,9 +178,17 @@ struct GhostQuickStartDraft {
         }
 
         if let updates {
-            updatesEnabled =
-                updates.enabled
+            updatesConfiguration = updates
+            updatesEnabled = updates.enabled
         }
+    }
+
+    func resolvedUpdates(
+        fallback: WatchGhostRaceAudioConfiguration
+    ) -> WatchGhostRaceAudioConfiguration {
+        var configuration = updatesConfiguration ?? fallback
+        configuration.enabled = updatesEnabled
+        return configuration
     }
 
     /// Editing either field recalculates the other immediately. Keep raw
@@ -329,8 +340,8 @@ struct RunGuidanceSetupView: View {
                             featureRow(
                                 icon: "location.north.line",
                                 title: ATHLTHLocalization.choose(
-                                    english: "Route Guardian",
-                                    norwegian: "Ruteveiledning"
+                                    english: "Navigation",
+                                    norwegian: "Navigasjon"
                                 ),
                                 detail: routeGuardian.enabled
                                     ? ATHLTHLocalization.format(
@@ -533,8 +544,8 @@ struct PerWorkoutRouteGuardianView: View {
                         norwegian: "RUTEVEILEDNING"
                     ),
                     title: ATHLTHLocalization.choose(
-                        english: "Route Guardian",
-                        norwegian: "Hold deg på ruten"
+                        english: "Navigation",
+                        norwegian: "Navigasjon"
                     ),
                     subtitle: ATHLTHLocalization.choose(
                         english: "Choose when and how the coach warns you about route deviation.",
@@ -547,8 +558,8 @@ struct PerWorkoutRouteGuardianView: View {
                     Toggle(isOn: $draft.enabled) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(ATHLTHLocalization.choose(
-                                english: "Route Guardian",
-                                norwegian: "Ruteveiledning"
+                                english: "Navigation",
+                                norwegian: "Navigasjon"
                             ))
                             .font(.headline)
                             .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -683,15 +694,28 @@ struct PerWorkoutRouteGuardianView: View {
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .tint(ATHLTHPlanDesign.accentInk)
         .navigationTitle(ATHLTHLocalization.choose(
-            english: "Route Guardian", norwegian: "Ruteveiledning"
+            english: "Navigation", norwegian: "Navigasjon"
         ))
         .navigationBarTitleDisplayMode(.inline)
     }
 }
 
 struct PerWorkoutGhostView: View {
+    @EnvironmentObject private var settings: AppSettingsStore
     @Binding var draft: GhostQuickStartDraft
     let route: TrainingRoute?
+
+    private var updatesBinding: Binding<WatchGhostRaceAudioConfiguration> {
+        Binding(
+            get: {
+                draft.resolvedUpdates(fallback: settings.ghostRaceAudioConfiguration)
+            },
+            set: { value in
+                draft.updatesConfiguration = value
+                draft.updatesEnabled = value.enabled
+            }
+        )
+    }
 
     private var targetTimeBinding: Binding<String> {
         Binding(
@@ -929,23 +953,12 @@ struct PerWorkoutGhostView: View {
                         }
                         .tint(ATHLTHPlanDesign.accentInk)
 
-                        NavigationLink {
-                            ATHLTHGhostUpdatesSettingsView()
-                        } label: {
-                            HStack {
-                                Label(ATHLTHLocalization.choose(
-                                    english: "Adjust update preferences",
-                                    norwegian: "Juster oppdateringene"
-                                ), systemImage: "slider.horizontal.3")
-                                .font(.subheadline.weight(.medium))
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
-                            }
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                            .frame(minHeight: 42)
+                        if draft.updatesEnabled {
+                            Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                            ATHLTHGhostSessionUpdatesControls(
+                                configuration: updatesBinding
+                            )
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
