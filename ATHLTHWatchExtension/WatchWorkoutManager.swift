@@ -5564,7 +5564,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         ghostDistanceMeters: Double,
         routeDistanceMeters: Double
     ) {
-        guard plannedRouteLocations.count >= 2,
+        let now = Date()
+        // A HealthKit sample may be re-delivered after GPS stops. Never
+        // stamp that old coordinate with "now" and present it as live.
+        guard state == .running,
+              !automaticPauseActive,
+              userLocation.horizontalAccuracy.isFinite,
+              (0...30).contains(userLocation.horizontalAccuracy),
+              abs(now.timeIntervalSince(userLocation.timestamp)) <= 12,
+              plannedRouteLocations.count >= 2,
               plannedRouteCumulativeMeters.count ==
                 plannedRouteLocations.count,
               plannedRouteGeometryMeters > 0,
@@ -5572,8 +5580,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         else {
             return
         }
-
-        let now = Date()
         if let lastGhostMapPublishedAt,
            now.timeIntervalSince(
                 lastGhostMapPublishedAt
