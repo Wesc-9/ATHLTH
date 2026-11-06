@@ -3748,7 +3748,7 @@ struct WorkoutTemplateBuilderView: View {
             studioAdvanced: studioAdvanced,
             studioDate: studioBasicDate,
             pendingExercisePicker: showingExercisePicker || resumeExercisePickerAfterWake,
-            pendingRunningPicker: showingRunningExercisePicker || resumeRunningPickerAfterWake
+            pendingRunningPicker: showingRunningExercisePicker || resumeRunningPickerAfterWake,
             audioCoachConfiguration: currentAudioCoachConfiguration,
             routeAlertConfiguration: routeIsCustomized
                 ? routeGuardianDraft.configuration : nil,
@@ -3756,7 +3756,7 @@ struct WorkoutTemplateBuilderView: View {
             ghostUpdates: ghostDraft.enabled
                 ? ghostDraft.resolvedUpdates(
                     fallback: settings.ghostRaceAudioConfiguration
-                  ) : nil,
+                  ) : nil
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: draftStorageKey)
