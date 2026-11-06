@@ -6,7 +6,7 @@ import XCTest
 final class StrengthAIExerciseSelectionPolicyTests: XCTestCase {
     private func entry(
         _ name: String,
-        source: ExerciseLibrarySource,
+        custom: Bool,
         focus: String = "Chest",
         equipment: [String] = ["Dumbbell"]
     ) -> ExerciseLibraryEntry {
@@ -25,7 +25,7 @@ final class StrengthAIExerciseSelectionPolicyTests: XCTestCase {
         return ExerciseLibraryEntry(
             id: exercise.id,
             exercise: exercise,
-            source: source,
+            source: custom ? .custom : .athlthCatalog,
             sourceIdentifier: nil,
             summary: nil,
             tips: [],
@@ -49,10 +49,10 @@ final class StrengthAIExerciseSelectionPolicyTests: XCTestCase {
     }
 
     func testMineOnlyIncludesCustomExercisesAndRespectsFilters() {
-        let catalog = entry("Catalog chest", source: .athlthCatalog)
-        let own = entry("My chest", source: .custom)
-        let back = entry("My back", source: .custom, focus: "Back")
-        let barbell = entry("My barbell", source: .custom, equipment: ["Barbell"])
+        let catalog = entry("Catalog chest", custom: false)
+        let own = entry("My chest", custom: true)
+        let back = entry("My back", custom: true, focus: "Back")
+        let barbell = entry("My barbell", custom: true, equipment: ["Barbell"])
         let all = [catalog, own, back, barbell]
 
         let filtered = StrengthAIExerciseSelectionPolicy.available(
@@ -63,8 +63,8 @@ final class StrengthAIExerciseSelectionPolicyTests: XCTestCase {
     }
 
     func testEntireLibraryIncludesCatalogAndMineButExcludesExistingWorkout() {
-        let catalog = entry("Catalog", source: .athlthCatalog)
-        let own = entry("Mine", source: .custom)
+        let catalog = entry("Catalog", custom: false)
+        let own = entry("Mine", custom: true)
         let filtered = StrengthAIExerciseSelectionPolicy.available(
             from: [catalog, own],
             excluding: [own.id], source: .library, focus: nil, equipment: nil
