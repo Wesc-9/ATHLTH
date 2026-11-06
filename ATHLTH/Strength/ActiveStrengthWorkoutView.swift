@@ -348,7 +348,8 @@ struct ActiveStrengthWorkoutView: View {
                         targetWeightKilograms: $5,
                         targetResistanceLevel: $6,
                         restSeconds: $7,
-                        warmUpSets: $8
+                        warmUpSets: $8,
+                        openEndedTime: $9
                     )
                     pendingExercise = nil
                     showingWorkoutReview = false
@@ -9539,7 +9540,8 @@ private struct FreestyleExercisePrescriptionView: View {
             Double?,
             Int?,
             Int?,
-            Int
+            Int,
+            Bool
         ) -> Void
 
     @State private var sets = 3
@@ -9551,6 +9553,7 @@ private struct FreestyleExercisePrescriptionView: View {
         StrengthExerciseLoadKind
     @State private var restSeconds = 90
     @State private var warmUpSets = 0
+    @State private var hasTimeGoal = true
     @State private var useLoadTarget: Bool
     @State private var weightKilograms = 20.0
     @State private var resistanceLevel = 5
@@ -9594,6 +9597,7 @@ private struct FreestyleExercisePrescriptionView: View {
         // many as they need without making all 3 working sets warm-ups.
         _warmUpSets = State(initialValue: initialWarmUp || isTreadmill ? 1 : 0)
         _targetKind = State(initialValue: initialTarget)
+        _hasTimeGoal = State(initialValue: !snapshot.isFreeStrengthTimer)
         _durationSeconds = State(
             initialValue: isTreadmill
                 ? StrengthTreadmillWarmUpDefaults.durationSeconds
@@ -9706,7 +9710,30 @@ private struct FreestyleExercisePrescriptionView: View {
                         in: 1...20
                     )
 
-                    targetRow
+                    if targetKind == .time &&
+                        entry.exercise.snapshot.isTimeOnlyBodyweightStrength {
+                        Toggle(
+                            ATHLTHLocalization.choose(
+                                english: "Set a time goal",
+                                norwegian: "Angi tidsmål"
+                            ),
+                            isOn: $hasTimeGoal
+                        )
+                        .tint(ATHLTHTheme.accentDeep)
+                    }
+                    if targetKind != .time || hasTimeGoal {
+                        targetRow
+                    } else {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Start a stopwatch and finish when ready.",
+                                norwegian: "Start tidtakingen og avslutt når du er ferdig."
+                            ),
+                            systemImage: "stopwatch"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
 
                     if !entry.exercise.snapshot.isTimeOnlyBodyweightStrength {
                     Toggle(
@@ -9819,7 +9846,7 @@ private struct FreestyleExercisePrescriptionView: View {
                                 ? reps
                                 : nil,
                             targetKind,
-                            targetKind == .time
+                            targetKind == .time && hasTimeGoal
                                 ? durationSeconds
                                 : nil,
                             loadKind,
@@ -9832,7 +9859,8 @@ private struct FreestyleExercisePrescriptionView: View {
                                 ? resistanceLevel
                                 : nil,
                             restSeconds,
-                            warmUpSets
+                            warmUpSets,
+                            targetKind == .time && !hasTimeGoal
                         )
                         dismiss()
                     }
@@ -12656,7 +12684,7 @@ private struct StrengthActiveExerciseQueueView: View {
                 entry: entry,
                 initialWarmUp: addingWarmUp
             ) { sets, reps, targetKind, duration, loadKind, weight,
-                resistance, rest, warmUpSets in
+                resistance, rest, warmUpSets, openEndedTime in
                 strength.appendExercise(
                     entry.exercise,
                     sets: sets,
@@ -12667,7 +12695,8 @@ private struct StrengthActiveExerciseQueueView: View {
                     targetWeightKilograms: weight,
                     targetResistanceLevel: resistance,
                     restSeconds: rest,
-                    warmUpSets: warmUpSets
+                    warmUpSets: warmUpSets,
+                    openEndedTime: openEndedTime
                 )
             }
         }
