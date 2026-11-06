@@ -829,6 +829,17 @@ struct HomeActiveFriendsStrip: View {
         .onChange(of: social.isHomeFriendsRefreshing) { _, refreshing in
             if !refreshing { rememberFriends() }
         }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .athlthFriendQuickShareDidSucceed
+        )) { notification in
+            // All four Home friend actions share the same sheet. Release its
+            // owning presentation state after confirmed delivery, so the
+            // user returns to Home instead of a lingering share screen.
+            guard let kind = notification.object as? ATHLTHFriendQuickShareKind,
+                  shareRequest?.kind == kind else { return }
+            shareRequest = nil
+            selectedFriendID = nil
+        }
     }
 
     private func rememberFriends() {
