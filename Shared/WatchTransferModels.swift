@@ -1361,6 +1361,7 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     /// Optional so older Watch builds can still decode the workout.
     /// Repetition sets can start a count-up effort clock from the Watch.
     var setEffortStartedAt: Date? = nil
+    var isOpenEndedTimedSet: Bool? = nil
     /// Empty/free sessions carry draft defaults, not an exercise to perform.
     var hasExercisePrescription: Bool { exerciseCount > 0 }
 
