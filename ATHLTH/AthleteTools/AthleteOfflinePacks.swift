@@ -205,28 +205,31 @@ final class AthleteOfflinePackStore: ObservableObject {
                 pack.exerciseImageIDs = Array(Set(pack.exerciseImageIDs))
             }
             if !includeMedia {
-                // Saving a fresh plan snapshot must not discard media already
-                // downloaded for the same plan.
-                let existing = folder.appendingPathComponent(
-                    plan.id.uuidString, isDirectory: true
+                // Keep only media belonging to this revision of the plan.
+                // Old routes and removed exercises must not remain in the
+                // saved manifest after an offline edit.
+                let allowedExerciseIDs = Set(
+                    sessions.flatMap(\.exercises).map(\.id)
                 )
-                let metadata = existing.appendingPathComponent("pack.json")
-                if let data = try? Data(contentsOf: metadata),
-                   let previous = try? JSONDecoder().decode(
-                    AthleteOfflinePack.self, from: data
-                   ) {
-                    for assetID in Set(previous.mapRouteIDs + previous.exerciseImageIDs) {
-                        let name = assetID.uuidString + ".png"
-                        let source = existing.appendingPathComponent(name)
-                        let target = temporary.appendingPathComponent(name)
-                        if FileManager.default.fileExists(atPath: source.path) {
-                            try FileManager.default.copyItem(at: source, to: target)
-                        }
+                let oldRouteIDs = Set(previousPack?.mapRouteIDs ?? [])
+                let oldImageIDs = Set(previousPack?.exerciseImageIDs ?? [])
+                for assetID in oldRouteIDs.intersection(routeIDs) {
+                    if try reuseAsset(
+                        assetID, availableIDs: previousPack?.mapRouteIDs ?? []
+                    ) {
+                        pack.mapRouteIDs.append(assetID)
                     }
-                    pack.mapRouteIDs = previous.mapRouteIDs
-                    pack.exerciseImageIDs = previous.exerciseImageIDs
-                    pack.missingAssets = previous.missingAssets
                 }
+                for assetID in oldImageIDs.intersection(allowedExerciseIDs) {
+                    if try reuseAsset(
+                        assetID, availableIDs: previousPack?.exerciseImageIDs ?? []
+                    ) {
+                        pack.exerciseImageIDs.append(assetID)
+                    }
+                }
+                // Missing media will be assessed during enrichment, rather
+                // than carrying over an outdated count from another plan.
+                pack.missingAssets = 0
             }
             try Task.checkCancellation()
             try JSONEncoder().encode(pack).write(to: temporary.appendingPathComponent("pack.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
