@@ -190,9 +190,14 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             return false
         }
 
-        guard workout.captureDevice ==
-                .appleWatch
-        else {
+        // A phone-initiated workout can still accept Watch set logging
+        // when the athlete chose "Both". Capture device denotes who owns
+        // the HealthKit workout, not which device can record sets.
+        let inputMode = workout.advancedConfiguration?.inputMode ?? .both
+        let watchMayRecordSets =
+            workout.captureDevice == .appleWatch ||
+            inputMode == .both
+        guard watchMayRecordSets else {
             sendSnapshotNow()
             return true
         }
