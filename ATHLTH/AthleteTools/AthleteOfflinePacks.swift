@@ -190,33 +190,47 @@ struct AthleteOfflineView: View {
     @State private var selectedPlanID: UUID?
     var body: some View {
         List {
-            Section("Download a plan") {
-                Picker("Plan", selection: $selectedPlanID) {
-                    Text("Choose a plan").tag(nil as UUID?)
-                    ForEach(session.trainingPlans) { Text($0.title).tag(Optional($0.id)) }
+            Section(ATHLTHLocalization.choose(
+                english: "Save a plan", norwegian: "Lagre en plan"
+            )) {
+                Picker(ATHLTHLocalization.choose(
+                    english: "Plan", norwegian: "Plan"
+                ), selection: $selectedPlanID) {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose a plan", norwegian: "Velg en plan"
+                    )).tag(nil as UUID?)
+                    ForEach(session.trainingPlans) {
+                        Text($0.title).tag(Optional($0.id))
+                    }
                 }
-                Button("Download for offline use") {
-                    guard let plan = session.trainingPlans.first(where: { $0.id == selectedPlanID }) else { return }
-                    let userID = session.profile.userID
-                    Task { await offline.download(plan: plan, routes: session.savedRoutes, userID: userID) }
-                }.disabled(offline.downloading || selectedPlanID == nil)
                 Button(ATHLTHLocalization.choose(
-                    english: "Save plan now (no internet required)",
-                    norwegian: "Lagre plan nå (uten internett)"
+                    english: "Save", norwegian: "Lagre"
                 )) {
                     guard let plan = session.trainingPlans.first(where: {
                         $0.id == selectedPlanID
                     }) else { return }
                     let userID = session.profile.userID
                     Task {
+                        // Save essential plan data first, regardless of network.
                         await offline.download(
                             plan: plan, routes: session.savedRoutes,
                             userID: userID, includeMedia: false
                         )
+                        guard offline.error == nil else { return }
+                        // Enrich with images and map snapshots when possible.
+                        // If offline, the local plan remains available.
+                        await offline.download(
+                            plan: plan, routes: session.savedRoutes,
+                            userID: userID, includeMedia: true
+                        )
                     }
                 }
                 .disabled(offline.downloading || selectedPlanID == nil)
-                if offline.downloading { ProgressView("Saving offline plan…") }
+                if offline.downloading {
+                    ProgressView(ATHLTHLocalization.choose(
+                        english: "Saving…", norwegian: "Lagrer…"
+                    ))
+                }
             }
             Section("On this device") {
                 ForEach(offline.packs) { pack in
