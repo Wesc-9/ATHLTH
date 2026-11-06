@@ -10,7 +10,7 @@ enum ATHLTHStrengthWatchControlPolicy {
     ) -> Bool {
         guard whenIPhoneControls else { return true }
         switch command {
-        case .completeSet, .skipRest, .skipRestAndStartTimedSet,
+        case .completeSet, .skipSet, .skipRest, .skipRestAndStartTimedSet,
              .startTimedSet, .nextExercise:
             return true
         case .updateDraft, .completeSetWithoutDetails, .addRest,
@@ -178,6 +178,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
 
         let setScopedCommand =
             command.kind == .updateDraft ||
+            command.kind == .skipSet ||
             command.kind == .completeSet ||
             command.kind ==
                 .completeSetWithoutDetails ||
@@ -340,6 +341,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 strengthWorkout
                     .completeCurrentDraftSet()
             }
+
+        case .skipSet:
+            _ = strengthWorkout.skipCurrentSet()
 
         case .completeSetWithoutDetails:
             if let restSeconds = command.restSeconds {
