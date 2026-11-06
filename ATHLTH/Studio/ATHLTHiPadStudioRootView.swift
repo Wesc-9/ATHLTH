@@ -46,6 +46,8 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var inspectorShowsCoach = false
     @State private var inspectorShowsInbox = false
     @State private var showingProfile = false
+    @State private var studioUtility: ATHLTHSideMenuDestination?
+    @State private var studioFeature: ATHLTHSideMenuDestination?
     @SceneStorage("athlth.studio.libraryExpanded") private var libraryExpanded = false
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var focusedPlanningDate: Date?
@@ -273,6 +275,13 @@ struct ATHLTHiPadStudioRootView: View {
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
         }
+        .sheet(item: $studioUtility) { destination in
+            ATHLTHSideMenuUtilitiesView(destination: destination)
+        }
+        .sheet(item: $studioFeature) { destination in
+            ATHLTHSideMenuDeepLinkView(destination: destination)
+                .frame(minWidth: 420, minHeight: 520)
+        }
         .sheet(isPresented: $showingProfile) {
             // The existing iPhone profile stays unchanged inside a tall,
             // phone-width sheet rather than stretching across the iPad.
@@ -448,110 +457,235 @@ struct ATHLTHiPadStudioRootView: View {
         .background(canvas)
     }
 
+    /// The iPad sidebar follows the same information architecture as the
+    /// iPhone Home menu, but opens the real iPad destinations and inspectors.
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 5) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text("ATHLTH")
-                    .font(.system(size: 25, weight: .bold, design: .rounded))
-                    .tracking(2.2)
+                    .font(.system(size: 24, weight: .semibold))
+                    .tracking(3)
                     .foregroundStyle(ink)
                 Text("STUDIO")
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(3)
+                    .font(.caption.weight(.medium))
+                    .tracking(2)
                     .foregroundStyle(gold)
             }
-            .padding(.horizontal, 23)
-            .padding(.top, 27)
-            .padding(.bottom, 26)
+            .padding(.horizontal, 22)
+            .padding(.top, 26)
+            .padding(.bottom, 17)
+
+            sidebarProfileRow
+                .padding(.horizontal, 11)
+                .padding(.bottom, 14)
+
+            Divider().padding(.horizontal, 18)
 
             ScrollView {
-                VStack(spacing: 5) {
-                    ForEach(ATHLTHStudioDestination.allCases) { destination in
-                        Button {
-                            selection = destination
-                        } label: {
-                            HStack(spacing: 13) {
-                                Image(systemName: destination.symbol)
-                                    .font(.system(size: 17))
-                                    .frame(width: 24)
-                                Text(destination.label)
-                                    .font(.system(size: 14, weight: selection == destination ? .semibold : .medium))
-                                Spacer(minLength: 0)
-                            }
-                            .padding(.horizontal, 15)
-                            .frame(minHeight: 46)
-                            .foregroundStyle(selection == destination ? ink : ink.opacity(0.68))
-                            .background {
-                                if selection == destination {
-                                    RoundedRectangle(cornerRadius: 13).fill(.white)
-                                }
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityAddTraits(selection == destination ? .isSelected : [])
+                VStack(alignment: .leading, spacing: 4) {
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Home", norwegian: "Hjem"),
+                        symbol: "house",
+                        selected: selection == .overview
+                    ) { selection = .overview }
 
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Inbox", norwegian: "Innboks"),
+                        symbol: "envelope"
+                    ) {
+                        inspectorShowsCoach = false
+                        inspectorShowsInbox = true
+                        showingInspector = true
                     }
-                    Divider()
-                        .padding(.vertical, 9)
-                        .padding(.horizontal, 12)
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Notifications", norwegian: "Varsler"),
+                        symbol: "bell"
+                    ) { studioUtility = .notifications }
+
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Search", norwegian: "Søk"),
+                        symbol: "magnifyingglass"
+                    ) { studioUtility = .search }
+
+                    Divider().padding(.vertical, 7).padding(.horizontal, 10)
+
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Plan Studio", norwegian: "Plan Studio"),
+                        symbol: "calendar"
+                    ) { selection = .planner }
 
                     trainingLibraryShortcut
+
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Train Together", norwegian: "Tren sammen"),
+                        symbol: "person.2"
+                    ) { studioFeature = .trainTogether }
+
+                    sidebarAction("Ghost Race", symbol: "flag.checkered") {
+                        trainRequest = .ghost
+                        showingTrain = true
+                    }
+
+                    sidebarAction("Arena", symbol: "trophy") {
+                        studioFeature = .arena
+                    }
+
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Clubs", norwegian: "Klubber"),
+                        symbol: "person.3"
+                    ) { studioFeature = .clubs }
+
+                    Divider().padding(.vertical, 7).padding(.horizontal, 10)
+
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremgang"),
+                        symbol: "chart.xyaxis.line",
+                        selected: selection == .insights
+                    ) { selection = .insights }
+
+                    sidebarAction("ATHLTH Coach", symbol: "sparkles",
+                                  selected: selection == .coach) {
+                        selection = .coach
+                    }
+
+                    sidebarAction(
+                        ATHLTHLocalization.choose(english: "Profile", norwegian: "Profil"),
+                        symbol: "person.crop.circle"
+                    ) { showingProfile = true }
+
+                    Menu {
+                        Button {
+                            selection = .history
+                        } label: {
+                            Label(ATHLTHStudioDestination.history.label,
+                                  systemImage: "clock.arrow.circlepath")
+                        }
+                        Button {
+                            selection = .explore
+                        } label: {
+                            Label(ATHLTHStudioDestination.explore.label,
+                                  systemImage: "map")
+                        }
+                        Button {
+                            selection = .community
+                        } label: {
+                            Label(ATHLTHStudioDestination.community.label,
+                                  systemImage: "person.3")
+                        }
+                        Button {
+                            studioFeature = .exerciseProgress
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Exercise progression",
+                                    norwegian: "Øvelsesfremdrift"
+                                ),
+                                systemImage: "chart.bar"
+                            )
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(english: "More", norwegian: "Mer"),
+                            systemImage: "ellipsis.circle"
+                        )
+                        .foregroundStyle(ink)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .padding(.horizontal, 15)
+                    }
                 }
                 .padding(.horizontal, 11)
+                .padding(.vertical, 10)
             }
+            .scrollIndicators(.hidden)
 
-            Button {
-                showingProfile = true
-            } label: {
-                HStack(spacing: 11) {
-                    Group {
-                        if let avatarURL = session.profile.avatarURL {
-                            ATHLTHStorageImage(url: avatarURL, maxPixelSize: 140) { phase in
-                                if case .success(let image) = phase {
-                                    image.resizable().scaledToFill()
-                                } else {
-                                    profileFallback
-                                }
-                            }
-                        } else {
-                            profileFallback
-                        }
-                    }
-                    .frame(width: 46, height: 46)
-                    .clipShape(Circle())
-                    .overlay(Circle().stroke(gold.opacity(0.5)))
+            Divider().padding(.horizontal, 18)
 
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(session.profile.displayName.isEmpty ? "ATHLTH" : session.profile.displayName)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ink)
-                            .lineLimit(1)
-                        Text(session.profile.username.isEmpty
-                             ? ATHLTHLocalization.choose(english: "My profile", norwegian: "Min profil")
-                             : "@\(session.profile.username)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
-                    Spacer(minLength: 0)
-                    Image(systemName: "chevron.up.right")
-                        .font(.caption)
-                        .foregroundStyle(gold)
-                }
-                .padding(12)
-                .background(.white.opacity(0.9), in: RoundedRectangle(cornerRadius: 16))
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ATHLTHLocalization.choose(
-                english: "Open my profile", norwegian: "Åpne min profil"
-            ))
-            .accessibilityIdentifier("athlth-ipad-profile-footer")
-            .padding(.horizontal, 11)
-            .padding(.bottom, 12)
+            sidebarAction(
+                ATHLTHLocalization.choose(english: "Settings", norwegian: "Innstillinger"),
+                symbol: "gearshape",
+                selected: selection == .settings
+            ) { selection = .settings }
+                .padding(.horizontal, 11)
+                .padding(.vertical, 12)
         }
         .background(canvas)
+    }
+
+    private func sidebarAction(
+        _ title: String,
+        symbol: String,
+        selected: Bool = false,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 17))
+                    .frame(width: 24)
+                Text(title)
+                    .font(.subheadline.weight(selected ? .semibold : .regular))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .foregroundStyle(selected ? ink : ink.opacity(0.78))
+            .padding(.horizontal, 14)
+            .frame(minHeight: 44)
+            .background {
+                if selected {
+                    RoundedRectangle(cornerRadius: 11)
+                        .fill(Color.white)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private var sidebarProfileRow: some View {
+        Button {
+            showingProfile = true
+        } label: {
+            HStack(spacing: 11) {
+                Group {
+                    if let avatarURL = session.profile.avatarURL {
+                        ATHLTHStorageImage(url: avatarURL, maxPixelSize: 140) { phase in
+                            if case .success(let image) = phase {
+                                image.resizable().scaledToFill()
+                            } else {
+                                profileFallback
+                            }
+                        }
+                    } else {
+                        profileFallback
+                    }
+                }
+                .frame(width: 40, height: 40)
+                .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(session.profile.displayName.isEmpty
+                         ? "ATHLTH" : session.profile.displayName)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ink)
+                        .lineLimit(1)
+                    Text(session.profile.username.isEmpty
+                         ? ATHLTHLocalization.choose(english: "My profile", norwegian: "Min profil")
+                         : "@\(session.profile.username)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-ipad-profile-footer")
     }
 
     private var profileFallback: some View {
