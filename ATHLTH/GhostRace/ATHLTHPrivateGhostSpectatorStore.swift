@@ -35,8 +35,9 @@ struct ATHLTHPrivateGhostSpectatorSnapshot: Codable, Hashable, Identifiable {
     /// current from a stale record, including while the iPad was asleep.
     func isFresh(at now: Date = .now) -> Bool {
         let age = now.timeIntervalSince1970 - capturedAtEpoch
-        return age >= -10 && age < 70 && course.count >= 2 &&
-            routeDistanceMeters.isFinite && routeDistanceMeters >= 200
+        return age >= -10 && age < 60 && course.count >= 2 &&
+            routeDistanceMeters.isFinite && routeDistanceMeters >= 200 &&
+            course.allSatisfy(Self.validCoordinate)
     }
 
     /// Markers and the live gap expire faster than the course itself.
@@ -125,6 +126,8 @@ enum ATHLTHPrivateGhostSpectatorStore {
     private static var lastSentAt: Date?
     private static var lastRaceID: UUID?
     private static var lastPaused: Bool?
+    private static var mutationGeneration = 0
+    private static var lastPublishingUserID: UUID?
 
     private struct Write: Encodable {
         let user_id: UUID
@@ -144,6 +147,8 @@ enum ATHLTHPrivateGhostSpectatorStore {
     static func setEnabled(_ enabled: Bool, for userID: UUID) {
         AccountLocalStorage.write(enabled, name: preference, userID: userID)
         if !enabled {
+            mutationGeneration &+= 1
+            lastPublishingUserID = nil
             lastRaceID = nil
             lastSentAt = nil
             lastPaused = nil
@@ -164,7 +169,8 @@ enum ATHLTHPrivateGhostSpectatorStore {
         else { return }
 
         let now = Date()
-        if lastRaceID == reference.id, lastPaused == paused,
+        if lastPublishingUserID == userID,
+           lastRaceID == reference.id, lastPaused == paused,
            let lastSentAt, now.timeIntervalSince(lastSentAt) < 4 {
             return
         }
@@ -175,9 +181,11 @@ enum ATHLTHPrivateGhostSpectatorStore {
 
         // Throttle before awaiting the network so parallel GPS and Watch
         // updates cannot overwhelm the database.
+        lastPublishingUserID = userID
         lastRaceID = reference.id
         lastPaused = paused
         lastSentAt = now
+        let generationAtSend = mutationGeneration
 
         let formatter = ISO8601DateFormatter()
         let write = Write(
@@ -192,6 +200,12 @@ enum ATHLTHPrivateGhostSpectatorStore {
             try await client.from(table)
                 .upsert(write, onConflict: "user_id")
                 .execute()
+            // An in-flight network write cannot silently undo opt-out
+            // or a finish event that cleared the spectator session.
+            if generationAtSend != mutationGeneration ||
+               !isEnabled(for: userID) {
+                await clear(for: userID)
+            }
         } catch {
             // Offline running must continue. Readers discard expired data;
             // the publisher retries on the next active GPS update.
@@ -200,6 +214,8 @@ enum ATHLTHPrivateGhostSpectatorStore {
 
     static func clear(for userID: UUID) async {
         guard client.auth.currentUser?.id == userID else { return }
+        mutationGeneration &+= 1
+        lastPublishingUserID = nil
         lastRaceID = nil
         lastPaused = nil
         lastSentAt = nil
