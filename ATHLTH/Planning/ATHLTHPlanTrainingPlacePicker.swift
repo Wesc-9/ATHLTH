@@ -86,6 +86,7 @@ struct ATHLTHPlanTrainingPlacePicker: View {
     @State private var favorites: [ATHLTHTrainingPlace] = []
     @StateObject private var placeSearch = ATHLTHTrainingPlaceSearch()
     @State private var query = ""
+    @FocusState private var nameFocused: Bool
 
     let onSave: (ATHLTHTrainingPlace?) -> Void
 
@@ -115,9 +116,78 @@ struct ATHLTHPlanTrainingPlacePicker: View {
                         title: ATHLTHLocalization.choose(
                             english: "Where will you train?", norwegian: "Hvor skal du trene?"),
                         subtitle: ATHLTHLocalization.choose(
-                            english: "Choose a favorite or add a new location for this day.",
-                            norwegian: "Velg et favorittsted eller legg til et nytt sted for denne dagen."),
+                            english: "Select a type, search Apple Maps or choose a favorite. A street address is optional.",
+                            norwegian: "Velg type, søk i Apple Maps eller bruk et favorittsted. Adresse er valgfritt."),
                         icon: "mappin.and.ellipse")
+
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "WHAT KIND OF PLACE?", norwegian: "HVOR TRENER DU?"
+                        ))
+                        .font(.caption.weight(.semibold))
+                        .tracking(1)
+                        .foregroundStyle(.secondary)
+
+                        LazyVGrid(columns: [
+                            GridItem(.flexible(), spacing: 9),
+                            GridItem(.flexible(), spacing: 9),
+                            GridItem(.flexible(), spacing: 9)
+                        ], spacing: 9) {
+                            ForEach(
+                                ATHLTHTrainingPlaceKind.allCases.filter {
+                                    $0 != .address && $0 != .other
+                                }
+                            ) { option in
+                                Button {
+                                    kind = option
+                                    if name.isEmpty { nameFocused = true }
+                                } label: {
+                                    VStack(spacing: 7) {
+                                        Image(systemName: option.symbol)
+                                            .font(.title3)
+                                            .frame(height: 24)
+                                        Text(option.title)
+                                            .font(.caption.weight(.medium))
+                                            .lineLimit(2)
+                                            .multilineTextAlignment(.center)
+                                    }
+                                    .foregroundStyle(
+                                        kind == option
+                                            ? Color.white : ATHLTHPlanDesign.ink
+                                    )
+                                    .frame(maxWidth: .infinity, minHeight: 76)
+                                    .padding(.horizontal, 5)
+                                    .background(
+                                        kind == option
+                                            ? ATHLTHPlanDesign.ink
+                                            : ATHLTHPlanDesign.selectedSurface,
+                                        in: RoundedRectangle(cornerRadius: 14)
+                                    )
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityAddTraits(kind == option ? .isSelected : [])
+                            }
+                        }
+                        Button {
+                            kind = .other
+                            if name.isEmpty { nameFocused = true }
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Another training place",
+                                    norwegian: "Annet treningssted"
+                                ),
+                                systemImage: "mappin.and.ellipse"
+                            )
+                            .font(.subheadline)
+                            .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    }
+                    .padding(15)
+                    .background(.white, in: RoundedRectangle(cornerRadius: 19))
+
 
                     ATHLTHPlanSurface {
                         VStack(alignment: .leading, spacing: 10) {
@@ -160,18 +230,12 @@ struct ATHLTHPlanTrainingPlacePicker: View {
 
                     ATHLTHPlanSurface {
                         VStack(alignment: .leading, spacing: 14) {
-                            Picker(ATHLTHLocalization.choose(
-                                english: "Type of place", norwegian: "Type sted"),
-                                   selection: $kind) {
-                                ForEach(ATHLTHTrainingPlaceKind.allCases) { value in
-                                    Label(value.title, systemImage: value.symbol).tag(value)
-                                }
-                            }
                             TextField(ATHLTHLocalization.choose(
-                                english: "Name (gym, hotel, etc.)",
-                                norwegian: "Navn (treningssenter, hotell osv.)"),
+                                english: "Name of the training place",
+                                norwegian: "Navn på treningsstedet"),
                                 text: $name)
                                 .textInputAutocapitalization(.words)
+                                .focused($nameFocused)
                             TextField(ATHLTHLocalization.choose(
                                 english: "Address (optional)", norwegian: "Adresse (valgfritt)"),
                                 text: $address)
