@@ -2326,6 +2326,76 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
     }
 
+    /// Omit only the current pending set. The durable command is replayed on
+    /// iPhone with exercise/set indices; it is never counted as performance.
+    func skipStrengthSet() {
+        guard !strengthActionPending,
+              let snapshot = strengthSession,
+              !snapshot.isResting,
+              !snapshot.currentExerciseComplete,
+              snapshot.setCount > 0
+        else { return }
+
+        let sent = sendStrengthCommand(
+            WatchStrengthCommand(
+                id: UUID(),
+                workoutID: snapshot.workoutID,
+                kind: .skipSet,
+                reps: nil,
+                weightKilograms: nil,
+                restSeconds: nil,
+                addRestSeconds: nil,
+                sentAt: Date(),
+                exerciseIndex: snapshot.exerciseIndex,
+                setIndex: snapshot.setIndex
+            )
+        )
+        guard sent else { return }
+
+        var updated = snapshot
+        updated.timedSetCountdown = nil
+        updated.restEndsAt = nil
+        updated.isResting = false
+        updated.totalSets = max(0, snapshot.totalSets - 1)
+        updated.setCount = max(0, snapshot.setCount - 1)
+
+        if var queue = updated.exerciseQueue,
+           let exercisePosition = queue.firstIndex(where: {
+               $0.index == snapshot.exerciseIndex
+           }) {
+            var exercise = queue[exercisePosition]
+            if var plans = exercise.setPlans,
+               plans.indices.contains(snapshot.setIndex) {
+                plans.remove(at: snapshot.setIndex)
+                exercise.setPlans = plans
+            }
+            exercise.setCount = max(exercise.setCount - 1, 0)
+            exercise.isCompleted = exercise.setCount == 0
+            exercise.firstPendingSetIndex = exercise.setCount > 0
+                ? min(snapshot.setIndex, exercise.setCount - 1)
+                : nil
+            queue[exercisePosition] = exercise
+            updated.exerciseQueue = queue
+        }
+
+        updated.setIndex = updated.setCount > 0
+            ? min(snapshot.setIndex, updated.setCount - 1) : 0
+        updated.setNumber = updated.setCount > 0
+            ? updated.setIndex + 1 : nil
+        updated.currentExerciseComplete = updated.setCount == 0
+        updated.allExercisesComplete = updated.totalSets == updated.completedSets
+        updated.updatedAt = Date()
+        if !updated.currentExerciseComplete {
+            applyStrengthPlanDefaults(
+                to: &updated,
+                exerciseIndex: updated.exerciseIndex,
+                setIndex: updated.setIndex
+            )
+        }
+        publish { self.strengthSession = updated }
+        persistWorkoutRecoveryState()
+    }
+
     /// Start the selected timed set from the Watch, even when its values
     /// are controlled on iPhone. This must be one durable command: a separate
     /// skip-rest followed by start-timer may be reordered during reconnection.
