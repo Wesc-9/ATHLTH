@@ -132,6 +132,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var audioCoachReadyAnnouncedForWorkout = false
     private var strengthRestCoachTask:
         Task<Void, Never>?
+    /// Watch rest haptics are independent from speech and work with Coach off.
+    private var strengthRestHapticTask: Task<Void, Never>?
+    private var strengthRestHapticScheduleKey: String?
+    private var strengthRestHapticDeliveredKey: String?
     private var strengthStatusCoachTask:
         Task<Void, Never>?
     /// Independent of Audio Coach: time-goal haptics still work when speech
@@ -1152,6 +1156,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             self.strengthActionPending = false
         }
 
+        scheduleStrengthRestHaptic(accepted)
         handleStrengthCoachTransition(
             from: previous,
             to: accepted
@@ -1696,6 +1701,46 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
+    /// Set by the absolute end date, independent of Audio Coach settings,
+    /// speech lease, UI page or iPhone foreground state.
+    private func scheduleStrengthRestHaptic(
+        _ snapshot: WatchStrengthSessionSnapshot
+    ) {
+        guard snapshot.isResting,
+              let end = snapshot.restEndsAt,
+              audioCoachConfiguration.shouldUseStrengthHaptics
+        else {
+            strengthRestHapticTask?.cancel()
+            strengthRestHapticTask = nil
+            strengthRestHapticScheduleKey = nil
+            return
+        }
+
+        let key = "\(snapshot.workoutID.uuidString):\(end.timeIntervalSince1970)"
+        guard strengthRestHapticDeliveredKey != key else { return }
+        guard strengthRestHapticScheduleKey != key else { return }
+        strengthRestHapticTask?.cancel()
+        strengthRestHapticScheduleKey = key
+        strengthRestHapticTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let seconds = end.timeIntervalSinceNow
+            // Never buzz for a stale checkpoint restored minutes afterwards.
+            guard seconds > 0 else { return }
+            do { try await Task.sleep(for: .seconds(seconds)) }
+            catch { return }
+            guard !Task.isCancelled,
+                  self.strengthSession?.workoutID == snapshot.workoutID,
+                  self.strengthSession?.isResting == true,
+                  self.strengthSession?.restEndsAt == end,
+                  self.audioCoachConfiguration.shouldUseStrengthHaptics,
+                  self.strengthRestHapticDeliveredKey != key
+            else { return }
+            self.strengthRestHapticDeliveredKey = key
+            self.strengthRestHapticScheduleKey = nil
+            WKInterfaceDevice.current().play(.notification)
+        }
+    }
+
     private func scheduleStrengthRestCoach(
         _ snapshot:
             WatchStrengthSessionSnapshot
@@ -1805,12 +1850,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     return
                 }
 
-                if self.audioCoachConfiguration
-                    .shouldUseStrengthHaptics {
-                    WKInterfaceDevice.current()
-                        .play(.success)
-                }
-
+                // Rest completion haptic is independently scheduled above.
                 var englishParts:
                     [String] = []
                 var norwegianParts:
