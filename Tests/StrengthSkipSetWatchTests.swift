@@ -55,4 +55,19 @@ final class StrengthSkipSetWatchTests: XCTestCase {
             .updateDraft, whenIPhoneControls: true
         ))
     }
+
+    func testPhoneCapturedWorkoutAllowsWatchSetLoggingForBothAndWatchModes() {
+        XCTAssertTrue(ATHLTHStrengthWatchControlPolicy.acceptsSetCommands(
+            captureDevice: .iPhone, inputMode: .both
+        ))
+        XCTAssertTrue(ATHLTHStrengthWatchControlPolicy.acceptsSetCommands(
+            captureDevice: .iPhone, inputMode: .appleWatch
+        ))
+        XCTAssertFalse(ATHLTHStrengthWatchControlPolicy.acceptsSetCommands(
+            captureDevice: .iPhone, inputMode: .iPhone
+        ))
+        XCTAssertTrue(ATHLTHStrengthWatchControlPolicy.acceptsSetCommands(
+            captureDevice: .appleWatch, inputMode: .both
+        ))
+    }
 }
