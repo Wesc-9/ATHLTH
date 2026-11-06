@@ -207,6 +207,7 @@ struct ATHLTHAudioCoachSettingsView: View {
                     // ATHLTH+ applies to premium voices and workout features,
                     // not to discovering local voices or editing preferences.
                     studioEntrySection
+                    motivationAndZoneQuickSection
                     experienceSection
                     speakingToneQuickSection
                     voiceSection
@@ -423,6 +424,138 @@ struct ATHLTHAudioCoachSettingsView: View {
                 )
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    /// Formerly hidden inside Coach Studio. Keep the most important
+    /// motivation and measured-zone controls immediately accessible from
+    /// standard workout guidance.
+    private var motivationAndZoneQuickSection: some View {
+        premiumSection(ATHLTHLocalization.choose(
+            english: "Motivation & heart-rate zones",
+            norwegian: "Motivasjon og pulssoner"
+        )) {
+            premiumCard {
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Motivational coaching",
+                            norwegian: "Motivasjonssnakk"
+                        ))
+                        .font(.headline)
+                    }
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Encourage me during runs",
+                            norwegian: "Gi meg oppmuntring mens jeg løper"
+                        ),
+                        isOn: $settings.audioCoachSmartSettings.motivationEnabled
+                    )
+                    .tint(ATHLTHTheme.accentDeep)
+
+                    if settings.audioCoachSmartSettings.motivationEnabled {
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english: "Motivational frequency",
+                                norwegian: "Hvor ofte skal coachen motivere?"
+                            ),
+                            selection: $settings.audioCoachSmartSettings.motivationIntervalSeconds
+                        ) {
+                            Text("30 s").tag(30)
+                            Text("1 min").tag(60)
+                            Text("2 min").tag(120)
+                            Text("3 min").tag(180)
+                            Text("5 min").tag(300)
+                        }
+                        .pickerStyle(.menu)
+                        Picker(
+                            ATHLTHLocalization.choose(
+                                english: "Motivational style",
+                                norwegian: "Motivasjonsstil"
+                            ),
+                            selection: Binding(
+                                get: {
+                                    settings.audioCoachSmartSettings.encouragementStyle ??
+                                        .encouragement
+                                },
+                                set: { settings.audioCoachSmartSettings.encouragementStyle = $0 }
+                            )
+                        ) {
+                            ForEach(ATHLTHCoachEncouragementStyle.allCases) { style in
+                                Text(style.title).tag(style)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Contextual encouragement on hills and final stretch",
+                            norwegian: "Motiver i bakker og på siste etappe"
+                        ),
+                        isOn: Binding(
+                            get: {
+                                settings.audioCoachSmartSettings.contextualFeedbackEnabled ?? true
+                            },
+                            set: { settings.audioCoachSmartSettings.contextualFeedbackEnabled = $0 }
+                        )
+                    )
+                    .tint(ATHLTHTheme.accentDeep)
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Surprise encouragement",
+                            norwegian: "Tilfeldig oppmuntring"
+                        ),
+                        isOn: $settings.audioCoachSmartSettings.randomEncouragementEnabled
+                    )
+                    .tint(ATHLTHTheme.accentDeep)
+                    Divider()
+                    HStack(spacing: 10) {
+                        Image(systemName: "heart.text.square")
+                            .foregroundStyle(ATHLTHTheme.premiumGold)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Measured heart-rate zone",
+                            norwegian: "Målt pulssone"
+                        ))
+                        .font(.headline)
+                    }
+                    Toggle(
+                        ATHLTHLocalization.choose(
+                            english: "Tell me which heart-rate zone I'm in",
+                            norwegian: "Fortell hvilken pulssone jeg er i"
+                        ),
+                        isOn: Binding(
+                            get: {
+                                settings.audioCoachSmartSettings.announceCurrentHeartRateZone ??
+                                    false
+                            },
+                            set: { settings.audioCoachSmartSettings.announceCurrentHeartRateZone = $0 }
+                        )
+                    )
+                    .tint(ATHLTHTheme.accentDeep)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Uses current measured heart rate and a valid maximum heart rate. Target-zone warnings take priority.",
+                        norwegian: "Bruker målt puls og gyldig makspuls. Varsler om målsone prioriteres."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    NavigationLink {
+                        ATHLTHAudioCoachStudioView()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Custom phrases, places and saved profiles",
+                                norwegian: "Egne meldinger, steder og lagrede profiler"
+                            ),
+                            systemImage: "arrow.up.right"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(minHeight: 44)
+                    }
+                }
+                .padding(18)
+            }
         }
     }
 
