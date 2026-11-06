@@ -1223,6 +1223,7 @@ struct IPhoneWorkoutView: View {
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
+    @EnvironmentObject private var ghostRace: GhostRaceStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var socialCompanion =
@@ -1573,6 +1574,27 @@ struct IPhoneWorkoutView: View {
                         }
                     }
 
+                    // Historical and target Ghost races use a fixed route,
+                    // not the cloud-based Live Ghost location feed.
+                    if let reference = ghostRace.reference,
+                       workout.ghostRaceTitle != nil,
+                       workout.runEnvironment == .outdoor {
+                        ATHLTHGhostRaceLiveCourseMap(
+                            reference: reference,
+                            comparison: ghostRace.comparison,
+                            runnerTrail: workout.points.map {
+                                $0.location.coordinate
+                            },
+                            paused: workout.resumedAt == nil,
+                            mapHeight: 300
+                        )
+                        .listRowInsets(EdgeInsets(
+                            top: 8, leading: 14, bottom: 10, trailing: 14
+                        ))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                    }
+
                     if let liveSession = realtime.currentSession,
                        realtime.isSharingLiveLocation {
                         Section("Live") {
@@ -1601,6 +1623,7 @@ struct IPhoneWorkoutView: View {
                     }
 
                     if workout.runEnvironment == .outdoor &&
+                       ghostRace.reference == nil &&
                        (workout.plannedRouteCoordinates?.count ?? 0) >= 2 {
                         premiumWorkoutMap(
                             workout
