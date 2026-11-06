@@ -10228,144 +10228,135 @@ private struct FreestyleExercisePrescriptionView: View {
         .buttonStyle(.plain)
     }
 
-    private var loadTargetRow:
-        some View {
+    private var loadTargetRow: some View {
         Group {
             if loadKind == .resistanceLevel {
-                Stepper(
-                    value: $resistanceLevel,
-                    in: 1...10
-                ) {
+                HStack(spacing: 11) {
                     loadMenu(
-                        value:
-                            ATHLTHLocalization.choose(
-                                english: "Level \(resistanceLevel)",
-                                norwegian: "Steg \(resistanceLevel)"
-                            )
+                        value: tr("Level", "Nivå") + " \(resistanceLevel)"
                     )
+                    .font(.subheadline)
+                    Spacer(minLength: 4)
+                    countControl(
+                        title: tr("Resistance", "Motstand"),
+                        value: resistanceLevel,
+                        minimum: 1,
+                        maximum: 10
+                    ) { resistanceLevel = $0 }
                 }
+                .frame(minHeight: 55)
             } else {
-                HStack {
-                    loadMenu(
-                        value:
-                            String(
-                                format:
-                                    "%.1f kg",
-                                weightKilograms
-                            )
-                    )
-
-                    Spacer()
-
+                HStack(spacing: 11) {
+                    loadMenu(value: tr("Weight", "Vekt"))
+                        .font(.subheadline)
+                    Spacer(minLength: 4)
                     StrengthClearableNumericField(
                         value: $weightKilograms,
                         allowsDecimal: true
                     )
-                    .frame(width: 100)
-
+                    .keyboardType(.decimalPad)
+                    .multilineTextAlignment(.trailing)
+                    .frame(width: 80)
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 42)
+                    .background(
+                        premiumCanvas,
+                        in: RoundedRectangle(cornerRadius: 11)
+                    )
+                    .accessibilityIdentifier("strength-add-exercise-weight")
                     Text("kg")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
+                .frame(minHeight: 55)
             }
         }
     }
 
-    private func loadMenu(
-        value: String
-    ) -> some View {
+    private func loadMenu(value: String) -> some View {
         Menu {
             Button {
-                loadKind =
-                    .weightKilograms
+                loadKind = .weightKilograms
             } label: {
                 Label(
-                    ATHLTHLocalization.choose(
-                        english: "Weight",
-                        norwegian: "Vekt"
-                    ),
-                    systemImage:
-                        loadKind == .weightKilograms
-                            ? "checkmark"
-                            : "scalemass"
+                    tr("Weight", "Vekt"),
+                    systemImage: loadKind == .weightKilograms
+                        ? "checkmark" : "scalemass"
                 )
             }
 
             Button {
-                loadKind =
-                    .resistanceLevel
+                loadKind = .resistanceLevel
                 useLoadTarget = true
             } label: {
                 Label(
-                    ATHLTHLocalization.choose(
-                        english: "Resistance",
-                        norwegian: "Motstand"
-                    ),
-                    systemImage:
-                        loadKind == .resistanceLevel
-                            ? "checkmark"
-                            : "dial.medium"
+                    tr("Resistance", "Motstand"),
+                    systemImage: loadKind == .resistanceLevel
+                        ? "checkmark" : "dial.medium"
                 )
             }
         } label: {
-            HStack(spacing: 5) {
-                Text(
-                    "\(loadKind.title): \(value)"
-                )
-                .foregroundStyle(.primary)
-
+            HStack(spacing: 6) {
+                Text(value)
+                    .foregroundStyle(premiumInk)
                 Image(systemName: "chevron.down")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(premiumBronze)
             }
         }
     }
 
-    private var targetRow:
-        some View {
-        Group {
-            if targetKind == .reps {
-                Stepper(
-                    value: $reps,
-                    in: 1...100
-                ) {
-                    targetMenu(
-                        value: "\(reps)"
-                    )
-                }
+    private var targetRow: some View {
+        HStack(spacing: 12) {
+            setupIcon(targetKind == .reps ? "target" : "stopwatch")
+
+            if entry.exercise.snapshot.isTimeOnlyBodyweightStrength {
+                Text(tr("Time goal", "Tidsmål") + ": " +
+                     TimeInterval(durationSeconds).clockDuration)
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(premiumInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
             } else {
-                Stepper(
-                    value: $durationSeconds,
-                    in: 15...7_200,
+                targetMenu(
+                    value: targetKind == .reps
+                        ? "\(reps)"
+                        : TimeInterval(durationSeconds).clockDuration
+                )
+                .font(.subheadline.weight(.medium))
+            }
+
+            Spacer(minLength: 4)
+
+            if targetKind == .reps {
+                countControl(
+                    title: tr("Target reps", "Målreps"),
+                    value: reps,
+                    minimum: 1,
+                    maximum: 100
+                ) { reps = $0 }
+            } else {
+                countControl(
+                    title: tr("Duration", "Varighet"),
+                    value: durationSeconds,
+                    minimum: 15,
+                    maximum: 7_200,
                     step: 15
-                ) {
-                    targetMenu(
-                        value:
-                            TimeInterval(
-                                durationSeconds
-                            )
-                            .clockDuration
-                    )
-                }
+                ) { durationSeconds = $0 }
             }
         }
+        .frame(minHeight: 73)
     }
 
-    private func targetMenu(
-        value: String
-    ) -> some View {
+    private func targetMenu(value: String) -> some View {
         Menu {
             Button {
                 targetKind = .reps
             } label: {
                 Label(
-                    ATHLTHLocalization.choose(
-                        english: "Target reps",
-                        norwegian: "Målreps"
-                    ),
-                    systemImage:
-                        targetKind == .reps
-                            ? "checkmark"
-                            : "repeat"
+                    tr("Target reps", "Målreps"),
+                    systemImage: targetKind == .reps
+                        ? "checkmark" : "repeat"
                 )
             }
 
@@ -10373,29 +10364,24 @@ private struct FreestyleExercisePrescriptionView: View {
                 targetKind = .time
             } label: {
                 Label(
-                    ATHLTHLocalization.choose(
-                        english: "Duration",
-                        norwegian: "Varighet"
-                    ),
-                    systemImage:
-                        targetKind == .time
-                            ? "checkmark"
-                            : "timer"
+                    tr("Duration", "Varighet"),
+                    systemImage: targetKind == .time
+                        ? "checkmark" : "timer"
                 )
             }
         } label: {
-            HStack(spacing: 5) {
-                Text(
-                    "\(targetKind.title): \(value)"
-                )
-                .foregroundStyle(.primary)
-
+            HStack(spacing: 6) {
+                Text(targetKind.title + ": " + value)
+                    .foregroundStyle(premiumInk)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
                 Image(systemName: "chevron.down")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(premiumBronze)
             }
         }
     }
+
 }
 
 struct StrengthSetResultEditTarget: Identifiable {
