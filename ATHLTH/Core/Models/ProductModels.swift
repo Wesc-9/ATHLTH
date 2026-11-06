@@ -460,6 +460,30 @@ extension ExerciseSnapshot {
         isCardioResistanceMachine
     }
 
+    /// Stable classification for hold-type abdominal exercises and the
+    /// generic free-strength timer. An old RepDB weight result must not
+    /// silently convert a hold into a weighted repetition record.
+    var isTimeOnlyBodyweightStrength: Bool {
+        let title = name.folding(
+            options: [.caseInsensitive, .diacriticInsensitive],
+            locale: .current
+        ).lowercased()
+        return [
+            "six inch hold", "six-inch hold", "6 inch hold",
+            "hollow hold", "hollow body hold",
+            "plank", "side plank", "sideplanke",
+            "rkc plank", "wall sit", "dead hang",
+            "l-sit", "l sit", "isometric hold",
+            "fri styrketrening", "free strength training"
+        ].contains(where: title.contains)
+    }
+
+    var isFreeStrengthTimer: Bool {
+        let title = name.lowercased()
+        return title.contains("free strength training") ||
+            title.contains("fri styrketrening")
+    }
+
     var defaultStrengthTargetKind: StrengthExerciseTargetKind {
         let normalized =
             ([name] + equipment)
@@ -486,6 +510,13 @@ extension ExerciseSnapshot {
             "stairmaster",
             "battle rope",
             "plank",
+            "six inch hold",
+            "six-inch hold",
+            "6 inch hold",
+            "hollow body hold",
+            "free strength training",
+            "fri styrketrening",
+            "l-sit",
             "wall sit",
             "dead hang",
             "hollow hold",
@@ -503,6 +534,8 @@ extension ExerciseSnapshot {
     }
 
     var defaultStrengthTargetDurationSeconds: Int {
+        if isFreeStrengthTimer { return 600 }
+        if isTimeOnlyBodyweightStrength { return 30 }
         let normalized =
             ([name] + equipment)
                 .joined(separator: " ")
