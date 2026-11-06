@@ -158,6 +158,17 @@ struct StrengthAIExercisePlannerView: View {
     @State private var exerciseCount = 5
     @State private var focusBodyPart: String?
     @State private var personalize = true
+    @State private var sourceFilter: StrengthAIExerciseSourceFilter = .library
+    @State private var equipmentFilter: String?
+    @State private var editedSuggestions: [StrengthAIExerciseSuggestion] = []
+    @State private var replacingSuggestion: StrengthAIExerciseSuggestion?
+    @State private var inspectingEntry: ExerciseLibraryEntry?
+    @State private var showingLibrary = false
+
+    private let ink = Color(red: 0.18, green: 0.19, blue: 0.21)
+    private let accent = Color(red: 0.57, green: 0.47, blue: 0.37)
+    private let separator = Color(red: 0.90, green: 0.89, blue: 0.87)
+    private let canvas = Color(red: 0.976, green: 0.972, blue: 0.966)
     @State private var isGenerating = false
     @State private var errorMessage: String?
     @State private var plan:
@@ -170,103 +181,61 @@ struct StrengthAIExercisePlannerView: View {
         exerciseLibrary.bodyParts
     }
 
-    private var candidateEntries:
-        [ExerciseLibraryEntry] {
-        let existingIDs =
-            Set(
-                existingExercises
-                    .compactMap(\.exerciseID)
-            )
-
-        let filtered =
-            exerciseLibrary.allExercises
-                .filter {
-                    !existingIDs.contains($0.id) &&
-                    $0.exercise
-                        .snapshot
-                        .defaultStrengthTargetKind ==
-                        .reps
-                }
-
-        let sorted =
-            filtered.sorted {
-                lhs,
-                rhs in
-
-                let lhsFocus =
-                    focusScore(lhs)
-                let rhsFocus =
-                    focusScore(rhs)
-
-                if lhsFocus != rhsFocus {
-                    return lhsFocus > rhsFocus
-                }
-
-                if lhs.source != rhs.source {
-                    return lhs.source ==
-                        .athlthCatalog
-                }
-
-                return lhs.canonicalName
-                    .localizedCaseInsensitiveCompare(
-                        rhs.canonicalName
-                    ) ==
-                    .orderedAscending
-            }
-
-        return Array(
-            sorted.prefix(80)
-        )
+    private var existingIDs: Set<UUID> {
+        Set(existingExercises.compactMap(\.exerciseID))
     }
 
+    private var candidateEntries: [ExerciseLibraryEntry] {
+        Array(StrengthAIExerciseSelectionPolicy.available(
+            from: exerciseLibrary.allExercises,
+            excluding: existingIDs,
+            source: sourceFilter,
+            focus: focusBodyPart,
+            equipment: equipmentFilter
+        ).prefix(80))
+    }
+
+    private var availableEquipment: [String] {
+        let matching = StrengthAIExerciseSelectionPolicy.available(
+            from: exerciseLibrary.allExercises,
+            excluding: existingIDs,
+            source: sourceFilter,
+            focus: focusBodyPart,
+            equipment: nil
+        )
+        return Array(Set(matching.flatMap { $0.exercise.equipment }))
+            .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
+    }
+
+    private var activeSuggestions: [StrengthAIExerciseSuggestion] {
+        editedSuggestions
+    }
+
+    /// Only exact UUID matches from the current source/focus/equipment
+    /// allow-list may be displayed and subsequently saved.
     private var resolvedSuggestions:
-        [(StrengthAIExerciseSuggestion,
-          ExerciseLibraryEntry)] {
-        guard let plan else {
-            return []
-        }
-
-        let byID =
-            Dictionary(
-                uniqueKeysWithValues:
-                    exerciseLibrary
-                        .allExercises
-                        .map {
-                            ($0.id, $0)
-                        }
-            )
-
-        var seen:
-            Set<UUID> = []
-
-        return plan.exercises
-            .compactMap {
-                suggestion in
-
-                guard
-                    !seen.contains(
-                        suggestion
-                            .exerciseID
-                    ),
-                    let entry =
-                        byID[
-                            suggestion
-                                .exerciseID
-                        ]
-                else {
-                    return nil
-                }
-
-                seen.insert(
-                    suggestion
-                        .exerciseID
-                )
-
-                return (
-                    suggestion,
-                    entry
-                )
+        [(StrengthAIExerciseSuggestion, ExerciseLibraryEntry)] {
+        let byID = Dictionary(
+            uniqueKeysWithValues: candidateEntries.map { ($0.id, $0) }
+        )
+        var seen = Set<UUID>()
+        return activeSuggestions.compactMap { suggestion in
+            guard !seen.contains(suggestion.exerciseID),
+                  let entry = byID[suggestion.exerciseID] else {
+                return nil
             }
+            seen.insert(suggestion.exerciseID)
+            return (suggestion, entry)
+        }
+    }
+
+    private var availableReplacements: [ExerciseLibraryEntry] {
+        let used = Set(editedSuggestions.map(\.exerciseID))
+        return candidateEntries.filter { !used.contains($0.id) }
+    }
+
+    private var hasEnoughExercises: Bool {
+        candidateEntries.count >= (quickSuggestion ? 1 : exerciseCount)
     }
 
     var body: some View {
@@ -281,7 +250,7 @@ struct StrengthAIExercisePlannerView: View {
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                    } else {
+                    } else if plan == nil {
                         introCard
                         setupCard
                     }
@@ -307,14 +276,7 @@ struct StrengthAIExercisePlannerView: View {
                 .padding(16)
                 .padding(.bottom, 26)
             }
-            .background(
-                ATHLTHPremiumCanvas(
-                    accent:
-                        ATHLTHTheme
-                            .premiumGold
-                            .opacity(0.20)
-                )
-            )
+            .background(canvas.ignoresSafeArea())
             .navigationTitle(
                 ATHLTHLocalization.choose(
                     english: quickSuggestion
@@ -350,6 +312,40 @@ struct StrengthAIExercisePlannerView: View {
         .task {
             if quickSuggestion && plan == nil && !isGenerating {
                 generate()
+            }
+        }
+        .sheet(item: $replacingSuggestion) { target in
+            StrengthAIExerciseReplacementPicker(choices: availableReplacements) {
+                replacement in
+                replace(target.exerciseID, with: replacement)
+            }
+        }
+        .sheet(item: $inspectingEntry) { entry in
+            NavigationStack {
+                ExerciseDetailView(entry: entry, selectionTitle: nil, onSelect: nil)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Close", norwegian: "Lukk"
+                            )) { inspectingEntry = nil }
+                        }
+                    }
+            }
+        }
+        .sheet(isPresented: $showingLibrary) {
+            NavigationStack {
+                ExerciseLibraryView(
+                    source: sourceFilter == .mine ? .mine : .library,
+                    selectionTitle: nil,
+                    onSelect: nil
+                )
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(ATHLTHLocalization.choose(
+                            english: "Done", norwegian: "Ferdig"
+                        )) { showingLibrary = false }
+                    }
+                }
             }
         }
     }
