@@ -107,100 +107,186 @@ struct ATHLTHStrengthCompletionReview: View {
     }
 
     private var completionHero: some View {
-        VStack(spacing: 0) {
-            GeometryReader { viewport in
-                ZStack(alignment: .bottomLeading) {
-                    Image("StrengthPostWorkoutHero")
+        GeometryReader { viewport in
+            ZStack(alignment: .topLeading) {
+                // Use the original uploaded barbell photograph, not the
+                // treadmill/studio shot or a generated background.
+                Image("StrengthQuickHero")
                     .resizable()
+                    .interpolation(.high)
                     .scaledToFill()
-                    .athlthBoundedFill()
-                    .frame(width: viewport.size.width, height: 190)
+                    .frame(width: viewport.size.width, height: viewport.size.height)
                     .clipped()
+
+                // Keep the photograph visible while reserving readable
+                // negative space for the title and three key statistics.
                 LinearGradient(
-                    colors: [
-                        Color.black.opacity(0.08),
-                        Color.black.opacity(0.78)
+                    stops: [
+                        .init(color: Color.white.opacity(0.83), location: 0),
+                        .init(color: Color.white.opacity(0.41), location: 0.35),
+                        .init(color: Color.white.opacity(0.05), location: 0.70),
+                        .init(color: Color.white.opacity(0.17), location: 1)
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0.25),
+                        .init(color: Color(red: 0.98, green: 0.967, blue: 0.95)
+                            .opacity(0.64), location: 0.66),
+                        .init(color: Color(red: 0.98, green: 0.967, blue: 0.95)
+                            .opacity(0.96), location: 1)
                     ],
                     startPoint: .top,
                     endPoint: .bottom
                 )
-                VStack(alignment: .leading, spacing: 8) {
-                    Label(tr("WORKOUT COMPLETE", "ØKT FULLFØRT"),
-                          systemImage: "checkmark.seal.fill")
-                        .font(.caption.weight(.bold))
-                        .tracking(1.1)
-                        .foregroundStyle(.white.opacity(0.88))
-                    Text(workout.title)
-                        .font(.system(size: 30, weight: .semibold, design: .serif))
-                        .foregroundStyle(.white)
-                        .lineLimit(2)
-                        .minimumScaleFactor(0.82)
-                    Text(workout.startDate.formatted(
-                        date: .abbreviated, time: .shortened
-                    ))
-                    .font(.subheadline)
-                    .foregroundStyle(.white.opacity(0.84))
-                }
-                .padding(21)
-                }
-                .frame(width: viewport.size.width, height: 190)
-            }
-            .frame(height: 190)
 
-            LazyVGrid(columns: [
-                GridItem(.flexible(), spacing: 1),
-                GridItem(.flexible(), spacing: 1)
-            ], spacing: 1) {
-                metric(
-                    tr("Duration", "Varighet"),
-                    duration(workout.duration),
-                    "clock"
-                )
-                metric(
-                    tr("Training volume", "Treningsvolum"),
-                    displayVolume.map(weight) ?? "—",
-                    "scalemass"
-                )
-                metric(
-                    tr("Exercises", "Øvelser"),
-                    String(completedExercises.isEmpty
-                        ? workout.strengthExerciseCount ?? 0
-                        : completedExercises.count),
-                    "dumbbell"
-                )
-                metric(
-                    tr("Sets completed", "Gjennomførte sett"),
-                    log.map { String($0.totalCompletedSets) } ?? "—",
-                    "checkmark.circle"
+                if !muscleProfile.activations.isEmpty {
+                    // Both anatomical figures stay on the right. Only
+                    // muscles used by this workout receive warm colors.
+                    StrengthMuscleMapView(
+                        profile: muscleProfile,
+                        compact: true,
+                        style: .activation,
+                        presentation: .home,
+                        activationTint: Color(red: 0.85, green: 0.46, blue: 0.22),
+                        regionTints: sessionMuscleTints,
+                        warmIvoryBase: true
+                    )
+                    .frame(
+                        width: min(viewport.size.width * 0.46, 240),
+                        height: viewport.size.height * 0.58
+                    )
+                    .frame(
+                        width: viewport.size.width,
+                        height: viewport.size.height,
+                        alignment: .topTrailing
+                    )
+                    .padding(.top, 45)
+                    .padding(.trailing, 9)
+                    .allowsHitTesting(false)
+                }
+
+                VStack(alignment: .leading, spacing: 0) {
+                    Label(
+                        tr("WORKOUT COMPLETE", "ØKT FULLFØRT"),
+                        systemImage: "checkmark.circle.fill"
+                    )
+                    .font(.system(size: 10, weight: .bold))
+                    .tracking(1.5)
+                    .foregroundStyle(bronze)
+
+                    Spacer(minLength: 60)
+
+                    Text(tr("Strength", "Styrke"))
+                        .font(.system(size: 35, weight: .bold, design: .rounded))
+                        .tracking(-0.8)
+                        .foregroundStyle(ink)
+
+                    Text(heroMuscleFocus)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(muted)
+                        .lineLimit(2)
+                        .frame(
+                            maxWidth: viewport.size.width * 0.55,
+                            alignment: .leading
+                        )
+                        .padding(.top, 3)
+
+                    Spacer(minLength: 12)
+
+                    HStack(spacing: 0) {
+                        heroMetric(
+                            "clock",
+                            duration(workout.duration),
+                            tr("Time", "Tid")
+                        )
+                        heroMetricDivider
+                        heroMetric(
+                            "dumbbell.fill",
+                            "\(completedExercises.isEmpty
+                                ? (workout.strengthExerciseCount ?? 0)
+                                : completedExercises.count)",
+                            tr("Exercises", "Øvelser")
+                        )
+                        heroMetricDivider
+                        heroMetric(
+                            "scalemass.fill",
+                            displayVolume.map(weight) ?? "—",
+                            tr("Volume", "Volum")
+                        )
+                    }
+                    .frame(height: 53)
+                }
+                .padding(20)
+                .frame(
+                    width: viewport.size.width,
+                    height: viewport.size.height,
+                    alignment: .leading
                 )
             }
-            .background(soft)
+            .frame(width: viewport.size.width, height: viewport.size.height)
+            .clipped()
         }
-        .background(.white, in: RoundedRectangle(cornerRadius: 26))
+        .frame(height: 320)
         .clipShape(RoundedRectangle(cornerRadius: 26))
         .overlay {
-            RoundedRectangle(cornerRadius: 26).stroke(border, lineWidth: 0.8)
+            RoundedRectangle(cornerRadius: 26)
+                .stroke(border, lineWidth: 0.8)
         }
+        .accessibilityElement(children: .combine)
     }
 
-    private func metric(_ label: String, _ value: String, _ icon: String) -> some View {
-        VStack(alignment: .leading, spacing: 9) {
-            Label(label, systemImage: icon)
-                .font(.caption.weight(.medium))
-                .foregroundStyle(muted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-            Text(value)
-                .font(.system(size: 27, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
+    private var heroMuscleFocus: String {
+        let names = muscleProfile.topActivations.prefix(2)
+            .map { $0.region.activityDisplayTitle }
+        guard !names.isEmpty else {
+            return tr("Strength training", "Styrketrening")
         }
-        .frame(maxWidth: .infinity, minHeight: 104, alignment: .leading)
-        .padding(.horizontal, 19)
-        .padding(.vertical, 13)
-        .background(.white)
+        return names.joined(separator: " · ")
+    }
+
+    private var sessionMuscleTints: [StrengthMuscleRegion: Color] {
+        // Relative use, not an injury, soreness or fatigue diagnosis.
+        var result: [StrengthMuscleRegion: Color] = [:]
+        for activation in muscleProfile.activations {
+            result[activation.region] = ATHLTHStrengthFocusTint.color(
+                for: muscleProfile.intensity(for: activation.region)
+            )
+        }
+        return result
+    }
+
+    private var heroMetricDivider: some View {
+        Rectangle()
+            .fill(bronze.opacity(0.24))
+            .frame(width: 1, height: 30)
+            .padding(.horizontal, 6)
+    }
+
+    private func heroMetric(
+        _ symbol: String,
+        _ value: String,
+        _ label: String
+    ) -> some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 5) {
+                Image(systemName: symbol)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(bronze)
+                Text(value)
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .monospacedDigit()
+                    .foregroundStyle(ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(muted)
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private var resultsCard: some View {
