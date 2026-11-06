@@ -98,6 +98,11 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         titleRow(expanded: split)
 
+                        // Live workout data is displayed, never edited, on iPad.
+                        if strength.activeWorkout != nil {
+                            ATHLTHStudioLiveStrengthReadOnlyCard()
+                        }
+
                         if split {
                             HStack(alignment: .top, spacing: 15) {
                                 planCard
