@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Share an existing personal item with one explicitly selected mutual friend.
 /// Reuses the messaging library picker and its privacy-safe payload factory.
-enum ATHLTHFriendQuickShareKind: String, Identifiable {
+enum ATHLTHFriendQuickShareKind: String, CaseIterable, Identifiable {
     case plan, workout, route, exercise
 
     var id: String { rawValue }
