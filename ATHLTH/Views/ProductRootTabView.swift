@@ -5814,6 +5814,7 @@ struct ATHLTHTrainView: View {
     @State private var selectedSection: ATHLTHTrainSection = .today
     @State private var displayedTrainDay = Calendar.current.startOfDay(for: .now)
     @State private var preparedTrainUserID: UUID?
+    @State private var trainHistoryReconcileTask: Task<Void, Never>?
     @State private var todayScrollPosition = ScrollPosition(edge: .top)
     @State private var planScrollPosition = ScrollPosition(edge: .top)
     @State private var progressScrollPosition = ScrollPosition(edge: .top)
@@ -6394,17 +6395,13 @@ struct ATHLTHTrainView: View {
                     )
                 }
             }
-            .onReceive(phoneWorkout.$history) { history in
-                guard isActive, preparedTrainUserID == session.profile.userID else { return }
-                session.reconcilePlanLinkedPhoneWorkouts(
-                    history, healthWorkouts: health.workouts
-                )
+            // HealthKit and phone history can publish in bursts. Coalesce
+            // them rather than reconciling plans repeatedly in one frame.
+            .onReceive(phoneWorkout.$history) { _ in
+                scheduleTrainHistoryReconciliation()
             }
-            .onReceive(health.$workouts) { workouts in
-                guard isActive, preparedTrainUserID == session.profile.userID else { return }
-                session.reconcilePlanLinkedPhoneWorkouts(
-                    phoneWorkout.history, healthWorkouts: workouts
-                )
+            .onReceive(health.$workouts) { _ in
+                scheduleTrainHistoryReconciliation()
             }
             .onChange(
                 of: navigationRequest?.id
@@ -6438,6 +6435,8 @@ struct ATHLTHTrainView: View {
                     refreshTrainDayIfChanged()
                     return
                 }
+                trainHistoryReconcileTask?.cancel()
+                trainHistoryReconcileTask = nil
                 // Preserve the viewport when leaving Train. Resetting three
                 // ScrollPositions during a tab transition can force layout
                 // work on the main thread and cause a visible hitch.
@@ -6508,6 +6507,24 @@ struct ATHLTHTrainView: View {
         // or floating duplicate tabs are drawn over scrolled content.
         .scrollPosition(section == .plan ? $planScrollPosition : $todayScrollPosition)
         .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+    }
+
+    @MainActor
+    private func scheduleTrainHistoryReconciliation() {
+        guard isActive, preparedTrainUserID == session.profile.userID else { return }
+        trainHistoryReconcileTask?.cancel()
+        trainHistoryReconcileTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(180))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled, isActive,
+                  preparedTrainUserID == session.profile.userID else { return }
+            session.reconcilePlanLinkedPhoneWorkouts(
+                phoneWorkout.history, healthWorkouts: health.workouts
+            )
+        }
     }
 
     private func refreshTrainDayIfChanged() {
