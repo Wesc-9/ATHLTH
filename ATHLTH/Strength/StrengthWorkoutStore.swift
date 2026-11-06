@@ -1563,6 +1563,14 @@ final class StrengthWorkoutStore: ObservableObject {
 
         let now = date
         startCurrentSetEffort(at: now)
+        // An untargeted timed hold uses only the durable count-up effort
+        // clock. Do not fabricate a duration or launch a countdown.
+        if set.plannedDurationSeconds == nil &&
+           exercise.exercise.isTimeOnlyBodyweightStrength {
+            timedSetCountdown = nil
+            persistCheckpointNow()
+            return
+        }
         if var countdown = currentTimedSetCountdown {
             guard !countdown.isRunning else { return }
             countdown.resumedAt = now
@@ -1964,7 +1972,10 @@ final class StrengthWorkoutStore: ObservableObject {
                     resumedAt: $0.resumedAt
                 )
             },
-            setEffortStartedAt: currentSetEffortClock?.startedAt
+            setEffortStartedAt: currentSetEffortClock?.startedAt,
+            isOpenEndedTimedSet: set?.resolvedTargetKind == .time &&
+                set?.plannedDurationSeconds == nil &&
+                exercise?.exercise.isTimeOnlyBodyweightStrength == true
         )
     }
 
@@ -2478,7 +2489,8 @@ final class StrengthWorkoutStore: ObservableObject {
         targetResistanceLevel: Int? = nil,
         restSeconds: Int? = 90,
         warmUpSets: Int = 0,
-        recordsWeight: Bool? = nil
+        recordsWeight: Bool? = nil,
+        openEndedTime: Bool = false
     ) {
         finalizeActualRestIfNeeded()
         guard var workout = activeWorkout else { return }
@@ -2529,12 +2541,10 @@ final class StrengthWorkoutStore: ObservableObject {
                             : nil,
                     targetKind: resolvedTargetKind,
                     plannedDurationSeconds:
-                        resolvedTargetKind == .time
+                        resolvedTargetKind == .time && !openEndedTime
                             ? max(
                                 targetDurationSeconds ??
-                                    exercise
-                                        .snapshot
-                                        .defaultStrengthTargetDurationSeconds,
+                                    snapshot.defaultStrengthTargetDurationSeconds,
                                 15
                             )
                             : nil,
@@ -3243,7 +3253,10 @@ final class StrengthWorkoutStore: ObservableObject {
                     : nil,
             durationSeconds:
                 targetKind == .time
-                    ? (currentTimedSetCountdown?.elapsedSeconds() ?? draftDurationSeconds)
+                    ? (currentSet?.plannedDurationSeconds == nil &&
+                       currentExercise?.exercise.isTimeOnlyBodyweightStrength == true
+                        ? Int((currentSetEffortClock?.elapsedSeconds() ?? 0).rounded())
+                        : (currentTimedSetCountdown?.elapsedSeconds() ?? draftDurationSeconds))
                     : nil,
             weightKilograms:
                 loadKind == .weightKilograms && !treadmill && currentSetRecordsWeight
