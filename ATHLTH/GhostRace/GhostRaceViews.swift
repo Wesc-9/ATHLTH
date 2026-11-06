@@ -250,13 +250,20 @@ struct GhostRaceHubView: View {
         .navigationTitle("Ghost Race")
         .navigationBarTitleDisplayMode(.inline)
         .task(id: session.profile.userID) {
+            remoteOwnGhostStatus = nil
             if ATHLTHDeviceRole.isIPad {
                 while !Task.isCancelled {
-                    remoteOwnGhostStatus = session.signedIn
-                        ? await ATHLTHPrivateGhostSpectatorStore.fetch(
-                            for: session.profile.userID
+                    if session.signedIn {
+                        let userID = session.profile.userID
+                        let fetched = await ATHLTHPrivateGhostSpectatorStore.fetch(
+                            for: userID
                         )
-                        : nil
+                        guard !Task.isCancelled, userID == session.profile.userID
+                        else { return }
+                        remoteOwnGhostStatus = fetched
+                    } else {
+                        remoteOwnGhostStatus = nil
+                    }
                     try? await Task.sleep(
                         for: .seconds(remoteOwnGhostStatus == nil ? 8 : 3)
                     )
