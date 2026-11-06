@@ -49,6 +49,79 @@ final class StrengthSkipSetWatchTests: XCTestCase {
     }
 
     @MainActor
+    func testReduceThreeSetsToOneKeepsTheOnlyCompletedSet() {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
+        store.appendExercise(exercise(), sets: 3, reps: 8, restSeconds: 0)
+
+        let exerciseID = try! XCTUnwrap(store.activeWorkout?.exercises.first?.id)
+        let firstID = try! XCTUnwrap(store.activeWorkout?.exercises.first?.sets.first?.id)
+        store.completeCurrentDraftSet()
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
+        XCTAssertEqual(store.watchSnapshot?.setCount, 3)
+
+        XCTAssertTrue(store.adjustActiveExerciseSetCount(exerciseID, to: 1))
+        XCTAssertEqual(store.activeWorkout?.exercises[0].sets.count, 1)
+        XCTAssertEqual(store.activeWorkout?.exercises[0].sets[0].id, firstID)
+        XCTAssertTrue(store.activeWorkout?.exercises[0].sets[0].isCompleted == true)
+        XCTAssertEqual(store.activeWorkout?.exercises[0].skippedPlannedSetCount ?? 0, 0)
+        XCTAssertTrue(store.currentExerciseAllSetsCompleted)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
+        XCTAssertEqual(store.watchSnapshot?.setCount, 1)
+        XCTAssertEqual(store.watchSnapshot?.totalSets, 1)
+        XCTAssertEqual(store.watchSnapshot?.completedSets, 1)
+    }
+
+    @MainActor
+    func testErroneouslyCompletedSetsNeedExplicitCorrection() {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
+        store.appendExercise(exercise(), sets: 3, reps: 8, restSeconds: 0)
+        let exerciseID = try! XCTUnwrap(store.activeWorkout?.exercises.first?.id)
+        let firstID = try! XCTUnwrap(store.activeWorkout?.exercises.first?.sets.first?.id)
+
+        for _ in 0..<3 {
+            store.completeCurrentDraftSet()
+        }
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 3)
+
+        XCTAssertFalse(store.adjustActiveExerciseSetCount(exerciseID, to: 1))
+        XCTAssertEqual(store.activeWorkout?.exercises[0].sets.count, 3)
+        XCTAssertTrue(store.adjustActiveExerciseSetCount(
+            exerciseID, to: 1, correctRecordedSets: true
+        ))
+        XCTAssertEqual(store.activeWorkout?.exercises[0].sets.map(\.id), [firstID])
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
+        XCTAssertEqual(store.watchSnapshot?.totalSets, 1)
+        XCTAssertEqual(store.watchSnapshot?.completedSets, 1)
+    }
+
+    @MainActor
+    func testIncreasingSetsCreatesPendingSetWithoutDuplicatingResults() {
+        let store = StrengthWorkoutStore()
+        store.startFreestyle(watchSessionID: UUID(), captureDevice: .iPhone)
+        store.appendExercise(exercise(), sets: 2, reps: 10, restSeconds: 0)
+        let exerciseID = try! XCTUnwrap(store.activeWorkout?.exercises.first?.id)
+        store.completeCurrentDraftSet()
+        let firstID = try! XCTUnwrap(store.activeWorkout?.exercises.first?.sets.first?.id)
+
+        XCTAssertTrue(store.adjustActiveExerciseSetCount(exerciseID, to: 1))
+        XCTAssertTrue(store.adjustActiveExerciseSetCount(exerciseID, to: 2))
+
+        let sets = store.activeWorkout?.exercises.first?.sets ?? []
+        XCTAssertEqual(sets.count, 2)
+        XCTAssertEqual(sets[0].id, firstID)
+        XCTAssertNotEqual(sets[1].id, firstID)
+        XCTAssertTrue(sets[0].isCompleted)
+        XCTAssertFalse(sets[1].isCompleted)
+        XCTAssertEqual(sets[1].setNumber, 2)
+        XCTAssertEqual(sets[1].plannedReps, 10)
+        XCTAssertNil(sets[1].completedReps)
+        XCTAssertEqual(store.activeWorkout?.totalCompletedSets, 1)
+        XCTAssertFalse(store.currentExerciseAllSetsCompleted)
+    }
+
+    @MainActor
     func testCompletedSetCannotBeSkippedAgain() throws {
         let store = StrengthWorkoutStore()
         store.startFreestyle(watchSessionID: UUID(), captureDevice: .appleWatch)
