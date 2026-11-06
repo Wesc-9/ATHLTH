@@ -4819,6 +4819,101 @@ final class HealthKitManager: ObservableObject {
         )
     }
 
+    /// Prefer workout-associated Apple Watch distance samples when producing
+    /// retrospective km pace. GPS geometry is for maps, not the Watch's fused
+    /// running distance. Missing, condensed or inconsistent samples return [],
+    /// allowing the result screen to retain its existing verified GPS fallback.
+    func runningDistanceKilometerSplits(
+        for workoutID: UUID
+    ) async -> [ATHLTHRunningResultInsights.KilometerSplit] {
+        let workout: HKWorkout?
+        if let cached = workoutObjects[workoutID] {
+            workout = cached
+        } else {
+            workout = try? await workoutForChallenge(uuid: workoutID)
+            if let workout { cacheWorkoutObject(workout) }
+        }
+        guard let workout,
+              workout.workoutActivityType == .running ||
+                workout.workoutActivityType == .walking,
+              let type = HKObjectType.quantityType(
+                forIdentifier: .distanceWalkingRunning
+              )
+        else { return [] }
+
+        let samples: [HKQuantitySample]
+        do {
+            samples = try await withCheckedThrowingContinuation {
+                (continuation: CheckedContinuation<[HKQuantitySample], Error>) in
+                let query = HKSampleQuery(
+                    sampleType: type,
+                    predicate: HKQuery.predicateForObjects(from: workout),
+                    limit: 12_000,
+                    sortDescriptors: [
+                        NSSortDescriptor(
+                            key: HKSampleSortIdentifierStartDate,
+                            ascending: true
+                        )
+                    ]
+                ) { _, results, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                    } else {
+                        continuation.resume(
+                            returning: results as? [HKQuantitySample] ?? []
+                        )
+                    }
+                }
+                healthStore.execute(query)
+            }
+        } catch {
+            return []
+        }
+
+        guard !Task.isCancelled else { return [] }
+        var pauses: [DateInterval] = []
+        var pausedAt: Date?
+        for event in (workout.workoutEvents ?? []).sorted(
+            by: { $0.dateInterval.start < $1.dateInterval.start }
+        ) {
+            switch event.type {
+            case .pause, .motionPaused:
+                if pausedAt == nil { pausedAt = event.dateInterval.start }
+            case .resume, .motionResumed:
+                if let start = pausedAt, event.dateInterval.start > start {
+                    pauses.append(DateInterval(
+                        start: start, end: event.dateInterval.start
+                    ))
+                }
+                pausedAt = nil
+            default:
+                break
+            }
+        }
+        if let start = pausedAt, workout.endDate > start {
+            pauses.append(DateInterval(start: start, end: workout.endDate))
+        }
+
+        let distance = workout.statistics(for: type)?
+            .sumQuantity()?.doubleValue(for: .meter()) ??
+            workout.totalDistance?.doubleValue(for: .meter())
+
+        let intervals = samples.map {
+            ATHLTHRunningResultInsights.HealthDistanceInterval(
+                startDate: $0.startDate,
+                endDate: $0.endDate,
+                distanceMeters: $0.quantity.doubleValue(for: .meter())
+            )
+        }
+        return ATHLTHRunningResultInsights.healthDistanceKilometerSplits(
+            from: intervals,
+            workoutStart: workout.startDate,
+            workoutEnd: workout.endDate,
+            reportedDistanceMeters: distance,
+            pausedIntervals: pauses
+        )
+    }
+
     /// Measured heart-rate timeline for a single completed workout.
     /// A failed/denied HealthKit read returns no points, never simulated data.
     func runningHeartRateTimeline(for workoutID: UUID)
