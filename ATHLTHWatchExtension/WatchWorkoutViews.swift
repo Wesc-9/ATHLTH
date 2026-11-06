@@ -1036,6 +1036,35 @@ struct WatchActiveWorkoutView: View {
                     )
                     .lineLimit(1)
 
+                    if snapshot.targetKindRaw != "time" &&
+                        snapshot.setEffortStartedAt == nil &&
+                        !snapshot.isResting &&
+                        !snapshot.currentExerciseComplete {
+                        Button {
+                            workoutManager.startStrengthSet()
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Start set",
+                                    norwegian: "Start sett"
+                                ),
+                                systemImage: "play.fill"
+                            )
+                            .font(.system(size: 10, weight: .bold))
+                            .frame(maxWidth: .infinity, minHeight: 35)
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(WatchTheme.liveStrengthReps)
+                        .disabled(workoutManager.strengthActionPending)
+                    } else if let started = snapshot.setEffortStartedAt,
+                              !snapshot.isResting {
+                        Text(started, style: .timer)
+                            .font(.system(size: 14, weight: .semibold,
+                                          design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(WatchTheme.liveStrengthReps)
+                    }
+
                     Button {
                         workoutManager
                             .completeStrengthSet()
@@ -2063,6 +2092,34 @@ struct WatchActiveWorkoutView: View {
                 }
                 .padding(10)
                 .watchSurface(radius: 18)
+
+                if snapshot.targetKindRaw != "time" &&
+                    snapshot.setEffortStartedAt == nil &&
+                    !snapshot.isResting &&
+                    !snapshot.currentExerciseComplete {
+                    Button {
+                        workoutManager.startStrengthSet()
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Start set",
+                                norwegian: "Start sett"
+                            ),
+                            systemImage: "play.fill"
+                        )
+                        .font(.system(size: 12, weight: .bold))
+                        .frame(maxWidth: .infinity, minHeight: 38)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(workoutManager.strengthActionPending)
+                } else if let started = snapshot.setEffortStartedAt,
+                          !snapshot.isResting {
+                    Text(started, style: .timer)
+                        .font(.system(size: 16, weight: .semibold,
+                                      design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(WatchTheme.accent)
+                }
 
                 Button {
                     workoutManager.completeStrengthSet()
