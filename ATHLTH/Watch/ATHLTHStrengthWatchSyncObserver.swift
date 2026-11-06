@@ -500,11 +500,12 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         pendingDraftSnapshotTask?.cancel()
         pendingDraftSnapshotTask = nil
 
-        guard strengthWorkout
-                .activeWorkout?
-                .captureDevice == .appleWatch,
-              let snapshot =
-                strengthWorkout.watchSnapshot
+        guard let workout = strengthWorkout.activeWorkout,
+              ATHLTHStrengthWatchControlPolicy.acceptsSetCommands(
+                  captureDevice: workout.captureDevice,
+                  inputMode: workout.advancedConfiguration?.inputMode ?? .both
+              ),
+              let snapshot = strengthWorkout.watchSnapshot
         else {
             return
         }
