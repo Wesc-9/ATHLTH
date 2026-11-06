@@ -205,9 +205,9 @@ struct ATHLTHStrengthCompletionReview: View {
                         heroMetricDivider
                         heroMetric(
                             "dumbbell.fill",
-                            "\(completedExercises.isEmpty
+                            String(completedExercises.isEmpty
                                 ? (workout.strengthExerciseCount ?? 0)
-                                : completedExercises.count)",
+                                : completedExercises.count),
                             tr("Exercises", "Øvelser")
                         )
                         heroMetricDivider
