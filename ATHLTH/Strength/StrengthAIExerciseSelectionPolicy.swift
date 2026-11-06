@@ -28,6 +28,7 @@ enum StrengthAIExerciseSourceFilter: String, CaseIterable, Identifiable {
 /// A renamed exercise never acquires identity by matching its display name.
 @MainActor
 enum StrengthAIExerciseSelectionPolicy {
+    /// Compatibility wrapper for callers that require one specific muscle.
     static func available(
         from library: [ExerciseLibraryEntry],
         excluding existingIDs: Set<UUID>,
@@ -35,7 +36,23 @@ enum StrengthAIExerciseSelectionPolicy {
         focus: String?,
         equipment: String?
     ) -> [ExerciseLibraryEntry] {
-        library.filter { entry in
+        available(
+            from: library, excluding: existingIDs, source: source,
+            focuses: focus.map { [$0] } ?? [], equipment: equipment
+        )
+    }
+
+    static func available(
+        from library: [ExerciseLibraryEntry],
+        excluding existingIDs: Set<UUID>,
+        source: StrengthAIExerciseSourceFilter,
+        focuses: [String],
+        equipment: String?
+    ) -> [ExerciseLibraryEntry] {
+        let selectedFocuses = Set(focuses.map {
+            ExerciseLibraryStore.canonicalMuscleFilter($0)
+        })
+        return library.filter { entry in
             guard !existingIDs.contains(entry.id),
                   entry.exercise.snapshot.defaultStrengthTargetKind == .reps
             else { return false }
@@ -49,13 +66,14 @@ enum StrengthAIExerciseSelectionPolicy {
                 return false
             }
 
-            if let focus, !focus.isEmpty {
-                let target = ExerciseLibraryStore.canonicalMuscleFilter(focus)
+            if !selectedFocuses.isEmpty {
                 let groups = [entry.bodyPart].compactMap { $0 } +
                     entry.exercise.primaryMuscles +
                     entry.exercise.secondaryMuscles
                 guard groups.contains(where: {
-                    ExerciseLibraryStore.canonicalMuscleFilter($0) == target
+                    selectedFocuses.contains(
+                        ExerciseLibraryStore.canonicalMuscleFilter($0)
+                    )
                 }) else { return false }
             }
 
