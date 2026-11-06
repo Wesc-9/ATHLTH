@@ -181,6 +181,7 @@ struct WatchActiveWorkoutView: View {
                         if workoutManager.strengthSession?.hasExercisePrescription != true {
                             WatchFreeStrengthPage().tag(0)
                         } else if workoutManager.strengthSession?.targetKindRaw == "time",
+                           workoutManager.strengthSession?.isOpenEndedTimedSet != true,
                            workoutManager.strengthSession?.isResting != true,
                            workoutManager.strengthSession?.currentExerciseComplete != true {
                             WatchStrengthTimedSetPage()
@@ -1036,7 +1037,8 @@ struct WatchActiveWorkoutView: View {
                     )
                     .lineLimit(1)
 
-                    if snapshot.targetKindRaw != "time" &&
+                    if (snapshot.targetKindRaw != "time" ||
+                        snapshot.isOpenEndedTimedSet == true) &&
                         snapshot.setEffortStartedAt == nil &&
                         !snapshot.isResting &&
                         !snapshot.currentExerciseComplete {
@@ -2093,7 +2095,8 @@ struct WatchActiveWorkoutView: View {
                 .padding(10)
                 .watchSurface(radius: 18)
 
-                if snapshot.targetKindRaw != "time" &&
+                if (snapshot.targetKindRaw != "time" ||
+                        snapshot.isOpenEndedTimedSet == true) &&
                     snapshot.setEffortStartedAt == nil &&
                     !snapshot.isResting &&
                     !snapshot.currentExerciseComplete {
