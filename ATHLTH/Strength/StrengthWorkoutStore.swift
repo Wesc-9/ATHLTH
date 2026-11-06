@@ -4492,15 +4492,24 @@ final class StrengthWorkoutStore: ObservableObject {
         workout.exercises[exerciseIndex] = exercise
 
         if selectedExerciseID == exerciseID {
+            // An added pending set must become the active Watch/iPhone set,
+            // even if the previous selection was the last completed set.
             currentSetIndex = updated.firstIndex(where: {
-                $0.id == selectedSetID
+                $0.id == selectedSetID && !$0.isCompleted
             }) ?? updated.firstIndex(where: {
                 !$0.isCompleted
+            }) ?? updated.firstIndex(where: {
+                $0.id == selectedSetID
             }) ?? max(updated.count - 1, 0)
 
             if updated.allSatisfy(\.isCompleted) {
                 timedSetCountdown = nil
                 setEffortClock = nil
+                restStartedAt = nil
+                restEndsAt = nil
+            } else if original.allSatisfy(\.isCompleted) {
+                // Reopening an already finished exercise must not retain
+                // its previous post-exercise rest as an active rest timer.
                 restStartedAt = nil
                 restEndsAt = nil
             }
