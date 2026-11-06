@@ -9889,6 +9889,10 @@ private struct FreestyleExercisePrescriptionView: View {
                         value: $sets,
                         in: 1...20
                     )
+                    .onChange(of: sets) { _, newValue in
+                        warmUpSets = wholeExerciseWarmUp
+                            ? newValue : min(warmUpSets, newValue)
+                    }
 
                     if targetKind == .time &&
                         entry.exercise.snapshot.isTimeOnlyBodyweightStrength {
@@ -9965,10 +9969,6 @@ private struct FreestyleExercisePrescriptionView: View {
                             value: $warmUpSets,
                             in: 0...sets
                         )
-                    }
-                    .onChange(of: sets) { _, newValue in
-                        warmUpSets = wholeExerciseWarmUp
-                            ? newValue : min(warmUpSets, newValue)
                     }
                 }
 
