@@ -188,7 +188,7 @@ struct StrengthAIExercisePlannerView: View {
 
     private var candidateEntries: [ExerciseLibraryEntry] {
         let available = StrengthAIExerciseSelectionPolicy.available(
-            from: exerciseLibrary.allExercises,
+            from: exerciseLibrary.selectableExercises,
             excluding: existingIDs,
             source: sourceFilter,
             focuses: Array(focusBodyParts),
@@ -228,7 +228,7 @@ struct StrengthAIExercisePlannerView: View {
 
     private var availableEquipment: [String] {
         let matching = StrengthAIExerciseSelectionPolicy.available(
-            from: exerciseLibrary.allExercises,
+            from: exerciseLibrary.selectableExercises,
             excluding: existingIDs,
             source: sourceFilter,
             focuses: Array(focusBodyParts),
