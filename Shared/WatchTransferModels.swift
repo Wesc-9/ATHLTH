@@ -1311,6 +1311,8 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     var setNumber: Int?
     var completedSets: Int
     var totalSets: Int
+    /// Number deliberately omitted from this session; not completed work.
+    var skippedSets: Int? = nil
     var draftReps: Int
     var draftWeightKilograms: Double
     var draftRestSeconds: Int
