@@ -4660,6 +4660,26 @@ final class StrengthWorkoutStore: ObservableObject {
         )
     }
 
+    /// A late HealthKit save must update the exact finished session only,
+    /// never whichever workout happens to be on screen when it returns.
+    func attachFinishedWorkoutHealthKitUUID(
+        _ uuid: UUID,
+        workoutID: UUID,
+        ownerID: UUID
+    ) {
+        guard accountID == ownerID,
+              var saved = workoutHistory.first(where: {
+                  $0.id == workoutID && $0.isFinished
+              }) else { return }
+
+        saved.healthMetrics.healthKitWorkoutUUID = uuid
+        upsertWorkoutHistory(saved)
+        if completedWorkout?.id == workoutID {
+            completedWorkout = saved
+        }
+        try? StrengthWorkoutCompletionJournal.save(saved, userID: ownerID)
+    }
+
     func attachHealthMetrics(_ metrics: LinkedHealthWorkoutMetrics) {
         if var activeWorkout {
             activeWorkout.healthMetrics = metrics
