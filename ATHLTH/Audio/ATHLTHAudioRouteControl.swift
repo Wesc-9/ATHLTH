@@ -248,21 +248,33 @@ enum ATHLTHSpokenAudioSession {
         }
     }
 
+    /// Clear the ducking category before notifying music owners.
+    /// Retrying only setActive(false) can leave audio ducking stuck after
+    /// Bluetooth / AirPods route changes.
+    private static func restoreMusicAudio(
+        _ session: AVAudioSession
+    ) throws {
+        try session.setCategory(
+            .playback,
+            mode: .default,
+            options: [.mixWithOthers]
+        )
+        try session.setActive(
+            false,
+            options: .notifyOthersOnDeactivation
+        )
+    }
+
     private static func restoreIfIdle(generation: Int) {
         guard owners.isEmpty, generation == revision else { return }
         delayedRestoreTask?.cancel()
         delayedRestoreTask = nil
 
         let session = AVAudioSession.sharedInstance()
-        // Removing duckOthers before deactivating is essential even if
-        // notifyOthersOnDeactivation succeeds: Bluetooth handoffs can retain
-        // the previous category while the music owner is transitioning.
-        // Only do this when all ATHLTH speakers have released their leases.
-        try? session.setCategory(
-            .playback, mode: .default, options: [.mixWithOthers]
-        )
+        // Restore category and activation together. If either fails,
+        // retry both operations, without racing a new speaker.
         do {
-            try session.setActive(false, options: .notifyOthersOnDeactivation)
+            try restoreMusicAudio(session)
         } catch {
             // Keep retrying deactivation after route transitions. No retry
             // can remove a new cue's mixing/duck policy: it re-checks revision.
@@ -286,10 +298,7 @@ enum ATHLTHSpokenAudioSession {
                           revision == generation else { return }
 
                     do {
-                        try session.setActive(
-                            false,
-                            options: .notifyOthersOnDeactivation
-                        )
+                        try restoreMusicAudio(session)
                         delayedRestoreTask = nil
                         return
                     } catch {
@@ -308,9 +317,7 @@ enum ATHLTHSpokenAudioSession {
                           owners.isEmpty,
                           revision == generation else { return }
                     do {
-                        try session.setActive(
-                            false, options: .notifyOthersOnDeactivation
-                        )
+                        try restoreMusicAudio(session)
                         delayedRestoreTask = nil
                         return
                     } catch { continue }
