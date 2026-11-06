@@ -251,6 +251,34 @@ struct ATHLTHRouteGuardianSettingsView: View {
                     .tint(ATHLTHPlanDesign.accentInk)
                 }
 
+                VStack(alignment: .leading, spacing: 12) {
+                    Text(tr("ALERT SENSITIVITY", "FØLSOMHET FOR RUTEAVVIK"))
+                        .font(.caption.weight(.semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(.secondary)
+
+                    HStack(spacing: 9) {
+                        routePreset(
+                            tr("Precise", "Presis"), distance: 50, grace: 10
+                        )
+                        routePreset(
+                            tr("Balanced", "Balansert"), distance: 80, grace: 20
+                        )
+                        routePreset(
+                            tr("Relaxed", "Rolig"), distance: 150, grace: 30
+                        )
+                    }
+
+                    Text(tr(
+                        "GPS accuracy varies near buildings, woods and tunnels. A larger distance and grace period helps prevent false alarms.",
+                        "GPS-nøyaktighet varierer ved bygninger, skog og tunneler. Større avstand og litt ventetid reduserer unødvendige varsler."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(18)
+                .background(.white, in: RoundedRectangle(cornerRadius: 20))
+
                 if settings.routeAlertsEnabled {
                     ATHLTHPlanSurface(ghost: false) {
                         heading(tr("When to alert", "Når skal du varsles"),
@@ -360,6 +388,36 @@ private enum GhostRaceUpdatePreset:
                 norwegian: "Egendefinert"
             )
         }
+    }
+
+    private func routePreset(
+        _ title: String, distance: Double, grace: Int
+    ) -> some View {
+        let selected = settings.routeAlertsEnabled &&
+            settings.routeAlertDeviationMeters == distance &&
+            settings.routeAlertGraceSeconds == grace
+        return Button {
+            settings.routeAlertDeviationMeters = distance
+            settings.routeAlertGraceSeconds = grace
+            settings.routeAlertsEnabled = true
+        } label: {
+            VStack(spacing: 6) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                Text("\(Int(distance)) m · \(grace) s")
+                    .font(.caption)
+            }
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .background(
+                selected
+                    ? Color(red: 0.20, green: 0.21, blue: 0.24)
+                    : Color(red: 0.95, green: 0.95, blue: 0.94),
+                in: RoundedRectangle(cornerRadius: 14)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }
 
