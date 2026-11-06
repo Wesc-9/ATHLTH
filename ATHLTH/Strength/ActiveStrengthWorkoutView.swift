@@ -6900,8 +6900,70 @@ struct ActiveStrengthWorkoutView: View {
     /// One shared timer surface in both focused and legacy strength set layouts.
     /// The absolute start date lives in StrengthWorkoutStore, so a locked phone
     /// or a temporarily backgrounded app cannot make the countdown drift.
+    @ViewBuilder
     private var timedSetCountdownCard: some View {
-        TimelineView(.periodic(from: .now, by: 0.5)) { context in
+        if strength.currentSet?.resolvedTargetKind == .time &&
+            strength.currentSet?.plannedDurationSeconds == nil &&
+            strength.currentExercise?.exercise.isTimeOnlyBodyweightStrength == true {
+            TimelineView(.periodic(from: .now, by: 1)) { tick in
+                let elapsed = strength.currentSetEffortClock?
+                    .elapsedSeconds(at: tick.date) ?? 0
+                let started = strength.currentSetEffortClock != nil
+
+                VStack(alignment: .leading, spacing: 13) {
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "OPEN-ENDED HOLD · STOPWATCH",
+                            norwegian: "FRI HOLDØVELSE · STOPPEKLOKKE"
+                        ),
+                        systemImage: "stopwatch"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                    Text(TimeInterval(elapsed).clockDuration)
+                        .font(.system(size: 46, weight: .semibold,
+                                      design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .frame(maxWidth: .infinity, alignment: .center)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "The time you actually hold is what is recorded.",
+                        norwegian: "Det er tiden du faktisk holder som blir registrert."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                    Button {
+                        if started {
+                            strength.completeCurrentDraftSet()
+                        } else {
+                            strength.startOrResumeTimedSet()
+                        }
+                    } label: {
+                        Label(
+                            started
+                                ? ATHLTHLocalization.choose(
+                                    english: "Stop and record", norwegian: "Stopp og registrer"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Start stopwatch", norwegian: "Start tidtaking"
+                                ),
+                            systemImage: started ? "checkmark.circle.fill" : "play.fill"
+                        )
+                        .font(.headline)
+                        .frame(maxWidth: .infinity, minHeight: 49)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(ATHLTHPlanDesign.accentInk)
+                }
+                .padding(17)
+                .background(ATHLTHPlanDesign.warmSurface,
+                            in: RoundedRectangle(cornerRadius: 20))
+            }
+        } else {
+            TimelineView(.periodic(from: .now, by: 0.5)) { context in
             let countdown = strength.currentTimedSetCountdown
             let target = countdown?.targetSeconds ?? strength.draftDurationSeconds
             let remaining = countdown?.secondsRemaining(at: context.date) ?? target
@@ -7081,6 +7143,7 @@ struct ActiveStrengthWorkoutView: View {
                     .stroke(ATHLTHTheme.premiumGold.opacity(0.28), lineWidth: 0.8)
             }
             .sensoryFeedback(.success, trigger: finished)
+            }
         }
     }
 
