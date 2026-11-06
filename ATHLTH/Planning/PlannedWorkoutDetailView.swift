@@ -815,7 +815,7 @@ struct PlannedWorkoutDetailView: View {
                     if currentWorkout.kind ==
                         .running {
                         plannedGuidanceTile(
-                            title: "Ghost",
+                            title: "Ghost Race",
                             subtitle:
                                 ghostDetailText,
                             icon:
@@ -828,8 +828,8 @@ struct PlannedWorkoutDetailView: View {
                         plannedGuidanceTile(
                             title:
                                 ATHLTHLocalization.choose(
-                                    english: "Route",
-                                    norwegian: "Rute"
+                                    english: "Navigation",
+                                    norwegian: "Navigasjon"
                                 ),
                             subtitle:
                                 routeGuardianDetailText,
