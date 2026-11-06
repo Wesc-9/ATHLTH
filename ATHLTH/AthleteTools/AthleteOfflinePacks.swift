@@ -108,10 +108,27 @@ final class AthleteOfflinePackStore: ObservableObject {
             try Task.checkCancellation()
             try JSONEncoder().encode(pack).write(to: temporary.appendingPathComponent("pack.json"), options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
             let destination = folder.appendingPathComponent(plan.id.uuidString)
-            if FileManager.default.fileExists(atPath: destination.path) {
-                _ = try FileManager.default.replaceItemAt(destination, withItemAt: temporary)
-            } else { try FileManager.default.moveItem(at: temporary, to: destination) }
-            staging = nil
+            // Replace directory packs with a rollback path. A failed update
+            // must not destroy the last usable offline plan and media.
+            let previous = folder.appendingPathComponent(
+                "previous-" + UUID().uuidString, isDirectory: true
+            )
+            let hadPrevious = FileManager.default.fileExists(atPath: destination.path)
+            if hadPrevious {
+                try FileManager.default.moveItem(at: destination, to: previous)
+            }
+            do {
+                try FileManager.default.moveItem(at: temporary, to: destination)
+                staging = nil
+                if hadPrevious {
+                    try? FileManager.default.removeItem(at: previous)
+                }
+            } catch {
+                if hadPrevious {
+                    try? FileManager.default.moveItem(at: previous, to: destination)
+                }
+                throw error
+            }
             guard accountID == userID else { return }
             load(userID: userID)
         } catch { if !Task.isCancelled { self.error = "The download could not be completed. Your existing pack has been preserved." } }
