@@ -30,6 +30,7 @@ type RequestBody = {
   durationMinutes?: number;
   exerciseCount?: number;
   focusBodyPart?: string | null;
+  focusBodyParts?: string[] | null;
   personalize?: boolean;
   language?: string;
   existingExerciseIDs?: string[];
@@ -426,6 +427,12 @@ Deno.serve(async (req: Request) => {
         body.focusBodyPart.trim()
         ? body.focusBodyPart.trim().slice(0, 60)
         : null,
+    focusBodyParts: Array.isArray(body.focusBodyParts)
+      ? [...new Set(body.focusBodyParts
+          .slice(0, 8)
+          .map((part) => String(part).trim().slice(0, 60))
+          .filter(Boolean))]
+      : [],
     personalize: body.personalize === true,
     language,
     existingExerciseNames: (body.existingExerciseNames ?? [])
@@ -443,6 +450,8 @@ Deno.serve(async (req: Request) => {
     "Existing exercises are already in the workout. Complement them and do not choose duplicates.",
     "Use recentWorkouts only when personalize is true. Recent history can reduce unnecessary repetition, but it does not prove fatigue, soreness, injury, or recovery state.",
     "Respect the requested goal, time, focus and exercise count.",
+    "When focusBodyParts contains two or more groups, choose useful exercises across ALL selected groups when eligible candidates exist.",
+    "When focusBodyParts is empty and focusBodyPart is null, choose an appropriate balanced focus yourself with no muscle restriction.",
     "Prefer a balanced ordering: larger compound movements earlier when appropriate, smaller accessory work later.",
     "For strength: generally favor lower-to-moderate reps and longer rests.",
     "For hypertrophy: generally favor moderate reps and moderate rests.",
