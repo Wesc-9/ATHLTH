@@ -3642,6 +3642,11 @@ struct DirectMessageThreadView: View {
             )
         let lifecycleEvents = challengeLifecycleEventsWithFriend
         let standaloneInvites = challengeInvitationsWithoutMessages(messages)
+        let timeline = threadTimelineItems(
+            messages: messages,
+            lifecycleEvents: lifecycleEvents,
+            challengeInvitations: standaloneInvites
+        )
 
         ScrollViewReader { proxy in
             ScrollView {
@@ -3675,13 +3680,7 @@ struct DirectMessageThreadView: View {
                         )
                     }
 
-                    ForEach(
-                        threadTimelineItems(
-                            messages: messages,
-                            lifecycleEvents: lifecycleEvents,
-                            challengeInvitations: standaloneInvites
-                        )
-                    ) { item in
+                    ForEach(timeline) { item in
                         switch item {
                         case .message(let message):
                             MessageBubble(
@@ -3787,36 +3786,20 @@ struct DirectMessageThreadView: View {
                 .padding(.horizontal)
                 .padding(.top, 20)
                 .padding(.bottom, 8)
+                // A stable end marker works even when the last item is a
+                // challenge invitation or lifecycle event rather than a DM.
+                Color.clear.frame(height: 1).id("thread-bottom")
             }
-            .onChange(
-                of: messages.count
-            ) { _, _ in
-                if let last =
-                        messages.last {
-                    withAnimation(
-                        .easeOut(
-                            duration:
-                                0.2
-                        )
-                    ) {
-                        proxy.scrollTo(
-                            last.id,
-                            anchor:
-                                .bottom
-                        )
-                    }
+            .defaultScrollAnchor(.bottom, for: .initialOffset)
+            .onChange(of: timeline.last?.id) { _, _ in
+                withAnimation(.easeOut(duration: 0.2)) {
+                    proxy.scrollTo("thread-bottom", anchor: .bottom)
                 }
             }
-            .task {
-                if let last =
-                        messages.last,
-                   standaloneInvites.isEmpty {
-                    proxy.scrollTo(
-                        last.id,
-                        anchor:
-                            .bottom
-                    )
-                }
+            .task(id: conversationID) {
+                // Wait for the lazy timeline to be laid out on first open.
+                await Task.yield()
+                proxy.scrollTo("thread-bottom", anchor: .bottom)
             }
         }
     }
