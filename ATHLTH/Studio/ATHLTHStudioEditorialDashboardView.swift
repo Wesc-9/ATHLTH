@@ -175,12 +175,17 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
         .task(id: session.profile.userID) {
             guard ATHLTHDeviceRole.isIPad else { return }
+            // Do not briefly show the previous signed-in account's map.
+            remoteGhostStatus = nil
             while !Task.isCancelled {
                 if session.signedIn, scenePhase == .active {
-                    remoteGhostStatus =
-                        await ATHLTHPrivateGhostSpectatorStore.fetch(
-                            for: session.profile.userID
-                        )
+                    let userID = session.profile.userID
+                    let fetched = await ATHLTHPrivateGhostSpectatorStore.fetch(
+                        for: userID
+                    )
+                    guard !Task.isCancelled, userID == session.profile.userID
+                    else { return }
+                    remoteGhostStatus = fetched
                 } else {
                     remoteGhostStatus = nil
                 }
