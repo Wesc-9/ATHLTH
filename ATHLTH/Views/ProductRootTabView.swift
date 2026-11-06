@@ -6161,10 +6161,14 @@ struct ATHLTHTrainView: View {
                             plannedPlanID: planOrigin?.planID,
                             plannedSessionID: planOrigin?.workout.id
                         )
-                        _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        if needsSocialLobby {
+                            _ = await social.confirmCurrentJoinedWorkoutStarted()
+                        }
                         return nil
                     } catch {
-                        await social.markCurrentJoinedWorkoutLaunchFailed()
+                        if needsSocialLobby {
+                            await social.markCurrentJoinedWorkoutLaunchFailed()
+                        }
                         return error.localizedDescription
                     }
                 }
