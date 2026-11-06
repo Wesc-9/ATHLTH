@@ -29,6 +29,7 @@ struct ATHLTHStudioPrivateGhostSpectatorCard: View {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 18) {
                     map
+                        .frame(minWidth: 390)
                         .frame(maxWidth: .infinity)
                     stats
                         .frame(width: 255, alignment: .topLeading)
