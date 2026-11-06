@@ -1274,6 +1274,8 @@ struct WatchStrengthExerciseSummary: Codable, Hashable {
     var setPlans: [WatchStrengthSetPlan]? = nil
     var isCompleted: Bool? = nil
     var firstPendingSetIndex: Int? = nil
+    /// Count omitted on this exercise, distinct from completed efforts.
+    var skippedSets: Int? = nil
     var isEmbeddedRunningInterval: Bool? = nil
 }
 
