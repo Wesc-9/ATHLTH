@@ -2459,103 +2459,12 @@ struct GhostRaceLivePanel: View {
         reference: GhostRaceReference,
         comparison: GhostRaceComparison
     ) -> some View {
-        ATHLTHUnifiedCard {
-            Map(
-                initialPosition:
-                    .region(
-                        region(
-                            reference: reference
-                        )
-                    )
-            ) {
-                MapPolyline(
-                    coordinates:
-                        reference.points.map(
-                            \.coordinate
-                        )
-                )
-                .stroke(
-                    ATHLTHTheme.vitality
-                        .opacity(0.45),
-                    lineWidth: 5
-                )
-
-                Annotation(
-                    "You",
-                    coordinate:
-                        comparison
-                            .userCoordinate
-                ) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                ATHLTHTheme
-                                    .accentDeep
-                            )
-                            .frame(
-                                width: 24,
-                                height: 24
-                            )
-                        Circle()
-                            .stroke(
-                                .white,
-                                lineWidth: 3
-                            )
-                            .frame(
-                                width: 24,
-                                height: 24
-                            )
-                    }
-                }
-
-                Annotation(
-                    "Ghost",
-                    coordinate:
-                        comparison
-                            .ghostCoordinate
-                ) {
-                    Image(systemName: "figure.run")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.white)
-                        .frame(width: 28, height: 28)
-                        .background(
-                            ATHLTHTheme.vitality,
-                            in: Circle()
-                        )
-                        .overlay {
-                            Circle()
-                                .stroke(
-                                    .white,
-                                    lineWidth: 2
-                                )
-                        }
-                }
-            }
-            .mapStyle(.standard(
-                elevation: .flat
-            ))
-            .frame(height: 250)
-            .clipShape(
-                RoundedRectangle(
-                    cornerRadius: 19,
-                    style: .continuous
-                )
-            )
-
-            if comparison.routeDeviationMeters > 80 {
-                Label(
-                    ATHLTHLocalization.format(
-                    english: "You are about %d m from the ghost route.",
-                    norwegian: "Du er omtrent %d m fra Ghost-ruten.",
-                    Int(comparison.routeDeviationMeters.rounded())
-                ),
-                    systemImage: "location.slash.fill"
-                )
-                .font(.caption)
-                .foregroundStyle(.orange)
-                .padding(.top, 10)
-            }
-        }
+        ATHLTHGhostRaceLiveCourseMap(
+            reference: reference,
+            comparison: comparison,
+            paused: snapshot.state == .paused,
+            mapHeight: 260
+        )
     }
 
     private func metrics(
