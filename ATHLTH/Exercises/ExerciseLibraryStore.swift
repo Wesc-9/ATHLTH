@@ -766,6 +766,19 @@ final class ExerciseLibraryStore: ObservableObject {
         }
     }
 
+    /// These curated additions have distinct user-requested variants that
+    /// are not reliably available through the licensed upstream catalog.
+    /// Unlike legacy original-core entries, they must appear in normal
+    /// search, AI candidate lists, and all library selection surfaces.
+    static let featuredNativeExerciseSlugs: Set<String> = [
+        "athlth-native-incline-dumbbell-bench-press",
+        "athlth-native-tabletop-sit-up",
+        "athlth-native-weighted-russian-twist",
+        "athlth-native-six-inch-hold",
+        "athlth-native-hollow-body-hold",
+        "athlth-native-free-strength-training"
+    ]
+
     /// Keep historical native exercise IDs available for old workout logs,
     /// but offer RepDB (and personal exercises) as the primary choices.
     var selectableExercises: [ExerciseLibraryEntry] {
@@ -774,7 +787,13 @@ final class ExerciseLibraryStore: ObservableObject {
         if repDBExercises.isEmpty {
             resolved = allExercises
         } else {
-            resolved = allExercises.filter { $0.source == .repDB || $0.source == .custom }
+            resolved = allExercises.filter {
+                $0.source == .repDB || $0.source == .custom ||
+                    ($0.source == .athlthCatalog &&
+                     $0.sourceIdentifier.map {
+                         Self.featuredNativeExerciseSlugs.contains($0)
+                     } == true)
+            }
         }
         cachedSelectableExercises = resolved
         return resolved
