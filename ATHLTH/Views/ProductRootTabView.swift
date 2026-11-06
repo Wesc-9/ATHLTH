@@ -6260,10 +6260,11 @@ struct ATHLTHTrainView: View {
                             creatorCaptureDevice: configuration.captureDevice
                         )
                         guard lobbyReady else {
-                        return social.errorMessage ?? ATHLTHLocalization.choose(
-                            english: "Workout could not start. Unlock Apple Watch and try again.",
-                            norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
-                        )
+                            return social.errorMessage ?? ATHLTHLocalization.choose(
+                                english: "Workout could not start. Unlock Apple Watch and try again.",
+                                norwegian: "Økten kunne ikke startes. Lås opp Apple Watch og prøv igjen."
+                            )
+                        }
                     }
                     do {
                         try await WorkoutLaunchCoordinator.startRunQuick(
