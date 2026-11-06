@@ -1339,6 +1339,28 @@ settingsSection("Preferences") {
                             SettingsDivider()
 
                             NavigationLink {
+                                ATHLTHStrengthBarMassSettingsView()
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "scalemass",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Default bar weight",
+                                        norwegian: "Standard stangvekt"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Choose a default and override it per exercise",
+                                        norwegian: "Velg en standard og overstyr for hver øvelse"
+                                    )
+                                ) {
+                                    Image(systemName: "chevron.right")
+                                        .foregroundStyle(ATHLTHTheme.mutedText.opacity(0.72))
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+                            SettingsDivider()
+
+                            NavigationLink {
                                 TrainingDataSettingsView()
                             } label: {
                                 PremiumSettingsRow(
