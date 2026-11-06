@@ -31,6 +31,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
     @EnvironmentObject private var workoutMirroring: WorkoutMirroringStore
 
     @State private var pendingDraftSnapshotTask: Task<Void, Never>?
+    @State private var pendingPrivateStatusTask: Task<Void, Never>?
     @State private var lastStrengthMutationAtByWorkout:
         [UUID: Date] = [:]
 
@@ -45,6 +46,23 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                     strengthWorkout.ingestWatchCardioSnapshot(latest)
                 }
             }
+            // Private, opt-in, read-only status for another device on the
+            // same account. Refreshes while a live strength workout is open,
+            // so a long rest does not appear disconnected on iPad.
+            .task(id: appSession.profile.userID) {
+                guard !ATHLTHDeviceRole.isIPad else { return }
+                while !Task.isCancelled {
+                    if appSession.signedIn {
+                        await ATHLTHPrivateLiveStrengthStatusStore.publish(
+                            ATHLTHPrivateLiveStrengthSnapshot.make(
+                                from: strengthWorkout
+                            ),
+                            userID: appSession.profile.userID
+                        )
+                    }
+                    try? await Task.sleep(for: .seconds(25))
+                }
+            }
             .onChange(of: workoutMirroring.snapshot) { _, latest in
                 if let latest {
                     strengthWorkout.ingestWatchCardioSnapshot(latest)
@@ -53,6 +71,8 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             .onDisappear {
                 pendingDraftSnapshotTask?.cancel()
                 pendingDraftSnapshotTask = nil
+                pendingPrivateStatusTask?.cancel()
+                pendingPrivateStatusTask = nil
             }
             .onChange(
                 of:
@@ -64,6 +84,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             .onChange(of: strengthWorkout.activeWorkout) { _, _ in
                 drainPendingCommands()
                 sendSnapshotNow()
+                schedulePrivateStatusUpdate()
             }
             .onChange(of: strengthWorkout.currentExerciseIndex) { _, _ in
                 sendSnapshotNow()
@@ -73,6 +94,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             }
             .onChange(of: strengthWorkout.restEndsAt) { _, _ in
                 sendSnapshotNow()
+                schedulePrivateStatusUpdate()
             }
             .onChange(of: strengthWorkout.draftReps) { _, _ in
                 scheduleDraftSnapshot()
@@ -95,6 +117,20 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             .onChange(of: strengthWorkout.timedSetCountdown) { _, _ in
                 sendSnapshotNow()
             }
+    }
+
+    @MainActor
+    private func schedulePrivateStatusUpdate() {
+        guard !ATHLTHDeviceRole.isIPad, appSession.signedIn else { return }
+        pendingPrivateStatusTask?.cancel()
+        pendingPrivateStatusTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(800))
+            guard !Task.isCancelled else { return }
+            await ATHLTHPrivateLiveStrengthStatusStore.publish(
+                ATHLTHPrivateLiveStrengthSnapshot.make(from: strengthWorkout),
+                userID: appSession.profile.userID
+            )
+        }
     }
 
     @MainActor
