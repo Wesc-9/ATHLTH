@@ -129,6 +129,40 @@ final class AthleteOfflinePackStore: ObservableObject {
                 } catch { if Task.isCancelled { throw CancellationError() }; pack.missingAssets += 1 }
             }
             }
+            if includeMedia {
+                // A failed image/map refresh must not delete previously
+                // downloaded files. Keep only assets referenced by this plan.
+                let existing = folder.appendingPathComponent(
+                    plan.id.uuidString, isDirectory: true
+                )
+                let metadata = existing.appendingPathComponent("pack.json")
+                if let data = try? Data(contentsOf: metadata),
+                   let previous = try? JSONDecoder().decode(
+                    AthleteOfflinePack.self, from: data
+                   ) {
+                    for assetID in Set(previous.mapRouteIDs + previous.exerciseImageIDs) {
+                        let name = assetID.uuidString + ".png"
+                        let source = existing.appendingPathComponent(name)
+                        let target = temporary.appendingPathComponent(name)
+                        guard !FileManager.default.fileExists(atPath: target.path),
+                              FileManager.default.fileExists(atPath: source.path)
+                        else { continue }
+                        try FileManager.default.copyItem(at: source, to: target)
+                        if previous.mapRouteIDs.contains(assetID),
+                           selectedRoutes.contains(where: { $0.id == assetID }) {
+                            pack.mapRouteIDs.append(assetID)
+                        }
+                        if previous.exerciseImageIDs.contains(assetID),
+                           sessions.flatMap(\.exercises).contains(where: {
+                            $0.id == assetID
+                           }) {
+                            pack.exerciseImageIDs.append(assetID)
+                        }
+                    }
+                }
+                pack.mapRouteIDs = Array(Set(pack.mapRouteIDs))
+                pack.exerciseImageIDs = Array(Set(pack.exerciseImageIDs))
+            }
             if !includeMedia {
                 // Saving a fresh plan snapshot must not discard media already
                 // downloaded for the same plan.
