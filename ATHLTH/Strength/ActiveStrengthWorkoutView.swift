@@ -5951,49 +5951,6 @@ struct ActiveStrengthWorkoutView: View {
                 }
 
                 HStack(spacing: 10) {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "SET TIME", norwegian: "SETTID"
-                        ), systemImage: "stopwatch"
-                    )
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    Spacer()
-                    TimelineView(.periodic(from: .now, by: 1)) { tick in
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Text(
-                                (
-                                    strength.currentSetEffortClock?
-                                        .elapsedSeconds(at: tick.date) ?? 0
-                                ).clockDuration
-                            )
-                            .font(.system(size: 23, weight: .bold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                            Text(
-                                ATHLTHLocalization.choose(
-                                    english: "Exercise total",
-                                    norwegian: "Øvelse totalt"
-                                ) + " · " +
-                                strength.currentExerciseMeasuredSeconds.clockDuration
-                            )
-                            .font(.caption2)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Elapsed set time and exercise total",
-                            norwegian: "Tid brukt i settet og totalt for øvelsen"
-                        ))
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-                .background(
-                    ATHLTHPlanDesign.accent.opacity(0.07),
-                    in: RoundedRectangle(cornerRadius: 13)
-                )
-
-                HStack(spacing: 10) {
                     if currentStrengthLoadKind == .resistanceLevel {
                         compactLiveIntegerMetric(
                             title: ATHLTHLocalization.choose(
@@ -6022,10 +5979,11 @@ struct ActiveStrengthWorkoutView: View {
                     }
                 }
 
-                // Keep the timer immediately beside the set action.
-                if currentStrengthTargetKind == .time {
-                    focusedTimedCountdown
-                }
+                // One timer in one fixed place: the active countdown
+                // replaces elapsed set time instead of stacking two clocks.
+                // Timed holds without a countdown and rep-based sets show
+                // the actual set-effort clock here.
+                focusedSetTimingRow
 
                 let needsStart = strength.currentSetEffortClock == nil ||
                     (currentStrengthTargetKind == .time &&
@@ -6943,6 +6901,68 @@ struct ActiveStrengthWorkoutView: View {
                 )
             }
         )
+    }
+
+    /// A single timing slot below the exercise input controls and above
+    /// the Complete Set action. Showing a countdown suppresses the separate
+    /// elapsed set clock; recorded effort time is still tracked in the store.
+    @ViewBuilder
+    private var focusedSetTimingRow: some View {
+        if currentStrengthTargetKind == .time,
+           strength.currentTimedSetCountdown != nil {
+            focusedTimedCountdown
+        } else {
+            TimelineView(.periodic(from: .now, by: 1)) { tick in
+                let elapsed = strength.currentSetEffortClock?
+                    .elapsedSeconds(at: tick.date) ?? 0
+                HStack(spacing: 12) {
+                    Image(systemName: "stopwatch")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "SET TIME",
+                            norwegian: "SETTID"
+                        ))
+                        .font(.system(size: 11, weight: .bold))
+                        .tracking(0.9)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Exercise total",
+                                norwegian: "Øvelse totalt"
+                            ) + " · " +
+                            strength.currentExerciseMeasuredSeconds.clockDuration
+                        )
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+
+                    Spacer(minLength: 4)
+
+                    Text(TimeInterval(elapsed).clockDuration)
+                        .font(.system(
+                            size: 25, weight: .bold, design: .rounded
+                        ))
+                        .monospacedDigit()
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                        .contentTransition(.numericText())
+                }
+                .padding(.horizontal, 14)
+                .frame(minHeight: 68)
+                .background(
+                    ATHLTHPlanDesign.accent.opacity(0.08),
+                    in: RoundedRectangle(cornerRadius: 14)
+                )
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(ATHLTHLocalization.choose(
+                    english: "Elapsed set time and exercise total",
+                    norwegian: "Tid brukt i settet og totalt for øvelsen"
+                ))
+            }
+        }
     }
 
     /// Shows the same date-anchored active countdown next to Start/Finish Set
