@@ -1447,7 +1447,16 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
                     format: "%d:%02d min", totalSeconds / 60, totalSeconds % 60
                 ))
             }
-            if StrengthCardioExercisePolicy.isCardio(exercise.exercise.name) {
+            if exercise.exercise.isTimeOnlyBodyweightStrength {
+                // Older hold records could carry an accidental weight value.
+                // Show their measured duration only, not a fictional lift.
+                if totalSeconds == 0 {
+                    details.append(ATHLTHLocalization.choose(
+                        english: "time not recorded",
+                        norwegian: "tid ikke registrert"
+                    ))
+                }
+            } else if StrengthCardioExercisePolicy.isCardio(exercise.exercise.name) {
                 let measured = sets.compactMap(\.watchMeasuredDistanceMeters)
                     .reduce(0, +)
                 let estimated = sets.compactMap(\.manuallyEstimatedTreadmillDistanceMeters)
@@ -1567,7 +1576,8 @@ struct SocialPublishableWorkout: Identifiable, Hashable {
         // Warm-up and cardio sets never contribute to strength training
         // volume or heaviest-lift statistics (or personal records).
         let workingSets = performedExercises.flatMap { exercise in
-            StrengthCardioExercisePolicy.isCardio(exercise.exercise.name)
+            (StrengthCardioExercisePolicy.isCardio(exercise.exercise.name) ||
+                exercise.exercise.isTimeOnlyBodyweightStrength)
                 ? [] : exercise.sets.filter(\.countsTowardTrainingLoad)
         }
         let totalVolume = workingSets.reduce(0.0) {
