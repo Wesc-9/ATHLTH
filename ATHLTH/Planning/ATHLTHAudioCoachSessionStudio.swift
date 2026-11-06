@@ -29,6 +29,20 @@ struct ATHLTHAudioCoachSessionStudio: View {
         )
     }
 
+    private var manualMaximumEnabled: Binding<Bool> {
+        Binding(
+            get: { draft.smartPrompts.maximumHeartRateBPM != nil },
+            set: { draft.smartPrompts.maximumHeartRateBPM = $0 ? 185 : nil }
+        )
+    }
+
+    private var manualMaximumValue: Binding<Int> {
+        Binding(
+            get: { Int((draft.smartPrompts.maximumHeartRateBPM ?? 185).rounded()) },
+            set: { draft.smartPrompts.maximumHeartRateBPM = Double($0) }
+        )
+    }
+
     private var contextualEnabled: Binding<Bool> {
         Binding(
             get: { draft.smartPrompts.contextualFeedbackEnabled ?? true },
@@ -241,6 +255,20 @@ struct ATHLTHAudioCoachSessionStudio: View {
             Toggle(tr("Say current measured zone", "Fortell hvilken pulssone jeg er i"),
                    isOn: zoneEnabled)
                 .tint(accent)
+            if zoneEnabled.wrappedValue {
+                Toggle(tr("Override maximum heart rate for this workout",
+                          "Overstyr makspuls for denne økten"),
+                       isOn: manualMaximumEnabled)
+                    .tint(accent)
+                if manualMaximumEnabled.wrappedValue {
+                    Stepper(value: manualMaximumValue, in: 100...240, step: 1) {
+                        Text(tr("Maximum heart rate: \(manualMaximumValue.wrappedValue) bpm",
+                                "Makspuls: \(manualMaximumValue.wrappedValue) slag/min"))
+                            .font(.subheadline)
+                            .monospacedDigit()
+                    }
+                }
+            }
             Text(tr(
                 "The coach announces a stable measured zone and important changes. A configured maximum heart rate and recent Watch heart-rate data are required; target-zone warnings take precedence.",
                 "Coachen leser opp stabil, målt pulssone og endringer. Krever registrert makspuls og ferske pulsmålinger. Varsler om planlagt pulssone prioriteres."
@@ -377,6 +405,21 @@ struct ATHLTHAudioCoachSessionStudio: View {
                 }
             }
             .pickerStyle(.menu)
+            NavigationLink {
+                ATHLTHCoachVoiceChoices(
+                    selectedIdentifier: $draft.voiceIdentifier,
+                    language: draft.language,
+                    speechRate: draft.speechRate,
+                    speechVolume: draft.speechVolume,
+                    duckOtherAudio: draft.duckOtherAudio,
+                    speechStyle: draft.speechStyle
+                )
+            } label: {
+                Label(tr("Choose and preview voice", "Velg og forhåndslytt til stemme"),
+                      systemImage: "waveform")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(minHeight: 44)
+            }
             VStack(alignment: .leading, spacing: 5) {
                 HStack {
                     Text(tr("Voice speed", "Stemmehastighet"))
