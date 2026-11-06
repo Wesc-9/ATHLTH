@@ -6121,14 +6121,17 @@ struct ATHLTHTrainView: View {
                     let planOrigin = validPendingPlanOrigin(
                         pendingPlannedEnduranceWorkout, kind: .walking
                     )
-                    guard await social.beginWorkoutWithFriends(
-                        title: "Walk",
-                        kind: .walking,
-                        friends: configuration.friends,
-                        creatorName: session.profile.displayName,
-                        creatorUsername: session.profile.username,
-                        invitePayload: configuration.trainTogetherInvitePayload,
-                        creatorCaptureDevice: configuration.captureDevice
+                    let needsSocialLobby = !configuration.friends.isEmpty
+                    let lobbyReady: Bool
+                    if needsSocialLobby {
+                        lobbyReady = await social.beginWorkoutWithFriends(
+                            title: "Walk",
+                            kind: .walking,
+                            friends: configuration.friends,
+                            creatorName: session.profile.displayName,
+                            creatorUsername: session.profile.username,
+                            invitePayload: configuration.trainTogetherInvitePayload,
+                            creatorCaptureDevice: configuration.captureDevice
                         )
                     } else {
                         lobbyReady = true
