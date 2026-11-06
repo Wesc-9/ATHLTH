@@ -32,14 +32,10 @@ PY
     fi
   done
 
-  # Never revoke a distribution certificate implicitly after a successful
-  # TestFlight/App Store upload. Apple may still be processing or validating
-  # builds signed with it. Revocation is now an explicit maintenance action.
-  if [ "${ATHLTH_REVOKE_TEMP_CERT:-0}" = "1" ] && [ -n "${TEMP_CERT_ID:-}" ]; then
-    curl --silent --show-error --request DELETE \
-      --header "Authorization: Bearer $TOKEN" \
-      "https://api.appstoreconnect.apple.com/v1/certificates/$TEMP_CERT_ID" >/dev/null
-  fi
+  # A reusable Distribution identity must never be revoked by a cleanup
+  # step, including failed builds or canceled uploads. Certificate rotation
+  # is deliberately isolated to tightly identity-verified bootstrap logic.
+  # Only per-run provisioning profiles are removed here.
 fi
 
 if [ -n "${SIGNING_KEYCHAIN:-}" ]; then

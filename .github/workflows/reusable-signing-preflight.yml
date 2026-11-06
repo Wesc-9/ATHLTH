@@ -1,0 +1,46 @@
+name: Verify reusable signing identity
+
+on:
+  push:
+    branches:
+      - feature/reusable-testflight-signing
+      - 'release/v*'
+    paths:
+      - scripts/reusable_apple_signing_identity.py
+      - scripts/tests/test_reusable_apple_signing_identity.py
+      - scripts/restore_reusable_app_store_signing.sh
+      - scripts/prepare_ephemeral_app_store_signing.sh
+      - scripts/cleanup_ephemeral_app_store_signing.sh
+      - .github/workflows/testflight.yml
+      - .github/workflows/reusable-signing-preflight.yml
+  pull_request:
+    paths:
+      - scripts/reusable_apple_signing_identity.py
+      - scripts/tests/test_reusable_apple_signing_identity.py
+      - scripts/restore_reusable_app_store_signing.sh
+      - scripts/prepare_ephemeral_app_store_signing.sh
+      - scripts/cleanup_ephemeral_app_store_signing.sh
+      - .github/workflows/testflight.yml
+      - .github/workflows/reusable-signing-preflight.yml
+
+permissions:
+  contents: read
+
+jobs:
+  signing-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install cryptography dependency
+        run: python -m pip install --quiet --upgrade cryptography
+      - name: Validate CI signing shell scripts
+        run: |
+          bash -n scripts/prepare_ephemeral_app_store_signing.sh
+          bash -n scripts/cleanup_ephemeral_app_store_signing.sh
+          bash -n scripts/restore_reusable_app_store_signing.sh
+      - name: Verify encryption, decryption and certificate safeguards
+        run: python -m unittest discover -s scripts/tests -p 'test_reusable_apple_signing_identity.py' -v
