@@ -482,18 +482,57 @@ struct ATHLTHGhostUpdatesSettingsView: View {
     }
 
     private var presetCard: some View {
-        ATHLTHPlanSurface(ghost: false) {
-            heading(tr("Choose intensity", "Velg intensitet"), "slider.horizontal.3")
-            Picker(tr("Update preset", "Oppdateringsnivå"), selection: presetBinding) {
-                ForEach(GhostRaceUpdatePreset.allCases) { preset in
-                    Text(preset.title).tag(preset)
+        VStack(alignment: .leading, spacing: 13) {
+            Text(tr("HOW OFTEN SHOULD GHOST SPEAK?", "HVOR OFTE SKAL GHOST SNAKKE?"))
+                .font(.caption.weight(.semibold))
+                .tracking(0.8)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 9) {
+                ForEach([
+                    GhostRaceUpdatePreset.quiet,
+                    .normal,
+                    .competition
+                ]) { preset in
+                    let selected = presetBinding.wrappedValue == preset
+                    Button {
+                        applyPreset(preset)
+                    } label: {
+                        VStack(spacing: 6) {
+                            Image(systemName: preset == .quiet
+                                  ? "speaker.slash" :
+                                  preset == .competition
+                                    ? "flag.checkered" : "waveform")
+                                .font(.title3)
+                            Text(preset.title)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 72)
+                        .foregroundStyle(selected ? Color.white : Color.primary)
+                        .background(
+                            selected
+                                ? Color(red: 0.18, green: 0.20, blue: 0.23)
+                                : Color(red: 0.95, green: 0.95, blue: 0.94),
+                            in: RoundedRectangle(cornerRadius: 14)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(selected ? .isSelected : [])
                 }
             }
-            .pickerStyle(.segmented)
+            if presetBinding.wrappedValue == .custom {
+                Label(tr("Custom settings", "Egendefinerte innstillinger"),
+                      systemImage: "slider.horizontal.3")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
             Text(presetDescription)
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
+        .padding(18)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
     }
 
     private var cadenceCard: some View {
