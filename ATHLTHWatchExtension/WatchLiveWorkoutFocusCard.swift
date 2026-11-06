@@ -123,7 +123,10 @@ struct WatchLiveWorkoutFocusCard: View {
             HStack {
                 Label(
                     target?.heartRateZone.map { "ZONE \($0)" } ??
-                        "ZONE LOCK",
+                        ATHLTHLocalization.choose(
+                            english: "HEART RATE",
+                            norwegian: "PULS"
+                        ),
                     systemImage: "heart.fill"
                 )
                 .font(.system(size: 9, weight: .bold))
@@ -132,8 +135,14 @@ struct WatchLiveWorkoutFocusCard: View {
                 Spacer()
 
                 Text(
-                    workoutManager.liveTargetStatus ??
-                    "Live"
+                    target?.heartRateEnabled == true
+                        ? (workoutManager.liveTargetStatus ??
+                           ATHLTHLocalization.choose(
+                               english: "Tracking", norwegian: "Måler"
+                           ))
+                        : ATHLTHLocalization.choose(
+                            english: "Live", norwegian: "Nå"
+                        )
                 )
                 .font(.system(size: 8, weight: .bold))
                 .foregroundStyle(
