@@ -72,6 +72,30 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
     }
 
     @MainActor
+    func testNewCuratedCoreAndFreeStrengthExercisesAreActuallySelectable() {
+        let library = ExerciseLibraryStore()
+        let featured = ExerciseLibraryStore.featuredNativeExerciseSlugs
+        XCTAssertTrue(featured.allSatisfy { slug in
+            library.selectableExercises.contains {
+                $0.source == .athlthCatalog && $0.sourceIdentifier == slug
+            }
+        })
+        for phrase in [
+            "Skråbenk med manualer",
+            "Situps med beina i 90 grader",
+            "Russisk rotasjon med vekt",
+            "Six Inch Hold",
+            "Fri styrketrening"
+        ] {
+            XCTAssertFalse(library.search(query: phrase).isEmpty,
+                           "Curated exercise missing from selectable search: \(phrase)")
+        }
+        XCTAssertFalse(library.selectableExercises.contains {
+            ExerciseLibraryStore.isRetiredOriginalCoreSlug($0.sourceIdentifier)
+        })
+    }
+
+    @MainActor
     func testMuscleFiltersMatchSelectableRepDBExercises() {
         let library = ExerciseLibraryStore()
 
