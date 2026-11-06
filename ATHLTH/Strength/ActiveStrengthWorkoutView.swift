@@ -1768,47 +1768,48 @@ struct ActiveStrengthWorkoutView: View {
 
         case .iPhone:
             let endDate = Date()
-            let ownerID =
-                appSession.profile.userID
-
-            // ATHLTH is the source of truth for the strength log. When Health
-            // write access is available, also create a real HealthKit workout
-            // so Apple Health, Progress and streak all see the same session.
-            let healthWorkoutUUID =
-                await health
-                    .saveManualStrengthWorkout(
-                        startDate:
-                            workout.startedAt,
-                        endDate: endDate,
-                        externalID:
-                            workout.id
-                    )
+            let ownerID = appSession.profile.userID
 
             guard appSession.signedIn,
-                  appSession.profile.userID ==
-                    ownerID,
-                  strength.activeWorkout?.id ==
-                    workout.id
+                  strength.activeWorkout?.id == workout.id
             else {
                 finishInProgress = false
                 return
             }
 
+            // Commit the ATHLTH log and reveal the summary immediately.
+            // A slow HealthKit write must NEVER block the completed-workout
+            // screen, leave a spinner for many seconds, or lose the sets.
             guard strength.finish(
-                healthKitWorkoutUUID:
-                    healthWorkoutUUID,
-                duration:
-                    endDate.timeIntervalSince(
-                        workout.startedAt
-                    )
+                healthKitWorkoutUUID: nil,
+                duration: endDate.timeIntervalSince(workout.startedAt)
             ) else {
                 finishInProgress = false
                 watchFinishError = strength.completionSaveError
                 return
             }
+
             appSession.endTrainingStatus()
             finishInProgress = false
             dismiss()
+
+            // Create the HealthKit workout asynchronously and attach its
+            // identifier to this exact saved session if still signed into
+            // the same account. The local log survives a temporary failure.
+            let healthService = health
+            let historyStore = strength
+            Task { @MainActor in
+                let uuid = await healthService.saveManualStrengthWorkout(
+                    startDate: workout.startedAt,
+                    endDate: endDate,
+                    externalID: workout.id
+                )
+                if let uuid {
+                    historyStore.attachFinishedWorkoutHealthKitUUID(
+                        uuid, workoutID: workout.id, ownerID: ownerID
+                    )
+                }
+            }
         }
     }
 
