@@ -1926,6 +1926,10 @@ final class StrengthWorkoutStore: ObservableObject {
                                             set.plannedReps,
                                         durationSeconds:
                                             set.plannedDurationSeconds,
+                                        openEndedTime:
+                                            set.resolvedTargetKind == .time &&
+                                            set.plannedDurationSeconds == nil &&
+                                            item.exercise.isTimeOnlyBodyweightStrength,
                                         weightKilograms:
                                             set.plannedWeightKilograms,
                                         resistanceLevel:
