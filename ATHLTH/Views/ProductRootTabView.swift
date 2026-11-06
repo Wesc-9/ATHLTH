@@ -7178,15 +7178,16 @@ struct ATHLTHTrainView: View {
         _ plan: TrainingPlan
     ) -> some View {
         let sessions = todaySessions(in: plan)
-        let healthCompletedIDs =
-            healthCompletedTodaySessionIDs(
-                planID: plan.id,
-                sessions: sessions
-            )
         let completedIDs =
             completedTodaySessionIDs(
                 planID: plan.id,
                 sessions: sessions
+            )
+        let healthCompletedIDs =
+            healthCompletedTodaySessionIDs(
+                planID: plan.id,
+                sessions: sessions,
+                completedIDs: completedIDs
             )
         let primary =
             sessions.first(
@@ -12151,14 +12152,15 @@ struct ATHLTHTrainView: View {
     private func healthCompletedTodaySessionIDs(
         planID: UUID,
         sessions: [PlannedSession],
-        completedIDs: Set<UUID>
+        completedIDs: Set<UUID>? = nil
     ) -> Set<UUID> {
-        // Only completed sessions can have a Health completion badge.
-        // Reuse the already computed completion set to avoid repeating
-        // expensive history checks for every unfinished session.
-        Set(
+        // Reuse the completion set when the caller already has it;
+        // otherwise derive one for single-workout links.
+        let verifiedCompletedIDs = completedIDs ??
+            completedTodaySessionIDs(planID: planID, sessions: sessions)
+        return Set(
             sessions.lazy.filter {
-                completedIDs.contains($0.id) &&
+                verifiedCompletedIDs.contains($0.id) &&
                 !session.isPlanSessionManuallyCompleted(
                     planID: planID,
                     sessionID: $0.id
