@@ -5749,6 +5749,7 @@ struct SessionEditorView: View {
                     .ghostUpdates?
                     .enabled ??
                 true
+            plannedGhost.updatesConfiguration = workout.ghostUpdates
         }
         _ghostDraft =
             State(
