@@ -1028,6 +1028,7 @@ struct PostWorkoutReviewView: View {
     @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var selectedPhotoPreviews: [Data] = []
     @State private var mediaErrorMessage: String?
+    @State private var strengthReviewPersonalRecords: [StrengthWorkoutPersonalRecord] = []
 
     var body: some View {
         NavigationStack {
@@ -1276,6 +1277,17 @@ struct PostWorkoutReviewView: View {
                     mediaLoad
                 )
             }
+            // PR comparisons traverse earlier strength history. Cache once
+            // per completed workout; a change to RPE, visibility or another
+            // review field must never repeat this expensive calculation.
+            .task(id: completedStrengthLog?.id) {
+                guard let finished = completedStrengthLog else {
+                    strengthReviewPersonalRecords = []
+                    return
+                }
+                strengthReviewPersonalRecords =
+                    strengthWorkoutStore.workoutPersonalRecords(for: finished)
+            }
             .onChange(
                 of: selectedPhotoItems
             ) { _, items in
@@ -1509,9 +1521,7 @@ struct PostWorkoutReviewView: View {
             ATHLTHStrengthCompletionReview(
                 workout: workout,
                 log: completedStrengthLog,
-                personalRecords: completedStrengthLog.map {
-                    strengthWorkoutStore.workoutPersonalRecords(for: $0)
-                } ?? [],
+                personalRecords: strengthReviewPersonalRecords,
                 muscleProfile: completionMuscleProfile
             )
         } else {
