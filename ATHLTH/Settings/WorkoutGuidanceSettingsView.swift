@@ -1,268 +1,256 @@
 import SwiftUI
 
 struct ATHLTHWorkoutGuidanceSettingsView: View {
-    @EnvironmentObject private var settings:
-        AppSettingsStore
+    @EnvironmentObject private var settings: AppSettingsStore
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
 
     var body: some View {
-        List {
-            Section {
-                NavigationLink {
-                    ATHLTHAudioCoachSettingsView()
-                } label: {
-                    guidanceRow(
-                        title: "Audio Coach",
-                        subtitle:
-                            audioCoachSummary,
-                        icon:
-                            "waveform.and.mic",
-                        tint:
-                            ATHLTHTheme
-                                .premiumGold
-                    )
-                }
-
-                NavigationLink {
-                    ATHLTHRouteGuardianSettingsView()
-                } label: {
-                    guidanceRow(
-                        title: "Route Guardian",
-                        subtitle:
-                            routeGuardianSummary,
-                        icon:
-                            "location.fill",
-                        tint:
-                            ATHLTHTheme.vitality
-                    )
-                }
-
-                NavigationLink {
-                    ATHLTHGhostUpdatesSettingsView()
-                } label: {
-                    guidanceRow(
-                        title: "Ghost Updates",
-                        subtitle:
-                            ghostSummary,
-                        icon:
-                            "figure.run.circle",
-                        tint:
-                            ATHLTHTheme.accent
-                    )
-                }
-
-                NavigationLink {
-                    ATHLTHGuidancePrioritySettingsView()
-                } label: {
-                    guidanceRow(
-                        title: "Alert priority",
-                        subtitle:
-                            "Critical guidance always wins over routine updates",
-                        icon:
-                            "list.number",
-                        tint:
-                            .orange
-                    )
-                }
-
-                NavigationLink {
-                    ATHLTHWidgetsAndSurfacesSettingsView()
-                } label: {
-                    guidanceRow(
-                        title: "Live workout display",
-                        subtitle:
-                            "Dynamic Island, Lock Screen and Apple Watch focus",
-                        icon:
-                            "rectangle.3.group.bubble.left.fill",
-                        tint:
-                            ATHLTHTheme.recoveryBlue
-                    )
-                }
-            } header: {
-                Text("Workout guidance")
-            } footer: {
-                Text(
-                    "Audio Coach reports your workout. Route Guardian keeps you on course. Ghost Updates compares you with a reference run. ATHLTH prioritizes safety and workout instructions when several signals happen together."
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                ATHLTHPlanSectionIntro(
+                    eyebrow: tr("ATHLTH · WORKOUT EXPERIENCE", "ATHLTH · ØKTOPPLEVELSE"),
+                    title: tr("Your running companion", "Din treningspartner"),
+                    subtitle: tr(
+                        "Voice coaching, live competition and navigation. These are defaults; every planned workout can have its own setup.",
+                        "Stemmeveiledning, konkurranse og navigasjon. Her setter du standardvalg, mens hver planlagte økt kan tilpasses."
+                    ),
+                    icon: "waveform.and.person.filled"
                 )
-            }
 
+                ATHLTHPlanSurface(ghost: false) {
+                    sectionHeading(tr("Three tools. One run.", "Tre verktøy. Én økt."))
+                    NavigationLink {
+                        ATHLTHAudioCoachSettingsView()
+                    } label: {
+                        guidanceRow(
+                            title: "Audio Coach",
+                            subtitle: settings.audioCoachEnabledByDefault
+                                ? tr("Default on · motivation, zones and voice",
+                                     "Standard på · motivasjon, pulssoner og stemme")
+                                : tr("Configure motivation, zones and voice",
+                                     "Tilpass motivasjon, pulssoner og stemme"),
+                            icon: "waveform.and.mic",
+                            status: settings.audioCoachEnabledByDefault
+                                ? tr("Default on", "Standard på")
+                                : tr("Custom", "Tilpass")
+                        )
+                    }
+                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                    NavigationLink {
+                        ATHLTHGhostUpdatesSettingsView()
+                    } label: {
+                        guidanceRow(
+                            title: "Ghost Race",
+                            subtitle: tr("Pacing, spoken comparisons and race events",
+                                         "Tempo, sammenligning og løpshendelser"),
+                            icon: "figure.run.circle",
+                            status: settings.ghostRaceAudioEnabled
+                                ? tr("Voice on", "Stemme på")
+                                : tr("Silent", "Uten stemme")
+                        )
+                    }
+                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                    NavigationLink {
+                        ATHLTHRouteGuardianSettingsView()
+                    } label: {
+                        guidanceRow(
+                            title: tr("Navigation", "Navigasjon"),
+                            subtitle: tr("Stay on course without unnecessary alarms",
+                                         "Hold deg på ruten uten unødvendige varsler"),
+                            icon: "location.north.line",
+                            status: settings.routeAlertsEnabled
+                                ? "\(Int(settings.routeAlertDeviationMeters)) m"
+                                : tr("Off", "Av")
+                        )
+                    }
+                }
+
+                ATHLTHPlanSurface(ghost: false) {
+                    sectionHeading(tr("While you train", "Mens du trener"))
+                    NavigationLink {
+                        ATHLTHGuidancePrioritySettingsView()
+                    } label: {
+                        guidanceRow(
+                            title: tr("Alert priority", "Prioritering av varsler"),
+                            subtitle: tr("Navigation and target-zone alerts before routine updates",
+                                         "Navigasjon og pulssonemål før vanlige oppdateringer"),
+                            icon: "list.number",
+                            status: nil
+                        )
+                    }
+                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                    NavigationLink {
+                        ATHLTHWidgetsAndSurfacesSettingsView()
+                    } label: {
+                        guidanceRow(
+                            title: tr("Live workout display", "Live treningsvisning"),
+                            subtitle: tr("Apple Watch, Lock Screen and Dynamic Island",
+                                         "Apple Watch, låseskjerm og Dynamic Island"),
+                            icon: "rectangle.3.group.bubble.left",
+                            status: nil
+                        )
+                    }
+                }
+                Text(tr(
+                    "The workout-specific choices are stored with each workout. Changing these defaults does not overwrite an existing plan.",
+                    "Valgene for den enkelte økt lagres sammen med økten. Endring av standardinnstillingene overskriver ikke eksisterende planer."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                .padding(.horizontal, 5)
+            }
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
+            .padding(16)
         }
-        .athlthBrandedForm()
-        .navigationTitle("Workout Guidance")
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
+        .navigationTitle(tr("Workout guidance", "Øktveiledning"))
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    @ViewBuilder
-    private func guidanceRow(
-        title: String,
-        subtitle: String,
-        icon: String,
-        tint: Color
-    ) -> some View {
+    private func sectionHeading(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 21, weight: .semibold, design: .serif))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+    }
+
+    private func guidanceRow(title: String, subtitle: String, icon: String,
+                             status: String?) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .font(
-                    .system(
-                        size: 17,
-                        weight: .semibold
-                    )
-                )
-                .foregroundStyle(tint)
-                .frame(width: 38, height: 38)
-                .background(
-                    tint.opacity(0.11),
-                    in:
-                        RoundedRectangle(
-                            cornerRadius: 11,
-                            style: .continuous
-                        )
-                )
-
-            VStack(
-                alignment: .leading,
-                spacing: 2
-            ) {
-                Text(title)
-                    .font(
-                        .subheadline
-                            .weight(.semibold)
-                    )
-
+                .font(.system(size: 20, weight: .medium))
+                .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                .frame(width: 45, height: 45)
+                .background(ATHLTHPlanDesign.selectedSurface,
+                            in: RoundedRectangle(cornerRadius: 15))
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title).font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
                 Text(subtitle)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 5)
+            if let status {
+                Text(status)
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
                     .lineLimit(2)
             }
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
-        .padding(.vertical, 3)
-    }
-
-    private var audioCoachSummary: String {
-        settings.audioCoachEnabledByDefault
-            ? "On by default · pace, distance and workout instructions"
-            : "Off by default · configurable per workout"
-    }
-
-    private var routeGuardianSummary: String {
-        guard settings.routeAlertsEnabled
-        else {
-            return "Off"
-        }
-
-        return
-            "Alert at " +
-            String(
-                format:
-                    "%.0f m",
-                settings
-                    .routeAlertDeviationMeters
-            ) +
-            " off route"
-    }
-
-    private var ghostSummary: String {
-        guard settings.ghostRaceAudioEnabled
-        else {
-            return "Silent · live comparison still stays visible"
-        }
-
-        return ATHLTHLocalization.choose(
-            english:
-                "Race status + selected race events",
-            norwegian:
-                "Løpsstatus + valgte løpshendelser"
-        )
+        .frame(minHeight: 58)
+        .contentShape(Rectangle())
     }
 }
 
 struct ATHLTHRouteGuardianSettingsView: View {
-    @EnvironmentObject private var settings:
-        AppSettingsStore
+    @EnvironmentObject private var settings: AppSettingsStore
+
+    private func tr(_ en: String, _ no: String) -> String {
+        ATHLTHLocalization.choose(english: en, norwegian: no)
+    }
 
     var body: some View {
-        Form {
-            Section {
-                Toggle(
-                    "Off-route alerts",
-                    isOn:
-                        $settings
-                            .routeAlertsEnabled
+        ScrollView {
+            VStack(alignment: .leading, spacing: 15) {
+                ATHLTHPlanSectionIntro(
+                    eyebrow: tr("ROUTE GUIDANCE", "RUTEVEILEDNING"),
+                    title: tr("Navigation", "Navigasjon"),
+                    subtitle: tr(
+                        "Quiet until your position is reliably off route. Get a clear warning and know when you're back.",
+                        "Rolig så lenge du følger ruten. Få et tydelig varsel ved avvik og beskjed når du er tilbake."
+                    ),
+                    icon: "location.north.line"
                 )
-            } footer: {
-                Text(
-                    "Route Guardian is independent from Audio Coach and Ghost Updates. Critical route warnings have the highest guidance priority."
-                )
-            }
 
-            if settings.routeAlertsEnabled {
-                Section("Trigger") {
-                    Picker(
-                        "Alert when off route",
-                        selection:
-                            $settings
-                                .routeAlertDeviationMeters
-                    ) {
-                        Text("25 m").tag(25.0)
-                        Text("50 m").tag(50.0)
-                        Text("80 m").tag(80.0)
-                        Text("100 m").tag(100.0)
-                        Text("150 m").tag(150.0)
-                        Text("250 m").tag(250.0)
+                ATHLTHPlanSurface(ghost: false) {
+                    Toggle(isOn: $settings.routeAlertsEnabled) {
+                        Text(tr("Off-route navigation alerts", "Varsler ved ruteavvik"))
+                            .font(.headline)
+                            .foregroundStyle(ATHLTHPlanDesign.ink)
                     }
-
-                    Picker(
-                        "Wait before alert",
-                        selection:
-                            $settings
-                                .routeAlertGraceSeconds
-                    ) {
-                        Text("Immediately").tag(0)
-                        Text("5 sec").tag(5)
-                        Text("10 sec").tag(10)
-                        Text("20 sec").tag(20)
-                        Text("30 sec").tag(30)
-                    }
-
-                    Picker(
-                        "Repeat while off route",
-                        selection:
-                            $settings
-                                .routeAlertRepeatSeconds
-                    ) {
-                        Text("30 sec").tag(30)
-                        Text("1 min").tag(60)
-                        Text("2 min").tag(120)
-                        Text("5 min").tag(300)
-                    }
+                    .tint(ATHLTHPlanDesign.accentInk)
                 }
 
-                Section("Delivery") {
-                    Picker(
-                        "Alert style",
-                        selection:
-                            $settings
-                                .routeAlertDelivery
-                    ) {
-                        ForEach(
-                            WatchAlertDelivery
-                                .allCases
-                        ) { delivery in
-                            Text(delivery.title)
-                                .tag(delivery)
+                if settings.routeAlertsEnabled {
+                    ATHLTHPlanSurface(ghost: false) {
+                        heading(tr("When to alert", "Når skal du varsles"),
+                                "point.topleft.down.to.point.bottomright.curvepath")
+                        Picker(tr("Deviation", "Avstand fra ruten"),
+                               selection: $settings.routeAlertDeviationMeters) {
+                            Text("25 m").tag(25.0)
+                            Text("50 m").tag(50.0)
+                            Text("80 m").tag(80.0)
+                            Text("100 m").tag(100.0)
+                            Text("150 m").tag(150.0)
+                            Text("250 m").tag(250.0)
                         }
+                        .pickerStyle(.menu)
+                        Picker(tr("Wait for stable deviation", "Vent på stabilt avvik"),
+                               selection: $settings.routeAlertGraceSeconds) {
+                            Text(tr("Immediately", "Straks")).tag(0)
+                            Text("5 s").tag(5)
+                            Text("10 s").tag(10)
+                            Text("20 s").tag(20)
+                            Text("30 s").tag(30)
+                        }
+                        .pickerStyle(.menu)
+                        Picker(tr("Repeat if still off route", "Gjenta ved fortsatt avvik"),
+                               selection: $settings.routeAlertRepeatSeconds) {
+                            Text("30 s").tag(30)
+                            Text("1 min").tag(60)
+                            Text("2 min").tag(120)
+                            Text("5 min").tag(300)
+                        }
+                        .pickerStyle(.menu)
                     }
 
-                    Toggle(
-                        "Tell me when I'm back on route",
-                        isOn:
-                            $settings
-                                .routeAlertAnnounceBackOnRoute
-                    )
+                    ATHLTHPlanSurface(ghost: false) {
+                        heading(tr("How to notify", "Slik blir du varslet"),
+                                "speaker.wave.2")
+                        Picker(tr("Alert method", "Varseltype"),
+                               selection: $settings.routeAlertDelivery) {
+                            ForEach(WatchAlertDelivery.allCases) { delivery in
+                                Text(delivery.title).tag(delivery)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        Toggle(tr("Tell me when back on route",
+                                  "Gi beskjed når jeg er tilbake på ruten"),
+                               isOn: $settings.routeAlertAnnounceBackOnRoute)
+                            .tint(ATHLTHPlanDesign.accentInk)
+                    }
                 }
+
+                Text(tr(
+                    "Navigation does not change the GPS route or compete with Ghost Race. Warnings have priority over motivational messages.",
+                    "Navigasjon endrer ikke GPS-ruten og konkurrerer ikke med Ghost Race. Varsler om ruteavvik prioriteres foran motivasjon."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
             }
+            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: .infinity)
+            .padding(16)
         }
-        .athlthBrandedForm()
-        .navigationTitle("Route Guardian")
+        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
+        .tint(ATHLTHPlanDesign.accentInk)
+        .navigationTitle(tr("Navigation", "Navigasjon"))
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func heading(_ title: String, _ icon: String) -> some View {
+        Label(title, systemImage: icon)
+            .font(.system(size: 19, weight: .semibold, design: .serif))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
     }
 }
 
