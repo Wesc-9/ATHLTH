@@ -71,7 +71,7 @@ final class StrengthPostWorkoutReviewTests: XCTestCase {
         )
     }
 
-    func testHistoricalSixInchHoldDoesNotBecomeAWeightRecord() {
+    func testHistoricalSixInchHoldDoesNotBecomeAWeightRecord() throws {
         // A legacy hold accidentally recorded a 20 kg draft weight.
         // Preserve the real measured time, never invent weighted effort.
         let hold = exercise(
