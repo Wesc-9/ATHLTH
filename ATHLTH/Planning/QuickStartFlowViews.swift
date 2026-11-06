@@ -3040,12 +3040,12 @@ struct RunQuickStartSheet: View {
 
         if routeGuardianDraft.enabled,
            guidanceRoute != nil {
-            parts.append("Route Guardian")
+            parts.append(ATHLTHLocalization.choose(english: "Navigation", norwegian: "Navigasjon"))
         }
 
         if ghostDraft.enabled,
            guidanceRoute != nil {
-            parts.append("Ghost Updates")
+            parts.append("Ghost Race")
         }
 
         return parts.isEmpty
