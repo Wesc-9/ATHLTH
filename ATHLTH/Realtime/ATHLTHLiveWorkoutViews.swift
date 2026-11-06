@@ -40,7 +40,44 @@ struct ATHLTHLiveWorkoutMapView: View {
     let session: ATHLTHLiveWorkoutSession
 
     var body: some View {
-        VStack(spacing: 0) {
+        GeometryReader { geometry in
+            if ATHLTHDeviceRole.isIPad && geometry.size.width >= 740 {
+                HStack(spacing: 0) {
+                    mapSurface
+                    ScrollView {
+                        liveSummary
+                            .padding(22)
+                    }
+                    .frame(width: min(max(geometry.size.width * 0.33, 310), 440))
+                    .background(.regularMaterial)
+                }
+            } else {
+                VStack(spacing: 0) {
+                    mapSurface
+                    liveSummary
+                        .padding(16)
+                        .background(.regularMaterial)
+                }
+            }
+        }
+        .navigationTitle(session.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .task(id: session.id) {
+            realtime.startWatching(session)
+        }
+        .onDisappear {
+            // Keep the lightweight watcher alive only when this session was
+            // explicitly selected as the user's Live Ghost. Ordinary map
+            // viewing stops immediately when the view closes.
+            if realtime.selectedLiveGhostSessionID !=
+                session.id {
+                realtime.stopWatching()
+            }
+        }
+    }
+
+
+    private var mapSurface: some View {
             Map {
                 ForEach(
                     Array(
@@ -85,10 +122,17 @@ struct ATHLTHLiveWorkoutMapView: View {
                             )
                             .font(.system(size: 30))
                             .foregroundStyle(
-                                location.userID ==
-                                session.ownerID
-                                    ? ATHLTHTheme.vitality
-                                    : ATHLTHTheme.accent
+                                session.ghostChallengeID != nil
+                                    ? (
+                                        location.userID == session.ownerID
+                                            ? Color(red: 0.13, green: 0.22, blue: 0.33)
+                                            : Color(red: 0.76, green: 0.47, blue: 0.22)
+                                    )
+                                    : (
+                                        location.userID == session.ownerID
+                                            ? ATHLTHTheme.vitality
+                                            : ATHLTHTheme.accent
+                                    )
                             )
                             .background(
                                 Color.white,
@@ -121,25 +165,6 @@ struct ATHLTHLiveWorkoutMapView: View {
                     .background(.thinMaterial)
                 }
             }
-
-            liveSummary
-                .padding(16)
-                .background(.regularMaterial)
-        }
-        .navigationTitle(session.title)
-        .navigationBarTitleDisplayMode(.inline)
-        .task(id: session.id) {
-            realtime.startWatching(session)
-        }
-        .onDisappear {
-            // Keep the lightweight watcher alive only when this session was
-            // explicitly selected as the user's Live Ghost. Ordinary map
-            // viewing stops immediately when the view closes.
-            if realtime.selectedLiveGhostSessionID !=
-                session.id {
-                realtime.stopWatching()
-            }
-        }
     }
 
     private var liveSummary: some View {
@@ -241,7 +266,7 @@ struct ATHLTHLiveWorkoutMapView: View {
                 }
             }
 
-            if currentUserIsParticipant {
+            if currentUserIsParticipant && !ATHLTHDeviceRole.isIPad {
                 Divider()
 
                 HStack(spacing: 12) {
@@ -587,6 +612,11 @@ struct ATHLTHLiveWorkoutMapView: View {
     private func trailColor(
         _ userID: UUID
     ) -> Color {
+        if session.ghostChallengeID != nil {
+            return userID == session.ownerID
+                ? Color(red: 0.13, green: 0.22, blue: 0.33)
+                : Color(red: 0.76, green: 0.47, blue: 0.22)
+        }
         if userID ==
             realtime.currentUserID {
             return ATHLTHTheme.vitality
