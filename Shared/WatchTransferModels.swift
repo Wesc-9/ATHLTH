@@ -1419,6 +1419,8 @@ enum ATHLTHStrengthWatchSnapshotAcceptance {
 enum WatchStrengthCommandKind: String, Codable, Hashable {
     case updateDraft
     case completeSet
+    /// Explicit omission: never record zero reps as a completed effort.
+    case skipSet
     case completeSetWithoutDetails
     case skipRest
     /// One atomic command: end rest and start the upcoming timed set.
