@@ -98,12 +98,12 @@ HTTP_CODE="$(curl --silent --show-error \
   --data-binary "@$RUNNER_TEMP/certificate-request.json" \
   "https://api.appstoreconnect.apple.com/v1/certificates")"
 
-# The ATHLTH 2.1.3 export (GitHub run 42122394376) created an
-# ephemeral distribution certificate at 2026-11-05 22:33 UTC, after it
-# verified and retired the prior CI-owned certificate 9285X3798K.
-# That build archived and exported successfully, but its TestFlight upload
-# was blocked by failing unit tests. Cleanup retains the distribution cert,
-# while its private key was discarded with the temporary CI keychain.
+# The approved ATHLTH 2.1.3 TestFlight run 42130194237 created the
+# CI-owned Apple Distribution certificate 2YXL46JQ8P during its signing step
+# at 2026-11-05 23:33:25–23:33:26 UTC, after safely retiring the previous
+# verified CI-owned certificate. The run's cleanup step explicitly recorded
+# TEMP_CERT_ID=2YXL46JQ8P at 2026-11-06 00:20:50 UTC.
+# That upload succeeded, but the ephemeral runner's private key was discarded.
 # Only this exact verified ATHLTH CI certificate is eligible for rotation.
 # This is a one-time repair; subsequent releases need a persistent securely
 # stored signing identity rather than creating disposable certificates.
@@ -115,7 +115,7 @@ HTTP_CODE="$(curl --silent --show-error \
 if [ "$HTTP_CODE" = "409" ] \
   && grep -q "already have a current Distribution certificate" "$RUNNER_TEMP/certificate-response.json"; then
   echo "::notice::Apple signing certificate limit reached; checking the verified previous ATHLTH CI certificate."
-  STALE_CERT_ID="9SPQDF8X2J"
+  STALE_CERT_ID="2YXL46JQ8P"
   LOOKUP_HTTP="$(curl --silent --show-error --retry 2 --retry-delay 3 \
     --output "$RUNNER_TEMP/known-ci-certificate.json" \
     --write-out '%{http_code}' \
@@ -142,10 +142,10 @@ if item.get("id") != sys.argv[2] or attrs.get("certificateType") != "DISTRIBUTIO
 certificate = x509.load_der_x509_certificate(base64.b64decode(attrs["certificateContent"]))
 issued = certificate.not_valid_before_utc
 # Apple normally backdates the certificate validity by about ten minutes.
-# GitHub run 42122394376 created this cert at 2026-11-05 22:33 UTC.
+# GitHub run 42130194237 created this cert at 2026-11-05 23:33 UTC.
 # Require the exact logged ID, distribution type and X.509 issuance window.
-start = datetime(2026, 11, 5, 22, 20, tzinfo=timezone.utc)
-end = datetime(2026, 11, 5, 22, 36, tzinfo=timezone.utc)
+start = datetime(2026, 11, 5, 23, 20, tzinfo=timezone.utc)
+end = datetime(2026, 11, 5, 23, 36, tzinfo=timezone.utc)
 if not start <= issued <= end:
     raise SystemExit(f"Certificate issued {issued} outside verified ATHLTH CI run; no revocation performed")
 print("Verified previous ATHLTH CI distribution certificate; safe targeted rotation.")
