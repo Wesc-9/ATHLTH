@@ -574,6 +574,40 @@ struct PerWorkoutRouteGuardianView: View {
                     .tint(ATHLTHPlanDesign.accentInk)
                     if draft.enabled {
                         Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                        VStack(alignment: .leading, spacing: 9) {
+                            Text(ATHLTHLocalization.choose(
+                                english: "ALERT SENSITIVITY",
+                                norwegian: "FØLSOMHET"
+                            ))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            HStack(spacing: 8) {
+                                sensitivityChoice(
+                                    ATHLTHLocalization.choose(
+                                        english: "Precise", norwegian: "Presis"
+                                    ),
+                                    meters: 50, grace: 10
+                                )
+                                sensitivityChoice(
+                                    ATHLTHLocalization.choose(
+                                        english: "Balanced", norwegian: "Balansert"
+                                    ),
+                                    meters: 80, grace: 20
+                                )
+                                sensitivityChoice(
+                                    ATHLTHLocalization.choose(
+                                        english: "Relaxed", norwegian: "Rolig"
+                                    ),
+                                    meters: 150, grace: 30
+                                )
+                            }
+                            Text(ATHLTHLocalization.choose(
+                                english: "GPS uncertainty is accounted for before a warning is spoken.",
+                                norwegian: "GPS-usikkerhet tas med i vurderingen før varsel gis."
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
                         Text(ATHLTHLocalization.choose(
                             english: "DEVIATION",
                             norwegian: "AVVIK FRA RUTEN"
@@ -698,6 +732,37 @@ struct PerWorkoutRouteGuardianView: View {
         ))
         .navigationBarTitleDisplayMode(.inline)
     }
+    private func sensitivityChoice(
+        _ title: String,
+        meters: Double,
+        grace: Int
+    ) -> some View {
+        let selected = draft.deviationMeters == meters &&
+            draft.graceSeconds == grace
+        return Button {
+            draft.deviationMeters = meters
+            draft.graceSeconds = grace
+            draft.enabled = true
+        } label: {
+            VStack(spacing: 5) {
+                Text(title)
+                    .font(.caption.weight(.semibold))
+                Text("\(Int(meters)) m · \(grace) s")
+                    .font(.caption2.monospacedDigit())
+            }
+            .foregroundStyle(selected ? Color.white : ATHLTHPlanDesign.ink)
+            .frame(maxWidth: .infinity, minHeight: 62)
+            .background(
+                selected
+                    ? Color(red: 0.20, green: 0.21, blue: 0.24)
+                    : Color(red: 0.955, green: 0.954, blue: 0.95),
+                in: RoundedRectangle(cornerRadius: 13)
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
 }
 
 struct PerWorkoutGhostView: View {
