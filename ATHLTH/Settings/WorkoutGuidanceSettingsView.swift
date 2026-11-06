@@ -9,107 +9,178 @@ struct ATHLTHWorkoutGuidanceSettingsView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                ATHLTHPlanSectionIntro(
-                    eyebrow: tr("ATHLTH · WORKOUT EXPERIENCE", "ATHLTH · ØKTOPPLEVELSE"),
-                    title: tr("Your running companion", "Din treningspartner"),
-                    subtitle: tr(
-                        "Voice coaching, live competition and navigation. These are defaults; every planned workout can have its own setup.",
-                        "Stemmeveiledning, konkurranse og navigasjon. Her setter du standardvalg, mens hver planlagte økt kan tilpasses."
-                    ),
-                    icon: "waveform.and.person.filled"
-                )
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(tr("WORKOUT EXPERIENCE", "ØKTOPPLEVELSE"))
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.2)
+                        .foregroundStyle(.secondary)
+                    Text(tr("Guidance that moves with you", "Veiledning som følger deg"))
+                        .font(.system(.largeTitle, design: .serif))
+                        .foregroundStyle(ink)
+                    Text(tr(
+                        "Decide what you hear, when navigation intervenes and how Ghost Race keeps you informed. Each workout can override these defaults.",
+                        "Bestem hva du hører, når navigasjonen skal gripe inn, og hvordan Ghost Race gir deg oppdateringer. Hver økt kan overstyre standardvalgene."
+                    ))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
 
-                ATHLTHPlanSurface(ghost: false) {
-                    sectionHeading(tr("Three tools. One run.", "Tre verktøy. Én økt."))
-                    NavigationLink {
+                VStack(alignment: .leading, spacing: 12) {
+                    guidanceLink(
+                        title: "Audio Coach",
+                        description: tr(
+                            "Voice, motivation, pulse zones and custom triggers",
+                            "Stemme, motivasjon, pulssoner og egne meldinger"
+                        ),
+                        symbol: "waveform",
+                        status: settings.audioCoachEnabledByDefault
+                            ? tr("Enabled", "Aktiv") : tr("Custom", "Tilpass")
+                    ) {
                         ATHLTHAudioCoachSettingsView()
-                    } label: {
-                        guidanceRow(
-                            title: "Audio Coach",
-                            subtitle: settings.audioCoachEnabledByDefault
-                                ? tr("Default on · motivation, zones and voice",
-                                     "Standard på · motivasjon, pulssoner og stemme")
-                                : tr("Configure motivation, zones and voice",
-                                     "Tilpass motivasjon, pulssoner og stemme"),
-                            icon: "waveform.and.mic",
-                            status: settings.audioCoachEnabledByDefault
-                                ? tr("Default on", "Standard på")
-                                : tr("Custom", "Tilpass")
-                        )
                     }
-                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                    NavigationLink {
-                        ATHLTHGhostUpdatesSettingsView()
-                    } label: {
-                        guidanceRow(
-                            title: "Ghost Race",
-                            subtitle: tr("Pacing, spoken comparisons and race events",
-                                         "Tempo, sammenligning og løpshendelser"),
-                            icon: "figure.run.circle",
-                            status: settings.ghostRaceAudioEnabled
-                                ? tr("Voice on", "Stemme på")
-                                : tr("Silent", "Uten stemme")
-                        )
+
+                    guidanceLink(
+                        title: tr("Strength coaching", "Styrkeveiledning"),
+                        description: tr(
+                            "Rest countdown, next set and next exercise announcements",
+                            "Hvilenedtelling, neste sett og neste øvelse"
+                        ),
+                        symbol: "dumbbell",
+                        status: tr("Configure", "Tilpass")
+                    ) {
+                        ATHLTHStrengthCoachGlobalSettingsView()
                     }
-                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
-                    NavigationLink {
+
+                    guidanceLink(
+                        title: tr("Navigation", "Navigasjon"),
+                        description: tr(
+                            "Route deviation, warning thresholds and back-on-track cues",
+                            "Ruteavvik, varselgrenser og melding når du er tilbake"
+                        ),
+                        symbol: "location.north.line",
+                        status: settings.routeAlertsEnabled
+                            ? "\(Int(settings.routeAlertDeviationMeters)) m"
+                            : tr("Off", "Av")
+                    ) {
                         ATHLTHRouteGuardianSettingsView()
-                    } label: {
-                        guidanceRow(
-                            title: tr("Navigation", "Navigasjon"),
-                            subtitle: tr("Stay on course without unnecessary alarms",
-                                         "Hold deg på ruten uten unødvendige varsler"),
-                            icon: "location.north.line",
-                            status: settings.routeAlertsEnabled
-                                ? "\(Int(settings.routeAlertDeviationMeters)) m"
-                                : tr("Off", "Av")
-                        )
+                    }
+
+                    guidanceLink(
+                        title: "Ghost Race",
+                        description: tr(
+                            "Live comparisons, pacing, overtakes and finish-line cues",
+                            "Sammenligning, tempo, forbikjøringer og sluttspurt"
+                        ),
+                        symbol: "flag.checkered",
+                        status: settings.ghostRaceAudioEnabled
+                            ? tr("Voice on", "Stemme på")
+                            : tr("Silent", "Stille")
+                    ) {
+                        ATHLTHGhostUpdatesSettingsView()
                     }
                 }
 
-                ATHLTHPlanSurface(ghost: false) {
-                    sectionHeading(tr("While you train", "Mens du trener"))
+                VStack(alignment: .leading, spacing: 13) {
+                    Text(tr("THE REST OF THE EXPERIENCE", "RESTEN AV OPPLEVELSEN"))
+                        .font(.caption.weight(.semibold))
+                        .tracking(0.8)
+                        .foregroundStyle(.secondary)
+
                     NavigationLink {
                         ATHLTHGuidancePrioritySettingsView()
                     } label: {
-                        guidanceRow(
-                            title: tr("Alert priority", "Prioritering av varsler"),
-                            subtitle: tr("Navigation and target-zone alerts before routine updates",
-                                         "Navigasjon og pulssonemål før vanlige oppdateringer"),
-                            icon: "list.number",
-                            status: nil
+                        Label(
+                            tr("Alert priority", "Prioritering av varsler"),
+                            systemImage: "list.number"
                         )
+                        .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
                     }
-                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+
+                    Divider()
+
                     NavigationLink {
                         ATHLTHWidgetsAndSurfacesSettingsView()
                     } label: {
-                        guidanceRow(
-                            title: tr("Live workout display", "Live treningsvisning"),
-                            subtitle: tr("Apple Watch, Lock Screen and Dynamic Island",
-                                         "Apple Watch, låseskjerm og Dynamic Island"),
-                            icon: "rectangle.3.group.bubble.left",
-                            status: nil
+                        Label(
+                            tr("Watch, Lock Screen & Dynamic Island",
+                               "Klokke, låseskjerm og Dynamic Island"),
+                            systemImage: "rectangle.3.group"
                         )
+                        .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
                     }
                 }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ink)
+                .padding(20)
+                .background(.white, in: RoundedRectangle(cornerRadius: 20))
+
                 Text(tr(
-                    "The workout-specific choices are stored with each workout. Changing these defaults does not overwrite an existing plan.",
-                    "Valgene for den enkelte økt lagres sammen med økten. Endring av standardinnstillingene overskriver ikke eksisterende planer."
+                    "Changes here never overwrite the settings of a previously planned workout.",
+                    "Endringer her overskriver aldri innstillingene i en allerede planlagt økt."
                 ))
                 .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .padding(.horizontal, 5)
+                .foregroundStyle(.secondary)
             }
-            .frame(maxWidth: ATHLTHPlanDesign.maxContentWidth)
+            .frame(maxWidth: 920)
             .frame(maxWidth: .infinity)
-            .padding(16)
+            .padding(18)
         }
-        .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
-        .tint(ATHLTHPlanDesign.accentInk)
+        .background(Color(red: 0.975, green: 0.975, blue: 0.971).ignoresSafeArea())
         .navigationTitle(tr("Workout guidance", "Øktveiledning"))
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private var ink: Color {
+        Color(red: 0.17, green: 0.18, blue: 0.20)
+    }
+
+    private func guidanceLink<Destination: View>(
+        title: String,
+        description: String,
+        symbol: String,
+        status: String,
+        @ViewBuilder destination: () -> Destination
+    ) -> some View {
+        NavigationLink(destination: destination()) {
+            HStack(spacing: 14) {
+                Image(systemName: symbol)
+                    .font(.title3)
+                    .foregroundStyle(ink)
+                    .frame(width: 48, height: 48)
+                    .background(
+                        Color(red: 0.94, green: 0.94, blue: 0.93),
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundStyle(ink)
+                    Text(description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 6)
+                VStack(alignment: .trailing, spacing: 6) {
+                    Text(status)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.secondary)
+                    Image(systemName: "arrow.up.right")
+                        .font(.caption)
+                        .foregroundStyle(ink)
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 83, alignment: .leading)
+            .padding(18)
+            .background(.white, in: RoundedRectangle(cornerRadius: 20))
+            .overlay(
+                RoundedRectangle(cornerRadius: 20)
+                    .stroke(Color.primary.opacity(0.055))
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     private func sectionHeading(_ title: String) -> some View {
