@@ -20,7 +20,7 @@ enum ATHLTHStrengthWatchControlPolicy {
     ) -> Bool {
         guard whenIPhoneControls else { return true }
         switch command {
-        case .completeSet, .skipSet, .skipRest, .skipRestAndStartTimedSet,
+        case .completeSet, .startSetEffort, .skipSet, .skipRest, .skipRestAndStartTimedSet,
              .startTimedSet, .nextExercise:
             return true
         case .updateDraft, .completeSetWithoutDetails, .addRest,
@@ -123,6 +123,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
             }
             .onChange(of: strengthWorkout.draftWarmUp) { _, _ in
                 scheduleDraftSnapshot()
+            }
+            .onChange(of: strengthWorkout.setEffortClock) { _, _ in
+                sendSnapshotNow()
             }
             .onChange(of: strengthWorkout.timedSetCountdown) { _, _ in
                 sendSnapshotNow()
@@ -231,6 +234,7 @@ struct ATHLTHStrengthWatchSyncObserver: View {
         let setScopedCommand =
             command.kind == .updateDraft ||
             command.kind == .skipSet ||
+            command.kind == .startSetEffort ||
             command.kind == .completeSet ||
             command.kind ==
                 .completeSetWithoutDetails ||
@@ -393,6 +397,9 @@ struct ATHLTHStrengthWatchSyncObserver: View {
                 strengthWorkout
                     .completeCurrentDraftSet()
             }
+
+        case .startSetEffort:
+            strengthWorkout.startCurrentSetEffort(at: command.sentAt)
 
         case .skipSet:
             _ = strengthWorkout.skipCurrentSet()
