@@ -2425,19 +2425,18 @@ final class StrengthWorkoutStore: ObservableObject {
         guard var workout = activeWorkout else { return }
         isFreeTrainingBetweenExercises = false
 
+        let snapshot = exercise.snapshot
         let isHold = StrengthTimedBodyweightDefaults.isBodyweightHold(
-            exercise.snapshot.name
-        )
+            snapshot.name
+        ) || snapshot.isTimeOnlyBodyweightStrength
         let resolvedTargetKind =
-            targetKind ?? (isHold
-                ? .time
-                : exercise.snapshot.defaultStrengthTargetKind)
+            targetKind ?? (isHold ? .time : snapshot.defaultStrengthTargetKind)
         let resolvedLoadKind =
             loadKind ??
             exercise
                 .snapshot
                 .defaultStrengthLoadKind
-        let setCount = max(sets, 1)
+        let setCount = snapshot.isFreeStrengthTimer ? 1 : max(sets, 1)
         var log = StrengthExerciseLog(
             id: UUID(),
             plannedExerciseID: nil,
@@ -2458,7 +2457,7 @@ final class StrengthWorkoutStore: ObservableObject {
                     completedWeightKilograms: nil,
                     rpe: nil,
                     completedAt: nil,
-                    restSeconds: restSeconds,
+                    restSeconds: snapshot.isFreeStrengthTimer ? 0 : restSeconds,
                     isWarmUp:
                         number <= max(
                             min(
@@ -2497,10 +2496,13 @@ final class StrengthWorkoutStore: ObservableObject {
         )
 
         for index in log.sets.indices {
-            log.sets[index].recordsWeight = recordsWeight ??
-                !(isHold || StrengthTreadmillWarmUpDefaults.isTreadmill(
-                    exercise.snapshot.name
-                ))
+            log.sets[index].recordsWeight =
+                snapshot.isTimeOnlyBodyweightStrength
+                    ? false
+                    : (recordsWeight ??
+                        !(isHold || StrengthTreadmillWarmUpDefaults.isTreadmill(
+                            snapshot.name
+                        )))
         }
         let wasEmpty =
             workout.exercises.isEmpty
