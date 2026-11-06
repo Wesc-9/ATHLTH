@@ -86,7 +86,39 @@ final class AthleteOfflinePackStore: ObservableObject {
             let routeIDs = Set(sessions.compactMap(\.routeID) + sessions.compactMap { $0.runningWorkout?.routeID } + sessions.flatMap { $0.runningWorkouts ?? [] }.compactMap(\.routeID))
             let selectedRoutes = routes.filter { routeIDs.contains($0.id) }
             var pack = AthleteOfflinePack(plan: plan, routes: selectedRoutes, downloadedAt: Date(), mapRouteIDs: [], exerciseImageIDs: [], missingAssets: 0)
+            // Reuse existing media before attempting network work. A save
+            // should not redownload assets already safely on the device.
+            let previousDirectory = folder.appendingPathComponent(
+                plan.id.uuidString, isDirectory: true
+            )
+            let previousMetadata = previousDirectory.appendingPathComponent("pack.json")
+            let previousPack: AthleteOfflinePack? = {
+                guard let bytes = try? Data(contentsOf: previousMetadata) else {
+                    return nil
+                }
+                return try? JSONDecoder().decode(
+                    AthleteOfflinePack.self, from: bytes
+                )
+            }()
+            func reuseAsset(_ id: UUID, availableIDs: [UUID]) throws -> Bool {
+                guard availableIDs.contains(id) else { return false }
+                let name = id.uuidString + ".png"
+                let source = previousDirectory.appendingPathComponent(name)
+                guard FileManager.default.fileExists(atPath: source.path) else {
+                    return false
+                }
+                try FileManager.default.copyItem(
+                    at: source, to: temporary.appendingPathComponent(name)
+                )
+                return true
+            }
             if includeMedia { for route in selectedRoutes {
+                if try reuseAsset(
+                    route.id, availableIDs: previousPack?.mapRouteIDs ?? []
+                ) {
+                    pack.mapRouteIDs.append(route.id)
+                    continue
+                }
                 try Task.checkCancellation()
                 let coordinates = route.coordinates.map(\.coordinate).filter(CLLocationCoordinate2DIsValid)
                 guard coordinates.count >= 2 else { pack.missingAssets += 1; continue }
@@ -116,6 +148,13 @@ final class AthleteOfflinePackStore: ObservableObject {
             var seen = Set<UUID>()
             if includeMedia { for exercise in sessions.flatMap(\.exercises) where seen.insert(exercise.id).inserted {
                 try Task.checkCancellation()
+                if try reuseAsset(
+                    exercise.id,
+                    availableIDs: previousPack?.exerciseImageIDs ?? []
+                ) {
+                    pack.exerciseImageIDs.append(exercise.id)
+                    continue
+                }
                 guard let url = exercise.embeddedExercise.imageURL, url.scheme == "https" else { continue }
                 do {
                     let (bytes, response) = try await URLSession.shared.data(from: url)
