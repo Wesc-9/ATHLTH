@@ -11,6 +11,49 @@ final class ATHLTHGhostPaceTimeConversionTests: XCTestCase {
         XCTAssertEqual(pace, "13:52")
     }
 
+    func testWholeMinuteTargetPaceWorksOnScreenshotRoute() {
+        // Screenshot: the user types just "5" for a 3.95 km route.
+        XCTAssertEqual(
+            ATHLTHGhostPaceTimeConversion.paceSeconds(from: "5"), 300
+        )
+        XCTAssertEqual(
+            ATHLTHGhostPaceTimeConversion.normalizedPaceText(from: "5"),
+            "5:00"
+        )
+        XCTAssertEqual(
+            ATHLTHGhostPaceTimeConversion.paceSeconds(from: "6"), 360
+        )
+        var draft = GhostQuickStartDraft()
+        draft.enabled = true
+        draft.setTargetPaceText("5", distanceKilometers: 3.95)
+        XCTAssertEqual(draft.targetDuration, 1_185)
+        XCTAssertEqual(draft.targetTimeText, "19:45")
+        // The active text remains untouched until the athlete finishes editing.
+        XCTAssertEqual(draft.targetPaceText, "5")
+        draft.finalizeTargetPaceText(distanceKilometers: 3.95)
+        XCTAssertEqual(draft.targetPaceText, "5:00")
+        XCTAssertEqual(draft.targetTimeText, "19:45")
+    }
+
+    func testTargetGhostAlsoAcceptsWholeMinutePace() {
+        XCTAssertEqual(GhostTargetPaceFormatter.secondsPerKilometer(from: "5"), 300)
+        XCTAssertEqual(GhostTargetPaceFormatter.secondsPerKilometer(from: "5:30"), 330)
+        XCTAssertEqual(GhostTargetPaceFormatter.text(secondsPerKilometer: 300), "5:00")
+        XCTAssertNil(GhostTargetPaceFormatter.secondsPerKilometer(from: "5:"))
+        XCTAssertNil(GhostTargetPaceFormatter.secondsPerKilometer(from: "5:99"))
+        XCTAssertNil(GhostTargetPaceFormatter.secondsPerKilometer(from: "1"))
+    }
+
+    func testShorthandDoesNotAcceptInvalidOrAmbiguousInput() {
+        for invalid in ["", " ", "0", "-5", "5:", ":05", "5:99", "5.5", "61",
+                        "999999999999999999999999"] {
+            XCTAssertNil(ATHLTHGhostPaceTimeConversion.paceSeconds(from: invalid))
+            XCTAssertNil(ATHLTHGhostPaceTimeConversion.normalizedPaceText(from: invalid))
+        }
+        XCTAssertEqual(ATHLTHGhostPaceTimeConversion.paceSeconds(from: "5:30"), 330)
+        XCTAssertEqual(ATHLTHGhostPaceTimeConversion.normalizedPaceText(from: "5:8"), "5:08")
+    }
+
     func testPacePopulatesTime() {
         var draft = GhostQuickStartDraft()
         draft.enabled = true
