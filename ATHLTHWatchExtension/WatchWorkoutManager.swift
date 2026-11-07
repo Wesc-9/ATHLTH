@@ -6580,7 +6580,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
                 resolvedMaximumBPM
         )
-        guard target?.heartRateEnabled != true,
+        let explicitPeriodicZone = audioCoachConfiguration.smartPrompts?
+            .measuredZoneAnnouncementIntervalSeconds != nil
+        guard (target?.heartRateEnabled != true || explicitPeriodicZone),
               let zone = ATHLTHHeartRateZones.measuredZone(
                   heartRateBPM: heartRate,
                   maximumBPM: resolvedMaximumBPM
@@ -6599,7 +6601,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
         guard now.timeIntervalSince(measuredCoachZoneStartedAt ?? now) >= 15,
               measuredCoachLastZoneAnnouncementAt.map({
-                  now.timeIntervalSince($0) >= 180
+                  now.timeIntervalSince($0) >=
+                      (audioCoachConfiguration.smartPrompts?
+                        .resolvedMeasuredZoneInterval ?? 180)
               }) ?? true
         else { return }
 
@@ -6769,6 +6773,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     now.timeIntervalSince($0) >= 300
                 } ?? true),
                audioCoachConfiguration.enabled,
+               audioCoachConfiguration.smartPrompts?.confirmWhenBackInZone != false,
                !coachSpeechPaused,
                !targetWasOutside {
                 let confirmation =
@@ -6777,9 +6782,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 deliverWorkoutAlert(
                     english: confirmation.english,
                     norwegian: confirmation.norwegian,
-                    delivery: ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
-                        configuration.delivery, coachEnabled: true
-                    ),
+                    delivery: audioCoachConfiguration.smartPrompts?
+                        .targetZoneVoiceAlertsEnabled == false
+                            ? .haptic : ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
+                                configuration.delivery, coachEnabled: true
+                            ),
                     haptic: .success,
                     priority: .targetCritical
                 )
@@ -6826,7 +6833,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 // positive announcement immediately after it.
                 lastPositiveZoneAnnouncementAt = Date()
 
-                if configuration.announceBackInTarget {
+                if configuration.announceBackInTarget &&
+                   audioCoachConfiguration.smartPrompts?.confirmWhenBackInZone != false {
                     let recovery = ATHLTHHeartRateZoneCoachTarget
                         .backInTargetPhrase(
                             zone: configuration.heartRateEnabled
@@ -6838,7 +6846,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         delivery: ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
                             configuration.delivery,
                             coachEnabled: audioCoachConfiguration.enabled &&
-                                configuration.heartRateEnabled
+                                configuration.heartRateEnabled &&
+                                (audioCoachConfiguration.smartPrompts?
+                                    .targetZoneVoiceAlertsEnabled != false)
                         ),
                         haptic: .success,
                         priority: .targetCritical
@@ -6881,11 +6891,13 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         deliverWorkoutAlert(
             english: violation.english,
             norwegian: violation.norwegian,
-            delivery: ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
-                configuration.delivery,
-                coachEnabled: audioCoachConfiguration.enabled &&
-                    configuration.heartRateEnabled
-            ),
+            delivery: audioCoachConfiguration.smartPrompts?
+                .targetZoneVoiceAlertsEnabled == false && configuration.heartRateEnabled
+                    ? .haptic : ATHLTHHeartRateZoneCoachTarget.spokenDelivery(
+                        configuration.delivery,
+                        coachEnabled: audioCoachConfiguration.enabled &&
+                            configuration.heartRateEnabled
+                    ),
             haptic: .notification,
             priority: .targetCritical
         )

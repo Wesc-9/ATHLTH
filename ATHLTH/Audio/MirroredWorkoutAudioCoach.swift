@@ -522,7 +522,8 @@ final class MirroredWorkoutAudioCoach:
         guard (snapshot.kind == .running || snapshot.kind == .walking),
               (configuration.smartPrompts?.announceCurrentHeartRateZone ??
                 configuration.announceHeartRate),
-              snapshot.runningStepTargetHeartRateZone == nil,
+              (snapshot.runningStepTargetHeartRateZone == nil ||
+               configuration.smartPrompts?.measuredZoneAnnouncementIntervalSeconds != nil),
               ATHLTHCoachSensorFreshness.validHeartRate(
                   snapshot.heartRate,
                   sampledAt: snapshot.coachHeartRateSampleAt
@@ -543,7 +544,8 @@ final class MirroredWorkoutAudioCoach:
             return
         }
         guard snapshot.elapsedTime - (measuredZoneFirstSeenAt ?? snapshot.elapsedTime) >= 15,
-              snapshot.elapsedTime - lastMeasuredZoneAnnouncementAt >= 180
+              snapshot.elapsedTime - lastMeasuredZoneAnnouncementAt >=
+                (configuration.smartPrompts?.resolvedMeasuredZoneInterval ?? 180)
         else { return }
         lastMeasuredZoneAnnouncementAt = snapshot.elapsedTime
         speak(

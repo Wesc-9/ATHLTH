@@ -179,4 +179,24 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
         ATHLTHAudioCoachOption.contextual.setActive(false, in: &draft)
         XCTAssertFalse(ATHLTHAudioCoachOption.contextual.isActive(in: draft))
     }
+
+    func testAdvancedZonePreferencesEncodeDecodeWithLegacyFallbacks() throws {
+        var smart = ATHLTHAudioCoachSmartSettings()
+        XCTAssertEqual(smart.resolvedMeasuredZoneInterval, 180)
+        XCTAssertEqual(smart.resolvedAdaptiveCooldown, 150)
+        smart.measuredZoneAnnouncementIntervalSeconds = 60
+        smart.targetZoneVoiceAlertsEnabled = true
+        smart.confirmWhenBackInZone = true
+        smart.coachingMode = .custom
+        smart.strongStartDurationSeconds = 180
+        smart.pushOnUnexpectedPaceDrop = true
+        smart.paceDropThresholdPercent = 12
+        let copy = try JSONDecoder().decode(
+            ATHLTHAudioCoachSmartSettings.self, from: JSONEncoder().encode(smart)
+        )
+        XCTAssertEqual(copy.resolvedMeasuredZoneInterval, 60)
+        XCTAssertEqual(copy.coachingMode, .custom)
+        XCTAssertEqual(copy.resolvedPaceDropPercent, 0.12, accuracy: 0.001)
+        XCTAssertTrue(copy.pushOnUnexpectedPaceDrop == true)
+    }
 }

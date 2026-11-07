@@ -117,6 +117,23 @@ struct ATHLTHCoachLandmark: Codable, Hashable, Identifiable {
     }
 }
 
+/// ATHLTH's contextual coaching or a user-directed set of triggers.
+enum ATHLTHCoachMotivationControlMode: String, Codable, CaseIterable, Identifiable {
+    case automatic
+    case custom
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .automatic:
+            return ATHLTHLocalization.choose(
+                english: "ATHLTH decides", norwegian: "ATHLTH bestemmer")
+        case .custom:
+            return ATHLTHLocalization.choose(
+                english: "My rules", norwegian: "Egendefinert")
+        }
+    }
+}
+
 /// Optional in Watch transfers: older iPhone/Watch builds continue to decode.
 struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     var motivationEnabled = false
@@ -134,6 +151,30 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     // Supplied from the athlete profile when the workout is launched; never
     // infer a zone without a valid configured/estimated HR maximum.
     var maximumHeartRateBPM: Double? = nil
+    // Optional = old Watch profiles decode unchanged. Explicit selections
+    // in the new editor are picked up by Watch and the mirrored iPhone voice.
+    var measuredZoneAnnouncementIntervalSeconds: Int? = nil
+    var targetZoneVoiceAlertsEnabled: Bool? = nil
+    var confirmWhenBackInZone: Bool? = nil
+    var coachingMode: ATHLTHCoachMotivationControlMode? = nil
+    var strongStartDurationSeconds: Int? = nil
+    var pushWhenBelowTargetZone: Bool? = nil
+    var pushWhenBelowTargetPace: Bool? = nil
+    var pushOnUnexpectedPaceDrop: Bool? = nil
+    var paceDropThresholdPercent: Int? = nil
+    var adaptiveCooldownSeconds: Int? = nil
+
+    var resolvedMeasuredZoneInterval: TimeInterval {
+        TimeInterval(min(max(measuredZoneAnnouncementIntervalSeconds ?? 180, 30), 900))
+    }
+
+    var resolvedAdaptiveCooldown: TimeInterval {
+        TimeInterval(min(max(adaptiveCooldownSeconds ?? 150, 60), 600))
+    }
+
+    var resolvedPaceDropPercent: Double {
+        Double(min(max(paceDropThresholdPercent ?? 15, 8), 35)) / 100
+    }
 
     var isContextualFeedbackEnabled: Bool {
         contextualFeedbackEnabled ?? true
