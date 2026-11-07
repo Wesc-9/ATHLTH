@@ -441,6 +441,7 @@ enum RouteMapSnapshotCache {
 }
 
 struct RouteMapSnapshotThumbnail: View {
+    @EnvironmentObject private var session: AppSessionStore
     let route: TrainingRoute
     var height: CGFloat = 118
 
@@ -567,11 +568,23 @@ struct RouteMapSnapshotThumbnail: View {
             }
             .task(id: requestID) {
                 guard proxy.size.width > 20 else { return }
+                // Show any previously downloaded snapshot immediately.
+                // A new MapKit request may fail, particularly in flight mode.
+                if let prepared = AthleteOfflinePackStore.cachedRouteSnapshot(
+                    routeID: route.id, userID: session.profile.userID
+                ) {
+                    image = prepared
+                    imageRequestID = requestID
+                }
                 let loaded = await RouteMapSnapshotCache.image(
                     for: route, size: size, requestID: requestID
                 )
                 guard !Task.isCancelled else { return }
-                image = loaded
+                if let loaded {
+                    image = loaded
+                }
+                // When neither image is available, show the local route
+                // trace rather than a blank tile or an endless spinner.
                 imageRequestID = requestID
             }
         }
