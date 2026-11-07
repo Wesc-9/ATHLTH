@@ -326,7 +326,15 @@ struct RouteLibraryListView: View {
                     Spacer(minLength: 0)
                 }
 
-                ATHLTHRouteBrowseModePicker(selection: viewModeBinding)
+                HStack(spacing: 10) {
+                    ATHLTHRouteBrowseModePicker(selection: viewModeBinding)
+                    Spacer(minLength: 0)
+                    Label(tr("Estimated times", "Estimerte tider"),
+                          systemImage: "info.circle")
+                        .font(.caption2)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        .lineLimit(1)
+                }
 
                 if loading && catalog.isEmpty {
                     ProgressView(tr("Loading routes…", "Henter ruter …"))
@@ -443,12 +451,12 @@ struct RouteLibraryListView: View {
     private var databaseHeader: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("ATHLTH  /  " + tr("ROUTES", "RUTER"))
+                Text("ATHLTH · " + tr("EXPLORE ROUTES", "UTFORSK RUTER"))
                     .font(.system(size: 10, weight: .bold))
-                    .tracking(2)
+                    .tracking(1.5)
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(tr("Find new routes", "Finn nye ruter"))
-                    .font(.system(size: 27, weight: .semibold, design: .serif))
+                Text(tr("Discover routes", "Utforsk ruter"))
+                    .font(.system(size: 25, weight: .medium, design: .serif))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                 Text(tr("Public routes from ATHLTH members",
                         "Offentlige ruter fra ATHLTH-fellesskapet"))
@@ -481,10 +489,10 @@ struct RouteLibraryListView: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(.white)
-                    .frame(width: 48, height: 48)
-                    .background(ATHLTHTheme.accentDeep,
-                                in: RoundedRectangle(cornerRadius: 16))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(width: 44, height: 44)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                    .overlay { Circle().strokeBorder(ATHLTHPlanDesign.outline) }
             }
             .accessibilityLabel(tr("Create route", "Opprett rute"))
         }
@@ -600,7 +608,12 @@ struct RouteLibraryListView: View {
             }
         }
         .padding(16)
-        .athlthPlanCard()
+        .padding(13)
+        .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 19))
+        .overlay {
+            RoundedRectangle(cornerRadius: 19)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.7), lineWidth: 0.8)
+        }
     }
 
     private func catalogFilterChip(_ title: String, icon: String) -> some View {
@@ -769,7 +782,7 @@ struct RouteLibraryListView: View {
     }
 
     private func databasePremiumCard(_ entry: RouteLibraryEntry) -> some View {
-        VStack(alignment: .leading, spacing: 13) {
+        VStack(alignment: .leading, spacing: 11) {
             Group {
                 if let route = hydratedRoutes[entry.id] {
                     Button {
@@ -777,7 +790,7 @@ struct RouteLibraryListView: View {
                         showingMapRoute = route
                     } label: {
                         ZStack(alignment: .bottomTrailing) {
-                            RouteMapSnapshotThumbnail(route: route, height: 174)
+                            RouteMapSnapshotThumbnail(route: route, height: 150)
                                 .frame(maxWidth: .infinity)
                                 .clipShape(RoundedRectangle(cornerRadius: 17))
                             Label(tr("Explore", "Utforsk"),
@@ -806,7 +819,7 @@ struct RouteLibraryListView: View {
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
                     }
-                    .frame(height: 174)
+                    .frame(height: 150)
                 }
             }
             .task(id: entry.id) { await loadRouteDetail(entry.id) }
@@ -889,35 +902,17 @@ struct RouteLibraryListView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.8)
 
-            HStack(spacing: 0) {
-                publicRouteMetric(
-                    value: String(format: "%.1f km", entry.distanceKilometers),
-                    caption: tr("DISTANCE", "DISTANSE"),
-                    icon: "point.topleft.down.to.point.bottomright.curvepath"
+            ATHLTHRouteMetricRibbon(
+                kilometers: entry.distanceKilometers,
+                estimatedWalk: estimatedDuration(
+                    kilometers: entry.distanceKilometers,
+                    paceMinutes: walkPaceMinutes
+                ),
+                estimatedRun: estimatedDuration(
+                    kilometers: entry.distanceKilometers,
+                    paceMinutes: runPaceMinutes
                 )
-                Divider().frame(height: 35)
-                publicRouteMetric(
-                    value: estimatedDuration(kilometers: entry.distanceKilometers,
-                                             paceMinutes: walkPaceMinutes),
-                    caption: tr("EST. WALK", "EST. GANGE"),
-                    icon: "figure.walk"
-                )
-                Divider().frame(height: 35)
-                publicRouteMetric(
-                    value: estimatedDuration(kilometers: entry.distanceKilometers,
-                                             paceMinutes: runPaceMinutes),
-                    caption: tr("EST. RUN", "EST. LØPING"),
-                    icon: "figure.run"
-                )
-            }
-            .padding(.vertical, 12)
-            .background(ATHLTHPlanDesign.warmSurface.opacity(0.7),
-                        in: RoundedRectangle(cornerRadius: 14))
-
-            Text(tr("Time estimates use your recent workouts or a standard pace; elevation and stops may affect actual time.",
-                    "Tidsanslagene bruker dine siste økter eller standardtempo. Stigning og stopp kan endre faktisk tid."))
-                .font(.system(size: 10))
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            )
 
             HStack(spacing: 12) {
                 NavigationLink {
@@ -952,8 +947,12 @@ struct RouteLibraryListView: View {
                 }
             }
         }
-        .padding(14)
-        .athlthPlanCard()
+        .padding(12)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.70), lineWidth: 0.8)
+        }
     }
 
     private func databaseCompactRow(_ entry: RouteLibraryEntry) -> some View {
