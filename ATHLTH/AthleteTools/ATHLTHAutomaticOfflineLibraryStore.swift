@@ -29,6 +29,9 @@ enum ATHLTHOfflineLibraryPreparationPolicy {
     ) -> Bool {
         guard let existing else { return true }
         let encoder = JSONEncoder()
+        // Dictionary keys otherwise may encode in a different order and
+        // repeatedly invalidate a perfectly good offline snapshot.
+        encoder.outputFormatting = [.sortedKeys]
         // Codable equality also detects nested workout target and route
         // changes, not merely the plan title/date.
         guard let planned = try? encoder.encode(plan),
@@ -74,6 +77,7 @@ final class ATHLTHAutomaticOfflineLibraryStore: ObservableObject {
         label: "com.athlth.offline-library.network"
     )
     private var isUnmeteredOnline = false
+    private var isOnline = false
     private var signedInAccountID: UUID?
     private var latestPlans: [TrainingPlan] = []
     private var latestRoutes: [TrainingRoute] = []
@@ -83,13 +87,24 @@ final class ATHLTHAutomaticOfflineLibraryStore: ObservableObject {
 
     init() {
         networkMonitor.pathUpdateHandler = { [weak self] path in
-            let unmetered = path.status == .satisfied &&
+            let connected = path.status == .satisfied
+            let unmetered = connected &&
                 !path.isExpensive && !path.isConstrained
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                let changed = self.isUnmeteredOnline != unmetered
+                let reconnected = connected && !self.isOnline
+                let mediaChanged = self.isUnmeteredOnline != unmetered
+                self.isOnline = connected
                 self.isUnmeteredOnline = unmetered
-                if changed, unmetered { self.schedule() }
+                if mediaChanged && unmetered { self.schedule() }
+                if reconnected {
+                    // Reuse the app's opt-in sync engines. This never
+                    // uploads training data unless user consent exists.
+                    NotificationCenter.default.post(
+                        name: .athlthNetworkConnectivityRestored,
+                        object: nil
+                    )
+                }
             }
         }
         networkMonitor.start(queue: networkQueue)
