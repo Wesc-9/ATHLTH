@@ -265,6 +265,14 @@ final class AudioCoachVoiceRoutingTests: XCTestCase {
             from: JSONEncoder().encode(snapshot)
         )
         XCTAssertEqual(newSnapshot.supportsAudioCoachVoiceLease, true)
+        snapshot.runningStepTargetSlowestPaceSecondsPerKilometer = 420
+        snapshot.coachResolvedMaximumHeartRateBPM = 192
+        let withTargets = try JSONDecoder().decode(
+            WatchWorkoutLiveSnapshot.self,
+            from: JSONEncoder().encode(snapshot)
+        )
+        XCTAssertEqual(withTargets.runningStepTargetSlowestPaceSecondsPerKilometer, 420)
+        XCTAssertEqual(withTargets.coachResolvedMaximumHeartRateBPM, 192)
     }
 
     func testPriorityGateDoesNotOverrideCriticalWithRoutine() {

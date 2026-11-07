@@ -8158,6 +8158,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             currentRunningStep?.targetTreadmillInclinePercent
         snapshot.runningStepTargetPaceSecondsPerKilometer =
             currentRunningStep?.targetPaceMinSecondsPerKilometer
+        snapshot.runningStepTargetSlowestPaceSecondsPerKilometer =
+            currentRunningStep?.targetPaceMaxSecondsPerKilometer ??
+            currentRunningStep?.targetPaceMinSecondsPerKilometer
         snapshot.runningAwaitingMainStart = awaitingMainStart
         snapshot.runningRouteWarmup =
             structuredRunningWorkout?.deferRouteUntilMain == true &&

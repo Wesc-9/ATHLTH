@@ -619,6 +619,7 @@ final class MirroredWorkoutAudioCoach:
                     resolvedPace(snapshot), sampledAt: snapshot.coachPaceSampleAt
                 ) ? resolvedPace(snapshot) : nil,
             targetSlowestPaceSecondsPerKilometer:
+                snapshot.runningStepTargetSlowestPaceSecondsPerKilometer ??
                 snapshot.runningStepTargetPaceSecondsPerKilometer,
             measuredHeartRateBPM: ATHLTHCoachSensorFreshness.validHeartRate(
                 snapshot.heartRate, sampledAt: snapshot.coachHeartRateSampleAt

@@ -1641,6 +1641,9 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     var runningOverallProgress: Double? = nil
     var runningStepTargetTreadmillInclinePercent: Double? = nil
     var runningStepTargetPaceSecondsPerKilometer: Double? = nil
+    /// Exact lower-effort edge of planned pace (larger seconds/km).
+    /// Older Watch builds omit this optional field.
+    var runningStepTargetSlowestPaceSecondsPerKilometer: Double? = nil
     var runningManualAdvanceRequired: Bool? = nil
     var runningAwaitingMainStart: Bool? = nil
     /// This warm-up needs just one manual tap to start the saved route.
