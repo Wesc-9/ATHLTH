@@ -75,6 +75,16 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
     func testCuratedExercisesRemainSelectableButDuplicateNativeMovementsAreHidden() {
         let library = ExerciseLibraryStore()
         let featured = ExerciseLibraryStore.featuredNativeExerciseSlugs
+        XCTAssertEqual(featured, Set([
+            "athlth-native-tabletop-sit-up",
+            "athlth-native-free-strength-training"
+        ]))
+        XCTAssertEqual(ExerciseLibraryStore.retiredNativeDuplicateSlugs, Set([
+            "athlth-native-weighted-russian-twist",
+            "athlth-native-six-inch-hold",
+            "athlth-native-incline-dumbbell-bench-press",
+            "athlth-native-hollow-body-hold"
+        ]))
         XCTAssertTrue(featured.allSatisfy { slug in
             library.selectableExercises.contains {
                 $0.source == .athlthCatalog && $0.sourceIdentifier == slug
@@ -105,6 +115,11 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
             Set(library.selectableExercises
                 .filter { $0.source == .repDB }.map(\.id))
         )
+        XCTAssertFalse(library.repDBExercises.isEmpty)
+        // Retired policy is strictly scoped to ATHLTH-native source records.
+        XCTAssertTrue(library.repDBExercises.allSatisfy {
+            !ExerciseLibraryStore.isRetiredNativeDuplicate($0)
+        })
         XCTAssertFalse(library.selectableExercises.contains {
             ExerciseLibraryStore.isRetiredOriginalCoreSlug($0.sourceIdentifier)
         })
