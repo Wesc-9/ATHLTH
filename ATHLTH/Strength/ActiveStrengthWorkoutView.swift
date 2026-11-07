@@ -6922,22 +6922,6 @@ struct ActiveStrengthWorkoutView: View {
         )
     }
 
-    private var draftWeightBinding:
-        Binding<Double> {
-        Binding(
-            get: {
-                strength
-                    .draftWeightKilograms
-            },
-            set: { value in
-                strength.setDraft(
-                    weightKilograms:
-                        max(value, 0)
-                )
-            }
-        )
-    }
-
     private var draftResistanceBinding:
         Binding<Int> {
         Binding(
