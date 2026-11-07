@@ -123,8 +123,8 @@ struct ATHLTHPetsSettingsView: View {
                 .tint(ATHLTHPetStyle.bronze)
 
                 Text(ATHLTHLocalization.choose(
-                    english: "Pets and workout associations stay private to you unless you explicitly make a pet public. Pet information is not written into Apple Health.",
-                    norwegian: "Kjæledyr og tilknyttede økter er private med mindre du gjør kjæledyret offentlig. Dyreopplysninger skrives ikke til Apple Helse."))
+                    english: "Manage your pets and their activity here. Choose who joins a workout from its optional pet menu. Pet data is not written to Apple Health.",
+                    norwegian: "Administrer kjæledyr og aktivitet her. Velg hvem som blir med fra den valgfrie turkameratmenyen under trening. Kjæledyrdata skrives ikke til Apple Helse."))
                     .font(.caption)
                     .foregroundStyle(ATHLTHPetStyle.muted)
 
@@ -248,20 +248,6 @@ struct ATHLTHPetEditorView: View {
                         Text("kg").foregroundStyle(.secondary)
                     }
                 }
-                Section(ATHLTHLocalization.choose(english: "Visibility", norwegian: "Synlighet")) {
-                    Toggle(ATHLTHLocalization.choose(
-                        english: "Show on my profile", norwegian: "Vis på min profil"),
-                        isOn: $draft.showOnProfile)
-                    Toggle(ATHLTHLocalization.choose(
-                        english: "Visible to other ATHLTH users", norwegian: "Synlig for andre ATHLTH-brukere"),
-                        isOn: $draft.isPublic)
-                        .disabled(!draft.showOnProfile)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Your pet stays private by default. Public sharing only applies when both switches are enabled.",
-                        norwegian: "Kjæledyret er privat som standard. Andre kan bare se det når begge valgene er på."))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
                 if editing != nil {
                     Section {
                         Button(ATHLTHLocalization.choose(
@@ -335,94 +321,12 @@ struct ATHLTHPetEditorView: View {
         } else {
             draft.weightKG = nil
         }
+        // Keep legacy storage fields for old records, but new edits do not
+        // publish pets on the user's public or personal profile.
+        draft.showOnProfile = false
+        draft.isPublic = false
         if await pets.save(draft: draft, editing: editing, jpegData: jpegData, removePhoto: removePhoto) {
             dismiss()
-        }
-    }
-}
-
-/// Compact but personal preview: tap a companion for detailed activity.
-/// Kept deliberately compact: no photo/statistics grid on the profile.
-/// A single row opens the existing pet library and detailed statistics.
-struct ATHLTHPetProfileSection: View {
-    @EnvironmentObject private var pets: ATHLTHPetStore
-
-    var body: some View {
-        if !pets.visiblePets.isEmpty {
-            NavigationLink {
-                ATHLTHPetsSettingsView()
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: "pawprint.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHPetStyle.bronze)
-                        .frame(width: 28, height: 28)
-                        .background(ATHLTHTheme.premiumGoldSoft.opacity(0.65),
-                                    in: Circle())
-                    HStack(spacing: -8) {
-                        ForEach(Array(pets.visiblePets.prefix(3))) { pet in
-                            ATHLTHPetAvatar(pet: pet, size: 30)
-                        }
-                    }
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Companions", norwegian: "Turkamerater"
-                        ))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHPetStyle.ink)
-                        if pets.visiblePets.count == 1,
-                           let pet = pets.visiblePets.first {
-                            let stats = pets.stats(for: pet)
-                            Text(
-                                pet.name + " · " + "\(stats.outings) " +
-                                ATHLTHLocalization.choose(
-                                    english: "outings", norwegian: "turer"
-                                ) + " · " +
-                                String(format: "%.1f km", stats.meters / 1000)
-                            )
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPetStyle.muted)
-                            .lineLimit(1)
-                        } else {
-                            let outings = pets.visiblePets.reduce(0) {
-                                $0 + pets.stats(for: $1).outings
-                            }
-                            Text(
-                                "\(pets.visiblePets.count) " +
-                                ATHLTHLocalization.choose(
-                                    english: "pets", norwegian: "kjæledyr"
-                                ) + " · " + "\(outings) " +
-                                ATHLTHLocalization.choose(
-                                    english: "outings in total", norwegian: "turer totalt"
-                                )
-                            )
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPetStyle.muted)
-                            .lineLimit(1)
-                        }
-                    }
-                    Spacer(minLength: 3)
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHPetStyle.bronze)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.white.opacity(0.91),
-                            in: RoundedRectangle(cornerRadius: 17))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 17)
-                        .strokeBorder(ATHLTHPetStyle.gold.opacity(0.12),
-                                      lineWidth: 0.8)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(ATHLTHLocalization.choose(
-                english: "Open pet profiles and activity statistics",
-                norwegian: "Åpne kjæledyrprofiler og aktivitetsstatistikk"
-            ))
         }
     }
 }
@@ -737,133 +641,6 @@ struct ATHLTHLivePetSelectionCard: View {
                 english: "Update companions without interrupting the workout",
                 norwegian: "Endre turkamerater uten å avbryte økten"
             ))
-        }
-    }
-}
-
-struct ATHLTHWorkoutPetHistoryCard: View {
-    @EnvironmentObject private var pets: ATHLTHPetStore
-    let workout: SocialPublishableWorkout
-
-    var body: some View {
-        let linked = pets.pets.filter { pets.petIDs(for: workout.id).contains($0.id) }
-        if !linked.isEmpty {
-            ATHLTHUnifiedCard {
-                VStack(alignment: .leading, spacing: 10) {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Companions", norwegian: "Turkamerater"),
-                        systemImage: "pawprint.fill")
-                        .font(.headline)
-                    ForEach(linked) { pet in
-                        NavigationLink {
-                            ATHLTHPetDetailView(petID: pet.id)
-                        } label: {
-                            HStack(spacing: 10) {
-                                ATHLTHPetAvatar(pet: pet, size: 40)
-                                Text(pet.name)
-                                    .font(.subheadline.weight(.medium))
-                                Spacer()
-                                if let record = pets.usage.first(where: {
-                                    $0.petID == pet.id && $0.workoutID == workout.id
-                                }) {
-                                    Text(String(format: "%.2f km", (record.distanceMeters ?? 0) / 1000))
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                            }
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
-    }
-}
-
- 
-/// Only opt-in public companions appear on other people's ATHLTH profiles.
-/// Workout history and private animal details are never fetched here.
-struct ATHLTHPublicPetProfileSection: View {
-    let userID: UUID
-    @State private var publicPets: [ATHLTHPet] = []
-    @State private var photoURLs: [UUID: URL] = [:]
-
-    var body: some View {
-        Group {
-            if !publicPets.isEmpty {
-            ATHLTHCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Companions", norwegian: "Turkamerater"),
-                        systemImage: "pawprint.fill")
-                        .font(.headline)
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-                    ForEach(publicPets) { pet in
-                        HStack(spacing: 11) {
-                            ZStack {
-                                RoundedRectangle(cornerRadius: 13)
-                                    .fill(ATHLTHTheme.accentSoft)
-                                if let url = photoURLs[pet.id] {
-                                    AsyncImage(url: url) { phase in
-                                        if let image = phase.image {
-                                            image.resizable().scaledToFill()
-                                        } else {
-                                            Image(systemName: "pawprint.fill")
-                                                .foregroundStyle(ATHLTHTheme.premiumGold)
-                                        }
-                                    }
-                                } else {
-                                    Image(systemName: "pawprint.fill")
-                                        .foregroundStyle(ATHLTHTheme.premiumGold)
-                                }
-                            }
-                            .frame(width: 48, height: 48)
-                            .clipShape(RoundedRectangle(cornerRadius: 13))
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(pet.name)
-                                    .font(.subheadline.weight(.semibold))
-                                Text([pet.breed, pet.speciesName]
-                                    .compactMap { $0 }.joined(separator: " · "))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                        }
-                        if pet.id != publicPets.last?.id { Divider() }
-                    }
-                }
-            }
-            }
-        }
-        .task(id: userID) { await load() }
-    }
-
-    private func load() async {
-        do {
-            let rows: [ATHLTHPet] = try await SupabaseEnvironment.client
-                .from("profile_pets")
-                .select().eq("user_id", value: userID)
-                .eq("is_public", value: true)
-                .eq("show_on_profile", value: true)
-                .execute().value
-            publicPets = rows
-            var URLs: [UUID: URL] = [:]
-            for pet in rows {
-                guard let path = pet.photoPath,
-                      let URL = try? await SupabaseEnvironment.client.storage
-                        .from("pet-photos")
-                        .createSignedURL(path: path, expiresIn: 3600)
-                else { continue }
-                URLs[pet.id] = URL
-            }
-            photoURLs = URLs
-        } catch {
-            // Pet sharing is optional and must never block another profile.
-            publicPets = []
-            photoURLs = [:]
         }
     }
 }
