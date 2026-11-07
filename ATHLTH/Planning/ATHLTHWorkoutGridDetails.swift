@@ -9,7 +9,7 @@ struct ATHLTHWorkoutGridDetails: View {
     var body: some View {
         let summary = ATHLTHWorkoutLibraryExerciseIndex.preview(for: workout)
         VStack(alignment: .leading, spacing: 4) {
-            ForEach(Array(summary.titles.enumerated()), id: \.offset) { _, title in
+            ForEach(summary.titles, id: \.self) { title in
                 Text(title)
                     .font(.caption2)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
