@@ -84,7 +84,9 @@ private final class QuickStartRouteLocationProbe:
 }
 
 struct AudioCoachDraft {
-    var enabled = false
+    // New workouts start with the simple coach enabled unless the athlete's
+    // saved default explicitly opts out.
+    var enabled = true
     var distanceTriggerEnabled = true
     var timeTriggerEnabled = false
     var distanceIntervalKilometers = 1.0
@@ -118,6 +120,41 @@ struct AudioCoachDraft {
         TimeInterval = 10
 
     var language: WatchAudioCoachLanguage = .system
+
+    init() {
+        smartPrompts.motivationEnabled = true
+        smartPrompts.motivationIntervalSeconds = 180
+    }
+
+    /// Explicitly resets content, but retains language, chosen voice and
+    /// music volume/ducking; never silently discards a saved global profile.
+    mutating func applySimpleAudioCoach() {
+        enabled = true
+        distanceTriggerEnabled = true
+        timeTriggerEnabled = false
+        distanceIntervalKilometers = 1.0
+        customRules = []
+        announceDistance = true
+        announceElapsedTime = true
+        announceAveragePace = true
+        announceClockTime = false
+        announceHeartRate = false
+        announceRemainingRouteDistance = false
+        announceEstimatedRemainingRouteTime = false
+        announceCurrentWorkoutStep = false
+        announceRemainingStepTime = false
+        announceRemainingStepDistance = false
+        announceWorkoutStart = true
+        announcePauseResume = true
+        announceWorkoutComplete = true
+        smartPrompts.motivationEnabled = true
+        smartPrompts.motivationIntervalSeconds = 180
+        smartPrompts.randomEncouragementEnabled = false
+        smartPrompts.contextualFeedbackEnabled = false
+        smartPrompts.announceCurrentHeartRateZone = false
+        smartPrompts.customEncouragements = []
+        smartPrompts.landmarks = []
+    }
 
     /// Preserve voice, language, music routing and per-workout session data.
     var experiencePreset: ATHLTHCoachExperiencePreset? {
@@ -153,9 +190,9 @@ struct AudioCoachDraft {
 
     @MainActor
     mutating func load(from settings: AppSettingsStore) {
-        // Each fresh Quick Train session is opt-in. Keep all saved voice and
-        // guidance preferences, but never inherit a previous 'on' toggle.
-        enabled = false
+        // The user can turn off the coach in global Settings. Fresh Quick
+        // sessions inherit that explicit choice, defaulting to on otherwise.
+        enabled = settings.audioCoachEnabledByDefault
         distanceTriggerEnabled =
             settings.audioCoachDistanceTriggerEnabled
         timeTriggerEnabled =

@@ -57,53 +57,14 @@ struct ATHLTHAudioCoachSessionStudio: View {
         )
     }
 
+    // The long stacked editor is replaced by a single active-list
+    // workspace; the existing model and Watch configuration stay unchanged.
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            ATHLTHPlanSurface(ghost: false) {
-                HStack(spacing: 12) {
-                    Image(systemName: "waveform.and.mic")
-                        .font(.title2)
-                        .foregroundStyle(accent)
-                        .frame(width: 48, height: 48)
-                        .background(ATHLTHPlanDesign.selectedSurface,
-                                    in: RoundedRectangle(cornerRadius: 15))
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text("Audio Coach")
-                            .font(.headline)
-                            .foregroundStyle(ATHLTHPlanDesign.ink)
-                        Text(tr("Voice guidance for this workout only",
-                                "Stemmeveiledning kun for denne økten"))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                    Spacer(minLength: 5)
-                    Toggle("Audio Coach", isOn: $draft.enabled)
-                        .labelsHidden()
-                        .tint(accent)
-                        .accessibilityLabel("Audio Coach")
-                }
-            }
-
-            if draft.enabled {
-                presetCard
-                motivationCard
-                pulseCard
-                announcementsCard
-                voiceCard
-                if showRouteOptions || showStructuredOptions {
-                    workoutContextCard
-                }
-                profilesCard
-                Text(tr(
-                    "Changes affect this workout only. Save a named profile to reuse them.",
-                    "Endringene gjelder bare denne økten. Lagre en profil for å bruke dem igjen."
-                ))
-                .font(.caption)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .padding(.horizontal, 4)
-            }
-        }
-        .tint(accent)
+        ATHLTHAudioCoachActiveListView(
+            draft: $draft,
+            showRouteOptions: showRouteOptions,
+            showStructuredOptions: showStructuredOptions
+        )
     }
 
     private var presetCard: some View {

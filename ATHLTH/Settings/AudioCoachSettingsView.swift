@@ -200,40 +200,9 @@ struct ATHLTHAudioCoachSettingsView: View {
 
 
     var body: some View {
-        ZStack {
-            premiumBackground
-            ScrollView {
-                VStack(spacing: 0) {
-                    // ATHLTH+ applies to premium voices and workout features,
-                    // not to discovering local voices or editing preferences.
-                    studioEntrySection
-                    motivationAndZoneQuickSection
-                    experienceSection
-                    speakingToneQuickSection
-                    voiceSection
-                    advancedOptionsToggle
-                    if showAdvancedSettings {
-                        customCoachRulesSection
-                        triggerSection
-                        updateSection
-                        eventSection
-                        routeAndStructureSection
-                        fuelHydrationSection
-                        musicSection
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                // Keep the final controls clear of ATHLTH's floating tab bar.
-                .padding(.bottom, 110)
-            }
-            .scrollIndicators(.hidden)
-        }
-        .navigationTitle("Audio Coach")
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingCustomTimeInterval) {
-            customTimeIntervalSheet
-        }
+        ATHLTHAudioCoachGlobalEditorView()
+            .navigationTitle("Audio Coach")
+            .navigationBarTitleDisplayMode(.inline)
     }
 
     /// Keep both the new second-accurate value and the older minute setting

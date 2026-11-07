@@ -896,7 +896,7 @@ final class AppSettingsStore: ObservableObject {
         audioCoachEnabledByDefault =
             defaults.object(
                 forKey: "settings.audioCoach.enabledByDefault"
-            ) as? Bool ?? false
+            ) as? Bool ?? true
         audioCoachLanguage =
             WatchAudioCoachLanguage(
                 rawValue: defaults.string(
@@ -938,7 +938,13 @@ final class AppSettingsStore: ObservableObject {
             forKey: "settings.audioCoach.smartPrompts.v1"
         ).flatMap { try? JSONDecoder().decode(
             ATHLTHAudioCoachSmartSettings.self, from: $0
-        ) } ?? ATHLTHAudioCoachSmartSettings()
+        ) } ?? {
+            var initial = ATHLTHAudioCoachSmartSettings()
+            initial.motivationEnabled = true
+            initial.motivationIntervalSeconds = 180
+            initial.contextualFeedbackEnabled = false
+            return initial
+        }()
         audioCoachProfiles = defaults.data(
             forKey: "settings.audioCoach.profiles.v1"
         ).flatMap { try? JSONDecoder().decode(
@@ -1632,6 +1638,39 @@ final class AppSettingsStore: ObservableObject {
         )
 
         return applyingFuelVoice(to: configuration)
+    }
+
+    /// Persist the same draft model used by Quick Train and planned workouts.
+    /// This updates global defaults only when the athlete edits Settings.
+    func updateAudioCoachDefaults(from draft: AudioCoachDraft) {
+        audioCoachEnabledByDefault = draft.enabled
+        audioCoachDistanceTriggerEnabled = draft.distanceTriggerEnabled
+        audioCoachTimeTriggerEnabled = draft.timeTriggerEnabled
+        audioCoachDistanceIntervalKilometers = draft.distanceIntervalKilometers
+        audioCoachTimeIntervalMinutes = draft.timeIntervalMinutes
+        audioCoachTimeIntervalSeconds = draft.timeIntervalMinutes * 60
+        audioCoachCustomRules = Array(draft.customRules.prefix(20))
+        audioCoachSmartSettings = draft.smartPrompts
+        audioCoachAnnounceDistance = draft.announceDistance
+        audioCoachAnnounceElapsedTime = draft.announceElapsedTime
+        audioCoachAnnounceAveragePace = draft.announceAveragePace
+        audioCoachAnnounceClockTime = draft.announceClockTime
+        audioCoachAnnounceHeartRate = draft.announceHeartRate
+        audioCoachAnnounceRemainingRouteDistance = draft.announceRemainingRouteDistance
+        audioCoachAnnounceEstimatedRemainingRouteTime = draft.announceEstimatedRemainingRouteTime
+        audioCoachAnnounceCurrentWorkoutStep = draft.announceCurrentWorkoutStep
+        audioCoachAnnounceRemainingStepTime = draft.announceRemainingStepTime
+        audioCoachAnnounceRemainingStepDistance = draft.announceRemainingStepDistance
+        audioCoachAnnounceWorkoutStart = draft.announceWorkoutStart
+        audioCoachAnnouncePauseResume = draft.announcePauseResume
+        audioCoachAnnounceWorkoutComplete = draft.announceWorkoutComplete
+        audioCoachLanguage = draft.language
+        audioCoachVoiceIdentifier = draft.voiceIdentifier
+        audioCoachSpeechRate = draft.speechRate
+        audioCoachSpeechVolume = draft.speechVolume
+        audioCoachSpeechStyle = draft.speechStyle
+        audioCoachDuckOtherAudio = draft.duckOtherAudio
+        guidanceQuietPeriodSeconds = Int(draft.guidanceQuietPeriodSeconds)
     }
 
     /// A profile captures a reusable full set of coach preferences. It does not
