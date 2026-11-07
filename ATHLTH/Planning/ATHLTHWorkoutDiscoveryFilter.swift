@@ -37,10 +37,14 @@ struct ATHLTHWorkoutDiscoveryFilter {
     var muscleGroups: Set<String> = []
     var runningType: RunningWorkoutType?
     var duration: Duration = .any
+    var exerciseName: String? = nil
 
     func matches(_ entry: WorkoutTemplateCatalogEntry) -> Bool {
         guard duration.matches(minutes: entry.estimatedDurationMinutes.map(Double.init))
         else { return false }
+        if let exerciseName, !ATHLTHWorkoutLibraryExerciseIndex.containsExercise(
+            exerciseName, in: entry.blocks
+        ) { return false }
         if !muscleGroups.isEmpty &&
             !Self.matchesMuscles(
                 tags: entry.tags, blocks: entry.blocks, chosen: muscleGroups
@@ -63,6 +67,9 @@ struct ATHLTHWorkoutDiscoveryFilter {
             minutes: workout.durationMinutes.map(Double.init) ??
                 catalogEntry?.estimatedDurationMinutes.map(Double.init)
         ) else { return false }
+        if let exerciseName, !ATHLTHWorkoutLibraryExerciseIndex.containsExercise(
+            exerciseName, in: workout
+        ) { return false }
         // A personal copy may carry only the source workout ID and recipe,
         // without the publisher's muscle tags. Resolve its original metadata
         // from the *same* catalog rather than guessing from a workout title.
@@ -88,6 +95,9 @@ struct ATHLTHWorkoutDiscoveryFilter {
 
     func matches(_ workout: RunningWorkoutTemplate) -> Bool {
         guard runningType == nil || workout.type == runningType else { return false }
+        if let exerciseName, !ATHLTHWorkoutLibraryExerciseIndex.containsExercise(
+            exerciseName, in: workout.plannedSession()
+        ) { return false }
         // Estimating a running workout expands interval repeats. Do not do
         // that calculation at all when the user has no duration filter.
         return duration == .any || duration.matches(
