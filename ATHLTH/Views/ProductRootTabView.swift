@@ -1095,7 +1095,7 @@ struct ATHLTHHomeView: View {
                             .overlay(alignment: .topTrailing) {
                                 if sideMenuUnreadCount > 0 {
                                     Circle()
-                                        .fill(ATHLTHTheme.premiumGold)
+                                        .fill(Color.red)
                                         .frame(width: 9, height: 9)
                                         .overlay {
                                             Circle()
