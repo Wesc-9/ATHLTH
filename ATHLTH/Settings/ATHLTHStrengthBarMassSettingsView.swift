@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// The bar itself is included in the TOTAL weight entered for each working set.
-/// The default is account-local; exercise-specific overrides live separately.
+/// The athlete enters plate weight (both sides combined) on a barbell live card.
+/// ATHLTH saves total kilograms including the bar; preferences stay account-local.
 struct ATHLTHStrengthBarMassSettingsView: View {
     @EnvironmentObject private var session: AppSessionStore
 
@@ -89,8 +89,8 @@ struct ATHLTHStrengthBarMassSettingsView: View {
 
                 Label(
                     tr(
-                        "Enter TOTAL kilograms during a set, including the bar. ATHLTH will not add this mass on top of your result.",
-                        "Registrer TOTAL antall kilo under settet, inkludert stangen. ATHLTH legger ikke stangvekten til én gang til."
+                        "Enter the weight of the plates on both sides combined during a set. ATHLTH adds the selected bar once and records the total load.",
+                        "Under settet legger du inn vekten av skivene på begge sider til sammen. ATHLTH legger til valgt stangvekt én gang og lagrer totalbelastningen."
                     ),
                     systemImage: "info.circle"
                 )
