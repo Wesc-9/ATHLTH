@@ -447,57 +447,108 @@ struct ATHLTHStudioEditorialDashboardView: View {
             .scrollIndicators(.hidden)
 
             if let activeDay {
-                HStack(spacing: 12) {
-                    if let item = activeDay.planned.first,
-                       !item.workout.isExplicitRestDay {
-                        Image(systemName: item.workout.kind.systemImage)
-                            .foregroundStyle(bronze)
-                            .frame(width: 28)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(item.workout.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ink)
-                                .lineLimit(1)
-                            Text(item.date.formatted(.dateTime.weekday(.wide).day().month(.abbreviated)))
-                                .font(.caption)
+                // A selected day may contain several recorded workouts, several
+                // planned sessions, or both. Never infer that a particular
+                // planned session was completed merely because Health has a
+                // recording on the same day.
+                VStack(alignment: .leading, spacing: 9) {
+                    ForEach(activeDay.recorded) { workout in
+                        Button {
+                            onInspect(workout)
+                        } label: {
+                            HStack(spacing: 11) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(bronze)
+                                    .frame(width: 26)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(workout.activity.rawValue.capitalized)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ink)
+                                    Text(tr("Recorded workout", "Registrert økt") +
+                                         " · " +
+                                         workout.startDate.formatted(date: .omitted, time: .shortened))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer(minLength: 4)
+                                Text("\(Int(workout.duration / 60)) min")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(ink)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(minHeight: 45)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityHint(tr("Open recorded workout details",
+                                              "Åpne detaljer for registrert økt"))
+                    }
+
+                    ForEach(activeDay.planned.filter { !$0.workout.isExplicitRestDay }) { item in
+                        HStack(spacing: 11) {
+                            Image(systemName: completed(item)
+                                  ? "checkmark.circle.fill" : item.workout.kind.systemImage)
+                                .foregroundStyle(bronze)
+                                .frame(width: 26)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(item.workout.title)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                Text(completed(item)
+                                     ? tr("Completed plan workout", "Fullført planlagt økt")
+                                     : tr("Planned workout", "Planlagt økt"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer(minLength: 4)
+                            Button {
+                                openOrStart(item)
+                            } label: {
+                                Label(
+                                    canStart(item) ? tr("Start", "Start")
+                                        : tr("Open workout", "Åpne økt"),
+                                    systemImage: canStart(item)
+                                        ? "play.fill" : "arrow.up.right"
+                                )
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(ink)
+                            .contextMenu { workoutActions(item) }
+                        }
+                        .frame(minHeight: 45)
+                    }
+
+                    if activeDay.recorded.isEmpty &&
+                        activeDay.planned.allSatisfy({ $0.workout.isExplicitRestDay }) {
+                        HStack(spacing: 11) {
+                            Image(systemName: activeDay.planned.isEmpty
+                                  ? "calendar.badge.plus" : "moon.zzz")
+                                .foregroundStyle(bronze)
+                            Text(activeDay.planned.isEmpty
+                                 ? tr("No workouts recorded or planned", "Ingen registrerte eller planlagte økter")
+                                 : tr("Rest day", "Hviledag"))
+                                .font(.subheadline)
                                 .foregroundStyle(.secondary)
+                            Spacer(minLength: 4)
+                            if activeDay.planned.isEmpty {
+                                Button {
+                                    focusedPlanningDate = activeDay.date
+                                } label: {
+                                    Label(tr("Plan a workout", "Planlegg økt"),
+                                          systemImage: "plus")
+                                }
+                                .buttonStyle(.bordered)
+                                .disabled(!HomeWeeklyProgressCalendar.canScheduleStandalone(
+                                    on: activeDay.date
+                                ))
+                            }
                         }
-                        Spacer(minLength: 4)
-                        Button {
-                            openOrStart(item)
-                        } label: {
-                            Label(
-                                canStart(item) ? tr("Start", "Start")
-                                    : tr("Open workout", "Åpne økt"),
-                                systemImage: canStart(item) ? "play.fill" : "arrow.up.right"
-                            )
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(ink)
-                        .contextMenu { workoutActions(item) }
-                    } else {
-                        Image(systemName: "calendar.badge.plus")
-                            .foregroundStyle(bronze)
-                        Text(activeDay.planned.first?.workout.isExplicitRestDay == true
-                             ? tr("Rest day", "Hviledag")
-                             : tr("No workout planned", "Ingen planlagt økt"))
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Spacer(minLength: 4)
-                        Button {
-                            focusedPlanningDate = activeDay.date
-                        } label: {
-                            Label(tr("Plan a workout", "Planlegg økt"),
-                                  systemImage: "plus")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(!HomeWeeklyProgressCalendar.canScheduleStandalone(
-                            on: activeDay.date
-                        ))
+                        .frame(minHeight: 45)
                     }
                 }
-                .frame(minHeight: 47)
-                .padding(.top, 10)
+                .padding(.top, 11)
                 .overlay(alignment: .top) { Divider() }
             }
         }
@@ -510,8 +561,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
     private func dayTile(_ day: ATHLTHStudioHomeWeek.Day,
                          selected: Bool) -> some View {
         let planned = day.planned.first
+        let firstRecorded = day.recorded.first
         let isToday = Calendar.current.isDateInToday(day.date)
         let isRest = planned?.workout.isExplicitRestDay == true
+        let isPlanCompleted = planned.map(completed) == true
 
         return Button {
             selectedDate = day.date
@@ -530,15 +583,16 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .font(.title3.weight(.semibold))
                     .monospacedDigit()
                 Spacer(minLength: 0)
-                Image(systemName: planned == nil ? (!day.recorded.isEmpty
-                    ? "checkmark.circle.fill" : "minus") :
-                    isRest ? "moon.zzz" : planned!.workout.kind.systemImage)
+                Image(systemName: isPlanCompleted ||
+                      (planned == nil && firstRecorded != nil)
+                    ? "checkmark.circle.fill"
+                    : planned == nil ? "minus"
+                    : isRest ? "moon.zzz" : planned!.workout.kind.systemImage)
                     .font(.system(size: 21))
                     .frame(height: 26)
                 Text(planned == nil
-                     ? (!day.recorded.isEmpty
-                        ? tr("Recorded", "Registrert")
-                        : tr("No workout", "Ingen økt"))
+                     ? (firstRecorded?.activity.rawValue.capitalized
+                        ?? tr("No workout", "Ingen økt"))
                      : isRest ? tr("Rest", "Hvile") : planned!.workout.title)
                     .font(.caption.weight(.medium))
                     .lineLimit(2)
@@ -548,6 +602,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
                    !isRest,
                    let minutes = item.workout.durationMinutes {
                     Text("\(minutes) min")
+                        .font(.caption)
+                        .opacity(0.8)
+                } else if let recorded = firstRecorded {
+                    Text("\(Int(recorded.duration / 60)) min")
                         .font(.caption)
                         .opacity(0.8)
                 } else {
@@ -566,8 +624,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(
             day.date.formatted(date: .complete, time: .omitted) + ", " +
-            (planned?.workout.title ??
-                tr("No planned workout", "Ingen planlagt økt"))
+            (planned?.workout.title ?? firstRecorded?.activity.rawValue ??
+                tr("No planned or recorded workout", "Ingen planlagt eller registrert økt"))
         )
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
