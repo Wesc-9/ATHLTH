@@ -771,9 +771,7 @@ final class ExerciseLibraryStore: ObservableObject {
     /// Unlike legacy original-core entries, they must appear in normal
     /// search, AI candidate lists, and all library selection surfaces.
     static let featuredNativeExerciseSlugs: Set<String> = [
-        "athlth-native-incline-dumbbell-bench-press",
         "athlth-native-tabletop-sit-up",
-        "athlth-native-hollow-body-hold",
         "athlth-native-free-strength-training"
     ]
 
@@ -783,7 +781,9 @@ final class ExerciseLibraryStore: ObservableObject {
     /// RepDB originals are not modified or filtered by this policy.
     static let retiredNativeDuplicateSlugs: Set<String> = [
         "athlth-native-weighted-russian-twist",
-        "athlth-native-six-inch-hold"
+        "athlth-native-six-inch-hold",
+        "athlth-native-incline-dumbbell-bench-press",
+        "athlth-native-hollow-body-hold"
     ]
 
     static func isRetiredNativeDuplicate(_ entry: ExerciseLibraryEntry) -> Bool {
