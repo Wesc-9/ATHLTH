@@ -737,8 +737,10 @@ final class MirroredWorkoutAudioCoach:
             priority: .routineCoach,
             event: ATHLTHCoachEvent(
                 kind: .routineMilestone,
-                key: (due ? milestoneKeys.joined(separator: "-") : "custom") +
-                    ":\(Int(snapshot.elapsedTime)):\(Int(snapshot.distanceMeters))",
+                key: ATHLTHAudioCoachRuleDelivery.stableDeliveryKey(
+                    standardMilestones: due ? milestoneKeys : [],
+                    customAnnouncements: customDue
+                ),
                 priority: .routineCoach,
                 createdAt: snapshot.capturedAt,
                 validFor: 10

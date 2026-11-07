@@ -4788,8 +4788,10 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 priority: .routineCoach,
                 event: ATHLTHCoachEvent(
                     kind: .routineMilestone,
-                    key: (maySpeakRoutine ? milestoneKeys.joined(separator: "-") : "custom") +
-                        ":\(Int(elapsedTime)):\(Int(distanceMeters))",
+                    key: ATHLTHAudioCoachRuleDelivery.stableDeliveryKey(
+                        standardMilestones: maySpeakRoutine ? milestoneKeys : [],
+                        customAnnouncements: customDue
+                    ),
                     priority: .routineCoach,
                     validFor: 10
                 )

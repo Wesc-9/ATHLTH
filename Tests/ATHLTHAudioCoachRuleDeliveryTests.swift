@@ -282,4 +282,36 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertTrue(spoken.contains("Pulssone"))
         XCTAssertTrue(spoken.contains("Distanse"))
     }
+
+    func testDeliveryKeysAreStableAcrossSnapshotTimingAndOrder() {
+        let custom = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .heartRate, interval: 1_000
+        )
+        var watchSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: [custom], distanceMeters: 0, elapsedSeconds: 0
+        )
+        var phoneSlots = watchSlots
+        let watch = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: [custom], distanceMeters: 1_001, elapsedSeconds: 355,
+            paceSecondsPerKilometer: 350, heartRateBPM: 150,
+            norwegian: true, lastSlots: &watchSlots
+        )
+        let phone = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: [custom], distanceMeters: 1_010, elapsedSeconds: 357,
+            paceSecondsPerKilometer: 355, heartRateBPM: 149,
+            norwegian: true, lastSlots: &phoneSlots
+        )
+        let watchKey = ATHLTHAudioCoachRuleDelivery.stableDeliveryKey(
+            standardMilestones: ["d1000", "t300"], customAnnouncements: watch
+        )
+        let phoneKey = ATHLTHAudioCoachRuleDelivery.stableDeliveryKey(
+            standardMilestones: ["t300", "d1000"], customAnnouncements: phone
+        )
+        XCTAssertEqual(watchKey, phoneKey)
+        XCTAssertTrue(watchKey.count < 110)
+        let later = ATHLTHAudioCoachRuleDelivery.stableDeliveryKey(
+            standardMilestones: ["d2000", "t300"], customAnnouncements: watch
+        )
+        XCTAssertNotEqual(watchKey, later)
+    }
 }

@@ -138,6 +138,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
 struct ATHLTHAudioCoachDueAnnouncement {
     let text: String
     let metrics: Set<ATHLTHAudioCoachRule.Metric>
+    /// Deterministic milestone identity, stable across Watch and phone.
+    let milestoneKey: String
 }
 
 /// Evaluates each user's distance/time rule independently. The slot journal
@@ -231,11 +233,33 @@ enum ATHLTHAudioCoachRuleDelivery {
                   ) else { continue }
             let covered = Set(effective)
             messages.append(ATHLTHAudioCoachDueAnnouncement(
-                text: message, metrics: covered
+                text: message,
+                metrics: covered,
+                milestoneKey: rule.id.uuidString + ":" + String(current)
             ))
             spokenMetrics.formUnion(covered)
         }
         return messages
+    }
+
+    /// Event receipts must identify the scheduled milestone, not the
+    /// exact live distance/time when speech starts. Watch/iPhone snapshots
+    /// arrive at different moments and otherwise produce different keys.
+    /// A small deterministic digest also stays beneath receipt length limits
+    /// when several custom rules happen together.
+    static func stableDeliveryKey(
+        standardMilestones: [String],
+        customAnnouncements: [ATHLTHAudioCoachDueAnnouncement]
+    ) -> String {
+        let pieces = (
+            standardMilestones.map { "s:" + $0 } +
+            customAnnouncements.map { "c:" + $0.milestoneKey }
+        ).sorted()
+        var digest: UInt64 = 0xcbf29ce484222325
+        for byte in pieces.joined(separator: "|").utf8 {
+            digest = (digest ^ UInt64(byte)) &* 0x100000001b3
+        }
+        return "audio:" + String(digest, radix: 16)
     }
 
     private static func slot(
