@@ -238,7 +238,7 @@ struct ATHLTHAudioCoachSmartState {
                                     "Målet er like foran deg. Du har gjort jobben, finn en god avslutning!",
                                     "Siste etappe! Behold flyten helt til du er fremme.",
                                     "Du er nesten ved mål. Sterk innsats, avslutt kontrollert!",
-                                    "Det er kort igjen. God rytme – la deg selv fullføre sterkt."
+                                    "Det er kort igjen til mål. God rytme – fullfør sterkt."
                                   ]
                                 : [
                                     "You're on the final stretch! Great work — keep your focus.",
