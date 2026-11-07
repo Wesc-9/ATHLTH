@@ -1363,6 +1363,10 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     /// Repetition sets can start a count-up effort clock from the Watch.
     var setEffortStartedAt: Date? = nil
     var isOpenEndedTimedSet: Bool? = nil
+    /// Optional for compatibility with Watch snapshots made before plate-only
+    /// input support. Nil means keep the legacy total-weight input.
+    /// Draft/load commands always carry TOTAL kilograms, bar included.
+    var barWeightKilograms: Double? = nil
     /// Empty/free sessions carry draft defaults, not an exercise to perform.
     var hasExercisePrescription: Bool { exerciseCount > 0 }
 
