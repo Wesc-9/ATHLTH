@@ -203,6 +203,7 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
     func testStandardAfterAdvancedProfileDiscardsAllHiddenTriggers() {
         var draft = AudioCoachDraft()
         draft.smartPrompts.maximumHeartRateBPM = 185
+        draft.smartPrompts.preferredHeartRateZone = 4
         draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds = 60
         draft.smartPrompts.targetZoneVoiceAlertsEnabled = true
         draft.smartPrompts.confirmWhenBackInZone = true
@@ -219,6 +220,7 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
         XCTAssertTrue(draft.enabled)
         XCTAssertEqual(draft.distanceIntervalKilometers, 1)
         XCTAssertNil(draft.smartPrompts.maximumHeartRateBPM)
+        XCTAssertNil(draft.smartPrompts.preferredHeartRateZone)
         XCTAssertNil(draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds)
         XCTAssertNil(draft.smartPrompts.targetZoneVoiceAlertsEnabled)
         XCTAssertNil(draft.smartPrompts.confirmWhenBackInZone)

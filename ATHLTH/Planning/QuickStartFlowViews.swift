@@ -161,6 +161,7 @@ struct AudioCoachDraft {
         // Switching from a complex profile back to Standard must truly
         // remove every advanced trigger; do not keep invisible Watch rules.
         smartPrompts.maximumHeartRateBPM = nil
+        smartPrompts.preferredHeartRateZone = nil
         smartPrompts.measuredZoneAnnouncementIntervalSeconds = nil
         smartPrompts.targetZoneVoiceAlertsEnabled = nil
         smartPrompts.confirmWhenBackInZone = nil

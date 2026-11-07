@@ -4670,6 +4670,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 smartCoachState.isReliablyNotClimbing,
             norwegian: norwegian
         ) {
+            smartCoachState.noteExternalPrompt(elapsed: elapsedTime, settings: settings)
             speak(
                 message,
                 priority: .routineCoach,

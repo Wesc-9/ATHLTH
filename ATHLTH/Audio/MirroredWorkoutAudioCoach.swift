@@ -629,6 +629,9 @@ final class MirroredWorkoutAudioCoach:
                 snapshot.coachReliableNonClimbingTerrain == true,
             norwegian: norwegian
         ) {
+            smartCoachState.noteExternalPrompt(
+                elapsed: snapshot.elapsedTime, settings: settings
+            )
             speak(
                 message,
                 priority: .routineCoach,

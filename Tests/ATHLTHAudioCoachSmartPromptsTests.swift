@@ -319,4 +319,39 @@ final class ATHLTHAudioCoachSmartPromptsTests: XCTestCase {
         )
         XCTAssertNil(restored.smartPrompts)
     }
+
+    func testReactiveCueSuppressesSameSlotAutomaticMotivation() {
+        var state = ATHLTHAudioCoachSmartState()
+        var settings = ATHLTHAudioCoachSmartSettings()
+        settings.motivationEnabled = true
+        settings.motivationIntervalSeconds = 60
+        settings.randomEncouragementEnabled = true
+        settings.randomIntervalSeconds = 120
+
+        state.noteExternalPrompt(elapsed: 60, settings: settings)
+        XCTAssertNil(state.nextMotivation(
+            settings: settings, elapsed: 60.5,
+            paceSecondsPerKilometer: 350, norwegian: true
+        ))
+        XCTAssertNil(state.nextMotivation(
+            settings: settings, elapsed: 90,
+            paceSecondsPerKilometer: 350, norwegian: true
+        ))
+        XCTAssertNotNil(state.nextMotivation(
+            settings: settings, elapsed: 120,
+            paceSecondsPerKilometer: 350, norwegian: true
+        ))
+    }
+
+    func testReactiveCueResetClearsAntiOverlapState() {
+        var state = ATHLTHAudioCoachSmartState()
+        var settings = ATHLTHAudioCoachSmartSettings()
+        settings.motivationEnabled = true
+        state.noteExternalPrompt(elapsed: 60, settings: settings)
+        state.reset()
+        XCTAssertNotNil(state.nextMotivation(
+            settings: settings, elapsed: 60,
+            paceSecondsPerKilometer: nil, norwegian: true
+        ))
+    }
 }

@@ -222,6 +222,28 @@ struct ATHLTHAudioCoachSmartState {
 
     mutating func reset() { self = Self() }
 
+    /// Explicit reactive feedback and ATHLTH's scheduled encouragement share
+    /// one voice quiet period, so two valid coach rules cannot talk at once.
+    /// Consume a coinciding scheduled slot rather than speaking it late.
+    mutating func noteExternalPrompt(
+        elapsed: TimeInterval,
+        settings: ATHLTHAudioCoachSmartSettings
+    ) {
+        guard elapsed.isFinite, elapsed >= 0 else { return }
+        lastSpokenAt = max(lastSpokenAt, elapsed)
+        if settings.motivationEnabled {
+            let slot = Int(min(
+                floor(elapsed / settings.validatedMotivationInterval),
+                Double(Int.max / 2)
+            ))
+            lastMotivationSlot = max(lastMotivationSlot, slot)
+        }
+        if settings.randomEncouragementEnabled {
+            nextRandomAt = max(nextRandomAt,
+                elapsed + max(35, settings.validatedRandomInterval / 4))
+        }
+    }
+
     /// Terrain cues use independently recorded, accurate, fresh GPS altitude.
     /// Do not infer grade from one point or from horizontal GPS noise.
     mutating func observeTerrain(location: CLLocation, now: Date = Date()) {
