@@ -167,49 +167,6 @@ struct ATHLTHAudioCoachActiveListView: View {
                 "Aktive regler blir erstattet av enkel coach. Lagrede profiler er fortsatt tilgjengelige."
             ))
         }
-        .confirmationDialog(
-            tr("Manage Coach profile", "Behandle coach-profil"),
-            isPresented: Binding(
-                get: { pendingProfileAction != nil },
-                set: { if !$0 { pendingProfileAction = nil } }
-            ),
-            titleVisibility: .visible
-        ) {
-            Button(
-                {
-                    switch pendingProfileAction {
-                    case .delete: return tr("Delete saved profile", "Slett lagret profil")
-                    case .replace: return tr("Replace saved profile", "Erstatt lagret profil")
-                    case nil: return tr("Confirm", "Bekreft")
-                    }
-                }(),
-                role: .destructive
-            ) {
-                switch pendingProfileAction {
-                case let .delete(id):
-                    settings.audioCoachProfiles.removeAll { $0.id == id }
-                    if settings.activeAudioCoachProfileID == id {
-                        settings.activeAudioCoachProfileID = nil
-                    }
-                case let .replace(id):
-                    if let index = settings.audioCoachProfiles.firstIndex(where: {
-                        $0.id == id
-                    }) {
-                        settings.audioCoachProfiles[index].configuration = draft.configuration()
-                    }
-                case nil: break
-                }
-                pendingProfileAction = nil
-            }
-            Button(tr("Cancel", "Avbryt"), role: .cancel) {
-                pendingProfileAction = nil
-            }
-        } message: {
-            Text(tr(
-                "Changes to saved profiles are only made after you confirm.",
-                "Lagrede profiler endres først når du bekrefter."
-            ))
-        }
         .sheet(isPresented: $showingVoice) { voiceSheet }
         .sheet(isPresented: $showingProfiles) { profilesSheet }
         .confirmationDialog(
@@ -1181,6 +1138,49 @@ struct ATHLTHAudioCoachActiveListView: View {
                     Button(tr("Done", "Ferdig")) { showingProfiles = false }
                 }
             }
+        }
+        .confirmationDialog(
+            tr("Manage Coach profile", "Behandle coach-profil"),
+            isPresented: Binding(
+                get: { pendingProfileAction != nil },
+                set: { if !$0 { pendingProfileAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(
+                {
+                    switch pendingProfileAction {
+                    case .delete: return tr("Delete saved profile", "Slett lagret profil")
+                    case .replace: return tr("Replace saved profile", "Erstatt lagret profil")
+                    case nil: return tr("Confirm", "Bekreft")
+                    }
+                }(),
+                role: .destructive
+            ) {
+                switch pendingProfileAction {
+                case let .delete(id):
+                    settings.audioCoachProfiles.removeAll { $0.id == id }
+                    if settings.activeAudioCoachProfileID == id {
+                        settings.activeAudioCoachProfileID = nil
+                    }
+                case let .replace(id):
+                    if let index = settings.audioCoachProfiles.firstIndex(where: {
+                        $0.id == id
+                    }) {
+                        settings.audioCoachProfiles[index].configuration = draft.configuration()
+                    }
+                case nil: break
+                }
+                pendingProfileAction = nil
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                pendingProfileAction = nil
+            }
+        } message: {
+            Text(tr(
+                "Changes to saved profiles are only made after you confirm.",
+                "Lagrede profiler endres først når du bekrefter."
+            ))
         }
     }
 
