@@ -1858,8 +1858,8 @@ struct WorkoutTemplateLibraryView: View {
             }
         } message: {
             Text(ATHLTHLocalization.choose(
-                english: "Pace, heart-rate targets and incline are optional. Your library original stays unchanged.",
-                norwegian: "Fart, pulsmål og stigning er valgfrie. Originaløkten i biblioteket endres ikke."
+                english: "Set your own weight, sets, repetitions, rest, pace and other optional targets. The original library workout stays unchanged.",
+                norwegian: "Tilpass målvekt, sett, repetisjoner, pauser, fart og andre valgfrie mål. Originaløkten i biblioteket endres ikke."
             ))
         }
         .sheet(isPresented: $showingCatalogPersonalization, onDismiss: {
@@ -2427,10 +2427,11 @@ struct WorkoutTemplateLibraryView: View {
     }
 }
 
-/// Explicit first-add choice; simple users never see a personalization prompt.
+/// Offer an optional personal copy on first use in both Simple and Advanced.
+/// The athlete can still add the original structure without target overrides.
 enum ATHLTHWorkoutFirstUsePolicy {
     static func asksForTargets(advanced: Bool, hasPersonalCopy: Bool) -> Bool {
-        advanced && !hasPersonalCopy
+        !hasPersonalCopy
     }
 }
 
@@ -2654,7 +2655,7 @@ struct WorkoutTemplateDetailView: View {
             isPresented: $askingForPersonalTargets,
             titleVisibility: .visible
         ) {
-            Button(tr("Enter pace and targets", "Legg inn fart og mål")) {
+            Button(tr("Personalize workout", "Tilpass økten")) {
                 personalBlocks = ATHLTHWorkoutLibraryPersonalization.blankTargets(entry.blocks)
                 editingPersonalTargets = true
             }
@@ -2666,8 +2667,8 @@ struct WorkoutTemplateDetailView: View {
             Button(tr("Cancel", "Avbryt"), role: .cancel) {}
         } message: {
             Text(tr(
-                "You can set pace, heart-rate zone, incline and other personal targets now, or add them later. The original workout will not change.",
-                "Du kan legge inn tempo, pulssone, stigning og andre egne mål nå eller senere. Originaløkten endres ikke."
+                "You can personalize weight, sets, reps, rest, pace, heart-rate zone and other targets now, or later. The original workout stays unchanged.",
+                "Du kan tilpasse vekt, sett, repetisjoner, pauser, tempo, pulssone og andre mål nå eller senere. Originaløkten endres ikke."
             ))
         }
         .sheet(isPresented: $editingPersonalTargets) {
