@@ -448,6 +448,74 @@ struct RouteMapSnapshotThumbnail: View {
         UIImage?
     @State private var imageRequestID: String?
 
+    private var offlineTrace: some View {
+        let coordinates = route.coordinates
+            .sorted { $0.sequence < $1.sequence }
+            .map(\.coordinate)
+        let points = ATHLTHOfflineRouteTraceGeometry.normalizedPoints(coordinates)
+        return ZStack(alignment: .bottomLeading) {
+            ATHLTHPlanDesign.selectedSurface
+            if points.count >= 2 {
+                Canvas { context, size in
+                    let inset: CGFloat = 20
+                    let availableWidth = max(1, size.width - inset * 2)
+                    let availableHeight = max(1, size.height - inset * 2)
+                    let pathPoints = points.map { point in
+                        CGPoint(
+                            x: inset + point.x * availableWidth,
+                            y: inset + point.y * availableHeight
+                        )
+                    }
+                    var path = Path()
+                    path.addLines(pathPoints)
+                    context.stroke(
+                        path, with: .color(.white),
+                        style: StrokeStyle(lineWidth: 7, lineCap: .round,
+                                           lineJoin: .round)
+                    )
+                    context.stroke(
+                        path, with: .color(ATHLTHPlanDesign.accentInk),
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round,
+                                           lineJoin: .round)
+                    )
+                    if let start = pathPoints.first,
+                       let finish = pathPoints.last {
+                        for (point, tint) in [
+                            (start, ATHLTHPlanDesign.ink),
+                            (finish, ATHLTHTheme.vitality)
+                        ] {
+                            context.fill(
+                                Path(ellipseIn: CGRect(
+                                    x: point.x - 5, y: point.y - 5,
+                                    width: 10, height: 10
+                                )),
+                                with: .color(tint)
+                            )
+                        }
+                    }
+                }
+            } else {
+                Image(systemName: "map")
+                    .font(.title2)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Route preview · offline",
+                    norwegian: "Rutevisning · uten nett"
+                ),
+                systemImage: "point.topleft.down.to.point.bottomright.curvepath"
+            )
+            .font(.system(size: 10, weight: .medium))
+            .foregroundStyle(ATHLTHPlanDesign.ink)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(.regularMaterial, in: Capsule())
+            .padding(9)
+        }
+    }
+
     var body: some View {
         GeometryReader { proxy in
             let size = CGSize(width: max(proxy.size.width, 88), height: height)
@@ -465,28 +533,14 @@ struct RouteMapSnapshotThumbnail: View {
                 )
 
                 if imageRequestID == requestID, let image {
-                    Image(
-                        uiImage: image
-                    )
-                    .resizable()
-                    .scaledToFill()
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
                 } else {
-                    VStack(spacing: 6) {
-                        Image(
-                            systemName:
-                                "map.fill"
-                        )
-                        .font(.title3)
-                        .foregroundStyle(
-                            ATHLTHTheme
-                                .vitality
-                        )
-
-                        ProgressView()
-                            .controlSize(
-                                .mini
-                            )
-                    }
+                    // Never show an endless spinner with airplane mode on.
+                    // Coordinates are already in the saved route, so the
+                    // track can be drawn immediately without map tiles.
+                    offlineTrace
                 }
             }
             .frame(
