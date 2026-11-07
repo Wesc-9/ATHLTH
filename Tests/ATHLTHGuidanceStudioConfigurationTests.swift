@@ -140,17 +140,20 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
         XCTAssertFalse(ATHLTHAudioCoachOption.currentZone.isActive(in: draft))
     }
 
-    func testIndependentCustomRulesSuppressBasicPeriodicTriggers() {
+    func testCustomRulesAndBasicUpdatesRemainIndependent() {
         var draft = AudioCoachDraft()
         draft.applySimpleAudioCoach()
         draft.customRules = [ATHLTHAudioCoachRule(
-            trigger: .time, metric: .pace, interval: 30
+            trigger: .time, metric: .heartRate, interval: 30
         )]
-        XCTAssertFalse(ATHLTHAudioCoachOption.distanceUpdates.isActive(in: draft))
+        XCTAssertTrue(ATHLTHAudioCoachOption.distanceUpdates.isActive(in: draft))
         XCTAssertTrue(ATHLTHAudioCoachOption.customAnnouncements.isActive(in: draft))
+        XCTAssertNotNil(draft.configuration().distanceIntervalMeters)
+        ATHLTHAudioCoachOption.distanceUpdates.setActive(false, in: &draft)
+        XCTAssertEqual(draft.customRules.count, 1)
         XCTAssertNil(draft.configuration().distanceIntervalMeters)
         ATHLTHAudioCoachOption.distanceUpdates.setActive(true, in: &draft)
-        XCTAssertTrue(draft.customRules.isEmpty)
+        XCTAssertEqual(draft.customRules.count, 1)
         XCTAssertNotNil(draft.configuration().distanceIntervalMeters)
     }
 

@@ -130,6 +130,13 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     }
 }
 
+/// A spoken rule together with the metrics it covers. Used by both voice
+/// owners to combine scheduled/default updates without repeating a metric.
+struct ATHLTHAudioCoachDueAnnouncement {
+    let text: String
+    let metrics: Set<ATHLTHAudioCoachRule.Metric>
+}
+
 /// Evaluates each user's distance/time rule independently. The slot journal
 /// prevents repeats when workout snapshots arrive more than once per second.
 enum ATHLTHAudioCoachRuleDelivery {
@@ -159,7 +166,29 @@ enum ATHLTHAudioCoachRuleDelivery {
         maximumHeartRateBPM: Double? = nil,
         lastSlots: inout [UUID: Int]
     ) -> [String] {
-        var messages: [String] = []
+        dueAnnouncements(
+            rules: rules,
+            distanceMeters: distanceMeters,
+            elapsedSeconds: elapsedSeconds,
+            paceSecondsPerKilometer: paceSecondsPerKilometer,
+            heartRateBPM: heartRateBPM,
+            norwegian: norwegian,
+            maximumHeartRateBPM: maximumHeartRateBPM,
+            lastSlots: &lastSlots
+        ).map(\.text)
+    }
+
+    static func dueAnnouncements(
+        rules: [ATHLTHAudioCoachRule],
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval,
+        paceSecondsPerKilometer: TimeInterval?,
+        heartRateBPM: Double?,
+        norwegian: Bool,
+        maximumHeartRateBPM: Double? = nil,
+        lastSlots: inout [UUID: Int]
+    ) -> [ATHLTHAudioCoachDueAnnouncement] {
+        var messages: [ATHLTHAudioCoachDueAnnouncement] = []
         for rule in rules.prefix(20) {
             let current = slot(
                 for: rule,
@@ -179,7 +208,23 @@ enum ATHLTHAudioCoachRuleDelivery {
                 norwegian: norwegian,
                 maximumHeartRateBPM: maximumHeartRateBPM
             ) else { continue }
-            messages.append(message)
+            messages.append(ATHLTHAudioCoachDueAnnouncement(
+                text: message,
+                metrics: Set(rule.selectedMetrics.filter {
+                    // Unavailable sensors cannot suppress a working standard
+                    // update (nor should an empty custom bundle be spoken).
+                    switch $0 {
+                    case .heartRate: return heartRateBPM != nil
+                    case .heartRateZone:
+                        return ATHLTHHeartRateZones.measuredZone(
+                            heartRateBPM: heartRateBPM,
+                            maximumBPM: maximumHeartRateBPM
+                        ) != nil
+                    case .pace: return paceSecondsPerKilometer != nil
+                    case .distance, .elapsedTime: return true
+                    }
+                })
+            ))
         }
         return messages
     }

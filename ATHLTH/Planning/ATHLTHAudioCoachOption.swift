@@ -119,9 +119,9 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
     func isActive(in d: AudioCoachDraft) -> Bool {
         switch self {
         case .distanceUpdates:
-            return d.distanceTriggerEnabled && d.customRules.isEmpty
+            return d.distanceTriggerEnabled
         case .timedUpdates:
-            return d.timeTriggerEnabled && d.customRules.isEmpty
+            return d.timeTriggerEnabled
         case .distance: return d.announceDistance
         case .elapsedTime: return d.announceElapsedTime
         case .averagePace: return d.announceAveragePace
@@ -154,10 +154,8 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
     func setActive(_ active: Bool, in d: inout AudioCoachDraft) {
         switch self {
         case .distanceUpdates:
-            if active { d.customRules = [] }
             d.distanceTriggerEnabled = active
         case .timedUpdates:
-            if active { d.customRules = [] }
             d.timeTriggerEnabled = active
         case .distance: d.announceDistance = active
         case .elapsedTime: d.announceElapsedTime = active

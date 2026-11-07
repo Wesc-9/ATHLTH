@@ -238,4 +238,24 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         )
         XCTAssertEqual(old.selectedMetrics, [.heartRate])
     }
+
+    func testDueAnnouncementsIdentifyOnlyMetricsWithSensorData() {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 1_000,
+            additionalMetrics: [.elapsedTime, .heartRate, .heartRateZone]
+        )
+        var slots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: [rule], distanceMeters: 0, elapsedSeconds: 0
+        )
+        let due = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: [rule], distanceMeters: 1_004, elapsedSeconds: 380,
+            paceSecondsPerKilometer: 380, heartRateBPM: nil, norwegian: true,
+            maximumHeartRateBPM: 190, lastSlots: &slots
+        )
+        XCTAssertEqual(due.count, 1)
+        XCTAssertTrue(due[0].metrics.contains(.distance))
+        XCTAssertTrue(due[0].metrics.contains(.elapsedTime))
+        XCTAssertFalse(due[0].metrics.contains(.heartRate))
+        XCTAssertFalse(due[0].metrics.contains(.heartRateZone))
+    }
 }

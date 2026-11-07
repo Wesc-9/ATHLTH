@@ -1568,11 +1568,11 @@ final class AppSettingsStore: ObservableObject {
             enabled: enabled,
             language: audioCoachLanguage,
             distanceIntervalMeters:
-                audioCoachCustomRules.isEmpty && audioCoachDistanceTriggerEnabled
+                audioCoachDistanceTriggerEnabled
                     ? audioCoachDistanceIntervalKilometers * 1_000
                     : nil,
             timeIntervalSeconds:
-                audioCoachCustomRules.isEmpty && audioCoachTimeTriggerEnabled
+                audioCoachTimeTriggerEnabled
                     ? Double(min(max(audioCoachTimeIntervalSeconds, 15), 7_200))
                     : nil,
             customRules: audioCoachCustomRules.isEmpty ? nil

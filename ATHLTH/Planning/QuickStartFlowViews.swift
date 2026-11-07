@@ -385,11 +385,11 @@ struct AudioCoachDraft {
             enabled: enabled,
             language: language,
             distanceIntervalMeters:
-                enabled && customRules.isEmpty && distanceTriggerEnabled
+                enabled && distanceTriggerEnabled
                     ? distanceIntervalKilometers * 1_000
                     : nil,
             timeIntervalSeconds:
-                enabled && customRules.isEmpty && timeTriggerEnabled
+                enabled && timeTriggerEnabled
                     ? Double(min(max(timeIntervalSeconds, 15), 7_200))
                     : nil,
             customRules: enabled && !customRules.isEmpty
