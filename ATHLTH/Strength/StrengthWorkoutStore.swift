@@ -1854,7 +1854,7 @@ final class StrengthWorkoutStore: ObservableObject {
             !workout.exercises.isEmpty &&
             workout.exercises.allSatisfy(\.isCompleted)
 
-        return WatchStrengthSessionSnapshot(
+        var snapshot = WatchStrengthSessionSnapshot(
             workoutID: workout.id,
             title: workout.title,
             exerciseIndex: currentExerciseIndex,
@@ -2009,6 +2009,17 @@ final class StrengthWorkoutStore: ObservableObject {
                 set?.plannedDurationSeconds == nil &&
                 exercise?.exercise.isTimeOnlyBodyweightStrength == true
         )
+        // The Watch may show/adjust plates only when the iPhone knows this
+        // exercise uses a bar. Nil intentionally preserves legacy total entry
+        // for older/offline Watch-created sessions.
+        snapshot.barWeightKilograms = exercise.flatMap { item in
+            guard currentSetRecordsWeight,
+                  set?.resolvedLoadKind == .weightKilograms,
+                  StrengthBarbellExercisePolicy.usesBar(item)
+            else { return nil }
+            return item.barWeightKilograms ?? suggestedBarWeight(for: item)
+        }
+        return snapshot
     }
 
     func startFromWatchSnapshot(
