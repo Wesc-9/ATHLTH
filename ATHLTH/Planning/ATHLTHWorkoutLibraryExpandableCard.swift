@@ -52,6 +52,10 @@ struct ATHLTHWorkoutLibraryExpandableCard<Accessory: View>: View {
                                     .lineLimit(2)
                                     .multilineTextAlignment(.leading)
                             }
+                            if !expanded {
+                                ATHLTHWorkoutGridDetails(workout: workout)
+                                    .padding(.top, 3)
+                            }
                             HStack(spacing: 6) {
                                 Text(ATHLTHLocalization.choose(
                                     english: "\(stepCount) steps",
