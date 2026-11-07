@@ -19,10 +19,14 @@ APP = ROOT / "ATHLTH"
 # These checks intentionally avoid matching asset names or changing artwork.
 REQUIRED = {
     # Coach now uses a compact, image-free header. The old 164 pt
-    # aspect-fill photo guard is intentionally obsolete.
+    # aspect-fill photo guard is intentionally obsolete. Chat content
+    # must follow the *inspector's* width on the very first render. Using
+    # containerRelativeFrame(.horizontal) here used the full iPad canvas
+    # before the inspector had a resolved width and caused clipped replies.
     "ATHLTH/Recovery/RecoveryAIViews.swift": (
         r"private struct RecoveryCoachCompactHeader",
-        r"\.containerRelativeFrame\(\.horizontal\)",
+        r"struct RecoveryCoachView: View.*?\.frame\(maxWidth:\s*\.infinity,\s*alignment:\s*\.leading\)",
+        r"struct RecoveryCoachView: View.*?\.frame\(maxWidth:\s*\.infinity,\s*maxHeight:\s*\.infinity\)",
     ),
     "ATHLTH/Social/HomeActivityStrengthDetailView.swift": (
         r"GeometryReader\s*\{\s*viewport\s+in",
