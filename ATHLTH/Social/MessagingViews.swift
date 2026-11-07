@@ -10,8 +10,8 @@ struct MessageInboxDestinationView: View {
 
     var body: some View {
         MessageInboxView(
-            onNewMessage: { showingNewMessage = true },
-            onBack: onBack
+            onBack: onBack,
+            onNewMessage: { showingNewMessage = true }
         )
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
@@ -73,8 +73,10 @@ struct MessageInboxView: View {
     @EnvironmentObject private var realtime:
         ATHLTHRealtimeSocialStore
 
-    var onNewMessage: () -> Void = {}
+    // Keep onNewMessage last so existing trailing-closure callers still
+    // open the composer rather than unintentionally wiring a back action.
     var onBack: (() -> Void)? = nil
+    var onNewMessage: () -> Void = {}
 
     @State private var arenaInboxVisibleCount = 0
     @State private var searchText = ""
