@@ -5,14 +5,19 @@ import Foundation
 /// used by the workout engine, without expanding set/recovery repeats.
 enum ATHLTHWorkoutLibraryExerciseIndex {
     static func mainTitles(from blocks: [WorkoutTemplateBlock]) -> [String] {
-        let main = blocks.filter {
-            $0.resolvedPhase == .main &&
-            $0.kind != .note &&
-            !$0.isRestOrActiveRecovery
+        // Exercises, running steps, and genuinely executable wellness or
+        // cycling sections count. Instruction-only notes and pauses do not.
+        let activities = blocks.filter { block in
+            guard !block.isRestOrActiveRecovery else { return false }
+            switch block.kind {
+            case .exercise, .run: return true
+            case .note: return block.wellnessKind != nil ||
+                block.activityTag == "cycling"
+            case .rest: return false
+            }
         }
-        let candidates = main.isEmpty
-            ? blocks.filter { $0.kind != .note && !$0.isRestOrActiveRecovery }
-            : main
+        let main = activities.filter { $0.resolvedPhase == .main }
+        let candidates = main.isEmpty ? activities : main
         var seen: Set<String> = []
         return candidates.compactMap { block in
             let name = block.title.trimmingCharacters(in: .whitespacesAndNewlines)
