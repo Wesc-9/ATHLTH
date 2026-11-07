@@ -222,6 +222,30 @@ struct ATHLTHAudioCoachActiveListView: View {
             .foregroundStyle(ink)
             .padding(.vertical, 5)
 
+            HStack(spacing: 10) {
+                Menu {
+                    ForEach(settings.audioCoachProfiles) { profile in
+                        Button(profile.name) {
+                            draft.load(profile: profile)
+                            editorMode = "basic"
+                        }
+                    }
+                } label: {
+                    Label(tr("Use a saved profile", "Bruk lagret profil"),
+                          systemImage: "square.stack")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .disabled(settings.audioCoachProfiles.isEmpty)
+                .buttonStyle(.bordered)
+                Button {
+                    editorMode = "advanced"
+                } label: {
+                    Label(tr("Edit Coach", "Rediger coach"),
+                          systemImage: "slider.horizontal.3")
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+            }
             Button {
                 draft.applySimpleAudioCoach()
             } label: {
@@ -442,7 +466,23 @@ struct ATHLTHAudioCoachActiveListView: View {
                         Text("\(Int(draft.smartPrompts.maximumHeartRateBPM ?? 185)) bpm")
                     }
                 }
+                Picker(tr("Announce current zone every", "Les pulssone hvert"),
+                       selection: Binding(
+                        get: { draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds ?? 180 },
+                        set: { draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds = $0 }
+                       )) {
+                    Text("30 s").tag(30)
+                    Text("1 min").tag(60)
+                    Text("2 min").tag(120)
+                    Text("3 min").tag(180)
+                    Text("5 min").tag(300)
+                }
+                .pickerStyle(.menu)
             }
+        case .targetZoneCoach:
+            ATHLTHAudioCoachTargetZoneEditor(smart: $draft.smartPrompts)
+        case .adaptiveMotivation:
+            ATHLTHAudioCoachAdaptiveRulesEditor(smart: $draft.smartPrompts)
         case .motivation:
             editorCard {
                 Text(tr("Motivational coaching", "Motivasjonssnakk")).font(.headline)
