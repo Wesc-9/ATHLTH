@@ -135,11 +135,20 @@ enum GhostTargetPaceFormatter {
     static func secondsPerKilometer(from text: String) -> TimeInterval? {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         let parts = trimmed.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 2,
+        // Whole minutes are valid: "5" means "5:00". Do not accept
+        // incomplete colon input or out-of-range seconds.
+        guard (1...2).contains(parts.count),
               let minutes = Int(parts[0]),
-              let seconds = Int(parts[1]),
-              minutes >= 0, minutes <= 30,
-              seconds >= 0, seconds < 60 else { return nil }
+              (0...30).contains(minutes)
+        else { return nil }
+        let seconds: Int
+        if parts.count == 2 {
+            guard let parsed = Int(parts[1]), (0..<60).contains(parsed)
+            else { return nil }
+            seconds = parsed
+        } else {
+            seconds = 0
+        }
         let value = Double(minutes * 60 + seconds)
         return (120...1_800).contains(value) ? value : nil
     }
@@ -348,6 +357,7 @@ struct TargetGhostSetupView: View {
 
     @State private var targetTimeText: String
     @State private var targetPaceText: String
+    @FocusState private var paceFieldFocused: Bool
     @State private var basicShowCustomTime = false
     @State private var goalType: GhostTargetGoalType = .finishTime
     @State private var pacingStrategy: GhostTargetPacingStrategy = .even
@@ -1220,6 +1230,11 @@ struct TargetGhostSetupView: View {
                             TextField("5:00", text: $targetPaceText)
                                 .font(.system(size: 34, weight: .bold, design: .rounded))
                                 .keyboardType(.numbersAndPunctuation)
+                                .focused($paceFieldFocused)
+                                .onSubmit { finalizePaceEntry() }
+                                .onChange(of: paceFieldFocused) { _, focused in
+                                    if !focused { finalizePaceEntry() }
+                                }
                                 .multilineTextAlignment(.center)
                                 .monospacedDigit()
                                 .padding(12)
@@ -1356,6 +1371,15 @@ struct TargetGhostSetupView: View {
                 }
             }
         }
+    }
+
+    private func finalizePaceEntry() {
+        guard let seconds = GhostTargetPaceFormatter.secondsPerKilometer(
+            from: targetPaceText
+        ) else { return }
+        targetPaceText = GhostTargetPaceFormatter.text(
+            secondsPerKilometer: seconds
+        )
     }
 
     private func paceStepButton(_ step: Int) -> some View {
