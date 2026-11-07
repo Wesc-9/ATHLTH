@@ -997,16 +997,17 @@ struct WatchActiveWorkoutView: View {
                                     ATHLTHLocalization
                                         .choose(
                                             english:
-                                                "Weight",
+                                                snapshot.barWeightKilograms == nil
+                                                    ? "Weight" : "Plates",
                                             norwegian:
-                                                "Vekt"
+                                                snapshot.barWeightKilograms == nil
+                                                    ? "Vekt" : "Skiver"
                                         ),
                                 valueText:
                                     String(
                                         format:
                                             "%.1f kg",
-                                        snapshot
-                                            .draftWeightKilograms
+                                        strengthWeightBinding.wrappedValue
                                     ),
                                 value:
                                     strengthWeightBinding,
@@ -1019,6 +1020,18 @@ struct WatchActiveWorkoutView: View {
                                 compact: true
                             )
                         }
+                    }
+
+                    if let bar = snapshot.barWeightKilograms {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Bar \(bar.formatted()) kg · Total \(snapshot.draftWeightKilograms.formatted()) kg",
+                                norwegian: "Stang \(bar.formatted()) kg · Totalt \(snapshot.draftWeightKilograms.formatted()) kg"
+                            )
+                        )
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(WatchTheme.muted)
+                        .monospacedDigit()
                     }
 
                     Text(
@@ -2066,12 +2079,14 @@ struct WatchActiveWorkoutView: View {
                         } else {
                             WatchStrengthPrimaryCrownMetric(
                                 title: ATHLTHLocalization.choose(
-                                    english: "Weight",
-                                    norwegian: "Vekt"
+                                    english: snapshot.barWeightKilograms == nil
+                                        ? "Weight" : "Plates",
+                                    norwegian: snapshot.barWeightKilograms == nil
+                                        ? "Vekt" : "Skiver"
                                 ),
                                 valueText: String(
                                     format: "%.1f kg",
-                                    snapshot.draftWeightKilograms
+                                    strengthWeightBinding.wrappedValue
                                 ),
                                 value: strengthWeightBinding,
                                 range: 0...500,
@@ -2080,6 +2095,18 @@ struct WatchActiveWorkoutView: View {
                                 tint: WatchTheme.slate
                             )
                         }
+                    }
+
+                    if let bar = snapshot.barWeightKilograms {
+                        Text(
+                            ATHLTHLocalization.choose(
+                                english: "Bar \(bar.formatted()) kg · Total \(snapshot.draftWeightKilograms.formatted()) kg",
+                                norwegian: "Stang \(bar.formatted()) kg · Totalt \(snapshot.draftWeightKilograms.formatted()) kg"
+                            )
+                        )
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(WatchTheme.muted)
+                        .monospacedDigit()
                     }
 
                     Text(
@@ -2302,16 +2329,24 @@ struct WatchActiveWorkoutView: View {
             .name
     }
 
+    /// Crown edits plates where a bar is known; commands remain total kg.
+    /// Without bar metadata, keep older Watch sessions on total input.
     private var strengthWeightBinding: Binding<Double> {
         Binding(
             get: {
-                workoutManager
-                    .strengthSession?
-                    .draftWeightKilograms ?? 0
+                guard let snapshot = workoutManager.strengthSession else {
+                    return 0
+                }
+                guard let bar = snapshot.barWeightKilograms else {
+                    return snapshot.draftWeightKilograms
+                }
+                return max(0, snapshot.draftWeightKilograms - max(0, bar))
             },
-            set: {
+            set: { plates in
+                guard plates.isFinite else { return }
+                let bar = workoutManager.strengthSession?.barWeightKilograms ?? 0
                 workoutManager.updateStrengthDraft(
-                    weightKilograms: $0
+                    weightKilograms: max(0, plates) + max(0, bar)
                 )
             }
         )
