@@ -1166,6 +1166,23 @@ struct ATHLTHHomeView: View {
             // other root tabs. Only the scrolling sheet moves behind it; the
             // system tab bar itself remains unchanged.
             .ignoresSafeArea(.container, edges: .bottom)
+            // Recognize a deliberate swipe from the screen's left edge,
+            // without stealing vertical scrolling or changing how the menu
+            // button opens the existing drawer. This is attached only to
+            // Home's root content, not to pushed screens or other tabs.
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 18, coordinateSpace: .local)
+                    .onEnded { value in
+                        guard isActive,
+                              !ATHLTHDeviceRole.isIPad,
+                              ATHLTHHomeEdgeSwipePolicy.shouldOpen(
+                                startLocation: value.startLocation,
+                                translation: value.translation
+                              )
+                        else { return }
+                        onOpenSideMenu()
+                    }
+            )
             // Erase the large Home content before attaching modal sheets.
             .athlthStablePresentationBoundary()
             .sheet(
