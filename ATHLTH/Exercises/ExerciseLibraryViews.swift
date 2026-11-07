@@ -361,29 +361,12 @@ struct ExerciseLibraryView: View {
                                 )
                         }
                         Text(ATHLTHLocalization.choose(
-                            english: "Create with AI or manually. Add a picture and your own technique video. Edit the exercise any time.",
-                            norwegian: "Lag med AI eller manuelt. Legg til bilde og egen teknikkvideo. Rediger øvelsen når som helst."
+                            english: "Your personal exercises, pictures and technique videos in one place. Edit them any time.",
+                            norwegian: "Dine egne øvelser, bilder og teknikkvideoer samlet på ett sted. Rediger dem når som helst."
                         ))
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
 
-                        Button {
-                            showingCreateExercise = true
-                        } label: {
-                            Label(
-                                ATHLTHLocalization.choose(
-                                    english: "Create exercise",
-                                    norwegian: "Opprett øvelse"
-                                ),
-                                systemImage: "plus"
-                            )
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.white)
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 46)
-                            .background(ATHLTHPlanDesign.ink, in: Capsule())
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -418,14 +401,6 @@ struct ExerciseLibraryView: View {
                             english: "Create an exercise to see it here.",
                             norwegian: "Lag en egen øvelse for å se den her."
                         ))
-                    } actions: {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Create exercise", norwegian: "Opprett øvelse"
-                        )) {
-                            showingCreateExercise = true
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(ATHLTHTheme.accent)
                     }
                 } else {
                     VStack(spacing: 12) {
