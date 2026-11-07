@@ -1696,6 +1696,8 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     // fresh live heart-rate or pace data it cannot verify.
     var coachHeartRateSampleAt: Date? = nil
     var coachPaceSampleAt: Date? = nil
+    /// Watch-verified fresh terrain grade; absent on older Watch builds.
+    var coachReliableNonClimbingTerrain: Bool? = nil
 }
 
 struct WatchGhostRaceTimingPoint: Codable, Hashable {

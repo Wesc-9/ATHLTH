@@ -4667,8 +4667,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             targetHeartRateMinimumBPM: target?.heartRateEnabled == true
                 ? target?.heartRateMinimumBPM : nil,
             reliableNotClimbing: usesOutdoorGPS &&
-                smartCoachState.hasReliableTerrainEvidence &&
-                smartCoachState.inferredTerrain != .uphill,
+                smartCoachState.isReliablyNotClimbing,
             norwegian: norwegian
         ) {
             speak(
@@ -8125,6 +8124,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 currentStepProgress: awaitingMainStart ? 0 : progress
             )
         }
+        snapshot.coachReliableNonClimbingTerrain =
+            usesOutdoorGPS && smartCoachState.isReliablyNotClimbing
         snapshot.watchOwnedAudioCoach =
             ghostRaceConfiguration != nil ||
             kind == .strength ||

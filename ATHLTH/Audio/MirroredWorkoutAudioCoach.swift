@@ -602,10 +602,11 @@ final class MirroredWorkoutAudioCoach:
             return
         }
 
-        // Mirrored snapshots do not include reliable terrain grade, so
-        // this owner can coach on planned zones and pace, not flat-ground drops.
+        // Missing terrain evidence from an older Watch is never treated as
+        // a verified flat/downhill stretch.
         let targetRange = ATHLTHHeartRateZones.range(
             for: snapshot.runningStepTargetHeartRateZone ??
+                snapshot.heartRateTargetZone ??
                 settings.preferredHeartRateZone ?? 0,
             maximumBPM: settings.maximumHeartRateBPM
         )
@@ -621,8 +622,11 @@ final class MirroredWorkoutAudioCoach:
             measuredHeartRateBPM: ATHLTHCoachSensorFreshness.validHeartRate(
                 snapshot.heartRate, sampledAt: snapshot.coachHeartRateSampleAt
             ) ? snapshot.heartRate : nil,
-            targetHeartRateMinimumBPM: targetRange.map { Double($0.lowerBound) },
-            reliableNotClimbing: false,
+            targetHeartRateMinimumBPM:
+                snapshot.heartRateTargetMinimumBPM ??
+                targetRange.map { Double($0.lowerBound) },
+            reliableNotClimbing:
+                snapshot.coachReliableNonClimbingTerrain == true,
             norwegian: norwegian
         ) {
             speak(

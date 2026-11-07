@@ -212,6 +212,11 @@ struct ATHLTHAudioCoachSmartState {
     private(set) var inferredTerrain: ATHLTHCoachTerrain?
     // Missing terrain classification does not prove flat ground.
     private(set) var hasReliableTerrainEvidence = false
+    private var terrainEvidenceAt: Date?
+    var isReliablyNotClimbing: Bool {
+        hasReliableTerrainEvidence && inferredTerrain != .uphill &&
+        terrainEvidenceAt.map { Date().timeIntervalSince($0) <= 20 } == true
+    }
     private var lastTerrainPhraseAt: Double = -.infinity
     private var announcedFinalStretch = false
 
@@ -228,6 +233,7 @@ struct ATHLTHAudioCoachSmartState {
               location.altitude.isFinite else {
             inferredTerrain = nil
             hasReliableTerrainEvidence = false
+            terrainEvidenceAt = nil
             return
         }
         guard let anchor = lastTerrainLocation else {
@@ -243,9 +249,11 @@ struct ATHLTHAudioCoachSmartState {
             lastTerrainLocation = location
             inferredTerrain = nil
             hasReliableTerrainEvidence = false
+            terrainEvidenceAt = nil
             return
         }
         hasReliableTerrainEvidence = true
+        terrainEvidenceAt = now
         let climbed = location.altitude - anchor.altitude
         let gradient = climbed / max(traveled, 1)
         inferredTerrain = climbed >= 7 && gradient >= 0.035
