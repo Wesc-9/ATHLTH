@@ -138,6 +138,18 @@ final class AthleteOfflinePackStore: ObservableObject {
                     AthleteOfflinePack.self, from: bytes
                 )
             }()
+            func routeUnchanged(_ id: UUID) -> Bool {
+                guard let old = previousPack?.routes.first(where: { $0.id == id }),
+                      let updated = selectedRoutes.first(where: { $0.id == id })
+                else { return false }
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.sortedKeys]
+                guard let oldData = try? encoder.encode(old),
+                      let nextData = try? encoder.encode(updated)
+                else { return false }
+                return oldData == nextData
+            }
+
             func reuseAsset(_ id: UUID, availableIDs: [UUID]) throws -> Bool {
                 guard availableIDs.contains(id) else { return false }
                 let name = id.uuidString + ".png"
@@ -151,9 +163,9 @@ final class AthleteOfflinePackStore: ObservableObject {
                 return true
             }
             if includeMedia { for route in selectedRoutes {
-                if try reuseAsset(
+                if routeUnchanged(route.id) && (try reuseAsset(
                     route.id, availableIDs: previousPack?.mapRouteIDs ?? []
-                ) {
+                )) {
                     pack.mapRouteIDs.append(route.id)
                     continue
                 }
@@ -228,7 +240,7 @@ final class AthleteOfflinePackStore: ObservableObject {
                         else { continue }
                         try FileManager.default.copyItem(at: source, to: target)
                         if previous.mapRouteIDs.contains(assetID),
-                           selectedRoutes.contains(where: { $0.id == assetID }) {
+                           routeUnchanged(assetID) {
                             pack.mapRouteIDs.append(assetID)
                         }
                         if previous.exerciseImageIDs.contains(assetID),
@@ -251,7 +263,8 @@ final class AthleteOfflinePackStore: ObservableObject {
                 )
                 let oldRouteIDs = Set(previousPack?.mapRouteIDs ?? [])
                 let oldImageIDs = Set(previousPack?.exerciseImageIDs ?? [])
-                for assetID in oldRouteIDs.intersection(routeIDs) {
+                for assetID in oldRouteIDs.intersection(routeIDs)
+                    where routeUnchanged(assetID) {
                     if try reuseAsset(
                         assetID, availableIDs: previousPack?.mapRouteIDs ?? []
                     ) {
