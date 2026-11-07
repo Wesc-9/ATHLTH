@@ -12571,12 +12571,13 @@ enum StrengthBarbellExercisePolicy {
     static func usesBarEquipment(name: String, equipment: [String]) -> Bool {
         let terms = ([name] + equipment).joined(separator: " ").lowercased()
         if ["dumbbell", "manual", "kettlebell", "hantel", "cable",
-            "kabel", "bodyweight"].contains(where: terms.contains) {
+            "kabel", "bodyweight", "egenvekt", "uten vekt", "goblet",
+            "air squat", "hack squat", "no equipment"].contains(where: terms.contains) {
             return false
         }
         return ["barbell", "smith", "vektstang", "stang",
-                "benkpress", "deadlift", "markløft",
-                "skivestang"].contains(where: terms.contains)
+                "benkpress", "deadlift", "markløft", "knebøy",
+                "back squat", "front squat", "skivestang"].contains(where: terms.contains)
     }
 }
 
@@ -12985,8 +12986,8 @@ private struct StrengthActiveExerciseQueueView: View {
                                     }
                                     if exercise.barWeightKilograms != nil {
                                         Text(ATHLTHLocalization.choose(
-                                            english: "Bar included in total kg, never added twice.",
-                                            norwegian: "Stangen inngår i totalvekten og legges ikke til to ganger."
+                                            english: "Enter plates separately on the live card. ATHLTH records their total plus the bar.",
+                                            norwegian: "Legg inn skivene separat på øktkortet. ATHLTH lagrer skivene pluss stangen som totalvekt."
                                         ))
                                         .font(.caption2)
                                         .foregroundStyle(.secondary)
