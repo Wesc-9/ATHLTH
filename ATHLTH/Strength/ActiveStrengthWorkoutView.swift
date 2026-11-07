@@ -4551,10 +4551,13 @@ struct ActiveStrengthWorkoutView: View {
                                 english: "RESIST.",
                                 norwegian: "MOTST."
                             )
-                            : ATHLTHLocalization.choose(
-                                english: "WEIGHT",
-                                norwegian: "VEKT"
-                            ),
+                            : currentBarWeightKilograms == nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "WEIGHT", norwegian: "VEKT"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "TOTAL", norwegian: "TOTAL"
+                                ),
                     icon:
                         currentStrengthLoadKind ==
                             .resistanceLevel
@@ -5937,15 +5940,19 @@ struct ActiveStrengthWorkoutView: View {
                                 }
                             }
                         } label: {
-                            Label(String(format: "%g kg", exercise.barWeightKilograms ??
-                                strength.suggestedBarWeight(for: exercise)),
-                                  systemImage: "scalemass")
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Bar ", norwegian: "Stang "
+                                ) + String(format: "%g kg", exercise.barWeightKilograms ??
+                                    strength.suggestedBarWeight(for: exercise)),
+                                systemImage: "scalemass"
+                            )
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
                         }
                         .accessibilityLabel(ATHLTHLocalization.choose(
-                            english: "Bar weight, included in the total",
-                            norwegian: "Stangvekt, inkludert i totalvekten"
+                            english: "Bar weight. Enter plates separately; total is calculated.",
+                            norwegian: "Stangvekt. Legg inn skiver separat; totalen beregnes."
                         ))
                     }
                 }
@@ -5959,9 +5966,14 @@ struct ActiveStrengthWorkoutView: View {
                         )
                     } else if strength.currentSetRecordsWeight {
                         compactLiveDecimalMetric(
-                            title: ATHLTHLocalization.choose(
-                                english: "Total kg", norwegian: "Totalvekt"),
-                            value: draftWeightBinding, step: 2.5
+                            title: currentBarWeightKilograms == nil
+                                ? ATHLTHLocalization.choose(
+                                    english: "Weight", norwegian: "Vekt"
+                                )
+                                : ATHLTHLocalization.choose(
+                                    english: "Plates total", norwegian: "Skiver totalt"
+                                ),
+                            value: draftPlateWeightBinding, step: 2.5
                         )
                     }
                     if currentStrengthTargetKind == .time {
@@ -5977,6 +5989,29 @@ struct ActiveStrengthWorkoutView: View {
                             value: draftRepsBinding, step: 1
                         )
                     }
+                }
+
+                if let bar = currentBarWeightKilograms {
+                    HStack(spacing: 5) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Plates + bar", norwegian: "Skiver + stang"
+                        ))
+                        Spacer(minLength: 0)
+                        Text(
+                            "\(formatWeight(draftPlateWeightBinding.wrappedValue)) + " +
+                            "\(formatWeight(bar)) = " +
+                            "\(formatWeight(strength.draftWeightKilograms)) kg"
+                        )
+                        .monospacedDigit()
+                    }
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Total load including bar, \(formatWeight(strength.draftWeightKilograms)) kilograms",
+                            norwegian: "Total belastning med stang, \(formatWeight(strength.draftWeightKilograms)) kilo"
+                        )
+                    )
                 }
 
                 // One timer in one fixed place: the active countdown
@@ -6269,11 +6304,13 @@ struct ActiveStrengthWorkoutView: View {
                         focusedNumberField(
                             title:
                                 ATHLTHLocalization.choose(
-                                    english: "Weight",
-                                    norwegian: "Vekt"
+                                    english: currentBarWeightKilograms == nil
+                                        ? "Weight" : "Plates total",
+                                    norwegian: currentBarWeightKilograms == nil
+                                        ? "Vekt" : "Skiver totalt"
                                 ),
                             value:
-                                draftWeightBinding,
+                                draftPlateWeightBinding,
                             suffix: "kg"
                         )
                     }
@@ -6310,8 +6347,8 @@ struct ActiveStrengthWorkoutView: View {
                             ))
                             .font(.caption.weight(.semibold))
                             Text(ATHLTHLocalization.choose(
-                                english: "Included in total weight",
-                                norwegian: "Inkludert i totalvekten"
+                                english: "Enter plates separately (both sides combined)",
+                                norwegian: "Legg inn skivene separat (begge sider samlet)"
                             ))
                             .font(.caption2)
                             .foregroundStyle(.secondary)
@@ -6373,6 +6410,18 @@ struct ActiveStrengthWorkoutView: View {
                         }
                     }
                     .padding(.vertical, 5)
+                    Text(
+                        ATHLTHLocalization.choose(
+                            english: "Plates + bar = total: ",
+                            norwegian: "Skiver + stang = total: "
+                        ) +
+                        "\(formatWeight(draftPlateWeightBinding.wrappedValue)) + " +
+                        "\(formatWeight(active.barWeightKilograms ?? strength.suggestedBarWeight(for: active))) = " +
+                        "\(formatWeight(strength.draftWeightKilograms)) kg"
+                    )
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    .monospacedDigit()
                 }
 
                 if currentStrengthTargetKind == .time {
@@ -6835,6 +6884,41 @@ struct ActiveStrengthWorkoutView: View {
         Binding(
             get: { strength.draftTreadmillInclinePercent },
             set: { strength.setDraft(treadmillInclinePercent: $0) }
+        )
+    }
+
+    /// Plate-only inputs are a presentation detail. The draft remains
+    /// TOTAL kilograms for Watch synchronization, history and volume.
+    private var currentBarWeightKilograms: Double? {
+        guard currentStrengthLoadKind == .weightKilograms,
+              strength.currentSetRecordsWeight,
+              let exercise = strength.currentExercise,
+              StrengthBarbellExercisePolicy.usesBar(exercise)
+        else { return nil }
+        return exercise.barWeightKilograms ??
+            strength.suggestedBarWeight(for: exercise)
+    }
+
+    private var draftPlateWeightBinding: Binding<Double> {
+        Binding(
+            get: {
+                guard let bar = currentBarWeightKilograms else {
+                    return strength.draftWeightKilograms
+                }
+                return StrengthBarbellLoad.plates(
+                    totalKilograms: strength.draftWeightKilograms,
+                    barKilograms: bar
+                )
+            },
+            set: { value in
+                guard value.isFinite else { return }
+                let total = currentBarWeightKilograms.map {
+                    StrengthBarbellLoad.total(
+                        platesKilograms: value, barKilograms: $0
+                    )
+                } ?? max(0, value)
+                strength.setDraft(weightKilograms: total)
+            }
         )
     }
 
@@ -9147,10 +9231,22 @@ struct ActiveStrengthWorkoutView: View {
                     )
                 } else {
                     valueStepper(
-                        title: "Weight",
-                        value: String(format: "%.1f kg", strength.draftWeightKilograms),
-                        minus: { strength.setDraft(weightKilograms: max(0, strength.draftWeightKilograms - 2.5)) },
-                        plus: { strength.setDraft(weightKilograms: strength.draftWeightKilograms + 2.5) }
+                        title: currentBarWeightKilograms == nil
+                            ? ATHLTHLocalization.choose(
+                                english: "Weight", norwegian: "Vekt"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "Plates", norwegian: "Skiver"
+                            ),
+                        value: String(format: "%.1f kg", draftPlateWeightBinding.wrappedValue),
+                        minus: {
+                            draftPlateWeightBinding.wrappedValue =
+                                max(0, draftPlateWeightBinding.wrappedValue - 2.5)
+                        },
+                        plus: {
+                            draftPlateWeightBinding.wrappedValue =
+                                draftPlateWeightBinding.wrappedValue + 2.5
+                        }
                     )
                 }
 
