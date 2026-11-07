@@ -278,4 +278,16 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
         XCTAssertNil(draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds)
         XCTAssertFalse(ATHLTHAudioCoachOption.currentZone.isActive(in: draft))
     }
+
+    func testActiveMetricRequiresActualPeriodAndCanEnableDefaultTrigger() {
+        var draft = AudioCoachDraft()
+        draft.applySimpleAudioCoach()
+        draft.distanceTriggerEnabled = false
+        draft.timeTriggerEnabled = false
+        XCTAssertFalse(ATHLTHAudioCoachOption.distance.isActive(in: draft))
+        XCTAssertFalse(ATHLTHAudioCoachOption.heartRate.isActive(in: draft))
+        ATHLTHAudioCoachOption.heartRate.setActive(true, in: &draft)
+        XCTAssertTrue(draft.distanceTriggerEnabled)
+        XCTAssertTrue(ATHLTHAudioCoachOption.heartRate.isActive(in: draft))
+    }
 }

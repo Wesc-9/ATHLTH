@@ -1696,6 +1696,9 @@ struct WatchWorkoutLiveSnapshot: Codable, Hashable {
     // fresh live heart-rate or pace data it cannot verify.
     var coachHeartRateSampleAt: Date? = nil
     var coachPaceSampleAt: Date? = nil
+    /// The Watch may use HRmax from a structured plan rather than a
+    /// session-wide Coach preference. Mirror the effective value to iPhone.
+    var coachResolvedMaximumHeartRateBPM: Double? = nil
     /// Watch-verified fresh terrain grade; absent on older Watch builds.
     var coachReliableNonClimbingTerrain: Bool? = nil
 }

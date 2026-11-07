@@ -122,13 +122,20 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
             return d.distanceTriggerEnabled
         case .timedUpdates:
             return d.timeTriggerEnabled
-        case .distance: return d.announceDistance
-        case .elapsedTime: return d.announceElapsedTime
-        case .averagePace: return d.announceAveragePace
-        case .clockTime: return d.announceClockTime
-        case .heartRate: return d.announceHeartRate
+        case .distance:
+            return d.announceDistance && (d.distanceTriggerEnabled || d.timeTriggerEnabled)
+        case .elapsedTime:
+            return d.announceElapsedTime && (d.distanceTriggerEnabled || d.timeTriggerEnabled)
+        case .averagePace:
+            return d.announceAveragePace && (d.distanceTriggerEnabled || d.timeTriggerEnabled)
+        case .clockTime:
+            return d.announceClockTime && (d.distanceTriggerEnabled || d.timeTriggerEnabled)
+        case .heartRate:
+            return d.announceHeartRate && (d.distanceTriggerEnabled || d.timeTriggerEnabled)
         case .currentZone: return d.smartPrompts.announceCurrentHeartRateZone ?? false
-        case .targetZoneCoach: return d.smartPrompts.targetZoneVoiceAlertsEnabled ?? false
+        case .targetZoneCoach:
+            return d.smartPrompts.targetZoneVoiceAlertsEnabled == true ||
+                d.smartPrompts.preferredHeartRateZone != nil
         case .adaptiveMotivation: return d.smartPrompts.coachingMode == .custom
         case .motivation: return d.smartPrompts.motivationEnabled
         case .contextual:
@@ -157,11 +164,31 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
             d.distanceTriggerEnabled = active
         case .timedUpdates:
             d.timeTriggerEnabled = active
-        case .distance: d.announceDistance = active
-        case .elapsedTime: d.announceElapsedTime = active
-        case .averagePace: d.announceAveragePace = active
-        case .clockTime: d.announceClockTime = active
-        case .heartRate: d.announceHeartRate = active
+        case .distance:
+            d.announceDistance = active
+            if active && !d.distanceTriggerEnabled && !d.timeTriggerEnabled {
+                d.distanceTriggerEnabled = true
+            }
+        case .elapsedTime:
+            d.announceElapsedTime = active
+            if active && !d.distanceTriggerEnabled && !d.timeTriggerEnabled {
+                d.distanceTriggerEnabled = true
+            }
+        case .averagePace:
+            d.announceAveragePace = active
+            if active && !d.distanceTriggerEnabled && !d.timeTriggerEnabled {
+                d.distanceTriggerEnabled = true
+            }
+        case .clockTime:
+            d.announceClockTime = active
+            if active && !d.distanceTriggerEnabled && !d.timeTriggerEnabled {
+                d.distanceTriggerEnabled = true
+            }
+        case .heartRate:
+            d.announceHeartRate = active
+            if active && !d.distanceTriggerEnabled && !d.timeTriggerEnabled {
+                d.distanceTriggerEnabled = true
+            }
         case .currentZone:
             d.smartPrompts.announceCurrentHeartRateZone = active
             if active {

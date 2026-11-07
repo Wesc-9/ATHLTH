@@ -8137,6 +8137,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 currentStepProgress: awaitingMainStart ? 0 : progress
             )
         }
+        snapshot.coachResolvedMaximumHeartRateBPM =
+            audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM ??
+            structuredRunningWorkout?.heartRateZoneMaximumBPM
         snapshot.coachReliableNonClimbingTerrain =
             usesOutdoorGPS && smartCoachState.isReliablyNotClimbing
         snapshot.watchOwnedAudioCoach =

@@ -519,6 +519,9 @@ final class MirroredWorkoutAudioCoach:
         _ snapshot: WatchWorkoutLiveSnapshot
     ) {
         guard (snapshot.kind == .running || snapshot.kind == .walking),
+              // Updated Watch speaks measured-zone cues locally. Never
+              // duplicate the same zone on the phone mirror.
+              snapshot.supportsAudioCoachVoiceLease != true,
               (configuration.smartPrompts?.announceCurrentHeartRateZone ??
                 configuration.announceHeartRate),
               (snapshot.runningStepTargetHeartRateZone == nil ||
@@ -529,7 +532,8 @@ final class MirroredWorkoutAudioCoach:
               ),
               let zone = ATHLTHHeartRateZones.measuredZone(
                   heartRateBPM: snapshot.heartRate,
-                  maximumBPM: configuration.smartPrompts?.maximumHeartRateBPM
+                  maximumBPM: snapshot.coachResolvedMaximumHeartRateBPM ??
+                    configuration.smartPrompts?.maximumHeartRateBPM
               )
         else {
             measuredZoneCandidate = nil
@@ -604,7 +608,8 @@ final class MirroredWorkoutAudioCoach:
             for: snapshot.runningStepTargetHeartRateZone ??
                 snapshot.heartRateTargetZone ??
                 settings.preferredHeartRateZone ?? 0,
-            maximumBPM: settings.maximumHeartRateBPM
+            maximumBPM: snapshot.coachResolvedMaximumHeartRateBPM ??
+                settings.maximumHeartRateBPM
         )
         if let message = adaptiveCoachState.nextCue(
             settings: settings,
