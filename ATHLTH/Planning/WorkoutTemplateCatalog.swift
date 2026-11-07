@@ -1388,7 +1388,7 @@ struct WorkoutTemplateLibraryView: View {
                                     ATHLTHLocalization.choose(
                                         english: "All", norwegian: "Alle"
                                     ),
-                                    systemImage: nil,
+                                    systemImage: "square.grid.2x2",
                                     selected: selectedStrengthMuscles.isEmpty
                                 )
                                 .frame(minHeight: 44)
@@ -1402,7 +1402,7 @@ struct WorkoutTemplateLibraryView: View {
                                 } label: {
                                     filterChip(
                                         focusName(muscle),
-                                        systemImage: selected ? "checkmark" : nil,
+                                        systemImage: strengthMuscleIcon(muscle),
                                         selected: selected
                                     )
                                     .frame(minHeight: 44)
@@ -1445,9 +1445,9 @@ struct WorkoutTemplateLibraryView: View {
 
                 }
 
-                if initialCategory == .strength {
+                if isStrengthScope {
                     strengthRefinementBar
-                } else if initialCategory != nil {
+                } else if initialCategory != nil || isRunningScope {
                     activityDiscoveryFilters
                 }
 
@@ -1652,6 +1652,7 @@ struct WorkoutTemplateLibraryView: View {
                                 selectedRunningType = nil
                                 selectedWorkoutDuration = .any
                                 selectedWorkoutLevel = "all"
+                                selectedExerciseName = nil
                                 selectedDiscoverySort = .alphabetical
                             }
                             .buttonStyle(.borderedProminent)
@@ -2115,6 +2116,7 @@ struct WorkoutTemplateLibraryView: View {
                         selectedRunningType = nil
                         selectedWorkoutDuration = .any
                         selectedWorkoutLevel = "all"
+                        selectedExerciseName = nil
                         selectedDiscoverySort = .alphabetical
                     }
                     .font(.caption.weight(.semibold))
@@ -2122,7 +2124,7 @@ struct WorkoutTemplateLibraryView: View {
                 }
             }
 
-            if initialCategory == .running {
+            if isRunningScope {
                 Text(ATHLTHLocalization.choose(
                     english: "Workout type", norwegian: "Økttype"
                 ))
@@ -2143,7 +2145,7 @@ struct WorkoutTemplateLibraryView: View {
                         ForEach(RunningWorkoutType.allCases) { type in
                             Button { selectedRunningType = type } label: {
                                 filterChip(
-                                    type.title, systemImage: nil,
+                                    type.title, systemImage: type.systemImage,
                                     selected: selectedRunningType == type
                                 )
                             }
@@ -2169,7 +2171,7 @@ struct WorkoutTemplateLibraryView: View {
                                 selectedWorkoutDuration = duration
                             } label: {
                                 filterChip(
-                                    duration.title, systemImage: nil,
+                                    duration.title, systemImage: "clock",
                                     selected: selectedWorkoutDuration == duration
                                 )
                             }
