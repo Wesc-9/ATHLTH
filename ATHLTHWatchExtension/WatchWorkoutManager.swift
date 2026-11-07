@@ -4582,31 +4582,25 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         )
     }
 
-    private func evaluateCustomAudioCoachRules() {
+    /// Read only crossed rule milestones; the routine scheduler merges
+    /// these with basic distance/time updates before speaking.
+    private func evaluateCustomAudioCoachRules() -> [ATHLTHAudioCoachDueAnnouncement] {
         guard !coachSpeechPaused, kind == .running || kind == .walking else {
-            return
+            return []
         }
-        let messages = ATHLTHAudioCoachRuleDelivery.dueMessages(
+        return ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: audioCoachConfiguration.customRules ?? [],
             distanceMeters: distanceMeters,
             elapsedSeconds: elapsedTime,
-            paceSecondsPerKilometer: currentPaceSecondsPerKilometer,
+            paceSecondsPerKilometer:
+                ATHLTHCoachSensorFreshness.validPace(
+                    currentPaceSecondsPerKilometer, sampledAt: coachPaceSampleAt
+                ) ? currentPaceSecondsPerKilometer : nil,
             heartRateBPM: hasFreshHeartRate ? heartRate : nil,
             norwegian: coachPhrase(english: "en", norwegian: "no") == "no",
             maximumHeartRateBPM: audioCoachConfiguration.smartPrompts?
                 .maximumHeartRateBPM ?? structuredRunningWorkout?.heartRateZoneMaximumBPM,
             lastSlots: &customAudioCoachLastSlots
-        )
-        guard !messages.isEmpty else { return }
-        speak(
-            messages.joined(separator: ". "),
-            priority: .routineCoach,
-            event: ATHLTHCoachEvent(
-                kind: .routineMilestone,
-                key: "custom:\(Int(elapsedTime)):\(Int(distanceMeters))",
-                priority: .routineCoach,
-                validFor: 10
-            )
         )
     }
 
@@ -4718,8 +4712,12 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             return
         }
 
-        evaluateCustomAudioCoachRules()
-        evaluateSmartAudioCoach()
+        let customDue = evaluateCustomAudioCoachRules()
+        let coveredMetrics = customDue.reduce(
+            into: Set<ATHLTHAudioCoachRule.Metric>()
+        ) { result, item in
+            result.formUnion(item.metrics)
+        }
 
         var shouldAnnounce = false
         var milestoneKeys: [String] = []
@@ -4756,16 +4754,15 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             shouldAnnounce = true
         }
 
-        if shouldAnnounce {
-            guard ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
+        let maySpeakRoutine = shouldAnnounce &&
+            ATHLTHCoachRoutineContextPolicy.shouldSpeakMilestone(
                 step: currentStructuredRunningStep,
                 elapsedInStep: currentStructuredStepElapsedTime,
                 distanceInStepMeters: currentStructuredStepDistanceMeters
-            ) else { return }
-
-            var message = metricsAnnouncement
-            guard !message.isEmpty else { return }
-
+            )
+        var segments: [String] = []
+        if maySpeakRoutine {
+            var standard = metricsAnnouncement(excluding: coveredMetrics)
             if let feedback = ATHLTHCoachGoalEncouragement.phrase(
                 style: audioCoachConfiguration.speechStyle ?? .balanced,
                 step: currentStructuredRunningStep,
@@ -4775,22 +4772,27 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 lastSpokenAt: lastGoalEncouragementAt,
                 norwegian: coachPhrase(english: "en", norwegian: "no") == "no"
             ) {
-                message += ". " + feedback
+                standard += standard.isEmpty ? feedback : ". " + feedback
                 lastGoalEncouragementAt = Date()
             }
-
+            if !standard.isEmpty { segments.append(standard) }
+        }
+        segments.append(contentsOf: customDue.map(\.text))
+        if !segments.isEmpty {
             WKInterfaceDevice.current().play(.click)
             speak(
-                message,
+                segments.joined(separator: ". "),
                 priority: .routineCoach,
                 event: ATHLTHCoachEvent(
                     kind: .routineMilestone,
-                    key: milestoneKeys.joined(separator: "-"),
+                    key: (maySpeakRoutine ? milestoneKeys.joined(separator: "-") : "custom") +
+                        ":\(Int(elapsedTime)):\(Int(distanceMeters))",
                     priority: .routineCoach,
                     validFor: 10
                 )
             )
         }
+        evaluateSmartAudioCoach()
     }
 
     /// Sample once per 60 seconds of active step time, plus any residual
@@ -5127,10 +5129,17 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     }
 
     private var metricsAnnouncement: String {
+        metricsAnnouncement(excluding: [])
+    }
+
+    private func metricsAnnouncement(
+        excluding metrics: Set<ATHLTHAudioCoachRule.Metric>
+    ) -> String {
         var parts: [String] = []
         let configuration = audioCoachConfiguration
 
         if configuration.announceDistance,
+           !metrics.contains(.distance),
            distanceMeters > 0 {
             parts.append(
                 coachPhrase(
@@ -5141,7 +5150,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             )
         }
 
-        if configuration.announceElapsedTime {
+        if configuration.announceElapsedTime,
+           !metrics.contains(.elapsedTime) {
             parts.append(
                 coachPhrase(
                     english: "Elapsed time",
@@ -5164,6 +5174,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }()
 
         if configuration.announceAveragePace,
+           !metrics.contains(.pace),
            let averageSecondsPerKilometer {
             parts.append(
                 coachPhrase(
@@ -5175,6 +5186,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         if configuration.announceHeartRate,
+           !metrics.contains(.heartRate),
            ATHLTHCoachSensorFreshness.validHeartRate(
                heartRate,
                sampledAt: coachHeartRateSampleAt

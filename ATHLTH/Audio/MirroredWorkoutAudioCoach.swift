@@ -208,10 +208,10 @@ final class MirroredWorkoutAudioCoach:
             announceStepIfNeeded(snapshot)
             announceIntervalProgressIfDue(snapshot)
             announceFuelIfNeeded(snapshot)
-            announceCustomAudioCoachRules(snapshot)
+            let customDue = announceCustomAudioCoachRules(snapshot)
             announceMeasuredZoneIfNeeded(snapshot)
+            announceRoutineIfNeeded(snapshot, customDue: customDue)
             announceSmartCoachIfNeeded(snapshot)
-            announceRoutineIfNeeded(snapshot)
         }
 
         if snapshot.state == .completed {
@@ -489,31 +489,22 @@ final class MirroredWorkoutAudioCoach:
 
     private func announceCustomAudioCoachRules(
         _ snapshot: WatchWorkoutLiveSnapshot
-    ) {
-        let messages = ATHLTHAudioCoachRuleDelivery.dueMessages(
+    ) -> [ATHLTHAudioCoachDueAnnouncement] {
+        ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
             rules: configuration.customRules ?? [],
             distanceMeters: snapshot.distanceMeters,
             elapsedSeconds: snapshot.elapsedTime,
-            paceSecondsPerKilometer: resolvedPace(snapshot),
+            paceSecondsPerKilometer:
+                ATHLTHCoachSensorFreshness.validPace(
+                    resolvedPace(snapshot), sampledAt: snapshot.coachPaceSampleAt
+                ) ? resolvedPace(snapshot) : nil,
             heartRateBPM: ATHLTHCoachSensorFreshness.validHeartRate(
-                snapshot.heartRate,
-                sampledAt: snapshot.coachHeartRateSampleAt
+                snapshot.heartRate, sampledAt: snapshot.coachHeartRateSampleAt
             ) ? snapshot.heartRate : nil,
             norwegian: phrase(english: "en", norwegian: "no") == "no",
-            maximumHeartRateBPM: configuration.smartPrompts?.maximumHeartRateBPM,
+            maximumHeartRateBPM: snapshot.coachResolvedMaximumHeartRateBPM ??
+                configuration.smartPrompts?.maximumHeartRateBPM,
             lastSlots: &customAudioCoachLastSlots
-        )
-        guard !messages.isEmpty else { return }
-        speak(
-            messages.joined(separator: ". "),
-            priority: .routineCoach,
-            event: ATHLTHCoachEvent(
-                kind: .routineMilestone,
-                key: "custom:\(Int(snapshot.elapsedTime)):\(Int(snapshot.distanceMeters))",
-                priority: .routineCoach,
-                createdAt: snapshot.capturedAt,
-                validFor: 10
-            )
         )
     }
 
@@ -671,8 +662,8 @@ final class MirroredWorkoutAudioCoach:
     }
 
     private func announceRoutineIfNeeded(
-        _ snapshot:
-            WatchWorkoutLiveSnapshot
+        _ snapshot: WatchWorkoutLiveSnapshot,
+        customDue: [ATHLTHAudioCoachDueAnnouncement]
     ) {
         var due = false
         var milestoneKeys: [String] = []
@@ -717,23 +708,26 @@ final class MirroredWorkoutAudioCoach:
             }
         }
 
-        guard due else {
-            return
+        let covered = customDue.reduce(
+            into: Set<ATHLTHAudioCoachRule.Metric>()
+        ) { result, cue in
+            result.formUnion(cue.metrics)
         }
-
-        let text =
-            routinePhrase(snapshot)
-
-        guard !text.isEmpty else {
-            return
+        var parts: [String] = []
+        if due {
+            let regular = routinePhrase(snapshot, excluding: covered)
+            if !regular.isEmpty { parts.append(regular) }
         }
+        parts.append(contentsOf: customDue.map(\.text))
+        guard !parts.isEmpty else { return }
 
         speak(
-            text,
+            parts.joined(separator: ". "),
             priority: .routineCoach,
             event: ATHLTHCoachEvent(
                 kind: .routineMilestone,
-                key: milestoneKeys.joined(separator: "-"),
+                key: (due ? milestoneKeys.joined(separator: "-") : "custom") +
+                    ":\(Int(snapshot.elapsedTime)):\(Int(snapshot.distanceMeters))",
                 priority: .routineCoach,
                 createdAt: snapshot.capturedAt,
                 validFor: 10
@@ -742,13 +736,14 @@ final class MirroredWorkoutAudioCoach:
     }
 
     private func routinePhrase(
-        _ snapshot:
-            WatchWorkoutLiveSnapshot
+        _ snapshot: WatchWorkoutLiveSnapshot,
+        excluding metrics: Set<ATHLTHAudioCoachRule.Metric>
     ) -> String {
         var english: [String] = []
         var norwegian: [String] = []
 
-        if configuration.announceDistance {
+        if configuration.announceDistance,
+           !metrics.contains(.distance) {
             let kilometers =
                 snapshot.distanceMeters /
                 1_000
@@ -768,8 +763,8 @@ final class MirroredWorkoutAudioCoach:
             )
         }
 
-        if configuration
-            .announceElapsedTime {
+        if configuration.announceElapsedTime,
+           !metrics.contains(.elapsedTime) {
             let minutes =
                 Int(
                     snapshot.elapsedTime
@@ -793,8 +788,8 @@ final class MirroredWorkoutAudioCoach:
             )
         }
 
-        if configuration
-            .announceAveragePace,
+        if configuration.announceAveragePace,
+           !metrics.contains(.pace),
            let pace =
                 resolvedPace(snapshot) {
             let total =
@@ -825,8 +820,8 @@ final class MirroredWorkoutAudioCoach:
             )
         }
 
-        if configuration
-            .announceHeartRate,
+        if configuration.announceHeartRate,
+           !metrics.contains(.heartRate),
            ATHLTHCoachSensorFreshness.validHeartRate(
                snapshot.heartRate,
                sampledAt: snapshot.coachHeartRateSampleAt
