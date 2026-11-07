@@ -8,7 +8,6 @@ struct ATHLTHEditProfileView: View {
     @EnvironmentObject private var accountService: SupabaseAccountService
     @EnvironmentObject private var social: SocialStore
     @EnvironmentObject private var gear: ProfileGearStore
-    @EnvironmentObject private var pets: ATHLTHPetStore
     @EnvironmentObject private var settings: AppSettingsStore
     @EnvironmentObject private var realtime: ATHLTHRealtimeSocialStore
 
@@ -99,10 +98,6 @@ struct ATHLTHEditProfileView: View {
                             .padding(.horizontal, 2)
 
                         gearCard
-                    }
-
-                    if !pets.visiblePets.isEmpty {
-                        ATHLTHPetProfileSection()
                     }
 
                     HStack(alignment: .top, spacing: 10) {
