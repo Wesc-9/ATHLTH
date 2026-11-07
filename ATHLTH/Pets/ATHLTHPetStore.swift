@@ -44,7 +44,8 @@ struct ATHLTHPetDraft {
     var breed = ""
     var birthDate: Date?
     var weightKG: Double?
-    var showOnProfile = true
+    // Pets are added in Settings and do not appear in profile cards.
+    var showOnProfile = false
     var isPublic = false
 
     init(pet: ATHLTHPet? = nil) {
