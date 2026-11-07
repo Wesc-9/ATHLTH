@@ -1539,7 +1539,8 @@ struct WorkoutTemplateLibraryView: View {
                                     workoutGridCard(
                                         title: workout.title,
                                         subtitle: workout.kind.title,
-                                        symbol: workout.kind.systemImage
+                                        symbol: workout.kind.systemImage,
+                                        workout: workout
                                     )
                                 } else {
                                 VStack(alignment: .leading, spacing: 10) {
@@ -1605,7 +1606,8 @@ struct WorkoutTemplateLibraryView: View {
                                     workoutGridCard(
                                         title: workout.title,
                                         subtitle: workout.kind.title,
-                                        symbol: workout.kind.systemImage
+                                        symbol: workout.kind.systemImage,
+                                        workout: workout
                                     )
                                 } else {
                                 HStack(spacing: 10) {
@@ -2273,7 +2275,9 @@ struct WorkoutTemplateLibraryView: View {
             workoutGridCard(
                 title: entry.title,
                 subtitle: entry.categoryTitle,
-                symbol: entry.systemImage
+                symbol: entry.systemImage,
+                workout: entry.plannedSession(),
+                estimatedMinutes: entry.estimatedDurationMinutes
             )
         } else {
             workoutCard(entry)
@@ -2286,7 +2290,11 @@ struct WorkoutTemplateLibraryView: View {
             workoutGridCard(
                 title: workout.title,
                 subtitle: workout.type.title,
-                symbol: workout.type.systemImage
+                symbol: workout.type.systemImage,
+                workout: workout.plannedSession(),
+                estimatedMinutes: workout.estimatedDurationSeconds.map {
+                    Int(($0 / 60).rounded(.up))
+                }
             )
         } else {
             runningWorkoutCard(workout)
@@ -2294,7 +2302,8 @@ struct WorkoutTemplateLibraryView: View {
     }
 
     private func workoutGridCard(
-        title: String, subtitle: String, symbol: String
+        title: String, subtitle: String, symbol: String,
+        workout: PlannedSession, estimatedMinutes: Int? = nil
     ) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Image(systemName: symbol)
@@ -2313,11 +2322,16 @@ struct WorkoutTemplateLibraryView: View {
             Text(subtitle)
                 .font(.caption)
                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .lineLimit(2)
+                .lineLimit(1)
+            ATHLTHWorkoutGridDetails(
+                workout: workout,
+                estimatedMinutes: estimatedMinutes
+            )
+            .padding(.top, 3)
             Spacer(minLength: 0)
         }
         .padding(13)
-        .frame(maxWidth: .infinity, minHeight: 164, alignment: .topLeading)
+        .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
         .background(.white, in: RoundedRectangle(cornerRadius: 18))
     }
 
