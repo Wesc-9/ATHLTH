@@ -66,6 +66,14 @@ final class AthleteOfflinePackStore: ObservableObject {
         guard let accountID, let folder = try? root(accountID) else { return nil }
         return UIImage(contentsOfFile: folder.appendingPathComponent(packID.uuidString).appendingPathComponent(assetID.uuidString + ".png").path)
     }
+    /// Forget which account is active without deleting its encrypted local
+    /// files. A later sign-in to that account can load them again.
+    func clearActiveAccount() {
+        accountID = nil
+        packs = []
+        error = nil
+    }
+
     func remove(_ pack: AthleteOfflinePack) {
         guard let accountID else { return }
         do { try FileManager.default.removeItem(at: root(accountID).appendingPathComponent(pack.id.uuidString)); packs.removeAll { $0.id == pack.id } }
