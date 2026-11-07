@@ -3,6 +3,8 @@ import Foundation
 extension Notification.Name {
     static let athlthTrainingDataDidChange =
         Notification.Name("athlth.trainingDataDidChange")
+    static let athlthNetworkConnectivityRestored =
+        Notification.Name("athlth.networkConnectivityRestored")
 }
 
 enum ATHLTHTrainingDataChangeSignal {
