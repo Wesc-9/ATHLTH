@@ -342,182 +342,88 @@ struct ATHLTHPetEditorView: View {
 }
 
 /// Compact but personal preview: tap a companion for detailed activity.
-/// It shows only pets explicitly visible in the user's profile.
+/// Kept deliberately compact: no photo/statistics grid on the profile.
+/// A single row opens the existing pet library and detailed statistics.
 struct ATHLTHPetProfileSection: View {
     @EnvironmentObject private var pets: ATHLTHPetStore
 
     var body: some View {
         if !pets.visiblePets.isEmpty {
-            VStack(alignment: .leading, spacing: 12) {
-                HStack(spacing: 9) {
+            NavigationLink {
+                ATHLTHPetsSettingsView()
+            } label: {
+                HStack(spacing: 10) {
                     Image(systemName: "pawprint.fill")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHPetStyle.bronze)
-                    Text(ATHLTHLocalization.choose(
-                        english: "My companions",
-                        norwegian: "Mine turkamerater"
-                    ))
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(ATHLTHPetStyle.ink)
-
-                    Spacer()
-
-                    NavigationLink {
-                        ATHLTHPetsSettingsView()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Manage", norwegian: "Rediger"
-                            ))
-                            Image(systemName: "chevron.right")
+                        .frame(width: 28, height: 28)
+                        .background(ATHLTHTheme.premiumGoldSoft.opacity(0.65),
+                                    in: Circle())
+                    HStack(spacing: -8) {
+                        ForEach(Array(pets.visiblePets.prefix(3))) { pet in
+                            ATHLTHPetAvatar(pet: pet, size: 30)
                         }
+                    }
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Companions", norwegian: "Turkamerater"
+                        ))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPetStyle.ink)
+                        if pets.visiblePets.count == 1,
+                           let pet = pets.visiblePets.first {
+                            let stats = pets.stats(for: pet)
+                            Text(
+                                pet.name + " · " + "\(stats.outings) " +
+                                ATHLTHLocalization.choose(
+                                    english: "outings", norwegian: "turer"
+                                ) + " · " +
+                                String(format: "%.1f km", stats.meters / 1000)
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPetStyle.muted)
+                            .lineLimit(1)
+                        } else {
+                            let outings = pets.visiblePets.reduce(0) {
+                                $0 + pets.stats(for: $1).outings
+                            }
+                            Text(
+                                "\(pets.visiblePets.count) " +
+                                ATHLTHLocalization.choose(
+                                    english: "pets", norwegian: "kjæledyr"
+                                ) + " · " + "\(outings) " +
+                                ATHLTHLocalization.choose(
+                                    english: "outings in total", norwegian: "turer totalt"
+                                )
+                            )
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPetStyle.muted)
+                            .lineLimit(1)
+                        }
+                    }
+                    Spacer(minLength: 3)
+                    Image(systemName: "chevron.right")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ATHLTHPetStyle.bronze)
-                    }
-                    .buttonStyle(.plain)
                 }
-
-                ForEach(pets.visiblePets) { pet in
-                    NavigationLink {
-                        ATHLTHPetDetailView(petID: pet.id)
-                    } label: {
-                        companionPreview(pet)
-                    }
-                    .buttonStyle(.plain)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.white.opacity(0.91),
+                            in: RoundedRectangle(cornerRadius: 17))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 17)
+                        .strokeBorder(ATHLTHPetStyle.gold.opacity(0.12),
+                                      lineWidth: 0.8)
                 }
+                .contentShape(Rectangle())
             }
-            .padding(14)
-            .background(
-                Color.white.opacity(0.91),
-                in: RoundedRectangle(cornerRadius: 26)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 26)
-                    .strokeBorder(
-                        ATHLTHPetStyle.gold.opacity(0.11), lineWidth: 0.8
-                    )
-            }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Open pet profiles and activity statistics",
+                norwegian: "Åpne kjæledyrprofiler og aktivitetsstatistikk"
+            ))
         }
-    }
-
-    private func companionPreview(_ pet: ATHLTHPet) -> some View {
-        let stats = pets.stats(for: pet)
-        let breed = pet.breed?.trimmingCharacters(in: .whitespacesAndNewlines)
-        return VStack(alignment: .leading, spacing: 11) {
-            HStack(alignment: .center, spacing: 12) {
-                ATHLTHPetAvatar(pet: pet, size: 66)
-
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(pet.name)
-                        .font(.system(size: 20, weight: .semibold, design: .serif))
-                        .foregroundStyle(ATHLTHPetStyle.ink)
-                        .lineLimit(1)
-
-                    Text((breed?.isEmpty == false ? breed : nil) ?? pet.speciesName)
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHPetStyle.muted)
-                        .lineLimit(1)
-
-                    if let last = stats.lastOuting {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Last adventure",
-                                norwegian: "Siste tur"
-                            ) + " · " +
-                                last.formatted(date: .abbreviated, time: .omitted)
-                        )
-                        .font(.caption2)
-                        .foregroundStyle(ATHLTHPetStyle.bronze)
-                    } else {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Ready for the first adventure",
-                            norwegian: "Klar for første tur"
-                        ))
-                        .font(.caption2.weight(.medium))
-                        .foregroundStyle(ATHLTHPetStyle.bronze)
-                    }
-                }
-
-                Spacer(minLength: 2)
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(ATHLTHPetStyle.bronze.opacity(0.72))
-            }
-
-            HStack(spacing: 8) {
-                companionMetric(
-                    value: "\(stats.outings)",
-                    label: ATHLTHLocalization.choose(
-                        english: "Outings", norwegian: "Turer"
-                    )
-                )
-                companionMetric(
-                    value: String(format: "%.1f km", stats.meters / 1000),
-                    label: ATHLTHLocalization.choose(
-                        english: "Distance", norwegian: "Distanse"
-                    )
-                )
-                companionMetric(
-                    value: stats.seconds < 3600
-                        ? "\(Int((stats.seconds / 60).rounded())) min"
-                        : String(format: "%.1f t", stats.seconds / 3600),
-                    label: ATHLTHLocalization.choose(
-                        english: "Active time", norwegian: "Aktiv tid"
-                    )
-                )
-            }
-
-            if stats.outings == 0 {
-                Text(ATHLTHLocalization.choose(
-                    english: "Add your companion to a walk or workout to begin the activity history.",
-                    norwegian: "Ta med turkameraten på en tur eller økt for å starte turhistorikken."
-                ))
-                .font(.caption2)
-                .foregroundStyle(ATHLTHPetStyle.muted)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-        .padding(12)
-        .background(
-            LinearGradient(
-                colors: [
-                    ATHLTHTheme.premiumGoldSoft.opacity(0.25),
-                    Color.white.opacity(0.80)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 20)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 20)
-                .strokeBorder(ATHLTHPetStyle.gold.opacity(0.16), lineWidth: 0.8)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(pet.name), \(stats.outings) " +
-            ATHLTHLocalization.choose(english: "outings", norwegian: "turer"))
-    }
-
-    private func companionMetric(value: String, label: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(value)
-                .font(.system(size: 14, weight: .semibold, design: .rounded))
-                .monospacedDigit()
-                .foregroundStyle(ATHLTHPetStyle.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-            Text(label)
-                .font(.system(size: 10, weight: .medium))
-                .foregroundStyle(ATHLTHPetStyle.muted)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 9)
-        .background(
-            Color.white.opacity(0.83),
-            in: RoundedRectangle(cornerRadius: 12)
-        )
     }
 }
 
@@ -708,88 +614,129 @@ struct ATHLTHPetDetailView: View {
     }
 }
 
+/// A single compact menu replaces the large multi-row card.
+/// The selected pet IDs are the same binding used by the workout engine.
 struct ATHLTHWorkoutPetSelectionCard: View {
     @EnvironmentObject private var pets: ATHLTHPetStore
     @Binding var selectedPetIDs: Set<UUID>
 
+    private var selectedNames: String {
+        let names = pets.pets.filter { selectedPetIDs.contains($0.id) }
+            .map(\.name)
+        if names.isEmpty {
+            return ATHLTHLocalization.choose(
+                english: "Choose", norwegian: "Velg"
+            )
+        }
+        return names.joined(separator: ", ")
+    }
+
     var body: some View {
         if !pets.pets.isEmpty {
-            ATHLTHCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Label(ATHLTHLocalization.choose(
-                            english: "With pets", norwegian: "Med kjæledyr"),
-                            systemImage: "pawprint.fill")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(ATHLTHPetStyle.ink)
-                        Spacer()
-                        Text(ATHLTHLocalization.choose(english: "Optional", norwegian: "Valgfritt"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    ForEach(pets.pets) { pet in
-                        Button {
-                            if selectedPetIDs.contains(pet.id) {
-                                selectedPetIDs.remove(pet.id)
-                            } else {
-                                selectedPetIDs.insert(pet.id)
-                            }
-                        } label: {
-                            HStack(spacing: 11) {
-                                ATHLTHPetAvatar(pet: pet, size: 37)
-                                Text(pet.name)
-                                    .font(.subheadline)
-                                    .foregroundStyle(ATHLTHPetStyle.ink)
-                                Spacer()
-                                Image(systemName: selectedPetIDs.contains(pet.id)
-                                    ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(selectedPetIDs.contains(pet.id)
-                                        ? ATHLTHPetStyle.bronze : .secondary)
-                                    .font(.title3)
-                            }
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
+            Menu {
+                ForEach(pets.pets) { pet in
+                    Button {
+                        if selectedPetIDs.contains(pet.id) {
+                            selectedPetIDs.remove(pet.id)
+                        } else {
+                            selectedPetIDs.insert(pet.id)
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel(pet.name)
-                        .accessibilityAddTraits(selectedPetIDs.contains(pet.id) ? [.isSelected] : [])
+                    } label: {
+                        Label(pet.name, systemImage: selectedPetIDs.contains(pet.id)
+                            ? "checkmark.circle.fill" : "circle")
                     }
                 }
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "pawprint.fill")
+                        .foregroundStyle(ATHLTHPetStyle.bronze)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Companion", norwegian: "Turkamerat"
+                    ))
+                    .foregroundStyle(ATHLTHPetStyle.ink)
+                    Spacer(minLength: 4)
+                    Text(selectedNames)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPetStyle.muted)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHPetStyle.bronze)
+                }
+                .font(.subheadline.weight(.medium))
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .background(Color.white.opacity(0.9),
+                            in: RoundedRectangle(cornerRadius: 14))
             }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Choose one or more pets for the workout",
+                norwegian: "Velg ett eller flere kjæledyr som blir med"
+            ))
         }
     }
 }
 
+/// Live edits preserve the existing participation/partial-distance logic.
 struct ATHLTHLivePetSelectionCard: View {
     @EnvironmentObject private var pets: ATHLTHPetStore
     let distanceMeters: Double?
 
     var body: some View {
         if !pets.pets.isEmpty {
-            VStack(alignment: .leading, spacing: 10) {
-                Label(ATHLTHLocalization.choose(
-                    english: "Companions on this workout", norwegian: "Turkamerater på denne økten"),
-                    systemImage: "pawprint.fill")
-                    .font(.subheadline.weight(.semibold))
+            Menu {
                 ForEach(pets.pets) { pet in
                     Button {
                         var ids = pets.activePetIDs
-                        if ids.contains(pet.id) { ids.remove(pet.id) }
-                        else { ids.insert(pet.id) }
-                        pets.updateActiveWorkoutPets(ids, distanceMeters: distanceMeters)
-                    } label: {
-                        HStack {
-                            ATHLTHPetAvatar(pet: pet, size: 32)
-                            Text(pet.name)
-                            Spacer()
-                            Image(systemName: pets.activePetIDs.contains(pet.id)
-                                ? "checkmark.circle.fill" : "circle")
+                        if ids.contains(pet.id) {
+                            ids.remove(pet.id)
+                        } else {
+                            ids.insert(pet.id)
                         }
-                        .frame(minHeight: 44)
+                        pets.updateActiveWorkoutPets(
+                            ids, distanceMeters: distanceMeters
+                        )
+                    } label: {
+                        Label(pet.name, systemImage:
+                            pets.activePetIDs.contains(pet.id)
+                                ? "checkmark.circle.fill" : "circle")
                     }
-                    .buttonStyle(.plain)
                 }
+            } label: {
+                HStack(spacing: 9) {
+                    Image(systemName: "pawprint.fill")
+                        .foregroundStyle(ATHLTHPetStyle.bronze)
+                    Text(ATHLTHLocalization.choose(
+                        english: "Companion", norwegian: "Turkamerat"
+                    ))
+                    .font(.subheadline.weight(.medium))
+                    Spacer(minLength: 4)
+                    let selected = pets.pets.filter {
+                        pets.activePetIDs.contains($0.id)
+                    }.map(\.name)
+                    Text(selected.isEmpty
+                         ? ATHLTHLocalization.choose(
+                            english: "Add", norwegian: "Legg til")
+                         : selected.joined(separator: ", "))
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(ATHLTHPetStyle.muted)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(ATHLTHPetStyle.bronze)
+                }
+                .foregroundStyle(ATHLTHPetStyle.ink)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .background(Color.white.opacity(0.9),
+                            in: RoundedRectangle(cornerRadius: 14))
             }
+            .buttonStyle(.plain)
+            .accessibilityHint(ATHLTHLocalization.choose(
+                english: "Update companions without interrupting the workout",
+                norwegian: "Endre turkamerater uten å avbryte økten"
+            ))
         }
     }
 }
