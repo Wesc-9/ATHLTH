@@ -74,6 +74,30 @@ on:
       - Tests/ATHLTHTrainDesignLayoutTests.swift
       - Tests/ATHLTHTrainTodayLayoutTests.swift
       - Tests/ATHLTHTrainPlanStudioIntegrationTests.swift
+      # Audio Coach must be exercised on both iPhone Simulator and watchOS
+      # whenever its rules, speech routing, profiles or pulse zones change.
+      - ATHLTH/Audio/ATHLTHAzureWorkoutSpeech.swift
+      - ATHLTH/Audio/MirroredWorkoutAudioCoach.swift
+      - ATHLTH/Audio/ATHLTHAudioRouteControl.swift
+      - ATHLTH/Recording/IPhoneWorkoutStore.swift
+      - ATHLTH/Planning/ATHLTHAudioCoachActiveListView.swift
+      - ATHLTH/Planning/ATHLTHAudioCoachOption.swift
+      - ATHLTH/Planning/ATHLTHAudioCoachAdvancedEditors.swift
+      - ATHLTH/Planning/QuickStartFlowViews.swift
+      - ATHLTH/Settings/ATHLTHAudioCoachGlobalEditorView.swift
+      - ATHLTH/Settings/AppSettings.swift
+      - Shared/ATHLTHAudioCoachRule.swift
+      - Shared/ATHLTHAudioCoachSmartPrompts.swift
+      - Shared/ATHLTHCoachAdaptiveMotivation.swift
+      - Shared/ATHLTHCoachEventEngine.swift
+      - Shared/ATHLTHCoachCueQueue.swift
+      - Shared/ATHLTHCoachSensorFreshness.swift
+      - Shared/ATHLTHHeartRateZoneCoachTarget.swift
+      - Tests/ATHLTHGuidanceStudioConfigurationTests.swift
+      - Tests/ATHLTHAudioCoachRuleDeliveryTests.swift
+      - Tests/ATHLTHCoachAdaptiveMotivationTests.swift
+      - Tests/AudioCoachFreshnessAndReceiptTests.swift
+      - Tests/AudioCoachVoiceRoutingTests.swift
 
 concurrency:
   group: athlth-train-hybrid-tests-${{ github.ref }}
@@ -157,6 +181,12 @@ jobs:
             -only-testing:ATHLTHTests/ATHLTHWorkoutContentSummaryTests \
             -only-testing:ATHLTHTests/StrengthWorkoutCompletionRecoveryTests \
             -only-testing:ATHLTHTests/ATHLTHWorkoutMirrorContinuityTests \
+            -only-testing:ATHLTHTests/ATHLTHGuidanceStudioConfigurationTests \
+            -only-testing:ATHLTHTests/ATHLTHAudioCoachRuleDeliveryTests \
+            -only-testing:ATHLTHTests/ATHLTHCoachAdaptiveMotivationTests \
+            -only-testing:ATHLTHTests/AudioCoachFreshnessAndReceiptTests \
+            -only-testing:ATHLTHTests/AudioCoachVoiceRoutingTests \
+            -only-testing:ATHLTHTests/ATHLTHAudioCoachSmartPromptsTests \
             CODE_SIGNING_ALLOWED=NO \
             test
 
