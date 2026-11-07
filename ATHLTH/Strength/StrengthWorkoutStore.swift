@@ -1488,12 +1488,18 @@ final class StrengthWorkoutStore: ObservableObject {
               StrengthBarbellExercisePolicy.usesBar(exercise),
               kilograms.isFinite, (0...40).contains(kilograms)
         else { return false }
+        // Update the active draft before changing the stored preference,
+        // otherwise a legacy nil bar can resolve its OLD mass as the new
+        // preference and accidentally alter the plate-only input.
+        guard setActiveExerciseBarWeight(id, kilograms: kilograms) else {
+            return false
+        }
         StrengthBarWeightPreferences.setExerciseMass(
             kilograms,
             for: exercise.exercise.name,
             userID: accountID
         )
-        return setActiveExerciseBarWeight(id, kilograms: kilograms)
+        return true
     }
 
     private func applyBarDefaults(_ logs: inout [StrengthExerciseLog]) {
