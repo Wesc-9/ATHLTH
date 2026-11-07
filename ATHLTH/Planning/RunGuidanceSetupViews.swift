@@ -220,6 +220,15 @@ struct GhostQuickStartDraft {
         targetTimeText = GhostTargetTimeFormatter.string(duration)
     }
 
+    /// Complete shorthand when the field loses focus. Keep raw input during
+    /// editing so people can type either "5", "5:00" or "5:30".
+    mutating func finalizeTargetPaceText(distanceKilometers: Double?) {
+        guard let normalized = ATHLTHGhostPaceTimeConversion.normalizedPaceText(
+            from: targetPaceText
+        ) else { return }
+        setTargetPaceText(normalized, distanceKilometers: distanceKilometers)
+    }
+
     var targetDuration: TimeInterval? {
         guard enabled,
               let duration = GhostTargetTimeFormatter.parse(targetTimeText),
@@ -769,6 +778,7 @@ struct PerWorkoutGhostView: View {
     @EnvironmentObject private var settings: AppSettingsStore
     @Binding var draft: GhostQuickStartDraft
     let route: TrainingRoute?
+    @FocusState private var paceFieldFocused: Bool
 
     private var updatesBinding: Binding<WatchGhostRaceAudioConfiguration> {
         Binding(
@@ -883,6 +893,19 @@ struct PerWorkoutGhostView: View {
                                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                                         TextField("5:30", text: targetPaceBinding)
                                             .keyboardType(.numbersAndPunctuation)
+                                            .focused($paceFieldFocused)
+                                            .onSubmit {
+                                                draft.finalizeTargetPaceText(
+                                                    distanceKilometers: route?.distanceKilometers
+                                                )
+                                            }
+                                            .onChange(of: paceFieldFocused) { _, focused in
+                                                if !focused {
+                                                    draft.finalizeTargetPaceText(
+                                                        distanceKilometers: route?.distanceKilometers
+                                                    )
+                                                }
+                                            }
                                             .font(.system(size: 24, weight: .semibold,
                                                           design: .rounded))
                                             .foregroundStyle(ATHLTHPlanDesign.ink)
