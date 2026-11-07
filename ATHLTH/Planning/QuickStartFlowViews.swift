@@ -91,6 +91,8 @@ struct AudioCoachDraft {
     var timeTriggerEnabled = false
     var distanceIntervalKilometers = 1.0
     var timeIntervalMinutes = 10
+    /// Preserve precise 15-second to 120-minute Watch cadence.
+    var timeIntervalSeconds = 600
     // Existing rules and motivation engine are shared with Settings and Watch.
     // Per-workout selections are snapshots, never edits to the saved preset.
     var customRules: [ATHLTHAudioCoachRule] = []
@@ -133,6 +135,8 @@ struct AudioCoachDraft {
         distanceTriggerEnabled = true
         timeTriggerEnabled = false
         distanceIntervalKilometers = 1.0
+        timeIntervalMinutes = 10
+        timeIntervalSeconds = 600
         customRules = []
         announceDistance = true
         announceElapsedTime = true
@@ -201,6 +205,7 @@ struct AudioCoachDraft {
             settings.audioCoachDistanceIntervalKilometers
         timeIntervalMinutes =
             settings.audioCoachTimeIntervalMinutes
+        timeIntervalSeconds = min(max(settings.audioCoachTimeIntervalSeconds, 15), 7_200)
         customRules = settings.audioCoachCustomRules
         smartPrompts = settings.audioCoachSmartSettings
         announceDistance =
@@ -260,6 +265,7 @@ struct AudioCoachDraft {
         distanceIntervalKilometers = (config.distanceIntervalMeters ?? 1_000) / 1_000
         timeTriggerEnabled = config.timeIntervalSeconds != nil
         timeIntervalMinutes = max(1, Int(((config.timeIntervalSeconds ?? 600) / 60).rounded()))
+        timeIntervalSeconds = Int(min(max(config.timeIntervalSeconds ?? 600, 15), 7_200))
         announceDistance = config.announceDistance
         announceElapsedTime = config.announceElapsedTime
         announceAveragePace = config.announceAveragePace
@@ -350,7 +356,7 @@ struct AudioCoachDraft {
                     : nil,
             timeIntervalSeconds:
                 enabled && customRules.isEmpty && timeTriggerEnabled
-                    ? Double(timeIntervalMinutes * 60)
+                    ? Double(min(max(timeIntervalSeconds, 15), 7_200))
                     : nil,
             customRules: enabled && !customRules.isEmpty
                 ? Array(customRules.prefix(20)) : nil,

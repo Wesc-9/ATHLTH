@@ -19,6 +19,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var nextEditor: ATHLTHAudioCoachOption?
     @State private var pendingRemoval: ATHLTHAudioCoachOption?
     @State private var profileName = ""
+    @State private var ruleSetName = ""
     @State private var phraseText = ""
     @State private var newRuleTrigger: ATHLTHAudioCoachRule.Trigger = .distance
     @State private var newRuleMetric: ATHLTHAudioCoachRule.Metric = .pace
@@ -37,6 +38,17 @@ struct ATHLTHAudioCoachActiveListView: View {
         var subtitle: String
         var latitude: Double
         var longitude: Double
+    }
+
+    private var timeSeconds: Binding<Int> {
+        Binding(
+            get: { draft.timeIntervalSeconds },
+            set: { seconds in
+                let valid = min(max(seconds, 15), 7_200)
+                draft.timeIntervalSeconds = valid
+                draft.timeIntervalMinutes = max(1, Int((Double(valid) / 60).rounded()))
+            }
+        )
     }
 
     private let bronze = ATHLTHPlanDesign.accentInk
@@ -157,7 +169,9 @@ struct ATHLTHAudioCoachActiveListView: View {
                         .font(.headline)
                         .foregroundStyle(ink)
                     Text(draft.enabled
-                        ? tr("Active for this workout", "Aktiv stemmeveiledning")
+                        ? (globalScope
+                            ? tr("On for new workouts", "På for nye økter")
+                            : tr("Active for this workout", "Aktiv stemmeveiledning"))
                         : tr("Voice guidance is off", "Stemmeveiledning er av"))
                         .font(.caption)
                         .foregroundStyle(dim)
@@ -184,10 +198,24 @@ struct ATHLTHAudioCoachActiveListView: View {
             .font(.subheadline)
             .foregroundStyle(dim)
             VStack(alignment: .leading, spacing: 8) {
-                Label(tr("1 km updates", "Oppdatering hver kilometer"),
-                      systemImage: "point.bottomleft.forward.to.point.topright.scurvepath")
-                Label(tr("Motivation and finish highlights", "Motivasjon og høydepunkter ved mål"),
-                      systemImage: "sparkles")
+                if draft.distanceTriggerEnabled && draft.customRules.isEmpty {
+                    Label(
+                        ATHLTHAudioCoachOption.distanceUpdates.detail(in: draft),
+                        systemImage: "point.bottomleft.forward.to.point.topright.scurvepath"
+                    )
+                }
+                if draft.smartPrompts.motivationEnabled {
+                    Label(tr("Motivational coaching", "Motivasjonssnakk"),
+                          systemImage: "sparkles")
+                }
+                if draft.announceWorkoutComplete {
+                    Label(tr("Finish summary", "Oppsummering ved mål"),
+                          systemImage: "flag.checkered")
+                }
+                if !draft.customRules.isEmpty {
+                    Label(tr("Custom rules are active", "Egne regler er aktive"),
+                          systemImage: "waveform.badge.plus")
+                }
             }
             .font(.caption.weight(.medium))
             .foregroundStyle(ink)
@@ -378,9 +406,14 @@ struct ATHLTHAudioCoachActiveListView: View {
         case .timedUpdates:
             editorCard {
                 Text(tr("Read updates after time", "Les opp etter tid")).font(.headline)
-                Picker(tr("Every", "Hvert"), selection: $draft.timeIntervalMinutes) {
-                    ForEach([1, 2, 3, 5, 10, 15, 30, 60], id: \.self) {
-                        Text("\($0) min").tag($0)
+                Picker(tr("Every", "Hvert"), selection: timeSeconds) {
+                    ForEach([30, 60, 90, 120, 180, 300, 600, 900, 1_800, 3_600], id: \.self) {
+                        seconds in
+                        Text(seconds < 60 ? "\(seconds) s" :
+                            seconds.isMultiple(of: 60)
+                                ? "\(seconds / 60) min"
+                                : "\(seconds / 60) min \(seconds % 60) s")
+                            .tag(seconds)
                     }
                 }
                 .pickerStyle(.menu)
@@ -504,6 +537,41 @@ struct ATHLTHAudioCoachActiveListView: View {
                     Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 }
             }
+            if !settings.audioCoachSavedRuleSets.isEmpty {
+                Menu {
+                    ForEach(settings.audioCoachSavedRuleSets) { saved in
+                        Button(saved.title) {
+                            draft.customRules = Array(saved.rules.prefix(20))
+                        }
+                    }
+                } label: {
+                    Label(tr("Load saved announcement list", "Hent lagret beskjedliste"),
+                          systemImage: "square.stack")
+                }
+                .font(.subheadline.weight(.medium))
+            }
+            if !draft.customRules.isEmpty {
+                TextField(tr("Save rule list as", "Lagre beskjedlisten som"),
+                          text: $ruleSetName)
+                    .textFieldStyle(.roundedBorder)
+                Button {
+                    let title = ruleSetName.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard !title.isEmpty, settings.audioCoachSavedRuleSets.count < 30 else {
+                        return
+                    }
+                    settings.audioCoachSavedRuleSets.append(ATHLTHAudioCoachRuleSet(
+                        title: String(title.prefix(60)), rules: draft.customRules
+                    ))
+                    ruleSetName = ""
+                } label: {
+                    Label(tr("Save rule list", "Lagre beskjedliste"),
+                          systemImage: "square.and.arrow.down")
+                }
+                .disabled(ruleSetName.trimmingCharacters(
+                    in: .whitespacesAndNewlines
+                ).isEmpty || settings.audioCoachSavedRuleSets.count >= 30)
+            }
+            Divider().overlay(ATHLTHPlanDesign.warmDivider)
             Text(tr("New announcement", "Ny beskjed"))
                 .font(.subheadline.weight(.semibold))
             Picker(tr("Metric", "Innhold"), selection: $newRuleMetric) {

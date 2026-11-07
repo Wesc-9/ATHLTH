@@ -1643,34 +1643,35 @@ final class AppSettingsStore: ObservableObject {
     /// Persist the same draft model used by Quick Train and planned workouts.
     /// This updates global defaults only when the athlete edits Settings.
     func updateAudioCoachDefaults(from draft: AudioCoachDraft) {
-        audioCoachEnabledByDefault = draft.enabled
-        audioCoachDistanceTriggerEnabled = draft.distanceTriggerEnabled
-        audioCoachTimeTriggerEnabled = draft.timeTriggerEnabled
-        audioCoachDistanceIntervalKilometers = draft.distanceIntervalKilometers
-        audioCoachTimeIntervalMinutes = draft.timeIntervalMinutes
-        audioCoachTimeIntervalSeconds = draft.timeIntervalMinutes * 60
-        audioCoachCustomRules = Array(draft.customRules.prefix(20))
-        audioCoachSmartSettings = draft.smartPrompts
-        audioCoachAnnounceDistance = draft.announceDistance
-        audioCoachAnnounceElapsedTime = draft.announceElapsedTime
-        audioCoachAnnounceAveragePace = draft.announceAveragePace
-        audioCoachAnnounceClockTime = draft.announceClockTime
-        audioCoachAnnounceHeartRate = draft.announceHeartRate
-        audioCoachAnnounceRemainingRouteDistance = draft.announceRemainingRouteDistance
-        audioCoachAnnounceEstimatedRemainingRouteTime = draft.announceEstimatedRemainingRouteTime
-        audioCoachAnnounceCurrentWorkoutStep = draft.announceCurrentWorkoutStep
-        audioCoachAnnounceRemainingStepTime = draft.announceRemainingStepTime
-        audioCoachAnnounceRemainingStepDistance = draft.announceRemainingStepDistance
-        audioCoachAnnounceWorkoutStart = draft.announceWorkoutStart
-        audioCoachAnnouncePauseResume = draft.announcePauseResume
-        audioCoachAnnounceWorkoutComplete = draft.announceWorkoutComplete
-        audioCoachLanguage = draft.language
-        audioCoachVoiceIdentifier = draft.voiceIdentifier
-        audioCoachSpeechRate = draft.speechRate
-        audioCoachSpeechVolume = draft.speechVolume
-        audioCoachSpeechStyle = draft.speechStyle
-        audioCoachDuckOtherAudio = draft.duckOtherAudio
-        guidanceQuietPeriodSeconds = Int(draft.guidanceQuietPeriodSeconds)
+        // Avoid 28 redundant @Published writes for every voice-slider tick.
+        if audioCoachEnabledByDefault != draft.enabled { audioCoachEnabledByDefault = draft.enabled }
+        if audioCoachDistanceTriggerEnabled != draft.distanceTriggerEnabled { audioCoachDistanceTriggerEnabled = draft.distanceTriggerEnabled }
+        if audioCoachTimeTriggerEnabled != draft.timeTriggerEnabled { audioCoachTimeTriggerEnabled = draft.timeTriggerEnabled }
+        if audioCoachDistanceIntervalKilometers != draft.distanceIntervalKilometers { audioCoachDistanceIntervalKilometers = draft.distanceIntervalKilometers }
+        if audioCoachTimeIntervalMinutes != draft.timeIntervalMinutes { audioCoachTimeIntervalMinutes = draft.timeIntervalMinutes }
+        if audioCoachTimeIntervalSeconds != draft.timeIntervalSeconds { audioCoachTimeIntervalSeconds = draft.timeIntervalSeconds }
+        if audioCoachCustomRules != Array(draft.customRules.prefix(20)) { audioCoachCustomRules = Array(draft.customRules.prefix(20)) }
+        if audioCoachSmartSettings != draft.smartPrompts { audioCoachSmartSettings = draft.smartPrompts }
+        if audioCoachAnnounceDistance != draft.announceDistance { audioCoachAnnounceDistance = draft.announceDistance }
+        if audioCoachAnnounceElapsedTime != draft.announceElapsedTime { audioCoachAnnounceElapsedTime = draft.announceElapsedTime }
+        if audioCoachAnnounceAveragePace != draft.announceAveragePace { audioCoachAnnounceAveragePace = draft.announceAveragePace }
+        if audioCoachAnnounceClockTime != draft.announceClockTime { audioCoachAnnounceClockTime = draft.announceClockTime }
+        if audioCoachAnnounceHeartRate != draft.announceHeartRate { audioCoachAnnounceHeartRate = draft.announceHeartRate }
+        if audioCoachAnnounceRemainingRouteDistance != draft.announceRemainingRouteDistance { audioCoachAnnounceRemainingRouteDistance = draft.announceRemainingRouteDistance }
+        if audioCoachAnnounceEstimatedRemainingRouteTime != draft.announceEstimatedRemainingRouteTime { audioCoachAnnounceEstimatedRemainingRouteTime = draft.announceEstimatedRemainingRouteTime }
+        if audioCoachAnnounceCurrentWorkoutStep != draft.announceCurrentWorkoutStep { audioCoachAnnounceCurrentWorkoutStep = draft.announceCurrentWorkoutStep }
+        if audioCoachAnnounceRemainingStepTime != draft.announceRemainingStepTime { audioCoachAnnounceRemainingStepTime = draft.announceRemainingStepTime }
+        if audioCoachAnnounceRemainingStepDistance != draft.announceRemainingStepDistance { audioCoachAnnounceRemainingStepDistance = draft.announceRemainingStepDistance }
+        if audioCoachAnnounceWorkoutStart != draft.announceWorkoutStart { audioCoachAnnounceWorkoutStart = draft.announceWorkoutStart }
+        if audioCoachAnnouncePauseResume != draft.announcePauseResume { audioCoachAnnouncePauseResume = draft.announcePauseResume }
+        if audioCoachAnnounceWorkoutComplete != draft.announceWorkoutComplete { audioCoachAnnounceWorkoutComplete = draft.announceWorkoutComplete }
+        if audioCoachLanguage != draft.language { audioCoachLanguage = draft.language }
+        if audioCoachVoiceIdentifier != draft.voiceIdentifier { audioCoachVoiceIdentifier = draft.voiceIdentifier }
+        if audioCoachSpeechRate != draft.speechRate { audioCoachSpeechRate = draft.speechRate }
+        if audioCoachSpeechVolume != draft.speechVolume { audioCoachSpeechVolume = draft.speechVolume }
+        if audioCoachSpeechStyle != draft.speechStyle { audioCoachSpeechStyle = draft.speechStyle }
+        if audioCoachDuckOtherAudio != draft.duckOtherAudio { audioCoachDuckOtherAudio = draft.duckOtherAudio }
+        if guidanceQuietPeriodSeconds != Int(draft.guidanceQuietPeriodSeconds) { guidanceQuietPeriodSeconds = Int(draft.guidanceQuietPeriodSeconds) }
     }
 
     /// A profile captures a reusable full set of coach preferences. It does not

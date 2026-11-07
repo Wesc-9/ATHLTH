@@ -123,7 +123,9 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .heartRate: return d.announceHeartRate
         case .currentZone: return d.smartPrompts.announceCurrentHeartRateZone ?? false
         case .motivation: return d.smartPrompts.motivationEnabled
-        case .contextual: return d.smartPrompts.contextualFeedbackEnabled ?? false
+        case .contextual:
+            return d.smartPrompts.motivationEnabled &&
+                (d.smartPrompts.contextualFeedbackEnabled ?? true)
         case .randomEncouragement: return d.smartPrompts.randomEncouragementEnabled
         case .workoutStart: return d.announceWorkoutStart
         case .pauseResume: return d.announcePauseResume
@@ -134,7 +136,9 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .remainingStepTime: return d.announceRemainingStepTime
         case .remainingStepDistance: return d.announceRemainingStepDistance
         case .customAnnouncements: return !d.customRules.isEmpty
-        case .customPhrases: return !d.smartPrompts.customEncouragements.isEmpty
+        case .customPhrases:
+            return d.smartPrompts.randomEncouragementEnabled &&
+                !d.smartPrompts.customEncouragements.isEmpty
         case .landmarks: return !d.smartPrompts.landmarks.isEmpty
         }
     }
@@ -181,7 +185,10 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
                     .number.precision(.fractionLength(0))
                 ) + " m"
         case .timedUpdates:
-            return "\(draft.timeIntervalMinutes) min"
+            let seconds = draft.timeIntervalSeconds
+            if seconds < 60 { return "\(seconds) s" }
+            if seconds.isMultiple(of: 60) { return "\(seconds / 60) min" }
+            return "\(seconds / 60) min \(seconds % 60) s"
         case .motivation: return tr("About every ", "Omtrent hvert ") +
             "\(draft.smartPrompts.motivationIntervalSeconds) s"
         case .randomEncouragement: return tr("About every ", "Omtrent hvert ") +

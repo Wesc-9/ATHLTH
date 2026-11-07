@@ -153,4 +153,18 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
         XCTAssertTrue(draft.customRules.isEmpty)
         XCTAssertNotNil(draft.configuration().distanceIntervalMeters)
     }
+
+    func testSecondAccurateAudioUpdatesSurviveDraftRoundTrip() {
+        var draft = AudioCoachDraft()
+        draft.applySimpleAudioCoach()
+        draft.timeTriggerEnabled = true
+        draft.timeIntervalSeconds = 90
+        draft.timeIntervalMinutes = 2
+        let config = draft.configuration()
+        XCTAssertEqual(config.timeIntervalSeconds, 90)
+        var loaded = AudioCoachDraft()
+        loaded.load(configuration: config)
+        XCTAssertEqual(loaded.timeIntervalSeconds, 90)
+        XCTAssertEqual(loaded.configuration().timeIntervalSeconds, 90)
+    }
 }
