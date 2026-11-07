@@ -217,6 +217,19 @@ enum ATHLTHIntervalRecipeEditing {
         return result
     }
 
+    /// Remove the entire explicit interval sequence in one atomic operation,
+    /// without deleting surrounding warm-up, main-set or cooldown steps.
+    /// Invalid/non-contiguous or missing groups must never delete anything.
+    static func removing(
+        _ source: [WorkoutTemplateBlock], groupID: UUID
+    ) -> [WorkoutTemplateBlock]? {
+        guard let range = contiguousRange(for: groupID, in: source),
+              summary(for: groupID, in: source) != nil else { return nil }
+        var remaining = source
+        remaining.removeSubrange(range)
+        return renumbered(remaining)
+    }
+
     static func ungrouping(
         _ source: [WorkoutTemplateBlock], groupID: UUID
     ) -> [WorkoutTemplateBlock] {

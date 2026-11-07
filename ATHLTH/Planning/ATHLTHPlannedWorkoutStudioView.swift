@@ -29,11 +29,13 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     ) -> Void
     let onCopyIntervalTargets: (UUID) -> Void
     let onUngroupIntervals: (UUID) -> Void
+    let onDeleteInterval: (UUID) -> Void
 
     @State private var phasePendingDeletion: WorkoutPhaseKind?
     @State private var collapsedPhases: Set<WorkoutPhaseKind> = []
     @State private var expandedIntervalGroups: Set<UUID> = []
     @State private var intervalToAdjust: IntervalSelection?
+    @State private var intervalPendingDeletion: UUID?
     @State private var draggingID: UUID?
 
     private struct IntervalSelection: Identifiable {
@@ -166,6 +168,40 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                     selection.id, rounds, finalRecovery, work, recovery
                 )
             }
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "Delete entire interval?",
+                norwegian: "Slette hele intervallen?"
+            ),
+            isPresented: Binding(
+                get: { intervalPendingDeletion != nil },
+                set: { if !$0 { intervalPendingDeletion = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Delete entire interval",
+                norwegian: "Slett hele intervallen"
+            ), role: .destructive) {
+                if let id = intervalPendingDeletion {
+                    onDeleteInterval(id)
+                    expandedIntervalGroups.remove(id)
+                }
+                intervalPendingDeletion = nil
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) {
+                intervalPendingDeletion = nil
+            }
+        } message: {
+            let count = blocks.filter { $0.groupID == intervalPendingDeletion }.count
+            Text(ATHLTHLocalization.format(
+                english: "All %d efforts and recoveries in this interval will be deleted. Other workout sections are kept.",
+                norwegian: "Alle %d drag og pauser i intervallen slettes. Resten av treningsøkten beholdes.",
+                count
+            ))
         }
         .alert(
             ATHLTHLocalization.choose(
@@ -445,6 +481,15 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         Label(ATHLTHLocalization.choose(
                             english: "Ungroup all steps", norwegian: "Løs opp gruppen"
                         ), systemImage: "square.stack.3d.up.slash")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        intervalPendingDeletion = id
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Delete entire interval",
+                            norwegian: "Slett hele intervallen"
+                        ), systemImage: "trash")
                     }
                 } label: {
                     Image(systemName: "ellipsis")

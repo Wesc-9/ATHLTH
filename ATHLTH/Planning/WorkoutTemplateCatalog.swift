@@ -4961,6 +4961,23 @@ struct WorkoutTemplateBuilderView: View {
                     blocks, groupID: id
                 )
                 persistWorkoutDraft()
+            },
+            onDeleteInterval: { id in
+                guard let remaining = ATHLTHIntervalRecipeEditing.removing(
+                    blocks, groupID: id
+                ) else { return }
+                let routeTitle = session.savedRoutes.first {
+                    $0.id == selectedRouteID
+                }?.title
+                blocks = remaining
+                selectedRouteID = ATHLTHPlannedRoutePreviewPolicy.activeRouteID(
+                    selectedRouteID: selectedRouteID,
+                    routeTitle: routeTitle, blocks: remaining
+                )
+                studioBasicOwnedBlockIDs.formIntersection(
+                    Set(remaining.map(\.editorDragID))
+                )
+                persistWorkoutDraft()
             }
         )
     }

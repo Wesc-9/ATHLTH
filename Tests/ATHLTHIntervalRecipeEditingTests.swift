@@ -297,4 +297,64 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
         XCTAssertEqual(oneEdit[0].durationSeconds, 180)
         XCTAssertEqual(oneEdit[4].durationSeconds, 245)
     }
+
+    @MainActor
+    func testDeleteEntireIntervalRemovesAllEffortsAndPausesOnly() throws {
+        let first = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        let firstID = try XCTUnwrap(first.first?.groupID)
+        let second = ATHLTHRunningExercisePreset.fiveByThree.blocks(in: .main)
+        let secondID = try XCTUnwrap(second.first?.groupID)
+
+        let warmup = WorkoutTemplateBlock(
+            sequence: 0, kind: .run, title: "Warm-up",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 600, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .warmup
+        )
+        let cooldown = WorkoutTemplateBlock(
+            sequence: 0, kind: .run, title: "Cool-down",
+            exerciseSlug: nil, distanceMeters: nil, repetitions: nil,
+            durationSeconds: 300, targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .cooldown
+        )
+        let original = [warmup] + first + second + [cooldown]
+        let remaining = try XCTUnwrap(
+            ATHLTHIntervalRecipeEditing.removing(original, groupID: firstID)
+        )
+
+        XCTAssertEqual(remaining.count, 2 + second.count)
+        XCTAssertFalse(remaining.contains { $0.groupID == firstID })
+        XCTAssertEqual(remaining.filter { $0.groupID == secondID }.count, second.count)
+        XCTAssertEqual(remaining.first?.title, "Warm-up")
+        XCTAssertEqual(remaining.last?.title, "Cool-down")
+        XCTAssertEqual(remaining.map(\.sequence), Array(1...remaining.count))
+        XCTAssertEqual(
+            remaining.expandedForExecution().count, 2 + second.count
+        )
+        XCTAssertEqual(
+            remaining.filter { $0.groupID == secondID }.map(\.editorDragID),
+            second.map(\.editorDragID)
+        )
+        XCTAssertNil(
+            ATHLTHIntervalRecipeEditing.removing(original, groupID: UUID())
+        )
+    }
+
+    @MainActor
+    func testDeleteEntireIntervalPreservesOtherCustomizedInterval() throws {
+        let first = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        let firstID = try XCTUnwrap(first.first?.groupID)
+        let second = ATHLTHRunningExercisePreset.fiveByThree.blocks(in: .main)
+        var customized = second
+        customized[2].durationSeconds = 210
+        customized[2].targetPaceSecondsPerKilometer = 270
+        let original = first + customized
+        let remaining = try XCTUnwrap(
+            ATHLTHIntervalRecipeEditing.removing(original, groupID: firstID)
+        )
+        XCTAssertEqual(remaining[2].durationSeconds, 210)
+        XCTAssertEqual(remaining[2].targetPaceSecondsPerKilometer, 270)
+        XCTAssertEqual(remaining.count, customized.count)
+        XCTAssertEqual(Set(remaining.map(\.groupID)), Set(customized.map(\.groupID)))
+    }
 }
