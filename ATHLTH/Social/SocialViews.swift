@@ -1507,7 +1507,6 @@ struct FriendProfileView: View {
                             profile.workoutMedia
                         )
 
-                        ATHLTHPublicPetProfileSection(userID: userID)
                     }
                 } else {
                     ContentUnavailableView(
