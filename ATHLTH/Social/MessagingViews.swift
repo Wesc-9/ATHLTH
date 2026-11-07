@@ -4,10 +4,15 @@ import SwiftUI
 struct MessageInboxDestinationView: View {
     @State private var showingNewMessage = false
 
+    /// Populated only when the inbox was launched from the Home side drawer.
+    /// Other inbox entry points retain their original profile shortcut.
+    var onBack: (() -> Void)? = nil
+
     var body: some View {
-        MessageInboxView {
-            showingNewMessage = true
-        }
+        MessageInboxView(
+            onNewMessage: { showingNewMessage = true },
+            onBack: onBack
+        )
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .navigationBar)
@@ -69,6 +74,7 @@ struct MessageInboxView: View {
         ATHLTHRealtimeSocialStore
 
     var onNewMessage: () -> Void = {}
+    var onBack: (() -> Void)? = nil
 
     @State private var arenaInboxVisibleCount = 0
     @State private var searchText = ""
@@ -341,18 +347,46 @@ struct MessageInboxView: View {
             spacing: 16
         ) {
             HStack(alignment: .center) {
-                NavigationLink {
-                    ATHLTHProfileView()
-                } label: {
-                    ownProfileAvatar
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(
-                    ATHLTHLocalization.choose(
-                        english: "Open your profile",
-                        norwegian: "Åpne profilen din"
+                if let onBack {
+                    Button(action: onBack) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 17, weight: .semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .frame(width: 48, height: 48)
+                            .background(
+                                ATHLTHTheme.premiumGoldSoft.opacity(0.72),
+                                in: Circle()
+                            )
+                            .overlay {
+                                Circle()
+                                    .strokeBorder(
+                                        ATHLTHTheme.premiumGold.opacity(0.24),
+                                        lineWidth: 1
+                                    )
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Back to Home",
+                            norwegian: "Tilbake til Hjem"
+                        )
                     )
-                )
+                    .accessibilityIdentifier("athlth-inbox-back-to-home")
+                } else {
+                    NavigationLink {
+                        ATHLTHProfileView()
+                    } label: {
+                        ownProfileAvatar
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(
+                        ATHLTHLocalization.choose(
+                            english: "Open your profile",
+                            norwegian: "Åpne profilen din"
+                        )
+                    )
+                }
 
                 Spacer()
 
