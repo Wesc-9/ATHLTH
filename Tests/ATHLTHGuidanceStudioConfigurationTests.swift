@@ -235,4 +235,31 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
         XCTAssertEqual(draft.language, .norwegian)
         XCTAssertNil(draft.configuration().smartPrompts?.strongStartDurationSeconds)
     }
+
+    func testOneTapKilometerBundleCreatesOneNonDuplicatedVoiceRule() {
+        var draft = AudioCoachDraft()
+        draft.applySimpleAudioCoach()
+        XCTAssertTrue(draft.addKilometerMetricsBundle())
+        XCTAssertEqual(draft.customRules.count, 1)
+        XCTAssertEqual(draft.customRules.first?.validatedInterval, 1_000)
+        XCTAssertEqual(draft.customRules.first?.selectedMetrics,
+                       [.distance, .elapsedTime, .heartRate])
+        let config = draft.configuration()
+        XCTAssertNil(config.distanceIntervalMeters)
+        XCTAssertEqual(config.customRules?.count, 1)
+        XCTAssertFalse(draft.addKilometerMetricsBundle())
+        XCTAssertEqual(draft.customRules.count, 1)
+    }
+
+    func testKilometerBundleDoesNotResetVoiceAndRemainsSessionScoped() {
+        var draft = AudioCoachDraft()
+        draft.voiceIdentifier = "athlete-voice"
+        draft.duckOtherAudio = false
+        draft.language = .norwegian
+        XCTAssertTrue(draft.addKilometerMetricsBundle())
+        XCTAssertEqual(draft.voiceIdentifier, "athlete-voice")
+        XCTAssertFalse(draft.duckOtherAudio)
+        XCTAssertEqual(draft.configuration().language, .norwegian)
+        XCTAssertTrue(draft.customRules.first?.selectedMetrics.contains(.heartRate) == true)
+    }
 }

@@ -585,17 +585,21 @@ struct ATHLTHAudioCoachActiveListView: View {
             Text(tr("New announcement", "Ny beskjed"))
                 .font(.subheadline.weight(.semibold))
             Button {
-                newRuleTrigger = .distance
-                newRuleInterval = 1_000
-                newRuleMetric = .distance
-                newRuleAdditionalMetrics = [.elapsedTime, .heartRate]
+                // One tap saves the full bundle. No separate Add operation.
+                if draft.addKilometerMetricsBundle() {
+                    editingOption = nil
+                }
             } label: {
-                Label(tr("Preset: Every kilometre · distance, time and pulse",
-                         "Ferdigvalg: Hver km · distanse, tid og puls"),
-                      systemImage: "checkmark.circle")
+                Label(tr("Add: Every kilometre · distance, time and pulse",
+                         "Legg til: Hver km · distanse, tid og puls"),
+                      systemImage: "plus.circle.fill")
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             .buttonStyle(.bordered)
+            .disabled(draft.customRules.count >= 20 || draft.customRules.contains {
+                $0.trigger == .distance && $0.validatedInterval == 1_000 &&
+                $0.selectedMetrics == [.distance, .elapsedTime, .heartRate]
+            })
             Picker(tr("First value", "Første verdi"), selection: $newRuleMetric) {
                 ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
                     Text(metric.title).tag(metric)

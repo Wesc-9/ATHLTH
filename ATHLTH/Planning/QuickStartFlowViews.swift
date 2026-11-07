@@ -174,6 +174,26 @@ struct AudioCoachDraft {
         smartPrompts.adaptiveCooldownSeconds = nil
     }
 
+    /// One-tap announcement template. A complete distance/time/pulse cue
+    /// is one rule and can be edited as a group later.
+    @discardableResult
+    mutating func addKilometerMetricsBundle() -> Bool {
+        guard customRules.count < 20 else { return false }
+        enabled = true
+        let alreadyExists = customRules.contains {
+            $0.trigger == .distance && $0.validatedInterval == 1_000 &&
+            $0.selectedMetrics == [.distance, .elapsedTime, .heartRate]
+        }
+        guard !alreadyExists else { return false }
+        customRules.append(ATHLTHAudioCoachRule(
+            trigger: .distance,
+            metric: .distance,
+            interval: 1_000,
+            additionalMetrics: [.elapsedTime, .heartRate]
+        ))
+        return true
+    }
+
     /// Preserve voice, language, music routing and per-workout session data.
     var experiencePreset: ATHLTHCoachExperiencePreset? {
         guard enabled else { return nil }
