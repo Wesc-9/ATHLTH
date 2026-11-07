@@ -304,6 +304,19 @@ private struct ATHLTHSceneRootView: View {
             // flag, especially when recovering an older offline install.
             scheduleAutomaticOfflinePreparation()
         }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .athlthNetworkConnectivityRestored
+        )) { _ in
+            guard appSession.signedIn, scenePhase == .active else { return }
+            // StoreKit, Cloud Backup and Studio plan sync each retain their
+            // own permission/account checks. Offline saves are never gated
+            // on these network operations.
+            studioPlanSync.scheduleSync(session: appSession)
+            let accountID = appSession.profile.userID
+            Task {
+                await trainingBackups.backUp(userID: accountID)
+            }
+        }
     }
 
     /// Store editable training data locally (AppSessionStore) and prepare
