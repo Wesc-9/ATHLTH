@@ -747,6 +747,22 @@ struct ATHLTHAudioCoachActiveListView: View {
                 }
                 .buttonStyle(.plain)
             }
+            if globalScope {
+                Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                NavigationLink {
+                    AthleteFuelView()
+                } label: {
+                    HStack {
+                        Label(tr("Fuel and hydration reminders", "Energi og væske"),
+                              systemImage: "drop")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "chevron.right").foregroundStyle(dim)
+                    }
+                    .frame(minHeight: 50)
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 
@@ -868,6 +884,68 @@ struct ATHLTHAudioCoachActiveListView: View {
                     .disabled(profileName.trimmingCharacters(
                         in: .whitespacesAndNewlines
                     ).isEmpty || settings.audioCoachProfiles.count >= 30)
+
+                    Divider().overlay(ATHLTHPlanDesign.warmDivider)
+                    Text(tr("Saved announcement lists", "Lagrede beskjedlister"))
+                        .font(.headline)
+                    if !settings.audioCoachSavedRuleSets.isEmpty {
+                        ForEach(settings.audioCoachSavedRuleSets) { saved in
+                            HStack {
+                                Button {
+                                    draft.customRules = Array(saved.rules.prefix(20))
+                                    showingProfiles = false
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(saved.title).font(.subheadline.weight(.medium))
+                                        Text("\(saved.rules.count) " +
+                                             tr("rules", "regler"))
+                                            .font(.caption)
+                                            .foregroundStyle(dim)
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                Button(role: .destructive) {
+                                    settings.audioCoachSavedRuleSets.removeAll {
+                                        $0.id == saved.id
+                                    }
+                                } label: {
+                                    Image(systemName: "trash")
+                                        .frame(width: 44, height: 44)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                    TextField(tr("Rule list name", "Navn på beskjedliste"),
+                              text: $ruleSetName)
+                        .textFieldStyle(.roundedBorder)
+                    Button {
+                        let title = ruleSetName.trimmingCharacters(
+                            in: .whitespacesAndNewlines
+                        )
+                        guard !title.isEmpty,
+                              !draft.customRules.isEmpty,
+                              settings.audioCoachSavedRuleSets.count < 30
+                        else { return }
+                        settings.audioCoachSavedRuleSets.append(
+                            ATHLTHAudioCoachRuleSet(
+                                title: String(title.prefix(60)),
+                                rules: draft.customRules
+                            )
+                        )
+                        ruleSetName = ""
+                    } label: {
+                        Label(tr("Save current rule list", "Lagre aktiv beskjedliste"),
+                              systemImage: "square.and.arrow.down")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(ruleSetName.trimmingCharacters(
+                        in: .whitespacesAndNewlines
+                    ).isEmpty || draft.customRules.isEmpty ||
+                    settings.audioCoachSavedRuleSets.count >= 30)
                 }
                 .padding(16)
             }
