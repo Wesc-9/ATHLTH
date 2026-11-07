@@ -54,6 +54,7 @@ final class ATHLTHAzureWorkoutSpeech:
     private var identity = UUID()
     private var finishHandler: (() -> Void)?
     private var fallbackHandler: (() -> Void)?
+    private var startedHandler: (() -> Void)?
     private(set) var isBusy = false
     private var ownsAudioSession = false
     private var consecutiveFailures = 0
@@ -65,6 +66,7 @@ final class ATHLTHAzureWorkoutSpeech:
         voiceIdentifier: String?,
         duckMusic: Bool,
         onFallback: @escaping () -> Void,
+        onStarted: @escaping () -> Void,
         onFinished: @escaping () -> Void
     ) -> Bool {
         guard let key = ATHLTHAzureCoachVoice.key(voiceIdentifier),
@@ -80,6 +82,7 @@ final class ATHLTHAzureWorkoutSpeech:
         let generation = identity
         isBusy = true
         fallbackHandler = onFallback
+        startedHandler = onStarted
         finishHandler = onFinished
 
         // Never wait for an external service before giving workout feedback.
@@ -124,6 +127,9 @@ final class ATHLTHAzureWorkoutSpeech:
                         return
                     }
                     self.audio = player
+                    // Only a successful playback start warrants a delivery receipt.
+                    self.startedHandler?()
+                    self.startedHandler = nil
                     self.consecutiveFailures = 0
                     self.retryAfter = nil
                     self.timeoutTask?.cancel()
@@ -182,6 +188,7 @@ final class ATHLTHAzureWorkoutSpeech:
         }
         isBusy = false
         fallbackHandler = nil
+        startedHandler = nil
         finishHandler = nil
     }
 

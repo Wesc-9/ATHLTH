@@ -123,6 +123,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private var lastMirrorSnapshotSentAt: Date?
     private var appliedRunningAppendCommands = Set<UUID>()
     private let speechSynthesizer = AVSpeechSynthesizer()
+    private var pendingLocalCoachEvent: (
+        utterance: AVSpeechUtterance, event: ATHLTHCoachEvent
+    )?
     private var coachAudioSessionIsActive = false
     private var audioCoachRestorationTask: Task<Void, Never>?
     private var audioCoachSpeechWatchdog: Task<Void, Never>?
@@ -7302,8 +7305,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     return
                 }
 
-                if let event {
-                    self.coachEventLedger.didDeliver(event)
+                self.pendingLocalCoachEvent = event.map {
+                    (utterance: utterance, event: $0)
                 }
                 self.speechSynthesizer.speak(utterance)
                 self.watchCoachSpeechCompletion(utterance)
@@ -7314,9 +7317,6 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                         priority: priority
                     )
                     self.lastCoachMessage = self.coachReplayMemory.text
-                }
-                if let event {
-                    self.reportWatchSpokenEventAttempt(event)
                 }
             }
     }
@@ -8604,11 +8604,29 @@ extension WatchWorkoutManager:
 
     nonisolated func speechSynthesizer(
         _ synthesizer: AVSpeechSynthesizer,
-        didFinish utterance: AVSpeechUtterance
+        didStart utterance: AVSpeechUtterance
     ) {
         Task { @MainActor [weak self] in
             guard let self,
-                  !self.speechSynthesizer.isSpeaking,
+                  let pending = self.pendingLocalCoachEvent,
+                  pending.utterance === utterance else { return }
+            self.pendingLocalCoachEvent = nil
+            guard self.coachEventLedger.canDeliver(pending.event) else { return }
+            self.coachEventLedger.didDeliver(pending.event)
+            self.reportWatchSpokenEventAttempt(pending.event)
+        }
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if self.pendingLocalCoachEvent?.utterance === utterance {
+                self.pendingLocalCoachEvent = nil
+            }
+            guard !self.speechSynthesizer.isSpeaking,
                   self.audioCoachActivationTask == nil
             else {
                 return
@@ -8628,8 +8646,11 @@ extension WatchWorkoutManager:
         didCancel utterance: AVSpeechUtterance
     ) {
         Task { @MainActor [weak self] in
-            guard let self,
-                  !self.speechSynthesizer.isSpeaking,
+            guard let self else { return }
+            if self.pendingLocalCoachEvent?.utterance === utterance {
+                self.pendingLocalCoachEvent = nil
+            }
+            guard !self.speechSynthesizer.isSpeaking,
                   self.audioCoachActivationTask == nil
             else {
                 return

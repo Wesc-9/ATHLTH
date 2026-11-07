@@ -37,6 +37,9 @@ final class MirroredWorkoutAudioCoach:
 
     var onSpokenEventAttempt: ((ATHLTHCoachEvent, Date) -> Void)?
     private var workoutStartedAt: Date?
+    private var pendingLocalSpokenEvent: (
+        utterance: AVSpeechUtterance, event: ATHLTHCoachEvent
+    )?
 
     private var nextDistanceMeters:
         Double?
@@ -84,6 +87,7 @@ final class MirroredWorkoutAudioCoach:
         announcedStart = false
         finished = false
         workoutStartedAt = nil
+        pendingLocalSpokenEvent = nil
         smartCoachState.reset()
         adaptiveCoachState.reset()
         measuredZoneCandidate = nil
@@ -337,6 +341,7 @@ final class MirroredWorkoutAudioCoach:
         announcedStart = false
         finished = false
         workoutStartedAt = nil
+        pendingLocalSpokenEvent = nil
     }
 
     private func announceIntervalProgressIfDue(
@@ -1047,10 +1052,7 @@ final class MirroredWorkoutAudioCoach:
             break
         }
 
-        if let event {
-            eventLedger.didDeliver(event)
-        }
-
+        // Only acknowledge a cue when the selected speech engine starts.
         let spokenText = rememberForReplay
             ? (configuration.speechStyle ?? .balanced).render(
                 text,
@@ -1089,8 +1091,15 @@ final class MirroredWorkoutAudioCoach:
                     duckOtherAudio: self.configuration.shouldDuckOtherAudio,
                     owner: self.audioOwner
                 )
+                self.pendingLocalSpokenEvent = event.map {
+                    (utterance: utterance, event: $0)
+                }
                 self.synthesizer.speak(utterance)
                 self.watchLocalSpeech(utterance)
+            },
+            onStarted: { [weak self] in
+                guard let self, let event else { return }
+                self.markSpokenEventStarted(event)
             },
             onFinished: { [weak self] in
                 guard let self else { return }
@@ -1103,6 +1112,9 @@ final class MirroredWorkoutAudioCoach:
                 duckOtherAudio: configuration.shouldDuckOtherAudio,
                 owner: audioOwner
             )
+            pendingLocalSpokenEvent = event.map {
+                (utterance: utterance, event: $0)
+            }
             synthesizer.speak(utterance)
             watchLocalSpeech(utterance)
         }
@@ -1111,8 +1123,12 @@ final class MirroredWorkoutAudioCoach:
             coachReplayMemory.remember(spokenText, priority: priority)
             onLastSpokenCoachMessage?(coachReplayMemory.text)
         }
-        if let event,
-           let workoutStartedAt {
+    }
+
+    private func markSpokenEventStarted(_ event: ATHLTHCoachEvent) {
+        guard eventLedger.canDeliver(event) else { return }
+        eventLedger.didDeliver(event)
+        if let workoutStartedAt {
             onSpokenEventAttempt?(event, workoutStartedAt)
         }
     }
@@ -1161,14 +1177,30 @@ final class MirroredWorkoutAudioCoach:
     }
 
     nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didStart utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self,
+                  let pending = self.pendingLocalSpokenEvent,
+                  pending.utterance === utterance else { return }
+            self.pendingLocalSpokenEvent = nil
+            self.markSpokenEventStarted(pending.event)
+        }
+    }
+
+    nonisolated func speechSynthesizer(
         _ synthesizer:
             AVSpeechSynthesizer,
         didFinish utterance:
             AVSpeechUtterance
     ) {
         Task { @MainActor [weak self] in
-            guard let self,
-                  !self
+            guard let self else { return }
+            if self.pendingLocalSpokenEvent?.utterance === utterance {
+                self.pendingLocalSpokenEvent = nil
+            }
+            guard !self
                     .synthesizer
                     .isSpeaking,
                   !self.azureCoachSpeech.isBusy
@@ -1195,8 +1227,11 @@ final class MirroredWorkoutAudioCoach:
             AVSpeechUtterance
     ) {
         Task { @MainActor [weak self] in
-            guard let self,
-                  !self
+            guard let self else { return }
+            if self.pendingLocalSpokenEvent?.utterance === utterance {
+                self.pendingLocalSpokenEvent = nil
+            }
+            guard !self
                     .synthesizer
                     .isSpeaking,
                   !self.azureCoachSpeech.isBusy
