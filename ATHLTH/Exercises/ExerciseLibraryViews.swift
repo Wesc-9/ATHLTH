@@ -1486,6 +1486,7 @@ struct ExerciseDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
     @ObservedObject private var norwegianTranslations = NorwegianExerciseAutoTranslation.shared
     @State private var detailTranslationConfig: TranslationSession.Configuration?
     @State private var showOriginalEnglish = false
@@ -1864,8 +1865,23 @@ struct ExerciseDetailView: View {
                     ))
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                LibraryFavoriteButton(
+                    kind: .exercise,
+                    itemID: currentEntry.id.uuidString,
+                    title: library.localizedExerciseName(currentEntry),
+                    subtitle: [
+                        currentEntry.bodyPart.map(library.localizedBodyPartTitle),
+                        currentEntry.exercise.equipment.first.map(library.localizedEquipmentTitle)
+                    ].compactMap { $0 }.joined(separator: " · "),
+                    icon: "dumbbell.fill"
+                )
+            }
         }
         .onAppear(perform: refreshExerciseHistory)
+        .task(id: session.profile.userID) {
+            await favorites.refresh()
+        }
         .task(id: currentEntry.id) {
             if currentEntry.source == .custom &&
                currentEntry.exercise.sharedSourceExerciseID == nil {
