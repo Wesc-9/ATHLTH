@@ -1178,8 +1178,9 @@ struct RecoveryCoachView: View {
                                 )
                         }
                         .padding()
-                        // Wrap long replies within the chat viewport.
-                        .containerRelativeFrame(.horizontal)
+                        // Use the inspector's proposed width on the very
+                        // first render, not the full iPad scene width.
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .scrollDismissesKeyboard(
                         .interactively
@@ -1220,13 +1221,13 @@ struct RecoveryCoachView: View {
                     }
                     .task {
                         loadConversationIfNeeded()
-
-                        await MainActor.run {
-                            proxy.scrollTo(
-                                bottomAnchorID,
-                                anchor: .bottom
-                            )
-                        }
+                        // Allow the inspector to adopt its real width and
+                        // load messages before choosing the initial offset.
+                        await Task.yield()
+                        proxy.scrollTo(
+                            bottomAnchorID,
+                            anchor: .bottom
+                        )
                     }
                 }
                 .frame(
@@ -1241,7 +1242,7 @@ struct RecoveryCoachView: View {
                 .padding(.top, 0)
                 .zIndex(1)
             }
-            .containerRelativeFrame(.horizontal)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .safeAreaInset(
             edge: .bottom
