@@ -362,7 +362,6 @@ struct WorkoutHistoryDetailView: View {
 
                 metricGrid
                 workoutGearCard
-                ATHLTHWorkoutPetHistoryCard(workout: workout)
 
                 ATHLTHUnifiedCard {
                     HStack {
