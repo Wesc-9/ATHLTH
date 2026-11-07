@@ -1419,10 +1419,19 @@ struct WorkoutTemplateLibraryView: View {
                             category in
                             Button {
                                 selectedCategory = category
+                                // A hidden filter from the previous activity
+                                // must never silently exclude another category.
                                 if category != "Strength" {
                                     selectedMuscleFocus = "all"
+                                    selectedStrengthMuscles.removeAll()
                                     selectedWorkoutLevel = "all"
+                                    selectedExerciseName = nil
                                 }
+                                if category != "Running" {
+                                    selectedRunningType = nil
+                                }
+                                selectedWorkoutDuration = .any
+                                selectedDiscoverySort = .alphabetical
                             } label: {
                                 filterChip(
                                     category == "Running"
