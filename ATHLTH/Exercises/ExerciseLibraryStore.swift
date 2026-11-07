@@ -773,11 +773,25 @@ final class ExerciseLibraryStore: ObservableObject {
     static let featuredNativeExerciseSlugs: Set<String> = [
         "athlth-native-incline-dumbbell-bench-press",
         "athlth-native-tabletop-sit-up",
-        "athlth-native-weighted-russian-twist",
-        "athlth-native-six-inch-hold",
         "athlth-native-hollow-body-hold",
         "athlth-native-free-strength-training"
     ]
+
+    /// Older workout plans may still reference these stable ATHLTH-native
+    /// identifiers. Keep their underlying records for history and replay,
+    /// but remove the redundant NEW choices from the library. The licensed
+    /// RepDB originals are not modified or filtered by this policy.
+    static let retiredNativeDuplicateSlugs: Set<String> = [
+        "athlth-native-weighted-russian-twist",
+        "athlth-native-six-inch-hold"
+    ]
+
+    static func isRetiredNativeDuplicate(_ entry: ExerciseLibraryEntry) -> Bool {
+        entry.source == .athlthCatalog &&
+        entry.sourceIdentifier.map {
+            retiredNativeDuplicateSlugs.contains($0)
+        } == true
+    }
 
     /// Keep historical native exercise IDs available for old workout logs,
     /// but offer RepDB (and personal exercises) as the primary choices.
@@ -785,14 +799,17 @@ final class ExerciseLibraryStore: ObservableObject {
         if let cachedSelectableExercises { return cachedSelectableExercises }
         let resolved: [ExerciseLibraryEntry]
         if repDBExercises.isEmpty {
-            resolved = allExercises
+            resolved = allExercises.filter {
+                !Self.isRetiredNativeDuplicate($0)
+            }
         } else {
             resolved = allExercises.filter {
-                $0.source == .repDB || $0.source == .custom ||
-                    ($0.source == .athlthCatalog &&
-                     $0.sourceIdentifier.map {
-                         Self.featuredNativeExerciseSlugs.contains($0)
-                     } == true)
+                !Self.isRetiredNativeDuplicate($0) &&
+                    ($0.source == .repDB || $0.source == .custom ||
+                     ($0.source == .athlthCatalog &&
+                      $0.sourceIdentifier.map {
+                          Self.featuredNativeExerciseSlugs.contains($0)
+                      } == true))
             }
         }
         cachedSelectableExercises = resolved
