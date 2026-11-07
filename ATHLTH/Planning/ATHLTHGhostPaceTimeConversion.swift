@@ -13,11 +13,20 @@ enum ATHLTHGhostPaceTimeConversion {
         let fields = trimmed.split(
             separator: ":", omittingEmptySubsequences: false
         )
-        guard fields.count == 2,
+        // "5" is five minutes per km (5:00), not an invalid pace.
+        // Keep full M:SS input and reject incomplete/ambiguous forms.
+        guard (1...2).contains(fields.count),
               let minutes = Int(fields[0]),
-              let seconds = Int(fields[1]),
-              (0...60).contains(minutes), (0..<60).contains(seconds)
+              (0...60).contains(minutes)
         else { return nil }
+        let seconds: Int
+        if fields.count == 2 {
+            guard let parsed = Int(fields[1]), (0..<60).contains(parsed)
+            else { return nil }
+            seconds = parsed
+        } else {
+            seconds = 0
+        }
 
         let pace = TimeInterval(minutes * 60 + seconds)
         // Reject impossible or accidental inputs; 13:52/km and walking
@@ -26,6 +35,14 @@ enum ATHLTHGhostPaceTimeConversion {
             return nil
         }
         return pace
+    }
+
+    /// Expand shorthand only when the athlete finishes editing so typing
+    /// "5:30" never causes cursor jumps or wipes an in-progress value.
+    static func normalizedPaceText(from input: String) -> String? {
+        guard let seconds = paceSeconds(from: input) else { return nil }
+        let total = Int(seconds)
+        return String(format: "%d:%02d", total / 60, total % 60)
     }
 
     static func paceText(
