@@ -156,6 +156,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     @Published private(set) var lastCoachMessage: String?
     private var coachReplayMemory = ATHLTHCoachReplayMemory()
     private var smartCoachState = ATHLTHAudioCoachSmartState()
+    private var adaptiveCoachState = ATHLTHCoachAdaptiveMotivation()
 
     var canReplayLastCoachMessage: Bool {
         audioCoachConfiguration.enabled &&
@@ -4475,6 +4476,7 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         measuredCoachZoneStartedAt = nil
         measuredCoachLastZoneAnnouncementAt = nil
         smartCoachState.reset()
+        adaptiveCoachState.reset()
         let configuration = audioCoachConfiguration
         customAudioCoachLastSlots = ATHLTHAudioCoachRuleDelivery.initialSlots(
             rules: configuration.customRules ?? [],
@@ -4634,6 +4636,46 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                 event: ATHLTHCoachEvent(
                     kind: .routineMilestone,
                     key: "smart-place:\(Int(elapsedTime))",
+                    priority: .routineCoach,
+                    validFor: 12
+                )
+            )
+            return
+        }
+
+        // Sensor-validated, cooldown-limited interventions must never
+        // claim a hill is flat without reliable altitude evidence.
+        let target = ATHLTHHeartRateZoneCoachTarget.configuration(
+            configured: targetAlertConfiguration,
+            stepZone: awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRateZone,
+            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
+                settings.maximumHeartRateBPM
+        )
+        if let message = adaptiveCoachState.nextCue(
+            settings: settings,
+            elapsed: elapsedTime,
+            measuredPaceSecondsPerKilometer:
+                ATHLTHCoachSensorFreshness.validPace(
+                    currentPaceSecondsPerKilometer, sampledAt: coachPaceSampleAt
+                ) ? currentPaceSecondsPerKilometer : nil,
+            targetSlowestPaceSecondsPerKilometer:
+                currentStructuredRunningStep?.targetPaceMaxSecondsPerKilometer ??
+                currentStructuredRunningStep?.targetPaceMinSecondsPerKilometer,
+            measuredHeartRateBPM: hasFreshHeartRate ? heartRate : nil,
+            targetHeartRateMinimumBPM: target?.heartRateEnabled == true
+                ? target?.heartRateMinimumBPM : nil,
+            reliableNotClimbing: usesOutdoorGPS &&
+                smartCoachState.hasReliableTerrainEvidence &&
+                smartCoachState.inferredTerrain != .uphill,
+            norwegian: norwegian
+        ) {
+            speak(
+                message,
+                priority: .routineCoach,
+                event: ATHLTHCoachEvent(
+                    kind: .routineMilestone,
+                    key: "adaptive-motivation:\(Int(elapsedTime))",
                     priority: .routineCoach,
                     validFor: 12
                 )

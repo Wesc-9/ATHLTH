@@ -45,6 +45,7 @@ final class MirroredWorkoutAudioCoach:
     private var nextFuelSeconds: TimeInterval?
     private var customAudioCoachLastSlots: [UUID: Int] = [:]
     private var smartCoachState = ATHLTHAudioCoachSmartState()
+    private var adaptiveCoachState = ATHLTHCoachAdaptiveMotivation()
     private var measuredZoneCandidate: Int?
     private var measuredZoneFirstSeenAt: TimeInterval?
     private var lastMeasuredZoneAnnouncementAt: TimeInterval = -.infinity
@@ -84,6 +85,7 @@ final class MirroredWorkoutAudioCoach:
         finished = false
         workoutStartedAt = nil
         smartCoachState.reset()
+        adaptiveCoachState.reset()
         measuredZoneCandidate = nil
         measuredZoneFirstSeenAt = nil
         lastMeasuredZoneAnnouncementAt = -.infinity
@@ -329,6 +331,7 @@ final class MirroredWorkoutAudioCoach:
         nextFuelSeconds = nil
         customAudioCoachLastSlots = [:]
         smartCoachState.reset()
+        adaptiveCoachState.reset()
         lastState = nil
         lastStepIndex = nil
         announcedStart = false
@@ -594,6 +597,42 @@ final class MirroredWorkoutAudioCoach:
                     priority: .routineCoach,
                     createdAt: snapshot.capturedAt,
                     validFor: 10
+                )
+            )
+            return
+        }
+
+        // Mirrored snapshots do not include reliable terrain grade, so
+        // this owner can coach on planned zones and pace, not flat-ground drops.
+        let targetRange = ATHLTHHeartRateZones.range(
+            for: snapshot.runningStepTargetHeartRateZone ?? 0,
+            maximumBPM: settings.maximumHeartRateBPM
+        )
+        if let message = adaptiveCoachState.nextCue(
+            settings: settings,
+            elapsed: snapshot.elapsedTime,
+            measuredPaceSecondsPerKilometer:
+                ATHLTHCoachSensorFreshness.validPace(
+                    resolvedPace(snapshot), sampledAt: snapshot.coachPaceSampleAt
+                ) ? resolvedPace(snapshot) : nil,
+            targetSlowestPaceSecondsPerKilometer:
+                snapshot.runningStepTargetPaceSecondsPerKilometer,
+            measuredHeartRateBPM: ATHLTHCoachSensorFreshness.validHeartRate(
+                snapshot.heartRate, sampledAt: snapshot.coachHeartRateSampleAt
+            ) ? snapshot.heartRate : nil,
+            targetHeartRateMinimumBPM: targetRange.map { Double($0.lowerBound) },
+            reliableNotClimbing: false,
+            norwegian: norwegian
+        ) {
+            speak(
+                message,
+                priority: .routineCoach,
+                event: ATHLTHCoachEvent(
+                    kind: .routineMilestone,
+                    key: "adaptive-motivation:\(Int(snapshot.elapsedTime))",
+                    priority: .routineCoach,
+                    createdAt: snapshot.capturedAt,
+                    validFor: 12
                 )
             )
             return
