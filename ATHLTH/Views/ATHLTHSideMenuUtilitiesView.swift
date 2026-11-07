@@ -13,11 +13,15 @@ struct ATHLTHSideMenuUtilitiesView: View {
                 .navigationTitle(title)
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button(ATHLTHLocalization.choose(
-                            english: "Close", norwegian: "Lukk"
-                        )) {
-                            dismiss()
+                    // Inbox has its own in-content back button replacing
+                    // the profile avatar. Avoid a competing Close affordance.
+                    if destination != .inbox {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(ATHLTHLocalization.choose(
+                                english: "Close", norwegian: "Lukk"
+                            )) {
+                                dismiss()
+                            }
                         }
                     }
                 }
@@ -53,7 +57,7 @@ struct ATHLTHSideMenuUtilitiesView: View {
         case .search:
             ATHLTHGlobalSearchView()
         case .inbox:
-            MessageInboxDestinationView()
+            MessageInboxDestinationView(onBack: { dismiss() })
         case .notifications:
             ATHLTHNotificationCenterView()
         default:
