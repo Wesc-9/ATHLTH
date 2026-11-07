@@ -102,26 +102,9 @@ struct ATHLTHiPadStudioRootView: View {
                         for: .navigationBar
                     )
                     .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button {
-                                withAnimation(.easeInOut(duration: 0.18)) {
-                                    sidebarVisibility =
-                                        sidebarVisibility == .detailOnly ? .all : .detailOnly
-                                }
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Show or hide sidebar",
-                                        norwegian: "Vis eller skjul sidemeny"
-                                    ),
-                                    systemImage: "sidebar.left"
-                                )
-                            }
-                            .accessibilityHint(ATHLTHLocalization.choose(
-                                english: "Give the current Studio view more room",
-                                norwegian: "Gi den åpne Studio-visningen mer plass"
-                            ))
-                        }
+                        // NavigationSplitView supplies the native sidebar
+                        // visibility control. Do not draw a second identical
+                        // leading button in the detail NavigationStack.
                         ToolbarItemGroup(placement: .topBarTrailing) {
                             Button {
                                 let closing = showingInspector && inspectorShowsCoach
@@ -341,11 +324,21 @@ struct ATHLTHiPadStudioRootView: View {
         }
         .inspector(isPresented: $showingInspector) {
             if inspectorShowsCoach {
-                RecoveryCoachInboxDestinationView()
-                    .inspectorColumnWidth(min: 300, ideal: 370, max: 480)
+                VStack(spacing: 0) {
+                    inspectorCollapseButton
+                    RecoveryCoachInboxDestinationView()
+                        // The first presentation must be laid out at the
+                        // inspector's width, not the outer iPad window width.
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .inspectorColumnWidth(min: 320, ideal: 390, max: 480)
             } else if inspectorShowsInbox {
-                NavigationStack {
-                    MessageInboxDestinationView()
+                VStack(spacing: 0) {
+                    inspectorCollapseButton
+                    NavigationStack {
+                        MessageInboxDestinationView()
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
                 .inspectorColumnWidth(min: 320, ideal: 390, max: 480)
             } else if let selectedWorkout {
@@ -353,6 +346,35 @@ struct ATHLTHiPadStudioRootView: View {
                     .inspectorColumnWidth(min: 270, ideal: 320, max: 400)
             }
         }
+    }
+
+    /// A small, explicit dismiss affordance for either docked conversation.
+    /// The existing toolbar Inbox/Coach buttons reopen the inspector.
+    private var inspectorCollapseButton: some View {
+        HStack {
+            Spacer(minLength: 0)
+            Button {
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    showingInspector = false
+                }
+            } label: {
+                Label(
+                    ATHLTHLocalization.choose(
+                        english: "Hide side panel", norwegian: "Skjul sidepanelet"
+                    ),
+                    systemImage: "chevron.right"
+                )
+                .labelStyle(.titleAndIcon)
+                .font(.caption.weight(.semibold))
+                .frame(minHeight: 32)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(ink)
+            .accessibilityIdentifier("athlth-ipad-hide-inspector")
+        }
+        .padding(.horizontal, 15)
+        .padding(.vertical, 4)
+        .background(canvas)
     }
 
     @ViewBuilder
