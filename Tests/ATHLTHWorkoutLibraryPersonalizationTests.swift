@@ -4,8 +4,8 @@ import XCTest
 
 @MainActor
 final class ATHLTHWorkoutLibraryPersonalizationTests: XCTestCase {
-    func testOnlyAdvancedFirstAddAsksToSetTargets() {
-        XCTAssertFalse(ATHLTHWorkoutFirstUsePolicy.asksForTargets(
+    func testFirstAddOffersPersonalTargetsInSimpleAndAdvanced() {
+        XCTAssertTrue(ATHLTHWorkoutFirstUsePolicy.asksForTargets(
             advanced: false, hasPersonalCopy: false))
         XCTAssertFalse(ATHLTHWorkoutFirstUsePolicy.asksForTargets(
             advanced: false, hasPersonalCopy: true))
@@ -47,6 +47,28 @@ final class ATHLTHWorkoutLibraryPersonalizationTests: XCTestCase {
         XCTAssertNil(result[0].targetEffortRPE)
         XCTAssertNil(result[0].loadNote)
         XCTAssertEqual(withIncline.targetPaceSecondsPerKilometer, 285)
+    }
+
+    func testStrengthPrescriptionSurvivesPersonalTargetReset() {
+        var source = WorkoutTemplateBlock(
+            sequence: 1, kind: .exercise, title: "Biceps curl",
+            exerciseSlug: "biceps-curl", distanceMeters: nil, repetitions: 10,
+            durationSeconds: nil, targetWeightKilograms: 25,
+            loadNote: "Personal load", notes: "Keep 2 reps in reserve",
+            phase: .main
+        )
+        source.setCount = 3
+        source.restBetweenSetsSeconds = 75
+
+        let result = ATHLTHWorkoutLibraryPersonalization.blankTargets([source])
+
+        XCTAssertNil(result[0].targetWeightKilograms)
+        XCTAssertNil(result[0].loadNote)
+        XCTAssertEqual(result[0].setCount, 3)
+        XCTAssertEqual(result[0].repetitions, 10)
+        XCTAssertEqual(result[0].restBetweenSetsSeconds, 75)
+        XCTAssertEqual(result[0].notes, source.notes)
+        XCTAssertEqual(source.targetWeightKilograms, 25)
     }
 
     func testRunningStockTargetsAreClearedWithoutMutatingSource() throws {
