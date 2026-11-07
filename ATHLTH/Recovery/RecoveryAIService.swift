@@ -942,10 +942,11 @@ final class RecoveryAIService {
                         context: shareHealthData
                             ? context : .withoutHealthData,
                         question: question,
-                        language:
-                            ATHLTHLocalization.isNorwegian
-                                ? "nb"
-                                : "en",
+                        // Match the text of this message, regardless of the
+                        // language chosen for buttons and navigation.
+                        language: ATHLTHCoachMessageLanguage.responseCode(
+                            for: question
+                        ),
                         history:
                             shareHealthData && !requestHistory.isEmpty
                                 ? requestHistory
