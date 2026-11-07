@@ -4695,6 +4695,10 @@ final class IPhoneWorkoutStore:
                 self.speechSynthesizer.speak(utterance)
                 self.watchLocalCoachSpeech(utterance)
             },
+            // The standalone iPhone speaker does not issue a cross-device
+            // delivery receipt. Azure still reports playback start to
+            // callers that need a verified handoff.
+            onStarted: {},
             onFinished: { [weak self] in
                 guard let self else { return }
                 self.guidancePriorityGate.voiceDidFinish()
