@@ -78,6 +78,10 @@ enum ATHLTHIntervalRecipeEditing {
             var effort = index < efforts.count ? efforts[index] : firstEffort
             if index >= efforts.count {
                 effort.editorDragID = UUID()
+            }
+            if let automatic = automaticEffortBase(effort.title) {
+                effort.title = "\(automatic) · \(index + 1)/\(rounds)"
+            } else if index >= efforts.count {
                 effort.title = numberedTitle(firstEffort.title, round: index + 1)
             }
             replaced.append(effort)
@@ -85,6 +89,10 @@ enum ATHLTHIntervalRecipeEditing {
                 var rest = index < rests.count ? rests[index] : firstRest
                 if index >= rests.count {
                     rest.editorDragID = UUID()
+                }
+                if let automatic = automaticRecoveryBase(rest.title) {
+                    rest.title = "\(automatic) · \(index + 1)/\(rounds)"
+                } else if index >= rests.count {
                     rest.title = numberedTitle(firstRest.title, round: index + 1)
                 }
                 replaced.append(rest)
@@ -96,6 +104,86 @@ enum ATHLTHIntervalRecipeEditing {
         var updated = source
         updated.replaceSubrange(range, with: replaced)
         return renumbered(updated)
+    }
+
+    /// One explicit apply operation for the whole interval. Changing only the
+    /// count or final recovery preserves every existing individual override.
+    /// Supplying shared work or recovery targets intentionally updates that
+    /// type of step, including previously customized steps, but never replaces
+    /// sequence identities, custom titles or unrelated phases.
+    static func adjusting(
+        _ source: [WorkoutTemplateBlock],
+        groupID: UUID,
+        rounds: Int,
+        finalRecovery: Bool,
+        sharedWork: WorkoutTemplateBlock?,
+        sharedRecovery: WorkoutTemplateBlock?
+    ) -> [WorkoutTemplateBlock]? {
+        guard sharedWork == nil ||
+                (sharedWork?.kind == .run && sharedWork?.isActiveRecovery == false),
+              sharedRecovery == nil || sharedRecovery?.isRestOrActiveRecovery == true,
+              var updated = changing(
+                source, groupID: groupID, rounds: rounds,
+                finalRecovery: finalRecovery
+              ) else { return nil }
+
+        var recoveryOrdinal = 0
+        for index in updated.indices where updated[index].groupID == groupID {
+            if updated[index].kind == .run && !updated[index].isActiveRecovery {
+                guard let sharedWork else { continue }
+                updated[index].durationSeconds = sharedWork.durationSeconds
+                updated[index].distanceMeters = sharedWork.distanceMeters
+                updated[index].targetPaceSecondsPerKilometer =
+                    sharedWork.targetPaceSecondsPerKilometer
+                updated[index].targetHeartRateZone = sharedWork.targetHeartRateZone
+                updated[index].targetHeartRatePercentMin = sharedWork.targetHeartRatePercentMin
+                updated[index].targetHeartRatePercentMax = sharedWork.targetHeartRatePercentMax
+                updated[index].sourceIntensityZoneLabel = sharedWork.sourceIntensityZoneLabel
+                updated[index].targetEffortRPE = sharedWork.targetEffortRPE
+                updated[index].treadmillInclinePercent = sharedWork.treadmillInclinePercent
+                updated[index].isIndoor = sharedWork.isIndoor
+                updated[index].cardioActivity = sharedWork.cardioActivity
+                updated[index].notes = sharedWork.notes
+            } else if updated[index].isRestOrActiveRecovery {
+                recoveryOrdinal += 1
+                guard let sharedRecovery else { continue }
+                let active = sharedRecovery.isActiveRecovery
+                if automaticRecoveryBase(updated[index].title) != nil {
+                    let label = active
+                        ? ATHLTHLocalization.choose(
+                            english: "Active recovery", norwegian: "Aktiv pause"
+                          )
+                        : ATHLTHLocalization.choose(
+                            english: "Recovery", norwegian: "Pause"
+                          )
+                    updated[index].title = "\(label) · \(recoveryOrdinal)/\(rounds)"
+                }
+                updated[index].kind = active ? .run : .rest
+                updated[index].activityTag = active ? "active_recovery" : nil
+                updated[index].cardioActivity =
+                    active ? (sharedRecovery.cardioActivity ?? .running) : nil
+                updated[index].durationSeconds = sharedRecovery.durationSeconds
+                updated[index].distanceMeters =
+                    active ? sharedRecovery.distanceMeters : nil
+                updated[index].targetPaceSecondsPerKilometer =
+                    active ? sharedRecovery.targetPaceSecondsPerKilometer : nil
+                updated[index].targetHeartRateZone =
+                    active ? sharedRecovery.targetHeartRateZone : nil
+                updated[index].targetHeartRatePercentMin =
+                    active ? sharedRecovery.targetHeartRatePercentMin : nil
+                updated[index].targetHeartRatePercentMax =
+                    active ? sharedRecovery.targetHeartRatePercentMax : nil
+                updated[index].sourceIntensityZoneLabel =
+                    active ? sharedRecovery.sourceIntensityZoneLabel : nil
+                updated[index].targetEffortRPE =
+                    active ? sharedRecovery.targetEffortRPE : nil
+                updated[index].treadmillInclinePercent =
+                    active ? sharedRecovery.treadmillInclinePercent : nil
+                updated[index].isIndoor = active ? sharedRecovery.isIndoor : nil
+                updated[index].notes = sharedRecovery.notes
+            }
+        }
+        return updated
     }
 
     /// Explicit user choice, not a hidden intensity recommendation.
@@ -192,6 +280,9 @@ enum ATHLTHIntervalRecipeEditing {
         if seconds == 30 && recoverySeconds == 30 { return "30/30" }
         if seconds == 45 && recoverySeconds == 15 { return "45/15" }
         if seconds == 240 && recoverySeconds == 180 { return "4 × 4" }
+        if let automatic = automaticEffortBase(first.title) {
+            return automatic
+        }
         let cleaned = first.title.replacingOccurrences(
             of: #"\s+\d+$"#, with: "", options: .regularExpression
         )
@@ -229,6 +320,54 @@ enum ATHLTHIntervalRecipeEditing {
         rest.groupKind = .intervals
         rest.groupRounds = 1
         return rest
+    }
+
+    // The legacy expansion stored titles such as "Løpeintervall · 1/4".
+    // Increasing to 10 used to append " 5" to that stale denominator.
+    // Only normalize known generated labels; respect custom step names.
+    private static func automaticEffortBase(_ title: String) -> String? {
+        let base = strippingGeneratedCounter(title)
+        switch base.lowercased() {
+        case "run interval", "running interval", "løpeintervall",
+             "effort", "drag":
+            return ATHLTHLocalization.choose(
+                english: "Run interval", norwegian: "Løpeintervall"
+            )
+        case "walking interval", "gåintervall":
+            return ATHLTHLocalization.choose(
+                english: "Walking interval", norwegian: "Gåintervall"
+            )
+        default:
+            return nil
+        }
+    }
+
+    private static func automaticRecoveryBase(_ title: String) -> String? {
+        let base = strippingGeneratedCounter(title)
+        switch base.lowercased() {
+        case "recovery", "rest", "pause":
+            return ATHLTHLocalization.choose(
+                english: "Recovery", norwegian: "Pause"
+            )
+        case "active recovery", "active recovery · easy jog",
+             "aktiv pause", "aktiv pause · rolig jogg":
+            return ATHLTHLocalization.choose(
+                english: "Active recovery", norwegian: "Aktiv pause"
+            )
+        default:
+            return nil
+        }
+    }
+
+    private static func strippingGeneratedCounter(_ title: String) -> String {
+        title.replacingOccurrences(
+            of: #"\s*·\s*\d+/\d+(?:\s+\d+)?$"#,
+            with: "", options: .regularExpression
+        )
+        .replacingOccurrences(
+            of: #"\s+\d+$"#, with: "", options: .regularExpression
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private static func numberedTitle(_ title: String, round: Int) -> String {

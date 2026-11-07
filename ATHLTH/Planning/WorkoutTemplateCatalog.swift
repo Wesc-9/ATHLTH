@@ -4938,6 +4938,16 @@ struct WorkoutTemplateBuilderView: View {
                     persistWorkoutDraft()
                 }
             },
+            onAdjustInterval: { id, rounds, finalRecovery, work, recovery in
+                if let updated = ATHLTHIntervalRecipeEditing.adjusting(
+                    blocks, groupID: id, rounds: rounds,
+                    finalRecovery: finalRecovery,
+                    sharedWork: work, sharedRecovery: recovery
+                ) {
+                    blocks = updated
+                    persistWorkoutDraft()
+                }
+            },
             onCopyIntervalTargets: { id in
                 if let updated = ATHLTHIntervalRecipeEditing.copyingFirstEffortTargets(
                     in: blocks, groupID: id

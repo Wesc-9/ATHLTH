@@ -193,4 +193,108 @@ final class ATHLTHIntervalRecipeEditingTests: XCTestCase {
             })
         }
     }
+
+    @MainActor
+    func testIncreasingDefaultFourByFourRenumbersEveryGeneratedEffort() throws {
+        let original = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        let id = try XCTUnwrap(original.first?.groupID)
+        let expanded = try XCTUnwrap(ATHLTHIntervalRecipeEditing.changing(
+            original, groupID: id, rounds: 10, finalRecovery: false
+        ))
+        let titles = expanded.filter { $0.kind == .run && !$0.isActiveRecovery }
+            .map(\.title)
+        XCTAssertEqual(titles.count, 10)
+        for (index, title) in titles.enumerated() {
+            XCTAssertTrue(title.hasSuffix("\(index + 1)/10"), title)
+            XCTAssertFalse(title.contains("1/4 "), title)
+        }
+        XCTAssertEqual(expanded.count, 19)
+        let summary = try XCTUnwrap(ATHLTHIntervalRecipeEditing.summary(
+            for: id, in: expanded
+        ))
+        XCTAssertEqual(summary.rounds, 10)
+        XCTAssertFalse(summary.displayName.contains("1/4"))
+        XCTAssertEqual(expanded.expandedForExecution().count, 19)
+    }
+
+    @MainActor
+    func testBadLegacyIntervalLabelsAreRepairedWithoutReplacingCustomTitles() throws {
+        let original = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        let id = try XCTUnwrap(original.first?.groupID)
+        var custom = original
+        custom[0].title = "Løpeintervall · 1/4"
+        custom[2].title = "Avslutt sterkt"
+        custom[4].title = "Løpeintervall · 1/4 5"
+        let updated = try XCTUnwrap(ATHLTHIntervalRecipeEditing.changing(
+            custom, groupID: id, rounds: 6, finalRecovery: true
+        ))
+        XCTAssertTrue(updated[0].title.hasSuffix("1/6"))
+        XCTAssertEqual(updated[2].title, "Avslutt sterkt")
+        XCTAssertTrue(updated[4].title.hasSuffix("3/6"))
+        XCTAssertTrue(updated[10].title.hasSuffix("6/6"))
+    }
+
+    @MainActor
+    func testWholeIntervalUpdatesTargetsWhilePreservingEveryStepIdentity() throws {
+        let original = ATHLTHRunningExercisePreset.fourByFour.blocks(in: .main)
+        let id = try XCTUnwrap(original.first?.groupID)
+        var individualized = original
+        individualized[2].durationSeconds = 290
+        individualized[2].targetPaceSecondsPerKilometer = 410
+        individualized[3].durationSeconds = 210
+
+        // Count-only edits must not erase any manually tailored effort/pause.
+        let countOnly = try XCTUnwrap(ATHLTHIntervalRecipeEditing.adjusting(
+            individualized, groupID: id, rounds: 5, finalRecovery: false,
+            sharedWork: nil, sharedRecovery: nil
+        ))
+        XCTAssertEqual(countOnly[2].durationSeconds, 290)
+        XCTAssertEqual(countOnly[2].targetPaceSecondsPerKilometer, 410)
+        XCTAssertEqual(countOnly[3].durationSeconds, 210)
+        XCTAssertEqual(countOnly.count, 9)
+
+        var sharedWork = individualized[0]
+        sharedWork.durationSeconds = 180
+        sharedWork.distanceMeters = nil
+        sharedWork.targetPaceSecondsPerKilometer = 265
+        sharedWork.targetHeartRateZone = 4
+        sharedWork.treadmillInclinePercent = 2.5
+        sharedWork.isIndoor = true
+        sharedWork.targetEffortRPE = 8
+        sharedWork.notes = "Controlled effort"
+
+        var sharedRecovery = individualized[1]
+        sharedRecovery = ATHLTHActiveRecovery.convert(sharedRecovery, active: true)
+        sharedRecovery.durationSeconds = 75
+        sharedRecovery.targetPaceSecondsPerKilometer = 490
+        sharedRecovery.targetHeartRateZone = 2
+
+        let applied = try XCTUnwrap(ATHLTHIntervalRecipeEditing.adjusting(
+            individualized, groupID: id, rounds: 5, finalRecovery: true,
+            sharedWork: sharedWork, sharedRecovery: sharedRecovery
+        ))
+        XCTAssertEqual(applied.count, 10)
+        XCTAssertEqual(applied.expandedForExecution().count, 10)
+        XCTAssertEqual(Set(applied.map(\.editorDragID)).count, applied.count)
+        XCTAssertEqual(applied[2].editorDragID, individualized[2].editorDragID)
+        for block in applied where block.kind == .run && !block.isActiveRecovery {
+            XCTAssertEqual(block.durationSeconds, 180)
+            XCTAssertEqual(block.targetPaceSecondsPerKilometer, 265)
+            XCTAssertEqual(block.targetHeartRateZone, 4)
+            XCTAssertEqual(block.treadmillInclinePercent, 2.5)
+            XCTAssertEqual(block.targetEffortRPE, 8)
+            XCTAssertEqual(block.notes, "Controlled effort")
+        }
+        for block in applied where block.isActiveRecovery {
+            XCTAssertEqual(block.durationSeconds, 75)
+            XCTAssertEqual(block.targetPaceSecondsPerKilometer, 490)
+            XCTAssertEqual(block.targetHeartRateZone, 2)
+        }
+        XCTAssertEqual(applied.last?.isActiveRecovery, true)
+
+        var oneEdit = applied
+        oneEdit[4].durationSeconds = 245
+        XCTAssertEqual(oneEdit[0].durationSeconds, 180)
+        XCTAssertEqual(oneEdit[4].durationSeconds, 245)
+    }
 }

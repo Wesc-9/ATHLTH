@@ -24,13 +24,21 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onRemove: (UUID) -> Void
     let onRemovePhase: (WorkoutPhaseKind) -> Void
     let onUpdateIntervalGroup: (UUID, Int, Bool) -> Void
+    let onAdjustInterval: (
+        UUID, Int, Bool, WorkoutTemplateBlock?, WorkoutTemplateBlock?
+    ) -> Void
     let onCopyIntervalTargets: (UUID) -> Void
     let onUngroupIntervals: (UUID) -> Void
 
     @State private var phasePendingDeletion: WorkoutPhaseKind?
     @State private var collapsedPhases: Set<WorkoutPhaseKind> = []
     @State private var expandedIntervalGroups: Set<UUID> = []
+    @State private var intervalToAdjust: IntervalSelection?
     @State private var draggingID: UUID?
+
+    private struct IntervalSelection: Identifiable {
+        let id: UUID
+    }
     @State private var dragPoint: CGPoint = .zero
     @State private var dragFingerOffsetY: CGFloat = 0
     @State private var rowFrames: [UUID: CGRect] = [:]
@@ -150,6 +158,15 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         }
         .animation(.easeInOut(duration: 0.18), value: visiblePhases)
         .coordinateSpace(name: "athlthWorkoutStudio")
+        .sheet(item: $intervalToAdjust) { selection in
+            ATHLTHIntervalGroupAdjustmentView(
+                groupID: selection.id, blocks: blocks
+            ) { rounds, finalRecovery, work, recovery in
+                onAdjustInterval(
+                    selection.id, rounds, finalRecovery, work, recovery
+                )
+            }
+        }
         .alert(
             ATHLTHLocalization.choose(
                 english: "Delete workout section?",
@@ -405,6 +422,15 @@ struct ATHLTHPlannedWorkoutStudioView: View {
 
                 Menu {
                     Button {
+                        intervalToAdjust = IntervalSelection(id: id)
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Adjust whole interval",
+                            norwegian: "Endre / juster intervall"
+                        ), systemImage: "slider.horizontal.3")
+                    }
+                    Divider()
+                    Button {
                         onCopyIntervalTargets(id)
                     } label: {
                         Label(ATHLTHLocalization.choose(
@@ -427,41 +453,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                 }
             }
 
-            if let summary {
-                HStack(spacing: 8) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Efforts", norwegian: "Antall drag"
-                    ))
-                    .font(.subheadline)
-                    Spacer()
-                    Stepper(value: Binding(
-                        get: { summary.rounds },
-                        set: { onUpdateIntervalGroup(id, $0, summary.hasFinalRecovery) }
-                    ), in: 1...20) {
-                        Text("\(summary.rounds)")
-                            .font(.subheadline.weight(.semibold).monospacedDigit())
-                    }
-                    .fixedSize()
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Number of efforts", norwegian: "Antall drag"
-                    ))
-                }
-                .padding(.horizontal, 5)
-                Toggle(
-                    ATHLTHLocalization.choose(
-                        english: "Recovery after final effort",
-                        norwegian: "Pause etter siste drag"
-                    ),
-                    isOn: Binding(
-                        get: { summary.hasFinalRecovery },
-                        set: { onUpdateIntervalGroup(id, summary.rounds, $0) }
-                    )
-                )
-                .font(.subheadline)
-                .tint(bronze)
-                .padding(.horizontal, 5)
-            }
-
+            // Repetition count and final recovery belong to the complete
+            // interval editor in the ellipsis menu, not this compact card.
             if isExpanded {
                 VStack(spacing: 3) {
                     ForEach(members, id: \.element.editorDragID) { member in
