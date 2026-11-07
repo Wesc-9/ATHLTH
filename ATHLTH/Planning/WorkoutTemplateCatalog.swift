@@ -2016,67 +2016,109 @@ struct WorkoutTemplateLibraryView: View {
         }
     }
 
-    /// Extra strength filters stay on one small toolbar; muscle selection
-    /// belongs to the horizontal Favorites/tab row above the results.
+    /// Compact controls for real exercise membership, estimated duration,
+    /// experience and sorting. They scroll horizontally on smaller screens.
     private var strengthRefinementBar: some View {
-        HStack(spacing: 8) {
-            Menu {
-                ForEach(strengthLevels, id: \.self) { level in
-                    Button {
-                        selectedWorkoutLevel = level
-                    } label: {
-                        if selectedWorkoutLevel == level {
-                            Label(levelName(level), systemImage: "checkmark")
-                        } else {
-                            Text(levelName(level))
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                Button {
+                    showingExerciseFilter = true
+                } label: {
+                    Label(
+                        selectedExerciseName ?? ATHLTHLocalization.choose(
+                            english: "Exercise", norwegian: "Øvelse"
+                        ),
+                        systemImage: "magnifyingglass"
+                    )
+                    .lineLimit(1)
+                    .frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHPlanDesign.accentInk)
+                .accessibilityHint(ATHLTHLocalization.choose(
+                    english: "Find workouts containing a selected exercise",
+                    norwegian: "Finn økter som inneholder valgt øvelse"
+                ))
+
+                Menu {
+                    ForEach(ATHLTHWorkoutDiscoveryFilter.Duration.allCases) { duration in
+                        Button {
+                            selectedWorkoutDuration = duration
+                        } label: {
+                            if selectedWorkoutDuration == duration {
+                                Label(duration.title, systemImage: "checkmark")
+                            } else {
+                                Text(duration.title)
+                            }
                         }
                     }
-                }
-            } label: {
-                Label(
-                    selectedWorkoutLevel == "all"
-                        ? ATHLTHLocalization.choose(
-                            english: "Experience", norwegian: "Erfaringsnivå"
-                          )
-                        : levelName(selectedWorkoutLevel),
-                    systemImage: "slider.horizontal.3"
-                )
-                .font(.caption.weight(.semibold))
-                .lineLimit(1)
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .background(.white.opacity(0.86), in: Capsule())
-            }
-
-            Spacer(minLength: 0)
-
-            Picker(
-                ATHLTHLocalization.choose(
-                    english: "Sort workouts", norwegian: "Sorter økter"
-                ),
-                selection: $selectedDiscoverySort
-            ) {
-                ForEach(DiscoverySort.allCases) { sort in
-                    Text(sort.title).tag(sort)
-                }
-            }
-            .tint(ATHLTHPlanDesign.accentInk)
-
-            if hasDiscoveryFilters {
-                Button {
-                    clearStrengthFilters()
                 } label: {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                        .frame(width: 44, height: 44)
+                    Label(selectedWorkoutDuration.title, systemImage: "clock")
+                        .font(.caption.weight(.semibold))
+                        .frame(minHeight: 44)
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Clear filters", norwegian: "Nullstill filtre"
-                ))
+                .buttonStyle(.bordered)
+                .tint(ATHLTHPlanDesign.accentInk)
+
+                Menu {
+                    ForEach(strengthLevels, id: \.self) { level in
+                        Button {
+                            selectedWorkoutLevel = level
+                        } label: {
+                            if selectedWorkoutLevel == level {
+                                Label(levelName(level), systemImage: "checkmark")
+                            } else {
+                                Text(levelName(level))
+                            }
+                        }
+                    }
+                } label: {
+                    Label(levelName(selectedWorkoutLevel),
+                          systemImage: "slider.horizontal.3")
+                        .font(.caption.weight(.semibold))
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHPlanDesign.accentInk)
+
+                Menu {
+                    ForEach(DiscoverySort.allCases) { sort in
+                        Button { selectedDiscoverySort = sort } label: {
+                            if sort == selectedDiscoverySort {
+                                Label(sort.title, systemImage: "checkmark")
+                            } else {
+                                Text(sort.title)
+                            }
+                        }
+                    }
+                } label: {
+                    Label(selectedDiscoverySort.title,
+                          systemImage: "arrow.up.arrow.down")
+                        .font(.caption.weight(.semibold))
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.bordered)
+                .tint(ATHLTHPlanDesign.accentInk)
+
+                if hasDiscoveryFilters {
+                    Button {
+                        clearStrengthFilters()
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Clear", norwegian: "Nullstill"
+                        ), systemImage: "arrow.counterclockwise")
+                    }
+                    .buttonStyle(.bordered)
+                }
             }
+            .padding(.vertical, 3)
+        }
+        .sheet(isPresented: $showingExerciseFilter) {
+            ATHLTHWorkoutExerciseFilterSheet(
+                selectedExercise: $selectedExerciseName,
+                exerciseNames: availableExerciseNames
+            )
+            .presentationDetents([.medium, .large])
         }
     }
 
