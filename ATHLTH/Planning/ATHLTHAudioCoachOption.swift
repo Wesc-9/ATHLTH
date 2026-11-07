@@ -164,7 +164,17 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .averagePace: d.announceAveragePace = active
         case .clockTime: d.announceClockTime = active
         case .heartRate: d.announceHeartRate = active
-        case .currentZone: d.smartPrompts.announceCurrentHeartRateZone = active
+        case .currentZone:
+            d.smartPrompts.announceCurrentHeartRateZone = active
+            if active {
+                // A zone-announcement option must have a concrete interval,
+                // even alongside programmed target-zone alerts.
+                if d.smartPrompts.measuredZoneAnnouncementIntervalSeconds == nil {
+                    d.smartPrompts.measuredZoneAnnouncementIntervalSeconds = 60
+                }
+            } else {
+                d.smartPrompts.measuredZoneAnnouncementIntervalSeconds = nil
+            }
         case .targetZoneCoach:
             d.smartPrompts.targetZoneVoiceAlertsEnabled = active
             if active { d.smartPrompts.confirmWhenBackInZone = true }
@@ -221,7 +231,7 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
             if let interval = draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds {
                 return tr("Every", "Hvert") + " \(interval) s"
             }
-            return tr("When measured zone changes", "Ved endring av målt sone")
+            return tr("Every 3 minutes", "Hvert tredje minutt")
         case .targetZoneCoach:
             return draft.smartPrompts.preferredHeartRateZone.map {
                 tr("Target zone", "Målsone") + " \($0)"

@@ -262,4 +262,17 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
         XCTAssertEqual(draft.configuration().language, .norwegian)
         XCTAssertTrue(draft.customRules.first?.selectedMetrics.contains(.heartRate) == true)
     }
+
+    func testAddingCurrentZoneAnnouncementStartsWithExplicitMinuteCadence() {
+        var draft = AudioCoachDraft()
+        draft.applySimpleAudioCoach()
+        XCTAssertNil(draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds)
+        ATHLTHAudioCoachOption.currentZone.setActive(true, in: &draft)
+        XCTAssertEqual(draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds, 60)
+        XCTAssertTrue(ATHLTHAudioCoachOption.currentZone.isActive(in: draft))
+        XCTAssertTrue(ATHLTHAudioCoachOption.currentZone.detail(in: draft).contains("60"))
+        ATHLTHAudioCoachOption.currentZone.setActive(false, in: &draft)
+        XCTAssertNil(draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds)
+        XCTAssertFalse(ATHLTHAudioCoachOption.currentZone.isActive(in: draft))
+    }
 }

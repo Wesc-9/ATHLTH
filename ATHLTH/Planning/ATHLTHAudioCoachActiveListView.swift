@@ -11,13 +11,16 @@ struct ATHLTHAudioCoachActiveListView: View {
     let showStructuredOptions: Bool
     var globalScope: Bool = false
 
-    @AppStorage("athlth.audioCoach.editorMode.v2") private var editorMode = "basic"
+    // Every new workout opens the uncluttered Basic screen; the athlete's
+    // actual Coach settings and profiles remain unchanged.
+    @State private var editorMode = "basic"
     @State private var showingCatalogue = false
     @State private var showingVoice = false
     @State private var showingProfiles = false
     @State private var editingOption: ATHLTHAudioCoachOption?
     @State private var nextEditor: ATHLTHAudioCoachOption?
     @State private var pendingRemoval: ATHLTHAudioCoachOption?
+    @State private var confirmReplaceWithStandard = false
     @State private var profileName = ""
     @State private var ruleSetName = ""
     @State private var phraseText = ""
@@ -65,6 +68,19 @@ struct ATHLTHAudioCoachActiveListView: View {
             $0.isVisible(route: showRouteOptions, structured: showStructuredOptions)
                 && $0.isActive(in: draft)
         }
+    }
+
+    private var hasAdvancedConfiguration: Bool {
+        !draft.customRules.isEmpty ||
+        draft.smartPrompts.coachingMode == .custom ||
+        draft.smartPrompts.preferredHeartRateZone != nil ||
+        draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds != nil ||
+        draft.smartPrompts.targetZoneVoiceAlertsEnabled != nil ||
+        draft.smartPrompts.pushWhenBelowTargetPace == true ||
+        draft.smartPrompts.pushWhenBelowTargetZone == true ||
+        draft.smartPrompts.pushOnUnexpectedPaceDrop == true ||
+        !draft.smartPrompts.customEncouragements.isEmpty ||
+        !draft.smartPrompts.landmarks.isEmpty
     }
 
     private var inactiveOptions: [ATHLTHAudioCoachOption] {
@@ -129,6 +145,20 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
             .presentationDetents([.large])
         }
+        .alert(
+            tr("Replace Coach settings?", "Erstatte coach-oppsett?"),
+            isPresented: $confirmReplaceWithStandard
+        ) {
+            Button(tr("Use standard", "Bruk standard")) {
+                draft.applySimpleAudioCoach()
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {}
+        } message: {
+            Text(tr(
+                "Your current rules will be replaced by the simple coach. Saved profiles will still be available.",
+                "Aktive regler blir erstattet av enkel coach. Lagrede profiler er fortsatt tilgjengelige."
+            ))
+        }
         .sheet(isPresented: $showingVoice) { voiceSheet }
         .sheet(isPresented: $showingProfiles) { profilesSheet }
         .confirmationDialog(
@@ -192,10 +222,16 @@ struct ATHLTHAudioCoachActiveListView: View {
                   systemImage: "checkmark.circle")
                 .font(.headline)
                 .foregroundStyle(ink)
-            Text(tr(
-                "Start running with concise distance, time and pace updates, encouragement and a finish summary.",
-                "Løp med enkle oppdateringer om distanse, tid og tempo, oppmuntring og oppsummering ved mål."
-            ))
+            Text(hasAdvancedConfiguration
+                ? tr(
+                    "Your customized Coach setup is active. Open Advanced to see every rule, or choose the standard setup below.",
+                    "Det tilpassede coach-oppsettet ditt er aktivt. Åpne Avansert for å se alle reglene, eller velg standardoppsettet nedenfor."
+                )
+                : tr(
+                    "Start running with concise distance, time and pace updates, encouragement and a finish summary.",
+                    "Løp med enkle oppdateringer om distanse, tid og tempo, oppmuntring og oppsummering ved mål."
+                )
+            )
             .font(.subheadline)
             .foregroundStyle(dim)
             VStack(alignment: .leading, spacing: 8) {
@@ -247,7 +283,11 @@ struct ATHLTHAudioCoachActiveListView: View {
                 .buttonStyle(.bordered)
             }
             Button {
-                draft.applySimpleAudioCoach()
+                if hasAdvancedConfiguration {
+                    confirmReplaceWithStandard = true
+                } else {
+                    draft.applySimpleAudioCoach()
+                }
             } label: {
                 Label(tr("Use recommended basic setup", "Bruk anbefalt enkel oppsett"),
                       systemImage: "checkmark.circle.fill")
