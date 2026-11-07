@@ -244,7 +244,7 @@ struct SavedRoutesView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
+            LazyVStack(spacing: 13) {
                 heroHeader
                 if !session.savedRoutes.isEmpty {
                     searchAndFilters
@@ -301,12 +301,12 @@ struct SavedRoutesView: View {
     private var heroHeader: some View {
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 5) {
-                Text("ATHLTH  /  " + tr("ROUTES", "RUTER"))
+                Text("ATHLTH · " + tr("MY ROUTES", "MINE RUTER"))
                     .font(.system(size: 10, weight: .bold))
-                    .tracking(2.0)
+                    .tracking(1.5)
                     .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                Text(selectionTitle == nil ? tr("Find your next route", "Finn din neste rute") : tr("Choose a route", "Velg en rute"))
-                    .font(.system(size: 27, weight: .semibold, design: .serif))
+                Text(selectionTitle == nil ? tr("My routes", "Mine ruter") : tr("Choose a route", "Velg en rute"))
+                    .font(.system(size: 25, weight: .medium, design: .serif))
                     .foregroundStyle(ATHLTHPlanDesign.ink)
                 Text(tr("\(session.savedRoutes.count) saved routes", "\(session.savedRoutes.count) lagrede ruter"))
                     .font(.subheadline)
@@ -318,9 +318,10 @@ struct SavedRoutesView: View {
             } label: {
                 Image(systemName: "plus")
                     .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(Color.white)
-                    .frame(width: 48, height: 48)
-                    .background(ATHLTHTheme.accentDeep, in: RoundedRectangle(cornerRadius: 16))
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .frame(width: 44, height: 44)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                    .overlay { Circle().strokeBorder(ATHLTHPlanDesign.outline) }
             }
             .accessibilityLabel(tr("Create route", "Opprett rute"))
         }
@@ -420,8 +421,12 @@ struct SavedRoutesView: View {
                 .accessibilityLabel(tr("Change estimated running pace", "Endre estimert løpetempo"))
             }
         }
-        .padding(16)
-        .athlthPlanCard()
+        .padding(13)
+        .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 19))
+        .overlay {
+            RoundedRectangle(cornerRadius: 19)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.7), lineWidth: 0.8)
+        }
     }
 
     private func filterControl(title: String, icon: String) -> some View {
@@ -481,6 +486,12 @@ struct SavedRoutesView: View {
                 .foregroundStyle(ATHLTHPlanDesign.ink)
 
             ATHLTHRouteBrowseModePicker(selection: viewModeBinding)
+            Label(
+                tr("Times are estimates", "Tidene er estimater"),
+                systemImage: "info.circle"
+            )
+            .font(.caption2)
+            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 3)
@@ -632,13 +643,14 @@ struct SavedRoutesView: View {
 
     private func routeCard(_ entry: PositionedSavedRoute) -> some View {
         let route = entry.route
-        return VStack(alignment: .leading, spacing: 13) {
+        return VStack(alignment: .leading, spacing: 11) {
             Button {
                 markRecent(route)
                 previewRoute = route
             } label: {
                 ZStack(alignment: .bottomTrailing) {
-                    RouteMapSnapshotThumbnail(route: route, height: 174)
+                    RouteMapSnapshotThumbnail(route: route, height: 150)
+                        .clipShape(RoundedRectangle(cornerRadius: 15))
                     Label(tr("Explore", "Utforsk"), systemImage: "arrow.up.left.and.arrow.down.right")
                         .font(.caption2.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
@@ -701,24 +713,17 @@ struct SavedRoutesView: View {
             .lineLimit(1)
             .minimumScaleFactor(0.8)
 
-            HStack(spacing: 0) {
-                metric(value: String(format: "%.1f km", route.distanceKilometers),
-                       caption: tr("DISTANCE", "DISTANSE"), icon: "point.topleft.down.to.point.bottomright.curvepath")
-                Divider().frame(height: 35)
-                metric(value: durationText(kilometers: route.distanceKilometers, paceMinutes: walkPaceMinutes),
-                       caption: tr("EST. WALK", "EST. GANGE"), icon: "figure.walk")
-                Divider().frame(height: 35)
-                metric(value: durationText(kilometers: route.distanceKilometers, paceMinutes: runPaceMinutes),
-                       caption: tr("EST. RUN", "EST. LØPING"), icon: "figure.run")
-            }
-            .padding(.vertical, 12)
-            .background(ATHLTHPlanDesign.warmSurface.opacity(0.7),
-                        in: RoundedRectangle(cornerRadius: 14))
-
-            Text(tr("Time estimates use your recent workouts or a standard pace; elevation and stops may affect actual time.",
-                    "Tidsanslagene bruker dine siste økter eller standardtempo. Stigning og stopp kan endre faktisk tid."))
-                .font(.system(size: 10))
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+            ATHLTHRouteMetricRibbon(
+                kilometers: route.distanceKilometers,
+                estimatedWalk: durationText(
+                    kilometers: route.distanceKilometers,
+                    paceMinutes: walkPaceMinutes
+                ),
+                estimatedRun: durationText(
+                    kilometers: route.distanceKilometers,
+                    paceMinutes: runPaceMinutes
+                )
+            )
 
             HStack(spacing: 12) {
                 NavigationLink {
@@ -762,24 +767,12 @@ struct SavedRoutesView: View {
                 }
             }
         }
-        .padding(14)
-        .athlthPlanCard()
-    }
-
-    private func metric(value: String, caption: String, icon: String) -> some View {
-        VStack(spacing: 5) {
-            Label(caption, systemImage: icon)
-                .font(.system(size: 9, weight: .bold))
-                .tracking(0.5)
-                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                .lineLimit(1)
-            Text(value)
-                .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundStyle(ATHLTHPlanDesign.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
+        .padding(12)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(ATHLTHPlanDesign.outline.opacity(0.70), lineWidth: 0.8)
         }
-        .frame(maxWidth: .infinity)
     }
 
     private var filteredEmptyState: some View {
