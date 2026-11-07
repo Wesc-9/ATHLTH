@@ -430,6 +430,9 @@ final class IPhoneWorkoutStore:
     private var guidancePriorityGate =
         ATHLTHGuidancePriorityGate()
     private var coachEventLedger = ATHLTHCoachEventLedger()
+    private var pendingLocalCoachEvent: (
+        utterance: AVSpeechUtterance, event: ATHLTHCoachEvent
+    )?
     private var coachCueQueue = ATHLTHCoachCueQueue()
     private var nextDistanceAnnouncementMeters: Double?
     private var nextTimeAnnouncementSeconds: TimeInterval?
@@ -4650,10 +4653,8 @@ final class IPhoneWorkoutStore:
             break
         }
 
-        if let event {
-            coachEventLedger.didDeliver(event)
-        }
-
+        // Speech requests are not deliveries. Only the actual
+        // playback start acknowledges the event in the local ledger.
         let spokenPhrase = rememberForReplay
             ? (configuration.speechStyle ?? .balanced).render(
                 phrase,
@@ -4692,13 +4693,17 @@ final class IPhoneWorkoutStore:
                     duckOtherAudio: configuration.shouldDuckOtherAudio,
                     owner: self.audioOwner
                 )
+                self.pendingLocalCoachEvent = event.map {
+                    (utterance: utterance, event: $0)
+                }
                 self.speechSynthesizer.speak(utterance)
                 self.watchLocalCoachSpeech(utterance)
             },
-            // The standalone iPhone speaker does not issue a cross-device
-            // delivery receipt. Azure still reports playback start to
-            // callers that need a verified handoff.
-            onStarted: {},
+            // Standalone iPhone speech has its own local event ledger.
+            onStarted: { [weak self] in
+                guard let self, let event else { return }
+                self.markLocalCoachEventStarted(event)
+            },
             onFinished: { [weak self] in
                 guard let self else { return }
                 self.guidancePriorityGate.voiceDidFinish()
@@ -4710,6 +4715,9 @@ final class IPhoneWorkoutStore:
                 duckOtherAudio: configuration.shouldDuckOtherAudio,
                 owner: audioOwner
             )
+            pendingLocalCoachEvent = event.map {
+                (utterance: utterance, event: $0)
+            }
             speechSynthesizer.speak(utterance)
             watchLocalCoachSpeech(utterance)
         }
@@ -4718,6 +4726,11 @@ final class IPhoneWorkoutStore:
             coachReplayMemory.remember(spokenPhrase, priority: priority)
             lastCoachMessage = coachReplayMemory.text
         }
+    }
+
+    private func markLocalCoachEventStarted(_ event: ATHLTHCoachEvent) {
+        guard coachEventLedger.canDeliver(event) else { return }
+        coachEventLedger.didDeliver(event)
     }
 
     private func deliverNextQueuedCoachCue() {
@@ -4765,6 +4778,7 @@ final class IPhoneWorkoutStore:
     }
 
     private func deactivateCoachAudioSession() {
+        pendingLocalCoachEvent = nil
         localSpeechWatchdog?.cancel()
         localSpeechWatchdog = nil
         azureCoachSpeech.stop()
@@ -4778,11 +4792,27 @@ final class IPhoneWorkoutStore:
 
     nonisolated func speechSynthesizer(
         _ synthesizer: AVSpeechSynthesizer,
-        didFinish utterance: AVSpeechUtterance
+        didStart utterance: AVSpeechUtterance
     ) {
         Task { @MainActor [weak self] in
             guard let self,
-                  !self.speechSynthesizer.isSpeaking,
+                  let pending = self.pendingLocalCoachEvent,
+                  pending.utterance === utterance else { return }
+            self.pendingLocalCoachEvent = nil
+            self.markLocalCoachEventStarted(pending.event)
+        }
+    }
+
+    nonisolated func speechSynthesizer(
+        _ synthesizer: AVSpeechSynthesizer,
+        didFinish utterance: AVSpeechUtterance
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            if self.pendingLocalCoachEvent?.utterance === utterance {
+                self.pendingLocalCoachEvent = nil
+            }
+            guard !self.speechSynthesizer.isSpeaking,
                   !self.azureCoachSpeech.isBusy
             else {
                 // A delayed AVSpeechSynthesizer completion must not release
@@ -4805,8 +4835,11 @@ final class IPhoneWorkoutStore:
         didCancel utterance: AVSpeechUtterance
     ) {
         Task { @MainActor [weak self] in
-            guard let self,
-                  !self.speechSynthesizer.isSpeaking,
+            guard let self else { return }
+            if self.pendingLocalCoachEvent?.utterance === utterance {
+                self.pendingLocalCoachEvent = nil
+            }
+            guard !self.speechSynthesizer.isSpeaking,
                   !self.azureCoachSpeech.isBusy
             else {
                 // A delayed AVSpeechSynthesizer completion must not release
