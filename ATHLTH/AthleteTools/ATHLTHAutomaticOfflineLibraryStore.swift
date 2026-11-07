@@ -108,7 +108,11 @@ final class ATHLTHAutomaticOfflineLibraryStore: ObservableObject {
             work = nil
             signedInAccountID = userID
             lastMediaAttemptByPlan = [:]
-            packs.load(userID: userID ?? UUID())
+            if let userID {
+                packs.load(userID: userID)
+            } else {
+                packs.clearActiveAccount()
+            }
         }
         latestPlans = userID == nil ? [] : plans
         latestRoutes = userID == nil ? [] : routes
