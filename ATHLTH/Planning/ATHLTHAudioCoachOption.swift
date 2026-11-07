@@ -6,6 +6,7 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
     case distanceUpdates, timedUpdates
     case distance, elapsedTime, averagePace, clockTime, heartRate, currentZone
     case motivation, contextual, randomEncouragement
+    case targetZoneCoach, adaptiveMotivation
     case workoutStart, pauseResume, workoutFinish
     case routeRemaining, routeETA
     case currentStep, remainingStepTime, remainingStepDistance
@@ -27,6 +28,8 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .clockTime: return tr("Clock time", "Klokkeslett")
         case .heartRate: return tr("Heart rate", "Puls")
         case .currentZone: return tr("Current heart-rate zone", "Målt pulssone")
+        case .targetZoneCoach: return tr("Target-zone guidance", "Veiledning for målsone")
+        case .adaptiveMotivation: return tr("Situational motivation", "Situasjonsstyrt motivasjon")
         case .motivation: return tr("Motivational coaching", "Motivasjonssnakk")
         case .contextual: return tr("Hills and final stretch", "Bakker og siste etappe")
         case .randomEncouragement: return tr("Surprise encouragement", "Tilfeldig oppmuntring")
@@ -49,9 +52,10 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .distanceUpdates, .timedUpdates, .distance, .elapsedTime,
              .averagePace, .clockTime:
             return tr("Workout updates", "Øktoppdateringer")
-        case .heartRate, .currentZone:
+        case .heartRate, .currentZone, .targetZoneCoach:
             return tr("Heart rate", "Puls")
-        case .motivation, .contextual, .randomEncouragement, .customPhrases, .landmarks:
+        case .motivation, .contextual, .randomEncouragement, .adaptiveMotivation,
+             .customPhrases, .landmarks:
             return tr("Motivation", "Motivasjon")
         case .workoutStart, .pauseResume, .workoutFinish:
             return tr("Events", "Hendelser")
@@ -72,8 +76,9 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .averagePace: return "speedometer"
         case .clockTime: return "clock.badge"
         case .heartRate: return "heart"
-        case .currentZone: return "heart.text.square"
-        case .motivation, .contextual, .randomEncouragement: return "sparkles"
+        case .currentZone, .targetZoneCoach: return "heart.text.square"
+        case .motivation, .contextual, .randomEncouragement, .adaptiveMotivation:
+            return "sparkles"
         case .workoutStart: return "play.circle"
         case .pauseResume: return "pause.circle"
         case .workoutFinish: return "flag.checkered"
@@ -87,8 +92,9 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
 
     var requiresConfiguration: Bool {
         switch self {
-        case .distanceUpdates, .timedUpdates, .currentZone, .motivation,
-             .randomEncouragement, .customAnnouncements, .customPhrases,
+        case .distanceUpdates, .timedUpdates, .currentZone, .targetZoneCoach,
+             .adaptiveMotivation, .motivation, .randomEncouragement,
+             .customAnnouncements, .customPhrases,
              .landmarks:
             return true
         default:
@@ -122,6 +128,8 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .clockTime: return d.announceClockTime
         case .heartRate: return d.announceHeartRate
         case .currentZone: return d.smartPrompts.announceCurrentHeartRateZone ?? false
+        case .targetZoneCoach: return d.smartPrompts.targetZoneVoiceAlertsEnabled ?? false
+        case .adaptiveMotivation: return d.smartPrompts.coachingMode == .custom
         case .motivation: return d.smartPrompts.motivationEnabled
         case .contextual:
             return d.smartPrompts.motivationEnabled &&
@@ -157,6 +165,14 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .clockTime: d.announceClockTime = active
         case .heartRate: d.announceHeartRate = active
         case .currentZone: d.smartPrompts.announceCurrentHeartRateZone = active
+        case .targetZoneCoach:
+            d.smartPrompts.targetZoneVoiceAlertsEnabled = active
+            if active { d.smartPrompts.confirmWhenBackInZone = true }
+        case .adaptiveMotivation:
+            d.smartPrompts.coachingMode = active ? .custom : .automatic
+            if active && d.smartPrompts.strongStartDurationSeconds == nil {
+                d.smartPrompts.strongStartDurationSeconds = 180
+            }
         case .motivation: d.smartPrompts.motivationEnabled = active
         case .contextual:
             if active { d.smartPrompts.motivationEnabled = true }
@@ -202,7 +218,16 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .landmarks: return "\(draft.smartPrompts.landmarks.count) " +
             tr("places", "steder")
         case .currentZone:
-            return tr("Uses measured Watch heart rate", "Bruker målt puls fra klokken")
+            if let interval = draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds {
+                return tr("Every", "Hvert") + " \(interval) s"
+            }
+            return tr("When measured zone changes", "Ved endring av målt sone")
+        case .targetZoneCoach:
+            return draft.smartPrompts.preferredHeartRateZone.map {
+                tr("Target zone", "Målsone") + " \($0)"
+            } ?? tr("Uses planned interval zone", "Bruker pulssonen i treningsøkten")
+        case .adaptiveMotivation:
+            return tr("Based on live effort and targets", "Styres av faktisk innsats og mål")
         default: return tr("Enabled", "Aktiv")
         }
     }

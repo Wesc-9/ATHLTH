@@ -4647,8 +4647,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         // claim a hill is flat without reliable altitude evidence.
         let target = ATHLTHHeartRateZoneCoachTarget.configuration(
             configured: targetAlertConfiguration,
-            stepZone: awaitingMainStart ? nil :
-                currentStructuredRunningStep?.targetHeartRateZone,
+            stepZone: (awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRateZone) ??
+                settings.preferredHeartRateZone,
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
                 settings.maximumHeartRateBPM
         )
@@ -6617,8 +6618,9 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             structuredRunningWorkout?.heartRateZoneMaximumBPM
         let target = ATHLTHHeartRateZoneCoachTarget.configuration(
             configured: targetAlertConfiguration,
-            stepZone: awaitingMainStart ? nil :
-                currentStructuredRunningStep?.targetHeartRateZone,
+            stepZone: (awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRateZone) ??
+                audioCoachConfiguration.smartPrompts?.preferredHeartRateZone,
             maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
                 resolvedMaximumBPM
         )
@@ -6664,9 +6666,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
     private func evaluateWorkoutTargetAlerts() {
         let configuration = ATHLTHHeartRateZoneCoachTarget.configuration(
             configured: targetAlertConfiguration,
-            stepZone: awaitingMainStart ? nil :
-                currentStructuredRunningStep?.targetHeartRateZone,
-            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM
+            stepZone: (awaitingMainStart ? nil :
+                currentStructuredRunningStep?.targetHeartRateZone) ??
+                audioCoachConfiguration.smartPrompts?.preferredHeartRateZone,
+            maximumBPM: structuredRunningWorkout?.heartRateZoneMaximumBPM ??
+                audioCoachConfiguration.smartPrompts?.maximumHeartRateBPM
         )
         guard state == .running,
               !awaitingMainStart,

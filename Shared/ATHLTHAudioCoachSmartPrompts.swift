@@ -155,6 +155,8 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     // in the new editor are picked up by Watch and the mirrored iPhone voice.
     var measuredZoneAnnouncementIntervalSeconds: Int? = nil
     var targetZoneVoiceAlertsEnabled: Bool? = nil
+    /// Applies to free runs; an interval's programmed zone takes precedence.
+    var preferredHeartRateZone: Int? = nil
     var confirmWhenBackInZone: Bool? = nil
     var coachingMode: ATHLTHCoachMotivationControlMode? = nil
     var strongStartDurationSeconds: Int? = nil

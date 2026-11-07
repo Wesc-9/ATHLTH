@@ -605,7 +605,8 @@ final class MirroredWorkoutAudioCoach:
         // Mirrored snapshots do not include reliable terrain grade, so
         // this owner can coach on planned zones and pace, not flat-ground drops.
         let targetRange = ATHLTHHeartRateZones.range(
-            for: snapshot.runningStepTargetHeartRateZone ?? 0,
+            for: snapshot.runningStepTargetHeartRateZone ??
+                settings.preferredHeartRateZone ?? 0,
             maximumBPM: settings.maximumHeartRateBPM
         )
         if let message = adaptiveCoachState.nextCue(
