@@ -1447,12 +1447,27 @@ final class StrengthWorkoutStore: ObservableObject {
               kilograms == nil ||
                 (kilograms!.isFinite && (0...40).contains(kilograms!))
         else { return false }
+        let exercise = workout.exercises[index]
+        let oldBar = exercise.barWeightKilograms ??
+            suggestedBarWeight(for: exercise)
+        let newBar = kilograms ??
+            StrengthBarWeightPreferences.mass(
+                for: exercise.exercise.name, userID: accountID
+            )
+        let isEditingCurrentSet = currentExercise?.id == id &&
+            currentSet?.isCompleted == false &&
+            currentSetRecordsWeight
         workout.exercises[index].barWeightKilograms = kilograms
         activeWorkout = workout
-        if currentExercise?.id == id,
-           let kilograms, currentSetRecordsWeight,
-           draftWeightKilograms < kilograms {
-            setDraft(weightKilograms: kilograms)
+        if isEditingCurrentSet {
+            // Preserve the athlete's entered plates when swapping a 20 kg
+            // bar for another size. Set records and prescribed targets stay
+            // stored as total kilograms and are not recalculated.
+            setDraft(weightKilograms: StrengthBarbellLoad.totalPreservingPlates(
+                totalKilograms: draftWeightKilograms,
+                previousBarKilograms: oldBar,
+                newBarKilograms: newBar
+            ))
         }
         persistCheckpointNow()
         return true
