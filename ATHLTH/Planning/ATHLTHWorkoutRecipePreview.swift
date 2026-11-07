@@ -81,6 +81,10 @@ struct ATHLTHWorkoutRecipePreview: View {
     @State private var selectedExercise: WorkoutTemplateBlock?
     @State private var editingStep: IndexedWorkoutStep?
     @State private var inspectedCardioStep: IndexedWorkoutStep?
+    // All recipe categories start compact; each category and its steps can be
+    // opened independently without losing the underlying workout prescription.
+    @State private var collapsedPhases: Set<WorkoutPhaseKind> = Set(WorkoutPhaseKind.allCases)
+    @State private var expandedStepIndices: Set<Int> = []
 
     private func tr(_ english: String, _ norwegian: String) -> String {
         ATHLTHLocalization.choose(english: english, norwegian: norwegian)
@@ -125,11 +129,7 @@ struct ATHLTHWorkoutRecipePreview: View {
                 ))
             }
             modeControl
-            if advanced {
-                timeline
-            } else {
-                simpleOutline
-            }
+            expandableOutline
         }
         .sheet(item: $editingStep) { item in
             ATHLTHWorkoutStepEditor(block: item.block) { updated in
@@ -299,212 +299,192 @@ struct ATHLTHWorkoutRecipePreview: View {
         }
     }
 
-    // Simple: only the workout outline. Advanced holds targets, zones and editing.
-    private var simpleOutline: some View {
-        VStack(alignment: .leading, spacing: 11) {
+    /// Existing library recipes stay in their original warm-up/main/cool-down
+    /// phases. A phase opens to a compact exercise list, and each exercise can
+    /// open again to reveal rests and the editing action.
+    private var expandableOutline: some View {
+        VStack(alignment: .leading, spacing: 12) {
             ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                if shouldShowPhaseHeader(at: index) {
-                    Label(block.resolvedPhase.title.uppercased(),
-                          systemImage: block.resolvedPhase.symbol)
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.0)
-                        .foregroundStyle(recipeTint)
-                        .padding(.top, index == 0 ? 0 : 7)
+                if beginsPhase(at: index) {
+                    phaseDisclosure(at: index)
                 }
-                HStack(spacing: 11) {
-                    Text("\(index + 1)")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(recipeTint)
-                        .frame(width: 29, height: 29)
-                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                if !collapsedPhases.contains(displayPhase(at: index)) {
+                    recipeStepCard(block, index: index)
+                        .padding(.leading, 9)
+                }
+            }
+        }
+    }
+
+    /// Recovery intervals belong visually to the preceding training block.
+    /// This does not change their underlying phase or execution order.
+    private func displayPhase(at index: Int) -> WorkoutPhaseKind {
+        let phase = blocks[index].resolvedPhase
+        guard phase == .recovery else { return phase }
+        return blocks.prefix(index).reversed()
+            .first(where: { $0.resolvedPhase != .recovery })?.resolvedPhase ?? .recovery
+    }
+
+    private func beginsPhase(at index: Int) -> Bool {
+        index == 0 || displayPhase(at: index) != displayPhase(at: index - 1)
+    }
+
+    private func phaseStepCount(at start: Int) -> Int {
+        let phase = displayPhase(at: start)
+        return (start..<blocks.count)
+            .prefix(while: { displayPhase(at: $0) == phase }).count
+    }
+
+    private func phaseDisclosure(at index: Int) -> some View {
+        let phase = displayPhase(at: index)
+        let collapsed = collapsedPhases.contains(phase)
+        let count = phaseStepCount(at: index)
+        return Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                if collapsed {
+                    collapsedPhases.remove(phase)
+                } else {
+                    collapsedPhases.insert(phase)
+                }
+            }
+        } label: {
+            HStack(spacing: 11) {
+                Image(systemName: phase.symbol)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(width: 30, height: 30)
+                    .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(phase.title.uppercased())
+                        .font(.caption.weight(.bold))
+                        .tracking(1.1)
+                    Text(tr("Steps: ", "Øktdeler: ") + "\(count)")
+                        .font(.caption)
+                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                Spacer()
+                Image(systemName: collapsed ? "chevron.down" : "chevron.up")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundStyle(recipeTint)
+            .frame(maxWidth: .infinity, minHeight: 50, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(phase.title)
+        .accessibilityValue(tr(collapsed ? "Collapsed" : "Expanded",
+                               collapsed ? "Lukket" : "Utvidet"))
+        .accessibilityHint(tr("Double tap to show or hide this workout section",
+                              "Dobbelttrykk for å vise eller skjule øktdelen"))
+    }
+
+    private func recipeStepCard(_ block: WorkoutTemplateBlock, index: Int) -> some View {
+        let expanded = expandedStepIndices.contains(index)
+        return VStack(alignment: .leading, spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    if expanded {
+                        expandedStepIndices.remove(index)
+                    } else {
+                        expandedStepIndices.insert(index)
+                    }
+                }
+            } label: {
+                HStack(alignment: .center, spacing: 11) {
                     thumbnail(for: block)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(localizedTitle(block, compact: true))
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(ATHLTHPlanDesign.ink)
+                            .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
-                        if let seconds = block.durationSeconds, seconds > 0 {
-                            Text(ATHLTHWorkoutStepCopy.duration(seconds))
+                        if let target = block.targetText, !target.isEmpty {
+                            Text(target)
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        } else if let distance = block.distanceMeters, distance > 0 {
-                            Text(distance >= 1_000
-                                 ? String(format: "%.1f km", distance / 1_000)
-                                 : "\(Int(distance.rounded())) m")
+                                .multilineTextAlignment(.leading)
+                                .lineLimit(expanded ? nil : 2)
+                        } else {
+                            Text(tr("Tap for goals and rest", "Trykk for mål og pauser"))
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         }
                     }
                     Spacer(minLength: 0)
-                }
-                .padding(13)
-                .athlthPlanCard(radius: 19, warm: block.resolvedPhase != .recovery)
-                .overlay(alignment: .leading) {
-                    if block.resolvedPhase == .recovery {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(ATHLTHPlanDesign.accentInk.opacity(0.65))
-                            .frame(width: 4)
-                    }
-                }
-            }
-        }
-    }
-
-    private var timeline: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            ForEach(Array(blocks.enumerated()), id: \.offset) { index, block in
-                if shouldShowPhaseHeader(at: index) {
-                    Label(block.resolvedPhase.title.uppercased(),
-                          systemImage: block.resolvedPhase.symbol)
-                        .font(.caption2.weight(.bold))
-                        .tracking(1.0)
-                        .foregroundStyle(recipeTint)
-                        .padding(.top, index == 0 ? 0 : 8)
-                }
-
-                HStack(alignment: .top, spacing: 10) {
-                    Text("\(index + 1)")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(recipeTint)
-                        .frame(width: 31, height: 31)
-                        .background(ATHLTHPlanDesign.selectedSurface, in: Circle())
-                        .padding(.top, 10)
-
-                    recipeStep(block, index: index)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .background(alignment: .leading) {
-                    Rectangle()
-                        .fill(recipeTint.opacity(0.15))
-                        .frame(width: 2)
-                        .padding(.leading, 15)
-                        .padding(.vertical, 7)
-                }
-            }
-        }
-    }
-
-    // A recovery belongs to the preceding interval. Do not repeat the
-    // HOVEDDEL heading after every pause; show the pause inside its work set.
-    private func shouldShowPhaseHeader(at index: Int) -> Bool {
-        guard blocks.indices.contains(index) else { return false }
-        let phase = blocks[index].resolvedPhase
-        if phase == .recovery {
-            return blocks.prefix(index).allSatisfy { $0.resolvedPhase == .recovery }
-        }
-        let previous = blocks.prefix(index).reversed()
-            .first { $0.resolvedPhase != .recovery }
-        return previous?.resolvedPhase != phase
-    }
-
-    @ViewBuilder
-    private func recipeStep(_ block: WorkoutTemplateBlock, index: Int) -> some View {
-        if advanced && onUpdateBlock != nil {
-            Button {
-                editingStep = IndexedWorkoutStep(index: index, block: block)
-            } label: {
-                recipeStepCard(block)
-            }
-            .buttonStyle(.plain)
-        } else if block.kind == .exercise {
-            Button {
-                selectedExercise = block
-            } label: {
-                recipeStepCard(block)
-            }
-            .buttonStyle(.plain)
-        } else {
-            Button {
-                inspectedCardioStep = IndexedWorkoutStep(index: index, block: block)
-            } label: {
-                recipeStepCard(block)
-            }
-            .buttonStyle(.plain)
-            .accessibilityHint(tr("View step details", "Vis detaljer for øktdelen"))
-        }
-    }
-
-    private func recipeStepCard(_ block: WorkoutTemplateBlock) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if block.resolvedPhase == .recovery {
-                Label(
-                    tr("ACTIVE RECOVERY", "AKTIV PAUSE"),
-                    systemImage: "pause.circle.fill"
-                )
-                .font(.caption2.weight(.semibold))
-                .tracking(0.9)
-                .foregroundStyle(ATHLTHPlanDesign.accentInk)
-            }
-            HStack(alignment: .top, spacing: 11) {
-                thumbnail(for: block)
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(localizedTitle(block, compact: false))
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.ink)
-                        .fixedSize(horizontal: false, vertical: true)
-                    if let target = block.targetText, !target.isEmpty {
-                        Text(target)
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    }
-                    if let suggested = ATHLTHWorkoutStepCopy.suggestedZone(
-                        for: block, workoutTitle: title
-                    ) {
-                        Text(suggested)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    }
-                    if let pace = block.targetPaceSecondsPerKilometer,
-                       pace.isFinite, pace > 0 {
-                        Text(
-                            ATHLTHLocalization.choose(
-                                english: "Target speed ",
-                                norwegian: "Målhastighet "
-                            ) + String(format: "%.1f km/t", 3_600 / pace)
-                        )
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
-                    }
+                        .foregroundStyle(recipeTint)
                 }
-                Spacer(minLength: 0)
-                if block.kind == .exercise {
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                }
+                .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel(localizedTitle(block, compact: true))
+            .accessibilityValue(tr(expanded ? "Expanded" : "Collapsed",
+                                   expanded ? "Utvidet" : "Lukket"))
+            .accessibilityHint(tr("Double tap to show targets and recovery",
+                                  "Dobbelttrykk for å vise mål og pauser"))
 
-            if advanced {
-                let detail = advancedDetails(for: block)
-                if !detail.isEmpty {
-                    VStack(alignment: .leading, spacing: 6) {
-                        ForEach(detail, id: \.self) { value in
-                            Label(value, systemImage: "checkmark.circle")
+            if expanded {
+                Divider()
+                    .padding(.vertical, 11)
+
+                let details = advancedDetails(for: block)
+                if !details.isEmpty {
+                    VStack(alignment: .leading, spacing: 7) {
+                        ForEach(details, id: \.self) { detail in
+                            Label(detail, systemImage: "checkmark.circle")
                                 .font(.caption)
                                 .foregroundStyle(ATHLTHPlanDesign.ink)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                     }
-                    .padding(.leading, 50)
+                    .padding(.bottom, 12)
                 }
-            } else if block.kind == .note, let notes = block.notes,
-                      !notes.isEmpty {
-                Text(notes)
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.leading, 50)
+                if advanced, let suggested = ATHLTHWorkoutStepCopy.suggestedZone(
+                    for: block, workoutTitle: title
+                ) {
+                    Label(suggested, systemImage: "heart")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(recipeTint)
+                        .padding(.bottom, 12)
+                }
+
+                if onUpdateBlock != nil {
+                    Button {
+                        editingStep = IndexedWorkoutStep(index: index, block: block)
+                    } label: {
+                        Label(tr("Edit sets, weight and targets",
+                                 "Rediger sett, vekt og mål"),
+                              systemImage: "slider.horizontal.3")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity, minHeight: 40)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(recipeTint)
+                } else {
+                    Button {
+                        if block.kind == .exercise {
+                            selectedExercise = block
+                        } else {
+                            inspectedCardioStep = IndexedWorkoutStep(index: index, block: block)
+                        }
+                    } label: {
+                        Label(tr("View step details", "Se øktdetaljer"),
+                              systemImage: "info.circle")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(recipeTint)
+                }
             }
         }
-        .padding(13)
+        .padding(14)
         .athlthPlanCard(radius: 19, warm: block.resolvedPhase != .recovery)
         .overlay(alignment: .leading) {
             if block.resolvedPhase == .recovery {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(ATHLTHPlanDesign.accentInk.opacity(0.6))
+                    .fill(recipeTint.opacity(0.65))
                     .frame(width: 4)
-                    .padding(.leading, 2)
             }
         }
     }
@@ -671,12 +651,42 @@ private struct ATHLTHWorkoutStepEditor: View {
                     if draft.kind == .exercise {
                         HStack {
                             Text(ATHLTHLocalization.choose(
+                                english: "Sets", norwegian: "Sett"
+                            ))
+                            Spacer()
+                            TextField("—", value: $draft.setCount, format: .number)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Repetitions", norwegian: "Repetisjoner"
+                            ))
+                            Spacer()
+                            TextField("—", value: $draft.repetitions, format: .number)
+                                .keyboardType(.numberPad)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
                                 english: "Personal weight (kg)",
                                 norwegian: "Personlig vekt (kg)"
                             ))
                             Spacer()
                             TextField("—", value: $draft.targetWeightKilograms, format: .number)
                                 .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                        }
+                    }
+                    if draft.kind == .exercise || draft.kind == .run {
+                        HStack {
+                            Text(ATHLTHLocalization.choose(
+                                english: "Target effort (RPE 1–10)",
+                                norwegian: "Målintensitet (RPE 1–10)"
+                            ))
+                            Spacer()
+                            TextField("—", value: $draft.targetEffortRPE, format: .number)
+                                .keyboardType(.numberPad)
                                 .multilineTextAlignment(.trailing)
                         }
                     }
@@ -714,7 +724,10 @@ private struct ATHLTHWorkoutStepEditor: View {
                               (draft.treadmillInclinePercent.map {
                                   !$0.isFinite || !(0...20).contains($0)
                               } ?? false) ||
-                              (draft.targetWeightKilograms ?? 0) < 0 ||
+                              (draft.targetWeightKilograms.map { !$0.isFinite || $0 < 0 } ?? false) ||
+                              (draft.setCount.map { !(1...100).contains($0) } ?? false) ||
+                              (draft.repetitions.map { !(1...1000).contains($0) } ?? false) ||
+                              (draft.targetEffortRPE.map { !(1...10).contains($0) } ?? false) ||
                               (draft.targetHeartRateZone != nil &&
                                !(1...5).contains(draft.targetHeartRateZone!)))
                 }
