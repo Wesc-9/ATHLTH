@@ -199,4 +199,38 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
         XCTAssertEqual(copy.resolvedPaceDropPercent, 0.12, accuracy: 0.001)
         XCTAssertTrue(copy.pushOnUnexpectedPaceDrop == true)
     }
+
+    func testStandardAfterAdvancedProfileDiscardsAllHiddenTriggers() {
+        var draft = AudioCoachDraft()
+        draft.smartPrompts.maximumHeartRateBPM = 185
+        draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds = 60
+        draft.smartPrompts.targetZoneVoiceAlertsEnabled = true
+        draft.smartPrompts.confirmWhenBackInZone = true
+        draft.smartPrompts.coachingMode = .custom
+        draft.smartPrompts.strongStartDurationSeconds = 300
+        draft.smartPrompts.pushWhenBelowTargetZone = true
+        draft.smartPrompts.pushWhenBelowTargetPace = true
+        draft.smartPrompts.pushOnUnexpectedPaceDrop = true
+        draft.smartPrompts.paceDropThresholdPercent = 25
+        draft.smartPrompts.adaptiveCooldownSeconds = 120
+        draft.voiceIdentifier = "preferred-voice"
+        draft.language = .norwegian
+        draft.applySimpleAudioCoach()
+        XCTAssertTrue(draft.enabled)
+        XCTAssertEqual(draft.distanceIntervalKilometers, 1)
+        XCTAssertNil(draft.smartPrompts.maximumHeartRateBPM)
+        XCTAssertNil(draft.smartPrompts.measuredZoneAnnouncementIntervalSeconds)
+        XCTAssertNil(draft.smartPrompts.targetZoneVoiceAlertsEnabled)
+        XCTAssertNil(draft.smartPrompts.confirmWhenBackInZone)
+        XCTAssertEqual(draft.smartPrompts.coachingMode, .automatic)
+        XCTAssertNil(draft.smartPrompts.strongStartDurationSeconds)
+        XCTAssertNil(draft.smartPrompts.pushWhenBelowTargetZone)
+        XCTAssertNil(draft.smartPrompts.pushWhenBelowTargetPace)
+        XCTAssertNil(draft.smartPrompts.pushOnUnexpectedPaceDrop)
+        XCTAssertNil(draft.smartPrompts.paceDropThresholdPercent)
+        XCTAssertNil(draft.smartPrompts.adaptiveCooldownSeconds)
+        XCTAssertEqual(draft.voiceIdentifier, "preferred-voice")
+        XCTAssertEqual(draft.language, .norwegian)
+        XCTAssertNil(draft.configuration().smartPrompts?.strongStartDurationSeconds)
+    }
 }

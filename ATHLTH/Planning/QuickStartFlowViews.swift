@@ -158,6 +158,19 @@ struct AudioCoachDraft {
         smartPrompts.announceCurrentHeartRateZone = false
         smartPrompts.customEncouragements = []
         smartPrompts.landmarks = []
+        // Switching from a complex profile back to Standard must truly
+        // remove every advanced trigger; do not keep invisible Watch rules.
+        smartPrompts.maximumHeartRateBPM = nil
+        smartPrompts.measuredZoneAnnouncementIntervalSeconds = nil
+        smartPrompts.targetZoneVoiceAlertsEnabled = nil
+        smartPrompts.confirmWhenBackInZone = nil
+        smartPrompts.coachingMode = .automatic
+        smartPrompts.strongStartDurationSeconds = nil
+        smartPrompts.pushWhenBelowTargetZone = nil
+        smartPrompts.pushWhenBelowTargetPace = nil
+        smartPrompts.pushOnUnexpectedPaceDrop = nil
+        smartPrompts.paceDropThresholdPercent = nil
+        smartPrompts.adaptiveCooldownSeconds = nil
     }
 
     /// Preserve voice, language, music routing and per-workout session data.
