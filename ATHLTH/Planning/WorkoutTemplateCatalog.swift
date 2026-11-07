@@ -745,8 +745,10 @@ struct WorkoutTemplateLibraryView: View {
     @State private var selectedWorkoutLevel = "all"
     @State private var selectedStrengthMuscles: Set<String> = []
     @State private var selectedRunningType: RunningWorkoutType?
-    @State private var selectedRunningDuration:
+    @State private var selectedWorkoutDuration:
         ATHLTHWorkoutDiscoveryFilter.Duration = .any
+    @State private var selectedExerciseName: String?
+    @State private var showingExerciseFilter = false
     @State private var selectedDiscoverySort: DiscoverySort = .alphabetical
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var libraryViewWidth: CGFloat = 390
@@ -950,24 +952,68 @@ struct WorkoutTemplateLibraryView: View {
     private func clearStrengthFilters() {
         selectedStrengthMuscles.removeAll()
         selectedWorkoutLevel = "all"
+        selectedWorkoutDuration = .any
+        selectedExerciseName = nil
         selectedDiscoverySort = .alphabetical
+    }
+
+    private var isStrengthScope: Bool {
+        initialCategory == .strength ||
+            (initialCategory == nil && selectedCategory == "Strength")
+    }
+
+    private var isRunningScope: Bool {
+        initialCategory == .running ||
+            (initialCategory == nil && selectedCategory == "Running")
+    }
+
+    private var availableExerciseNames: [String] {
+        let scheduled = session.standalonePlannedSessions +
+            session.trainingPlans.flatMap { $0.weeks }
+                .flatMap { $0.days }
+                .flatMap { $0.sessions }
+        let names = catalog.entries.flatMap {
+            ATHLTHWorkoutLibraryExerciseIndex.availableExercises(in: $0.blocks)
+        } + (session.savedWorkoutTemplates + scheduled).flatMap {
+            ATHLTHWorkoutLibraryExerciseIndex.availableExercises(
+                in: ATHLTHUnifiedWorkout.editorBlocks(from: $0)
+            )
+        }
+        return Array(Set(names)).sorted {
+            $0.compare($1, options: [.caseInsensitive, .numeric],
+                       locale: ATHLTHExerciseAlphabet.locale) == .orderedAscending
+        }
+    }
+
+    private func strengthMuscleIcon(_ muscle: String) -> String {
+        switch muscle {
+        case "chest": return "figure.strengthtraining.traditional"
+        case "back": return "figure.rower"
+        case "shoulders": return "figure.boxing"
+        case "arms", "biceps", "triceps": return "dumbbell.fill"
+        case "legs", "quads", "hamstrings", "calves": return "figure.run"
+        case "glutes": return "figure.stairs"
+        case "core": return "figure.core.training"
+        case "fullbody": return "figure.mixed.cardio"
+        default: return "square.grid.2x2"
+        }
     }
 
     private var discoveryFilter: ATHLTHWorkoutDiscoveryFilter {
         ATHLTHWorkoutDiscoveryFilter(
-            muscleGroups: initialCategory == .strength
-                ? selectedStrengthMuscles : [],
-            runningType: initialCategory == .running
-                ? selectedRunningType : nil,
-            duration: initialCategory == .running
-                ? selectedRunningDuration : .any
+            muscleGroups: isStrengthScope ? selectedStrengthMuscles : [],
+            runningType: isRunningScope ? selectedRunningType : nil,
+            duration: (isStrengthScope || isRunningScope)
+                ? selectedWorkoutDuration : .any,
+            exerciseName: isStrengthScope ? selectedExerciseName : nil
         )
     }
 
     private var hasDiscoveryFilters: Bool {
         !selectedStrengthMuscles.isEmpty ||
         selectedRunningType != nil ||
-        selectedRunningDuration != .any ||
+        selectedWorkoutDuration != .any ||
+        selectedExerciseName != nil ||
         selectedDiscoverySort != .alphabetical ||
         (initialCategory == .strength && selectedWorkoutLevel != "all")
     }
@@ -1047,8 +1093,9 @@ struct WorkoutTemplateLibraryView: View {
     private var categories: [String] {
         ["All"] +
         Array(Set(
-            catalog.entries.map(\.categoryTitle) +
-            ATHLTHPlannedWorkoutType.defaultOrder.map(\.catalogCategory)
+            (catalog.entries.map(\.categoryTitle) +
+             ATHLTHPlannedWorkoutType.defaultOrder.map(\.catalogCategory))
+                .map { $0 == "Custom" ? "Hybrid" : $0 }
         )).sorted()
     }
 
@@ -1089,6 +1136,8 @@ struct WorkoutTemplateLibraryView: View {
             let categoryMatches =
                 selectedCategory == "All" ||
                 entry.categoryTitle == selectedCategory ||
+                (selectedCategory == "Hybrid" &&
+                 ATHLTHPlannedWorkoutType.custom.matches(entry)) ||
                 (selectedCategory == "Custom" &&
                  ATHLTHPlannedWorkoutType.custom.matches(entry))
 
@@ -1137,6 +1186,8 @@ struct WorkoutTemplateLibraryView: View {
                     (source.map(levelMatches) ?? false)
             else { return false }
             let matchesCategory = selectedCategory == "All" ||
+                (selectedCategory == "Hybrid" &&
+                 ATHLTHPlannedWorkoutType.custom.matches(workout)) ||
                 (ATHLTHPlannedWorkoutType(
                     rawValue: selectedCategory.lowercased()
                 )?.matches(workout) ??
@@ -1183,6 +1234,8 @@ struct WorkoutTemplateLibraryView: View {
                 rawValue: selectedCategory.lowercased()
             )
             return (selectedCategory == "All" ||
+                    (selectedCategory == "Hybrid" &&
+                     ATHLTHPlannedWorkoutType.custom.matches(workout)) ||
                     (matchingType?.matches(workout) ??
                      (workout.kind.title == selectedCategory))) &&
                 ATHLTHWorkoutSearch.matches(
@@ -1597,7 +1650,7 @@ struct WorkoutTemplateLibraryView: View {
                             )) {
                                 selectedStrengthMuscles = []
                                 selectedRunningType = nil
-                                selectedRunningDuration = .any
+                                selectedWorkoutDuration = .any
                                 selectedWorkoutLevel = "all"
                                 selectedDiscoverySort = .alphabetical
                             }
@@ -2060,7 +2113,7 @@ struct WorkoutTemplateLibraryView: View {
                     )) {
                         selectedStrengthMuscles = []
                         selectedRunningType = nil
-                        selectedRunningDuration = .any
+                        selectedWorkoutDuration = .any
                         selectedWorkoutLevel = "all"
                         selectedDiscoverySort = .alphabetical
                     }
@@ -2113,11 +2166,11 @@ struct WorkoutTemplateLibraryView: View {
                         ForEach(ATHLTHWorkoutDiscoveryFilter.Duration.allCases) {
                             duration in
                             Button {
-                                selectedRunningDuration = duration
+                                selectedWorkoutDuration = duration
                             } label: {
                                 filterChip(
                                     duration.title, systemImage: nil,
-                                    selected: selectedRunningDuration == duration
+                                    selected: selectedWorkoutDuration == duration
                                 )
                             }
                             .buttonStyle(.plain)
@@ -2126,7 +2179,7 @@ struct WorkoutTemplateLibraryView: View {
                     .padding(.trailing, 15)
                 }
                 .padding(.trailing, -15)
-                if selectedRunningDuration != .any {
+                if selectedWorkoutDuration != .any {
                     Text(ATHLTHLocalization.choose(
                         english: "Only workouts with a recorded duration can match a time filter.",
                         norwegian: "Kun økter med registrert varighet kan vises med tidsfilter."
