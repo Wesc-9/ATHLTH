@@ -72,7 +72,7 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
     }
 
     @MainActor
-    func testNewCuratedCoreAndFreeStrengthExercisesAreActuallySelectable() {
+    func testCuratedExercisesRemainSelectableButDuplicateNativeMovementsAreHidden() {
         let library = ExerciseLibraryStore()
         let featured = ExerciseLibraryStore.featuredNativeExerciseSlugs
         XCTAssertTrue(featured.allSatisfy { slug in
@@ -83,13 +83,28 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
         for phrase in [
             "Skråbenk med manualer",
             "Situps med beina i 90 grader",
-            "Russisk rotasjon med vekt",
-            "Six Inch Hold",
             "Fri styrketrening"
         ] {
             XCTAssertFalse(library.search(query: phrase).isEmpty,
                            "Curated exercise missing from selectable search: \(phrase)")
         }
+        for slug in ExerciseLibraryStore.retiredNativeDuplicateSlugs {
+            // Keep the old stable ID available when viewing saved history.
+            XCTAssertTrue(library.athlthCatalogExercises.contains {
+                $0.source == .athlthCatalog && $0.sourceIdentifier == slug
+            })
+            // But never offer a duplicate as a new exercise, even offline.
+            XCTAssertFalse(library.selectableExercises.contains {
+                $0.source == .athlthCatalog && $0.sourceIdentifier == slug
+            })
+        }
+        // None of the licensed RepDB records may be dropped by retiring
+        // duplicate ATHLTH-native entries.
+        XCTAssertEqual(
+            Set(library.repDBExercises.map(\.id)),
+            Set(library.selectableExercises
+                .filter { $0.source == .repDB }.map(\.id))
+        )
         XCTAssertFalse(library.selectableExercises.contains {
             ExerciseLibraryStore.isRetiredOriginalCoreSlug($0.sourceIdentifier)
         })
