@@ -50,7 +50,7 @@ struct ATHLTHRouteBrowseModePicker: View {
                         .frame(minHeight: 35)
                         .background(
                             selection == mode
-                                ? ATHLTHTheme.accentDeep
+                                ? ATHLTHPlanDesign.ink
                                 : Color.clear,
                             in: Capsule()
                         )
@@ -61,7 +61,12 @@ struct ATHLTHRouteBrowseModePicker: View {
             }
         }
         .padding(3)
-        .background(ATHLTHPlanDesign.warmSurface, in: Capsule())
+        .background(ATHLTHPlanDesign.surface, in: Capsule())
+        .overlay {
+            Capsule().strokeBorder(
+                ATHLTHPlanDesign.outline.opacity(0.55), lineWidth: 0.8
+            )
+        }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(ATHLTHLocalization.choose(
             english: "Route view", norwegian: "Rutevisning"))
