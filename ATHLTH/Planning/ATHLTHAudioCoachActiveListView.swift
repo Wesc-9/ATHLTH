@@ -22,6 +22,8 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var pendingRemoval: ATHLTHAudioCoachOption?
     @State private var confirmReplaceWithStandard = false
     @State private var profileName = ""
+    @State private var selectedProfileName: String?
+    @State private var pendingProfileAction: ProfileAction?
     @State private var ruleSetName = ""
     @State private var phraseText = ""
     @State private var newRuleTrigger: ATHLTHAudioCoachRule.Trigger = .distance
@@ -35,6 +37,11 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var placeResults: [PlaceCandidate] = []
     @State private var searchingPlaces = false
     @State private var placeError: String?
+
+    private enum ProfileAction {
+        case replace(UUID)
+        case delete(UUID)
+    }
 
     private struct PlaceCandidate: Identifiable {
         var id = UUID()
@@ -151,12 +158,56 @@ struct ATHLTHAudioCoachActiveListView: View {
         ) {
             Button(tr("Use standard", "Bruk standard")) {
                 draft.applySimpleAudioCoach()
+                selectedProfileName = nil
             }
             Button(tr("Cancel", "Avbryt"), role: .cancel) {}
         } message: {
             Text(tr(
                 "Your current rules will be replaced by the simple coach. Saved profiles will still be available.",
                 "Aktive regler blir erstattet av enkel coach. Lagrede profiler er fortsatt tilgjengelige."
+            ))
+        }
+        .confirmationDialog(
+            tr("Manage Coach profile", "Behandle coach-profil"),
+            isPresented: Binding(
+                get: { pendingProfileAction != nil },
+                set: { if !$0 { pendingProfileAction = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(
+                {
+                    switch pendingProfileAction {
+                    case .delete: return tr("Delete saved profile", "Slett lagret profil")
+                    case .replace: return tr("Replace saved profile", "Erstatt lagret profil")
+                    case nil: return tr("Confirm", "Bekreft")
+                    }
+                }(),
+                role: .destructive
+            ) {
+                switch pendingProfileAction {
+                case let .delete(id):
+                    settings.audioCoachProfiles.removeAll { $0.id == id }
+                    if settings.activeAudioCoachProfileID == id {
+                        settings.activeAudioCoachProfileID = nil
+                    }
+                case let .replace(id):
+                    if let index = settings.audioCoachProfiles.firstIndex(where: {
+                        $0.id == id
+                    }) {
+                        settings.audioCoachProfiles[index].configuration = draft.configuration()
+                    }
+                case nil: break
+                }
+                pendingProfileAction = nil
+            }
+            Button(tr("Cancel", "Avbryt"), role: .cancel) {
+                pendingProfileAction = nil
+            }
+        } message: {
+            Text(tr(
+                "Changes to saved profiles are only made after you confirm.",
+                "Lagrede profiler endres først når du bekrefter."
             ))
         }
         .sheet(isPresented: $showingVoice) { voiceSheet }
@@ -222,6 +273,11 @@ struct ATHLTHAudioCoachActiveListView: View {
                   systemImage: "checkmark.circle")
                 .font(.headline)
                 .foregroundStyle(ink)
+            if let selectedProfileName {
+                Label(selectedProfileName, systemImage: "square.stack")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(bronze)
+            }
             Text(hasAdvancedConfiguration
                 ? tr(
                     "Your customized Coach setup is active. Open Advanced to see every rule, or choose the standard setup below.",
@@ -263,6 +319,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     ForEach(settings.audioCoachProfiles) { profile in
                         Button(profile.name) {
                             draft.load(profile: profile)
+                            selectedProfileName = profile.name
                             editorMode = "basic"
                         }
                     }
@@ -287,6 +344,7 @@ struct ATHLTHAudioCoachActiveListView: View {
                     confirmReplaceWithStandard = true
                 } else {
                     draft.applySimpleAudioCoach()
+                    selectedProfileName = nil
                 }
             } label: {
                 Label(tr("Use recommended basic setup", "Bruk anbefalt enkel oppsett"),
@@ -990,18 +1048,42 @@ struct ATHLTHAudioCoachActiveListView: View {
                         .font(.headline)
                     if !settings.audioCoachProfiles.isEmpty {
                         ForEach(settings.audioCoachProfiles) { profile in
-                            Button {
-                                draft.load(profile: profile)
-                                showingProfiles = false
-                            } label: {
-                                HStack {
-                                    Text(profile.name)
-                                    Spacer()
-                                    Image(systemName: "arrow.down.circle")
+                            HStack(spacing: 12) {
+                                Button {
+                                    draft.load(profile: profile)
+                                    selectedProfileName = profile.name
+                                    showingProfiles = false
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(profile.name).font(.subheadline.weight(.semibold))
+                                        Text(profile.configurationSummary)
+                                            .font(.caption)
+                                            .foregroundStyle(dim)
+                                    }
+                                    .frame(maxWidth: .infinity, minHeight: 47,
+                                           alignment: .leading)
                                 }
-                                .frame(minHeight: 44)
+                                .buttonStyle(.plain)
+                                Menu {
+                                    Button(tr("Use profile", "Bruk profil")) {
+                                        draft.load(profile: profile)
+                                        selectedProfileName = profile.name
+                                        showingProfiles = false
+                                    }
+                                    Button(tr("Update from current setup",
+                                              "Oppdater fra nåværende oppsett")) {
+                                        pendingProfileAction = .replace(profile.id)
+                                    }
+                                    Button(tr("Delete profile", "Slett profil"),
+                                           role: .destructive) {
+                                        pendingProfileAction = .delete(profile.id)
+                                    }
+                                } label: {
+                                    Image(systemName: "ellipsis")
+                                        .frame(width: 44, height: 44)
+                                }
+                                .accessibilityLabel(tr("Profile options", "Profilvalg"))
                             }
-                            .buttonStyle(.plain)
                         }
                     }
                     TextField(tr("Profile name", "Navn på oppsett"),
