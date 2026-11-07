@@ -160,8 +160,9 @@ struct ATHLTHPlannedRunStepEditor: View {
                 } else {
                     ATHLTHPlannedPaceTargetView(
                         targetPaceSecondsPerKilometer: $block.targetPaceSecondsPerKilometer,
-                        prefersSpeed: false,
-                        defaultPace: 330
+                        prefersSpeed: block.isIndoor == true,
+                        defaultPace: 330,
+                        treadmillDisplay: block.isIndoor == true
                     )
                 }
             }

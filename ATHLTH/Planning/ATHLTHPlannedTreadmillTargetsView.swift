@@ -17,7 +17,8 @@ struct ATHLTHPlannedTreadmillTargetsView: View {
             ATHLTHPlannedPaceTargetView(
                 targetPaceSecondsPerKilometer: $block.targetPaceSecondsPerKilometer,
                 prefersSpeed: true,
-                defaultPace: 360
+                defaultPace: 360,
+                treadmillDisplay: true
             )
             Stepper(value: Binding(
                 get: { block.treadmillInclinePercent ?? 0 },

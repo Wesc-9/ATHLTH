@@ -5,6 +5,7 @@ import SwiftUI
 /// A normal tap edits; the more menu remains accessible. Swiping never reorders.
 struct ATHLTHPlannedWorkoutStepRow: View {
     @Environment(\.locale) private var locale
+    @AppStorage("settings.measurement") private var measurementRaw = "metric"
     let block: WorkoutTemplateBlock
     let position: Int
     let canMoveUp: Bool
@@ -69,15 +70,23 @@ struct ATHLTHPlannedWorkoutStepRow: View {
         guard block.kind == .run,
               let secondsPerKm = block.targetPaceSecondsPerKilometer,
               secondsPerKm.isFinite, secondsPerKm > 0 else { return nil }
+        let measurement = MeasurementPreference(rawValue: measurementRaw) ?? .metric
+        let displayPace = ATHLTHPlannedTreadmillTargets.displayPace(
+            secondsPerKm, measurement: measurement
+        )
+        let rounded = Int(displayPace.rounded())
+        let paceText = String(format: "%d:%02d", rounded / 60, rounded % 60)
         if block.treadmillInclinePercent != nil {
-            let kilometersPerHour = 3_600 / secondsPerKm
-            return kilometersPerHour.formatted(
+            let speed = ATHLTHPlannedTreadmillTargets.displaySpeed(
+                ATHLTHPlannedTreadmillTargets.speed(forPace: secondsPerKm),
+                measurement: measurement
+            )
+            return speed.formatted(
                 .number.precision(.fractionLength(1)).locale(locale)
-            ) + (ATHLTHLocalization.isNorwegian ? " km/t" : " km/h")
+            ) + " " + measurement.runningSpeedUnit +
+                " · " + paceText + " " + measurement.runningPaceUnit
         }
-        let seconds = Int(secondsPerKm.rounded())
-        let remainder = seconds % 60
-        return "\(seconds / 60):\(remainder < 10 ? "0" : "")\(remainder) min/km"
+        return paceText + " " + measurement.runningPaceUnit
     }
 
     // A local, long-press-driven gesture avoids iOS system drag-and-drop's

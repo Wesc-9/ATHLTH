@@ -55,4 +55,34 @@ final class ATHLTHRunningPaceTests: XCTestCase {
         XCTAssertNil(ATHLTHRunningPace.outdoorGPS(speedMetersPerSecond: 20, isOutdoor: true))
         XCTAssertNil(ATHLTHRunningPace.outdoorGPS(speedMetersPerSecond: .nan, isOutdoor: true))
     }
+
+    func testTreadmillSpeedTenMatchesOutdoorPaceAndDistance() {
+        let saved = ATHLTHPlannedTreadmillTargets.pace(forSpeed: 10)
+        XCTAssertEqual(saved, 360, accuracy: 0.0001)
+        XCTAssertEqual(ATHLTHPlannedTreadmillTargets.speed(forPace: saved), 10, accuracy: 0.0001)
+        XCTAssertEqual(ATHLTHRunningPace.outdoorGPS(
+            speedMetersPerSecond: 10 / 3.6, isOutdoor: true
+        ) ?? 0, saved, accuracy: 0.0001)
+        XCTAssertEqual(ATHLTHRunningPace.manuallyEstimatedTreadmillDistance(
+            speedKilometersPerHour: 10, durationSeconds: 1800
+        ) ?? 0, 5000, accuracy: 0.0001)
+    }
+
+    func testMetricAndImperialTreadmillModesConvertWithoutChangingSavedPace() {
+        let saved = ATHLTHPlannedTreadmillTargets.pace(forSpeed: 10)
+        let mph = ATHLTHPlannedTreadmillTargets.displaySpeed(10, measurement: .imperial)
+        XCTAssertEqual(mph, 6.2137119, accuracy: 0.0001)
+        XCTAssertEqual(ATHLTHPlannedTreadmillTargets.canonicalSpeed(
+            mph, measurement: .imperial
+        ), 10, accuracy: 0.0001)
+        let minPerMile = ATHLTHPlannedTreadmillTargets.displayPace(
+            saved, measurement: .imperial
+        )
+        XCTAssertEqual(minPerMile, 579.36384, accuracy: 0.001)
+        XCTAssertEqual(ATHLTHPlannedTreadmillTargets.canonicalPace(
+            minPerMile, measurement: .imperial
+        ), saved, accuracy: 0.0001)
+        XCTAssertEqual(MeasurementPreference.metric.runningPaceUnit, "min/km")
+        XCTAssertEqual(MeasurementPreference.imperial.runningSpeedUnit, "mph")
+    }
 }

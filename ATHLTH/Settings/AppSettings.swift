@@ -61,6 +61,11 @@ enum MeasurementPreference: String, CaseIterable, Identifiable, Codable {
     }
 
     var distanceUnit: String { self == .metric ? "km" : "mi" }
+    var runningSpeedUnit: String {
+        self == .imperial ? "mph" :
+            ATHLTHLocalization.choose(english: "km/h", norwegian: "km/t")
+    }
+    var runningPaceUnit: String { self == .metric ? "min/km" : "min/mi" }
     var weightUnit: String { self == .metric ? "kg" : "lb" }
     var heightUnit: String { self == .metric ? "cm" : "ft/in" }
     var temperatureUnit: String { self == .metric ? "°C" : "°F" }

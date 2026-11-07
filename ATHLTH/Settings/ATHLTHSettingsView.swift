@@ -84,6 +84,8 @@ struct ATHLTHSettingsView: View {
     @State private var healthRequestInProgress = false
     @State private var showingAppleHealthPauseConfirmation = false
     @State private var settingsSearchText = ""
+    @AppStorage("athlth.running.treadmillInputMode.v1")
+    private var preferredTreadmillInputMode = "treadmill"
 
     var body: some View {
         ZStack {
@@ -588,6 +590,52 @@ settingsSection("App") {
                             }
                             }
                             .buttonStyle(.plain)
+                            SettingsDivider()
+
+                            Menu {
+                                ForEach(ATHLTHTreadmillInputMode.allCases) { option in
+                                    Button {
+                                        preferredTreadmillInputMode = option.rawValue
+                                    } label: {
+                                        if preferredTreadmillInputMode == option.rawValue {
+                                            Label(option.title(
+                                                measurement: settings.measurementPreference
+                                            ), systemImage: "checkmark")
+                                        } else {
+                                            Text(option.title(
+                                                measurement: settings.measurementPreference
+                                            ))
+                                        }
+                                    }
+                                }
+                            } label: {
+                                PremiumSettingsRow(
+                                    icon: "figure.run.treadmill",
+                                    title: ATHLTHLocalization.choose(
+                                        english: "Treadmill tempo", norwegian: "Mølletempo"
+                                    ),
+                                    subtitle: ATHLTHLocalization.choose(
+                                        english: "Choose treadmill tempo, speed or pace",
+                                        norwegian: "Velg mølletempo, km/t eller min/km"
+                                    )
+                                ) {
+                                    HStack(spacing: 8) {
+                                        Text((ATHLTHTreadmillInputMode(
+                                            rawValue: preferredTreadmillInputMode
+                                        ) ?? .treadmill).title(
+                                            measurement: settings.measurementPreference
+                                        ))
+                                        .foregroundStyle(ATHLTHTheme.mutedText)
+                                        Image(systemName: "chevron.right")
+                                            .foregroundStyle(
+                                                ATHLTHTheme.mutedText.opacity(0.72)
+                                            )
+                                    }
+                                }
+                            }
+                            .buttonStyle(.plain)
+
+
 
                             SettingsDivider()
 

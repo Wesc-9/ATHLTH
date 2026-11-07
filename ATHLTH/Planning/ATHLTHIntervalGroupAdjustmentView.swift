@@ -203,7 +203,9 @@ struct ATHLTHIntervalGroupAdjustmentView: View {
                                 } else {
                                     ATHLTHPlannedPaceTargetView(
                                         targetPaceSecondsPerKilometer:
-                                            $effort.targetPaceSecondsPerKilometer
+                                            $effort.targetPaceSecondsPerKilometer,
+                                        prefersSpeed: effort.isIndoor == true,
+                                        treadmillDisplay: effort.isIndoor == true
                                     )
                                 }
                                 ATHLTHPlannedIntensityEditor(block: $effort)
