@@ -11271,17 +11271,13 @@ struct ATHLTHTrainView: View {
     }
 
     private var libraryContent: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            TrainingLibraryHomeView(
-                onStartRunning: { workout in
-                    pendingPlannedEnduranceWorkout = nil
-                    pendingRunningTemplate = workout
-                },
-                onOpenPlan: openPlanFromTrainingLibrary
-            )
-
-
-        }
+        TrainingLibraryHomeView(
+            onStartRunning: { workout in
+                pendingPlannedEnduranceWorkout = nil
+                pendingRunningTemplate = workout
+            },
+            onOpenPlan: openPlanFromTrainingLibrary
+        )
     }
 
     private func quickStartTile(
