@@ -74,6 +74,35 @@ final class AthleteOfflinePackStore: ObservableObject {
         error = nil
     }
 
+    /// Reuse previously prepared map tiles in the normal route library,
+    /// not only in the now-hidden manual offline-pack view. The manifest
+    /// prevents loading an unrelated exercise image with the same UUID.
+    static func cachedRouteSnapshot(routeID: UUID, userID: UUID) -> UIImage? {
+        guard let root = try? FileManager.default.url(
+            for: .applicationSupportDirectory, in: .userDomainMask,
+            appropriateFor: nil, create: false
+        ) else { return nil }
+        let directory = root
+            .appendingPathComponent("AthleteOfflinePacks", isDirectory: true)
+            .appendingPathComponent(userID.uuidString, isDirectory: true)
+        guard let folders = try? FileManager.default.contentsOfDirectory(
+            at: directory, includingPropertiesForKeys: nil
+        ) else { return nil }
+        for folder in folders {
+            guard UUID(uuidString: folder.lastPathComponent) != nil,
+                  let data = try? Data(contentsOf: folder.appendingPathComponent("pack.json")),
+                  let manifest = try? JSONDecoder().decode(
+                    AthleteOfflinePack.self, from: data
+                  ),
+                  manifest.mapRouteIDs.contains(routeID) else { continue }
+            let file = folder.appendingPathComponent(routeID.uuidString + ".png")
+            if let image = UIImage(contentsOfFile: file.path) {
+                return image
+            }
+        }
+        return nil
+    }
+
     func remove(_ pack: AthleteOfflinePack) {
         guard let accountID else { return }
         do { try FileManager.default.removeItem(at: root(accountID).appendingPathComponent(pack.id.uuidString)); packs.removeAll { $0.id == pack.id } }
