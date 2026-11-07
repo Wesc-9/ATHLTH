@@ -23,7 +23,10 @@ struct ATHLTHWorkoutGridDetails: View {
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(ATHLTHPlanDesign.accentInk)
             }
-            if let minutes = estimatedMinutes ?? workout.durationMinutes,
+            if let minutes = estimatedMinutes ?? workout.durationMinutes ??
+                ATHLTHWorkoutDurationEstimator.previewMinutes(
+                    for: ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+                ),
                minutes > 0 {
                 Label("~\(minutes) min", systemImage: "clock")
                     .font(.caption2.weight(.medium))
