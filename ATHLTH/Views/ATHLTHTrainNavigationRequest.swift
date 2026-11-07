@@ -9,6 +9,7 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
     case startPlannedWorkoutAfter(planID: UUID, workoutID: UUID, seconds: TimeInterval)
     case quick(WorkoutKind)
     case customQuick
+    case customQuickActivity(CustomQuickWorkoutActivity)
     case ghost
     case library
     case personalLibrary(ATHLTHPersonalLibrarySection)
@@ -31,6 +32,8 @@ enum ATHLTHTrainNavigationRequest: Identifiable {
             return "quick:\(kind.title)"
         case .customQuick:
             return "quick:custom"
+        case let .customQuickActivity(activity):
+            return "quick:custom:\(activity.rawValue)"
         case .ghost:
             return "ghost"
         case .library:
