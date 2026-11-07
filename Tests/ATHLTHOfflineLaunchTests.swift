@@ -48,6 +48,65 @@ final class ATHLTHOfflineLaunchTests: XCTestCase {
         XCTAssertTrue(session.restoreOfflineAccount(persistedAuthUserID: id))
     }
 
+    func testSavedPlanAndWorkoutOpenFromLocalStorageWithoutServer() throws {
+        let defaults = isolatedDefaults()
+        let id = UUID()
+        defaults.set(true, forKey: "session.signedIn")
+        defaults.set(true, forKey: "session.onboardingCompleted")
+        defaults.set(
+            try JSONEncoder().encode(cachedProfile(userID: id)),
+            forKey: "session.verifiedOfflineProfile.v1"
+        )
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        let plan = TrainingPlan(
+            id: UUID(), ownerID: id, title: "Offline plan", summary: "",
+            visibility: .privateOnly, version: 1,
+            weeks: [
+                TrainingPlanWeek(
+                    id: UUID(), weekNumber: 1, title: "Week 1",
+                    days: [
+                        TrainingPlanDay(
+                            id: UUID(), dayIndex: 1,
+                            title: "Monday", sessions: []
+                        )
+                    ]
+                )
+            ],
+            tags: [], createdAt: now, updatedAt: now, startDate: now
+        )
+        let savedWorkout = PlannedSession(
+            id: UUID(), title: "Offline strength", kind: .strength,
+            scheduledStart: nil, durationMinutes: 45,
+            targetDistanceKilometers: nil, targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [], notes: nil, runningWorkout: nil
+        )
+        let content = AccountTrainingContent(
+            activePlan: plan,
+            scheduledPlans: [plan],
+            planTemplates: [],
+            savedWorkoutTemplates: [savedWorkout],
+            manuallyCompletedPlanSessions: [],
+            savedRoutes: [],
+            onboardingProfile: nil
+        )
+        defaults.set(
+            try JSONEncoder().encode(content),
+            forKey: AccountLocalStorage.key("training", userID: id)
+        )
+        let session = AppSessionStore(defaults: defaults)
+        XCTAssertTrue(session.signedIn)
+        XCTAssertEqual(session.profile.userID, id)
+        XCTAssertEqual(session.trainingPlans.first?.id, plan.id)
+        XCTAssertEqual(session.savedWorkoutTemplates.first?.id, savedWorkout.id)
+        // Verifying a local checkpoint must not require network access.
+        session.checkpointTrainingContent()
+        let reloaded = AppSessionStore(defaults: defaults)
+        XCTAssertEqual(reloaded.trainingPlans.first?.id, plan.id)
+        XCTAssertEqual(
+            reloaded.savedWorkoutTemplates.first?.id, savedWorkout.id
+        )
+    }
+
     func testKeychainUserMismatchDoesNotOpenOtherAccountsData() throws {
         let defaults = isolatedDefaults()
         let id = UUID()
