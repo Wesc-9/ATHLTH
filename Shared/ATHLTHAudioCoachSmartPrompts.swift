@@ -165,6 +165,21 @@ struct ATHLTHAudioCoachSmartSettings: Codable, Hashable {
     var pushOnUnexpectedPaceDrop: Bool? = nil
     var paceDropThresholdPercent: Int? = nil
     var adaptiveCooldownSeconds: Int? = nil
+    // Independent repetition limits supplement the global speech cooldown.
+    // Optional so old profiles and watch configurations still decode.
+    var belowZoneRepeatSeconds: Int? = nil
+    var belowPaceRepeatSeconds: Int? = nil
+    var unexpectedDropRepeatSeconds: Int? = nil
+
+    var resolvedBelowZoneRepeat: TimeInterval {
+        TimeInterval(min(max(belowZoneRepeatSeconds ?? 180, 60), 900))
+    }
+    var resolvedBelowPaceRepeat: TimeInterval {
+        TimeInterval(min(max(belowPaceRepeatSeconds ?? 180, 60), 900))
+    }
+    var resolvedUnexpectedDropRepeat: TimeInterval {
+        TimeInterval(min(max(unexpectedDropRepeatSeconds ?? 240, 60), 900))
+    }
 
     var resolvedMeasuredZoneInterval: TimeInterval {
         TimeInterval(min(max(measuredZoneAnnouncementIntervalSeconds ?? 180, 30), 900))

@@ -98,4 +98,31 @@ final class ATHLTHCoachAdaptiveMotivationTests: XCTestCase {
         XCTAssertEqual(decoded.preferredHeartRateZone, 3)
         XCTAssertTrue(decoded.confirmWhenBackInZone == true)
     }
+
+    func testRepeatedZonePushHasItsOwnCooldownAndVariedPhrase() {
+        var settings = ATHLTHAudioCoachSmartSettings()
+        settings.coachingMode = .custom
+        settings.pushWhenBelowTargetZone = true
+        settings.adaptiveCooldownSeconds = 60
+        settings.belowZoneRepeatSeconds = 180
+        settings.encouragementStyle = .push
+        var state = ATHLTHCoachAdaptiveMotivation()
+        func cue(_ t: Double) -> String? {
+            state.nextCue(
+                settings: settings, elapsed: t,
+                measuredPaceSecondsPerKilometer: nil,
+                targetSlowestPaceSecondsPerKilometer: nil,
+                measuredHeartRateBPM: 125,
+                targetHeartRateMinimumBPM: 145,
+                reliableNotClimbing: false, norwegian: true
+            )
+        }
+        XCTAssertNil(cue(100))
+        let first = cue(122)
+        XCTAssertNotNil(first)
+        XCTAssertNil(cue(190))
+        let second = cue(305)
+        XCTAssertNotNil(second)
+        XCTAssertNotEqual(first, second)
+    }
 }

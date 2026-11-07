@@ -206,6 +206,58 @@ struct ATHLTHAudioCoachAdaptiveRulesEditor: View {
                         .foregroundStyle(dim)
                     }
 
+                    Picker(tr("How strongly should Coach push?",
+                              "Hvor hardt skal coachen pushe?"),
+                           selection: Binding(
+                            get: { smart.encouragementStyle ?? .encouragement },
+                            set: { smart.encouragementStyle = $0 }
+                           )) {
+                        ForEach(ATHLTHCoachEncouragementStyle.allCases) { style in
+                            Text(style.title).tag(style)
+                        }
+                    }
+                    .pickerStyle(.menu)
+
+                    if belowZone.wrappedValue {
+                        Picker(tr("Repeat zone encouragement no sooner than",
+                                  "Gjenta puls-push tidligst etter"),
+                               selection: Binding(
+                                get: { smart.belowZoneRepeatSeconds ?? 180 },
+                                set: { smart.belowZoneRepeatSeconds = $0 }
+                               )) {
+                            ForEach([60, 120, 180, 300, 600], id: \.self) { seconds in
+                                Text("\(seconds / 60) min").tag(seconds)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    if belowPace.wrappedValue {
+                        Picker(tr("Repeat pace encouragement no sooner than",
+                                  "Gjenta tempo-push tidligst etter"),
+                               selection: Binding(
+                                get: { smart.belowPaceRepeatSeconds ?? 180 },
+                                set: { smart.belowPaceRepeatSeconds = $0 }
+                               )) {
+                            ForEach([60, 120, 180, 300, 600], id: \.self) { seconds in
+                                Text("\(seconds / 60) min").tag(seconds)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+                    if unexpectedDrop.wrappedValue {
+                        Picker(tr("Repeat pace-drop prompt no sooner than",
+                                  "Gjenta tempofall-push tidligst etter"),
+                               selection: Binding(
+                                get: { smart.unexpectedDropRepeatSeconds ?? 240 },
+                                set: { smart.unexpectedDropRepeatSeconds = $0 }
+                               )) {
+                            ForEach([60, 120, 180, 240, 300, 600], id: \.self) { seconds in
+                                Text("\(seconds / 60) min").tag(seconds)
+                            }
+                        }
+                        .pickerStyle(.menu)
+                    }
+
                     Divider().overlay(ATHLTHPlanDesign.warmDivider)
                     Picker(tr("Quiet time between interventions",
                               "Minst tid mellom push"),
