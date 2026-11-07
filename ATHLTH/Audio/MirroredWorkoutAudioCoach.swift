@@ -497,6 +497,7 @@ final class MirroredWorkoutAudioCoach:
                 sampledAt: snapshot.coachHeartRateSampleAt
             ) ? snapshot.heartRate : nil,
             norwegian: phrase(english: "en", norwegian: "no") == "no",
+            maximumHeartRateBPM: configuration.smartPrompts?.maximumHeartRateBPM,
             lastSlots: &customAudioCoachLastSlots
         )
         guard !messages.isEmpty else { return }

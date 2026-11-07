@@ -4591,6 +4591,8 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
             paceSecondsPerKilometer: currentPaceSecondsPerKilometer,
             heartRateBPM: hasFreshHeartRate ? heartRate : nil,
             norwegian: coachPhrase(english: "en", norwegian: "no") == "no",
+            maximumHeartRateBPM: audioCoachConfiguration.smartPrompts?
+                .maximumHeartRateBPM ?? structuredRunningWorkout?.heartRateZoneMaximumBPM,
             lastSlots: &customAudioCoachLastSlots
         )
         guard !messages.isEmpty else { return }

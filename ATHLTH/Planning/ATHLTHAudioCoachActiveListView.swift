@@ -23,6 +23,7 @@ struct ATHLTHAudioCoachActiveListView: View {
     @State private var phraseText = ""
     @State private var newRuleTrigger: ATHLTHAudioCoachRule.Trigger = .distance
     @State private var newRuleMetric: ATHLTHAudioCoachRule.Metric = .pace
+    @State private var newRuleAdditionalMetrics: [ATHLTHAudioCoachRule.Metric] = []
     @State private var newRuleInterval = 1_000
 
     @State private var placeQuery = ""
@@ -514,11 +515,18 @@ struct ATHLTHAudioCoachActiveListView: View {
                             Image(systemName: "trash").frame(width: 44, height: 44)
                         }
                     }
-                    Picker(tr("Metric", "Innhold"), selection: $rule.metric) {
+                    Picker(tr("First value", "Første verdi"), selection: $rule.metric) {
                         ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
                             Text(metric.title).tag(metric)
                         }
                     }
+                    multiMetricChoices(
+                        primary: rule.metric,
+                        selected: Binding(
+                            get: { rule.additionalMetrics ?? [] },
+                            set: { rule.additionalMetrics = $0 }
+                        )
+                    )
                     Picker(tr("When", "Utløser"), selection: $rule.trigger) {
                         ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
                             Text(trigger.title).tag(trigger)
@@ -536,11 +544,25 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
             Text(tr("New announcement", "Ny beskjed"))
                 .font(.subheadline.weight(.semibold))
-            Picker(tr("Metric", "Innhold"), selection: $newRuleMetric) {
+            Button {
+                newRuleTrigger = .distance
+                newRuleInterval = 1_000
+                newRuleMetric = .distance
+                newRuleAdditionalMetrics = [.elapsedTime, .heartRate]
+            } label: {
+                Label(tr("Preset: Every kilometre · distance, time and pulse",
+                         "Ferdigvalg: Hver km · distanse, tid og puls"),
+                      systemImage: "checkmark.circle")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .buttonStyle(.bordered)
+            Picker(tr("First value", "Første verdi"), selection: $newRuleMetric) {
                 ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
                     Text(metric.title).tag(metric)
                 }
             }
+            multiMetricChoices(primary: newRuleMetric,
+                               selected: $newRuleAdditionalMetrics)
             Picker(tr("When", "Utløser"), selection: $newRuleTrigger) {
                 ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
                     Text(trigger.title).tag(trigger)
@@ -557,7 +579,10 @@ struct ATHLTHAudioCoachActiveListView: View {
             Button {
                 guard draft.customRules.count < 20 else { return }
                 draft.customRules.append(ATHLTHAudioCoachRule(
-                    trigger: newRuleTrigger, metric: newRuleMetric, interval: newRuleInterval
+                    trigger: newRuleTrigger, metric: newRuleMetric, interval: newRuleInterval,
+                    additionalMetrics: newRuleAdditionalMetrics.filter {
+                        $0 != newRuleMetric
+                    }
                 ))
             } label: {
                 Label(tr("Add rule", "Legg til regel"), systemImage: "plus")
@@ -565,6 +590,39 @@ struct ATHLTHAudioCoachActiveListView: View {
             }
             .buttonStyle(.bordered)
             .disabled(draft.customRules.count >= 20)
+        }
+    }
+
+    /// Additional metrics are read in the same sentence and at the SAME
+    /// milestone; unlike three independent rules they cannot overlap.
+    private func multiMetricChoices(
+        primary: ATHLTHAudioCoachRule.Metric,
+        selected: Binding<[ATHLTHAudioCoachRule.Metric]>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(tr("Also read out", "Les også opp"))
+                .font(.subheadline.weight(.semibold))
+            ForEach(ATHLTHAudioCoachRule.Metric.allCases.filter {
+                $0 != primary
+            }) { metric in
+                Toggle(metric.title, isOn: Binding(
+                    get: { selected.wrappedValue.contains(metric) },
+                    set: { included in
+                        var values = selected.wrappedValue.filter {
+                            $0 != primary && $0 != metric
+                        }
+                        if included { values.append(metric) }
+                        selected.wrappedValue = values
+                    }
+                ))
+                .tint(bronze)
+            }
+            Text(tr(
+                "These values will be spoken together in one announcement.",
+                "Verdiene leses opp samlet i én beskjed."
+            ))
+            .font(.caption)
+            .foregroundStyle(dim)
         }
     }
 

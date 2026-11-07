@@ -22,6 +22,7 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         case elapsedTime
         case distance
         case heartRate
+        case heartRateZone
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -33,6 +34,8 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                 english: "Distance", norwegian: "Distanse")
             case .heartRate: return ATHLTHLocalization.choose(
                 english: "Heart rate", norwegian: "Puls")
+            case .heartRateZone: return ATHLTHLocalization.choose(
+                english: "Heart-rate zone", norwegian: "Pulssone")
             }
         }
     }
@@ -42,6 +45,17 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
     var metric: Metric
     /// Metres for distance rules, seconds for time rules.
     var interval: Int
+    /// Optional for compatibility with existing stored one-metric rules.
+    /// A single scheduled event can read several metrics as ONE spoken cue.
+    var additionalMetrics: [Metric]? = nil
+
+    var selectedMetrics: [Metric] {
+        var ordered: [Metric] = [metric]
+        for next in additionalMetrics ?? [] where !ordered.contains(next) {
+            ordered.append(next)
+        }
+        return Array(ordered.prefix(5))
+    }
 
     var validatedInterval: Int {
         switch trigger {
@@ -55,7 +69,29 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         elapsedSeconds: TimeInterval,
         paceSecondsPerKilometer: TimeInterval?,
         heartRateBPM: Double?,
-        norwegian: Bool
+        norwegian: Bool,
+        maximumHeartRateBPM: Double? = nil
+    ) -> String? {
+        let parts = selectedMetrics.compactMap { item in
+            component(
+                item, distanceMeters: distanceMeters,
+                elapsedSeconds: elapsedSeconds,
+                paceSecondsPerKilometer: paceSecondsPerKilometer,
+                heartRateBPM: heartRateBPM, norwegian: norwegian,
+                maximumHeartRateBPM: maximumHeartRateBPM
+            )
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: ". ")
+    }
+
+    private func component(
+        _ metric: Metric,
+        distanceMeters: Double,
+        elapsedSeconds: TimeInterval,
+        paceSecondsPerKilometer: TimeInterval?,
+        heartRateBPM: Double?,
+        norwegian: Bool,
+        maximumHeartRateBPM: Double?
     ) -> String? {
         switch metric {
         case .pace:
@@ -85,6 +121,11 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
                   (30...230).contains(heartRateBPM) else { return nil }
             return norwegian ? "Puls \(Int(heartRateBPM.rounded()))"
                 : "Heart rate \(Int(heartRateBPM.rounded()))"
+        case .heartRateZone:
+            guard let zone = ATHLTHHeartRateZones.measuredZone(
+                heartRateBPM: heartRateBPM, maximumBPM: maximumHeartRateBPM
+            ) else { return nil }
+            return norwegian ? "Pulssone \(zone)" : "Heart-rate zone \(zone)"
         }
     }
 }
@@ -115,6 +156,7 @@ enum ATHLTHAudioCoachRuleDelivery {
         paceSecondsPerKilometer: TimeInterval?,
         heartRateBPM: Double?,
         norwegian: Bool,
+        maximumHeartRateBPM: Double? = nil,
         lastSlots: inout [UUID: Int]
     ) -> [String] {
         var messages: [String] = []
@@ -134,7 +176,8 @@ enum ATHLTHAudioCoachRuleDelivery {
                 elapsedSeconds: elapsedSeconds,
                 paceSecondsPerKilometer: paceSecondsPerKilometer,
                 heartRateBPM: heartRateBPM,
-                norwegian: norwegian
+                norwegian: norwegian,
+                maximumHeartRateBPM: maximumHeartRateBPM
             ) else { continue }
             messages.append(message)
         }

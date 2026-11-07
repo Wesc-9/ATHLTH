@@ -192,4 +192,50 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertEqual(restored, saved)
         XCTAssertEqual(restored.rules.map(\.validatedInterval), [1_000, 30])
     }
+
+    func testOneKilometreBundleIncludesDistanceTimePacePulseAndZone() {
+        let rule = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 1_000,
+            additionalMetrics: [.elapsedTime, .pace, .heartRate, .heartRateZone]
+        )
+        var slot = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: [rule], distanceMeters: 0, elapsedSeconds: 0
+        )
+        let message = ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [rule], distanceMeters: 1_010, elapsedSeconds: 360,
+            paceSecondsPerKilometer: 355, heartRateBPM: 151,
+            norwegian: true, maximumHeartRateBPM: 185, lastSlots: &slot
+        )
+        XCTAssertEqual(message.count, 1)
+        XCTAssertTrue(message[0].contains("Distanse"))
+        XCTAssertTrue(message[0].contains("Tid"))
+        XCTAssertTrue(message[0].contains("Tempo"))
+        XCTAssertTrue(message[0].contains("Puls 151"))
+        XCTAssertTrue(message[0].contains("Pulssone"))
+        XCTAssertTrue(ATHLTHAudioCoachRuleDelivery.dueMessages(
+            rules: [rule], distanceMeters: 1_050, elapsedSeconds: 362,
+            paceSecondsPerKilometer: 355, heartRateBPM: 151,
+            norwegian: true, maximumHeartRateBPM: 185, lastSlots: &slot
+        ).isEmpty)
+    }
+
+    func testLegacyRuleAndNewBundleEncodeDecodeWithoutLosingMetrics() throws {
+        let original = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .heartRateZone, interval: 60,
+            additionalMetrics: [.heartRate]
+        )
+        let encoded = try JSONEncoder().encode(original)
+        let restored = try JSONDecoder().decode(
+            ATHLTHAudioCoachRule.self, from: encoded
+        )
+        XCTAssertEqual(restored.selectedMetrics, [.heartRateZone, .heartRate])
+        let legacy = """
+        {"id":"A519D13E-2792-49DF-AB57-F69705011EB5",
+         "trigger":"distance","metric":"heartRate","interval":1000}
+        """
+        let old = try JSONDecoder().decode(
+            ATHLTHAudioCoachRule.self, from: Data(legacy.utf8)
+        )
+        XCTAssertEqual(old.selectedMetrics, [.heartRate])
+    }
 }
