@@ -40,7 +40,10 @@ struct ATHLTHWorkoutDiscoveryFilter {
     var exerciseName: String? = nil
 
     func matches(_ entry: WorkoutTemplateCatalogEntry) -> Bool {
-        guard duration.matches(minutes: entry.estimatedDurationMinutes.map(Double.init))
+        let estimatedMinutes: Int? = duration == .any ? nil :
+            (entry.estimatedDurationMinutes ??
+             ATHLTHWorkoutDurationEstimator.previewMinutes(for: entry.blocks))
+        guard duration.matches(minutes: estimatedMinutes.map(Double.init))
         else { return false }
         if let exerciseName, !ATHLTHWorkoutLibraryExerciseIndex.containsExercise(
             exerciseName, in: entry.blocks
@@ -63,10 +66,14 @@ struct ATHLTHWorkoutDiscoveryFilter {
         _ workout: PlannedSession,
         catalogEntry: WorkoutTemplateCatalogEntry? = nil
     ) -> Bool {
-        guard duration.matches(
-            minutes: workout.durationMinutes.map(Double.init) ??
-                catalogEntry?.estimatedDurationMinutes.map(Double.init)
-        ) else { return false }
+        let estimatedMinutes: Int? = duration == .any ? nil :
+            (workout.durationMinutes ??
+             catalogEntry?.estimatedDurationMinutes ??
+             ATHLTHWorkoutDurationEstimator.previewMinutes(
+                for: ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+             ))
+        guard duration.matches(minutes: estimatedMinutes.map(Double.init))
+        else { return false }
         if let exerciseName, !ATHLTHWorkoutLibraryExerciseIndex.containsExercise(
             exerciseName, in: workout
         ) { return false }
@@ -101,7 +108,10 @@ struct ATHLTHWorkoutDiscoveryFilter {
         // Estimating a running workout expands interval repeats. Do not do
         // that calculation at all when the user has no duration filter.
         return duration == .any || duration.matches(
-            minutes: workout.estimatedDurationSeconds.map { $0 / 60 }
+            minutes: workout.estimatedDurationSeconds.map { $0 / 60 } ??
+                ATHLTHWorkoutDurationEstimator.previewMinutes(
+                    for: ATHLTHUnifiedWorkout.editorBlocks(from: workout.plannedSession())
+                ).map(Double.init)
         )
     }
 
