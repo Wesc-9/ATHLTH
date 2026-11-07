@@ -12301,13 +12301,6 @@ struct ATHLTHTrainView: View {
                 )
             }
 
-        case let .customQuickActivity(activity):
-            // Go straight to the activity-specific Quick Start form selected
-            // on the iPad. The full training view still owns the workout
-            // engine and validates whether another workout is already active.
-            selectedSection = .today
-            startCustomQuick(as: activity)
-
         case .ghost:
             selectedSection = .today
             showingGhostHub = true
