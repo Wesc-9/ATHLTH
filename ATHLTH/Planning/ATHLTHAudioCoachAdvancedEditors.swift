@@ -14,7 +14,7 @@ struct ATHLTHAudioCoachTargetZoneEditor: View {
 
     private var speakOutsideZone: Binding<Bool> {
         Binding(
-            get: { smart.targetZoneVoiceAlertsEnabled ?? false },
+            get: { smart.targetZoneVoiceAlertsEnabled ?? true },
             set: { smart.targetZoneVoiceAlertsEnabled = $0 }
         )
     }
@@ -40,7 +40,18 @@ struct ATHLTHAudioCoachTargetZoneEditor: View {
                 .font(.subheadline)
                 .foregroundStyle(dim)
 
-                Toggle(tr("Alert me when I leave the target zone",
+                Picker(tr("Target zone", "Målsone"), selection: Binding(
+                get: { smart.preferredHeartRateZone ?? 0 },
+                set: { smart.preferredHeartRateZone = $0 == 0 ? nil : $0 }
+            )) {
+                Text(tr("From workout", "Fra treningsøkt")).tag(0)
+                ForEach(1...5, id: \.self) { zone in
+                    Text(tr("Zone", "Sone") + " \(zone)").tag(zone)
+                }
+            }
+            .pickerStyle(.menu)
+
+            Toggle(tr("Alert me when I leave the target zone",
                           "Varsle når jeg går ut av målsonen"),
                        isOn: speakOutsideZone)
                     .tint(bronze)
