@@ -258,4 +258,28 @@ final class ATHLTHAudioCoachRuleDeliveryTests: XCTestCase {
         XCTAssertFalse(due[0].metrics.contains(.heartRate))
         XCTAssertFalse(due[0].metrics.contains(.heartRateZone))
     }
+
+    func testCollidingCustomRulesSpeakEachMetricAtMostOnce() {
+        let first = ATHLTHAudioCoachRule(
+            trigger: .distance, metric: .distance, interval: 1_000,
+            additionalMetrics: [.elapsedTime, .heartRate]
+        )
+        let second = ATHLTHAudioCoachRule(
+            trigger: .time, metric: .heartRate, interval: 60,
+            additionalMetrics: [.heartRateZone]
+        )
+        var slots = ATHLTHAudioCoachRuleDelivery.initialSlots(
+            rules: [first, second], distanceMeters: 0, elapsedSeconds: 0
+        )
+        let cues = ATHLTHAudioCoachRuleDelivery.dueAnnouncements(
+            rules: [first, second], distanceMeters: 1_001, elapsedSeconds: 360,
+            paceSecondsPerKilometer: 360, heartRateBPM: 150,
+            norwegian: true, maximumHeartRateBPM: 185, lastSlots: &slots
+        )
+        XCTAssertEqual(cues.count, 2)
+        let spoken = cues.map(\.text).joined(separator: ". ")
+        XCTAssertEqual(spoken.components(separatedBy: "Puls 150").count - 1, 1)
+        XCTAssertTrue(spoken.contains("Pulssone"))
+        XCTAssertTrue(spoken.contains("Distanse"))
+    }
 }

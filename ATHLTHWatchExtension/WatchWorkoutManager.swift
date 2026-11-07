@@ -7531,6 +7531,11 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
                     if self.speechSynthesizer.isSpeaking ||
                        self.audioCoachActivationTask != nil { return }
                     do {
+                        // Re-apply a non-ducking category on every retry:
+                        // route handoffs can reject category *and* deactivation.
+                        try AVAudioSession.sharedInstance().setCategory(
+                            .playback, mode: .default, options: [.mixWithOthers]
+                        )
                         try AVAudioSession.sharedInstance().setActive(
                             false, options: .notifyOthersOnDeactivation)
                         self.coachAudioSessionIsActive = false

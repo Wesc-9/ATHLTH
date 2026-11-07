@@ -197,6 +197,22 @@ struct ATHLTHAudioCoachProfile: Codable, Hashable, Identifiable {
     var id = UUID()
     var name: String
     var configuration: WatchAudioCoachConfiguration
+
+    var configurationSummary: String {
+        let rules = configuration.customRules?.count ?? 0
+        let parts: [String?] = [
+            configuration.distanceIntervalMeters.map {
+                "\(Int($0)) m"
+            },
+            configuration.timeIntervalSeconds.map {
+                "\(Int($0)) s"
+            },
+            rules > 0 ? "\(rules) custom rules" : nil
+        ]
+        let labels = parts.compactMap { $0 }
+        return labels.isEmpty ? "Custom Audio Coach" :
+            labels.joined(separator: " · ")
+    }
 }
 
 /// Shared, workout-scoped policy for Watch and iPhone voice ownership.

@@ -70,9 +70,12 @@ struct ATHLTHAudioCoachRule: Codable, Hashable, Identifiable {
         paceSecondsPerKilometer: TimeInterval?,
         heartRateBPM: Double?,
         norwegian: Bool,
-        maximumHeartRateBPM: Double? = nil
+        maximumHeartRateBPM: Double? = nil,
+        excluding excludedMetrics: Set<Metric> = []
     ) -> String? {
-        let parts = selectedMetrics.compactMap { item in
+        let parts = selectedMetrics.filter {
+            !excludedMetrics.contains($0)
+        }.compactMap { item in
             component(
                 item, distanceMeters: distanceMeters,
                 elapsedSeconds: elapsedSeconds,
@@ -189,6 +192,7 @@ enum ATHLTHAudioCoachRuleDelivery {
         lastSlots: inout [UUID: Int]
     ) -> [ATHLTHAudioCoachDueAnnouncement] {
         var messages: [ATHLTHAudioCoachDueAnnouncement] = []
+        var spokenMetrics: Set<ATHLTHAudioCoachRule.Metric> = []
         for rule in rules.prefix(20) {
             let current = slot(
                 for: rule,
@@ -200,31 +204,36 @@ enum ATHLTHAudioCoachRuleDelivery {
             // Consume the crossed milestone even if a sensor value is missing.
             // It must not be announced much later after that value recovers.
             lastSlots[rule.id] = current
-            guard let message = rule.phrase(
-                distanceMeters: distanceMeters,
-                elapsedSeconds: elapsedSeconds,
-                paceSecondsPerKilometer: paceSecondsPerKilometer,
-                heartRateBPM: heartRateBPM,
-                norwegian: norwegian,
-                maximumHeartRateBPM: maximumHeartRateBPM
-            ) else { continue }
+            // Simultaneous rules are composed into one speech event. A
+            // metric already included by another rule is not repeated.
+            let available = rule.selectedMetrics.filter { metric in
+                switch metric {
+                case .heartRate: return heartRateBPM != nil
+                case .heartRateZone:
+                    return ATHLTHHeartRateZones.measuredZone(
+                        heartRateBPM: heartRateBPM,
+                        maximumBPM: maximumHeartRateBPM
+                    ) != nil
+                case .pace: return paceSecondsPerKilometer != nil
+                case .distance, .elapsedTime: return true
+                }
+            }
+            let effective = available.filter { !spokenMetrics.contains($0) }
+            guard !effective.isEmpty,
+                  let message = rule.phrase(
+                    distanceMeters: distanceMeters,
+                    elapsedSeconds: elapsedSeconds,
+                    paceSecondsPerKilometer: paceSecondsPerKilometer,
+                    heartRateBPM: heartRateBPM,
+                    norwegian: norwegian,
+                    maximumHeartRateBPM: maximumHeartRateBPM,
+                    excluding: Set(rule.selectedMetrics).subtracting(effective)
+                  ) else { continue }
+            let covered = Set(effective)
             messages.append(ATHLTHAudioCoachDueAnnouncement(
-                text: message,
-                metrics: Set(rule.selectedMetrics.filter {
-                    // Unavailable sensors cannot suppress a working standard
-                    // update (nor should an empty custom bundle be spoken).
-                    switch $0 {
-                    case .heartRate: return heartRateBPM != nil
-                    case .heartRateZone:
-                        return ATHLTHHeartRateZones.measuredZone(
-                            heartRateBPM: heartRateBPM,
-                            maximumBPM: maximumHeartRateBPM
-                        ) != nil
-                    case .pace: return paceSecondsPerKilometer != nil
-                    case .distance, .elapsedTime: return true
-                    }
-                })
+                text: message, metrics: covered
             ))
+            spokenMetrics.formUnion(covered)
         }
         return messages
     }
