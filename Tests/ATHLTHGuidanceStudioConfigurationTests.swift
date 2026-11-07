@@ -167,4 +167,16 @@ final class ATHLTHGuidanceStudioConfigurationTests: XCTestCase {
         XCTAssertEqual(loaded.timeIntervalSeconds, 90)
         XCTAssertEqual(loaded.configuration().timeIntervalSeconds, 90)
     }
+
+    func testTurningOnContextMotivationAlsoEnablesCoachSpeech() {
+        var draft = AudioCoachDraft()
+        draft.smartPrompts.motivationEnabled = false
+        draft.smartPrompts.contextualFeedbackEnabled = nil
+        XCTAssertFalse(ATHLTHAudioCoachOption.contextual.isActive(in: draft))
+        ATHLTHAudioCoachOption.contextual.setActive(true, in: &draft)
+        XCTAssertTrue(draft.smartPrompts.motivationEnabled)
+        XCTAssertTrue(ATHLTHAudioCoachOption.contextual.isActive(in: draft))
+        ATHLTHAudioCoachOption.contextual.setActive(false, in: &draft)
+        XCTAssertFalse(ATHLTHAudioCoachOption.contextual.isActive(in: draft))
+    }
 }

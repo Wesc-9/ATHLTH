@@ -158,7 +158,9 @@ enum ATHLTHAudioCoachOption: String, CaseIterable, Identifiable {
         case .heartRate: d.announceHeartRate = active
         case .currentZone: d.smartPrompts.announceCurrentHeartRateZone = active
         case .motivation: d.smartPrompts.motivationEnabled = active
-        case .contextual: d.smartPrompts.contextualFeedbackEnabled = active
+        case .contextual:
+            if active { d.smartPrompts.motivationEnabled = true }
+            d.smartPrompts.contextualFeedbackEnabled = active
         case .randomEncouragement: d.smartPrompts.randomEncouragementEnabled = active
         case .workoutStart: d.announceWorkoutStart = active
         case .pauseResume: d.announcePauseResume = active

@@ -502,76 +502,38 @@ struct ATHLTHAudioCoachActiveListView: View {
             ))
             .font(.caption)
             .foregroundStyle(dim)
-            ForEach(draft.customRules.indices, id: \.self) { index in
+            ForEach($draft.customRules) { $rule in
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
-                        Text(tr("Rule", "Regel") + " \(index + 1)")
-                            .font(.subheadline.weight(.semibold))
+                        Text(rule.metric.title).font(.subheadline.weight(.semibold))
                         Spacer()
                         Button(role: .destructive) {
-                            let id = draft.customRules[index].id
+                            let id = rule.id
                             draft.customRules.removeAll { $0.id == id }
                         } label: {
                             Image(systemName: "trash").frame(width: 44, height: 44)
                         }
                     }
-                    Picker(tr("Metric", "Innhold"),
-                           selection: $draft.customRules[index].metric) {
+                    Picker(tr("Metric", "Innhold"), selection: $rule.metric) {
                         ForEach(ATHLTHAudioCoachRule.Metric.allCases) { metric in
                             Text(metric.title).tag(metric)
                         }
                     }
-                    Picker(tr("When", "Utløser"),
-                           selection: $draft.customRules[index].trigger) {
+                    Picker(tr("When", "Utløser"), selection: $rule.trigger) {
                         ForEach(ATHLTHAudioCoachRule.Trigger.allCases) { trigger in
                             Text(trigger.title).tag(trigger)
                         }
                     }
-                    Stepper(value: $draft.customRules[index].interval,
-                            in: draft.customRules[index].trigger == .time
+                    Stepper(value: $rule.interval,
+                            in: rule.trigger == .time
                                 ? 15...7_200 : 100...42_000,
-                            step: draft.customRules[index].trigger == .time ? 15 : 100) {
-                        Text("\(draft.customRules[index].validatedInterval) " +
-                            (draft.customRules[index].trigger == .time ? "s" : "m"))
+                            step: rule.trigger == .time ? 15 : 100) {
+                        Text("\(rule.validatedInterval) " +
+                            (rule.trigger == .time ? "s" : "m"))
                     }
                     Divider().overlay(ATHLTHPlanDesign.warmDivider)
                 }
             }
-            if !settings.audioCoachSavedRuleSets.isEmpty {
-                Menu {
-                    ForEach(settings.audioCoachSavedRuleSets) { saved in
-                        Button(saved.title) {
-                            draft.customRules = Array(saved.rules.prefix(20))
-                        }
-                    }
-                } label: {
-                    Label(tr("Load saved announcement list", "Hent lagret beskjedliste"),
-                          systemImage: "square.stack")
-                }
-                .font(.subheadline.weight(.medium))
-            }
-            if !draft.customRules.isEmpty {
-                TextField(tr("Save rule list as", "Lagre beskjedlisten som"),
-                          text: $ruleSetName)
-                    .textFieldStyle(.roundedBorder)
-                Button {
-                    let title = ruleSetName.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !title.isEmpty, settings.audioCoachSavedRuleSets.count < 30 else {
-                        return
-                    }
-                    settings.audioCoachSavedRuleSets.append(ATHLTHAudioCoachRuleSet(
-                        title: String(title.prefix(60)), rules: draft.customRules
-                    ))
-                    ruleSetName = ""
-                } label: {
-                    Label(tr("Save rule list", "Lagre beskjedliste"),
-                          systemImage: "square.and.arrow.down")
-                }
-                .disabled(ruleSetName.trimmingCharacters(
-                    in: .whitespacesAndNewlines
-                ).isEmpty || settings.audioCoachSavedRuleSets.count >= 30)
-            }
-            Divider().overlay(ATHLTHPlanDesign.warmDivider)
             Text(tr("New announcement", "Ny beskjed"))
                 .font(.subheadline.weight(.semibold))
             Picker(tr("Metric", "Innhold"), selection: $newRuleMetric) {
