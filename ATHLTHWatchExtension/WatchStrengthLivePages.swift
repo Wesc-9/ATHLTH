@@ -428,9 +428,13 @@ struct WatchStrengthReadOnlySetPage: View {
                             ? "timer" : "repeat"
                     )
                     WatchStrengthReadout(
-                        title: ATHLTHLocalization.choose(
-                            english: "LOAD", norwegian: "BELASTNING"
-                        ),
+                        title: snapshot.barWeightKilograms == nil
+                            ? ATHLTHLocalization.choose(
+                                english: "LOAD", norwegian: "BELASTNING"
+                            )
+                            : ATHLTHLocalization.choose(
+                                english: "TOTAL", norwegian: "TOTAL"
+                            ),
                         value: snapshot.loadKindRaw == "resistanceLevel"
                             ? ATHLTHLocalization.choose(
                                 english: "Level \(snapshot.draftResistanceLevel ?? 5)",
@@ -440,6 +444,15 @@ struct WatchStrengthReadOnlySetPage: View {
                                      snapshot.draftWeightKilograms),
                         symbol: "scalemass"
                     )
+                }
+
+                if let bar = snapshot.barWeightKilograms {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Bar \(bar.formatted()) kg · plates entered separately",
+                        norwegian: "Stang \(bar.formatted()) kg · skiver legges inn separat"
+                    ))
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(WatchTheme.muted)
                 }
 
                 Label(
