@@ -1731,27 +1731,24 @@ struct AroundYouExploreView: View {
     @ViewBuilder
     private var exploreTrailStatusOverlay:
         some View {
-        if (
-            publicTrailDiscovery.isLoading ||
-            publicTrailDiscovery.isWarmingCache ||
-            routeDiscovery.isLoadingNearby ||
-            routeDiscovery.isLoading
-           ) &&
-           publicTrailDiscovery.trails.isEmpty {
+        if isSearchingVisibleArea ||
+            ((publicTrailDiscovery.isLoading ||
+              publicTrailDiscovery.isWarmingCache) &&
+             publicTrailDiscovery.trails.isEmpty) {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
 
                 Text(ATHLTHLocalization.choose(
-                    english: routeDiscovery.isLoadingNearby
-                        ? "Loading nearby routes…"
+                    english: isSearchingVisibleArea
+                        ? "Searching visible map area…"
                         : publicTrailDiscovery.isWarmingCache
-                            ? "Finding public trails nearby…"
+                            ? "Finding public trails…"
                             : "Loading public trails…",
-                    norwegian: routeDiscovery.isLoadingNearby
-                        ? "Henter ruter i nærheten…"
+                    norwegian: isSearchingVisibleArea
+                        ? "Søker i kartutsnittet…"
                         : publicTrailDiscovery.isWarmingCache
-                            ? "Finner turstier i nærheten…"
+                            ? "Finner turstier…"
                             : "Henter turstier…"
                 ))
                 .font(.caption)
@@ -3453,6 +3450,7 @@ struct AroundYouExploreView: View {
               RouteDiscoveryRegionBounds(region: requestedRegion) != nil
         else { return }
 
+        hasRequestedInitialVisibleSearch = true
         isSearchingVisibleArea = true
         defer { isSearchingVisibleArea = false }
 
