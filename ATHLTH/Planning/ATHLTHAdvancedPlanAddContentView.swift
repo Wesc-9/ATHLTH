@@ -26,6 +26,7 @@ struct ATHLTHAdvancedPlanAddContentView: View {
     @State private var kind: Kind = .exercise
     @State private var origin: Origin = .all
     @State private var search = ""
+    @State private var searchInput = ""
     @State private var muscle: String? = nil
     @State private var workoutActivity: ATHLTHPlanWorkoutActivityFilter = .all
     @State private var runningType: RunningWorkoutType?
@@ -132,11 +133,14 @@ struct ATHLTHAdvancedPlanAddContentView: View {
                         Image(systemName: "magnifyingglass").foregroundStyle(secondary)
                         TextField(kind == .exercise
                                   ? tr("Search exercises", "Søk etter øvelser")
-                                  : tr("Search workouts", "Søk etter treningsøkter"), text: $search)
+                                  : tr("Search workouts", "Søk etter treningsøkter"), text: $searchInput)
                             .font(.subheadline)
                             .autocorrectionDisabled()
-                        if !search.isEmpty {
-                            Button { search = "" } label: {
+                        if !searchInput.isEmpty {
+                            Button {
+                                searchInput = ""
+                                search = ""
+                            } label: {
                                 Image(systemName: "xmark.circle.fill")
                             }
                             .accessibilityLabel(tr("Clear search", "Tøm søk"))
@@ -163,10 +167,20 @@ struct ATHLTHAdvancedPlanAddContentView: View {
             .background(canvas.ignoresSafeArea())
             .onAppear { kind = initialKind }
             .onChange(of: kind) { _, _ in
+                searchInput = ""
                 search = ""
                 muscle = nil
                 workoutActivity = .all
                 runningType = nil
+            }
+            .task(id: searchInput) {
+                do {
+                    try await Task.sleep(for: .milliseconds(180))
+                } catch {
+                    return
+                }
+                guard !Task.isCancelled else { return }
+                search = searchInput
             }
             .navigationTitle(kind == .exercise
                              ? tr("Add exercise", "Legg til øvelse")
@@ -225,7 +239,9 @@ struct ATHLTHAdvancedPlanAddContentView: View {
     }
 
     private var exerciseContent: some View {
-        VStack(alignment: .leading, spacing: 13) {
+        // Reuse one filtered list for quick picks, count, empty state and rows.
+        let matchingExercises = availableExercises
+        return VStack(alignment: .leading, spacing: 13) {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 13) {
                     muscleChoice(nil, "All", "square.grid.2x2")
@@ -240,7 +256,7 @@ struct ATHLTHAdvancedPlanAddContentView: View {
                 .font(.system(size: 19, weight: .semibold, design: .serif))
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 9) {
-                    ForEach(Array(availableExercises.prefix(6))) { item in
+                    ForEach(Array(matchingExercises.prefix(6))) { item in
                         Button {
                             selectedExerciseID = item.id
                         } label: {
@@ -261,15 +277,15 @@ struct ATHLTHAdvancedPlanAddContentView: View {
                 Text(tr("All exercises", "Alle øvelser"))
                     .font(.system(size: 19, weight: .semibold, design: .serif))
                 Spacer()
-                Text("\(availableExercises.count)")
+                Text("\(matchingExercises.count)")
                     .font(.caption).foregroundStyle(secondary)
             }
-            if availableExercises.isEmpty {
+            if matchingExercises.isEmpty {
                 ContentUnavailableView(tr("No exercises", "Ingen øvelser"),
                                        systemImage: "magnifyingglass",
                                        description: Text(tr("Try another filter", "Prøv et annet filter")))
             }
-            ForEach(availableExercises.prefix(120)) { item in
+            ForEach(matchingExercises.prefix(120)) { item in
                 Button { selectedExerciseID = item.id } label: {
                     HStack(spacing: 11) {
                         ExerciseArtwork(entry: item, size: 58)
