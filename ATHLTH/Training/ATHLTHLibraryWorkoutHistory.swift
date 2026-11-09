@@ -48,6 +48,63 @@ enum ATHLTHLibraryWorkoutHistory {
         return Summary(date: record.completedAt, result: result)
     }
 
+    /// Precomputed once per history revision for library scrolling. Matching
+    /// preserves the existing identity-first rules: personal exercises never
+    /// inherit a different exercise's result from its name alone.
+    struct StrengthExerciseIndex {
+        let byID: [UUID: Summary]
+        let byName: [String: Summary]
+
+        static let empty = StrengthExerciseIndex(byID: [:], byName: [:])
+
+        func summary(id: UUID, canonicalName: String, isCustom: Bool) -> Summary? {
+            let exact = byID[id]
+            guard !isCustom else { return exact }
+            let name = byName[ATHLTHExerciseReferenceResolver.key(canonicalName)]
+            switch (exact, name) {
+            case let (a?, b?): return a.date >= b.date ? a : b
+            case let (a?, nil): return a
+            case let (nil, b?): return b
+            default: return nil
+            }
+        }
+    }
+
+    static func strengthExerciseIndex(
+        workouts: [StrengthWorkoutLog]
+    ) -> StrengthExerciseIndex {
+        var byID: [UUID: Summary] = [:]
+        var byName: [String: Summary] = [:]
+        for workout in workouts where workout.isFinished {
+            for exercise in workout.exercises {
+                let completed = exercise.sets.filter(\.isCompleted)
+                guard !completed.isEmpty else { continue }
+                let date = exercise.completedAt ??
+                    completed.compactMap(\.completedAt).max() ??
+                    workout.endedAt ?? workout.startedAt
+                let maximum = completed.compactMap(\.completedWeightKilograms)
+                    .filter { $0.isFinite && $0 > 0 }.max()
+                var result = ATHLTHLocalization.counted(
+                    completed.count, englishSingular: "set", englishPlural: "sets",
+                    norwegianSingular: "sett", norwegianPlural: "sett"
+                )
+                if let maximum {
+                    result += String(format: " · %.1f kg", maximum)
+                }
+                let candidate = Summary(date: date, result: result)
+                if let id = exercise.plannedExerciseID,
+                   byID[id] == nil || date > byID[id]!.date {
+                    byID[id] = candidate
+                }
+                let name = ATHLTHExerciseReferenceResolver.key(exercise.exercise.name)
+                if byName[name] == nil || date > byName[name]!.date {
+                    byName[name] = candidate
+                }
+            }
+        }
+        return StrengthExerciseIndex(byID: byID, byName: byName)
+    }
+
     static func strengthExercise(
         id: UUID, canonicalName: String, isCustom: Bool,
         workouts: [StrengthWorkoutLog]
