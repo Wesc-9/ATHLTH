@@ -43,6 +43,7 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var selection: ATHLTHStudioDestination = .overview
     @State private var selectedWorkout: WorkoutSummary?
     @State private var inspectedWeekDate: Date?
+    @State private var selectedHomeWeekDate: Date = .now
     /// Side-menu libraries live in the Studio detail column.
     @State private var libraryPage: ATHLTHStudioLibraryPage?
     /// Reset pushed detail cards when switching sidebar destinations.
@@ -339,7 +340,20 @@ struct ATHLTHiPadStudioRootView: View {
                     ? .detailOnly : .all
             }
         }
+        .onChange(of: selectedHomeWeekDate) { _, date in
+            // Moving the week while the day inspector is visible must move
+            // the inspector too: no stale dates from the previous week.
+            if inspectedWeekDate != nil, showingInspector,
+               !inspectorShowsCoach, !inspectorShowsInbox {
+                inspectedWeekDate = Calendar.current.startOfDay(for: date)
+                selectedWorkout = nil
+            }
+        }
         .onChange(of: focusedPlanningDate) { _, newDate in
+            if newDate != nil {
+                clearWeekInspectorIfNeeded()
+                showingInspector = false
+            }
             withAnimation(.easeInOut(duration: 0.18)) {
                 sidebarVisibility = (libraryPage != nil || sidebarPage != nil)
                     ? .all :
@@ -995,7 +1009,8 @@ struct ATHLTHiPadStudioRootView: View {
                     inspectorShowsInbox = false
                     showingInspector = true
                 },
-                focusedPlanningDate: $focusedPlanningDate
+                focusedPlanningDate: $focusedPlanningDate,
+                selectedDate: $selectedHomeWeekDate
             )
         case .planner:
             ATHLTHStudioPlannerView(
@@ -1048,6 +1063,7 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func showWeekDay(_ date: Date) {
+        selectedHomeWeekDate = date
         selectedWorkout = nil
         inspectedWeekDate = Calendar.current.startOfDay(for: date)
         inspectorShowsCoach = false
