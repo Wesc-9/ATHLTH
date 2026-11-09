@@ -16,9 +16,9 @@ struct HomeDailyRecommendationCard: View {
     var compact: Bool = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: compact ? 5 : 10) {
+        VStack(alignment: .leading, spacing: compact ? 6 : 10) {
             Button(action: onShowDetails) {
-                VStack(alignment: .leading, spacing: compact ? 5 : 8) {
+                VStack(alignment: .leading, spacing: compact ? 8 : 8) {
                     HStack(spacing: 6) {
                         Image(systemName: "sparkles")
                             .font(.system(size: 12, weight: .medium))
@@ -64,8 +64,11 @@ struct HomeDailyRecommendationCard: View {
             ))
             .accessibilityIdentifier("home-daily-recommendation-details")
 
-            // Keep the divider close to the advice rather than letting a
-            // flexible Spacer create a large empty band above the workout.
+            // Give today's explanation its own open, calm area. Push the
+            // divider and recommended workout down to the bottom of the
+            // existing card without changing the shared calendar-card height.
+            Spacer(minLength: 0)
+
             Rectangle()
                 .fill(ATHLTHTrainDesign.rule.opacity(0.45))
                 .frame(height: 0.7)
@@ -130,9 +133,6 @@ struct HomeDailyRecommendationCard: View {
                 )
             )
 
-            // Remaining space belongs beneath the suggested workout, never
-            // between the assessment and the dividing line.
-            Spacer(minLength: 0)
         }
         .padding(compact ? 9 : 11)
         .frame(maxWidth: .infinity, alignment: .topLeading)
