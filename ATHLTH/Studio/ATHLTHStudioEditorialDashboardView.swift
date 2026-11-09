@@ -1,6 +1,20 @@
 import SwiftUI
 import Charts
 
+/// Keep seven existing calendar cards fully visible on wide iPads and allow
+/// horizontal scrolling only in compact Stage Manager windows.
+enum ATHLTHStudioWeekTileLayout {
+    static func tileWidth(
+        viewport: CGFloat,
+        accessibilityText: Bool
+    ) -> CGFloat {
+        let usable = min(max(0, viewport), 1500)
+        let outerInset: CGFloat =
+            usable >= 730 && !accessibilityText ? 44 : 28
+        return max(88, (usable - outerInset - 40 - 6 * 8) / 7)
+    }
+}
+
 /// iPad-only Studio home, inspired by the approved airy ATHLTH Studio reference.
 /// The content is sourced from existing local session and Health stores; no
 /// demonstration values, artificial readiness scores or implicit completions.
@@ -410,12 +424,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
         let activeDay = week.days.first {
             Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
         } ?? week.days.first
-        // Total: outer content padding + week card inset + six gaps.
-        // Fit exactly at full iPad widths, scroll only on compact windows.
-        let contentInset: CGFloat =
-            width >= 730 && !dynamicTypeSize.isAccessibilitySize ? 44 : 28
-        let usableWidth = width - contentInset - 40 - 6 * 8
-        let tileWidth = max(88, usableWidth / 7)
+        let tileWidth = ATHLTHStudioWeekTileLayout.tileWidth(
+            viewport: width,
+            accessibilityText: dynamicTypeSize.isAccessibilitySize
+        )
 
         return VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 10) {
