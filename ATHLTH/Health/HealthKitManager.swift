@@ -6501,11 +6501,14 @@ final class HealthKitManager: ObservableObject {
     ) async throws -> RecoveryReadinessSummary {
         let calendar = Calendar.current
         let baselineEnd = calendar.startOfDay(for: Date())
+        // A five-day paired baseline should not fail simply because one
+        // HealthKit signal is sparse in the last two weeks. Use the recent
+        // 28-day history, excluding the incomplete current calendar day.
         let baselineStart = calendar.date(
             byAdding: .day,
-            value: -14,
+            value: -28,
             to: baselineEnd
-        ) ?? baselineEnd.addingTimeInterval(-1_209_600)
+        ) ?? baselineEnd.addingTimeInterval(-28 * 86_400)
 
         async let sleepDaysTask = sleepDurationsByWakeDay(
             startDate: baselineStart,
@@ -6524,16 +6527,40 @@ final class HealthKitManager: ObservableObject {
             endDate: baselineEnd
         )
 
-        let sleepDays = (try? await sleepDaysTask) ?? [:]
-        let hrvDays = (try? await hrvDaysTask) ?? [:]
-        let restingDays = (try? await restingDaysTask) ?? [:]
+        // Do not silently turn a failed HealthKit query into "no history".
+        // Show which signal could not be fetched without exposing samples.
+        var failedSignals: [RecoveryReadinessSignal] = []
+        let sleepDays: [Date: Double]
+        let hrvDays: [Date: Double]
+        let restingDays: [Date: Double]
+
+        do {
+            sleepDays = try await sleepDaysTask
+        } catch {
+            sleepDays = [:]
+            failedSignals.append(.sleep)
+        }
+        do {
+            hrvDays = try await hrvDaysTask
+        } catch {
+            hrvDays = [:]
+            failedSignals.append(.hrv)
+        }
+        do {
+            restingDays = try await restingDaysTask
+        } catch {
+            restingDays = [:]
+            failedSignals.append(.restingHeartRate)
+        }
 
         return RecoveryReadinessEngine.evaluate(
             currentSleep: currentSleep,
             currentHeart: currentHeart,
             sleepDays: sleepDays,
             hrvDays: hrvDays,
-            restingHeartRateDays: restingDays
+            restingHeartRateDays: restingDays,
+            lookbackDays: 28,
+            failedSignals: failedSignals
         )
     }
 
