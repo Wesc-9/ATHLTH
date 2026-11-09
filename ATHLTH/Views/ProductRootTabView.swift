@@ -13484,10 +13484,12 @@ struct ATHLTHProfileView: View {
     var body: some View {
         ATHLTHPinnedHeroLayout(
             accent: ATHLTHTrainDesign.gold.opacity(0.16),
-            // Match the Home transition, including its warm surface and
-            // seamless fade from the hero into the scrolling content.
+            // Reuse the Home fade and warm canvas. Disable the bright
+            // sheet outline while keeping the same modest 8 pt overlap.
+            softTransition: true,
             pullDownFadeBridge: true,
-            warmHomePalette: true
+            warmHomePalette: true,
+            sheetOverlapOverride: 8
         ) {
             profileHero
         } content: {
