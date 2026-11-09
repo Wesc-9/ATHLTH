@@ -67,6 +67,23 @@ enum ATHLTHExerciseMuscleFilterPresentation {
         ["Back", "Triceps", "Glutes", "Hamstrings", "Calves"]
             .contains(part)
     }
+
+    static func emphasizedMuscles(for part: String) -> [String] {
+        part == "Legs" ? ["Quads", "Hamstrings", "Calves"] : [part]
+    }
+
+    static func icon(for part: String) -> String {
+        switch part {
+        case "Back": return "figure.rower"
+        case "Chest": return "figure.strengthtraining.traditional"
+        case "Shoulders": return "figure.boxing"
+        case "Biceps", "Triceps", "Forearms": return "dumbbell"
+        case "Core": return "figure.core.training"
+        case "Glutes": return "figure.squat"
+        case "Quads", "Hamstrings", "Legs", "Calves": return "figure.walk"
+        default: return "figure.strengthtraining.traditional"
+        }
+    }
 }
 
 struct ExerciseLibraryView: View {
@@ -611,7 +628,14 @@ struct ExerciseLibraryView: View {
             }
         }
         .sheet(isPresented: $showingCreateExercise) {
-            CustomExerciseEditorView()
+            CustomExerciseEditorView(onSaved: { _ in
+                selectedSection = .mine
+                selectedBodyPart = "All"
+                selectedEquipment = "All"
+                favoritesOnly = false
+                query = ""
+                queryInput = ""
+            })
                 .environmentObject(library)
                 .environmentObject(session)
         }
@@ -1186,7 +1210,9 @@ struct ExerciseLibraryView: View {
                     // figures rather than ambiguous generic sports icons.
                     ATHLTHPremiumMuscleFigure(
                         profile: ExerciseMuscleProfileFactory.profile(
-                            primary: [value], secondary: []
+                            primary: ATHLTHExerciseMuscleFilterPresentation
+                                .emphasizedMuscles(for: value),
+                            secondary: []
                         ),
                         isFront: !ATHLTHExerciseMuscleFilterPresentation.isBackMuscle(value),
                         activationTint: selected
@@ -2373,7 +2399,9 @@ struct CustomExerciseEditorView: View {
 
                     Menu {
                         ForEach(
-                            ExerciseMuscleGroup.allCases
+                            ExerciseMuscleGroup.allCases.sorted {
+                                $0.title.localizedStandardCompare($1.title) == .orderedAscending
+                            }
                         ) { group in
                             Button {
                                 togglePrimary(group)
@@ -2384,7 +2412,7 @@ struct CustomExerciseEditorView: View {
                                         primaryMuscles
                                             .contains(group)
                                             ? "checkmark.circle.fill"
-                                            : "circle"
+                                            : ATHLTHExerciseMuscleFilterPresentation.icon(for: group.rawValue)
                                 )
                             }
                         }
@@ -2434,7 +2462,9 @@ struct CustomExerciseEditorView: View {
 
                     Menu {
                         ForEach(
-                            ExerciseMuscleGroup.allCases
+                            ExerciseMuscleGroup.allCases.sorted {
+                                $0.title.localizedStandardCompare($1.title) == .orderedAscending
+                            }
                         ) { group in
                             Button {
                                 toggleSecondary(group)
@@ -2445,7 +2475,7 @@ struct CustomExerciseEditorView: View {
                                         secondaryMuscles
                                             .contains(group)
                                             ? "checkmark.circle.fill"
-                                            : "circle"
+                                            : ATHLTHExerciseMuscleFilterPresentation.icon(for: group.rawValue)
                                 )
                             }
                             .disabled(
