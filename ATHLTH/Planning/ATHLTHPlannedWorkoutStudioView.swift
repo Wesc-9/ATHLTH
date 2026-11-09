@@ -43,8 +43,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     }
     @State private var dragPoint: CGPoint = .zero
     @State private var dragFingerOffsetY: CGFloat = 0
-    @State private var rowFrames: [UUID: CGRect] = [:]
-    @State private var phaseFrames: [WorkoutPhaseKind: CGRect] = [:]
+    @State private var dragGeometry = ATHLTHStudioDragGeometry()
 
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
@@ -239,7 +238,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         .overlay(alignment: .topLeading) {
             if let draggingID,
                let block = blocks.first(where: { $0.editorDragID == draggingID }),
-               let frame = rowFrames[draggingID] {
+               let frame = dragGeometry.rowFrames[draggingID] {
                 ATHLTHPlannedWorkoutStepRow(
                     block: block,
                     position: (entries(in: presentationPhase(for: block))
@@ -422,7 +421,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         .onGeometryChange(for: CGRect.self) { geometry in
             geometry.frame(in: .named("athlthWorkoutStudio"))
         } action: { _, frame in
-            if phaseFrames[phase] != frame { phaseFrames[phase] = frame }
+            if dragGeometry.phaseFrames[phase] != frame { dragGeometry.phaseFrames[phase] = frame }
         }
     }
 
@@ -583,8 +582,8 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         .onGeometryChange(for: CGRect.self) { geometry in
             geometry.frame(in: .named("athlthWorkoutStudio"))
         } action: { _, frame in
-            if rowFrames[block.editorDragID] != frame {
-                rowFrames[block.editorDragID] = frame
+            if dragGeometry.rowFrames[block.editorDragID] != frame {
+                dragGeometry.rowFrames[block.editorDragID] = frame
             }
         }
         .opacity(draggingID == block.editorDragID ? 0.13 : 1)
@@ -593,7 +592,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     private func liveReorder(_ id: UUID, finger: CGPoint) {
         guard let item = blocks.first(where: { $0.editorDragID == id }) else { return }
         if draggingID == nil {
-            guard let startFrame = rowFrames[id] else { return }
+            guard let startFrame = dragGeometry.rowFrames[id] else { return }
             dragFingerOffsetY = finger.y - startFrame.midY
             draggingID = id
         }
@@ -605,7 +604,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         // Moving across sections uses the same authoritative move callback
         // as the workout editor. Empty phases are also valid destinations.
         if let destination = phases.first(where: { phase in
-            guard let frame = phaseFrames[phase] else { return false }
+            guard let frame = dragGeometry.phaseFrames[phase] else { return false }
             return centerY >= frame.minY + 10 && centerY <= frame.maxY - 10
         }), destination != currentPhase {
             withAnimation(.interactiveSpring(response: 0.24, dampingFraction: 0.86)) {
@@ -628,7 +627,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         if currentIndex + 1 < rows.count {
             let below = rows.dropFirst(currentIndex + 1)
             if let crossed = below.last(where: { other in
-                guard let frame = rowFrames[other.editorDragID] else {
+                guard let frame = dragGeometry.rowFrames[other.editorDragID] else {
                     return false
                 }
                 return centerY >= frame.midY
@@ -643,7 +642,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         if currentIndex > 0 {
             let above = rows.prefix(currentIndex)
             if let crossed = above.first(where: { other in
-                guard let frame = rowFrames[other.editorDragID] else {
+                guard let frame = dragGeometry.rowFrames[other.editorDragID] else {
                     return false
                 }
                 return centerY <= frame.midY
