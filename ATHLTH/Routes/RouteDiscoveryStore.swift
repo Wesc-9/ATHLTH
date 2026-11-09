@@ -354,7 +354,26 @@ final class RouteDiscoveryStore: ObservableObject {
             return
         }
 
-        guard !isLoadingNearby else { return }
+        if isLoadingNearby {
+            // A tab switch can cancel one view task while the next starts.
+            // Do not discard the new tab's initial request as a duplicate.
+            for _ in 0..<80 {
+                guard !Task.isCancelled else { return }
+                guard isLoadingNearby else { break }
+                do {
+                    try await Task.sleep(for: .milliseconds(250))
+                } catch { return }
+            }
+            guard !isLoadingNearby, !Task.isCancelled else { return }
+            if !force,
+               !localRoutes.isEmpty,
+               let lastNearbyRefreshAt,
+               let lastNearbyCenter,
+               Date().timeIntervalSince(lastNearbyRefreshAt) < 180,
+               location.distance(from: lastNearbyCenter) < 1_500 {
+                return
+            }
+        }
         isLoadingNearby = true
         defer { isLoadingNearby = false }
 
