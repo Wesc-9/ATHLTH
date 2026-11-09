@@ -427,7 +427,7 @@ struct ATHLTHiPadStudioRootView: View {
                 VStack(spacing: 7) {
                     ForEach(ATHLTHStudioDestination.allCases) { destination in
                         Button {
-                            selection = destination
+                            openStudio(destination)
                         } label: {
                             Image(systemName: destination.symbol)
                                 .font(.system(size: 18, weight: selection == destination
@@ -527,10 +527,7 @@ struct ATHLTHiPadStudioRootView: View {
                         ATHLTHLocalization.choose(english: "Home", norwegian: "Hjem"),
                         symbol: "house",
                         selected: selection == .overview && libraryPage == nil
-                    ) {
-                        libraryPage = nil
-                        selection = .overview
-                    }
+                    ) { openStudio(.overview) }
 
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Inbox", norwegian: "Innboks"),
@@ -542,13 +539,13 @@ struct ATHLTHiPadStudioRootView: View {
                     }
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Notifications", norwegian: "Varsler"),
-                        symbol: "bell"
+                        symbol: "bell",
                         selected: sidebarPage == .notifications
                     ) { openSidebarPage(.notifications) }
 
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Search", norwegian: "Søk"),
-                        symbol: "magnifyingglass"
+                        symbol: "magnifyingglass",
                         selected: sidebarPage == .search
                     ) { openSidebarPage(.search) }
 
@@ -557,13 +554,13 @@ struct ATHLTHiPadStudioRootView: View {
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Plan Studio", norwegian: "Plan Studio"),
                         symbol: "calendar"
-                    ) { selection = .planner }
+                    ) { openStudio(.planner) }
 
                     trainingLibraryShortcut
 
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Train Together", norwegian: "Tren sammen"),
-                        symbol: "person.2"
+                        symbol: "person.2",
                         selected: sidebarPage == .trainTogether
                     ) { openSidebarPage(.trainTogether) }
 
@@ -581,7 +578,7 @@ struct ATHLTHiPadStudioRootView: View {
 
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Clubs", norwegian: "Klubber"),
-                        symbol: "person.3"
+                        symbol: "person.3",
                         selected: sidebarPage == .clubs
                     ) { openSidebarPage(.clubs) }
 
@@ -591,11 +588,11 @@ struct ATHLTHiPadStudioRootView: View {
                         ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremgang"),
                         symbol: "chart.xyaxis.line",
                         selected: selection == .insights
-                    ) { selection = .insights }
+                    ) { openStudio(.insights) }
 
                     sidebarAction("ATHLTH Coach", symbol: "sparkles",
                                   selected: selection == .coach) {
-                        selection = .coach
+                        openStudio(.coach)
                     }
 
                     sidebarAction(
@@ -605,19 +602,19 @@ struct ATHLTHiPadStudioRootView: View {
 
                     Menu {
                         Button {
-                            selection = .history
+                            openStudio(.history)
                         } label: {
                             Label(ATHLTHStudioDestination.history.label,
                                   systemImage: "clock.arrow.circlepath")
                         }
                         Button {
-                            selection = .explore
+                            openStudio(.explore)
                         } label: {
                             Label(ATHLTHStudioDestination.explore.label,
                                   systemImage: "map")
                         }
                         Button {
-                            selection = .community
+                            openStudio(.community)
                         } label: {
                             Label(ATHLTHStudioDestination.community.label,
                                   systemImage: "person.3")
@@ -654,7 +651,7 @@ struct ATHLTHiPadStudioRootView: View {
                 ATHLTHLocalization.choose(english: "Settings", norwegian: "Innstillinger"),
                 symbol: "gearshape",
                 selected: selection == .settings
-            ) { selection = .settings }
+            ) { openStudio(.settings) }
                 .padding(.horizontal, 11)
                 .padding(.vertical, 12)
         }
@@ -873,10 +870,10 @@ struct ATHLTHiPadStudioRootView: View {
         case .overview:
             ATHLTHStudioEditorialDashboardView(
                 onInspect: inspect,
-                onOpenPlanner: { selection = .planner },
-                onOpenInsights: { selection = .insights },
-                onOpenHistory: { selection = .history },
-                onOpenSettings: { selection = .settings },
+                onOpenPlanner: { openStudio(.planner) },
+                onOpenInsights: { openStudio(.insights) },
+                onOpenHistory: { openStudio(.history) },
+                onOpenSettings: { openStudio(.settings) },
                 onOpenLibrary: {
                     openLibrary(.overview)
                 },
