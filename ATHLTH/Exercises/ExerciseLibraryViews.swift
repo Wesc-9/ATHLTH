@@ -446,7 +446,7 @@ struct ExerciseLibraryView: View {
                 ScrollViewReader { proxy in
                     ScrollView {
                         LazyVGrid(
-                            columns: ATHLTHLibraryGridColumns.make(
+                            columns: ATHLTHLibraryResponsiveLayout.columns(
                                 mode: displayMode,
                                 width: libraryViewWidth,
                                 reservedHorizontalSpace: 50,
