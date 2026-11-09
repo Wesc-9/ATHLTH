@@ -409,6 +409,102 @@ final class RecoveryReadinessEngineTests:
         XCTAssertEqual(result.baselineDays, 7)
     }
 
+    func testReadinessShowsExactlyWhichDaysAndSignalsAreMissing() throws {
+        let now = Date()
+        let days = baselineDays(count: 5, endingAt: now)
+        let result = RecoveryReadinessEngine.evaluate(
+            currentSleep: SleepSummary(totalAsleep: 8 * 3_600, sleepEnd: now),
+            currentHeart: HeartSummary(
+                restingHeartRate: 55, restingHeartRateDate: now,
+                hrvMilliseconds: 60, hrvDate: now
+            ),
+            sleepDays: dictionary(days, value: 8 * 3_600),
+            hrvDays: dictionary(Array(days.dropFirst()), value: 60),
+            restingHeartRateDays: dictionary(days, value: 55),
+            now: now
+        )
+
+        let diagnostic = try XCTUnwrap(result.diagnostics)
+        XCTAssertNil(result.score)
+        XCTAssertEqual(diagnostic.completeDays, 4)
+        XCTAssertEqual(diagnostic.requiredDays, 5)
+        XCTAssertEqual(diagnostic.sleepDays, 5)
+        XCTAssertEqual(diagnostic.hrvDays, 4)
+        XCTAssertEqual(diagnostic.restingHeartRateDays, 5)
+        XCTAssertEqual(diagnostic.lastSevenDays.first?.missingSignals, [.hrv])
+    }
+
+    func testStaleSignalDoesNotMaskCompleteBaseline() throws {
+        let now = Date()
+        let days = baselineDays(count: 6, endingAt: now)
+        let result = RecoveryReadinessEngine.evaluate(
+            currentSleep: SleepSummary(
+                totalAsleep: 8 * 3_600,
+                sleepEnd: now.addingTimeInterval(-49 * 3_600)
+            ),
+            currentHeart: HeartSummary(
+                restingHeartRate: 55, restingHeartRateDate: now,
+                hrvMilliseconds: 60, hrvDate: now
+            ),
+            sleepDays: dictionary(days, value: 8 * 3_600),
+            hrvDays: dictionary(days, value: 60),
+            restingHeartRateDays: dictionary(days, value: 55),
+            now: now
+        )
+
+        let diagnostic = try XCTUnwrap(result.diagnostics)
+        XCTAssertNil(result.score)
+        XCTAssertEqual(diagnostic.completeDays, 6)
+        XCTAssertEqual(diagnostic.missingRecentSignals, [.sleep])
+        XCTAssertTrue(result.detail.contains("48"))
+    }
+
+    func testHealthKitReadFailureIsNotMisreportedAsMissingBaseline() throws {
+        let now = Date()
+        let days = baselineDays(count: 7, endingAt: now)
+        let result = RecoveryReadinessEngine.evaluate(
+            currentSleep: SleepSummary(totalAsleep: 8 * 3_600, sleepEnd: now),
+            currentHeart: HeartSummary(
+                restingHeartRate: 55, restingHeartRateDate: now,
+                hrvMilliseconds: 60, hrvDate: now
+            ),
+            sleepDays: dictionary(days, value: 8 * 3_600),
+            hrvDays: dictionary(days, value: 60),
+            restingHeartRateDays: dictionary(days, value: 55),
+            now: now,
+            failedSignals: [.hrv]
+        )
+
+        XCTAssertNil(result.score)
+        let diagnostic = try XCTUnwrap(result.diagnostics)
+        XCTAssertEqual(diagnostic.completeDays, 7)
+        XCTAssertEqual(diagnostic.failedSignals, [.hrv])
+    }
+
+    func testHistoricalReadinessUsesTruePairedDaysNotIndependentCounts() throws {
+        let now = Date()
+        let days = baselineDays(count: 14, endingAt: now)
+        let result = RecoveryReadinessEngine.evaluate(
+            currentSleep: SleepSummary(totalAsleep: 8 * 3_600, sleepEnd: now),
+            currentHeart: HeartSummary(
+                restingHeartRate: 55, restingHeartRateDate: now,
+                hrvMilliseconds: 60, hrvDate: now
+            ),
+            sleepDays: dictionary(Array(days.prefix(7)), value: 8 * 3_600),
+            hrvDays: dictionary(Array(days.suffix(7)), value: 60),
+            restingHeartRateDays: dictionary(days, value: 55),
+            now: now,
+            lookbackDays: 28
+        )
+
+        XCTAssertNil(result.score)
+        let diagnostic = try XCTUnwrap(result.diagnostics)
+        XCTAssertEqual(diagnostic.sleepDays, 7)
+        XCTAssertEqual(diagnostic.hrvDays, 7)
+        XCTAssertEqual(diagnostic.completeDays, 0)
+        XCTAssertEqual(diagnostic.lookbackDays, 28)
+    }
+
     private func baselineDays(
         count: Int,
         endingAt date: Date
