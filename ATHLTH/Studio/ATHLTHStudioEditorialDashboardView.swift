@@ -27,7 +27,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     let onOpenCoach: () -> Void
     @Binding var focusedPlanningDate: Date?
 
-    @State private var selectedDate = Date.now
+    @Binding var selectedDate: Date
     @State private var periodDays = 28
     @State private var showingReadinessExplanation = false
     @State private var remoteStrengthStatus: ATHLTHPrivateLiveStrengthSnapshot?
@@ -68,6 +68,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
     private var nextWorkout: ATHLTHStudioSchedule.Occurrence? {
         upcoming.first { item in
+            guard ATHLTHStudioSchedule.isUpcoming(item) else { return false }
             guard let planID = item.planID else { return true }
             return !session.isPlanSessionSkipped(planID: planID, sessionID: item.workout.id)
                 && !completed(item)
@@ -120,37 +121,34 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             )
                         }
 
-                        if split {
+                        // Preserve the approved warm-white Studio appearance.
+                        // The week calendar keeps the entire content width.
+                        if threeColumns {
                             HStack(alignment: .top, spacing: 15) {
                                 planCard
                                     .frame(maxWidth: .infinity)
                                 nextWorkoutCard
-                                    .frame(width: max(280, width * 0.30))
+                                    .frame(width: max(260, width * 0.26))
+                                compactReadinessCard
+                                    .frame(width: max(220, width * 0.22))
                             }
+                        } else if split {
+                            HStack(alignment: .top, spacing: 15) {
+                                planCard.frame(maxWidth: .infinity)
+                                nextWorkoutCard.frame(width: max(270, width * 0.31))
+                            }
+                            compactReadinessCard
                         } else {
                             planCard
                             nextWorkoutCard
+                            compactReadinessCard
                         }
 
                         weekCard(calendarWeek, width: width)
 
-                        if threeColumns {
-                            HStack(alignment: .top, spacing: 15) {
-                                progressCard.frame(maxWidth: .infinity)
-                                signalsCard.frame(maxWidth: .infinity)
-                                coachCard.frame(maxWidth: .infinity)
-                            }
-                        } else if split {
-                            HStack(alignment: .top, spacing: 15) {
-                                progressCard.frame(maxWidth: .infinity)
-                                signalsCard.frame(maxWidth: .infinity)
-                            }
-                            coachCard
-                        } else {
-                            progressCard
-                            signalsCard
-                            coachCard
-                        }
+                        // Coach is permanently available in the iPad toolbar,
+                        // so avoid a duplicate, oversized recommendation card.
+                        progressCard
                     }
                     .padding(.horizontal, split ? 22 : 14)
                     .padding(.vertical, 17)
@@ -402,7 +400,12 @@ struct ATHLTHStudioEditorialDashboardView: View {
         let activeDay = week.days.first {
             Calendar.current.isDate($0.date, inSameDayAs: selectedDate)
         } ?? week.days.first
-        let tileWidth = max(88, (width - 92) / 7)
+        // Total: outer content padding + week card inset + six gaps.
+        // Fit exactly at full iPad widths, scroll only on compact windows.
+        let contentInset: CGFloat =
+            width >= 730 && !dynamicTypeSize.isAccessibilitySize ? 44 : 28
+        let usableWidth = width - contentInset - 40 - 6 * 8
+        let tileWidth = max(88, usableWidth / 7)
 
         return VStack(alignment: .leading, spacing: 15) {
             HStack(spacing: 10) {
@@ -466,13 +469,30 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .accessibilityIdentifier("athlth-ipad-weekly-overview")
     }
 
-    private func dayTile(_ day: ATHLTHStudioHomeWeek.Day,
-                         selected: Bool) -> some View {
+    private func dayTile(
+        _ day: ATHLTHStudioHomeWeek.Day,
+        selected: Bool
+    ) -> some View {
         let planned = day.planned.first
         let firstRecorded = day.recorded.first
         let isToday = Calendar.current.isDateInToday(day.date)
-        let isRest = planned?.workout.isExplicitRestDay == true
+        let isRest = planned == nil && !day.restDays.isEmpty
         let isPlanCompleted = planned.map(completed) == true
+        let pluralWorkoutLabel = tr(
+            "\(day.planned.count) workouts",
+            "\(day.planned.count) økter"
+        )
+        let shortLabel: String =
+            day.planned.count > 1 ? pluralWorkoutLabel :
+            planned?.workout.title ??
+            (isRest ? tr("Rest day", "Hviledag") :
+             firstRecorded?.activity.rawValue.capitalized ??
+             tr("No workout", "Ingen økt"))
+        let iconName: String =
+            (isPlanCompleted || (planned == nil && firstRecorded != nil))
+                ? "checkmark.circle.fill"
+                : planned?.workout.kind.systemImage ??
+                  (isRest ? "moon.zzz" : "minus")
 
         return Button {
             selectedDate = day.date
@@ -492,24 +512,21 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .font(.title3.weight(.semibold))
                     .monospacedDigit()
                 Spacer(minLength: 0)
-                Image(systemName: isPlanCompleted ||
-                      (planned == nil && firstRecorded != nil)
-                    ? "checkmark.circle.fill"
-                    : planned == nil ? "minus"
-                    : isRest ? "moon.zzz" : planned!.workout.kind.systemImage)
+                Image(systemName: iconName)
                     .font(.system(size: 21))
                     .frame(height: 26)
-                Text(planned == nil
-                     ? (firstRecorded?.activity.rawValue.capitalized
-                        ?? tr("No workout", "Ingen økt"))
-                     : isRest ? tr("Rest", "Hvile") : planned!.workout.title)
+                Text(shortLabel)
                     .font(.caption.weight(.medium))
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .frame(height: 32, alignment: .top)
-                if let item = planned,
-                   !isRest,
-                   let minutes = item.workout.durationMinutes {
+                if day.planned.count > 1 {
+                    Text("\(day.recorded.count) " +
+                         tr("recorded", "registrert"))
+                        .font(.caption2)
+                        .opacity(0.8)
+                } else if let item = planned,
+                          let minutes = item.workout.durationMinutes {
                     Text("\(minutes) min")
                         .font(.caption)
                         .opacity(0.8)
@@ -523,7 +540,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
             .foregroundStyle(selected ? Color.white : ink)
             .padding(11)
-            .frame(maxWidth: .infinity, minHeight: 153, alignment: .topLeading)
+            .frame(maxWidth: .infinity,
+                   minHeight: dynamicTypeSize.isAccessibilitySize ? 178 : 153,
+                   alignment: .topLeading)
             .background(
                 selected ? ink : cream,
                 in: RoundedRectangle(cornerRadius: 12)
@@ -533,15 +552,16 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .buttonStyle(.plain)
         .accessibilityLabel(
             day.date.formatted(date: .complete, time: .omitted) + ", " +
-            (planned?.workout.title ?? firstRecorded?.activity.rawValue ??
-                tr("No planned or recorded workout", "Ingen planlagt eller registrert økt"))
+            shortLabel
         )
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityHint(tr(
             "Show this day's workouts in the right sidebar",
             "Vis dagens økter i høyre sidepanel"
         ))
-        .accessibilityIdentifier("athlth-ipad-week-day-\(Calendar.current.startOfDay(for: day.date).timeIntervalSince1970)")
+        .accessibilityIdentifier(
+            "athlth-ipad-week-day-\(Calendar.current.startOfDay(for: day.date).timeIntervalSince1970)"
+        )
     }
 
     private func shiftWeek(_ offset: Int) {
@@ -768,6 +788,113 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .frame(maxWidth: .infinity, minHeight: 260, alignment: .leading)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+    }
+
+    private var compactReadinessCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(tr("Today's readiness", "Dagens form"))
+                    .font(.system(size: 21, weight: .medium, design: .serif))
+                    .foregroundStyle(ink)
+                Spacer(minLength: 6)
+                Image(systemName: "waveform.path.ecg")
+                    .foregroundStyle(bronze)
+                    .font(.subheadline)
+            }
+            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil {
+                ProgressView(tr("Updating", "Oppdaterer"))
+                    .font(.caption)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if hasHealth, let score = health.recovery.score {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text("\(score)")
+                        .font(.system(size: 36, weight: .semibold, design: .rounded))
+                        .monospacedDigit()
+                        .foregroundStyle(ink)
+                    Text(readinessTitle)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            } else if hasHealth, let diagnostics = health.recovery.diagnostics {
+                Text(tr("Building your baseline", "Kartlegger dagsform"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ink)
+                Text("\(diagnostics.completeDays)/\(diagnostics.requiredDays) " +
+                     tr("complete days", "komplette dager"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                Text(tr(
+                    "Apple Health data unavailable",
+                    "Helsedata er ikke tilgjengelige"
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+
+            Divider().overlay(outline)
+            Text(tr("TRAINING SIGNALS", "TRENINGSSIGNALER"))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.1)
+                .foregroundStyle(bronze)
+
+            VStack(alignment: .leading, spacing: 7) {
+                compactMetric(
+                    title: tr("Sleep", "Søvn"),
+                    value: hasHealth && health.sleep.totalAsleep > 0
+                        ? String(format: "%.1f t", health.sleep.totalAsleep / 3_600)
+                        : "—"
+                )
+                compactMetric(
+                    title: "HRV",
+                    value: hasHealth ? health.heart.hrvMilliseconds.map {
+                        String(format: "%.0f ms", $0)
+                    } ?? "—" : "—"
+                )
+                compactMetric(
+                    title: tr("Resting HR", "Hvilepuls"),
+                    value: hasHealth ? health.heart.restingHeartRate.map {
+                        String(format: "%.0f bpm", $0)
+                    } ?? "—" : "—"
+                )
+            }
+            Spacer(minLength: 0)
+            Button {
+                if hasHealth {
+                    showingReadinessExplanation = true
+                } else {
+                    onOpenSettings()
+                }
+            } label: {
+                Label(tr("Details", "Detaljer"),
+                      systemImage: "arrow.up.right")
+                    .font(.caption.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(bronze)
+            .frame(minHeight: 40)
+        }
+        .padding(19)
+        .frame(maxWidth: .infinity, minHeight: 230, alignment: .topLeading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+        .accessibilityIdentifier("athlth-ipad-readiness-compact")
+    }
+
+    private func compactMetric(title: String, value: String) -> some View {
+        HStack(spacing: 7) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 4)
+            Text(value)
+                .font(.caption.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+        }
     }
 
     private var readinessTitle: String {
