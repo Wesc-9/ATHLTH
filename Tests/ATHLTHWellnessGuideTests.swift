@@ -4,10 +4,10 @@ import XCTest
 final class ATHLTHWellnessGuideTests: XCTestCase {
     func testOfflineCatalogHasBreathingAndStretchingInstructions() {
         let guides = ATHLTHWellnessGuide.all
-        XCTAssertEqual(guides.count, 9)
+        XCTAssertGreaterThanOrEqual(guides.count, 25)
         XCTAssertEqual(Set(guides.map(\.id)).count, guides.count)
         XCTAssertEqual(guides.filter { $0.category == .zen }.count, 3)
-        XCTAssertEqual(guides.filter { $0.category == .stretching }.count, 6)
+        XCTAssertGreaterThanOrEqual(guides.filter { $0.category == .stretching }.count, 22)
         XCTAssertTrue(guides.allSatisfy {
             $0.seconds > 0 && !$0.title.isEmpty && !$0.instructions.isEmpty
         })
