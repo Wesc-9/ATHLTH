@@ -110,7 +110,7 @@ enum ATHLTHLibraryResponsiveLayout {
         let usable = max(0, width - reservedHorizontalSpace)
         if mode == .list {
             // Two readable list columns instead of one enormous landscape row.
-            let threshold: CGFloat = accessibilityText ? 1450 : 1050
+            let threshold: CGFloat = accessibilityText ? 1450 : 900
             let count = usable >= threshold ? 2 : 1
             return (0..<count).map { _ in GridItem(.flexible(), spacing: spacing) }
         }
