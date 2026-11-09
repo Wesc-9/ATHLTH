@@ -4,7 +4,12 @@ import SwiftUI
 /// by the existing record catalogue and picker.
 struct ATHLTHProfileRecordShelf<Content: View>: View {
     let destination: AnyView
-    @ViewBuilder let content: Content
+    let content: Content
+
+    init(destination: AnyView, @ViewBuilder content: () -> Content) {
+        self.destination = destination
+        self.content = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
