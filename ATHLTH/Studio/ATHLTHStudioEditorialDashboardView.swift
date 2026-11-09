@@ -513,6 +513,22 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
             .frame(minHeight: 44)
             .padding(.top, 2)
+            if !hasHealth {
+                Button(action: onOpenSettings) {
+                    Label(
+                        tr(
+                            "Apple Health is not connected. Planned workouts remain visible.",
+                            "Apple Health er ikke tilkoblet. Planlagte økter vises fortsatt."
+                        ),
+                        systemImage: "info.circle"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-ipad-health-source-status")
+            }
         }
         .padding(20)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
@@ -599,9 +615,19 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .lineLimit(2)
                     .multilineTextAlignment(.center)
                     .frame(height: 32, alignment: .top)
-                if day.planned.count > 1 {
-                    Text("\(day.recorded.count) " +
-                         tr("recorded", "registrert"))
+                if planned != nil && !day.recorded.isEmpty {
+                    Label(
+                        "\(day.recorded.count) " + tr("recorded", "registrert"),
+                        systemImage: "checkmark.circle"
+                    )
+                    .font(.caption2)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                    .opacity(0.85)
+                } else if day.planned.count > 1 {
+                    Text("\(day.planned.reduce(0) {
+                        $0 + max(0, $1.workout.durationMinutes ?? 0)
+                    }) min")
                         .font(.caption2)
                         .opacity(0.8)
                 } else if let item = planned,
