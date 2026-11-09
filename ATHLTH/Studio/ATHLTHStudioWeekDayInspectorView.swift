@@ -54,13 +54,43 @@ struct ATHLTHStudioWeekDayInspectorView: View {
                 dateHeading
 
                 if let selectedDay {
-                    if selectedDay.planned.isEmpty && selectedDay.recorded.isEmpty {
+                    if selectedDay.planned.isEmpty &&
+                        selectedDay.recorded.isEmpty &&
+                        selectedDay.restDays.isEmpty {
                         emptyDay
                     } else {
                         if !selectedDay.planned.isEmpty {
                             sectionTitle(tr("Planned workouts", "Planlagte økter"))
                             ForEach(selectedDay.planned) { item in
                                 plannedCard(item)
+                            }
+                        }
+
+                        if !selectedDay.restDays.isEmpty {
+                            sectionTitle(tr("Rest days", "Hviledager"))
+                            ForEach(selectedDay.restDays) { item in
+                                HStack(spacing: 12) {
+                                    Image(systemName: "moon.zzz")
+                                        .font(.title3)
+                                        .foregroundStyle(gold)
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(item.workout.title.isEmpty
+                                            ? tr("Rest day", "Hviledag")
+                                            : item.workout.title)
+                                            .font(.headline)
+                                            .foregroundStyle(ink)
+                                        if let name = item.planTitle {
+                                            Text(name)
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                    Spacer()
+                                }
+                                .padding(15)
+                                .background(.white, in:
+                                    RoundedRectangle(cornerRadius: 15)
+                                )
                             }
                         }
 
@@ -73,6 +103,7 @@ struct ATHLTHStudioWeekDayInspectorView: View {
                     }
 
                     if selectedDay.planned.isEmpty &&
+                        selectedDay.restDays.isEmpty &&
                         HomeWeeklyProgressCalendar.canScheduleStandalone(on: date) {
                         Button {
                             onPlanWorkout(Calendar.current.startOfDay(for: date))
