@@ -43,14 +43,14 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var selection: ATHLTHStudioDestination = .overview
     @State private var selectedWorkout: WorkoutSummary?
     @State private var inspectedWeekDate: Date?
+    @State private var showingWorkoutDetail = false
     @State private var selectedHomeWeekDate: Date = .now
     /// Side-menu libraries live in the Studio detail column.
     @State private var libraryPage: ATHLTHStudioLibraryPage?
     /// Reset pushed detail cards when switching sidebar destinations.
     @State private var detailNavigationPath = NavigationPath()
+    /// The iPad inspector is exclusively for Inbox; workouts use a sheet.
     @State private var showingInspector = false
-    @State private var inspectorShowsCoach = false
-    @State private var inspectorShowsInbox = false
     @State private var showingProfile = false
     /// Secondary Studio tools also replace the detail column, not modal sheets.
     @State private var sidebarPage: ATHLTHSideMenuDestination?
@@ -127,23 +127,11 @@ struct ATHLTHiPadStudioRootView: View {
                         // NavigationSplitView supplies the native sidebar
                         // visibility control. Do not draw a second identical
                         // leading button in the detail NavigationStack.
-                        ToolbarItemGroup(placement: .topBarTrailing) {
+                        ToolbarItem(placement: .topBarTrailing) {
                             Button {
-                                let closing = showingInspector && inspectorShowsCoach
-                                inspectorShowsCoach = true
-                                inspectorShowsInbox = false
-                                showingInspector = !closing
-                            } label: {
-                                Label("ATHLTH Coach", systemImage: "sparkles")
-                            }
-                            .help("ATHLTH Coach")
-                            .accessibilityIdentifier("athlth-ipad-coach-panel")
-
-                            Button {
-                                let closing = showingInspector && inspectorShowsInbox
-                                inspectorShowsCoach = false
-                                inspectorShowsInbox = true
-                                showingInspector = !closing
+                                withAnimation(.easeInOut(duration: 0.2)) {
+                                    showingInspector.toggle()
+                                }
                             } label: {
                                 Label(
                                     ATHLTHLocalization.choose(
@@ -153,111 +141,10 @@ struct ATHLTHiPadStudioRootView: View {
                                 )
                             }
                             .help(ATHLTHLocalization.choose(
-                                english: "Open messages alongside your work",
-                                norwegian: "Åpne meldinger ved siden av arbeidet"
+                                english: "Open or close Inbox",
+                                norwegian: "Åpne eller lukk innboksen"
                             ))
                             .accessibilityIdentifier("athlth-ipad-inbox-panel")
-
-                            Button {
-                                showingPlanSync = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Plan sync", norwegian: "Plansynkronisering"
-                                    ),
-                                    systemImage: !studioPlanSync.conflicts.isEmpty
-                                        ? "exclamationmark.icloud"
-                                        : studioPlanSync.enabled ? "checkmark.icloud" : "icloud.slash"
-                                )
-                            }
-                            .help(studioPlanSync.status)
-                            .accessibilityIdentifier("athlth-ipad-plan-sync")
-
-                            Button {
-                                showingPresentation = true
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Presentation mode",
-                                        norwegian: "Presentasjonsmodus"
-                                    ),
-                                    systemImage: "rectangle.on.rectangle"
-                                )
-                            }
-                            .help(ATHLTHLocalization.choose(
-                                english: "Show an aggregate, private-safe training overview",
-                                norwegian: "Vis en samlet treningsoversikt uten personlige detaljer"
-                            ))
-                            .accessibilityIdentifier("athlth-ipad-presentation-button")
-
-                            Menu {
-                                Button {
-                                    openStudio(.overview)
-                                } label: { Label(ATHLTHStudioDestination.overview.label,
-                                                 systemImage: "square.grid.2x2") }
-                                    .keyboardShortcut("1", modifiers: [.command])
-                                Button {
-                                    openStudio(.planner)
-                                } label: { Label(ATHLTHStudioDestination.planner.label,
-                                                 systemImage: "calendar") }
-                                    .keyboardShortcut("2", modifiers: [.command])
-                                Button {
-                                    openStudio(.insights)
-                                } label: { Label(ATHLTHStudioDestination.insights.label,
-                                                 systemImage: "chart.xyaxis.line") }
-                                    .keyboardShortcut("3", modifiers: [.command])
-                                Button {
-                                    openStudio(.history)
-                                } label: { Label(ATHLTHStudioDestination.history.label,
-                                                 systemImage: "clock.arrow.circlepath") }
-                                    .keyboardShortcut("4", modifiers: [.command])
-                                Button {
-                                    openStudio(.explore)
-                                } label: { Label(ATHLTHStudioDestination.explore.label,
-                                                 systemImage: "map") }
-                                    .keyboardShortcut("5", modifiers: [.command])
-                                Button {
-                                    openStudio(.community)
-                                } label: { Label(ATHLTHStudioDestination.community.label,
-                                                 systemImage: "person.3") }
-                                    .keyboardShortcut("6", modifiers: [.command])
-                                Button {
-                                    openStudio(.coach)
-                                } label: { Label(ATHLTHStudioDestination.coach.label,
-                                                 systemImage: "sparkles") }
-                                    .keyboardShortcut("7", modifiers: [.command])
-                                Button {
-                                    openStudio(.settings)
-                                } label: { Label(ATHLTHStudioDestination.settings.label,
-                                                 systemImage: "gearshape") }
-                                    .keyboardShortcut("8", modifiers: [.command])
-                                Divider()
-                                Button {
-                                    trainRequest = .customQuick
-                                    showingTrain = true
-                                } label: {
-                                    Label(
-                                        ATHLTHLocalization.choose(
-                                            english: "New quick workout",
-                                            norwegian: "Ny hurtigøkt"
-                                        ),
-                                        systemImage: "plus"
-                                    )
-                                }
-                                .keyboardShortcut("n", modifiers: [.command, .shift])
-                            } label: {
-                                Label(
-                                    ATHLTHLocalization.choose(
-                                        english: "Studio shortcuts",
-                                        norwegian: "Studio-hurtigtaster"
-                                    ),
-                                    systemImage: "keyboard"
-                                )
-                            }
-                            .help(ATHLTHLocalization.choose(
-                                english: "Navigate with Command 1–8",
-                                norwegian: "Naviger med Kommando 1–8"
-                            ))
                         }
                     }
             }
@@ -333,7 +220,7 @@ struct ATHLTHiPadStudioRootView: View {
             sidebarPage = nil
             detailNavigationPath = NavigationPath()
             savedDestination = destination.rawValue
-            // Keep Coach and Inbox docked while navigating Studio.
+            // Inbox stays docked until the user closes it; Coach is a page.
             if destination != .overview { focusedPlanningDate = nil }
             withAnimation(.easeInOut(duration: 0.18)) {
                 sidebarVisibility = destination == .planner
@@ -341,12 +228,11 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .onChange(of: selectedHomeWeekDate) { _, date in
-            // Moving the week while the day inspector is visible must move
-            // the inspector too: no stale dates from the previous week.
-            if inspectedWeekDate != nil, showingInspector,
-               !inspectorShowsCoach, !inspectorShowsInbox {
+            // Keep the selected day accurate if the week changes while
+            // its dedicated detail sheet is displayed.
+            if inspectedWeekDate != nil && showingWorkoutDetail &&
+                selectedWorkout == nil {
                 inspectedWeekDate = Calendar.current.startOfDay(for: date)
-                selectedWorkout = nil
             }
         }
         .onChange(of: focusedPlanningDate) { _, newDate in
@@ -361,71 +247,84 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .inspector(isPresented: $showingInspector) {
-            if inspectorShowsCoach {
-                VStack(spacing: 0) {
-                    inspectorCollapseButton
-                    RecoveryCoachInboxDestinationView()
-                        // The first presentation must be laid out at the
-                        // inspector's width, not the outer iPad window width.
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Inbox is the only destination allowed in the right inspector.
+            VStack(spacing: 0) {
+                inspectorCollapseButton
+                NavigationStack {
+                    MessageInboxDestinationView()
                 }
-                .inspectorColumnWidth(min: 320, ideal: 390, max: 480)
-            } else if inspectorShowsInbox {
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+            .inspectorColumnWidth(min: 320, ideal: 390, max: 480)
+        }
+        .sheet(isPresented: $showingWorkoutDetail, onDismiss: {
+            inspectedWeekDate = nil
+            selectedWorkout = nil
+        }) {
+            // Week days and recorded workouts remain accessible without
+            // occupying the Inbox-only right panel.
+            NavigationStack {
                 VStack(spacing: 0) {
-                    inspectorCollapseButton
-                    NavigationStack {
-                        MessageInboxDestinationView()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .inspectorColumnWidth(min: 320, ideal: 390, max: 480)
-            } else if let selectedWorkout {
-                VStack(spacing: 0) {
-                    inspectorCollapseButton
-                    if let inspectedWeekDate {
+                    HStack {
+                        if selectedWorkout != nil && inspectedWeekDate != nil {
+                            Button {
+                                selectedWorkout = nil
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "Back to selected day",
+                                        norwegian: "Tilbake til valgt dag"
+                                    ),
+                                    systemImage: "chevron.left"
+                                )
+                            }
+                            .buttonStyle(.plain)
+                            .foregroundStyle(ink)
+                        }
+                        Spacer(minLength: 0)
                         Button {
-                            self.selectedWorkout = nil
+                            showingWorkoutDetail = false
                         } label: {
                             Label(
                                 ATHLTHLocalization.choose(
-                                    english: "Back to selected day",
-                                    norwegian: "Tilbake til valgt dag"
+                                    english: "Close", norwegian: "Lukk"
                                 ),
-                                systemImage: "chevron.left"
+                                systemImage: "xmark"
                             )
-                            .font(.subheadline.weight(.medium))
-                            .frame(maxWidth: .infinity, minHeight: 44,
-                                   alignment: .leading)
                         }
                         .buttonStyle(.plain)
                         .foregroundStyle(ink)
-                        .padding(.horizontal, 17)
                     }
-                    ATHLTHStudioWorkoutInspectionView(workout: selectedWorkout)
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 12)
+
+                    Divider().opacity(0.35)
+
+                    if let selectedWorkout {
+                        ATHLTHStudioWorkoutInspectionView(workout: selectedWorkout)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    } else if let inspectedWeekDate {
+                        ATHLTHStudioWeekDayInspectorView(
+                            date: inspectedWeekDate,
+                            onOpenWorkout: { openWeekWorkout($0, start: false) },
+                            onStartWorkout: { openWeekWorkout($0, start: true) },
+                            onSendToWatch: sendWeekWorkoutToWatch,
+                            onInspectRecorded: inspectRecordedFromWeek,
+                            onPlanWorkout: planFromWeekDay
+                        )
+                        .id(Calendar.current.startOfDay(for: inspectedWeekDate))
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
                 }
-                .inspectorColumnWidth(min: 340, ideal: 430, max: 500)
-            } else if let inspectedWeekDate {
-                VStack(spacing: 0) {
-                    inspectorCollapseButton
-                    ATHLTHStudioWeekDayInspectorView(
-                        date: inspectedWeekDate,
-                        onOpenWorkout: { openWeekWorkout($0, start: false) },
-                        onStartWorkout: { openWeekWorkout($0, start: true) },
-                        onSendToWatch: sendWeekWorkoutToWatch,
-                        onInspectRecorded: inspectRecordedFromWeek,
-                        onPlanWorkout: planFromWeekDay
-                    )
-                    .id(Calendar.current.startOfDay(for: inspectedWeekDate))
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                .inspectorColumnWidth(min: 345, ideal: 435, max: 530)
+                .background(canvas.ignoresSafeArea())
             }
+            .presentationDetents([.large])
+            .presentationDragIndicator(.visible)
         }
     }
 
-    /// A small, explicit dismiss affordance for either docked conversation.
-    /// The existing toolbar Inbox/Coach buttons reopen the inspector.
+    /// The right inspector can be dismissed from here or the Inbox toolbar button.
     private var inspectorCollapseButton: some View {
         HStack {
             Spacer(minLength: 0)
@@ -436,7 +335,7 @@ struct ATHLTHiPadStudioRootView: View {
             } label: {
                 Label(
                     ATHLTHLocalization.choose(
-                        english: "Hide side panel", norwegian: "Skjul sidepanelet"
+                        english: "Close Inbox", norwegian: "Lukk innboks"
                     ),
                     systemImage: "chevron.right"
                 )
@@ -601,14 +500,6 @@ struct ATHLTHiPadStudioRootView: View {
                     ) { openStudio(.overview) }
 
                     sidebarAction(
-                        ATHLTHLocalization.choose(english: "Inbox", norwegian: "Innboks"),
-                        symbol: "envelope"
-                    ) {
-                        inspectorShowsCoach = false
-                        inspectorShowsInbox = true
-                        showingInspector = true
-                    }
-                    sidebarAction(
                         ATHLTHLocalization.choose(english: "Notifications", norwegian: "Varsler"),
                         symbol: "bell",
                         selected: sidebarPage == .notifications
@@ -693,6 +584,30 @@ struct ATHLTHiPadStudioRootView: View {
                         } label: {
                             Label(ATHLTHStudioDestination.community.label,
                                   systemImage: "person.3")
+                        }
+                        Divider()
+                        Button {
+                            showingPlanSync = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Plan sync", norwegian: "Plansynkronisering"
+                                ),
+                                systemImage: !studioPlanSync.conflicts.isEmpty
+                                    ? "exclamationmark.icloud"
+                                    : studioPlanSync.enabled ? "checkmark.icloud" : "icloud.slash"
+                            )
+                        }
+                        Button {
+                            showingPresentation = true
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Presentation mode",
+                                    norwegian: "Presentasjonsmodus"
+                                ),
+                                systemImage: "rectangle.on.rectangle"
+                            )
                         }
                         Button {
                             openSidebarPage(.exerciseProgress)
@@ -1027,11 +942,7 @@ struct ATHLTHiPadStudioRootView: View {
                     )
                     showingTrain = true
                 },
-                onOpenCoach: {
-                    inspectorShowsCoach = true
-                    inspectorShowsInbox = false
-                    showingInspector = true
-                }
+                onOpenCoach: { openStudio(.coach) }
             )
         case .insights:
             ATHLTHStudioInsightsView()
@@ -1049,31 +960,22 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func clearWeekInspectorIfNeeded() {
-        guard inspectedWeekDate != nil else { return }
+        guard inspectedWeekDate != nil || showingWorkoutDetail else { return }
+        showingWorkoutDetail = false
         inspectedWeekDate = nil
         selectedWorkout = nil
-        if !inspectorShowsCoach && !inspectorShowsInbox {
-            showingInspector = false
-        }
     }
 
     private func showWeekDay(_ date: Date) {
         selectedHomeWeekDate = date
         selectedWorkout = nil
         inspectedWeekDate = Calendar.current.startOfDay(for: date)
-        inspectorShowsCoach = false
-        inspectorShowsInbox = false
-        withAnimation(.easeInOut(duration: 0.20)) {
-            showingInspector = true
-        }
+        showingWorkoutDetail = true
     }
 
     private func inspectRecordedFromWeek(_ workout: WorkoutSummary) {
-        // Preserve the selected date so the back button returns to that day.
+        // The detail sheet remains open; back returns to the selected day.
         selectedWorkout = workout
-        inspectorShowsCoach = false
-        inspectorShowsInbox = false
-        showingInspector = true
     }
 
     private func openWeekWorkout(
@@ -1088,9 +990,10 @@ struct ATHLTHiPadStudioRootView: View {
                 : .workout(
                     planID: planID, workoutID: item.workout.id
                 )
+            showingWorkoutDetail = false
             showingTrain = true
         } else {
-            // Standalone sessions use their existing detail/editor workflow.
+            showingWorkoutDetail = false
             selectedStandaloneWorkout = item.workout
         }
     }
@@ -1102,21 +1005,18 @@ struct ATHLTHiPadStudioRootView: View {
         trainRequest = .sendPlannedWorkoutToWatch(
             planID: planID, workoutID: item.workout.id
         )
+        showingWorkoutDetail = false
         showingTrain = true
     }
 
     private func planFromWeekDay(_ date: Date) {
-        withAnimation(.easeInOut(duration: 0.18)) {
-            showingInspector = false
-        }
+        showingWorkoutDetail = false
         focusedPlanningDate = Calendar.current.startOfDay(for: date)
     }
 
     private func inspect(_ workout: WorkoutSummary) {
         inspectedWeekDate = nil
         selectedWorkout = workout
-        inspectorShowsCoach = false
-        inspectorShowsInbox = false
-        showingInspector = true
+        showingWorkoutDetail = true
     }
 }
