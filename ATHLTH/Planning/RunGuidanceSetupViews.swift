@@ -896,13 +896,13 @@ struct PerWorkoutGhostView: View {
                                             .focused($paceFieldFocused)
                                             .onSubmit {
                                                 draft.finalizeTargetPaceText(
-                                                    distanceKilometers: route?.distanceKilometers
+                                                    distanceKilometers: route.distanceKilometers
                                                 )
                                             }
                                             .onChange(of: paceFieldFocused) { _, focused in
                                                 if !focused {
                                                     draft.finalizeTargetPaceText(
-                                                        distanceKilometers: route?.distanceKilometers
+                                                        distanceKilometers: route.distanceKilometers
                                                     )
                                                 }
                                             }
