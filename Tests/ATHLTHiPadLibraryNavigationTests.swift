@@ -1,8 +1,8 @@
 import XCTest
 @testable import ATHLTH
 
-@MainActor
 final class ATHLTHiPadLibraryNavigationTests: XCTestCase {
+    @MainActor
     func testEachSidebarCollectionMapsToItsCanonicalFullSizeLibrary() {
         XCTAssertEqual(
             ATHLTHPersonalLibrarySection.exercises.studioLibraryPage,
@@ -22,6 +22,7 @@ final class ATHLTHiPadLibraryNavigationTests: XCTestCase {
         )
     }
 
+    @MainActor
     func testLibraryPagesAreDistinctAndAccessibleFromStudio() {
         XCTAssertEqual(ATHLTHStudioLibraryPage.allCases.count, 5)
         XCTAssertEqual(
@@ -35,6 +36,7 @@ final class ATHLTHiPadLibraryNavigationTests: XCTestCase {
         }
     }
 
+    @MainActor
     func testLibraryPageOrderStartsWithUnifiedHub() {
         XCTAssertEqual(ATHLTHStudioLibraryPage.allCases.first, .overview)
         XCTAssertTrue(ATHLTHStudioLibraryPage.allCases.contains(.exercises))
