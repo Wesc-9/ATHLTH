@@ -139,8 +139,11 @@ struct TrainingLibraryHomeView: View {
             await favorites.refresh()
         }
         .sheet(isPresented: $showingRecoveryRestPlanner) {
-            ATHLTHRecoveryRestPlanningSheet()
-                .presentationDetents([.large])
+            // Keep the original library button and change only its destination.
+            NavigationStack {
+                ATHLTHRecoveryWellnessLibraryView()
+            }
+            .presentationDetents([.large])
         }
     }
 
