@@ -79,6 +79,19 @@ enum ATHLTHStudioLibraryPage: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+extension ATHLTHPersonalLibrarySection {
+    /// Keep old deep-link identifiers intact while routing iPad taps to the
+    /// canonical combined categories in Studio's detail area.
+    var studioLibraryPage: ATHLTHStudioLibraryPage {
+        switch self {
+        case .exercises: .exercises
+        case .routes: .routes
+        case .trainingPlans: .trainingPlans
+        case .workouts: .workouts
+        }
+    }
+}
+
 /// A responsive iPad library workspace in the main NavigationSplitView
 /// detail column. The hub uses wide cards; individual categories use the
 /// existing list/grid navigation and adapt to the actual detail-column width.
