@@ -11,6 +11,21 @@ enum ATHLTHStudioSchedule {
         let planID: UUID?
     }
 
+    /// Untimed planned days remain actionable through their calendar day;
+    /// explicit start times must never be presented as a future workout once
+    /// their scheduled time has passed.
+    static func isUpcoming(
+        _ item: Occurrence,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> Bool {
+        if let explicitStart = item.workout.scheduledStart {
+            return explicitStart >= now
+        }
+        return calendar.startOfDay(for: item.date) >=
+            calendar.startOfDay(for: now)
+    }
+
     static func upcoming(
         plans: [TrainingPlan],
         standalone: [PlannedSession],
@@ -40,14 +55,16 @@ enum ATHLTHStudioSchedule {
         deactivatedPlanIDs: Set<UUID> = [],
         startDate: Date,
         days: Int,
-        calendar: Calendar = .current
+        calendar: Calendar = .current,
+        includeRestDays: Bool = false
     ) -> [Occurrence] {
         let start = calendar.startOfDay(for: startDate)
         let end = calendar.date(byAdding: .day, value: max(1, min(days, 90)), to: start) ?? start
         var entries: [Occurrence] = []
         var identifiers: Set<String> = []
         func append(_ item: PlannedSession, date: Date, planID: UUID?, planTitle: String?) {
-            guard !item.isExplicitRestDay, date >= start, date < end else { return }
+            guard (includeRestDays || !item.isExplicitRestDay),
+                  date >= start, date < end else { return }
             let key = "\(planID?.uuidString ?? "standalone"):\(item.id.uuidString)"
             guard identifiers.insert(key).inserted else { return }
             entries.append(Occurrence(id: key, workout: item, date: date, planTitle: planTitle, planID: planID))
