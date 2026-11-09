@@ -38,8 +38,11 @@ struct ATHLTHStudioWeekDayInspectorView: View {
         ATHLTHStudioHomeWeek.make(
             plans: session.trainingPlans,
             standalone: session.standalonePlannedSessions,
-            recorded: health.healthDataAvailable &&
-                health.hasRequestedAuthorization ? health.workouts : [],
+            recorded: ATHLTHStudioRecordedWorkouts.merged(
+                health: health.healthDataAvailable &&
+                    health.hasRequestedAuthorization ? health.workouts : [],
+                localStrength: strength.workoutHistory
+            ),
             pausedPlanIDs: session.pausedTrainingPlanIDs,
             deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
             now: date
