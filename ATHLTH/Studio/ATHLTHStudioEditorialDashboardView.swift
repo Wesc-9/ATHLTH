@@ -15,6 +15,16 @@ enum ATHLTHStudioWeekTileLayout {
     }
 }
 
+/// No day is complete just because its first planned workout is done.
+enum ATHLTHStudioDayCompletionPolicy {
+    static func allPlannedCompleted<Item>(
+        _ items: [Item],
+        isCompleted: (Item) -> Bool
+    ) -> Bool {
+        !items.isEmpty && items.allSatisfy(isCompleted)
+    }
+}
+
 /// iPad-only Studio home, inspired by the approved airy ATHLTH Studio reference.
 /// The content is sourced from existing local session and Health stores; no
 /// demonstration values, artificial readiness scores or implicit completions.
@@ -570,8 +580,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
         let isToday = Calendar.current.isDateInToday(day.date)
         let isRest = planned == nil && !day.restDays.isEmpty
         // All planned sessions must complete before the day gets a check.
-        let isPlanCompleted = !day.planned.isEmpty &&
-            day.planned.allSatisfy(completed)
+        let isPlanCompleted = ATHLTHStudioDayCompletionPolicy
+            .allPlannedCompleted(day.planned, isCompleted: completed)
         let pluralWorkoutLabel = tr(
             "\(day.planned.count) workouts",
             "\(day.planned.count) økter"
