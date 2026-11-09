@@ -1733,19 +1733,27 @@ struct AroundYouExploreView: View {
         some View {
         if (
             publicTrailDiscovery.isLoading ||
-            publicTrailDiscovery.isWarmingCache
+            publicTrailDiscovery.isWarmingCache ||
+            routeDiscovery.isLoadingNearby ||
+            routeDiscovery.isLoading
            ) &&
            publicTrailDiscovery.trails.isEmpty {
             HStack(spacing: 8) {
                 ProgressView()
                     .controlSize(.small)
 
-                Text(
-                    publicTrailDiscovery
-                        .isWarmingCache
-                        ? "Finding public trails nearby…"
-                        : "Loading public trails…"
-                )
+                Text(ATHLTHLocalization.choose(
+                    english: routeDiscovery.isLoadingNearby
+                        ? "Loading nearby routes…"
+                        : publicTrailDiscovery.isWarmingCache
+                            ? "Finding public trails nearby…"
+                            : "Loading public trails…",
+                    norwegian: routeDiscovery.isLoadingNearby
+                        ? "Henter ruter i nærheten…"
+                        : publicTrailDiscovery.isWarmingCache
+                            ? "Finner turstier i nærheten…"
+                            : "Henter turstier…"
+                ))
                 .font(.caption)
                 .foregroundStyle(
                     ATHLTHTheme.primaryText
