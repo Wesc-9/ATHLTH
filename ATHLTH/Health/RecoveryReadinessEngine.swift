@@ -7,7 +7,9 @@ enum RecoveryReadinessEngine {
         sleepDays: [Date: Double],
         hrvDays: [Date: Double],
         restingHeartRateDays: [Date: Double],
-        now: Date = Date()
+        now: Date = Date(),
+        lookbackDays: Int = 28,
+        failedSignals: [RecoveryReadinessSignal] = []
     ) -> RecoveryReadinessSummary {
         let commonDays =
             Set(sleepDays.keys)
@@ -35,6 +37,30 @@ enum RecoveryReadinessEngine {
                 }
         let baselineDays =
             commonDays.count
+
+        func usableCount(_ values: [Date: Double]) -> Int {
+            values.values.filter { $0.isFinite && $0 > 0 }.count
+        }
+
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: now)
+        let days: [RecoveryReadinessDayCoverage] = (1...7).compactMap { offset in
+            guard let day = calendar.date(byAdding: .day, value: -offset, to: today)
+            else { return nil }
+            var available: [RecoveryReadinessSignal] = []
+            if let value = sleepDays[day], value.isFinite, value > 0 {
+                available.append(.sleep)
+            }
+            if let value = hrvDays[day], value.isFinite, value > 0 {
+                available.append(.hrv)
+            }
+            if let value = restingHeartRateDays[day], value.isFinite, value > 0 {
+                available.append(.restingHeartRate)
+            }
+            return RecoveryReadinessDayCoverage(
+                date: day, availableSignals: available
+            )
+        }
 
         let averageSleep =
             average(
@@ -72,7 +98,32 @@ enum RecoveryReadinessEngine {
                     now.timeIntervalSince($0)
                 }
 
-        guard baselineDays >= 5,
+        let diagnostics = RecoveryReadinessDiagnostics(
+            lookbackDays: lookbackDays,
+            requiredDays: 5,
+            sleepDays: usableCount(sleepDays),
+            hrvDays: usableCount(hrvDays),
+            restingHeartRateDays: usableCount(restingHeartRateDays),
+            completeDays: baselineDays,
+            recentSleep: currentSleep.totalAsleep.isFinite &&
+                currentSleep.totalAsleep > 0 &&
+                sleepAge.map { $0 >= 0 && $0 <= recentWindow } == true,
+            recentHRV: currentHeart.hrvMilliseconds.map {
+                $0.isFinite && $0 > 0
+            } == true && hrvAge.map {
+                $0 >= 0 && $0 <= recentWindow
+            } == true,
+            recentRestingHeartRate: currentHeart.restingHeartRate.map {
+                $0.isFinite && $0 > 0
+            } == true && restingAge.map {
+                $0 >= 0 && $0 <= recentWindow
+            } == true,
+            failedSignals: failedSignals,
+            lastSevenDays: days
+        )
+
+        guard failedSignals.isEmpty,
+              baselineDays >= 5,
               currentSleep.totalAsleep.isFinite,
               currentSleep.totalAsleep > 0,
               let sleepAge,
@@ -102,22 +153,15 @@ enum RecoveryReadinessEngine {
             return RecoveryReadinessSummary(
                 score: nil,
                 state: .buildingBaseline,
-                detail:
-                    baselineDays >= 5
-                        ? ATHLTHLocalization.choose(
-                            english: "Recent sleep, HRV or resting heart rate is missing, invalid or outside the last 48 hours. Update Apple Health data to calculate readiness.",
-                            norwegian: "Søvn, HRV eller hvilepuls mangler, er ugyldig eller er utenfor de siste 48 timene. Oppdater Apple Health-data for å beregne dagsform."
-                        )
-                        : baselineDays > 0
-                        ? "ATHLTH has \(baselineDays) usable baseline day\(baselineDays == 1 ? "" : "s"). At least 5 days with sleep, HRV and resting heart rate are needed."
-                        : "ATHLTH is learning your recent sleep, HRV and resting heart-rate baseline.",
+                detail: missingDataDetail(diagnostics),
                 baselineDays: baselineDays,
                 averageSleepDuration:
                     averageSleep,
                 baselineHRVMilliseconds:
                     averageHRV,
                 baselineRestingHeartRate:
-                    averageRestingHeartRate
+                    averageRestingHeartRate,
+                diagnostics: diagnostics
             )
         }
 
@@ -179,15 +223,41 @@ enum RecoveryReadinessEngine {
         return RecoveryReadinessSummary(
             score: score,
             state: state,
-            detail:
-                "Based on last night's sleep and your most recent HRV/resting heart rate compared with your recent baseline.",
+            detail: ATHLTHLocalization.choose(
+                english: "Based on your recent sleep, HRV and resting heart rate compared with your personal baseline.",
+                norwegian: "Basert på søvn, HRV og hvilepuls sammenlignet med din personlige normal."
+            ),
             baselineDays: baselineDays,
             averageSleepDuration:
                 averageSleep,
             baselineHRVMilliseconds:
                 averageHRV,
             baselineRestingHeartRate:
-                averageRestingHeartRate
+                averageRestingHeartRate,
+            diagnostics: diagnostics
+        )
+    }
+
+    private static func missingDataDetail(
+        _ diagnostic: RecoveryReadinessDiagnostics
+    ) -> String {
+        if !diagnostic.failedSignals.isEmpty {
+            let names = diagnostic.failedSignals.map(\.title).joined(separator: ", ")
+            return ATHLTHLocalization.choose(
+                english: "Could not read Apple Health history for: \(names). Refresh or check Health access.",
+                norwegian: "Kunne ikke lese historikk fra Apple Helse for: \(names). Oppdater eller kontroller Helse-tilgangen."
+            )
+        }
+        if diagnostic.completeDays < diagnostic.requiredDays {
+            return ATHLTHLocalization.choose(
+                english: "\(diagnostic.completeDays) of \(diagnostic.requiredDays) complete days in the last \(diagnostic.lookbackDays) days. Sleep, HRV and resting heart rate must be recorded on the same days.",
+                norwegian: "\(diagnostic.completeDays) av \(diagnostic.requiredDays) komplette dager de siste \(diagnostic.lookbackDays) dagene. Søvn, HRV og hvilepuls må være registrert på de samme dagene."
+            )
+        }
+        let names = diagnostic.missingRecentSignals.map(\.title).joined(separator: ", ")
+        return ATHLTHLocalization.choose(
+            english: "Needs a valid recent measurement (within 48 hours): \(names).",
+            norwegian: "Trenger gyldige målinger fra de siste 48 timene: \(names)."
         )
     }
 
