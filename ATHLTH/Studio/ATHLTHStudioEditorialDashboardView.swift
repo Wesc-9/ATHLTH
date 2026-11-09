@@ -42,6 +42,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
     @Binding var selectedDate: Date
     @State private var periodDays = 28
+    /// Auto-follow today unless the user explicitly browses a date.
+    @State private var followsToday = true
     @State private var showingReadinessExplanation = false
     @State private var remoteStrengthStatus: ATHLTHPrivateLiveStrengthSnapshot?
     @State private var remoteGhostStatus: ATHLTHPrivateGhostSpectatorSnapshot?
@@ -166,9 +168,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
                         weekCard(calendarWeek, width: width)
 
-                        // Coach is permanently available in the iPad toolbar,
-                        // so avoid a duplicate, oversized recommendation card.
-                        progressCard
+                        // Coach already lives in the toolbar. Prioritize
+                        // factual progress rather than repeated advice.
+                        progressCard(wide: split)
                     }
                     .padding(.horizontal, split ? 22 : 14)
                     .padding(.vertical, 17)
@@ -219,9 +221,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active,
-               focusedPlanningDate == nil,
-               abs(selectedDate.timeIntervalSinceNow) < 86_400 {
+            if phase == .active, followsToday, focusedPlanningDate == nil {
+                selectedDate = .now
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(
+            for: .NSCalendarDayChanged
+        )) { _ in
+            if followsToday, focusedPlanningDate == nil {
                 selectedDate = .now
             }
         }
@@ -396,7 +403,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(bronze)
+                .tint(ink)
                 .controlSize(.large)
                 .contextMenu { workoutActions(item) }
             } else {
@@ -447,7 +454,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     Image(systemName: "chevron.left").frame(width: 34, height: 34)
                 }
                 .accessibilityLabel(tr("Previous week", "Forrige uke"))
-                Button { selectedDate = .now } label: {
+                Button {
+                    followsToday = true
+                    selectedDate = .now
+                } label: {
                     Text(tr("Today", "I dag"))
                         .font(.subheadline.weight(.semibold))
                         .frame(minHeight: 44)
@@ -517,6 +527,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
             return tr("Select a day in the calendar",
                       "Velg en dag i kalenderen")
         }
+        if !day.planned.isEmpty && !day.recorded.isEmpty {
+            return "\(day.planned.count) " + tr("planned", "planlagt") +
+                " · \(day.recorded.count) " + tr("recorded", "registrert")
+        }
         if !day.planned.isEmpty {
             return "\(day.planned.count) " +
                 tr("planned workouts", "planlagte økter")
@@ -539,7 +553,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
         let firstRecorded = day.recorded.first
         let isToday = Calendar.current.isDateInToday(day.date)
         let isRest = planned == nil && !day.restDays.isEmpty
-        let isPlanCompleted = planned.map(completed) == true
+        // All planned sessions must complete before the day gets a check.
+        let isPlanCompleted = !day.planned.isEmpty &&
+            day.planned.allSatisfy(completed)
         let pluralWorkoutLabel = tr(
             "\(day.planned.count) workouts",
             "\(day.planned.count) økter"
@@ -557,6 +573,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                   (isRest ? "moon.zzz" : "minus")
 
         return Button {
+            followsToday = false
             selectedDate = day.date
             onSelectWeekDay(day.date)
         } label: {
@@ -627,6 +644,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
     }
 
     private func shiftWeek(_ offset: Int) {
+        followsToday = false
         selectedDate = ATHLTHStudioHomeWeek.shiftedWeek(
             from: selectedDate, offset: offset
         )
@@ -692,7 +710,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
     }
 
-    private var progressCard: some View {
+    private func progressCard(wide: Bool) -> some View {
         let data = ATHLTHStudioAnalytics.snapshot(
             from: recordedWorkouts,
             days: periodDays
