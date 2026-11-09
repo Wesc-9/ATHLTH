@@ -45,6 +45,13 @@ struct ATHLTHStudioEditorialDashboardView: View {
         health.healthDataAvailable && health.hasRequestedAuthorization
     }
 
+    private var recordedWorkouts: [WorkoutSummary] {
+        ATHLTHStudioRecordedWorkouts.merged(
+            health: hasHealth ? health.workouts : [],
+            localStrength: strength.workoutHistory
+        )
+    }
+
     private var program: TrainingPlan? {
         if let active = session.activePlan,
            !session.pausedTrainingPlanIDs.contains(active.id),
@@ -79,7 +86,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
         ATHLTHStudioHomeWeek.make(
             plans: session.trainingPlans,
             standalone: session.standalonePlannedSessions,
-            recorded: hasHealth ? health.workouts : [],
+            recorded: recordedWorkouts,
             pausedPlanIDs: session.pausedTrainingPlanIDs,
             deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
             now: selectedDate
@@ -162,10 +169,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
             guard ATHLTHDeviceRole.isIPad else { return }
             while !Task.isCancelled {
                 if session.signedIn, scenePhase == .active {
-                    remoteStrengthStatus =
+                    let account = session.profile.userID
+                    let fetched =
                         await ATHLTHPrivateLiveStrengthStatusStore.fetch(
-                            for: session.profile.userID
+                            for: account
                         )
+                    guard !Task.isCancelled,
+                          account == session.profile.userID else { return }
+                    remoteStrengthStatus = fetched
                 } else {
                     remoteStrengthStatus = nil
                 }
@@ -671,7 +682,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
     private var progressCard: some View {
         let data = ATHLTHStudioAnalytics.snapshot(
-            from: hasHealth ? health.workouts : [],
+            from: recordedWorkouts,
             days: periodDays
         )
         return VStack(alignment: .leading, spacing: 12) {
@@ -695,9 +706,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil {
+            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil &&
+               strength.workoutHistory.isEmpty {
                 ProgressView().frame(maxWidth: .infinity, minHeight: 125)
-            } else if hasHealth && data.sessions > 0 {
+            } else if data.sessions > 0 {
                 Text("\(data.sessions) " + tr("sessions", "økter") + "  ·  " +
                      String(format: "%.1f t", data.minutes / 60))
                     .font(.subheadline.weight(.semibold))
