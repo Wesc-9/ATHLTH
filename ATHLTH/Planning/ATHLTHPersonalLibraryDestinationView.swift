@@ -11,16 +11,16 @@ struct ATHLTHPersonalLibraryDestinationView: View {
     var body: some View {
         switch section {
         case .exercises:
-            ExerciseLibraryView(source: .mine)
+            ExerciseLibraryView(source: .library)
 
         case .routes:
-            RouteLibraryListView(source: .mine)
+            RouteLibraryListView(source: .database)
 
         case .trainingPlans:
-            MyTrainingPlansLibraryView(onOpenPlan: onOpenPlan)
+            ATHLTHUnifiedPlansLibraryView(onOpenPlan: onOpenPlan)
 
         case .workouts:
-            LibrarySavedWorkoutsHubView(onStartRunning: onStartRunning)
+            ATHLTHUnifiedWorkoutsLibraryView(onStartRunning: onStartRunning)
         }
     }
 }
