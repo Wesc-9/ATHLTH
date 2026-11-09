@@ -6518,13 +6518,15 @@ final class HealthKitManager: ObservableObject {
             identifier: .heartRateVariabilitySDNN,
             unit: .secondUnit(with: .milli),
             startDate: baselineStart,
-            endDate: baselineEnd
+            endDate: baselineEnd,
+            missingDayFallbackLimit: 10
         )
         async let restingDaysTask = dailyAverageQuantities(
             identifier: .restingHeartRate,
             unit: HKUnit.count().unitDivided(by: .minute()),
             startDate: baselineStart,
-            endDate: baselineEnd
+            endDate: baselineEnd,
+            missingDayFallbackLimit: 10
         )
 
         // Do not silently turn a failed HealthKit query into "no history".
@@ -6568,7 +6570,8 @@ final class HealthKitManager: ObservableObject {
         identifier: HKQuantityTypeIdentifier,
         unit: HKUnit,
         startDate: Date,
-        endDate: Date
+        endDate: Date,
+        missingDayFallbackLimit: Int = 4
     ) async throws -> [Date: Double] {
         guard startDate <= endDate,
               let type =
@@ -6717,8 +6720,12 @@ final class HealthKitManager: ObservableObject {
             cursor = next
         }
 
-        for day in
-            missingDays.suffix(4) {
+        // Readiness needs at least five paired days. A four-day fallback
+        // could never establish a baseline if iOS omitted every collection
+        // bucket. Other callers keep the smaller four-day default.
+        for day in missingDays.suffix(
+            max(0, min(missingDayFallbackLimit, 28))
+        ) {
             guard let dayEnd =
                     calendar.date(
                         byAdding: .day,
