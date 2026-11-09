@@ -551,7 +551,7 @@ final class ExerciseLibraryStore: ObservableObject {
 
     static func searchableNorwegianTerms(
         sourceIdentifier: String?,
-        englishName: String,
+        englishName: String = "",
         bodyPart: String?,
         primaryMuscles: [String]
     ) -> String {
