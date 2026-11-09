@@ -4859,6 +4859,15 @@ struct LibraryFavoritesView: View {
         WorkoutTemplateCatalogStore()
     @State private var selectedKind: LibraryFavoriteKind?
     @State private var ownExerciseFavoritesOnly = false
+    @State private var libraryWidth: CGFloat = 390
+
+    private var favoriteColumns: [GridItem] {
+        ATHLTHLibraryResponsiveLayout.columns(
+            mode: .list,
+            width: libraryWidth,
+            reservedHorizontalSpace: 36
+        )
+    }
 
     private var displayedFavorites: [LibraryFavoriteRecord] {
         let kindFiltered: [LibraryFavoriteRecord]
@@ -5015,7 +5024,7 @@ struct LibraryFavoritesView: View {
                         )
                     )
                 } else {
-                    LazyVStack(spacing: 10) {
+                    LazyVGrid(columns: favoriteColumns, spacing: 10) {
                         ForEach(displayedFavorites) { item in
                             HStack(spacing: 8) {
                                 NavigationLink {
@@ -5053,8 +5062,10 @@ struct LibraryFavoritesView: View {
                 }
             }
             .padding(18)
-            .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
+        }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
+            libraryWidth = $0
         }
         .background(
             ATHLTHPremiumCanvas(
