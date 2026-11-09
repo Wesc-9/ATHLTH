@@ -127,7 +127,9 @@ struct ExerciseLibraryView: View {
             let sourceMatches: Bool
             switch selectedSection {
             case .library:
-                sourceMatches = entry.source != .custom
+                // Unified library: ATHLTH, RepDB and owned exercises share
+                // the same catalog. Mine is an optional filter below.
+                sourceMatches = true
             case .mine:
                 sourceMatches = entry.source == .custom
             case .marketplace:
@@ -422,7 +424,8 @@ struct ExerciseLibraryView: View {
                         .font(.subheadline)
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                         .multilineTextAlignment(.center)
-                        if selectedBodyPart != "All" || selectedEquipment != "All" || !query.isEmpty {
+                        if selectedBodyPart != "All" || selectedEquipment != "All" ||
+                       !query.isEmpty || selectedSection == .mine || favoritesOnly {
                             Button(ATHLTHLocalization.choose(
                                 english: "Clear filters", norwegian: "Nullstill filtrene"
                             )) {
@@ -430,6 +433,8 @@ struct ExerciseLibraryView: View {
                                 selectedEquipment = "All"
                                 query = ""
                                 queryInput = ""
+                                selectedSection = .library
+                                favoritesOnly = false
                             }
                             .font(.subheadline.weight(.semibold))
                             .tint(ATHLTHPlanDesign.accent)
@@ -610,14 +615,17 @@ struct ExerciseLibraryView: View {
         .navigationTitle(selectionTitle ?? "Exercises")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            if selectedSection == .mine {
+            if onSelect == nil {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showingCreateExercise = true
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .accessibilityLabel("Create exercise")
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Create exercise", norwegian: "Opprett øvelse"
+                    ))
+                    .accessibilityIdentifier("exercise-library-create-button")
                 }
             }
         }
@@ -1036,7 +1044,10 @@ struct ExerciseLibraryView: View {
                         )
                         .id("All")
 
-                        ForEach(library.bodyParts, id: \.self) { part in
+                        ForEach(ATHLTHExerciseMuscleFilterPresentation.sorted(
+                            library.bodyParts,
+                            title: library.localizedBodyPartTitle
+                        ), id: \.self) { part in
                             muscleGroupChip(
                                 library.localizedBodyPartTitle(part),
                                 value: part
@@ -1095,6 +1106,31 @@ struct ExerciseLibraryView: View {
                         )
                     }
                     .buttonStyle(.plain)
+
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.18)) {
+                            selectedSection = selectedSection == .mine ? .library : .mine
+                        }
+                    } label: {
+                        HStack(spacing: 5) {
+                            Image(systemName: "person.crop.square")
+                            Text(ATHLTHLocalization.choose(
+                                english: "My exercises", norwegian: "Egne øvelser"
+                            ))
+                        }
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(selectedSection == .mine ? .white : .primary)
+                        .padding(.horizontal, 11)
+                        .frame(minHeight: 44)
+                        .background(
+                            selectedSection == .mine
+                                ? ATHLTHTheme.accentDeep
+                                : ATHLTHTheme.cardWarm.opacity(0.72),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("exercise-library-mine-filter")
                     }
 
                     Menu {
@@ -1129,7 +1165,8 @@ struct ExerciseLibraryView: View {
                         )
                     }
 
-                    if selectedBodyPart != "All" || selectedEquipment != "All" {
+                    if selectedBodyPart != "All" || selectedEquipment != "All" ||
+                       selectedSection == .mine || favoritesOnly {
                         Button(
                             ATHLTHLocalization.choose(
                                 english: "Clear",
@@ -1138,6 +1175,8 @@ struct ExerciseLibraryView: View {
                         ) {
                             selectedBodyPart = "All"
                             selectedEquipment = "All"
+                            selectedSection = .library
+                            favoritesOnly = false
                         }
                         .font(.caption.weight(.semibold))
                         .frame(minHeight: 44)
@@ -1157,8 +1196,27 @@ struct ExerciseLibraryView: View {
         return Button {
             selectedBodyPart = value
         } label: {
-            Text(title)
-                .font(.caption.weight(selected ? .semibold : .medium))
+            HStack(spacing: 6) {
+                if value == "All" {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 12, weight: .medium))
+                } else {
+                    // Reuse the application's existing vector muscle anatomy
+                    // figures rather than ambiguous generic sports icons.
+                    ATHLTHPremiumMuscleFigure(
+                        profile: ExerciseMuscleProfileFactory.profile(
+                            primary: [value], secondary: []
+                        ),
+                        isFront: true,
+                        activationTint: selected
+                            ? Color.white : ATHLTHPlanDesign.accent
+                    )
+                    .frame(width: 20, height: 27)
+                    .accessibilityHidden(true)
+                }
+                Text(title)
+                    .font(.caption.weight(selected ? .semibold : .medium))
+            }
                 .foregroundStyle(
                     selected ? Color.white : ATHLTHPlanDesign.ink
                 )
