@@ -1004,11 +1004,6 @@ struct ATHLTHiPadStudioRootView: View {
                     )
                     showingTrain = true
                 },
-                onOpenCoach: {
-                    inspectorShowsCoach = true
-                    inspectorShowsInbox = false
-                    showingInspector = true
-                },
                 focusedPlanningDate: $focusedPlanningDate,
                 selectedDate: $selectedHomeWeekDate
             )
