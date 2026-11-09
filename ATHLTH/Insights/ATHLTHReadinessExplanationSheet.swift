@@ -40,6 +40,9 @@ struct ATHLTHReadinessExplanationSheet: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     hero
+                    if let diagnostics = recovery.diagnostics {
+                        coverageCard(diagnostics)
+                    }
                     VStack(alignment: .leading, spacing: 10) {
                         Text(tr("What makes up your score",
                                 "Slik beregnes scoren"))
@@ -175,6 +178,165 @@ struct ATHLTHReadinessExplanationSheet: View {
         .padding(22)
         .frame(maxWidth: .infinity, alignment: .leading)
         .athlthInsightsSurface()
+    }
+
+    /// Show the exact reason a score is unavailable, without displaying
+    /// fabricated numbers or asking users to re-authorize all Health data.
+    private func coverageCard(
+        _ diagnostic: RecoveryReadinessDiagnostics
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(tr("Health data coverage", "Dekning av helsedata"))
+                    .font(.system(size: 21, weight: .regular, design: .serif))
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
+                Spacer(minLength: 8)
+                Text("\(diagnostic.completeDays)/\(diagnostic.requiredDays)")
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(ATHLTHInsightsStyle.accent)
+            }
+
+            Text(tr(
+                "Days with all three measurements in the last \(diagnostic.lookbackDays) days.",
+                "Dager med alle tre målinger de siste \(diagnostic.lookbackDays) dagene."
+            ))
+            .font(.caption)
+            .foregroundStyle(ATHLTHInsightsStyle.muted)
+
+            HStack(spacing: 8) {
+                coverageMetric(
+                    .sleep,
+                    count: diagnostic.sleepDays,
+                    window: diagnostic.lookbackDays,
+                    failed: diagnostic.failedSignals.contains(.sleep)
+                )
+                coverageMetric(
+                    .hrv,
+                    count: diagnostic.hrvDays,
+                    window: diagnostic.lookbackDays,
+                    failed: diagnostic.failedSignals.contains(.hrv)
+                )
+                coverageMetric(
+                    .restingHeartRate,
+                    count: diagnostic.restingHeartRateDays,
+                    window: diagnostic.lookbackDays,
+                    failed: diagnostic.failedSignals.contains(.restingHeartRate)
+                )
+            }
+
+            if recovery.score == nil {
+                Text(recovery.detail)
+                    .font(.subheadline)
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("athlth-readiness-missing-data-reason")
+            }
+
+            VStack(alignment: .leading, spacing: 9) {
+                Text(tr("Most recent measurements", "Nyeste målinger"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHInsightsStyle.ink)
+
+                recentSignalRow(.sleep, current: diagnostic.recentSleep)
+                recentSignalRow(.hrv, current: diagnostic.recentHRV)
+                recentSignalRow(
+                    .restingHeartRate,
+                    current: diagnostic.recentRestingHeartRate
+                )
+            }
+
+            if recovery.score == nil {
+                VStack(alignment: .leading, spacing: 9) {
+                    Text(tr("Last 7 completed days", "Siste 7 avsluttede dager"))
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(ATHLTHInsightsStyle.ink)
+
+                    ForEach(diagnostic.lastSevenDays, id: \.date) { day in
+                        HStack(alignment: .firstTextBaseline, spacing: 10) {
+                            Text(day.date.formatted(
+                                .dateTime.day().month(.abbreviated)
+                            ))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHInsightsStyle.ink)
+                            .frame(width: 60, alignment: .leading)
+
+                            Spacer(minLength: 8)
+
+                            Text(day.missingSignals.isEmpty
+                                 ? tr("Complete", "Komplett")
+                                 : tr("Missing: ", "Mangler: ") +
+                                   day.missingSignals.map(\.title)
+                                        .joined(separator: ", "))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHInsightsStyle.muted)
+                            .multilineTextAlignment(.trailing)
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+
+                Text(tr(
+                    "Pull down in Insights to refresh. A score appears automatically when at least five complete days and fresh measurements are available.",
+                    "Dra ned i Innsikt for å oppdatere. Dagsform beregnes automatisk når fem komplette dager og ferske målinger er tilgjengelige."
+                ))
+                .font(.caption)
+                .foregroundStyle(ATHLTHInsightsStyle.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(17)
+        .athlthInsightsSurface()
+        .accessibilityIdentifier("athlth-readiness-data-coverage")
+    }
+
+    private func coverageMetric(
+        _ signal: RecoveryReadinessSignal,
+        count: Int,
+        window: Int,
+        failed: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(signal.title)
+                .font(.caption2)
+                .foregroundStyle(ATHLTHInsightsStyle.muted)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+            Text(failed
+                 ? tr("Read error", "Lesefeil")
+                 : "\(count)/\(window)")
+                .font(.subheadline.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHInsightsStyle.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(
+            ATHLTHInsightsStyle.canvas,
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+    }
+
+    private func recentSignalRow(
+        _ signal: RecoveryReadinessSignal,
+        current: Bool
+    ) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: current ? "checkmark.circle" : "exclamationmark.circle")
+                .foregroundStyle(ATHLTHInsightsStyle.accent)
+                .accessibilityHidden(true)
+            Text(signal.title)
+                .font(.caption)
+                .foregroundStyle(ATHLTHInsightsStyle.ink)
+            Spacer(minLength: 8)
+            Text(current
+                 ? tr("Within 48 hours", "Innen 48 timer")
+                 : tr("Missing or older", "Mangler eller er eldre"))
+                .font(.caption)
+                .foregroundStyle(ATHLTHInsightsStyle.muted)
+        }
+        .accessibilityElement(children: .combine)
     }
 
     private var readinessTitle: String {
