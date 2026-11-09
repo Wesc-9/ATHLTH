@@ -49,6 +49,26 @@ enum ExerciseLibrarySection: String, CaseIterable, Identifiable {
     }
 }
 
+/// Alphabetical muscle order follows the app's language while "All"
+/// stays pinned in front of the list.
+enum ATHLTHExerciseMuscleFilterPresentation {
+    static func sorted(
+        _ parts: [String],
+        title: (String) -> String
+    ) -> [String] {
+        parts.sorted {
+            let comparison = title($0).localizedStandardCompare(title($1))
+            return comparison == .orderedSame
+                ? $0 < $1 : comparison == .orderedAscending
+        }
+    }
+
+    static func isBackMuscle(_ part: String) -> Bool {
+        ["Back", "Triceps", "Glutes", "Hamstrings", "Calves"]
+            .contains(part)
+    }
+}
+
 struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
@@ -1207,7 +1227,7 @@ struct ExerciseLibraryView: View {
                         profile: ExerciseMuscleProfileFactory.profile(
                             primary: [value], secondary: []
                         ),
-                        isFront: true,
+                        isFront: !ATHLTHExerciseMuscleFilterPresentation.isBackMuscle(value),
                         activationTint: selected
                             ? Color.white : ATHLTHPlanDesign.accent
                     )
