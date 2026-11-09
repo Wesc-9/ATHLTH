@@ -190,42 +190,42 @@ struct ATHLTHiPadStudioRootView: View {
 
                             Menu {
                                 Button {
-                                    selection = .overview
+                                    openStudio(.overview)
                                 } label: { Label(ATHLTHStudioDestination.overview.label,
                                                  systemImage: "square.grid.2x2") }
                                     .keyboardShortcut("1", modifiers: [.command])
                                 Button {
-                                    selection = .planner
+                                    openStudio(.planner)
                                 } label: { Label(ATHLTHStudioDestination.planner.label,
                                                  systemImage: "calendar") }
                                     .keyboardShortcut("2", modifiers: [.command])
                                 Button {
-                                    selection = .insights
+                                    openStudio(.insights)
                                 } label: { Label(ATHLTHStudioDestination.insights.label,
                                                  systemImage: "chart.xyaxis.line") }
                                     .keyboardShortcut("3", modifiers: [.command])
                                 Button {
-                                    selection = .history
+                                    openStudio(.history)
                                 } label: { Label(ATHLTHStudioDestination.history.label,
                                                  systemImage: "clock.arrow.circlepath") }
                                     .keyboardShortcut("4", modifiers: [.command])
                                 Button {
-                                    selection = .explore
+                                    openStudio(.explore)
                                 } label: { Label(ATHLTHStudioDestination.explore.label,
                                                  systemImage: "map") }
                                     .keyboardShortcut("5", modifiers: [.command])
                                 Button {
-                                    selection = .community
+                                    openStudio(.community)
                                 } label: { Label(ATHLTHStudioDestination.community.label,
                                                  systemImage: "person.3") }
                                     .keyboardShortcut("6", modifiers: [.command])
                                 Button {
-                                    selection = .coach
+                                    openStudio(.coach)
                                 } label: { Label(ATHLTHStudioDestination.coach.label,
                                                  systemImage: "sparkles") }
                                     .keyboardShortcut("7", modifiers: [.command])
                                 Button {
-                                    selection = .settings
+                                    openStudio(.settings)
                                 } label: { Label(ATHLTHStudioDestination.settings.label,
                                                  systemImage: "gearshape") }
                                     .keyboardShortcut("8", modifiers: [.command])
