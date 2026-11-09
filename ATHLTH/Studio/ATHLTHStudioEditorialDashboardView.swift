@@ -710,6 +710,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
     }
 
+    /// Keep progress on a single calm surface. On wide iPads the chart and
+    /// the selected week's totals share a row; on narrow windows they stack.
     private func progressCard(wide: Bool) -> some View {
         let data = ATHLTHStudioAnalytics.snapshot(
             from: recordedWorkouts,
@@ -730,16 +732,58 @@ struct ATHLTHStudioEditorialDashboardView: View {
                           systemImage: "chevron.down")
                         .font(.caption)
                 }
-                .tint(bronze)
+                .tint(ink)
             }
+
+            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil &&
+                strength.workoutHistory.isEmpty {
+                ProgressView(tr("Loading workouts", "Henter økter"))
+                    .frame(maxWidth: .infinity, minHeight: 92)
+            } else {
+                if wide {
+                    HStack(alignment: .center, spacing: 22) {
+                        historyChart(data)
+                            .frame(maxWidth: .infinity)
+                        Rectangle()
+                            .fill(outline.opacity(0.85))
+                            .frame(width: 1)
+                        weeklyActivitySummary
+                            .frame(width: 205, alignment: .leading)
+                    }
+                } else {
+                    historyChart(data)
+                    Rectangle()
+                        .fill(outline.opacity(0.75))
+                        .frame(height: 1)
+                    weeklyActivitySummary
+                }
+            }
+
+            Button(action: onOpenInsights) {
+                Label(tr("View progress", "Se fremgang"),
+                      systemImage: "arrow.up.right")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(bronze)
+            .frame(minHeight: 44, alignment: .leading)
+        }
+        .padding(19)
+        .frame(maxWidth: .infinity, minHeight: 225, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+        .accessibilityIdentifier("athlth-ipad-progress")
+    }
+
+    @ViewBuilder
+    private func historyChart(
+        _ data: ATHLTHStudioAnalytics.Snapshot
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 9) {
             Text(tr("Recorded training time", "Registrert treningstid"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
-
-            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil &&
-               strength.workoutHistory.isEmpty {
-                ProgressView().frame(maxWidth: .infinity, minHeight: 125)
-            } else if data.sessions > 0 {
+            if data.sessions > 0 {
                 Text("\(data.sessions) " + tr("sessions", "økter") + "  ·  " +
                      String(format: "%.1f t", data.minutes / 60))
                     .font(.subheadline.weight(.semibold))
@@ -750,8 +794,11 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         y: .value("Hours", day.minutes / 60)
                     )
                     .foregroundStyle(
-                        LinearGradient(colors: [bronze.opacity(0.19), bronze.opacity(0.01)],
-                                       startPoint: .top, endPoint: .bottom)
+                        LinearGradient(
+                            colors: [bronze.opacity(0.15), bronze.opacity(0.01)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
                     )
                     LineMark(
                         x: .value("Date", day.date),
@@ -763,34 +810,57 @@ struct ATHLTHStudioEditorialDashboardView: View {
                 .frame(height: 110)
                 .chartLegend(.hidden)
                 .accessibilityLabel(tr(
-                    "Daily recorded training hours", "Registrerte treningstimer per dag"
+                    "Daily recorded training hours",
+                    "Registrerte treningstimer per dag"
                 ))
             } else {
-                ContentUnavailableView(
-                    tr("No training data yet", "Ingen treningsdata ennå"),
-                    systemImage: "chart.xyaxis.line",
-                    description: Text(hasHealth
-                        ? tr("Workouts will appear here once recorded.",
-                             "Registrerte økter vises her.")
-                        : tr("Connect Apple Health to view progress.",
-                             "Koble til Apple Health for å se fremgang."))
+                Label(
+                    tr("No recorded workouts for this period",
+                       "Ingen registrerte økter i denne perioden"),
+                    systemImage: "chart.xyaxis.line"
                 )
-                .frame(maxWidth: .infinity, minHeight: 141)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, minHeight: 100,
+                       alignment: .leading)
             }
-            Spacer(minLength: 0)
-            Button(action: onOpenInsights) {
-                Label(tr("View progress", "Se fremgang"),
-                      systemImage: "arrow.up.right")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(bronze)
-            .frame(minHeight: 44, alignment: .leading)
         }
-        .padding(19)
-        .frame(maxWidth: .infinity, minHeight: 260, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+    }
+
+    private var weeklyActivitySummary: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            Text(tr("SELECTED WEEK", "VALGT UKE"))
+                .font(.system(size: 10, weight: .semibold))
+                .tracking(1.3)
+                .foregroundStyle(bronze)
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(calendarWeek.plannedCount)")
+                    .font(.system(size: 24, weight: .semibold, design: .rounded))
+                    .foregroundStyle(ink)
+                    .monospacedDigit()
+                Text(tr("planned workouts", "planlagte økter"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            HStack(alignment: .firstTextBaseline) {
+                Text("\(calendarWeek.recordedCount)")
+                    .font(.system(size: 24, weight: .semibold, design: .rounded))
+                    .foregroundStyle(ink)
+                    .monospacedDigit()
+                Text(tr("recorded workouts", "registrerte økter"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Text(tr(
+                "Recorded workouts do not automatically mark a plan complete.",
+                "Registrerte økter markerer ikke automatisk en plan som fullført."
+            ))
+            .font(.caption2)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityIdentifier("athlth-ipad-week-totals")
     }
 
     private var compactReadinessCard: some View {
