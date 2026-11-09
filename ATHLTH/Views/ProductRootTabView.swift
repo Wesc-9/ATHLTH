@@ -13483,14 +13483,11 @@ struct ATHLTHProfileView: View {
 
     var body: some View {
         ATHLTHPinnedHeroLayout(
-            accent:
-                ATHLTHTheme.premiumGold.opacity(0.34),
-            immersiveTransition: true,
-            // Keep the rounded profile sheet below the stat row with a short,
-            // restrained fade. This matches the cleaner reference transition
-            // instead of pulling a large white dome up over the hero.
-            sheetOverlapOverride: 0,
-            transitionFadeHeightOverride: 22
+            accent: ATHLTHTrainDesign.gold.opacity(0.16),
+            // Match the Home transition, including its warm surface and
+            // seamless fade from the hero into the scrolling content.
+            pullDownFadeBridge: true,
+            warmHomePalette: true
         ) {
             profileHero
         } content: {
@@ -14361,61 +14358,32 @@ struct ATHLTHProfileView: View {
         }
     }
 
-    private var personalRecordsSection:
-        some View {
-        profileSection(
-            title:
-                ATHLTHLocalization.choose(
-                    english:
-                        "Personal records",
-                    norwegian:
-                        "Personlige rekorder"
-                ),
-            icon: "chart.bar.fill",
-            actionTitle:
-                ATHLTHLocalization.choose(
-                    english: "See all",
-                    norwegian: "Se alle"
-                ),
-            destination:
-                AnyView(
-                    PerformanceStatsView(
-                        stats: performanceStats,
-                        healthRecords: personalRecords
-                    )
+    private var personalRecordsSection: some View {
+        ATHLTHProfileRecordShelf(
+            destination: AnyView(
+                PerformanceStatsView(
+                    stats: performanceStats,
+                    healthRecords: personalRecords
                 )
+            )
         ) {
             LazyVGrid(
                 columns: [
-                    GridItem(.flexible(), spacing: 9),
-                    GridItem(.flexible(), spacing: 9)
+                    GridItem(.flexible(), spacing: 7),
+                    GridItem(.flexible(), spacing: 7)
                 ],
-                spacing: 9
+                spacing: 7
             ) {
-                ForEach(
-                    0..<ProfileFeaturedRecordKind
-                        .showcaseLimit,
-                    id: \.self
-                ) { index in
-                    if featuredRecordKinds.indices
-                        .contains(index) {
-                        recordCard(
-                            kind:
-                                featuredRecordKinds[
-                                    index
-                                ]
-                        )
+                ForEach(0..<ProfileFeaturedRecordKind.showcaseLimit, id: \.self) { index in
+                    if featuredRecordKinds.indices.contains(index) {
+                        recordCard(kind: featuredRecordKinds[index])
                     } else {
                         NavigationLink {
                             ProfileRecordShowcasePickerView(
-                                stats:
-                                    performanceStats,
-                                healthRecords:
-                                    personalRecords
+                                stats: performanceStats,
+                                healthRecords: personalRecords
                             )
-                            .environmentObject(
-                                strengthWorkout
-                            )
+                            .environmentObject(strengthWorkout)
                         } label: {
                             emptyRecordShowcaseCard
                         }
@@ -14695,28 +14663,21 @@ struct ATHLTHProfileView: View {
             )
     }
 
-    /// Readable 2-column results instead of four miniature single-line tiles.
-    /// The result is the visual focal point; icon and label stay restrained.
+    /// The original data, highlighted choices and full record picker are
+    /// preserved. Only the profile preview is condensed into quiet mini-tiles.
     private func recordCard(kind: ProfileFeaturedRecordKind) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 7) {
-                Image(systemName: kind.icon)
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
-                    .frame(width: 30, height: 30)
-                    .background(
-                        ATHLTHTheme.premiumGoldSoft.opacity(0.75),
-                        in: RoundedRectangle(cornerRadius: 10)
-                    )
-                Spacer(minLength: 0)
-                Image(systemName: "medal")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(ATHLTHTheme.premiumGold.opacity(0.66))
-                    .accessibilityHidden(true)
-            }
+        HStack(spacing: 9) {
+            Image(systemName: kind.icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 31, height: 31)
+                .background(
+                    ATHLTHTheme.premiumGoldSoft.opacity(0.52),
+                    in: RoundedRectangle(cornerRadius: 10, style: .continuous)
+                )
 
-            Text(
-                kind.displayValue(
+            VStack(alignment: .leading, spacing: 2) {
+                Text(kind.displayValue(
                     healthRecords: personalRecords,
                     stats: performanceStats,
                     strengthRecords: strengthWorkout.personalRecords,
@@ -14724,94 +14685,61 @@ struct ATHLTHProfileView: View {
                     performanceWorkouts: profilePerformanceWorkoutHistory.isEmpty
                         ? health.workouts : profilePerformanceWorkoutHistory,
                     strengthWorkouts: strengthWorkout.workoutHistory
-                )
-            )
-            .font(.system(size: 22, weight: .bold, design: .rounded))
-            .monospacedDigit()
-            .foregroundStyle(ATHLTHTheme.primaryText)
-            .lineLimit(1)
-            .minimumScaleFactor(0.72)
-            .contentTransition(.numericText())
+                ))
+                .font(.system(size: 17, weight: .bold, design: .rounded))
+                .monospacedDigit()
+                .foregroundStyle(ATHLTHTheme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.62)
+                .contentTransition(.numericText())
 
-            Text(kind.title)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(ATHLTHTheme.mutedText)
-                .lineLimit(2)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, minHeight: 26, alignment: .topLeading)
+                Text(kind.title)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(ATHLTHTheme.mutedText)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.74)
+            }
+            Spacer(minLength: 0)
         }
-        .padding(12)
-        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
-        .background(
-            LinearGradient(
-                colors: [
-                    Color.white.opacity(0.98),
-                    ATHLTHTheme.premiumGoldSoft.opacity(0.17)
-                ],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            ),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
+        .padding(.horizontal, 9)
+        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .background(Color.white.opacity(0.91),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .strokeBorder(
-                    ATHLTHTheme.premiumGold.opacity(0.17), lineWidth: 0.8
-                )
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(ATHLTHTheme.premiumGold.opacity(0.13), lineWidth: 0.7)
         }
         .accessibilityElement(children: .combine)
     }
 
-    private var emptyRecordShowcaseCard:
-        some View {
-        VStack(spacing: 7) {
+    private var emptyRecordShowcaseCard: some View {
+        HStack(spacing: 9) {
             Image(systemName: "plus")
-                .font(
-                    .system(
-                        size: 13,
-                        weight: .semibold
-                    )
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+                .frame(width: 31, height: 31)
+                .background(
+                    ATHLTHTheme.premiumGoldSoft.opacity(0.42),
+                    in: RoundedRectangle(cornerRadius: 10)
                 )
-                .foregroundStyle(
-                    ATHLTHTheme
-                        .premiumGold
-                )
-
-            Text(
-                ATHLTHLocalization.choose(
-                    english: "Choose",
-                    norwegian: "Velg"
-                )
-            )
-            .font(.system(size: 11, weight: .semibold))
+            Text(ATHLTHLocalization.choose(
+                english: "Choose record", norwegian: "Velg rekord"
+            ))
+            .font(.system(size: 11, weight: .medium))
             .foregroundStyle(ATHLTHTheme.mutedText)
+            .lineLimit(1)
+            Spacer(minLength: 0)
         }
-        .frame(
-            maxWidth: .infinity,
-            minHeight: 112
-        )
-        .background(
-            Color.black.opacity(0.025),
-            in: RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-        )
+        .padding(.horizontal, 9)
+        .frame(maxWidth: .infinity, minHeight: 68, alignment: .leading)
+        .background(Color.white.opacity(0.64),
+                    in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
-            RoundedRectangle(
-                cornerRadius: 16,
-                style: .continuous
-            )
-            .stroke(
-                ATHLTHTheme
-                    .premiumGold
-                    .opacity(0.16),
-                style:
-                    StrokeStyle(
-                        lineWidth: 1,
-                        dash: [4, 4]
-                    )
-            )
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(
+                    ATHLTHTheme.premiumGold.opacity(0.24),
+                    style: StrokeStyle(lineWidth: 0.8, dash: [3, 4])
+                )
         }
     }
 
