@@ -239,6 +239,21 @@ private struct AroundYouRouteItem: Identifiable {
     }
 }
 
+/// Panning and zooming mark a pending search without loading new data.
+enum ExploreVisibleRegionSearchPolicy {
+    static func needsSearch(
+        current: MKCoordinateRegion,
+        lastSearched: MKCoordinateRegion
+    ) -> Bool {
+        let lat = max(0.0003, abs(lastSearched.span.latitudeDelta) * 0.05)
+        let lon = max(0.0003, abs(lastSearched.span.longitudeDelta) * 0.05)
+        return abs(current.center.latitude - lastSearched.center.latitude) > lat ||
+            abs(current.center.longitude - lastSearched.center.longitude) > lon ||
+            abs(current.span.latitudeDelta - lastSearched.span.latitudeDelta) > lat ||
+            abs(current.span.longitudeDelta - lastSearched.span.longitudeDelta) > lon
+    }
+}
+
 private enum AroundYouFilter: String, CaseIterable, Identifiable {
     case all = "All"
     case routes = "Routes"
@@ -841,7 +856,8 @@ struct AroundYouExploreView: View {
     @State private var startingRoute = false
     @State private var routeToStart: TrainingRoute?
     @State private var visibleRegion: MKCoordinateRegion?
-    @State private var hasSeenInitialCamera = false
+    @State private var hasRequestedInitialVisibleSearch = false
+    @State private var lastSearchedRegion: MKCoordinateRegion?
     @State private var shouldSearchVisibleArea = false
     @State private var isSearchingVisibleArea = false
     @State private var activeSearchCenter: CLLocation?
@@ -1110,12 +1126,24 @@ struct AroundYouExploreView: View {
                     is3DMapEnabled = context.camera.pitch > 15
 
                     if suppressNextSearchPrompt {
+                        // Programmatic camera changes must not erase a
+                        // previously pending manual search.
                         suppressNextSearchPrompt = false
-                        shouldSearchVisibleArea = false
-                    } else if hasSeenInitialCamera {
-                        shouldSearchVisibleArea = true
+                    } else if let lastSearchedRegion {
+                        shouldSearchVisibleArea =
+                            ExploreVisibleRegionSearchPolicy.needsSearch(
+                                current: context.region,
+                                lastSearched: lastSearchedRegion
+                            )
                     } else {
-                        hasSeenInitialCamera = true
+                        shouldSearchVisibleArea = true
+                    }
+
+                    if isActive,
+                       hasCenteredOnUser,
+                       !hasRequestedInitialVisibleSearch {
+                        hasRequestedInitialVisibleSearch = true
+                        Task { await searchVisibleArea() }
                     }
                 }
                 .onTapGesture { point in
@@ -1238,47 +1266,19 @@ struct AroundYouExploreView: View {
             let accountID = session.profile.userID
             if lastMapRefreshAccountID == accountID,
                let lastMapRefreshAt,
-               Date().timeIntervalSince(lastMapRefreshAt) < 90,
-               // An empty first request must not suppress the next visit.
-               (!routeDiscovery.routes.isEmpty ||
-                !routeDiscovery.localRoutes.isEmpty) {
+               Date().timeIntervalSince(lastMapRefreshAt) < 90 {
                 return
             }
             let signpost = ATHLTHPerformance.begin("ExploreTabRefresh")
-            async let routesRefresh: Void =
-                routeDiscovery.refresh()
-            async let eventsRefresh: Void =
-                community.refresh()
-            async let publicWorkoutsRefresh: Void =
-                marketplace.refresh()
-            _ = await (
-                routesRefresh,
-                eventsRefresh,
-                publicWorkoutsRefresh
-            )
+            // Fetch public events separately; routes only load through
+            // a viewport-specific query below.
+            async let eventsRefresh: Void = community.refresh()
+            async let publicWorkoutsRefresh: Void = marketplace.refresh()
+            _ = await (eventsRefresh, publicWorkoutsRefresh)
             ATHLTHPerformance.end("ExploreTabRefresh", id: signpost)
             guard !Task.isCancelled else { return }
             lastMapRefreshAccountID = accountID
             lastMapRefreshAt = Date()
-        }
-        // Location becomes available *after* the initial Map view appears.
-        // Use a stable availability key instead of GPS timestamps: frequent
-        // CLLocation updates must not cancel the cold-start route request.
-        .task(id: "\(isActive)-\(locationStore.location == nil ? "awaiting-location" : "has-location")") {
-            guard isActive, let location = locationStore.location
-            else { return }
-
-            if activeSearchCenter == nil {
-                activeSearchCenter = location
-            }
-
-            async let nearbyRoutes: Void = routeDiscovery.refreshNearby(
-                near: location
-            )
-            async let publicTrails: Void = publicTrailDiscovery.refresh(
-                near: location
-            )
-            _ = await (nearbyRoutes, publicTrails)
         }
         .task(id: "\(isActive)-\(publicWorkoutLookupKey)") {
             guard isActive else { return }
@@ -3101,9 +3101,9 @@ struct AroundYouExploreView: View {
         var routesByID:
             [UUID: AroundYouRouteItem] = [:]
 
-        // The latest global page is not a complete local catalogue.
-        // Merge the location-filtered result on the very first Explore visit.
-        for route in routeDiscovery.routes + routeDiscovery.localRoutes {
+        // Only results from the searched viewport are on this map.
+        // Saved/owned routes are merged below from the on-device library.
+        for route in routeDiscovery.localRoutes {
             routesByID[route.id] =
                 AroundYouRouteItem(
                     id: route.id,
@@ -3205,11 +3205,7 @@ struct AroundYouExploreView: View {
                 )
                 .distance(from: location)
 
-                if !route.isPublicTrail,
-                   distance > 50_000 {
-                    return nil
-                }
-
+                // No fixed GPS radius: zoomed-out areas can be wider.
                 return (route, distance)
             }
 
@@ -3452,21 +3448,20 @@ struct AroundYouExploreView: View {
 
     @MainActor
     private func searchVisibleArea() async {
-        guard let visibleRegion else {
-            return
-        }
+        guard !isSearchingVisibleArea,
+              let requestedRegion = visibleRegion,
+              RouteDiscoveryRegionBounds(region: requestedRegion) != nil
+        else { return }
 
         isSearchingVisibleArea = true
-        defer {
-            isSearchingVisibleArea = false
-        }
+        defer { isSearchingVisibleArea = false }
 
-        let searchCenter = CLLocation(
-            latitude: visibleRegion.center.latitude,
-            longitude: visibleRegion.center.longitude
+        // Capture the viewport at tap time. A later pan never changes the
+        // request in flight or triggers another request automatically.
+        activeSearchCenter = CLLocation(
+            latitude: requestedRegion.center.latitude,
+            longitude: requestedRegion.center.longitude
         )
-        activeSearchCenter = searchCenter
-
         withAnimation(.easeInOut(duration: 0.16)) {
             selectedRoute = nil
             selectedEvent = nil
@@ -3474,19 +3469,22 @@ struct AroundYouExploreView: View {
         }
 
         async let trails: Void = publicTrailDiscovery.refresh(
-            in: visibleRegion,
+            in: requestedRegion,
             force: true
         )
-        async let nearbyRoutes: Void = routeDiscovery.refreshNearby(
-            near: searchCenter,
-            force: true
+        async let routes: Void = routeDiscovery.refreshVisibleRegion(
+            requestedRegion
         )
-        async let routes: Void = routeDiscovery.refresh(force: true)
-        async let events: Void = community.refresh()
-        async let posts: Void = marketplace.refresh()
-        _ = await (trails, nearbyRoutes, routes, events, posts)
+        _ = await (trails, routes)
 
-        shouldSearchVisibleArea = false
+        guard !Task.isCancelled else { return }
+        lastSearchedRegion = requestedRegion
+        shouldSearchVisibleArea = visibleRegion.map {
+            ExploreVisibleRegionSearchPolicy.needsSearch(
+                current: $0,
+                lastSearched: requestedRegion
+            )
+        } ?? false
     }
 
     private func centerOnUser() {
