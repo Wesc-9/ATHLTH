@@ -27,6 +27,7 @@ enum ATHLTHWorkoutSetExpansion {
     ) -> [WorkoutTemplateBlock] {
         var result: [WorkoutTemplateBlock] = []
         var cursor = 0
+        var changed = false
         while cursor < blocks.count {
             let first = blocks[cursor]
             guard first.kind == .exercise, first.groupID == nil,
@@ -50,6 +51,12 @@ enum ATHLTHWorkoutSetExpansion {
                       exercise.exerciseID == first.exerciseID,
                       exercise.title == first.title,
                       exercise.resolvedPhase == first.resolvedPhase,
+                      exercise.durationSeconds == first.durationSeconds,
+                      exercise.loadNote == first.loadNote,
+                      exercise.notes == first.notes,
+                      exercise.targetHeartRateZone == first.targetHeartRateZone,
+                      exercise.targetEffortRPE == first.targetEffortRPE,
+                      exercise.exerciseSnapshot == first.exerciseSnapshot,
                       sets.count < 20,
                       let seconds = rest.durationSeconds, seconds > 0,
                       restSeconds == nil || restSeconds == seconds else { break }
@@ -58,6 +65,7 @@ enum ATHLTHWorkoutSetExpansion {
                 next += 2
             }
             if sets.count > 1 {
+                changed = true
                 var parent = first
                 parent.setCount = sets.count
                 parent.restBetweenSetsSeconds = restSeconds
@@ -74,6 +82,7 @@ enum ATHLTHWorkoutSetExpansion {
                 cursor += 1
             }
         }
+        guard changed else { return blocks }
         return result.enumerated().map {
             ATHLTHWorkoutPhasePlacement.renumbered($0.element, sequence: $0.offset + 1)
         }
