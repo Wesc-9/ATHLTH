@@ -325,6 +325,7 @@ struct ATHLTHiPadStudioRootView: View {
             }
         }
         .onChange(of: selection) { _, destination in
+            clearWeekInspectorIfNeeded()
             // Switching to a main Studio destination clears the inline
             // library selection without dismissing any modal.
             libraryPage = nil
@@ -885,6 +886,7 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func openLibrary(_ page: ATHLTHStudioLibraryPage) {
+        clearWeekInspectorIfNeeded()
         libraryExpanded = true
         focusedPlanningDate = nil
         detailNavigationPath = NavigationPath()
@@ -902,6 +904,7 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func openSidebarPage(_ destination: ATHLTHSideMenuDestination) {
+        clearWeekInspectorIfNeeded()
         focusedPlanningDate = nil
         detailNavigationPath = NavigationPath()
         libraryPage = nil
@@ -921,6 +924,7 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func openStudio(_ destination: ATHLTHStudioDestination) {
+        clearWeekInspectorIfNeeded()
         detailNavigationPath = NavigationPath()
         libraryPage = nil
         sidebarPage = nil
@@ -1031,6 +1035,15 @@ struct ATHLTHiPadStudioRootView: View {
             RecoveryCoachInboxDestinationView()
         case .settings:
             ATHLTHSettingsView()
+        }
+    }
+
+    private func clearWeekInspectorIfNeeded() {
+        guard inspectedWeekDate != nil else { return }
+        inspectedWeekDate = nil
+        selectedWorkout = nil
+        if !inspectorShowsCoach && !inspectorShowsInbox {
+            showingInspector = false
         }
     }
 
