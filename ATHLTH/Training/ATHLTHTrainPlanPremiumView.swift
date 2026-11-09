@@ -2405,7 +2405,7 @@ struct ATHLTHTrainPlanPremiumView: View {
                         }
                     ),
                     attachmentAnchor: .rect(.bounds),
-                    arrowEdge: .top
+                    arrowEdge: .bottom
                 ) {
                     ATHLTHPlanDraftActionsPopover(
                         onContinue: {
