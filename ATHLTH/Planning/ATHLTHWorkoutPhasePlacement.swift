@@ -59,6 +59,7 @@ enum ATHLTHWorkoutPhasePlacement {
         next.treadmillInclinePercent = block.treadmillInclinePercent
         next.setCount = block.setCount
         next.restBetweenSetsSeconds = block.restBetweenSetsSeconds
+        next.individualSetTargets = block.individualSetTargets
         next.groupID = block.groupID
         next.groupKind = block.groupKind
         next.groupRounds = block.groupRounds
