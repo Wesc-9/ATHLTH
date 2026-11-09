@@ -43,13 +43,14 @@ actor ATHLTHLocalExerciseThumbnailLoader {
         ) else { return nil }
 
         guard !Task.isCancelled else { return nil }
-        let output = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(
-            output as CFMutableData, "public.png" as CFString, 1, nil
-        ) else { return nil }
+        guard let output = CFDataCreateMutable(nil, 0),
+              let destination = CGImageDestinationCreateWithData(
+                output, "public.png" as CFString, 1, nil
+              ) else { return nil }
         CGImageDestinationAddImage(destination, thumbnail, nil)
-        guard CGImageDestinationFinalize(destination) else { return nil }
-        let data = output as Data
+        guard CGImageDestinationFinalize(destination),
+              let bytes = CFDataGetBytePtr(output) else { return nil }
+        let data = Data(bytes: bytes, count: CFDataGetLength(output))
         thumbnails.setObject(data as NSData, forKey: key, cost: data.count)
         return data
     }
