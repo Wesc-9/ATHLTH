@@ -3494,8 +3494,9 @@ struct AroundYouExploreView: View {
 
         let coordinate = location.coordinate
         activeSearchCenter = location
-        shouldSearchVisibleArea = false
-        suppressNextSearchPrompt = true
+        // Initial recenter starts a single automatic viewport search. Later
+        // taps on recenter require manual search if the viewport changed.
+        suppressNextSearchPrompt = !hasRequestedInitialVisibleSearch
         hasCenteredOnUser = true
 
         withAnimation(
