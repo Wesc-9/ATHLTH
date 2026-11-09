@@ -62,8 +62,14 @@ enum ATHLTHWorkoutLibraryExerciseIndex {
     }
 
     static func normalize(_ text: String) -> String {
+        // Unicode diacritic folding does not map Scandinavian ø/æ on all
+        // Foundation platforms. Support natural Norwegian ASCII searches.
         text.folding(options: [.diacriticInsensitive, .caseInsensitive],
                      locale: Locale(identifier: "nb_NO"))
+            .lowercased()
+            .replacingOccurrences(of: "ø", with: "o")
+            .replacingOccurrences(of: "æ", with: "ae")
+            .replacingOccurrences(of: "å", with: "a")
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
