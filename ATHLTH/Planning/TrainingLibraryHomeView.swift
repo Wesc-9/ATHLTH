@@ -106,12 +106,12 @@ struct TrainingLibraryHomeView: View {
     private let green = ATHLTHTheme.vitality
     private let lavender = ATHLTHTheme.recoveryBlue
 
-    // The Library hub always presents two columns. Nested libraries still
-    // honor their own display settings and user-specific choices.
-    private let categoryLayout: [GridItem] = [
-        GridItem(.flexible(), spacing: 11),
-        GridItem(.flexible(), spacing: 11)
-    ]
+    // More categories share a row as the iPad window grows, without
+    // changing the familiar two-column iPhone landing page.
+    @State private var hubWidth: CGFloat = 390
+    private var categoryLayout: [GridItem] {
+        ATHLTHLibraryResponsiveLayout.hubColumns(for: hubWidth)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 25) {
@@ -130,9 +130,11 @@ struct TrainingLibraryHomeView: View {
             // additional empty 'recent' and 'recommended' carousels.
             learningHint
         }
-        .frame(maxWidth: 720, alignment: .leading)
-        .frame(maxWidth: .infinity, alignment: .center)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .buttonStyle(.plain)
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
+            hubWidth = $0
+        }
         .task {
             await favorites.refresh()
         }
@@ -1837,7 +1839,7 @@ struct TrainingPlanLibraryView: View {
                         .frame(maxWidth: .infinity)
                     } else {
                         LazyVGrid(
-                            columns: ATHLTHLibraryGridColumns.make(
+                            columns: ATHLTHLibraryResponsiveLayout.columns(
                                 mode: displayMode,
                                 width: libraryViewWidth,
                                 reservedHorizontalSpace: 36,
@@ -1858,7 +1860,6 @@ struct TrainingPlanLibraryView: View {
                 .padding(.horizontal, 18)
                 .padding(.top, 18)
                 .padding(.bottom, 44)
-                .frame(maxWidth: 760)
                 .frame(maxWidth: .infinity)
             }
             .scrollIndicators(.hidden)
@@ -2114,8 +2115,17 @@ struct TrainingPlanLibraryView: View {
                     .padding(.trailing, 6)
                 }
                 .frame(
-                    width: dynamicTypeSize.isAccessibilitySize ? 300 : 246,
-                    height: dynamicTypeSize.isAccessibilitySize ? 280 : 228
+                    width: ATHLTHLibraryResponsiveLayout.featuredCardWidth(
+                        for: libraryViewWidth,
+                        accessibilityText: dynamicTypeSize.isAccessibilitySize
+                    ),
+                    height: ATHLTHLibraryResponsiveLayout.featuredCardHeight(
+                        for: ATHLTHLibraryResponsiveLayout.featuredCardWidth(
+                            for: libraryViewWidth,
+                            accessibilityText: dynamicTypeSize.isAccessibilitySize
+                        ),
+                        accessibilityText: dynamicTypeSize.isAccessibilitySize
+                    )
                 )
                 .clipShape(RoundedRectangle(cornerRadius: 22))
                 .contentShape(RoundedRectangle(cornerRadius: 22))
