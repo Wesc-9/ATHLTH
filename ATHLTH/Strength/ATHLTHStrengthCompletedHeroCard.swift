@@ -112,8 +112,10 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                     .scaledToFill()
                     .frame(width: cardWidth, height: cardHeight)
                     .clipped()
-                    .saturation((trainDetailStyle || recentActivityStrip) ? 0.95 : 0.75)
-                    .contrast(trainDetailStyle ? 0.97 : (recentActivityStrip ? 0.98 : 0.88))
+                    // A quieter treatment only for Home's recent-activity strip.
+                    // Keep the original photo, crop and geometry unchanged.
+                    .saturation(recentActivityStrip ? 0.78 : (trainDetailStyle ? 0.95 : 0.75))
+                    .contrast(trainDetailStyle ? 0.97 : (recentActivityStrip ? 0.90 : 0.88))
 
                 if trainDetailStyle {
                     // Preserve the clean studio image and darken only enough
@@ -132,10 +134,10 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                     // The existing completion/Home artwork is unchanged.
                     LinearGradient(
                         stops: [
-                            .init(color: Color.white.opacity(recentActivityStrip ? 0.20 : 0.64), location: 0),
-                            .init(color: Color.white.opacity(recentActivityStrip ? 0.14 : 0.36), location: 0.42),
+                            .init(color: Color.white.opacity(recentActivityStrip ? 0.30 : 0.64), location: 0),
+                            .init(color: Color.white.opacity(recentActivityStrip ? 0.22 : 0.36), location: 0.42),
                             .init(color: Color(red: 0.98, green: 0.97, blue: 0.95)
-                                .opacity(recentActivityStrip ? 0.46 : 0.79), location: 1)
+                                .opacity(recentActivityStrip ? 0.52 : 0.79), location: 1)
                         ],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
@@ -151,6 +153,48 @@ struct ATHLTHStrengthCompletedHeroCard: View {
                     )
                     .frame(height: footerHeight + 28)
                     .frame(maxHeight: .infinity, alignment: .bottom)
+                }
+
+                if recentActivityStrip {
+                    // Lighten the underlying gym details behind the black
+                    // title without changing the title's size or position.
+                    RadialGradient(
+                        colors: [
+                            Color.white.opacity(0.43),
+                            Color.white.opacity(0.19),
+                            .clear
+                        ],
+                        center: .bottomLeading,
+                        startRadius: 0,
+                        endRadius: max(cardWidth * 0.62, 120)
+                    )
+                    .allowsHitTesting(false)
+
+                    if !profile.activations.isEmpty {
+                        // Subtle ivory separation behind the existing
+                        // front/back muscle figures; no atlas modifications.
+                        RadialGradient(
+                            colors: [
+                                Color.white.opacity(0.42),
+                                Color.white.opacity(0.16),
+                                .clear
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 125
+                        )
+                        .frame(
+                            width: min(cardWidth * 0.48, 245),
+                            height: cardHeight * 0.90
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .bottomTrailing
+                        )
+                        .padding(.trailing, 8)
+                        .allowsHitTesting(false)
+                    }
                 }
 
                 if !profile.activations.isEmpty {
