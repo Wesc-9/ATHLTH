@@ -450,22 +450,62 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
             .scrollIndicators(.hidden)
 
-            HStack(spacing: 7) {
-                Image(systemName: "sidebar.right")
+            Rectangle()
+                .fill(outline)
+                .frame(height: 1)
+            HStack(spacing: 9) {
+                Image(systemName: activeDay?.restDays.isEmpty == false
+                      ? "moon.zzz" : "calendar.badge.clock")
                     .foregroundStyle(bronze)
-                Text(tr(
-                    "Select a day to see its sessions in the right panel.",
-                    "Velg en dag for å se øktene i høyrepanelet."
-                ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                Text(weekSelectionSummary(activeDay))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+                Spacer(minLength: 8)
+                if let activeDay, activeDay.restDays.isEmpty,
+                   HomeWeeklyProgressCalendar.canScheduleStandalone(
+                       on: activeDay.date
+                   ) {
+                    Button {
+                        focusedPlanningDate = activeDay.date
+                    } label: {
+                        Label(tr("Plan workout", "Planlegg økt"),
+                              systemImage: "plus")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(bronze)
+                    .accessibilityIdentifier("athlth-ipad-week-plan-selected-day")
+                }
             }
-            .padding(.top, 4)
+            .frame(minHeight: 44)
+            .padding(.top, 2)
         }
         .padding(20)
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
         .accessibilityIdentifier("athlth-ipad-weekly-overview")
+    }
+
+    private func weekSelectionSummary(
+        _ day: ATHLTHStudioHomeWeek.Day?
+    ) -> String {
+        guard let day else {
+            return tr("Select a day in the calendar",
+                      "Velg en dag i kalenderen")
+        }
+        if !day.planned.isEmpty {
+            return "\(day.planned.count) " +
+                tr("planned workouts", "planlagte økter")
+        }
+        if !day.restDays.isEmpty {
+            return tr("Planned rest day", "Planlagt hviledag")
+        }
+        if !day.recorded.isEmpty {
+            return "\(day.recorded.count) " +
+                tr("recorded workouts", "registrerte økter")
+        }
+        return tr("No workout scheduled", "Ingen økt planlagt")
     }
 
     private func dayTile(
