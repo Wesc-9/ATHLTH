@@ -1852,7 +1852,6 @@ struct WorkoutTemplateLibraryView: View {
             .padding(.leading, 18)
             .padding(.trailing, initialCategory == nil ? 18 : 42)
             .padding(.vertical, 18)
-            .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
         .overlay(alignment: .trailing) {
@@ -2269,7 +2268,7 @@ struct WorkoutTemplateLibraryView: View {
     }
 
     private var libraryColumns: [GridItem] {
-        ATHLTHLibraryGridColumns.make(
+        ATHLTHLibraryResponsiveLayout.columns(
             mode: displayMode,
             width: libraryViewWidth,
             reservedHorizontalSpace: initialCategory == nil ? 36 : 60,
@@ -3149,7 +3148,7 @@ struct MyWorkoutTemplatesView: View {
     @State private var libraryViewWidth: CGFloat = 390
 
     private var libraryColumns: [GridItem] {
-        ATHLTHLibraryGridColumns.make(
+        ATHLTHLibraryResponsiveLayout.columns(
             mode: displayMode,
             width: libraryViewWidth,
             reservedHorizontalSpace: 36,
@@ -3312,7 +3311,6 @@ struct MyWorkoutTemplatesView: View {
                 }
             }
             .padding(18)
-            .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
         }
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
