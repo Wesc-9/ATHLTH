@@ -5,7 +5,7 @@ final class ATHLTHStudioDayCompletionPolicyTests: XCTestCase {
     func testEmptyDayIsNotCompleted() {
         XCTAssertFalse(
             ATHLTHStudioDayCompletionPolicy.allPlannedCompleted(
-                [Int][], isCompleted: { _ in true }
+                [Int](), isCompleted: { _ in true }
             )
         )
     }
