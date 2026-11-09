@@ -184,6 +184,9 @@ struct AudioCoachDraft {
             $0.trigger == .distance && $0.validatedInterval == 1_000 &&
             $0.selectedMetrics == [.distance, .elapsedTime, .heartRate]
         }
+        // The combined 1 km rule replaces the standard 1 km cue.
+        // Otherwise both are scheduled and the athlete hears duplicates.
+        distanceTriggerEnabled = false
         guard !alreadyExists else { return false }
         customRules.append(ATHLTHAudioCoachRule(
             trigger: .distance,
