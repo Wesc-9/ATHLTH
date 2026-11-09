@@ -150,6 +150,8 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
     // Optional fields preserve compatibility with all existing saved workouts.
     var setCount: Int? = nil
     var restBetweenSetsSeconds: TimeInterval? = nil
+    /// Per-set targets are stored with one parent exercise, not separate blocks.
+    var individualSetTargets: [ATHLTHStrengthSetTarget]? = nil
     var groupID: UUID? = nil
     var groupKind: WorkoutBlockGroupKind? = nil
     var groupRounds: Int? = nil
@@ -194,6 +196,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         lhs.treadmillInclinePercent == rhs.treadmillInclinePercent &&
         lhs.setCount == rhs.setCount &&
         lhs.restBetweenSetsSeconds == rhs.restBetweenSetsSeconds &&
+        lhs.individualSetTargets == rhs.individualSetTargets &&
         lhs.groupID == rhs.groupID &&
         lhs.groupKind == rhs.groupKind &&
         lhs.groupRounds == rhs.groupRounds &&
@@ -227,6 +230,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         hasher.combine(treadmillInclinePercent)
         hasher.combine(setCount)
         hasher.combine(restBetweenSetsSeconds)
+        hasher.combine(individualSetTargets)
         hasher.combine(groupID)
         hasher.combine(groupKind)
         hasher.combine(groupRounds)
@@ -268,6 +272,7 @@ struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
         case treadmillInclinePercent = "treadmill_incline_percent"
         case setCount = "set_count"
         case restBetweenSetsSeconds = "rest_between_sets_seconds"
+        case individualSetTargets = "individual_set_targets"
         case groupID = "group_id"
         case groupKind = "group_kind"
         case groupRounds = "group_rounds"
@@ -382,7 +387,8 @@ extension Array where Element == WorkoutTemplateBlock {
         var output: [WorkoutTemplateBlock] = []
         var cursor = 0
 
-        func append(_ source: WorkoutTemplateBlock, title: String? = nil) {
+        func append(_ source: WorkoutTemplateBlock, title: String? = nil,
+                    strengthSet: ATHLTHStrengthSetTarget? = nil) {
             guard output.count < 1000 else { return }
             var item = WorkoutTemplateBlock(
                 sequence: output.count + 1,
@@ -401,6 +407,10 @@ extension Array where Element == WorkoutTemplateBlock {
                 cardioActivity: source.cardioActivity,
                 isIndoor: source.isIndoor
             )
+            if let strengthSet {
+                item.repetitions = strengthSet.repetitions ?? source.repetitions
+                item.targetWeightKilograms = strengthSet.weightKilograms ?? source.targetWeightKilograms
+            }
             item.exerciseID = source.exerciseID
             item.exerciseSnapshot = source.exerciseSnapshot
             item.wellnessKind = source.wellnessKind
@@ -440,9 +450,12 @@ extension Array where Element == WorkoutTemplateBlock {
                 let sets = current.kind == .exercise
                     ? Swift.min(Swift.max(current.setCount ?? 1, 1), 20) : 1
                 for set in 1...sets {
+                    let target = current.individualSetTargets.flatMap { targets in
+                        targets.indices.contains(set - 1) ? targets[set - 1] : nil
+                    }
                     append(current, title: sets > 1
                         ? "\(current.title) · \(set)/\(sets)"
-                        : current.title)
+                        : current.title, strengthSet: target)
                     if set < sets,
                        let rest = current.restBetweenSetsSeconds,
                        rest > 0 {
@@ -5960,7 +5973,13 @@ struct WorkoutTemplateBuilderView: View {
                 if block.groupID == nil {
                     Stepper(value: Binding(
                         get: { blocks[index].setCount ?? 1 },
-                        set: { blocks[index].setCount = $0 }
+                        set: { count in
+                            blocks[index].setCount = count
+                            if blocks[index].individualSetTargets != nil {
+                                blocks[index].individualSetTargets =
+                                    ATHLTHWorkoutSetExpansion.targets(for: blocks[index])
+                            }
+                        }
                     ), in: 1...20) {
                         Text("\(blocks[index].setCount ?? 1) " + tr("sets", "sett"))
                             .font(.subheadline.weight(.semibold))
@@ -5976,36 +5995,8 @@ struct WorkoutTemplateBuilderView: View {
                                  tr("sec", "sek"))
                                 .font(.caption)
                         }
-                        Button {
-                            splitExerciseIntoIndividualSets(at: index)
-                        } label: {
-                            Label(
-                                tr("Customize each set", "Tilpass hvert sett"),
-                                systemImage: "slider.horizontal.3"
-                            )
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(studioAccent)
-                        }
-                        .buttonStyle(.plain)
                     }
                 }
-                Stepper(value: Binding(
-                    get: { blocks[index].targetWeightKilograms ?? 0 },
-                    set: { blocks[index].targetWeightKilograms = $0 }
-                ), in: 0...500, step: 2.5) {
-                    Text(String(format: "%.1f kg",
-                        blocks[index].targetWeightKilograms ?? 0))
-                        .font(.caption)
-                }
-
-                Stepper(
-                    value: repetitionsBinding(index),
-                    in: 1...300
-                ) {
-                    Text(tr("Target", "Mål") + " · \(blocks[index].repetitions ?? 10) " + tr("reps", "reps"))
-                    .font(.caption)
-                }
-
             case .rest:
                 durationEntryEditor(index)
 
