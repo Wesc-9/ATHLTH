@@ -570,7 +570,9 @@ struct ATHLTHiPadStudioRootView: View {
 
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Plan Studio", norwegian: "Plan Studio"),
-                        symbol: "calendar"
+                        symbol: "calendar",
+                        selected: selection == .planner && libraryPage == nil &&
+                            sidebarPage == nil
                     ) { openStudio(.planner) }
 
                     trainingLibraryShortcut
@@ -604,11 +606,13 @@ struct ATHLTHiPadStudioRootView: View {
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Progress", norwegian: "Fremgang"),
                         symbol: "chart.xyaxis.line",
-                        selected: selection == .insights
+                        selected: selection == .insights && libraryPage == nil &&
+                            sidebarPage == nil
                     ) { openStudio(.insights) }
 
                     sidebarAction("ATHLTH Coach", symbol: "sparkles",
-                                  selected: selection == .coach) {
+                                  selected: selection == .coach &&
+                                       libraryPage == nil && sidebarPage == nil) {
                         openStudio(.coach)
                     }
 
@@ -667,7 +671,8 @@ struct ATHLTHiPadStudioRootView: View {
             sidebarAction(
                 ATHLTHLocalization.choose(english: "Settings", norwegian: "Innstillinger"),
                 symbol: "gearshape",
-                selected: selection == .settings
+                selected: selection == .settings && libraryPage == nil &&
+                    sidebarPage == nil
             ) { openStudio(.settings) }
                 .padding(.horizontal, 11)
                 .padding(.vertical, 12)
