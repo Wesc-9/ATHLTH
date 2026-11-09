@@ -440,28 +440,28 @@ struct ATHLTHiPadStudioRootView: View {
                         openPersonalLibrary(.exercises)
                     } label: {
                         Label(ATHLTHLocalization.choose(
-                            english: "My exercises", norwegian: "Mine øvelser"
+                            english: "Exercises", norwegian: "Øvelser"
                         ), systemImage: "dumbbell")
                     }
                     Button {
                         openPersonalLibrary(.routes)
                     } label: {
                         Label(ATHLTHLocalization.choose(
-                            english: "My routes", norwegian: "Mine ruter"
+                            english: "Routes", norwegian: "Ruter"
                         ), systemImage: "map")
                     }
                     Button {
                         openPersonalLibrary(.trainingPlans)
                     } label: {
                         Label(ATHLTHLocalization.choose(
-                            english: "My training plans", norwegian: "Mine treningsplaner"
+                            english: "Training plans", norwegian: "Treningsplaner"
                         ), systemImage: "calendar")
                     }
                     Button {
                         openPersonalLibrary(.workouts)
                     } label: {
                         Label(ATHLTHLocalization.choose(
-                            english: "My workouts", norwegian: "Mine treningsøkter"
+                            english: "Workouts", norwegian: "Treningsøkter"
                         ), systemImage: "bookmark")
                     }
                 } label: {
@@ -754,10 +754,10 @@ struct ATHLTHiPadStudioRootView: View {
                 .accessibilityIdentifier("athlth-ipad-library-expand")
             }
             if libraryExpanded {
-                libraryLink(.exercises, "My exercises", "Mine øvelser", symbol: "dumbbell")
-                libraryLink(.routes, "My routes", "Mine ruter", symbol: "map")
-                libraryLink(.trainingPlans, "My training plans", "Mine treningsplaner", symbol: "calendar")
-                libraryLink(.workouts, "My workouts", "Mine treningsøkter", symbol: "bookmark")
+                libraryLink(.exercises, "Exercises", "Øvelser", symbol: "dumbbell")
+                libraryLink(.routes, "Routes", "Ruter", symbol: "map")
+                libraryLink(.trainingPlans, "Training plans", "Treningsplaner", symbol: "calendar")
+                libraryLink(.workouts, "Workouts", "Treningsøkter", symbol: "bookmark")
             }
         }
         .padding(.leading, 16)
