@@ -356,45 +356,6 @@ struct ExerciseLibraryView: View {
                     .padding(.bottom, 6)
             }
 
-            if selectedSection == .mine {
-                ATHLTHPlanSurface {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack(alignment: .top, spacing: 12) {
-                            VStack(alignment: .leading, spacing: 5) {
-                                Text("ATHLTH EXERCISE STUDIO")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .tracking(1.6)
-                                    .foregroundStyle(ATHLTHPlanDesign.accent)
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Your exercises",
-                                    norwegian: "Dine øvelser"
-                                ))
-                                .font(.system(size: 27, weight: .regular, design: .serif))
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                            }
-                            Spacer()
-                            Image(systemName: "figure.strengthtraining.traditional")
-                                .font(.system(size: 20, weight: .medium))
-                                .foregroundStyle(ATHLTHPlanDesign.accent)
-                                .frame(width: 42, height: 42)
-                                .background(
-                                    ATHLTHPlanDesign.selectedSurface,
-                                    in: Circle()
-                                )
-                        }
-                        Text(ATHLTHLocalization.choose(
-                            english: "Your personal exercises, pictures and technique videos in one place. Edit them any time.",
-                            norwegian: "Dine egne øvelser, bilder og teknikkvideoer samlet på ett sted. Rediger dem når som helst."
-                        ))
-                        .font(.subheadline)
-                        .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-
-                    }
-                }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 6)
-            }
-
             if scannerIsAnalyzing {
                 ProgressView(ATHLTHLocalization.choose(
                     english: "Analyzing equipment and finding exercises…",
