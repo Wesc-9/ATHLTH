@@ -849,6 +849,61 @@ enum RecoveryReadinessState: String, Equatable {
     }
 }
 
+/// HealthKit availability is tracked separately from readiness itself:
+/// missing and stale signals never become invented readiness measurements.
+enum RecoveryReadinessSignal: String, CaseIterable, Equatable {
+    case sleep
+    case hrv
+    case restingHeartRate
+
+    var title: String {
+        switch self {
+        case .sleep:
+            return ATHLTHLocalization.choose(english: "Sleep", norwegian: "Søvn")
+        case .hrv:
+            return "HRV"
+        case .restingHeartRate:
+            return ATHLTHLocalization.choose(
+                english: "Resting heart rate", norwegian: "Hvilepuls"
+            )
+        }
+    }
+}
+
+struct RecoveryReadinessDayCoverage: Equatable {
+    let date: Date
+    let availableSignals: [RecoveryReadinessSignal]
+
+    var missingSignals: [RecoveryReadinessSignal] {
+        RecoveryReadinessSignal.allCases.filter {
+            !availableSignals.contains($0)
+        }
+    }
+}
+
+/// Safe metadata only: counters and dates, no duplicated HealthKit samples.
+struct RecoveryReadinessDiagnostics: Equatable {
+    let lookbackDays: Int
+    let requiredDays: Int
+    let sleepDays: Int
+    let hrvDays: Int
+    let restingHeartRateDays: Int
+    let completeDays: Int
+    let recentSleep: Bool
+    let recentHRV: Bool
+    let recentRestingHeartRate: Bool
+    let failedSignals: [RecoveryReadinessSignal]
+    let lastSevenDays: [RecoveryReadinessDayCoverage]
+
+    var missingRecentSignals: [RecoveryReadinessSignal] {
+        var result: [RecoveryReadinessSignal] = []
+        if !recentSleep { result.append(.sleep) }
+        if !recentHRV { result.append(.hrv) }
+        if !recentRestingHeartRate { result.append(.restingHeartRate) }
+        return result
+    }
+}
+
 struct RecoveryReadinessSummary: Equatable {
     let score: Int?
     let state: RecoveryReadinessState
@@ -857,6 +912,8 @@ struct RecoveryReadinessSummary: Equatable {
     let averageSleepDuration: TimeInterval?
     let baselineHRVMilliseconds: Double?
     let baselineRestingHeartRate: Double?
+    /// Optional to preserve older summaries and existing call sites.
+    var diagnostics: RecoveryReadinessDiagnostics? = nil
 
     static let buildingBaseline = RecoveryReadinessSummary(
         score: nil,
