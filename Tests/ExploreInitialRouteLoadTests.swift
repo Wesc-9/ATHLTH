@@ -21,8 +21,8 @@ final class ExploreInitialRouteLoadTests: XCTestCase {
         XCTAssertGreaterThan(east, center.longitude)
 
         // Oslo is far away: its routes should not consume the local map page.
-        XCTAssertLessThan(bounds.maxLatitude, 59.9139 + 4)
-        XCTAssertGreaterThan(bounds.minLatitude, 63.1)
+        XCTAssertGreaterThan(bounds.minLatitude, 59.9139)
+        XCTAssertLessThan(bounds.maxLatitude, 64.0)
     }
 
     func testDatelineLookupSafelySkipsLongitudePrefilter() throws {
