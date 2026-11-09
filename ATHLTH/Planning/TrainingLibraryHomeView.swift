@@ -4833,14 +4833,20 @@ struct LibraryFavoritesView: View {
     @StateObject private var workoutLibrary =
         WorkoutTemplateCatalogStore()
     @State private var selectedKind: LibraryFavoriteKind?
+    @State private var ownExerciseFavoritesOnly = false
 
     private var displayedFavorites: [LibraryFavoriteRecord] {
-        guard let selectedKind else {
-            return favorites.favorites
+        let kindFiltered: [LibraryFavoriteRecord]
+        if let selectedKind {
+            kindFiltered = favorites.favorites.filter { $0.itemType == selectedKind }
+        } else {
+            kindFiltered = favorites.favorites
         }
-
-        return favorites.favorites.filter {
-            $0.itemType == selectedKind
+        guard ownExerciseFavoritesOnly else { return kindFiltered }
+        let ownedIDs = Set(exerciseLibrary.customExercises.map(\.id))
+        return kindFiltered.filter {
+            $0.itemType == .exercise &&
+                UUID(uuidString: $0.itemID).map { ownedIDs.contains($0) } == true
         }
     }
 
@@ -4903,9 +4909,23 @@ struct LibraryFavoritesView: View {
                         favoriteFilter(
                             "All",
                             icon: "sparkles",
-                            selected: selectedKind == nil
+                            selected: selectedKind == nil && !ownExerciseFavoritesOnly
                         ) {
                             withAnimation(.easeInOut(duration: 0.18)) {
+                                selectedKind = nil
+                                ownExerciseFavoritesOnly = false
+                            }
+                        }
+
+                        favoriteFilter(
+                            ATHLTHLocalization.choose(
+                                english: "My exercises", norwegian: "Egne øvelser"
+                            ),
+                            icon: "person.crop.square",
+                            selected: ownExerciseFavoritesOnly
+                        ) {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                ownExerciseFavoritesOnly.toggle()
                                 selectedKind = nil
                             }
                         }
@@ -4918,6 +4938,7 @@ struct LibraryFavoritesView: View {
                             ) {
                                 withAnimation(.easeInOut(duration: 0.18)) {
                                     selectedKind = kind
+                                    ownExerciseFavoritesOnly = false
                                 }
                             }
                         }
@@ -5193,10 +5214,24 @@ struct LibraryFavoritesView: View {
             favoriteArtwork(for: item, exerciseEntry: exerciseEntry)
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(item.itemType.title.uppercased())
-                    .font(.system(size: 8, weight: .bold))
-                    .tracking(1.2)
-                    .foregroundStyle(tint)
+                HStack(spacing: 6) {
+                    Text(item.itemType.title.uppercased())
+                        .font(.system(size: 8, weight: .bold))
+                        .tracking(1.2)
+                        .foregroundStyle(tint)
+
+                    if item.itemType == .exercise,
+                       exerciseEntry?.source == .custom {
+                        Text(ATHLTHLocalization.choose(
+                            english: "MY OWN", norwegian: "EGEN"
+                        ))
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(ATHLTHTheme.premiumGoldSoft, in: Capsule())
+                    }
+                }
 
                 Text(item.title)
                     .font(.subheadline.weight(.semibold))
