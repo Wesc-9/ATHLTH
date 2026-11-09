@@ -11,6 +11,7 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
     @State private var focus = "all"
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var activeGuide: ATHLTHWellnessGuide?
+    @State private var showingRecoveryPlanner = false
 
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
@@ -79,6 +80,26 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
                     .foregroundStyle(ATHLTHTrainDesign.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 }
+
+                Button {
+                    showingRecoveryPlanner = true
+                } label: {
+                    HStack(spacing: 9) {
+                        Image(systemName: "calendar.badge.clock")
+                            .foregroundStyle(bronze)
+                        Text(tr("Plan a recovery day", "Planlegg en hviledag"))
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ink)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTrainDesign.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 42)
+                    .background(paper, in: RoundedRectangle(cornerRadius: 12))
+                }
+                .buttonStyle(.plain)
 
                 HStack(spacing: 9) {
                     Image(systemName: "magnifyingglass")
@@ -169,6 +190,12 @@ struct ATHLTHRecoveryWellnessLibraryView: View {
                     Button(tr("Close", "Lukk"), action: onClose)
                 }
             }
+        }
+        .sheet(isPresented: $showingRecoveryPlanner) {
+            // Preserve the existing rest-day planner as an optional tool;
+            // this library now provides the primary content.
+            ATHLTHRecoveryRestPlanningSheet()
+                .presentationDetents([.large])
         }
         .sheet(item: $activeGuide) { guide in
             NavigationStack {
