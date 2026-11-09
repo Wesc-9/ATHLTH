@@ -4,7 +4,7 @@ import XCTest
 
 final class ATHLTHStudioWeekTileLayoutTests: XCTestCase {
     func testAllSevenDaysFitWhenIPadDetailIsWide() {
-        for width: CGFloat in [730, 820, 1080, 1300, 1500] {
+        for width: CGFloat in [748, 820, 1080, 1300, 1500] {
             let tile = ATHLTHStudioWeekTileLayout.tileWidth(
                 viewport: width, accessibilityText: false
             )
@@ -12,6 +12,15 @@ final class ATHLTHStudioWeekTileLayoutTests: XCTestCase {
             let total = outerInset + 40 + 6 * 8 + tile * 7
             XCTAssertLessThanOrEqual(total, width + 0.01)
         }
+    }
+
+    func testSevenCardsScrollNearTheCompactBreakpoint() {
+        XCTAssertEqual(
+            ATHLTHStudioWeekTileLayout.tileWidth(
+                viewport: 730, accessibilityText: false
+            ),
+            88
+        )
     }
 
     func testNarrowStageManagerWindowsScrollInsteadOfSqueezingDayText() {
