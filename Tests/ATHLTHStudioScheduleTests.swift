@@ -77,4 +77,41 @@ final class ATHLTHStudioScheduleTests: XCTestCase {
         let rows = ATHLTHStudioSchedule.upcoming(plans: [], standalone: [undated, rest])
         XCTAssertTrue(rows.isEmpty)
     }
+    func testNextWorkoutIgnoresPastExplicitStartButKeepsUntimedToday() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let today = try XCTUnwrap(calendar.date(from: DateComponents(
+            year: 2026, month: 11, day: 9, hour: 12, minute: 30
+        )))
+        let past = try XCTUnwrap(calendar.date(byAdding: .hour, value: -4, to: today))
+        let later = try XCTUnwrap(calendar.date(byAdding: .hour, value: 2, to: today))
+
+        func make(_ date: Date?) -> PlannedSession {
+            PlannedSession(
+                id: UUID(), title: "Run", kind: .running,
+                scheduledStart: date, durationMinutes: 40,
+                targetDistanceKilometers: nil,
+                targetPaceSecondsPerKilometer: nil, routeID: nil,
+                exercises: [], notes: nil
+            )
+        }
+
+        let expired = make(past)
+        let future = make(later)
+        let untimed = make(nil)
+        XCTAssertFalse(ATHLTHStudioSchedule.isUpcoming(.init(
+            id: "past", workout: expired, date: past,
+            planTitle: nil, planID: nil
+        ), now: today, calendar: calendar))
+        XCTAssertTrue(ATHLTHStudioSchedule.isUpcoming(.init(
+            id: "future", workout: future, date: later,
+            planTitle: nil, planID: nil
+        ), now: today, calendar: calendar))
+        XCTAssertTrue(ATHLTHStudioSchedule.isUpcoming(.init(
+            id: "untimed", workout: untimed,
+            date: calendar.startOfDay(for: today),
+            planTitle: nil, planID: nil
+        ), now: today, calendar: calendar))
+    }
+
 }
