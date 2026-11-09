@@ -143,4 +143,48 @@ final class ATHLTHStudioHomeWeekTests: XCTestCase {
         XCTAssertEqual(calendar.component(.day, from: week.days[0].date), 2)
         XCTAssertEqual(calendar.component(.day, from: week.days[6].date), 8)
     }
+    @MainActor
+    func testRestDayIsVisibleButDoesNotCountAsWorkout() throws {
+        let defaults = try XCTUnwrap(
+            UserDefaults(suiteName: "ATHLTHStudioRest.\(UUID().uuidString)")
+        )
+        let store = AppSessionStore(defaults: defaults)
+        let calendar = Calendar.current
+        let now = calendar.startOfDay(for: .now)
+        let weekday = (calendar.component(.weekday, from: now) + 5) % 7
+        let monday = try XCTUnwrap(
+            calendar.date(byAdding: .day, value: -weekday, to: now)
+        )
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "With rest", summary: "", weekCount: 1, startDate: monday
+        ))
+        var rest = session("Recovery", on: nil)
+        rest.workoutCategory = "rest_day"
+        store.addSession(rest, toDay: plan.weeks[0].days[1].id, inPlan: plan.id)
+        let stored = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+
+        let week = ATHLTHStudioHomeWeek.make(
+            plans: [stored], standalone: [], recorded: [], now: monday
+        )
+        XCTAssertEqual(week.plannedCount, 0)
+        XCTAssertEqual(week.days[1].restDays.count, 1)
+        XCTAssertEqual(week.days[1].restDays.first?.workout.title, "Recovery")
+    }
+
+    func testMultiplePlannedSessionsRemainSeparateOnSameDay() throws {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let a = session("Run", on: today)
+        let b = session("Strength", on: today, kind: .strength)
+        let week = ATHLTHStudioHomeWeek.make(
+            plans: [], standalone: [a, b], recorded: [], now: today
+        )
+        let day = try XCTUnwrap(week.days.first {
+            calendar.isDate($0.date, inSameDayAs: today)
+        })
+        XCTAssertEqual(day.planned.count, 2)
+        XCTAssertEqual(week.plannedCount, 2)
+        XCTAssertTrue(day.restDays.isEmpty)
+    }
+
 }
