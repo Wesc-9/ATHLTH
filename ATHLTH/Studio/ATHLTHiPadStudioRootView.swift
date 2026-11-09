@@ -48,8 +48,8 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var inspectorShowsCoach = false
     @State private var inspectorShowsInbox = false
     @State private var showingProfile = false
-    @State private var studioUtility: ATHLTHSideMenuDestination?
-    @State private var studioFeature: ATHLTHSideMenuDestination?
+    /// Secondary Studio tools also replace the detail column, not modal sheets.
+    @State private var sidebarPage: ATHLTHSideMenuDestination?
     @SceneStorage("athlth.studio.libraryExpanded") private var libraryExpanded = false
     @State private var sidebarVisibility: NavigationSplitViewVisibility = .all
     @State private var focusedPlanningDate: Date?
@@ -96,7 +96,8 @@ struct ATHLTHiPadStudioRootView: View {
                     // that previously consumed substantial iPad space.
                     .navigationTitle(
                         libraryPage?.title ??
-                            (selection == .overview ? "" : selection.label)
+                            (sidebarPage != nil ? "" :
+                                (selection == .overview ? "" : selection.label))
                     )
                     .navigationBarTitleDisplayMode(.inline)
                     // Keep the Overview scroll edge clean: a visible bar
@@ -104,7 +105,7 @@ struct ATHLTHiPadStudioRootView: View {
                     .toolbarBackground(canvas, for: .navigationBar)
                     .toolbarBackground(
                         selection == .overview && libraryPage == nil
-                            ? .hidden : .visible,
+                            && sidebarPage == nil ? .hidden : .visible,
                         for: .navigationBar
                     )
                     .toolbar {
@@ -264,13 +265,6 @@ struct ATHLTHiPadStudioRootView: View {
         .sheet(item: $selectedStandaloneWorkout) { workout in
             ATHLTHStudioStandaloneWorkoutDetailView(workoutID: workout.id)
         }
-        .sheet(item: $studioUtility) { destination in
-            ATHLTHSideMenuUtilitiesView(destination: destination)
-        }
-        .sheet(item: $studioFeature) { destination in
-            ATHLTHSideMenuDeepLinkView(destination: destination)
-                .frame(minWidth: 420, minHeight: 520)
-        }
         .sheet(isPresented: $showingProfile) {
             // The existing iPhone profile stays unchanged inside a tall,
             // phone-width sheet rather than stretching across the iPad.
@@ -317,6 +311,7 @@ struct ATHLTHiPadStudioRootView: View {
             // Switching to a main Studio destination clears the inline
             // library selection without dismissing any modal.
             libraryPage = nil
+            sidebarPage = nil
             savedDestination = destination.rawValue
             // Keep Coach and Inbox docked while navigating Studio.
             if destination != .overview { focusedPlanningDate = nil }
@@ -327,7 +322,8 @@ struct ATHLTHiPadStudioRootView: View {
         }
         .onChange(of: focusedPlanningDate) { _, newDate in
             withAnimation(.easeInOut(duration: 0.18)) {
-                sidebarVisibility = libraryPage != nil ? .all :
+                sidebarVisibility = (libraryPage != nil || sidebarPage != nil)
+                    ? .all :
                     (newDate != nil || selection == .planner) ? .detailOnly : .all
             }
         }
@@ -392,7 +388,13 @@ struct ATHLTHiPadStudioRootView: View {
             ATHLTHiPadLibraryWorkspaceView(
                 page: libraryPage,
                 onSelect: openLibrary,
-                onBack: { self.libraryPage = nil }
+                onBack: { returnFromSidebarPage() }
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let sidebarPage {
+            ATHLTHiPadSidebarPageView(
+                destination: sidebarPage,
+                onBack: { returnFromSidebarPage() }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else if selection == .planner {
@@ -541,12 +543,14 @@ struct ATHLTHiPadStudioRootView: View {
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Notifications", norwegian: "Varsler"),
                         symbol: "bell"
-                    ) { studioUtility = .notifications }
+                        selected: sidebarPage == .notifications
+                    ) { openSidebarPage(.notifications) }
 
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Search", norwegian: "Søk"),
                         symbol: "magnifyingglass"
-                    ) { studioUtility = .search }
+                        selected: sidebarPage == .search
+                    ) { openSidebarPage(.search) }
 
                     Divider().padding(.vertical, 7).padding(.horizontal, 10)
 
@@ -560,21 +564,26 @@ struct ATHLTHiPadStudioRootView: View {
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Train Together", norwegian: "Tren sammen"),
                         symbol: "person.2"
-                    ) { studioFeature = .trainTogether }
+                        selected: sidebarPage == .trainTogether
+                    ) { openSidebarPage(.trainTogether) }
 
                     sidebarAction("Ghost Race", symbol: "flag.checkered") {
                         trainRequest = .ghost
                         showingTrain = true
                     }
 
-                    sidebarAction("Arena", symbol: "trophy") {
-                        studioFeature = .arena
+                    sidebarAction(
+                        "Arena", symbol: "trophy",
+                        selected: sidebarPage == .arena
+                    ) {
+                        openSidebarPage(.arena)
                     }
 
                     sidebarAction(
                         ATHLTHLocalization.choose(english: "Clubs", norwegian: "Klubber"),
                         symbol: "person.3"
-                    ) { studioFeature = .clubs }
+                        selected: sidebarPage == .clubs
+                    ) { openSidebarPage(.clubs) }
 
                     Divider().padding(.vertical, 7).padding(.horizontal, 10)
 
@@ -614,7 +623,7 @@ struct ATHLTHiPadStudioRootView: View {
                                   systemImage: "person.3")
                         }
                         Button {
-                            studioFeature = .exerciseProgress
+                            openSidebarPage(.exerciseProgress)
                         } label: {
                             Label(
                                 ATHLTHLocalization.choose(
@@ -819,6 +828,7 @@ struct ATHLTHiPadStudioRootView: View {
 
     private func openLibrary(_ page: ATHLTHStudioLibraryPage) {
         focusedPlanningDate = nil
+        sidebarPage = nil
         libraryPage = page
         // The selected library replaces the Studio detail page. It never
         // launches the full-screen Train shell.
@@ -829,6 +839,32 @@ struct ATHLTHiPadStudioRootView: View {
 
     private func openPersonalLibrary(_ section: ATHLTHPersonalLibrarySection) {
         openLibrary(section.studioLibraryPage)
+    }
+
+    private func openSidebarPage(_ destination: ATHLTHSideMenuDestination) {
+        focusedPlanningDate = nil
+        libraryPage = nil
+        sidebarPage = destination
+        withAnimation(.easeInOut(duration: 0.18)) {
+            sidebarVisibility = .all
+        }
+    }
+
+    private func returnFromSidebarPage() {
+        libraryPage = nil
+        sidebarPage = nil
+        withAnimation(.easeInOut(duration: 0.18)) {
+            sidebarVisibility = selection == .planner ? .detailOnly : .all
+        }
+    }
+
+    private func openStudio(_ destination: ATHLTHStudioDestination) {
+        libraryPage = nil
+        sidebarPage = nil
+        selection = destination
+        withAnimation(.easeInOut(duration: 0.18)) {
+            sidebarVisibility = destination == .planner ? .detailOnly : .all
+        }
     }
 
     @ViewBuilder
