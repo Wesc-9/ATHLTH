@@ -3711,6 +3711,15 @@ struct MyTrainingPlansLibraryView: View {
     @State private var reviewingPlan: TrainingPlan?
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
+    @State private var libraryWidth: CGFloat = 390
+
+    private var cardColumns: [GridItem] {
+        ATHLTHLibraryResponsiveLayout.columns(
+            mode: .list,
+            width: libraryWidth,
+            reservedHorizontalSpace: 36
+        )
+    }
 
     var body: some View {
         ScrollView {
@@ -3755,8 +3764,10 @@ struct MyTrainingPlansLibraryView: View {
                         detail: "Reusable plans that are not on your calendar yet."
                     )
 
-                    ForEach(session.planTemplates) { template in
-                        templateCard(template)
+                    LazyVGrid(columns: cardColumns, spacing: 10) {
+                        ForEach(session.planTemplates) { template in
+                            templateCard(template)
+                        }
                     }
                 }
 
@@ -3766,6 +3777,7 @@ struct MyTrainingPlansLibraryView: View {
                         detail: "Active, upcoming and completed plans."
                     )
 
+                    LazyVGrid(columns: cardColumns, spacing: 12) {
                     ForEach(session.trainingPlans) { plan in
                         let progress = planProgress(plan)
 
@@ -3865,6 +3877,7 @@ struct MyTrainingPlansLibraryView: View {
                             }
                         }
                     }
+                    }
                 }
 
                 if session.planTemplates.isEmpty &&
@@ -3889,8 +3902,10 @@ struct MyTrainingPlansLibraryView: View {
                 }
             }
             .padding(18)
-            .frame(maxWidth: 760)
             .frame(maxWidth: .infinity)
+        }
+        .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
+            libraryWidth = $0
         }
         .background(
             ATHLTHPremiumCanvas(
