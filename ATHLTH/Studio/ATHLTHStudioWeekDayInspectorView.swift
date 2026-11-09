@@ -17,6 +17,7 @@ struct ATHLTHStudioWeekDayInspectorView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @State private var showsAllWorkoutSteps = false
 
     let date: Date
     let onOpenWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
@@ -244,42 +245,80 @@ struct ATHLTHStudioWeekDayInspectorView: View {
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(ink)
 
+                    let steps = item.workout.resolvedWorkoutBlocks
                     ForEach(
-                        Array(item.workout.resolvedWorkoutBlocks.prefix(10).enumerated()),
+                        Array(steps.prefix(
+                            showsAllWorkoutSteps ? steps.count : 6
+                        ).enumerated()),
                         id: \.offset
                     ) { index, block in
-                        HStack(alignment: .top, spacing: 9) {
+                        HStack(alignment: .top, spacing: 10) {
                             Circle()
                                 .fill(index == 0 ? gold : outline)
                                 .frame(width: 7, height: 7)
                                 .padding(.top, 6)
-                            Text(block.title)
-                                .font(.subheadline)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(ATHLTHWorkoutStepCopy.title(
+                                    for: block,
+                                    workoutTitle: item.workout.title,
+                                    compact: true
+                                ))
+                                .font(.subheadline.weight(.medium))
                                 .foregroundStyle(ink)
                                 .fixedSize(horizontal: false, vertical: true)
+
+                                if let target = block.targetText,
+                                   !target.isEmpty {
+                                    Text(target)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .fixedSize(horizontal: false, vertical: true)
+                                }
+                            }
                         }
                     }
 
-                    ForEach(item.workout.exercises) { exercise in
-                        HStack(alignment: .top, spacing: 9) {
-                            Image(systemName: "dumbbell")
-                                .font(.caption)
-                                .foregroundStyle(gold)
-                                .frame(width: 12)
-                            Text(exercise.embeddedExercise.displayName)
-                                .font(.subheadline)
-                                .foregroundStyle(ink)
-                            Spacer(minLength: 4)
-                            Text("\(exercise.sets) " + tr("sets", "sett"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    // Standalone strength plans may have no recipe blocks.
+                    // Do not display the same exercises a second time when
+                    // their authored blocks already carry their details.
+                    if steps.isEmpty {
+                        ForEach(item.workout.exercises) { exercise in
+                            HStack(alignment: .top, spacing: 9) {
+                                Image(systemName: "dumbbell")
+                                    .font(.caption)
+                                    .foregroundStyle(gold)
+                                    .frame(width: 12)
+                                Text(exercise.embeddedExercise.displayName)
+                                    .font(.subheadline)
+                                    .foregroundStyle(ink)
+                                Spacer(minLength: 4)
+                                Text("\(exercise.sets) " + tr("sets", "sett"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
-                    if item.workout.resolvedWorkoutBlocks.count > 10 {
-                        Text(tr("See the workout for all steps.",
-                                "Åpne økten for å se alle delene."))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+
+                    if steps.count > 6 {
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                showsAllWorkoutSteps.toggle()
+                            }
+                        } label: {
+                            Label(
+                                showsAllWorkoutSteps
+                                    ? tr("Show less", "Vis mindre")
+                                    : tr("Show all \(steps.count) steps",
+                                         "Vis alle \(steps.count) deler"),
+                                systemImage: showsAllWorkoutSteps
+                                    ? "chevron.up" : "chevron.down"
+                            )
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ink)
+                            .frame(minHeight: 38)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("athlth-ipad-week-steps-expand")
                     }
                 }
                 .padding(13)
