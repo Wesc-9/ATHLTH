@@ -374,6 +374,25 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                                 }) {
                                     intervalGroupCard(groupID, rows: rows, phase: phase)
                                 }
+                            } else if block.kind == .exercise,
+                                      block.groupID == nil,
+                                      (block.setCount ?? 1) > 1,
+                                      let liveIndex = blocks.firstIndex(where: {
+                                          $0.editorDragID == block.editorDragID
+                                      }) {
+                                ATHLTHStrengthGroupRow(
+                                    block: $blocks[liveIndex],
+                                    canMoveUp: position > 0,
+                                    canMoveDown: position + 1 < rows.count,
+                                    onEdit: { onEdit(block.editorDragID) },
+                                    onDelete: { onRemove(block.editorDragID) },
+                                    onMoveBy: { offset in
+                                        let destination = position + offset
+                                        guard rows.indices.contains(destination) else { return }
+                                        onMove(block.editorDragID, phase,
+                                               rows[destination].editorDragID)
+                                    }
+                                )
                             } else {
                                 stepRow(block, position: position + 1, phase: phase)
                             }
