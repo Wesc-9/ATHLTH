@@ -8,7 +8,7 @@ import SwiftUI
 /// in-progress activity and the Plan tab owns the active training schedule.
 /// The same library screen owns ATHLTH and personal content; old "Mine"
 /// entry points may still deep-link here without exposing duplicate pages.
-enum ATHLTHUnifiedLibraryScope: String, CaseIterable, Identifiable {
+enum ATHLTHUnifiedLibraryScope: String, CaseIterable, Identifiable, Hashable {
     case athlth
     case mine
     var id: String { rawValue }
