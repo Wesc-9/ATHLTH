@@ -408,7 +408,7 @@ struct ATHLTHInsightsView: View {
                             .font(.system(size: 37, weight: .regular, design: .serif))
                             .monospacedDigit()
                             .foregroundStyle(ATHLTHTrainDesign.ink)
-                        Text(health.recovery.score == nil ? tr("No data", "Ingen data") : pulseTitle.capitalized)
+                        Text(readinessRingCaption)
                             .font(.caption2.weight(.semibold))
                             .foregroundStyle(ATHLTHTrainDesign.secondary)
                             .lineLimit(1)
@@ -721,6 +721,21 @@ struct ATHLTHInsightsView: View {
         )
     }
 
+    private var readinessRingCaption: String {
+        if health.recovery.score != nil { return pulseTitle.capitalized }
+        guard let diagnostic = health.recovery.diagnostics else {
+            return tr("Loading", "Henter data")
+        }
+        if !diagnostic.failedSignals.isEmpty {
+            return tr("Read failed", "Lesefeil")
+        }
+        if diagnostic.completeDays >= diagnostic.requiredDays {
+            return tr("Outdated", "Utdatert")
+        }
+        return "\(diagnostic.completeDays)/\(diagnostic.requiredDays) " +
+            tr("days", "dager")
+    }
+
     private var pulseTitle: String {
         switch health.recovery.state {
         case .ready:
@@ -730,6 +745,14 @@ struct ATHLTHInsightsView: View {
         case .takeItEasy, .recover:
             return ATHLTHLocalization.choose(english: "RECOVER", norwegian: "RESTITUSJON")
         case .buildingBaseline:
+            if let diagnostic = health.recovery.diagnostics {
+                if !diagnostic.failedSignals.isEmpty {
+                    return tr("DATA UNAVAILABLE", "DATA UTILGJENGELIG")
+                }
+                if diagnostic.completeDays >= diagnostic.requiredDays {
+                    return tr("NEEDS NEW DATA", "TRENGER NYE DATA")
+                }
+            }
             return ATHLTHLocalization.choose(english: "LEARNING", norwegian: "KARTLEGGER")
         }
     }
@@ -764,8 +787,10 @@ struct ATHLTHInsightsView: View {
             return tr("Your recent signals suggest prioritizing a lighter day.",
                       "De siste signalene tyder på at en roligere dag kan være lurt.")
         case .buildingBaseline:
-            return tr("ATHLTH is establishing your personal baseline from recent health data.",
-                      "ATHLTH etablerer din personlige normal ut fra helsedata.")
+            return health.recovery.diagnostics == nil
+                ? tr("Reading Apple Health measurements.",
+                     "Henter målinger fra Apple Helse.")
+                : health.recovery.detail
         }
     }
 
