@@ -95,6 +95,63 @@ enum ATHLTHLibraryGridColumns {
 }
 
 
+/// Width rules shared by iPhone, iPad and Stage Manager. The old 760-point
+/// content cap left most of the iPad landscape screen unused. Allow library
+/// content to fill its parent, but keep individual cards easy to scan.
+enum ATHLTHLibraryResponsiveLayout {
+    static func columns(
+        mode: ATHLTHLibraryDisplayMode,
+        width: CGFloat,
+        reservedHorizontalSpace: CGFloat = 36,
+        spacing: CGFloat = 10,
+        accessibilityText: Bool = false,
+        preferredMinimumCardWidth: CGFloat = 0
+    ) -> [GridItem] {
+        let usable = max(0, width - reservedHorizontalSpace)
+        if mode == .list {
+            // Two readable list columns instead of one enormous landscape row.
+            let threshold: CGFloat = accessibilityText ? 1450 : 1050
+            let count = usable >= threshold ? 2 : 1
+            return (0..<count).map { _ in GridItem(.flexible(), spacing: spacing) }
+        }
+        if usable < 820 || accessibilityText {
+            // Preserve the familiar iPhone layouts and larger text sizes.
+            return ATHLTHLibraryGridColumns.make(
+                mode: mode,
+                width: width,
+                reservedHorizontalSpace: reservedHorizontalSpace,
+                spacing: spacing,
+                accessibilityText: accessibilityText,
+                preferredMinimumCardWidth: preferredMinimumCardWidth
+            )
+        }
+        let minimum = max(215, preferredMinimumCardWidth)
+        let count = min(5, max(1, Int((usable + spacing) / (minimum + spacing))))
+        return (0..<count).map { _ in GridItem(.flexible(), spacing: spacing) }
+    }
+
+    static func hubColumns(for width: CGFloat) -> [GridItem] {
+        let count = width >= 1100 ? 4 : (width >= 720 ? 3 : 2)
+        return (0..<count).map { _ in GridItem(.flexible(), spacing: 11) }
+    }
+
+    static func featuredCardWidth(
+        for width: CGFloat,
+        accessibilityText: Bool
+    ) -> CGFloat {
+        if accessibilityText { return 300 }
+        // One horizontally scrollable card at phone width, two equal cards
+        // spanning the available width on larger iPad windows.
+        return max(246, (width - 48) / 2)
+    }
+
+    static func featuredCardHeight(for cardWidth: CGFloat, accessibilityText: Bool) -> CGFloat {
+        if accessibilityText { return 280 }
+        return min(320, max(228, cardWidth * 0.49))
+    }
+}
+
+
 /// Card-only naming policy. Keep source names unchanged for training records,
 /// workout reuse, search, synchronization and full accessibility labels.
 enum ATHLTHLibraryName {
