@@ -16,9 +16,11 @@ actor ATHLTHLocalExerciseThumbnailLoader {
     }()
 
     func thumbnailData(for url: URL, maxPixels: Int) -> Data? {
-        guard url.isFileURL else { return nil }
+        guard url.isFileURL, !Task.isCancelled else { return nil }
         let pixels = max(64, min(maxPixels, 640))
-        let key = "\(url.path)|\(pixels)" as NSString
+        let revision = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+            .contentModificationDate?.timeIntervalSince1970 ?? 0
+        let key = "\(url.path)|\(pixels)|\(revision)" as NSString
         if let cached = thumbnails.object(forKey: key) {
             return cached as Data
         }
@@ -37,13 +39,12 @@ actor ATHLTHLocalExerciseThumbnailLoader {
             source, 0, options as CFDictionary
         ) else { return nil }
 
+        guard !Task.isCancelled else { return nil }
         let output = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
-            output, "public.jpeg" as CFString, 1, nil
+            output, "public.png" as CFString, 1, nil
         ) else { return nil }
-        CGImageDestinationAddImage(destination, thumbnail, [
-            kCGImageDestinationLossyCompressionQuality: 0.85
-        ] as CFDictionary)
+        CGImageDestinationAddImage(destination, thumbnail, nil)
         guard CGImageDestinationFinalize(destination) else { return nil }
         let data = output as Data
         thumbnails.setObject(data as NSData, forKey: key, cost: data.count)
