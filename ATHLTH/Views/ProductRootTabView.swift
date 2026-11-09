@@ -12272,6 +12272,18 @@ struct ATHLTHTrainView: View {
             selectedSection = .today
             handleQuickStart(kind)
 
+        case let .customQuickActivity(activity):
+            selectedSection = .today
+            customQuickInitialActivity = activity
+            if customQuickStartAvailable {
+                showingCustomQuickStart = true
+            } else {
+                watchTransferError = ATHLTHLocalization.choose(
+                    english: "Finish your current workout first.",
+                    norwegian: "Avslutt økten som pågår først."
+                )
+            }
+
         case .customQuick:
             selectedSection = .today
             if customQuickStartAvailable {
