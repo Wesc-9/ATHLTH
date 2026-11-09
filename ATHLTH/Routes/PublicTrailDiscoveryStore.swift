@@ -494,7 +494,21 @@ final class PublicTrailDiscoveryStore:
             await refresh(near: center, radiusKilometers: max(3, radius + 1), force: force)
             return
         }
-        guard !isLoading else { return }
+        // A Home request can still be finishing as Explore opens. Wait
+        // for it, then fetch the *selected viewport* instead of dropping
+        // this request and leaving the new map area blank.
+        if isLoading {
+            for _ in 0..<100 {
+                if !isLoading || Task.isCancelled { break }
+                do {
+                    try await Task.sleep(for: .milliseconds(250))
+                } catch {
+                    return
+                }
+            }
+            guard !isLoading, !Task.isCancelled else { return }
+        }
+
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
