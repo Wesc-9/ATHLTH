@@ -171,7 +171,7 @@ struct ATHLTHPlannedIntensityEditor: View {
             HStack(spacing: 10) {
                 Image(systemName: "heart")
                     .foregroundStyle(block.kind == .exercise
-                        ? .secondary : ATHLTHTrainDesign.bronze)
+                        ? Color.secondary : ATHLTHTrainDesign.bronze)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(tr("Heart rate zone", "Pulssone"))
                         .font(.subheadline.weight(.semibold))
