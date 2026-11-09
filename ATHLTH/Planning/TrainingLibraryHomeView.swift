@@ -141,7 +141,9 @@ struct TrainingLibraryHomeView: View {
         .sheet(isPresented: $showingRecoveryRestPlanner) {
             // Keep the original library button and change only its destination.
             NavigationStack {
-                ATHLTHRecoveryWellnessLibraryView()
+                ATHLTHRecoveryWellnessLibraryView(
+                    onClose: { showingRecoveryRestPlanner = false }
+                )
             }
             .presentationDetents([.large])
         }
