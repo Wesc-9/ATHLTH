@@ -4773,6 +4773,20 @@ struct MissedWorkoutsReviewView: View {
     }
 }
 
+/// Favorites reuse the artwork source already selected by ExerciseArtwork.
+/// An exercise without an image keeps the existing favorite-row icon.
+enum LibraryFavoriteExerciseArtworkPolicy {
+    static func hasArtwork(
+        imageURL: URL?,
+        isNativeATHLTH: Bool,
+        sourceIdentifier: String?
+    ) -> Bool {
+        imageURL != nil ||
+            (isNativeATHLTH &&
+             sourceIdentifier?.hasPrefix("athlth-core-") == true)
+    }
+}
+
 struct LibraryFavoritesView: View {
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var recents: LibraryRecentsStore
@@ -4797,8 +4811,25 @@ struct LibraryFavoritesView: View {
         }
     }
 
+    /// Resolve only favorited exercise IDs against the already cached offline
+    /// catalog. Avoid one full library scan or an extra network call per row.
+    private var favoriteExerciseEntriesByID: [UUID: ExerciseLibraryEntry] {
+        let ids = Set(displayedFavorites.compactMap { favorite -> UUID? in
+            guard favorite.itemType == .exercise else { return nil }
+            return UUID(uuidString: favorite.itemID)
+        })
+        guard !ids.isEmpty else { return [:] }
+
+        return Dictionary(uniqueKeysWithValues:
+            exerciseLibrary.allExercises.lazy
+                .filter { ids.contains($0.id) }
+                .map { ($0.id, $0) }
+        )
+    }
+
     var body: some View {
-        ScrollView {
+        let exerciseEntries = favoriteExerciseEntriesByID
+        return ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
                 LibraryPremiumIntro(
                     eyebrow: "FAVORITES",
@@ -4911,7 +4942,11 @@ struct LibraryFavoritesView: View {
                                 NavigationLink {
                                     favoriteDestination(item)
                                 } label: {
-                                    favoriteRow(item)
+                                    favoriteRow(
+                                        item,
+                                        exerciseEntry: UUID(uuidString: item.itemID)
+                                            .flatMap { exerciseEntries[$0] }
+                                    )
                                 }
                                 .buttonStyle(.plain)
                                 .simultaneousGesture(
@@ -5078,27 +5113,51 @@ struct LibraryFavoritesView: View {
         .buttonStyle(.plain)
     }
 
-    private func favoriteRow(
-        _ item: LibraryFavoriteRecord
+    @ViewBuilder
+    private func favoriteArtwork(
+        for item: LibraryFavoriteRecord,
+        exerciseEntry: ExerciseLibraryEntry?
     ) -> some View {
         let tint = favoriteTint(item.itemType)
 
-        return HStack(spacing: 13) {
+        if item.itemType == .exercise,
+           let exerciseEntry,
+           LibraryFavoriteExerciseArtworkPolicy.hasArtwork(
+               imageURL: exerciseEntry.imageStartURL,
+               isNativeATHLTH: exerciseEntry.source == .athlthCatalog,
+               sourceIdentifier: exerciseEntry.sourceIdentifier
+           ) {
+            // Same cached/bundled images and native artwork as the exercise
+            // library, including its failed-image placeholder.
+            ExerciseArtwork(entry: exerciseEntry, size: 46)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(Color.white.opacity(0.75), lineWidth: 0.8)
+                }
+                .accessibilityHidden(true)
+        } else {
             Image(
-                systemName:
-                    item.icon ??
-                    item.itemType.systemImage
+                systemName: item.icon ?? item.itemType.systemImage
             )
             .font(.system(size: 17, weight: .semibold))
             .foregroundStyle(tint)
             .frame(width: 46, height: 46)
             .background(
                 tint.opacity(0.10),
-                in: RoundedRectangle(
-                    cornerRadius: 14,
-                    style: .continuous
-                )
+                in: RoundedRectangle(cornerRadius: 14, style: .continuous)
             )
+            .accessibilityHidden(true)
+        }
+    }
+
+    private func favoriteRow(
+        _ item: LibraryFavoriteRecord,
+        exerciseEntry: ExerciseLibraryEntry?
+    ) -> some View {
+        let tint = favoriteTint(item.itemType)
+
+        return HStack(spacing: 13) {
+            favoriteArtwork(for: item, exerciseEntry: exerciseEntry)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.itemType.title.uppercased())
