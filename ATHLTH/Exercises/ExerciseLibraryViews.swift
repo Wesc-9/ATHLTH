@@ -2335,118 +2335,34 @@ struct CustomExerciseEditorView: View {
     private let aiDraftService = ATHLTHAIExerciseDraftService()
 
     var body: some View {
-        let photoButtonTitle =
-            selectedImageData == nil
-                ? "Add Exercise Image"
-                : "Change Exercise Image"
-
         return NavigationStack {
             Form {
-                Section {
-                    TextField(
-                        ATHLTHLocalization.choose(
-                            english: "Describe the movement, equipment and goal.",
-                            norwegian: "Beskriv bevegelsen, utstyret og formålet."
-                        ),
-                        text: $aiPrompt,
-                        axis: .vertical
-                    )
-                    .lineLimit(3...6)
-
-                    Button {
-                        Task { await generateAIDraft() }
-                    } label: {
-                        HStack(spacing: 9) {
-                            if isGeneratingAIDraft {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "sparkles")
-                            }
-                            Text(ATHLTHLocalization.choose(
-                                english: "Create AI suggestion",
-                                norwegian: "Lag forslag med AI"
-                            ))
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .frame(minHeight: 46)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(ATHLTHTheme.accentDeep)
-                    .disabled(
-                        isGeneratingAIDraft ||
-                        aiPrompt.trimmingCharacters(in: .whitespacesAndNewlines).count < 12
-                    )
-
-                    if let aiErrorMessage {
-                        Text(aiErrorMessage)
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-
-                    if hasAIDraft {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Draft ready. Review all fields before saving.",
-                                norwegian: "Utkastet er klart. Kontroller alle feltene før du lagrer."
-                            ),
-                            systemImage: "checkmark.circle"
-                        )
-                        .font(.caption)
-                        .foregroundStyle(ATHLTHTheme.vitality)
-                    }
-                    Text(ATHLTHLocalization.choose(
-                        english: "ATHLTH AI+ suggests text and muscle groups. You approve the result. The video storyboard is not a generated video.",
-                        norwegian: "ATHLTH AI+ foreslår tekst og muskelgrupper. Du godkjenner resultatet. Videoplanen er ikke en ferdig generert video."
-                    ))
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                } header: {
-                    Label("ATHLTH AI", systemImage: "sparkles")
-                }
-
-                Section {
-                    Button {
-                        if session.hasPaidAccess {
-                            showingEquipmentScanner = true
-                        } else {
-                            showingScannerSubscription = true
-                        }
-                    } label: {
-                        Label(
-                            ATHLTHLocalization.choose(
-                                english: "Scan a gym machine and suggest an exercise",
-                                norwegian: "Skann et apparat og få øvelsesforslag"
-                            ),
-                            systemImage: session.hasPaidAccess
-                                ? "camera.viewfinder" : "lock.fill"
-                        )
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .frame(minHeight: 48)
-                    }
-                    .tint(ATHLTHPlanDesign.ink)
-                    Text(
-                        session.hasPaidAccess
-                        ? ATHLTHLocalization.choose(
-                            english: "Choose an existing ATHLTH exercise as a starting point, then edit before saving your own version.",
-                            norwegian: "Bruk en eksisterende ATHLTH-øvelse som utgangspunkt, og tilpass den før du lagrer din egen versjon."
-                        )
-                        : ATHLTHLocalization.choose(
-                            english: "Requires ATHLTH+. Creating your own exercises manually remains free.",
-                            norwegian: "Krever ATHLTH+. Du kan fortsatt lage egne øvelser manuelt."
-                        )
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                } header: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Identify equipment with AI",
-                        norwegian: "Gjenkjenn apparat med AI"
-                    ))
-                }
-
                 Section("Exercise") {
+                    // Images move to the very top of Exercise Studio,
+                    // while a fresh exercise still starts with the name.
+                    if let selectedImageData,
+                       let image = UIImage(data: selectedImageData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 190)
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                            .accessibilityLabel(ATHLTHLocalization.choose(
+                                english: "Exercise image preview",
+                                norwegian: "Forhåndsvisning av øvelsesbilde"
+                            ))
+                    } else if let originalImageURL = editing?.exercise.imageURL,
+                              originalImageURL.isFileURL,
+                              let image = UIImage(contentsOfFile: originalImageURL.path) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 190)
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                    }
+
                     TextField(
                         ATHLTHLocalization.choose(english: "Name", norwegian: "Navn"),
                         text: $name
@@ -2469,6 +2385,22 @@ struct CustomExerciseEditorView: View {
                     }
                     .font(.caption2)
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    PhotosPicker(
+                        selection: $selectedPhoto,
+                        matching: .images
+                    ) {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: selectedImageData != nil || editing?.exercise.imageURL != nil
+                                    ? "Change exercise image" : "Add exercise image",
+                                norwegian: selectedImageData != nil || editing?.exercise.imageURL != nil
+                                    ? "Endre øvelsesbilde" : "Legg til øvelsesbilde"
+                            ),
+                            systemImage: "photo.badge.plus"
+                        )
+                    }
+                    .accessibilityIdentifier("exercise-studio-image-picker")
+
                     Picker(ATHLTHLocalization.choose(
                         english: "Activity", norwegian: "Aktivitet"
                     ), selection: $activityCategory) {
@@ -2615,38 +2547,6 @@ struct CustomExerciseEditorView: View {
                 }
 
                 Section("Media") {
-                    if let selectedImageData,
-                       let image = UIImage(data: selectedImageData) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 190)
-                            .clipShape(RoundedRectangle(cornerRadius: 18))
-                    }
-
-                    PhotosPicker(
-                        selection: $selectedPhoto,
-                        matching: .images
-                    ) {
-                        Label(
-                            photoButtonTitle,
-                            systemImage: "photo.badge.plus"
-                        )
-                    }
-
-                    if selectedImageData == nil,
-                       let originalImageURL = editing?.exercise.imageURL,
-                       originalImageURL.isFileURL,
-                       let image = UIImage(contentsOfFile: originalImageURL.path) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 160)
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
-                    }
-
                     Button {
                         showingVideoImporter = true
                     } label: {
@@ -2735,6 +2635,34 @@ struct CustomExerciseEditorView: View {
                     ))
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Button {
+                        if session.hasPaidAccess {
+                            showingEquipmentScanner = true
+                        } else {
+                            showingScannerSubscription = true
+                        }
+                    } label: {
+                        Label(
+                            ATHLTHLocalization.choose(
+                                english: "Scan a gym machine and suggest an exercise",
+                                norwegian: "Skann et apparat og få øvelsesforslag"
+                            ),
+                            systemImage: session.hasPaidAccess
+                                ? "camera.viewfinder" : "lock.fill"
+                        )
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(minHeight: 48)
+                    }
+                    .tint(ATHLTHPlanDesign.ink)
+                } header: {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Identify equipment with AI",
+                        norwegian: "Gjenkjenn apparat med AI"
+                    ))
                 }
 
                 Section("Sharing") {
