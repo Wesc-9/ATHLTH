@@ -6686,10 +6686,12 @@ final class HealthKitManager: ObservableObject {
             calendar.startOfDay(
                 for: startDate
             )
+        // End is exclusive. When the baseline ends at midnight, do not
+        // spend one of our recovery queries on the empty current day.
         let finalDay =
             min(
                 calendar.startOfDay(
-                    for: endDate
+                    for: endDate.addingTimeInterval(-0.001)
                 ),
                 calendar.startOfDay(
                     for: Date()
