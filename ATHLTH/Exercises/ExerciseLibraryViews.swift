@@ -1111,7 +1111,10 @@ struct ExerciseLibraryView: View {
                         )
                     }
                     .buttonStyle(.plain)
+                    }
 
+                    // The personal-exercise filter is also useful when
+                    // choosing exercises while building a workout.
                     Button {
                         withAnimation(.easeInOut(duration: 0.18)) {
                             selectedSection = selectedSection == .mine ? .library : .mine
@@ -1136,7 +1139,6 @@ struct ExerciseLibraryView: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("exercise-library-mine-filter")
-                    }
 
                     Menu {
                         Button(
