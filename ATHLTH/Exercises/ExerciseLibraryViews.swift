@@ -122,13 +122,17 @@ struct ExerciseLibraryView: View {
     @State private var scannerTask: Task<Void, Never>?
     @State private var scanIdentity = UUID()
     @State private var selectedSection: ExerciseLibrarySection = .library
-    @State private var exerciseHistory: [StrengthWorkoutLog] = []
+    @State private var strengthHistoryIndex =
+        ATHLTHLibraryWorkoutHistory.StrengthExerciseIndex.empty
 
     private func refreshExerciseHistory() {
-        exerciseHistory = AccountLocalStorage.read(
+        let history = AccountLocalStorage.read(
             [StrengthWorkoutLog].self, name: "strengthHistory",
             userID: session.profile.userID
         ) ?? []
+        strengthHistoryIndex = ATHLTHLibraryWorkoutHistory.strengthExerciseIndex(
+            workouts: history
+        )
     }
 
     init(
@@ -1476,9 +1480,9 @@ struct ExerciseLibraryView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                if let last = ATHLTHLibraryWorkoutHistory.strengthExercise(
+                if let last = strengthHistoryIndex.summary(
                     id: entry.id, canonicalName: entry.canonicalName,
-                    isCustom: entry.source == .custom, workouts: exerciseHistory
+                    isCustom: entry.source == .custom
                 ) {
                     ATHLTHLastWorkoutHistoryLabel(summary: last)
                         .padding(.top, 2)
