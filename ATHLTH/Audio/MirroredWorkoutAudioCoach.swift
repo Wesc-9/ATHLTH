@@ -1188,10 +1188,13 @@ final class MirroredWorkoutAudioCoach:
         _ synthesizer: AVSpeechSynthesizer,
         didStart utterance: AVSpeechUtterance
     ) {
+        // The AVFoundation delegate may call this off the main actor.
+        // Pass only the Sendable object identity into the actor-isolated Task.
+        let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self,
                   let pending = self.pendingLocalSpokenEvent,
-                  pending.utterance === utterance else { return }
+                  ObjectIdentifier(pending.utterance) == utteranceID else { return }
             self.pendingLocalSpokenEvent = nil
             self.markSpokenEventStarted(pending.event)
         }
@@ -1203,9 +1206,12 @@ final class MirroredWorkoutAudioCoach:
         didFinish utterance:
             AVSpeechUtterance
     ) {
+        let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self else { return }
-            if self.pendingLocalSpokenEvent?.utterance === utterance {
+            if self.pendingLocalSpokenEvent.map({
+                ObjectIdentifier($0.utterance) == utteranceID
+            }) == true {
                 self.pendingLocalSpokenEvent = nil
             }
             guard !self
@@ -1234,9 +1240,12 @@ final class MirroredWorkoutAudioCoach:
         didCancel utterance:
             AVSpeechUtterance
     ) {
+        let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self else { return }
-            if self.pendingLocalSpokenEvent?.utterance === utterance {
+            if self.pendingLocalSpokenEvent.map({
+                ObjectIdentifier($0.utterance) == utteranceID
+            }) == true {
                 self.pendingLocalSpokenEvent = nil
             }
             guard !self
