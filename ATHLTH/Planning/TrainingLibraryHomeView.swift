@@ -6,6 +6,89 @@ import SwiftUI
 /// The Library discovers, creates and organizes reusable training content.
 /// It intentionally avoids a 'recently used' feed; the Today tab owns
 /// in-progress activity and the Plan tab owns the active training schedule.
+/// The same library screen owns ATHLTH and personal content; old "Mine"
+/// entry points may still deep-link here without exposing duplicate pages.
+enum ATHLTHUnifiedLibraryScope: String, CaseIterable, Identifiable {
+    case athlth
+    case mine
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .athlth: return "ATHLTH"
+        case .mine:
+            return ATHLTHLocalization.choose(
+                english: "My own", norwegian: "Egne"
+            )
+        }
+    }
+}
+
+struct ATHLTHUnifiedPlansLibraryView: View {
+    var onOpenPlan: ((UUID) -> Void)? = nil
+    @State private var scope: ATHLTHUnifiedLibraryScope = .athlth
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Plan collection", norwegian: "Plansamling"
+                ), selection: $scope
+            ) {
+                ForEach(ATHLTHUnifiedLibraryScope.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+            .accessibilityIdentifier("training-plans-source-filter")
+
+            if scope == .athlth {
+                TrainingPlanLibraryView()
+            } else {
+                MyTrainingPlansLibraryView(onOpenPlan: onOpenPlan)
+            }
+        }
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Training plans", norwegian: "Treningsplaner"
+        ))
+    }
+}
+
+struct ATHLTHUnifiedWorkoutsLibraryView: View {
+    var onStartRunning: ((RunningWorkoutTemplate) -> Void)? = nil
+    @State private var scope: ATHLTHUnifiedLibraryScope = .athlth
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Workout collection", norwegian: "Øktsamling"
+                ), selection: $scope
+            ) {
+                ForEach(ATHLTHUnifiedLibraryScope.allCases) { option in
+                    Text(option.title).tag(option)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 18)
+            .padding(.top, 12)
+            .accessibilityIdentifier("workouts-source-filter")
+
+            if scope == .athlth {
+                WorkoutTemplateLibraryView(onStartRunning: onStartRunning)
+            } else {
+                MyWorkoutTemplatesView()
+            }
+        }
+        .background(ATHLTHTrainDesign.canvas.ignoresSafeArea())
+        .navigationTitle(ATHLTHLocalization.choose(
+            english: "Workouts", norwegian: "Treningsøkter"
+        ))
+    }
+}
+
 struct TrainingLibraryHomeView: View {
     @EnvironmentObject private var favorites: LibraryFavoritesStore
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
@@ -109,7 +192,7 @@ struct TrainingLibraryHomeView: View {
 
             LazyVGrid(columns: categoryLayout, spacing: 11) {
                 NavigationLink {
-                    TrainingPlanLibraryView()
+                    ATHLTHUnifiedPlansLibraryView(onOpenPlan: onOpenPlan)
                 } label: {
                     LibraryHubCategoryTile(
                         title: tr("Training plans", "Treningsplaner"),
@@ -121,7 +204,9 @@ struct TrainingLibraryHomeView: View {
                 }
 
                 NavigationLink {
-                    WorkoutTemplateLibraryView(onStartRunning: onStartRunning)
+                    ATHLTHUnifiedWorkoutsLibraryView(
+                        onStartRunning: onStartRunning
+                    )
                 } label: {
                     LibraryHubCategoryTile(
                         title: tr("Workouts", "Treningsøkter"),
@@ -165,78 +250,26 @@ struct TrainingLibraryHomeView: View {
     private var personalLibrarySection: some View {
         VStack(alignment: .leading, spacing: 12) {
             sectionHeading(
-                tr("YOUR COLLECTION", "DITT INNHOLD"),
-                title: tr("My library", "Mitt bibliotek"),
-                detail: tr("Everything you have created and saved.",
-                           "Alt du har opprettet og lagret.")
+                tr("SAVED", "LAGRET"),
+                title: tr("Your favorites", "Dine favoritter"),
+                detail: tr(
+                    "Your saved plans, workouts, exercises and routes.",
+                    "Lagrede planer, økter, øvelser og ruter samlet."
+                )
             )
-            LazyVGrid(columns: categoryLayout, spacing: 11) {
-                NavigationLink {
-                    MyTrainingPlansLibraryView(onOpenPlan: onOpenPlan)
-                } label: {
-                    LibraryHubCollectionRow(
-                        title: tr("My training plans", "Mine treningsplaner"),
-                        detail: tr("Created and scheduled", "Opprettede og planlagte"),
-                        symbol: "calendar",
-                        tint: gold,
-                        count: session.trainingPlans.count,
-                        grid: true
-                    )
-                }
-                NavigationLink {
-                    LibrarySavedWorkoutsHubView(
-                        onStartRunning: onStartRunning
-                    )
-                } label: {
-                    LibraryHubCollectionRow(
-                        title: tr("My workouts", "Mine økter"),
-                        detail: tr("Strength, hybrid and running",
-                                   "Styrke, kombinert og løping"),
-                        symbol: "bookmark",
-                        tint: slate,
-                        count: session.savedWorkoutTemplates.count
-                            + runningLibrary.customTemplates.count,
-                        grid: true
-                    )
-                }
-                NavigationLink {
-                    ExerciseLibraryView(source: .mine)
-                } label: {
-                    LibraryHubCollectionRow(
-                        title: tr("My exercises", "Mine øvelser"),
-                        detail: tr("Custom movements", "Egne øvelser"),
-                        symbol: "dumbbell",
-                        tint: lavender,
-                        count: exerciseLibrary.customExercises.count,
-                        grid: true
-                    )
-                }
-                NavigationLink {
-                    RouteLibraryListView(source: .mine)
-                } label: {
-                    LibraryHubCollectionRow(
-                        title: tr("My routes", "Mine ruter"),
-                        detail: tr("Saved and created routes", "Lagrede og opprettede ruter"),
-                        symbol: "map",
-                        tint: green,
-                        count: session.savedRoutes.count,
-                        grid: true
-                    )
-                }
-                NavigationLink {
-                    LibraryFavoritesView(onStartRunning: onStartRunning)
-                } label: {
-                    LibraryHubCollectionRow(
-                        title: tr("Favorites", "Favoritter"),
-                        detail: tr("Quick access to your favorites",
-                                   "Dine favoritter på ett sted"),
-                        symbol: "star",
-                        tint: gold,
-                        count: favorites.favorites.count,
-                        grid: true
-                    )
-                }
+            NavigationLink {
+                LibraryFavoritesView(onStartRunning: onStartRunning)
+            } label: {
+                LibraryHubCollectionRow(
+                    title: tr("Favorites", "Favoritter"),
+                    detail: tr("Quick access to saved content", "Gå rett til det du har lagret"),
+                    symbol: "star.fill",
+                    tint: gold,
+                    count: favorites.favorites.count,
+                    grid: false
+                )
             }
+            .buttonStyle(.plain)
         }
     }
 
