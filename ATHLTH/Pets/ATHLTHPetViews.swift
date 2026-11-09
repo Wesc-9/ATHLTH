@@ -48,31 +48,42 @@ struct ATHLTHPetAvatar: View {
 
 /// Optional and compact profile entry. No card appears until an athlete
 /// explicitly opts a pet into their profile, and pet privacy is preserved.
+/// Optional profile preview: a compact, premium link to full pet details.
+/// All pet identity and statistics remain available in the detail screen.
 struct ATHLTHPetProfileSection: View {
     @EnvironmentObject private var pets: ATHLTHPetStore
 
     var body: some View {
         Group {
             if !pets.visiblePets.isEmpty {
-                VStack(alignment: .leading, spacing: 11) {
+                VStack(alignment: .leading, spacing: 8) {
                     HStack(spacing: 8) {
                         Image(systemName: "pawprint.fill")
-                            .foregroundStyle(ATHLTHPetStyle.gold)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(ATHLTHPetStyle.bronze)
+                            .frame(width: 29, height: 29)
+                            .background(
+                                ATHLTHTheme.premiumGoldSoft.opacity(0.50),
+                                in: RoundedRectangle(cornerRadius: 9)
+                            )
                         Text(ATHLTHLocalization.choose(
                             english: "Training companions",
                             norwegian: "Mine turkamerater"
                         ))
-                        .font(.headline.weight(.semibold))
+                        .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(ATHLTHPetStyle.ink)
                         Spacer(minLength: 0)
+                        Text("\(pets.visiblePets.count)")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHPetStyle.muted)
                     }
 
                     ForEach(pets.visiblePets) { pet in
                         NavigationLink {
                             ATHLTHPetDetailView(petID: pet.id)
                         } label: {
-                            HStack(spacing: 10) {
-                                ATHLTHPetAvatar(pet: pet, size: 42)
+                            HStack(spacing: 9) {
+                                ATHLTHPetAvatar(pet: pet, size: 36)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(pet.name)
                                         .font(.subheadline.weight(.semibold))
@@ -80,31 +91,40 @@ struct ATHLTHPetProfileSection: View {
                                     Text(pet.breed ?? pet.speciesName)
                                         .font(.caption)
                                         .foregroundStyle(ATHLTHPetStyle.muted)
+                                        .lineLimit(1)
                                 }
-                                Spacer(minLength: 0)
+                                Spacer(minLength: 4)
                                 Image(systemName: "chevron.right")
-                                    .font(.caption.weight(.semibold))
+                                    .font(.system(size: 10, weight: .semibold))
                                     .foregroundStyle(ATHLTHPetStyle.muted)
                             }
-                            .frame(minHeight: 46)
+                            .padding(.horizontal, 9)
+                            .frame(minHeight: 51)
+                            .background(
+                                Color.white.opacity(0.82),
+                                in: RoundedRectangle(cornerRadius: 13)
+                            )
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(14)
+                .padding(11)
                 .background(
-                    ATHLTHTheme.card,
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    LinearGradient(
+                        colors: [.white.opacity(0.97),
+                                 ATHLTHTheme.premiumGoldSoft.opacity(0.13)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 21, style: .continuous)
                 )
                 .overlay {
-                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        .strokeBorder(ATHLTHPetStyle.border.opacity(0.7))
+                    RoundedRectangle(cornerRadius: 21, style: .continuous)
+                        .strokeBorder(ATHLTHPetStyle.border.opacity(0.53), lineWidth: 0.8)
                 }
             }
         }
-        // The profile should still load correctly when it opens before the
-        // pet store has completed its first network refresh.
         .task {
             if pets.pets.isEmpty { await pets.refresh() }
         }
@@ -491,13 +511,6 @@ struct ATHLTHPetDetailView: View {
                         VStack(alignment: .leading, spacing: 11) {
                             Text(ATHLTHLocalization.choose(english: "Activity history", norwegian: "Aktivitetshistorikk"))
                                 .font(.headline)
-                            if pets.usage(for: pet).isEmpty {
-                                Text(ATHLTHLocalization.choose(
-                                    english: "Add this companion to a walk or workout to begin tracking activity.",
-                                    norwegian: "Legg til turkameraten i en tur eller økt for å starte aktivitetsoversikten."))
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
                             ForEach(pets.usage(for: pet)) { entry in
                                 HStack {
                                     Image(systemName: "figure.walk")
