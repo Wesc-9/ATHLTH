@@ -7,6 +7,7 @@ enum ATHLTHStudioHomeWeek {
     struct Day: Identifiable {
         let date: Date
         let planned: [ATHLTHStudioSchedule.Occurrence]
+        let restDays: [ATHLTHStudioSchedule.Occurrence]
         let recorded: [WorkoutSummary]
         var id: Date { date }
     }
@@ -74,9 +75,17 @@ enum ATHLTHStudioHomeWeek {
             deactivatedPlanIDs: deactivatedPlanIDs,
             startDate: monday,
             days: 7,
-            calendar: calendar
+            calendar: calendar,
+            includeRestDays: true
         )
-        let groupedPlanned = Dictionary(grouping: planned) {
+        let groupedPlanned = Dictionary(grouping: planned.filter {
+            !$0.workout.isExplicitRestDay
+        }) {
+            calendar.startOfDay(for: $0.date)
+        }
+        let groupedRest = Dictionary(grouping: planned.filter {
+            $0.workout.isExplicitRestDay
+        }) {
             calendar.startOfDay(for: $0.date)
         }
         let until = weekInterval.end
@@ -94,6 +103,7 @@ enum ATHLTHStudioHomeWeek {
             return Day(
                 date: date,
                 planned: groupedPlanned[date] ?? [],
+                restDays: groupedRest[date] ?? [],
                 recorded: (groupedRecorded[date] ?? [])
                     .sorted { $0.startDate > $1.startDate }
             )
