@@ -17,6 +17,12 @@ final class HomeWeeklyProgressCalendarTests: XCTestCase {
         ))!
     }
 
+    func testWeeklyStrengthAndWalkingMetricUsesDashWhenEmpty() {
+        XCTAssertEqual(HomeWeeklyProgressCalendar.workoutCountText(0), "—")
+        XCTAssertEqual(HomeWeeklyProgressCalendar.workoutCountText(1), "1")
+        XCTAssertEqual(HomeWeeklyProgressCalendar.workoutCountText(12), "12")
+    }
+
     func testWeekPagerMovesExactlyOneCalendarWeekInEitherDirection() {
         let reference = date(2026, 10, 23)
         let current = HomeWeeklyProgressCalendar.weekInterval(
