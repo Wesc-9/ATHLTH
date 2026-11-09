@@ -129,11 +129,18 @@ struct ATHLTHStudioEditorialDashboardView: View {
             } else {
                 let width = geometry.size.width
                 let split = width >= 730 && !dynamicTypeSize.isAccessibilitySize
-                let threeColumns = width >= 1040 && !dynamicTypeSize.isAccessibilitySize
+                let threeColumns = width >= 880 && !dynamicTypeSize.isAccessibilitySize
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         titleRow(expanded: split)
+
+                        // When the right inspector opens the detail column
+                        // narrows. Keep the week visible above the stacked
+                        // cards so another day can be selected immediately.
+                        if !split {
+                            weekCard(calendarWeek, width: width)
+                        }
 
                         // The other device owns Ghost Race recording.
                         // iPad offers a wide, read-only live course surface.
@@ -176,7 +183,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             compactReadinessCard
                         }
 
-                        weekCard(calendarWeek, width: width)
+                        if split {
+                            weekCard(calendarWeek, width: width)
+                        }
 
                         // Coach already lives in the toolbar. Prioritize
                         // factual progress rather than repeated advice.
