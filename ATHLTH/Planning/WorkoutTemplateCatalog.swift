@@ -3681,7 +3681,8 @@ struct WorkoutTemplateBuilderView: View {
         )
         // Ignore an activity-specific seed when the athlete explicitly
         // chose "Start from scratch"; existing/saved workouts are untouched.
-        let initialRecipe: [WorkoutTemplateBlock] = startBlank ? [] : initialBlocks
+        let initialRecipe: [WorkoutTemplateBlock] = startBlank
+            ? [] : ATHLTHWorkoutSetExpansion.collapsingLegacySets(in: initialBlocks)
         let initialMinutes = startBlank ? nil : initialDurationOverrideMinutes
         _title = State(initialValue: initialTitle)
         _blocks = State(initialValue: initialRecipe)
@@ -3754,7 +3755,7 @@ struct WorkoutTemplateBuilderView: View {
         self.planCopyDays = planCopyDays
         self.onCopyToPlan = onCopyToPlan
         _copyWeekIndex = State(initialValue: initialCopyWeekIndex)
-        let originalBlocks = (try? JSONEncoder().encode(initialRecipe))?.base64EncodedString() ?? ""
+        let originalBlocks = (try? JSONEncoder().encode(initialBlocks))?.base64EncodedString() ?? ""
         self.initialDraftSignature = initialTitle + "|" + originalBlocks +
             "|" + (initialRouteID?.uuidString ?? "") +
             "|" + String(initialMinutes ?? -1)
@@ -3815,7 +3816,7 @@ struct WorkoutTemplateBuilderView: View {
                   savedAt: stored.updatedAt
               ) else { return }
         title = stored.title
-        blocks = stored.blocks
+        blocks = ATHLTHWorkoutSetExpansion.collapsingLegacySets(in: stored.blocks)
         selectedRouteID = stored.routeID
         selectedWorkoutGearIDs = Set(stored.gearIDs ?? [])
         gearSelectionTouched = stored.gearIDs != nil
@@ -6627,15 +6628,6 @@ struct WorkoutTemplateBuilderView: View {
         rest.groupKind = .intervals
         rest.groupRounds = 4
         insertBlock(rest, toGroup: id)
-    }
-
-    private func splitExerciseIntoIndividualSets(at index: Int) {
-        guard blocks.indices.contains(index) else { return }
-        let separated = ATHLTHWorkoutSetExpansion.separateSets(in: blocks[index])
-        guard separated.count > 1 else { return }
-        blocks.replaceSubrange(index...index, with: separated)
-        resequence()
-        expandedBlockIndex = index
     }
 
     /// Moving one interval effort must bring every recovery in that group.
