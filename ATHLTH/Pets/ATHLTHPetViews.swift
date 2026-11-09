@@ -46,6 +46,71 @@ struct ATHLTHPetAvatar: View {
     }
 }
 
+/// Optional and compact profile entry. No card appears until an athlete
+/// explicitly opts a pet into their profile, and pet privacy is preserved.
+struct ATHLTHPetProfileSection: View {
+    @EnvironmentObject private var pets: ATHLTHPetStore
+
+    var body: some View {
+        Group {
+            if !pets.visiblePets.isEmpty {
+                VStack(alignment: .leading, spacing: 11) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "pawprint.fill")
+                            .foregroundStyle(ATHLTHPetStyle.gold)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Training companions",
+                            norwegian: "Mine turkamerater"
+                        ))
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(ATHLTHPetStyle.ink)
+                        Spacer(minLength: 0)
+                    }
+
+                    ForEach(pets.visiblePets) { pet in
+                        NavigationLink {
+                            ATHLTHPetDetailView(petID: pet.id)
+                        } label: {
+                            HStack(spacing: 10) {
+                                ATHLTHPetAvatar(pet: pet, size: 42)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(pet.name)
+                                        .font(.subheadline.weight(.semibold))
+                                        .foregroundStyle(ATHLTHPetStyle.ink)
+                                    Text(pet.breed ?? pet.speciesName)
+                                        .font(.caption)
+                                        .foregroundStyle(ATHLTHPetStyle.muted)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(ATHLTHPetStyle.muted)
+                            }
+                            .frame(minHeight: 46)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(14)
+                .background(
+                    ATHLTHTheme.card,
+                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                )
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .strokeBorder(ATHLTHPetStyle.border.opacity(0.7))
+                }
+            }
+        }
+        // The profile should still load correctly when it opens before the
+        // pet store has completed its first network refresh.
+        .task {
+            if pets.pets.isEmpty { await pets.refresh() }
+        }
+    }
+}
+
 struct ATHLTHPetsSettingsView: View {
     @EnvironmentObject private var pets: ATHLTHPetStore
     @State private var showingCreate = false
