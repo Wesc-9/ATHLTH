@@ -482,7 +482,17 @@ final class RouteDiscoveryStore: ObservableObject {
         _ region: MKCoordinateRegion
     ) async {
         guard RouteDiscoveryRegionBounds(region: region) != nil else { return }
-        guard !isLoadingNearby else { return }
+        if isLoadingNearby {
+            // A legacy location query started before the map appeared
+            // should never make the explicit viewport search a no-op.
+            for _ in 0..<100 {
+                if !isLoadingNearby || Task.isCancelled { break }
+                do {
+                    try await Task.sleep(for: .milliseconds(250))
+                } catch { return }
+            }
+            guard !isLoadingNearby, !Task.isCancelled else { return }
+        }
         isLoadingNearby = true
         defer { isLoadingNearby = false }
 
