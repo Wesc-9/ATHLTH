@@ -3582,6 +3582,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var initialQuickAddConsumed = false
     @State private var draftFinished = false
     @State private var draftNotice = false
+    @State private var pendingDraftCheckpoint: Task<Void, Never>?
     @State private var showingBlockPicker = false
     @State private var showingSavedWorkoutPicker = false
     @State private var showingStudioRoutePicker = false
@@ -3858,8 +3859,27 @@ struct WorkoutTemplateBuilderView: View {
         draftNotice = true
     }
 
+    /// Coalesce rapid text and stepper edits so JSON encoding and UserDefaults
+    /// I/O do not compete with scrolling and exercise card updates.
+    /// The scene-background, close and explicit-save paths still flush instantly.
+    private func scheduleWorkoutDraftCheckpoint() {
+        guard draftActive, !draftFinished else { return }
+        pendingDraftCheckpoint?.cancel()
+        pendingDraftCheckpoint = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(280))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            persistWorkoutDraft()
+        }
+    }
+
     private func persistWorkoutDraft() {
         guard draftActive, !draftFinished else { return }
+        pendingDraftCheckpoint?.cancel()
+        pendingDraftCheckpoint = nil
         // Save on edits and when locking the device, not only on explicit Save.
         let snapshot = StoredWorkoutDraft(
             signature: initialDraftSignature,
@@ -4327,11 +4347,11 @@ struct WorkoutTemplateBuilderView: View {
                 manualDurationMinutes = nil
                 durationInputText = knownDurationMinutes.map(String.init) ?? ""
                 savedToMyWorkouts = false
-                persistWorkoutDraft()
+                scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: title) { _, _ in
                 savedToMyWorkouts = false
-                persistWorkoutDraft()
+                scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: selectedRouteID) { oldValue, newValue in
                 savedToMyWorkouts = false
@@ -4370,7 +4390,7 @@ struct WorkoutTemplateBuilderView: View {
             }
             .onChange(of: manualDurationMinutes) { _, _ in
                 savedToMyWorkouts = false
-                persistWorkoutDraft()
+                scheduleWorkoutDraftCheckpoint()
             }
             .onChange(of: pendingCopyDayIDs) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioVisiblePhases) { _, _ in persistWorkoutDraft() }
