@@ -24,6 +24,42 @@ struct ATHLTHWellnessGuide: Identifiable, Hashable {
         "\(seconds / 60) min" + (seconds % 60 == 0 ? "" : " \(seconds % 60) sek")
     }
 
+    /// Stable muscle-group keys used by the offline recovery library.
+    /// Existing guide IDs and workout blocks remain unchanged.
+    var focusKey: String {
+        switch id {
+        case "neck", "shoulder", "triceps", "rear-shoulder",
+             "wrist-flexor", "wrist-extensor", "side-bend":
+            return "upper"
+        case "back", "lats", "child-pose", "thoracic-rotation",
+             "seated-spinal-twist", "knees-to-chest":
+            return "back"
+        case "hip", "figure-four", "butterfly", "hip-90-90":
+            return "hips"
+        case "calves", "hamstrings", "quadriceps", "soleus", "ankle-rock":
+            return "legs"
+        default:
+            return category == .zen ? "calm" : "all"
+        }
+    }
+
+    var focusTitle: String {
+        switch focusKey {
+        case "upper": return ATHLTHLocalization.choose(
+            english: "Upper body", norwegian: "Overkropp")
+        case "back": return ATHLTHLocalization.choose(
+            english: "Back & spine", norwegian: "Rygg")
+        case "hips": return ATHLTHLocalization.choose(
+            english: "Hips & glutes", norwegian: "Hofte og sete")
+        case "legs": return ATHLTHLocalization.choose(
+            english: "Legs & ankles", norwegian: "Bein og ankler")
+        case "calm": return ATHLTHLocalization.choose(
+            english: "Breathing & calm", norwegian: "Pust og ro")
+        default: return ATHLTHLocalization.choose(
+            english: "Mobility", norwegian: "Mobilitet")
+        }
+    }
+
     static let all: [Self] = [
         .init(id: "calm-46", category: .zen,
               titleNO: "Rolig pust 4–6", titleEN: "Gentle breathing 4–6",
@@ -65,6 +101,86 @@ struct ATHLTHWellnessGuide: Identifiable, Hashable {
               detailNO: "Stå på alle fire. Rund ryggen og senk magen forsiktig, uten å presse ytterstillingene.",
               detailEN: "On hands and knees, gently round your back and lower your belly without forcing the movement.",
               seconds: 90, icon: "figure.pilates", inhale: 0, exhale: 0),
+        .init(id: "triceps", category: .stretching,
+              titleNO: "Tricepsstrekk over hodet", titleEN: "Overhead triceps stretch",
+              detailNO: "Bøy én arm bak hodet og støtt albuen lett med den andre hånden. Hold skuldrene lave, og bytt side halvveis.",
+              detailEN: "Bend one arm behind your head and gently support the elbow. Keep shoulders relaxed and switch sides halfway.",
+              seconds: 60, icon: "figure.flexibility", inhale: 0, exhale: 0),
+        .init(id: "rear-shoulder", category: .stretching,
+              titleNO: "Bakside skulder", titleEN: "Cross-body shoulder stretch",
+              detailNO: "Før armen mykt på tvers av brystet og støtt overarmen med motsatt hånd. Ikke press i skulderleddet. Bytt side.",
+              detailEN: "Move one arm gently across the chest, supporting the upper arm with the other hand. Avoid forcing the joint. Switch sides.",
+              seconds: 60, icon: "figure.cooldown", inhale: 0, exhale: 0),
+        .init(id: "wrist-flexor", category: .stretching,
+              titleNO: "Underarm og håndledd", titleEN: "Wrist flexor stretch",
+              detailNO: "Strekk én arm frem med håndflaten opp. Før fingrene forsiktig ned og bakover med den andre hånden. Bytt side.",
+              detailEN: "Extend one arm with your palm up. Gently ease the fingers downward and backward with the other hand. Switch sides.",
+              seconds: 60, icon: "hand.raised", inhale: 0, exhale: 0),
+        .init(id: "wrist-extensor", category: .stretching,
+              titleNO: "Overside underarm", titleEN: "Wrist extensor stretch",
+              detailNO: "Strekk en arm frem med håndflaten ned. Bøy håndleddet rolig nedover og støtt med motsatt hånd. Bytt side.",
+              detailEN: "Extend one arm palm down. Gently bend the wrist downward, supporting with the other hand. Switch sides.",
+              seconds: 60, icon: "hand.raised", inhale: 0, exhale: 0),
+        .init(id: "lats", category: .stretching,
+              titleNO: "Bred ryggmuskel", titleEN: "Lat stretch",
+              detailNO: "Hold hendene mot en benk eller vegg og før hoftene rolig bakover mens overkroppen senkes. Behold en behagelig ryggstilling.",
+              detailEN: "Rest your hands on a bench or wall, then move your hips back while gently lowering your chest. Keep the back comfortable.",
+              seconds: 60, icon: "figure.flexibility", inhale: 0, exhale: 0),
+        .init(id: "child-pose", category: .stretching,
+              titleNO: "Barnets posisjon", titleEN: "Child's pose",
+              detailNO: "Start på alle fire, før hoftene rolig bakover mot hælene og strekk armene frem. Stopp hvis knærne er ukomfortable.",
+              detailEN: "From hands and knees, ease hips toward the heels and reach arms forward. Stop if your knees feel uncomfortable.",
+              seconds: 75, icon: "figure.yoga", inhale: 0, exhale: 0),
+        .init(id: "thoracic-rotation", category: .stretching,
+              titleNO: "Rotasjon i brystryggen", titleEN: "Thoracic spine rotation",
+              detailNO: "Stå på alle fire, legg en hånd bak hodet og roter albuen rolig opp mot taket. Beveg deg kontrollert og bytt side.",
+              detailEN: "On hands and knees, place one hand behind your head and gently turn the elbow toward the ceiling. Switch sides.",
+              seconds: 80, icon: "figure.pilates", inhale: 0, exhale: 0),
+        .init(id: "quadriceps", category: .stretching,
+              titleNO: "Forside lår", titleEN: "Standing quad stretch",
+              detailNO: "Stå stødig med støtte ved behov, ta tak i ankelen og før hælen rolig mot setet. Hold knærne nær hverandre. Bytt side.",
+              detailEN: "Stand with support if needed, hold your ankle and gently bring the heel toward the glutes. Keep knees close. Switch sides.",
+              seconds: 70, icon: "figure.stand", inhale: 0, exhale: 0),
+        .init(id: "figure-four", category: .stretching,
+              titleNO: "Sete og utside hofte", titleEN: "Figure-four glute stretch",
+              detailNO: "Ligg på ryggen, legg den ene ankelen over motsatt kne og trekk låret rolig mot deg. Bytt side halvveis.",
+              detailEN: "Lie on your back, place one ankle over the opposite knee and gently draw the thigh toward you. Switch sides halfway.",
+              seconds: 80, icon: "figure.flexibility", inhale: 0, exhale: 0),
+        .init(id: "butterfly", category: .stretching,
+              titleNO: "Sommerfuglstrekk", titleEN: "Butterfly groin stretch",
+              detailNO: "Sitt med fotsålene mot hverandre og la knærne falle rolig ut til sidene. Sitt høyt og ikke press knærne ned.",
+              detailEN: "Sit with the soles of your feet together and allow your knees to relax outward. Sit tall; do not press the knees down.",
+              seconds: 70, icon: "figure.yoga", inhale: 0, exhale: 0),
+        .init(id: "soleus", category: .stretching,
+              titleNO: "Dyp leggstrekk", titleEN: "Bent-knee calf stretch",
+              detailNO: "Stå vendt mot en vegg med én fot bak. Bøy bakre kne forsiktig mens hælen holdes i gulvet. Bytt side.",
+              detailEN: "Face a wall with one foot behind. Gently bend the back knee while keeping its heel grounded. Switch sides.",
+              seconds: 60, icon: "figure.walk", inhale: 0, exhale: 0),
+        .init(id: "ankle-rock", category: .stretching,
+              titleNO: "Ankelmobilitet mot vegg", titleEN: "Knee-to-wall ankle mobility",
+              detailNO: "Stå med én fot nær veggen. Før kneet rolig frem mot veggen uten å løfte hælen. Gjenta kontrollert og bytt fot.",
+              detailEN: "Stand with one foot near a wall. Gently move your knee toward the wall without lifting the heel. Repeat and switch feet.",
+              seconds: 75, icon: "figure.walk", inhale: 0, exhale: 0),
+        .init(id: "hip-90-90", category: .stretching,
+              titleNO: "90/90 hofterotasjon", titleEN: "90/90 hip switches",
+              detailNO: "Sitt med bøyde knær og roter beina rolig fra side til side. Bruk hendene som støtte og beveg deg innenfor behagelig utslag.",
+              detailEN: "Sit with bent knees and rotate your legs gently side to side. Use your hands for support and stay within a comfortable range.",
+              seconds: 90, icon: "figure.pilates", inhale: 0, exhale: 0),
+        .init(id: "seated-spinal-twist", category: .stretching,
+              titleNO: "Sittende ryggrotasjon", titleEN: "Seated spinal twist",
+              detailNO: "Sitt oppreist og drei overkroppen forsiktig mot den ene siden uten å presse i korsryggen. Bytt side halvveis.",
+              detailEN: "Sit tall and gently turn your torso to one side without forcing your lower back. Switch sides halfway.",
+              seconds: 70, icon: "figure.cooldown", inhale: 0, exhale: 0),
+        .init(id: "side-bend", category: .stretching,
+              titleNO: "Sidestrekk for overkroppen", titleEN: "Standing side bend",
+              detailNO: "Stå med hoftebreddes avstand, løft én arm og bøy deg mykt til motsatt side. Unngå å vri kroppen. Bytt side.",
+              detailEN: "Stand hip-width apart, raise one arm and gently bend to the other side. Avoid twisting the torso. Switch sides.",
+              seconds: 60, icon: "figure.flexibility", inhale: 0, exhale: 0),
+        .init(id: "knees-to-chest", category: .stretching,
+              titleNO: "Kne mot bryst", titleEN: "Knee-to-chest stretch",
+              detailNO: "Ligg på ryggen og trekk ett kne mykt mot brystet mens det andre beinet hviler. Bytt side uten å presse hoften.",
+              detailEN: "Lie on your back and gently draw one knee toward your chest while the other leg rests. Switch sides without forcing the hip.",
+              seconds: 60, icon: "figure.yoga", inhale: 0, exhale: 0),
         .init(id: "hamstrings", category: .stretching,
               titleNO: "Bakside lår", titleEN: "Hamstring stretch",
               detailNO: "Sitt med ett bein strakt og len deg litt frem fra hoften med lang rygg. Bytt side halvveis.",
@@ -100,6 +216,7 @@ enum ATHLTHWellnessBlockFactory {
 
 struct ATHLTHWellnessGuideTimer: View {
     let guide: ATHLTHWellnessGuide
+    var autoStart = false
     @State private var remaining = 0
     @State private var running = false
 
@@ -175,7 +292,10 @@ struct ATHLTHWellnessGuideTimer: View {
         }
         .padding(14)
         .background(.white, in: RoundedRectangle(cornerRadius: 17))
-        .onAppear { remaining = guide.seconds }
+        .onAppear {
+            remaining = guide.seconds
+            running = autoStart
+        }
         .task(id: running) {
             while running && remaining > 0 {
                 try? await Task.sleep(for: .seconds(1))
