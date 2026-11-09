@@ -77,11 +77,22 @@ struct ATHLTHiPadStudioRootView: View {
             .overview, .planner, .insights, .explore, .community
         ]
         let initial = destinations[min(max(0, index), 4)]
+        let libraryArgument = ProcessInfo.processInfo.arguments.first {
+            $0.hasPrefix("--athlth-compatibility-library=")
+        }
+        let libraryPreview = libraryArgument.flatMap {
+            ATHLTHStudioLibraryPage(
+                rawValue: String(
+                    $0.dropFirst("--athlth-compatibility-library=".count)
+                )
+            )
+        }
         _selection = State(initialValue: initial)
-        // Plan Studio starts with an icon rail instead of consuming a quarter
-        // of the landscape iPad with a full navigation sidebar.
+        _libraryPage = State(initialValue: libraryPreview)
+        // Plan Studio starts with an icon rail, but inline library pages
+        // keep their sidebar visible in both preview and normal navigation.
         _sidebarVisibility = State(initialValue:
-            initial == .planner ? .detailOnly : .all)
+            libraryPreview == nil && initial == .planner ? .detailOnly : .all)
     }
 
     var body: some View {
@@ -279,7 +290,10 @@ struct ATHLTHiPadStudioRootView: View {
             // Scene-local, not shared across windows: Stage Manager windows
             // can keep different destinations without fighting each other.
             let compatibilityLaunch = ProcessInfo.processInfo.arguments
-                .contains { $0.hasPrefix("--athlth-compatibility-tab=") }
+                .contains {
+                    $0.hasPrefix("--athlth-compatibility-tab=") ||
+                        $0.hasPrefix("--athlth-compatibility-library=")
+                }
             if !compatibilityLaunch,
                let restored = ATHLTHStudioDestination(rawValue: savedDestination) {
                 selection = restored
@@ -827,6 +841,7 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func openLibrary(_ page: ATHLTHStudioLibraryPage) {
+        libraryExpanded = true
         focusedPlanningDate = nil
         detailNavigationPath = NavigationPath()
         sidebarPage = nil
