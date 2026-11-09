@@ -1666,6 +1666,12 @@ enum HomeWeeklyProgressCalendar {
         return DateInterval(start: start, end: end)
     }
 
+    /// A zero-count metric should use the same empty-state mark as
+    /// distance and duration. Positive counts remain numeric.
+    static func workoutCountText(_ count: Int) -> String {
+        count > 0 ? String(count) : "—"
+    }
+
     static func planPosition(
         for date: Date,
         startDate: Date,
@@ -2300,7 +2306,9 @@ struct HomeWeeklyProgressStrip:
             compactWeekMetric(
                 icon: "dumbbell.fill",
                 value:
-                    "\(visibleWeekStrengthSessions)",
+                    HomeWeeklyProgressCalendar.workoutCountText(
+                        visibleWeekStrengthSessions
+                    ),
                 accessibilityTitle:
                     ATHLTHLocalization.choose(
                         english:
@@ -2313,7 +2321,9 @@ struct HomeWeeklyProgressStrip:
             compactWeekMetric(
                 icon: "figure.walk",
                 value:
-                    "\(visibleWeekRunningWalkingSessions)",
+                    HomeWeeklyProgressCalendar.workoutCountText(
+                        visibleWeekRunningWalkingSessions
+                    ),
                 accessibilityTitle:
                     ATHLTHLocalization.choose(
                         english:
