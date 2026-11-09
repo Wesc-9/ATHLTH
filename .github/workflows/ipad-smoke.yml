@@ -257,6 +257,30 @@ jobs:
             xcrun simctl terminate "$UDID" com.wesc9.athlth || true
           done
 
+          # Verify the new native Studio library pages on the iPad, not
+          # just the five top-level tabs. A missing source/empty layout must
+          # no longer be hidden behind the full-screen Train overlay.
+          for LIBRARY in overview exercises workouts trainingPlans routes; do
+            echo "Rendering inline ATHLTH iPad library: $LIBRARY"
+
+            LIBRARY_OUTPUT=$(xcrun simctl launch "$UDID" com.wesc9.athlth \
+              --athlth-compatibility-preview \
+              "--athlth-compatibility-library=$LIBRARY" 2>&1)
+            echo "$LIBRARY_OUTPUT"
+
+            LIBRARY_PID=$(echo "$LIBRARY_OUTPUT" | awk -F': ' '/com\.wesc9\.athlth:/ {print $2}')
+            sleep 5
+
+            if [ -z "$LIBRARY_PID" ] || ! kill -0 "$LIBRARY_PID" 2>/dev/null; then
+              echo "::error::ATHLTH iPad library $LIBRARY exited after launch."
+              xcrun simctl spawn "$UDID" log show --last 3m --style compact --predicate 'process == "ATHLTH"' || true
+              exit 1
+            fi
+
+            validate_screen "library-$LIBRARY"
+            xcrun simctl terminate "$UDID" com.wesc9.athlth || true
+          done
+
           # Check the actual first logged-in Studio frame on a larger iPad,
           # in addition to the 11-inch device tested above. Keep the PNG for
           # visual inspection; entropy alone cannot prove layout quality.
@@ -302,7 +326,7 @@ jobs:
             echo "::warning::No 13-inch iPad simulator exists on this runner; 11-inch screenshots are available."
           fi
 
-          echo "ATHLTH onboarding, five iPad views and 13-inch Home (where available) inspected for blank frames."
+          echo "ATHLTH onboarding, five tabs, five inline library pages and 13-inch Home checked for blank frames."
 
       - name: Upload iPad smoke screenshots
         if: always()
