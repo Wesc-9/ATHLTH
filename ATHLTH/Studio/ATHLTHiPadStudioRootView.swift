@@ -42,6 +42,7 @@ struct ATHLTHiPadStudioRootView: View {
     private var savedDestination = ATHLTHStudioDestination.overview.rawValue
     @State private var selection: ATHLTHStudioDestination = .overview
     @State private var selectedWorkout: WorkoutSummary?
+    @State private var inspectedWeekDate: Date?
     /// Side-menu libraries live in the Studio detail column.
     @State private var libraryPage: ATHLTHStudioLibraryPage?
     /// Reset pushed detail cards when switching sidebar destinations.
@@ -364,8 +365,46 @@ struct ATHLTHiPadStudioRootView: View {
                 }
                 .inspectorColumnWidth(min: 320, ideal: 390, max: 480)
             } else if let selectedWorkout {
-                ATHLTHStudioWorkoutInspectionView(workout: selectedWorkout)
-                    .inspectorColumnWidth(min: 270, ideal: 320, max: 400)
+                VStack(spacing: 0) {
+                    inspectorCollapseButton
+                    if let inspectedWeekDate {
+                        Button {
+                            self.selectedWorkout = nil
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Back to selected day",
+                                    norwegian: "Tilbake til valgt dag"
+                                ),
+                                systemImage: "chevron.left"
+                            )
+                            .font(.subheadline.weight(.medium))
+                            .frame(maxWidth: .infinity, minHeight: 44,
+                                   alignment: .leading)
+                        }
+                        .buttonStyle(.plain)
+                        .foregroundStyle(ink)
+                        .padding(.horizontal, 17)
+                    }
+                    ATHLTHStudioWorkoutInspectionView(workout: selectedWorkout)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .inspectorColumnWidth(min: 340, ideal: 430, max: 500)
+            } else if let inspectedWeekDate {
+                VStack(spacing: 0) {
+                    inspectorCollapseButton
+                    ATHLTHStudioWeekDayInspectorView(
+                        date: inspectedWeekDate,
+                        onOpenWorkout: { openWeekWorkout($0, start: false) },
+                        onStartWorkout: { openWeekWorkout($0, start: true) },
+                        onSendToWatch: sendWeekWorkoutToWatch,
+                        onInspectRecorded: inspectRecordedFromWeek,
+                        onPlanWorkout: planFromWeekDay
+                    )
+                    .id(Calendar.current.startOfDay(for: inspectedWeekDate))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                .inspectorColumnWidth(min: 345, ideal: 435, max: 530)
             }
         }
     }
@@ -897,6 +936,7 @@ struct ATHLTHiPadStudioRootView: View {
         case .overview:
             ATHLTHStudioEditorialDashboardView(
                 onInspect: inspect,
+                onSelectWeekDay: showWeekDay,
                 onOpenPlanner: { openStudio(.planner) },
                 onOpenInsights: { openStudio(.insights) },
                 onOpenHistory: { openStudio(.history) },
@@ -994,7 +1034,62 @@ struct ATHLTHiPadStudioRootView: View {
         }
     }
 
+    private func showWeekDay(_ date: Date) {
+        selectedWorkout = nil
+        inspectedWeekDate = Calendar.current.startOfDay(for: date)
+        inspectorShowsCoach = false
+        inspectorShowsInbox = false
+        withAnimation(.easeInOut(duration: 0.20)) {
+            showingInspector = true
+        }
+    }
+
+    private func inspectRecordedFromWeek(_ workout: WorkoutSummary) {
+        // Preserve the selected date so the back button returns to that day.
+        selectedWorkout = workout
+        inspectorShowsCoach = false
+        inspectorShowsInbox = false
+        showingInspector = true
+    }
+
+    private func openWeekWorkout(
+        _ item: ATHLTHStudioSchedule.Occurrence,
+        start: Bool
+    ) {
+        if let planID = item.planID {
+            trainRequest = start
+                ? .startPlannedWorkout(
+                    planID: planID, workoutID: item.workout.id
+                )
+                : .workout(
+                    planID: planID, workoutID: item.workout.id
+                )
+            showingTrain = true
+        } else {
+            // Standalone sessions use their existing detail/editor workflow.
+            selectedStandaloneWorkout = item.workout
+        }
+    }
+
+    private func sendWeekWorkoutToWatch(
+        _ item: ATHLTHStudioSchedule.Occurrence
+    ) {
+        guard let planID = item.planID else { return }
+        trainRequest = .sendPlannedWorkoutToWatch(
+            planID: planID, workoutID: item.workout.id
+        )
+        showingTrain = true
+    }
+
+    private func planFromWeekDay(_ date: Date) {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            showingInspector = false
+        }
+        focusedPlanningDate = Calendar.current.startOfDay(for: date)
+    }
+
     private func inspect(_ workout: WorkoutSummary) {
+        inspectedWeekDate = nil
         selectedWorkout = workout
         inspectorShowsCoach = false
         inspectorShowsInbox = false
