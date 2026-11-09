@@ -551,10 +551,21 @@ final class ExerciseLibraryStore: ObservableObject {
 
     static func searchableNorwegianTerms(
         sourceIdentifier: String?,
+        englishName: String,
         bodyPart: String?,
         primaryMuscles: [String]
     ) -> String {
         var words: [String] = []
+        // Alias on existing licensed RepDB entries rather than creating a
+        // duplicate ATHLTH-native exercise with a different historical ID.
+        let nameAndID = (englishName + " " + (sourceIdentifier ?? ""))
+            .replacingOccurrences(of: "-", with: " ")
+            .lowercased()
+        if nameAndID.contains("incline") &&
+            (nameAndID.contains("dumbbell") || nameAndID.contains("db ")) &&
+            (nameAndID.contains("press") || nameAndID.contains("bench")) {
+            words.append("Skråbenk med manualer")
+        }
         if let sourceIdentifier {
             if let localized = norwegianExerciseNames[sourceIdentifier] {
                 words.append(localized)
@@ -871,11 +882,7 @@ final class ExerciseLibraryStore: ObservableObject {
         equipment: String? = nil
     ) -> [ExerciseLibraryEntry] {
         synchronizeSearchLanguage()
-        let cleanQuery = query
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .folding(options: [.diacriticInsensitive, .caseInsensitive],
-                     locale: Locale(identifier: "nb_NO"))
-            .lowercased()
+        let cleanQuery = ATHLTHWorkoutLibraryExerciseIndex.normalize(query)
 
         let request = SearchRequest(query: cleanQuery, bodyPart: bodyPart, equipment: equipment)
         let translationRevision = NorwegianExerciseAutoTranslation.shared.revision
@@ -934,11 +941,15 @@ final class ExerciseLibraryStore: ObservableObject {
                             .joined(separator: " "),
                         Self.searchableNorwegianTerms(
                             sourceIdentifier: entry.sourceIdentifier,
+                            englishName: entry.name,
                             bodyPart: entry.bodyPart,
                             primaryMuscles: entry.exercise.primaryMuscles
                         )
                     ]
                     .joined(separator: " ")
+                    .lowercased()
+                    .replacingOccurrences(of: "ø", with: "o")
+                    .replacingOccurrences(of: "æ", with: "ae")
                     .folding(options: [.diacriticInsensitive, .caseInsensitive],
                              locale: Locale(identifier: "nb_NO"))
                     .lowercased()
@@ -952,6 +963,9 @@ final class ExerciseLibraryStore: ObservableObject {
                     liveNorwegianName = (
                         NorwegianExerciseAutoTranslation.shared.translated(entry.name) ?? ""
                     )
+                    .lowercased()
+                    .replacingOccurrences(of: "ø", with: "o")
+                    .replacingOccurrences(of: "æ", with: "ae")
                     .folding(
                         options: [.diacriticInsensitive, .caseInsensitive],
                         locale: Locale(identifier: "nb_NO")
