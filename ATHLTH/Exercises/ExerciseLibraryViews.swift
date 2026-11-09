@@ -2980,11 +2980,13 @@ struct ExerciseArtwork: View {
                 // Distinct royalty-free local artwork for all 20 originals.
                 ATHLTHOriginalCoreArtwork(slug: slug)
             } else if let url = entry.imageStartURL {
-                if url.isFileURL,
-                   let image = UIImage(contentsOfFile: url.path) {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
+                if url.isFileURL {
+                    ATHLTHLocalExerciseThumbnailView(
+                        url: url,
+                        size: size,
+                        fallbackSymbol: entry.source == .custom
+                            ? "person.crop.circle.badge.plus" : "dumbbell.fill"
+                    )
                 } else {
                     ATHLTHStorageImage(url: url) { phase in
                         switch phase {
