@@ -378,8 +378,26 @@ final class PublicTrailDiscoveryStore:
             return
         }
 
-        guard !isLoading else {
-            return
+        if isLoading {
+            // Home may have started an overlapping request just before the
+            // user opened Explore. Wait for that request instead of silently
+            // dropping Explore's initial load. If Home was cancelled, retry.
+            for _ in 0..<100 {
+                guard !Task.isCancelled else { return }
+                guard isLoading else { break }
+                do {
+                    try await Task.sleep(for: .milliseconds(250))
+                } catch {
+                    return
+                }
+            }
+            guard !isLoading, !Task.isCancelled else { return }
+            if !force,
+               !trails.isEmpty,
+               let lastCenter,
+               location.distance(from: lastCenter) < movementThreshold {
+                return
+            }
         }
 
         isLoading = true
