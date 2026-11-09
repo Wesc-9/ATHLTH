@@ -67,6 +67,32 @@ final class ATHLTHPlannedDayWellnessAndPlacesTests: XCTestCase {
         XCTAssertTrue(edit.scheduledSessions(from: [sample]).isEmpty)
     }
 
+    func testQuickRestDayUsesSelectedCalendarDateWithoutWorkoutLoad() {
+        let selected = Date(timeIntervalSince1970: 1_800_001_234)
+        let rest = ATHLTHRestDayQuickScheduling.session(for: selected)
+        XCTAssertEqual(rest.scheduledStart, Calendar.current.startOfDay(for: selected))
+        XCTAssertTrue(rest.isExplicitRestDay)
+        XCTAssertEqual(rest.workoutCategory, "rest_day")
+        XCTAssertEqual(rest.kind, .recovery)
+        XCTAssertNil(rest.durationMinutes)
+        XCTAssertTrue(rest.exercises.isEmpty)
+    }
+
+    func testQuickRestDayDoesNotDuplicateSameCalendarDay() throws {
+        let selected = Date(timeIntervalSince1970: 1_800_001_234)
+        let first = ATHLTHRestDayQuickScheduling.session(for: selected)
+        let nextDay = try XCTUnwrap(Calendar.current.date(byAdding: .day, value: 1, to: selected))
+        XCTAssertTrue(ATHLTHRestDayQuickScheduling.isAlreadyScheduled(
+            on: selected, among: [first]
+        ))
+        XCTAssertFalse(ATHLTHRestDayQuickScheduling.isAlreadyScheduled(
+            on: nextDay, among: [first]
+        ))
+        XCTAssertFalse(ATHLTHRestDayQuickScheduling.isAlreadyScheduled(
+            on: selected, among: []
+        ))
+    }
+
     func testWarmupHasIndependentTimePaceAndHeartRateZone() {
         var warmup = WorkoutTemplateBlock(
             sequence: 1, kind: .run, title: "Oppvarming – rolig jogg",
