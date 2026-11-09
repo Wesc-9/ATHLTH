@@ -56,12 +56,12 @@ struct ATHLTHPetProfileSection: View {
     var body: some View {
         Group {
             if !pets.visiblePets.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack(spacing: 8) {
                         Image(systemName: "pawprint.fill")
                             .font(.system(size: 13, weight: .semibold))
                             .foregroundStyle(ATHLTHPetStyle.bronze)
-                            .frame(width: 29, height: 29)
+                            .frame(width: 25, height: 25)
                             .background(
                                 ATHLTHTheme.premiumGoldSoft.opacity(0.50),
                                 in: RoundedRectangle(cornerRadius: 9)
@@ -70,7 +70,7 @@ struct ATHLTHPetProfileSection: View {
                             english: "Training companions",
                             norwegian: "Mine turkamerater"
                         ))
-                        .font(.system(size: 16, weight: .semibold))
+                        .font(.system(size: 15, weight: .semibold))
                         .foregroundStyle(ATHLTHPetStyle.ink)
                         Spacer(minLength: 0)
                         Text("\(pets.visiblePets.count)")
@@ -82,8 +82,8 @@ struct ATHLTHPetProfileSection: View {
                         NavigationLink {
                             ATHLTHPetDetailView(petID: pet.id)
                         } label: {
-                            HStack(spacing: 9) {
-                                ATHLTHPetAvatar(pet: pet, size: 36)
+                            HStack(spacing: 8) {
+                                ATHLTHPetAvatar(pet: pet, size: 32)
                                 VStack(alignment: .leading, spacing: 2) {
                                     Text(pet.name)
                                         .font(.subheadline.weight(.semibold))
@@ -98,8 +98,8 @@ struct ATHLTHPetProfileSection: View {
                                     .font(.system(size: 10, weight: .semibold))
                                     .foregroundStyle(ATHLTHPetStyle.muted)
                             }
-                            .padding(.horizontal, 9)
-                            .frame(minHeight: 51)
+                            .padding(.horizontal, 8)
+                            .frame(minHeight: 42)
                             .background(
                                 Color.white.opacity(0.82),
                                 in: RoundedRectangle(cornerRadius: 13)
@@ -109,7 +109,7 @@ struct ATHLTHPetProfileSection: View {
                         .buttonStyle(.plain)
                     }
                 }
-                .padding(11)
+                .padding(9)
                 .background(
                     LinearGradient(
                         colors: [.white.opacity(0.97),
