@@ -63,6 +63,42 @@ struct CommunityRouteRecord: Codable, Identifiable, Hashable {
     }
 }
 
+/// A bounded local lookup prevents the global newest-routes page from
+/// crowding older routes out of the Explore map in a particular city.
+struct RouteDiscoveryNearbyBounds {
+    let minLatitude: Double
+    let maxLatitude: Double
+    let minLongitude: Double?
+    let maxLongitude: Double?
+
+    init?(coordinate: CLLocationCoordinate2D, radiusKilometers: Double) {
+        guard CLLocationCoordinate2DIsValid(coordinate),
+              coordinate.latitude.isFinite,
+              coordinate.longitude.isFinite,
+              radiusKilometers.isFinite,
+              radiusKilometers > 0 else { return nil }
+
+        let latitudeDelta = radiusKilometers / 111.2
+        let latitudeRadians = coordinate.latitude * .pi / 180
+        let longitudeDelta = radiusKilometers /
+            (111.2 * max(0.01, abs(cos(latitudeRadians))))
+        minLatitude = max(-90, coordinate.latitude - latitudeDelta)
+        maxLatitude = min(90, coordinate.latitude + latitudeDelta)
+
+        // Near the dateline/poles the longitude range wraps. Use the
+        // latitude-only server filter and exact distance check locally.
+        if longitudeDelta >= 180 ||
+            coordinate.longitude - longitudeDelta < -180 ||
+            coordinate.longitude + longitudeDelta > 180 {
+            minLongitude = nil
+            maxLongitude = nil
+        } else {
+            minLongitude = coordinate.longitude - longitudeDelta
+            maxLongitude = coordinate.longitude + longitudeDelta
+        }
+    }
+}
+
 private struct CommunityRouteWrite: Encodable {
     let id: UUID
     let ownerID: UUID
@@ -121,6 +157,42 @@ final class SupabaseRouteDiscoveryService {
             .limit(min(max(limit, 12), 80))
             .execute()
             .value
+    }
+
+    func loadDiscoverableRoutes(
+        near location: CLLocation,
+        radiusKilometers: Double = 50,
+        limit: Int = 80
+    ) async throws -> [CommunityRouteRecord] {
+        guard let bounds = RouteDiscoveryNearbyBounds(
+            coordinate: location.coordinate,
+            radiusKilometers: radiusKilometers
+        ) else { return [] }
+
+        var query = client.from("community_routes")
+            .select()
+            .gte("center_latitude", value: bounds.minLatitude)
+            .lte("center_latitude", value: bounds.maxLatitude)
+
+        if let west = bounds.minLongitude,
+           let east = bounds.maxLongitude {
+            query = query.gte("center_longitude", value: west)
+                .lte("center_longitude", value: east)
+        }
+
+        let candidates: [CommunityRouteRecord] = try await query
+            .order("created_at", ascending: false)
+            .limit(min(max(limit, 12), 100))
+            .execute()
+            .value
+
+        let maxDistance = radiusKilometers * 1_000
+        return candidates.filter { route in
+            CLLocation(
+                latitude: route.centerLatitude,
+                longitude: route.centerLongitude
+            ).distance(from: location) <= maxDistance
+        }
     }
 
     func searchRoutes(
@@ -214,12 +286,17 @@ final class SupabaseRouteDiscoveryService {
 @MainActor
 final class RouteDiscoveryStore: ObservableObject {
     @Published private(set) var routes: [CommunityRouteRecord] = []
+    /// Explore-specific geographic page, independent of other route lists.
+    @Published private(set) var localRoutes: [CommunityRouteRecord] = []
     @Published private(set) var searchResults: [CommunityRouteRecord] = []
     @Published private(set) var isLoading = false
+    @Published private(set) var isLoadingNearby = false
     @Published var errorMessage: String?
 
     private let service: SupabaseRouteDiscoveryService
     private var lastRefreshAt: Date?
+    private var lastNearbyRefreshAt: Date?
+    private var lastNearbyCenter: CLLocation?
 
     init(
         service: SupabaseRouteDiscoveryService =
@@ -258,6 +335,46 @@ final class RouteDiscoveryStore: ObservableObject {
         } catch {
             guard !Task.isCancelled else { return }
             errorMessage = error.localizedDescription
+        }
+    }
+
+    func refreshNearby(
+        near location: CLLocation,
+        radiusKilometers: Double = 50,
+        force: Bool = false
+    ) async {
+        guard CLLocationCoordinate2DIsValid(location.coordinate),
+              radiusKilometers.isFinite, radiusKilometers > 0 else { return }
+
+        if !force,
+           let lastNearbyRefreshAt,
+           let lastNearbyCenter,
+           Date().timeIntervalSince(lastNearbyRefreshAt) < 180,
+           location.distance(from: lastNearbyCenter) < 1_500 {
+            return
+        }
+
+        guard !isLoadingNearby else { return }
+        isLoadingNearby = true
+        defer { isLoadingNearby = false }
+
+        do {
+            let found = try await service.loadDiscoverableRoutes(
+                near: location,
+                radiusKilometers: radiusKilometers
+            )
+            guard !Task.isCancelled else { return }
+            localRoutes = found
+            lastNearbyCenter = location
+            lastNearbyRefreshAt = Date()
+            errorMessage = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            if localRoutes.isEmpty && routes.isEmpty {
+                errorMessage = error.localizedDescription
+            }
         }
     }
 
