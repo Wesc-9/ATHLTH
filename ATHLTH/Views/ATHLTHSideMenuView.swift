@@ -367,26 +367,26 @@ struct ATHLTHSideMenuView: View {
                 VStack(spacing: 1) {
                     menuRow(
                         .myExercises,
-                        english: "My exercises",
-                        norwegian: "Mine øvelser",
+                        english: "Exercises",
+                        norwegian: "Øvelser",
                         icon: "dumbbell"
                     )
                     menuRow(
                         .myRoutes,
-                        english: "My routes",
-                        norwegian: "Mine ruter",
+                        english: "Routes",
+                        norwegian: "Ruter",
                         icon: "map"
                     )
                     menuRow(
                         .myTrainingPlans,
-                        english: "My training plans",
-                        norwegian: "Mine treningsplaner",
+                        english: "Training plans",
+                        norwegian: "Treningsplaner",
                         icon: "calendar"
                     )
                     menuRow(
                         .myWorkouts,
-                        english: "My workouts",
-                        norwegian: "Mine treningsøkter",
+                        english: "Workouts",
+                        norwegian: "Treningsøkter",
                         icon: "bookmark"
                     )
                 }
