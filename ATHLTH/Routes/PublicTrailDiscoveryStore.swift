@@ -412,44 +412,26 @@ final class PublicTrailDiscoveryStore:
                 center: location
             )
 
-            // A cold cell returns immediately while the Edge Function warms
-            // the OpenStreetMap cache in the background. Retry exactly once
-            // so first-time Explore users usually see routes without having
-            // to close and reopen the screen.
-            if response.trails.isEmpty,
-               response.isRefreshing {
+            // The first cold-cache reply may contain no trails while the
+            // remote OSM/Kartverket cell is being generated. Keep polling for
+            // a bounded time rather than requiring a second tab visit.
+            // Never retry a genuinely empty, completed area or a failure.
+            let warmupDelays: [Duration] = [
+                .seconds(4), .seconds(6), .seconds(8)
+            ]
+            for delay in warmupDelays where
+                response.trails.isEmpty && response.isRefreshing {
                 isWarmingCache = true
+                try await Task.sleep(for: delay)
+                guard !Task.isCancelled else { return }
 
-                try await Task.sleep(
-                    for: .seconds(4)
+                response = try await service.discover(
+                    near: location,
+                    radiusKilometers: min(max(radiusKilometers, 3), 20),
+                    forceRefresh: true
                 )
-
-                guard !Task.isCancelled else {
-                    return
-                }
-
-                response =
-                    try await service.discover(
-                        near: location,
-                        radiusKilometers:
-                            min(
-                                max(
-                                    radiusKilometers,
-                                    3
-                                ),
-                                20
-                            ),
-                        forceRefresh: true
-                    )
-
-                guard !Task.isCancelled else {
-                    return
-                }
-
-                apply(
-                    response,
-                    center: location
-                )
+                guard !Task.isCancelled else { return }
+                apply(response, center: location)
             }
 
             isWarmingCache =
