@@ -163,9 +163,10 @@ final class AthleteOfflinePackStore: ObservableObject {
                 return true
             }
             if includeMedia { for route in selectedRoutes {
-                if routeUnchanged(route.id) && (try reuseAsset(
-                    route.id, availableIDs: previousPack?.mapRouteIDs ?? []
-                )) {
+                if routeUnchanged(route.id),
+                   try reuseAsset(
+                       route.id, availableIDs: previousPack?.mapRouteIDs ?? []
+                   ) {
                     pack.mapRouteIDs.append(route.id)
                     continue
                 }
