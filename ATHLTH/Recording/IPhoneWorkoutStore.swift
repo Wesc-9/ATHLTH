@@ -4794,10 +4794,13 @@ final class IPhoneWorkoutStore:
         _ synthesizer: AVSpeechSynthesizer,
         didStart utterance: AVSpeechUtterance
     ) {
+        // Only send a Sendable identifier from the nonisolated AVFoundation
+        // callback to the main actor; AVSpeechUtterance is not Sendable.
+        let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self,
                   let pending = self.pendingLocalCoachEvent,
-                  pending.utterance === utterance else { return }
+                  ObjectIdentifier(pending.utterance) == utteranceID else { return }
             self.pendingLocalCoachEvent = nil
             self.markLocalCoachEventStarted(pending.event)
         }
@@ -4807,9 +4810,12 @@ final class IPhoneWorkoutStore:
         _ synthesizer: AVSpeechSynthesizer,
         didFinish utterance: AVSpeechUtterance
     ) {
+        let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self else { return }
-            if self.pendingLocalCoachEvent?.utterance === utterance {
+            if self.pendingLocalCoachEvent.map({
+                ObjectIdentifier($0.utterance) == utteranceID
+            }) == true {
                 self.pendingLocalCoachEvent = nil
             }
             guard !self.speechSynthesizer.isSpeaking,
@@ -4834,9 +4840,12 @@ final class IPhoneWorkoutStore:
         _ synthesizer: AVSpeechSynthesizer,
         didCancel utterance: AVSpeechUtterance
     ) {
+        let utteranceID = ObjectIdentifier(utterance)
         Task { @MainActor [weak self] in
             guard let self else { return }
-            if self.pendingLocalCoachEvent?.utterance === utterance {
+            if self.pendingLocalCoachEvent.map({
+                ObjectIdentifier($0.utterance) == utteranceID
+            }) == true {
                 self.pendingLocalCoachEvent = nil
             }
             guard !self.speechSynthesizer.isSpeaking,
