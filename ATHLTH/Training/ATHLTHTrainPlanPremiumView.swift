@@ -47,6 +47,7 @@ struct ATHLTHTrainPlanPremiumView: View {
     @State private var creationDraftID: UUID?
     @State private var creationResumesDraft = true
     @State private var unfinishedPlanDrafts: [ATHLTHPlanDraftRecord] = []
+    @State private var activeDraftMenuID: UUID?
     @State private var showingDeletePlanDraftConfirmation = false
     @State private var draftPendingDeletionID: UUID?
     @State private var planDraftDeletionError: String?
@@ -2379,38 +2380,51 @@ struct ATHLTHTrainPlanPremiumView: View {
                         .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                 }
                 Spacer(minLength: 0)
-                Menu {
-                    Button {
-                        openDraft(checkpoint)
-                    } label: {
-                        Label(tr("Continue planning", "Fortsett planleggingen"),
-                              systemImage: "arrow.uturn.forward")
-                    }
-                    Button {
-                        beginNewPlanCreation()
-                    } label: {
-                        Label(tr("Start a new plan", "Start ny plan"),
-                              systemImage: "plus")
-                    }
-                    Divider()
-                    Button(role: .destructive) {
-                        draftPendingDeletionID = checkpoint.draftID
-                        showingDeletePlanDraftConfirmation = true
-                    } label: {
-                        Label(tr("Delete draft", "Slett utkast"),
-                              systemImage: "trash")
-                    }
+                Button {
+                    activeDraftMenuID = checkpoint.draftID
                 } label: {
                     Image(systemName: "ellipsis")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(ATHLTHPlanDesign.ink)
                         .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel(tr("Draft options", "Valg for utkast"))
                 .accessibilityHint(tr(
                     "Continue, start a new plan or delete this draft",
                     "Fortsett, start en ny plan eller slett utkastet"
                 ))
+                .popover(
+                    isPresented: Binding(
+                        get: { activeDraftMenuID == checkpoint.draftID },
+                        set: { shown in
+                            if !shown && activeDraftMenuID == checkpoint.draftID {
+                                activeDraftMenuID = nil
+                            }
+                        }
+                    ),
+                    attachmentAnchor: .rect(.bounds),
+                    arrowEdge: .top
+                ) {
+                    ATHLTHPlanDraftActionsPopover(
+                        onContinue: {
+                            activeDraftMenuID = nil
+                            openDraft(checkpoint)
+                        },
+                        onStartNew: {
+                            activeDraftMenuID = nil
+                            beginNewPlanCreation()
+                        },
+                        onDelete: {
+                            activeDraftMenuID = nil
+                            draftPendingDeletionID = checkpoint.draftID
+                            showingDeletePlanDraftConfirmation = true
+                        }
+                    )
+                    .presentationCompactAdaptation(.popover)
+                    .presentationBackground(.clear)
+                }
             }
 
             if let planDraftDeletionError {
