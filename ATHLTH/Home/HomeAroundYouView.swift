@@ -3461,10 +3461,11 @@ struct AroundYouExploreView: View {
             isSearchingVisibleArea = false
         }
 
-        activeSearchCenter = CLLocation(
+        let searchCenter = CLLocation(
             latitude: visibleRegion.center.latitude,
             longitude: visibleRegion.center.longitude
         )
+        activeSearchCenter = searchCenter
 
         withAnimation(.easeInOut(duration: 0.16)) {
             selectedRoute = nil
@@ -3477,7 +3478,7 @@ struct AroundYouExploreView: View {
             force: true
         )
         async let nearbyRoutes: Void = routeDiscovery.refreshNearby(
-            near: activeSearchCenter!,
+            near: searchCenter,
             force: true
         )
         async let routes: Void = routeDiscovery.refresh(force: true)
