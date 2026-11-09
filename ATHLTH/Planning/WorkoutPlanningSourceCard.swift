@@ -117,27 +117,17 @@ struct WorkoutPlanningSourceCard: View {
                 ATHLTHRecoveryRestEntryCard(action: onRecoveryRest)
             }
             if let onRestDay {
-                Button(action: onRestDay) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "moon.stars.fill")
-                            .foregroundStyle(ATHLTHTheme.recoveryBlue)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(ATHLTHLocalization.choose(english: "Rest day", norwegian: "Hviledag"))
-                                .font(.subheadline.weight(.semibold))
-                            Text(ATHLTHLocalization.choose(
-                                english: "Add a training-free day to your calendar.",
-                                norwegian: "Legg inn en treningsfri dag i kalenderen."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right")
-                    }
-                    .padding(15)
-                    .background(.white, in: RoundedRectangle(cornerRadius: 18))
-                }
-                .buttonStyle(.plain)
+                ATHLTHCompactPlanActionCard(
+                    title: ATHLTHLocalization.choose(
+                        english: "Rest day", norwegian: "Hviledag"
+                    ),
+                    subtitle: ATHLTHLocalization.choose(
+                        english: "Mark the selected date as a training-free day.",
+                        norwegian: "Marker valgt dato som treningsfri i kalenderen."
+                    ),
+                    symbol: "moon.stars.fill",
+                    action: onRestDay
+                )
             }
 
             HStack(alignment: .top, spacing: 10) {
@@ -281,59 +271,76 @@ struct WorkoutPlanningSourceCard: View {
 /// One reusable compact card on the extra-workout start, Library and Plan Studio.
 struct ATHLTHRecoveryRestEntryCard: View {
     let action: () -> Void
+
     var body: some View {
+        ATHLTHCompactPlanActionCard(
+            title: ATHLTHLocalization.choose(
+                english: "Recovery & wellbeing",
+                norwegian: "Restitusjon og velvære"
+            ),
+            subtitle: ATHLTHLocalization.choose(
+                english: "Breathing, stretching and active recovery.",
+                norwegian: "Pust, tøying og aktiv restitusjon."
+            ),
+            symbol: "leaf.fill",
+            action: action
+        )
+    }
+}
 
-                Button(action: action) {
-                    HStack(spacing: 12) {
-                        Image(systemName: "leaf.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                            .frame(width: 45, height: 45)
-                            .background(
-                                ATHLTHTheme.recoveryBlueSoft,
-                                in: RoundedRectangle(cornerRadius: 14)
-                            )
+/// Matching compact choices for rest and recovery use one surface, icon
+/// treatment, text hierarchy and tap target on iPhone and iPad.
+private struct ATHLTHCompactPlanActionCard: View {
+    let title: String
+    let subtitle: String
+    let symbol: String
+    let action: () -> Void
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(ATHLTHLocalization.choose(
-                                english: "Recovery & wellbeing",
-                                norwegian: "Restitusjon og velvære"
-                            ))
-                            .font(.subheadline.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
-
-                            Text(ATHLTHLocalization.choose(
-                                english: "Breathe, stretch, recover or plan a rest day.",
-                                norwegian: "Pust, tøying, restitusjon eller hviledag."
-                            ))
-                            .font(.caption)
-                            .foregroundStyle(ATHLTHTheme.mutedText)
-                            .fixedSize(horizontal: false, vertical: true)
-                        }
-
-                        Spacer(minLength: 3)
-
-                        Image(systemName: "chevron.right")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
-                    }
-                    .padding(14)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 13) {
+                Image(systemName: symbol)
+                    .font(.system(size: 19, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .frame(width: 48, height: 48)
                     .background(
-                        Color.white.opacity(0.86),
-                        in: RoundedRectangle(cornerRadius: 20)
+                        ATHLTHTheme.recoveryBlueSoft,
+                        in: RoundedRectangle(cornerRadius: 15, style: .continuous)
                     )
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(ATHLTHTheme.border.opacity(0.65), lineWidth: 0.8)
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Plan recovery or a rest day",
-                    norwegian: "Planlegg restitusjon eller hviledag"
-                ))
 
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(subtitle)
+                        .font(.system(size: 12))
+                        .foregroundStyle(ATHLTHTheme.mutedText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 4)
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, minHeight: 82, alignment: .leading)
+            .background(
+                Color.white.opacity(0.92),
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(ATHLTHTheme.border.opacity(0.65), lineWidth: 0.8)
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title). \(subtitle)")
     }
 }
 
@@ -803,5 +810,41 @@ struct ATHLTHRecoveryRestPlanningSheet: View {
         }
         onSaved?()
         dismiss()
+    }
+}
+
+
+/// Creates the exact same persisted rest-day model as the full recovery planner,
+/// without opening a second sheet when the athlete has already picked a date.
+enum ATHLTHRestDayQuickScheduling {
+    static func session(for date: Date, calendar: Calendar = .current) -> PlannedSession {
+        PlannedSession(
+            id: UUID(),
+            title: ATHLTHLocalization.choose(
+                english: "Rest day", norwegian: "Hviledag"
+            ),
+            kind: .recovery,
+            scheduledStart: calendar.startOfDay(for: date),
+            durationMinutes: nil,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil,
+            exercises: [],
+            notes: nil,
+            workoutCategory: "rest_day"
+        )
+    }
+
+    static func isAlreadyScheduled(
+        on date: Date,
+        among sessions: [PlannedSession],
+        calendar: Calendar = .current
+    ) -> Bool {
+        sessions.contains { entry in
+            guard entry.isExplicitRestDay, let start = entry.scheduledStart else {
+                return false
+            }
+            return calendar.isDate(start, inSameDayAs: date)
+        }
     }
 }
