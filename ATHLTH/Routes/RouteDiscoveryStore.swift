@@ -1,5 +1,6 @@
 import CoreLocation
 import Foundation
+import MapKit
 import Supabase
 
 struct CommunityRouteRecord: Codable, Identifiable, Hashable {
@@ -99,6 +100,54 @@ struct RouteDiscoveryNearbyBounds {
     }
 }
 
+/// The exact visible viewport is the source of truth for Explore searches.
+/// Bounds are intentionally not tied to the user's GPS position.
+struct RouteDiscoveryRegionBounds {
+    let center: CLLocationCoordinate2D
+    let latitudeSpan: Double
+    let longitudeSpan: Double
+    let south: Double
+    let north: Double
+    let west: Double?
+    let east: Double?
+
+    init?(region: MKCoordinateRegion) {
+        let latitude = region.center.latitude
+        let longitude = region.center.longitude
+        let latDelta = region.span.latitudeDelta
+        let lonDelta = region.span.longitudeDelta
+        guard CLLocationCoordinate2DIsValid(region.center),
+              latDelta.isFinite, lonDelta.isFinite,
+              latDelta > 0, lonDelta > 0 else { return nil }
+
+        center = region.center
+        latitudeSpan = latDelta
+        longitudeSpan = lonDelta
+        south = max(-90, latitude - latDelta / 2)
+        north = min(90, latitude + latDelta / 2)
+        if lonDelta >= 360 ||
+            longitude - lonDelta / 2 < -180 ||
+            longitude + lonDelta / 2 > 180 {
+            west = nil
+            east = nil
+        } else {
+            west = longitude - lonDelta / 2
+            east = longitude + lonDelta / 2
+        }
+    }
+
+    func contains(latitude: Double, longitude: Double) -> Bool {
+        guard latitude.isFinite, longitude.isFinite,
+              latitude >= south, latitude <= north else { return false }
+        if longitudeSpan >= 360 { return true }
+        let delta = abs(
+            (longitude - center.longitude + 540)
+                .truncatingRemainder(dividingBy: 360) - 180
+        )
+        return delta <= longitudeSpan / 2
+    }
+}
+
 private struct CommunityRouteWrite: Encodable {
     let id: UUID
     let ownerID: UUID
@@ -192,6 +241,36 @@ final class SupabaseRouteDiscoveryService {
                 latitude: route.centerLatitude,
                 longitude: route.centerLongitude
             ).distance(from: location) <= maxDistance
+        }
+    }
+
+    func loadDiscoverableRoutes(
+        in region: MKCoordinateRegion,
+        limit: Int = 100
+    ) async throws -> [CommunityRouteRecord] {
+        guard let bounds = RouteDiscoveryRegionBounds(region: region)
+        else { return [] }
+
+        var query = client.from("community_routes")
+            .select()
+            .gte("center_latitude", value: bounds.south)
+            .lte("center_latitude", value: bounds.north)
+
+        if let west = bounds.west, let east = bounds.east {
+            query = query.gte("center_longitude", value: west)
+                .lte("center_longitude", value: east)
+        }
+
+        let candidates: [CommunityRouteRecord] = try await query
+            .order("created_at", ascending: false)
+            .limit(min(max(limit, 12), 100))
+            .execute()
+            .value
+        return candidates.filter {
+            bounds.contains(
+                latitude: $0.centerLatitude,
+                longitude: $0.centerLongitude
+            )
         }
     }
 
@@ -394,6 +473,30 @@ final class RouteDiscoveryStore: ObservableObject {
             if localRoutes.isEmpty && routes.isEmpty {
                 errorMessage = error.localizedDescription
             }
+        }
+    }
+
+    /// Replace the Explore viewport result rather than appending all previous
+    /// areas. Other screens keep their existing global route catalogue.
+    func refreshVisibleRegion(
+        _ region: MKCoordinateRegion
+    ) async {
+        guard RouteDiscoveryRegionBounds(region: region) != nil else { return }
+        guard !isLoadingNearby else { return }
+        isLoadingNearby = true
+        defer { isLoadingNearby = false }
+
+        do {
+            let found = try await service.loadDiscoverableRoutes(in: region)
+            guard !Task.isCancelled else { return }
+            localRoutes = found
+            errorMessage = nil
+        } catch is CancellationError {
+            return
+        } catch {
+            guard !Task.isCancelled else { return }
+            localRoutes = []
+            errorMessage = error.localizedDescription
         }
     }
 
