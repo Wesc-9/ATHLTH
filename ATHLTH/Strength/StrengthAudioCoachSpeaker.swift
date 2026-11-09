@@ -181,6 +181,9 @@ final class StrengthAudioCoachSpeaker:
                 self.synthesizer.speak(utterance)
                 self.watchLocalSpeech(utterance)
             },
+            // Azure owns audio-session activation and reports playback start.
+            // Strength cues already record delivery in the event ledger.
+            onStarted: {},
             onFinished: { [weak self] in
                 self?.deliverNextQueuedCue()
             }
