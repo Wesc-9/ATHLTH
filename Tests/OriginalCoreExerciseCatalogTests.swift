@@ -98,6 +98,17 @@ final class OriginalCoreExerciseCatalogTests: XCTestCase {
             XCTAssertFalse(library.search(query: phrase).isEmpty,
                            "Curated exercise missing from selectable search: \(phrase)")
         }
+        // The incline dumbbell result must be the licensed RepDB original.
+        // Do not reintroduce a duplicate native exercise merely to pass search.
+        XCTAssertTrue(library.search(query: "Skråbenk med manualer").contains {
+            $0.source == .repDB
+        })
+        XCTAssertTrue(ExerciseLibraryStore.searchableNorwegianTerms(
+            sourceIdentifier: "incline-dumbbell-bench-press",
+            englishName: "Incline Dumbbell Bench Press",
+            bodyPart: "Chest",
+            primaryMuscles: ["Chest"]
+        ).contains("Skråbenk med manualer"))
         for slug in ExerciseLibraryStore.retiredNativeDuplicateSlugs {
             // Keep the old stable ID available when viewing saved history.
             XCTAssertTrue(library.athlthCatalogExercises.contains {
