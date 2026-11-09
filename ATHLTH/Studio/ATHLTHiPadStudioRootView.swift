@@ -44,6 +44,8 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var selectedWorkout: WorkoutSummary?
     /// Side-menu libraries live in the Studio detail column.
     @State private var libraryPage: ATHLTHStudioLibraryPage?
+    /// Reset pushed detail cards when switching sidebar destinations.
+    @State private var detailNavigationPath = NavigationPath()
     @State private var showingInspector = false
     @State private var inspectorShowsCoach = false
     @State private var inspectorShowsInbox = false
@@ -87,7 +89,7 @@ struct ATHLTHiPadStudioRootView: View {
             sidebar
                 .navigationSplitViewColumnWidth(min: 210, ideal: 244, max: 280)
         } detail: {
-            NavigationStack {
+            NavigationStack(path: $detailNavigationPath) {
                 studioDetail
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(canvas.ignoresSafeArea())
@@ -312,6 +314,7 @@ struct ATHLTHiPadStudioRootView: View {
             // library selection without dismissing any modal.
             libraryPage = nil
             sidebarPage = nil
+            detailNavigationPath = NavigationPath()
             savedDestination = destination.rawValue
             // Keep Coach and Inbox docked while navigating Studio.
             if destination != .overview { focusedPlanningDate = nil }
@@ -825,6 +828,7 @@ struct ATHLTHiPadStudioRootView: View {
 
     private func openLibrary(_ page: ATHLTHStudioLibraryPage) {
         focusedPlanningDate = nil
+        detailNavigationPath = NavigationPath()
         sidebarPage = nil
         libraryPage = page
         // The selected library replaces the Studio detail page. It never
@@ -840,6 +844,7 @@ struct ATHLTHiPadStudioRootView: View {
 
     private func openSidebarPage(_ destination: ATHLTHSideMenuDestination) {
         focusedPlanningDate = nil
+        detailNavigationPath = NavigationPath()
         libraryPage = nil
         sidebarPage = destination
         withAnimation(.easeInOut(duration: 0.18)) {
@@ -848,6 +853,7 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func returnFromSidebarPage() {
+        detailNavigationPath = NavigationPath()
         libraryPage = nil
         sidebarPage = nil
         withAnimation(.easeInOut(duration: 0.18)) {
@@ -856,6 +862,7 @@ struct ATHLTHiPadStudioRootView: View {
     }
 
     private func openStudio(_ destination: ATHLTHStudioDestination) {
+        detailNavigationPath = NavigationPath()
         libraryPage = nil
         sidebarPage = nil
         selection = destination
