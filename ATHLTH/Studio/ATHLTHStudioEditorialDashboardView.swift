@@ -24,7 +24,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
     let onStartWorkout: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onSendToWatch: (ATHLTHStudioSchedule.Occurrence) -> Void
     let onStartAfter: (ATHLTHStudioSchedule.Occurrence, TimeInterval) -> Void
-    let onOpenCoach: () -> Void
     @Binding var focusedPlanningDate: Date?
 
     @Binding var selectedDate: Date
@@ -712,84 +711,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
     }
 
-    private var signalsCard: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            Text(tr("Training signals", "Treningssignaler"))
-                .font(.system(size: 22, weight: .medium, design: .serif))
-                .foregroundStyle(ink)
-
-            if health.isRefreshing && health.lastSuccessfulRefreshAt == nil {
-                ProgressView(tr("Loading health data", "Henter helsedata"))
-                    .frame(maxWidth: .infinity, minHeight: 145)
-            } else if hasHealth, let score = health.recovery.score {
-                HStack(spacing: 14) {
-                    ZStack {
-                        Circle()
-                            .stroke(outline, lineWidth: 7)
-                        Circle()
-                            .trim(from: 0, to: CGFloat(max(0, min(100, score))) / 100)
-                            .stroke(bronze, style: StrokeStyle(lineWidth: 7, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                        Text("\(score)")
-                            .font(.system(size: 30, weight: .semibold, design: .rounded))
-                            .monospacedDigit()
-                            .foregroundStyle(ink)
-                    }
-                    .frame(width: 98, height: 98)
-
-                    VStack(alignment: .leading, spacing: 7) {
-                        Text(readinessTitle)
-                            .font(.headline)
-                            .foregroundStyle(ink)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Text(tr("Sleep · HRV · resting heart rate",
-                                "Søvn · HRV · hvilepuls"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                Text(tr(
-                    "Calculated from your available measurements. Not a medical assessment.",
-                    "Beregnet fra tilgjengelige målinger. Ikke en medisinsk vurdering."
-                ))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            } else {
-                ContentUnavailableView(
-                    tr("Signals unavailable", "Signaler utilgjengelige"),
-                    systemImage: "heart.text.square",
-                    description: Text(hasHealth
-                        ? tr("A personal baseline is still being built.",
-                             "Vi bygger fortsatt din personlige normal.")
-                        : tr("Apple Health is not available or connected.",
-                             "Apple Health er ikke tilgjengelig eller tilkoblet."))
-                )
-                .frame(maxWidth: .infinity, minHeight: 145)
-            }
-
-            Spacer(minLength: 0)
-            Button {
-                if hasHealth {
-                    showingReadinessExplanation = true
-                } else {
-                    onOpenSettings()
-                }
-            } label: {
-                Label(tr("Understand your signals", "Forstå signalene"),
-                      systemImage: "arrow.up.right")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(bronze)
-            .frame(minHeight: 44, alignment: .leading)
-        }
-        .padding(19)
-        .frame(maxWidth: .infinity, minHeight: 260, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
-    }
-
     private var compactReadinessCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .firstTextBaseline) {
@@ -910,60 +831,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
         case .buildingBaseline:
             tr("Building baseline", "Bygger normal")
         }
-    }
-
-    private var coachMessage: String {
-        guard hasHealth, health.recovery.score != nil else {
-            return tr(
-                "Open Coach to explore your training plan and goals.",
-                "Åpne Coach for å utforske treningsplanen og målene dine."
-            )
-        }
-        switch health.recovery.state {
-        case .ready, .balanced:
-            return tr(
-                "Your recovery signals look balanced. Review the planned workout before starting.",
-                "Restitusjonssignalene ser balanserte ut. Se over dagens økt før du starter."
-            )
-        case .takeItEasy, .recover:
-            return tr(
-                "Your recovery signals suggest a lighter day. Review your training load with Coach.",
-                "Restitusjonssignalene kan tilsi en roligere dag. Se over belastningen med Coach."
-            )
-        case .buildingBaseline:
-            return tr(
-                "More measurements are needed before assessing recovery trends.",
-                "Vi trenger flere målinger før vi kan vurdere restitusjonstrenden."
-            )
-        }
-    }
-
-    private var coachCard: some View {
-        VStack(alignment: .leading, spacing: 13) {
-            Label("ATHLTH Coach", systemImage: "sparkles")
-                .font(.system(size: 22, weight: .medium, design: .serif))
-                .foregroundStyle(ink)
-            Text(tr("Today's perspective", "Dagens vurdering"))
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(bronze)
-            Text(coachMessage)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
-            Button(action: onOpenCoach) {
-                Label(tr("Open Coach", "Åpne Coach"),
-                      systemImage: "arrow.up.right")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .buttonStyle(.plain)
-            .foregroundStyle(bronze)
-            .frame(minHeight: 44, alignment: .leading)
-        }
-        .padding(19)
-        .frame(maxWidth: .infinity, minHeight: 260, alignment: .leading)
-        .background(.white, in: RoundedRectangle(cornerRadius: 20))
-        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
     }
 
     private func weekLabel(_ plan: TrainingPlan) -> String {
