@@ -1238,7 +1238,10 @@ struct AroundYouExploreView: View {
             let accountID = session.profile.userID
             if lastMapRefreshAccountID == accountID,
                let lastMapRefreshAt,
-               Date().timeIntervalSince(lastMapRefreshAt) < 90 {
+               Date().timeIntervalSince(lastMapRefreshAt) < 90,
+               // An empty first request must not suppress the next visit.
+               (!routeDiscovery.routes.isEmpty ||
+                !routeDiscovery.localRoutes.isEmpty) {
                 return
             }
             let signpost = ATHLTHPerformance.begin("ExploreTabRefresh")
@@ -1258,19 +1261,24 @@ struct AroundYouExploreView: View {
             lastMapRefreshAccountID = accountID
             lastMapRefreshAt = Date()
         }
-        .task(id: "\(isActive)-\(locationStore.location?.timestamp.timeIntervalSince1970 ?? 0)") {
+        // Location becomes available *after* the initial Map view appears.
+        // Use a stable availability key instead of GPS timestamps: frequent
+        // CLLocation updates must not cancel the cold-start route request.
+        .task(id: "\(isActive)-\(locationStore.location == nil ? "awaiting-location" : "has-location")") {
             guard isActive, let location = locationStore.location
-            else {
-                return
-            }
+            else { return }
 
             if activeSearchCenter == nil {
                 activeSearchCenter = location
             }
 
-            await publicTrailDiscovery.refresh(
+            async let nearbyRoutes: Void = routeDiscovery.refreshNearby(
                 near: location
             )
+            async let publicTrails: Void = publicTrailDiscovery.refresh(
+                near: location
+            )
+            _ = await (nearbyRoutes, publicTrails)
         }
         .task(id: "\(isActive)-\(publicWorkoutLookupKey)") {
             guard isActive else { return }
@@ -3085,7 +3093,9 @@ struct AroundYouExploreView: View {
         var routesByID:
             [UUID: AroundYouRouteItem] = [:]
 
-        for route in routeDiscovery.routes {
+        // The latest global page is not a complete local catalogue.
+        // Merge the location-filtered result on the very first Explore visit.
+        for route in routeDiscovery.routes + routeDiscovery.localRoutes {
             routesByID[route.id] =
                 AroundYouRouteItem(
                     id: route.id,
@@ -3458,10 +3468,14 @@ struct AroundYouExploreView: View {
             in: visibleRegion,
             force: true
         )
+        async let nearbyRoutes: Void = routeDiscovery.refreshNearby(
+            near: activeSearchCenter!,
+            force: true
+        )
         async let routes: Void = routeDiscovery.refresh(force: true)
         async let events: Void = community.refresh()
         async let posts: Void = marketplace.refresh()
-        _ = await (trails, routes, events, posts)
+        _ = await (trails, nearbyRoutes, routes, events, posts)
 
         shouldSearchVisibleArea = false
     }
