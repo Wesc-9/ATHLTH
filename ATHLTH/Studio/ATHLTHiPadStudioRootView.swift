@@ -44,6 +44,8 @@ struct ATHLTHiPadStudioRootView: View {
     @State private var selectedWorkout: WorkoutSummary?
     @State private var inspectedWeekDate: Date?
     @State private var showingWorkoutDetail = false
+    @State private var pendingWeekTrainLaunch = false
+    @State private var pendingWeekStandaloneWorkout: PlannedSession?
     @State private var selectedHomeWeekDate: Date = .now
     /// Side-menu libraries live in the Studio detail column.
     @State private var libraryPage: ATHLTHStudioLibraryPage?
@@ -139,6 +141,7 @@ struct ATHLTHiPadStudioRootView: View {
                                     ),
                                     systemImage: "bubble.left.and.bubble.right"
                                 )
+                                .labelStyle(.iconOnly)
                             }
                             .help(ATHLTHLocalization.choose(
                                 english: "Open or close Inbox",
@@ -260,6 +263,15 @@ struct ATHLTHiPadStudioRootView: View {
         .sheet(isPresented: $showingWorkoutDetail, onDismiss: {
             inspectedWeekDate = nil
             selectedWorkout = nil
+            // Launch a selected workout only after the detail sheet has
+            // fully dismissed, avoiding competing modal presentations.
+            if pendingWeekTrainLaunch {
+                pendingWeekTrainLaunch = false
+                showingTrain = true
+            } else if let standalone = pendingWeekStandaloneWorkout {
+                pendingWeekStandaloneWorkout = nil
+                selectedStandaloneWorkout = standalone
+            }
         }) {
             // Week days and recorded workouts remain accessible without
             // occupying the Inbox-only right panel.
@@ -618,6 +630,86 @@ struct ATHLTHiPadStudioRootView: View {
                                     norwegian: "Øvelsesfremdrift"
                                 ),
                                 systemImage: "chart.bar"
+                            )
+                        }
+                        Menu {
+                            Button {
+                                openStudio(.overview)
+                            } label: {
+                                Label(ATHLTHStudioDestination.overview.label,
+                                      systemImage: "square.grid.2x2")
+                            }
+                            .keyboardShortcut("1", modifiers: [.command])
+                            Button {
+                                openStudio(.planner)
+                            } label: {
+                                Label(ATHLTHStudioDestination.planner.label,
+                                      systemImage: "calendar")
+                            }
+                            .keyboardShortcut("2", modifiers: [.command])
+                            Button {
+                                openStudio(.insights)
+                            } label: {
+                                Label(ATHLTHStudioDestination.insights.label,
+                                      systemImage: "chart.xyaxis.line")
+                            }
+                            .keyboardShortcut("3", modifiers: [.command])
+                            Button {
+                                openStudio(.history)
+                            } label: {
+                                Label(ATHLTHStudioDestination.history.label,
+                                      systemImage: "clock.arrow.circlepath")
+                            }
+                            .keyboardShortcut("4", modifiers: [.command])
+                            Button {
+                                openStudio(.explore)
+                            } label: {
+                                Label(ATHLTHStudioDestination.explore.label,
+                                      systemImage: "map")
+                            }
+                            .keyboardShortcut("5", modifiers: [.command])
+                            Button {
+                                openStudio(.community)
+                            } label: {
+                                Label(ATHLTHStudioDestination.community.label,
+                                      systemImage: "person.3")
+                            }
+                            .keyboardShortcut("6", modifiers: [.command])
+                            Button {
+                                openStudio(.coach)
+                            } label: {
+                                Label(ATHLTHStudioDestination.coach.label,
+                                      systemImage: "sparkles")
+                            }
+                            .keyboardShortcut("7", modifiers: [.command])
+                            Button {
+                                openStudio(.settings)
+                            } label: {
+                                Label(ATHLTHStudioDestination.settings.label,
+                                      systemImage: "gearshape")
+                            }
+                            .keyboardShortcut("8", modifiers: [.command])
+                            Divider()
+                            Button {
+                                trainRequest = .customQuick
+                                showingTrain = true
+                            } label: {
+                                Label(
+                                    ATHLTHLocalization.choose(
+                                        english: "New quick workout",
+                                        norwegian: "Ny hurtigøkt"
+                                    ),
+                                    systemImage: "plus"
+                                )
+                            }
+                            .keyboardShortcut("n", modifiers: [.command, .shift])
+                        } label: {
+                            Label(
+                                ATHLTHLocalization.choose(
+                                    english: "Keyboard shortcuts",
+                                    norwegian: "Hurtigtaster"
+                                ),
+                                systemImage: "keyboard"
                             )
                         }
                     } label: {
@@ -990,11 +1082,11 @@ struct ATHLTHiPadStudioRootView: View {
                 : .workout(
                     planID: planID, workoutID: item.workout.id
                 )
+            pendingWeekTrainLaunch = true
             showingWorkoutDetail = false
-            showingTrain = true
         } else {
+            pendingWeekStandaloneWorkout = item.workout
             showingWorkoutDetail = false
-            selectedStandaloneWorkout = item.workout
         }
     }
 
@@ -1005,8 +1097,8 @@ struct ATHLTHiPadStudioRootView: View {
         trainRequest = .sendPlannedWorkoutToWatch(
             planID: planID, workoutID: item.workout.id
         )
+        pendingWeekTrainLaunch = true
         showingWorkoutDetail = false
-        showingTrain = true
     }
 
     private func planFromWeekDay(_ date: Date) {
