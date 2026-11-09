@@ -582,6 +582,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
         // All planned sessions must complete before the day gets a check.
         let isPlanCompleted = ATHLTHStudioDayCompletionPolicy
             .allPlannedCompleted(day.planned, isCompleted: completed)
+        let plannedMinutes = day.planned.reduce(0) {
+            $0 + max(0, $1.workout.durationMinutes ?? 0)
+        }
         let pluralWorkoutLabel = tr(
             "\(day.planned.count) workouts",
             "\(day.planned.count) økter"
@@ -635,9 +638,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .minimumScaleFactor(0.75)
                     .opacity(0.85)
                 } else if day.planned.count > 1 {
-                    Text("\(day.planned.reduce(0) {
-                        $0 + max(0, $1.workout.durationMinutes ?? 0)
-                    }) min")
+                    Text("\(plannedMinutes) min")
                         .font(.caption2)
                         .opacity(0.8)
                 } else if let item = planned,
