@@ -5496,7 +5496,6 @@ struct SessionEditorView: View {
     @State private var scratchTimelineDraftID = UUID()
     @State private var showingUnifiedWorkoutComposer = false
     @State private var showingRecoveryRestPlanner = false
-    @State private var showingRestDayPlanner = false
     @State private var selectedPartnerID: UUID?
     @State private var partnerPlanningExpanded = false
     @State private var showingAllTrainingPartners = false
@@ -6254,11 +6253,28 @@ struct SessionEditorView: View {
                 ? { showingRecoveryRestPlanner = true }
                 : nil,
             onRestDay: onPreparedWorkout == nil
-                ? { showingRestDayPlanner = true }
+                ? { scheduleRestDayForSelectedDate() }
                 : nil
         )
     }
 
+
+    /// The source picker already knows the calendar date. A rest-day tap
+    /// persists it immediately instead of showing the recovery planner.
+    private func scheduleRestDayForSelectedDate() {
+        guard isStandalone, onPreparedWorkout == nil else { return }
+        let date = Calendar.current.startOfDay(for: scheduledTime)
+        if !ATHLTHRestDayQuickScheduling.isAlreadyScheduled(
+            on: date,
+            among: session.standalonePlannedSessions
+        ) {
+            session.addStandalonePlannedSession(
+                ATHLTHRestDayQuickScheduling.session(for: date)
+            )
+        }
+        finishDraft()
+        dismiss()
+    }
 
     /// "Fra bunnen av" starts with an actual blank shared session. Activity
     /// choice only controls initial defaults; no canned workout is copied.
@@ -6624,17 +6640,6 @@ struct SessionEditorView: View {
                     date: scheduledTime,
                     allowPlanSelection: false,
                     includesRestDay: false
-                ) {
-                    finishDraft()
-                    dismiss()
-                }
-                .presentationDetents([.large])
-            }
-            .sheet(isPresented: $showingRestDayPlanner) {
-                ATHLTHRecoveryRestPlanningSheet(
-                    date: scheduledTime,
-                    allowPlanSelection: false,
-                    initialMode: .rest
                 ) {
                     finishDraft()
                     dismiss()
