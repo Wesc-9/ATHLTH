@@ -3714,6 +3714,7 @@ struct MyTrainingPlansLibraryView: View {
     @EnvironmentObject private var exerciseLibrary: ExerciseLibraryStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strengthWorkout: StrengthWorkoutStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
 
     @State private var showingCreatePlan = false
     @State private var scheduleError: String?
@@ -3721,6 +3722,23 @@ struct MyTrainingPlansLibraryView: View {
     @State private var preparedShare: MessageShareDraft?
     @State private var shareError: String?
     @State private var libraryWidth: CGFloat = 390
+    @State private var query = ""
+    @State private var searchExpanded = false
+    @State private var favoritesOnly = false
+
+    private var displayedTemplates: [TrainingPlan] {
+        session.planTemplates.filter {
+            $0.title.localizedStandardContains(query) &&
+            (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
+        }
+    }
+
+    private var displayedPlans: [TrainingPlan] {
+        session.trainingPlans.filter {
+            $0.title.localizedStandardContains(query) &&
+            (!favoritesOnly || favorites.isFavorite(.plan, itemID: $0.id.uuidString))
+        }
+    }
 
     private var cardColumns: [GridItem] {
         ATHLTHLibraryResponsiveLayout.columns(
@@ -3767,27 +3785,55 @@ struct MyTrainingPlansLibraryView: View {
                     }
                 }
 
-                if !session.planTemplates.isEmpty {
+                HStack(spacing: 12) {
+                    Button { searchExpanded.toggle() } label: {
+                        Label(ATHLTHLocalization.choose(english: "Search", norwegian: "Søk"),
+                              systemImage: "magnifyingglass")
+                    }
+                    .buttonStyle(.plain)
+                    .frame(minHeight: 44)
+                    Button { favoritesOnly.toggle() } label: {
+                        Label(ATHLTHLocalization.choose(english: "Favorites", norwegian: "Favoritter"),
+                              systemImage: favoritesOnly ? "star.fill" : "star")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(favoritesOnly ? [.isSelected] : [])
+                    Spacer()
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(ATHLTHPlanDesign.ink)
+                if searchExpanded || !query.isEmpty {
+                    TextField(
+                        ATHLTHLocalization.choose(english: "Search my plans", norwegian: "Søk i mine planer"),
+                        text: $query
+                    )
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .padding(14)
+                    .background(ATHLTHPlanDesign.surface, in: RoundedRectangle(cornerRadius: 15))
+                }
+
+                if !displayedTemplates.isEmpty {
                     planSectionHeader(
                         "Saved Plans",
                         detail: "Reusable plans that are not on your calendar yet."
                     )
 
                     LazyVGrid(columns: cardColumns, spacing: 10) {
-                        ForEach(session.planTemplates) { template in
+                        ForEach(displayedTemplates) { template in
                             templateCard(template)
                         }
                     }
                 }
 
-                if !session.trainingPlans.isEmpty {
+                if !displayedPlans.isEmpty {
                     planSectionHeader(
                         "Scheduled Plans",
                         detail: "Active, upcoming and completed plans."
                     )
 
                     LazyVGrid(columns: cardColumns, spacing: 12) {
-                    ForEach(session.trainingPlans) { plan in
+                    ForEach(displayedPlans) { plan in
                         let progress = planProgress(plan)
 
                         VStack(spacing: 8) {
@@ -3831,6 +3877,12 @@ struct MyTrainingPlansLibraryView: View {
                                 .buttonStyle(.plain)
                             }
 
+                            HStack {
+                                LibraryFavoriteButton(kind: .plan,
+                                    itemID: plan.id.uuidString, title: plan.title,
+                                    subtitle: "", icon: "calendar")
+                                Spacer()
+                            }
                             Button {
                                 preparePlanShare(plan)
                             } label: {
@@ -3889,8 +3941,8 @@ struct MyTrainingPlansLibraryView: View {
                     }
                 }
 
-                if session.planTemplates.isEmpty &&
-                    session.trainingPlans.isEmpty {
+                if displayedTemplates.isEmpty &&
+                    displayedPlans.isEmpty {
                     ContentUnavailableView {
                         Label(
                             "No plans yet",
@@ -3916,6 +3968,12 @@ struct MyTrainingPlansLibraryView: View {
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) {
             libraryWidth = $0
         }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top < -28
+        } action: { _, isPulling in
+            if isPulling { searchExpanded = true }
+        }
+        .task { await favorites.refresh() }
         .background(
             ATHLTHPremiumCanvas(
                 accent: ATHLTHTheme.accent.opacity(0.26)
@@ -4028,6 +4086,9 @@ struct MyTrainingPlansLibraryView: View {
                 }
 
                 Spacer()
+                LibraryFavoriteButton(kind: .plan,
+                    itemID: template.id.uuidString, title: template.title,
+                    subtitle: "", icon: "calendar")
 
                 Button(role: .destructive) {
                     session.deletePlanTemplate(template.id)

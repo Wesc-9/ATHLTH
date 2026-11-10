@@ -3243,6 +3243,7 @@ struct MyWorkoutTemplatesView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
 
     @State private var completionHistory:
         [StructuredWorkoutCompletion] = []
@@ -3262,6 +3263,23 @@ struct MyWorkoutTemplatesView: View {
     @State private var showingHybridBuilder = false
     @State private var displayMode: ATHLTHLibraryDisplayMode = .list
     @State private var libraryViewWidth: CGFloat = 390
+    @State private var query = ""
+    @State private var searchExpanded = false
+    @State private var favoritesOnly = false
+
+    private var displayedRunningWorkouts: [RunningWorkoutTemplate] {
+        runningLibrary.customTemplates.filter {
+            $0.title.localizedStandardContains(query) &&
+            (!favoritesOnly || favorites.isFavorite(.workout, itemID: $0.id.uuidString))
+        }
+    }
+
+    private var displayedSavedWorkouts: [PlannedSession] {
+        session.savedWorkoutTemplates.filter {
+            $0.title.localizedStandardContains(query) &&
+            (!favoritesOnly || favorites.isFavorite(.workout, itemID: $0.id.uuidString))
+        }
+    }
 
     private var libraryColumns: [GridItem] {
         ATHLTHLibraryResponsiveLayout.columns(
@@ -3282,7 +3300,33 @@ struct MyWorkoutTemplatesView: View {
                     .font(.caption.weight(.medium))
                     .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
                     Spacer()
+                    Button { searchExpanded.toggle() } label: {
+                        Image(systemName: "magnifyingglass").frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(ATHLTHLocalization.choose(
+                        english: "Search workouts", norwegian: "Søk i økter"))
                     ATHLTHLibraryDisplayPicker(selection: $displayMode)
+                }
+                HStack(spacing: 10) {
+                    Button { favoritesOnly.toggle() } label: {
+                        Label(ATHLTHLocalization.choose(english: "Favorites", norwegian: "Favoritter"),
+                              systemImage: favoritesOnly ? "star.fill" : "star")
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                    .accessibilityAddTraits(favoritesOnly ? [.isSelected] : [])
+                    Spacer()
+                }
+                if searchExpanded || !query.isEmpty {
+                    TextField(ATHLTHLocalization.choose(
+                        english: "Search my workouts", norwegian: "Søk i mine treningsøkter"),
+                        text: $query)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .padding(14)
+                        .background(ATHLTHPlanDesign.surface,
+                            in: RoundedRectangle(cornerRadius: 15))
                 }
                 HStack(spacing: 10) {
                     Button {
@@ -3305,14 +3349,15 @@ struct MyWorkoutTemplatesView: View {
                 .buttonStyle(.bordered)
                 .controlSize(.regular)
 
-                if !runningLibrary.customTemplates.isEmpty {
+                if !displayedRunningWorkouts.isEmpty {
                     Text(ATHLTHLocalization.choose(
                         english: "SAVED DETAILED RUNS", norwegian: "LAGREDE DETALJØKTER"
                     ))
                     .font(.caption2.weight(.bold))
                     .foregroundStyle(ATHLTHTheme.mutedText)
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
-                    ForEach(runningLibrary.customTemplates) { workout in
+                    ForEach(displayedRunningWorkouts) { workout in
+                        VStack(alignment: .trailing, spacing: 5) {
                         NavigationLink {
                             RunningWorkoutDetailView(
                                 workout: workout,
@@ -3345,6 +3390,10 @@ struct MyWorkoutTemplatesView: View {
                             .athlthPlanCard(radius: 18)
                         }
                         .buttonStyle(.plain)
+                        LibraryFavoriteButton(kind: .workout,
+                            itemID: workout.id.uuidString, title: workout.title,
+                            subtitle: "", icon: "figure.run")
+                        }
                     }
                     }
                 }
@@ -3403,8 +3452,8 @@ struct MyWorkoutTemplatesView: View {
                     }
                 }
 
-                if session.savedWorkoutTemplates.isEmpty &&
-                   runningLibrary.customTemplates.isEmpty {
+                if displayedSavedWorkouts.isEmpty &&
+                   displayedRunningWorkouts.isEmpty {
                     ContentUnavailableView(
                         ATHLTHLocalization.choose(
                             english: "No saved workouts", norwegian: "Ingen lagrede treningsøkter"
@@ -3420,7 +3469,7 @@ struct MyWorkoutTemplatesView: View {
                     .padding(.top, 60)
                 } else {
                     LazyVGrid(columns: libraryColumns, spacing: 10) {
-                        ForEach(session.savedWorkoutTemplates) { workout in
+                        ForEach(displayedSavedWorkouts) { workout in
                             savedWorkoutCard(workout)
                         }
                     }
@@ -3428,6 +3477,11 @@ struct MyWorkoutTemplatesView: View {
             }
             .padding(18)
             .frame(maxWidth: .infinity)
+        }
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            geometry.contentOffset.y + geometry.contentInsets.top < -28
+        } action: { _, isPulling in
+            if isPulling { searchExpanded = true }
         }
         .background(ATHLTHPlanDesign.canvas.ignoresSafeArea())
         .navigationTitle(ATHLTHLocalization.choose(english: "My workouts", norwegian: "Mine treningsøkter"))
@@ -3443,6 +3497,7 @@ struct MyWorkoutTemplatesView: View {
         .onAppear {
             refreshHistory()
             displayMode = .load(userID: session.profile.userID)
+            Task { await favorites.refresh() }
         }
         .onGeometryChange(for: CGFloat.self, of: { $0.size.width }) { width in
             libraryViewWidth = width
@@ -3497,6 +3552,9 @@ struct MyWorkoutTemplatesView: View {
                 }
 
                 Spacer()
+                LibraryFavoriteButton(kind: .workout,
+                    itemID: workout.id.uuidString, title: workout.title,
+                    subtitle: "", icon: "dumbbell")
 
                 Menu {
                     Button(
