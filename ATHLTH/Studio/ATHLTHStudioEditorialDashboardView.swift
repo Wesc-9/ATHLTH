@@ -714,6 +714,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
         if let day {
             VStack(alignment: .leading, spacing: 9) {
                 ForEach(day.planned, id: \.workout.id) { entry in
+                    // Completion can consult both HealthKit and local logs.
+                    // Resolve once for the status label and Start control.
+                    let isCompleted = completed(entry)
                     HStack(spacing: 12) {
                         Image(systemName: entry.workout.kind.systemImage)
                             .font(.system(size: 17, weight: .medium))
@@ -727,7 +730,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                                 if let minutes = entry.workout.durationMinutes {
                                     Text("\(minutes) min")
                                 }
-                                if completed(entry) {
+                                if isCompleted {
                                     Label(tr("Completed", "Fullført"),
                                           systemImage: "checkmark.circle.fill")
                                 } else {
@@ -745,7 +748,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                                 .frame(width: 38, height: 38)
                         }
                         .accessibilityLabel(tr("Workout details", "Øktdetaljer"))
-                        if canStart(entry) {
+                        if canStart(entry, alreadyCompleted: isCompleted) {
                             Button {
                                 onStartWorkout(entry)
                             } label: {
@@ -941,11 +944,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
         )
     }
 
-    private func canStart(_ item: ATHLTHStudioSchedule.Occurrence) -> Bool {
+    private func canStart(
+        _ item: ATHLTHStudioSchedule.Occurrence,
+        alreadyCompleted: Bool? = nil
+    ) -> Bool {
         guard let planID = item.planID,
               !item.workout.isExplicitRestDay,
               !session.isPlanSessionSkipped(planID: planID, sessionID: item.workout.id),
-              !completed(item) else { return false }
+              !(alreadyCompleted ?? completed(item)) else { return false }
         return true
     }
 
