@@ -1578,6 +1578,13 @@ struct RunQuickStartSheet: View {
                                 basicGhostSelected = true
                                 environment = .outdoor
                                 mode = .route
+                                ghostDraft.enabled = true
+                                ghostDraft.setTargetTimeText(
+                                    GhostTargetTimeFormatter.string(
+                                        TimeInterval(basicGhostTargetMinutes * 60)
+                                    ),
+                                    distanceKilometers: guidanceRoute?.distanceKilometers
+                                )
                                 if selectedRoute == nil { showingRoutes = true }
                             },
                             onChooseStandardMode: {
@@ -1749,14 +1756,18 @@ struct RunQuickStartSheet: View {
                 // Plan -> From Scratch -> Running, not the legacy interval
                 // composer and not a second workout execution engine.
                 WorkoutTemplateBuilderView(
-                    initialTitle: advancedWorkout?.title ??
-                        selectedWorkout?.title ?? quickWorkoutName,
-                    initialBlocks: advancedWorkout?.resolvedWorkoutBlocks ??
+                    initialTitle: basicGoalSelected
+                        ? basicGoalWorkout.title
+                        : advancedWorkout?.title ??
+                          selectedWorkout?.title ?? quickWorkoutName,
+                    initialBlocks: (basicGoalSelected
+                        ? basicGoalWorkout.resolvedWorkoutBlocks
+                        : advancedWorkout?.resolvedWorkoutBlocks) ??
                         selectedWorkout.map {
                             ATHLTHQuickRunTimelineAdapter.editorBlocks(from: $0)
                         } ?? [],
-                    initialRouteID: advancedWorkout?.routeID ??
-                        selectedWorkout?.routeID,
+                    initialRouteID: basicGoalSelected ? nil :
+                        (advancedWorkout?.routeID ?? selectedWorkout?.routeID),
                     draftContext: "quick-run-advanced",
                     initialActivity: .running,
                     initialStudioAdvanced: true,
@@ -1903,6 +1914,19 @@ struct RunQuickStartSheet: View {
             }
             .onChange(of: scenePhase) { _, _ in
                 firePendingQuickRun()
+            }
+            .onChange(of: mode) { _, selected in
+                if selected != .structured { basicGoalSelected = false }
+                if selected != .route { basicGhostSelected = false }
+            }
+            .onChange(of: basicGhostTargetMinutes) { _, minutes in
+                guard basicGhostSelected else { return }
+                ghostDraft.setTargetTimeText(
+                    GhostTargetTimeFormatter.string(
+                        TimeInterval(minutes * 60)
+                    ),
+                    distanceKilometers: guidanceRoute?.distanceKilometers
+                )
             }
             .onChange(of: environment) { _, newValue in
                 if newValue != .outdoor {
