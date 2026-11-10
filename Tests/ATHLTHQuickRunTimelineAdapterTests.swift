@@ -73,6 +73,44 @@ final class ATHLTHQuickRunTimelineAdapterTests: XCTestCase {
         XCTAssertEqual(transfer?.autoAdvanceTimedSteps, true)
     }
 
+    func testActiveJogRecoveryInMainPhaseIsNotAnIntervalEffort() {
+        var warmup = block("Warm up", phase: .warmup, seconds: 300)
+        warmup.cardioActivity = .running
+        var effort = block("Fast", phase: .main, seconds: 180)
+        effort.targetHeartRateZone = 4
+        var jog = block("Jog recovery", phase: .main, seconds: 90)
+        jog.activityTag = "active_recovery"
+        jog.targetHeartRateZone = 1
+        let source = workout([warmup, effort, jog])
+        let transfer = ATHLTHQuickRunTimelineAdapter.transfer(
+            from: source, title: source.title,
+            routeAlerts: .standard, autoPauseEnabled: false
+        )
+        XCTAssertEqual(transfer?.steps.map(\.phase),
+                       ["warmup", "work", "recovery"])
+        XCTAssertEqual(transfer?.steps[2].targetHeartRateZone, 1)
+        XCTAssertEqual(transfer?.steps[2].measure, .time)
+    }
+
+    func testPlannedIndoorRunRemainsIndoorAfterQuickStart() {
+        var run = block("Indoor", phase: .main, seconds: 1_200)
+        run.isIndoor = true
+        var saved = workout([run])
+        saved.workoutCategory = "indoor"
+        XCTAssertEqual(RunEnvironment.forPlannedSession(saved), .indoor)
+        XCTAssertEqual(ATHLTHQuickRunTimelineAdapter.environment(for: saved),
+                       .indoor)
+        saved = ATHLTHQuickRunTimelineAdapter.withEnvironment(
+            saved, environment: .indoor
+        )
+        XCTAssertTrue(saved.resolvedWorkoutBlocks.allSatisfy {
+            $0.kind != .run || $0.isIndoor == true
+        })
+        XCTAssertEqual(RunEnvironment.forPlannedSession(saved), .indoor)
+        saved.workoutCategory = "treadmill"
+        XCTAssertEqual(RunEnvironment.forPlannedSession(saved), .treadmill)
+    }
+
     func testStrengthOrMixedWorkoutIsRejected() {
         let run = block("Run", phase: .main, seconds: 600)
         let strength = block("Strength", kind: .exercise, phase: .main, seconds: 60)
