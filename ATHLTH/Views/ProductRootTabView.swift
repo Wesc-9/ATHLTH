@@ -1636,9 +1636,9 @@ struct ATHLTHHomeView: View {
                 if homeInitialLoadAccountID == session.profile.userID,
                    let lastHomeInitialLoadAt,
                    Date().timeIntervalSince(lastHomeInitialLoadAt) < 90 {
-                    // Home's general data can be fresh even if its mutual
-                    // friends failed to load on the first attempt.
-                    await social.refreshHomeFriends()
+                    // A quick tab hop is not a refresh request. All Home
+                    // stores publish changes independently; re-querying mutual
+                    // friends on every return needlessly blocks Home rendering.
                     return
                 }
 
@@ -1706,9 +1706,6 @@ struct ATHLTHHomeView: View {
                 Task {
                     await loadHomeStreak()
                 }
-            }
-            .onChange(of: session.activePlan?.id) {
-                syncHomeTodayWorkoutToWatch()
             }
             .onChange(of: session.activePlan) {
                 // Editing sessions in the same plan must also refresh Watch.
