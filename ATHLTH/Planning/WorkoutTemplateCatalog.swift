@@ -4351,7 +4351,9 @@ struct WorkoutTemplateBuilderView: View {
                 loadGuidanceDefaultsIfNeeded()
                 routeIsCustomized = true
                 selectedWorkoutExtra = .navigation
-            }
+            },
+            showsExpandedLabel: isPlannedWorkout &&
+                !studioAdvanced && initialActivity == .running
         )
     }
 
@@ -4699,16 +4701,14 @@ struct WorkoutTemplateBuilderView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     if isPlannedWorkout {
                         if !studioAdvanced && initialActivity == .running {
-                            HStack {
-                                Spacer()
-                                workoutExtrasMenu
-                            }
                             ATHLTHRunBasicSetupView(
                                 workoutName: $title,
                                 mode: $studioBasicRunMode,
                                 environment: $studioBasicRunEnvironment,
                                 date: $studioBasicDate,
                                 scheduleEditable: true,
+                                workoutStepCount: blocks.count,
+                                onEditWorkout: { studioAdvanced = true },
                                 selectedRouteTitle: session.savedRoutes.first {
                                     $0.id == selectedRouteID
                                 }?.title,
@@ -4751,20 +4751,14 @@ struct WorkoutTemplateBuilderView: View {
                                 isGoalSelected: studioBasicGoalSelected,
                                 isGhostSelected: studioBasicGhostSelected
                             )
+                            // A labeled, native dropdown replaces the isolated
+                            // gear icon at the top of Basic running.
+                            workoutExtrasMenu
                             if studioBasicGoalSelected {
                                 studioBasicGoalEditor
                             }
                             if studioBasicGhostSelected {
                                 studioBasicGhostEditor
-                            }
-                            if blocks.count > 0 {
-                                Text(ATHLTHLocalization.format(
-                                    english: "%d workout steps selected",
-                                    norwegian: "%d deløkter valgt",
-                                    blocks.count
-                                ))
-                                .font(.caption)
-                                .foregroundStyle(studioInk.opacity(0.65))
                             }
                         } else if !studioAdvanced && initialActivity == .strength {
                             studioBasicStrengthModeSelector
