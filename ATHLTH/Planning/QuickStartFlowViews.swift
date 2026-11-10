@@ -523,12 +523,15 @@ enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
         guard let workout, workout.kind == .running else { return .outdoor }
         if workout.workoutCategory == "treadmill" { return .treadmill }
         if workout.workoutCategory == "indoor" { return .indoor }
-        // Legacy planned workouts with an indoor block but no explicit
-        // category were previously treadmill workouts: preserve their mode.
+        // Category is authoritative. Older recipes without a category
+        // distinguish a treadmill by its incline target, not by GPS-off
+        // alone: plain indoor running must remain plain indoor.
         if workout.resolvedWorkoutBlocks.contains(where: {
             $0.kind == .run && $0.isIndoor == true
         }) {
-            return .treadmill
+            return workout.resolvedWorkoutBlocks.contains(where: {
+                $0.kind == .run && $0.treadmillInclinePercent != nil
+            }) ? .treadmill : .indoor
         }
         return .outdoor
     }
@@ -1538,7 +1541,9 @@ struct RunQuickStartSheet: View {
                             selectedRouteTitle: selectedRoute?.title,
                             selectedWorkoutTitle: selectedWorkout?.title,
                             onChooseRoute: { showingRoutes = true },
-                            onChooseWorkout: { showingRunningLibrary = true }
+                            onChooseWorkout: { showingRunningLibrary = true },
+                            audioCoachEnabled: session.canAccess(.audioCoach)
+                                ? $audioCoachDraft.enabled : nil
                         )
                     }
 
