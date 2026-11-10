@@ -19,6 +19,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddCircuit: (WorkoutPhaseKind) -> Void
     let onAddStrengthMode: (WorkoutPhaseKind, WorkoutBlockGroupKind) -> Void
     let onSetGroupClock: (UUID, TimeInterval) -> Void
+    let onSetStationTransition: (UUID, Int) -> Void
     let onAddExerciseToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onAddRestToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onMoveSupersetMember: (UUID, UUID) -> Void
@@ -462,6 +463,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         let exercises = members.filter { $0.kind == .exercise }
         let rounds = members.first?.groupRounds ?? 3
         let clock = members.first?.groupClockSeconds
+        let transition = Int(members.first?.restBetweenSetsSeconds ?? 0)
         let collapsed = collapsedSupersetGroups.contains(id)
 
         return VStack(alignment: .leading, spacing: 10) {
@@ -515,6 +517,30 @@ struct ATHLTHPlannedWorkoutStudioView: View {
                         }
                         Divider()
                     }
+                    if kind == .emom {
+                        Menu(ATHLTHLocalization.choose(
+                            english: "Time per station", norwegian: "Tid per stasjon"
+                        )) {
+                            ForEach([60, 90, 120, 180], id: \.self) { seconds in
+                                Button("\(seconds) s") {
+                                    onSetGroupClock(id, Double(seconds))
+                                }
+                            }
+                        }
+                        Divider()
+                    }
+                    if kind.canInsertRoundPause {
+                        Menu(ATHLTHLocalization.choose(
+                            english: "Station transition", norwegian: "Pause ved øvelsesbytte"
+                        )) {
+                            ForEach([0, 10, 15, 30, 45, 60], id: \.self) { seconds in
+                                Button("\(seconds) s") {
+                                    onSetStationTransition(id, seconds)
+                                }
+                            }
+                        }
+                        Divider()
+                    }
                     Button {
                         onUngroupSuperset(id)
                         collapsedSupersetGroups.remove(id)
@@ -540,6 +566,14 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             }
 
             if !collapsed {
+                if kind.canInsertRoundPause {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Between stations: \(transition) s",
+                        norwegian: "Mellom stasjoner: \(transition) sek"
+                    ), systemImage: "arrow.right.circle")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
                 if kind == .dropSet {
                     Label(ATHLTHLocalization.choose(
                         english: "Set a positive weight for every stage, with each weight lower than the previous one. Tap a stage to edit repetitions and kg.",
@@ -650,7 +684,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         case .emom:
             return count + " · \(rounds) " + ATHLTHLocalization.choose(
                 english: "cycles", norwegian: "sykluser"
-            ) + " · 60 s " + ATHLTHLocalization.choose(
+            ) + " · \(Int(clockSeconds ?? 60)) s " + ATHLTHLocalization.choose(
                 english: "per station", norwegian: "per stasjon"
             )
         case .amrap:
