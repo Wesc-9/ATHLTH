@@ -192,6 +192,83 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         XCTAssertFalse(WorkoutBlockGroupKind.intervals.isStrengthGroup)
     }
 
+    func testEMOMUsesFixedMinuteSlotsRatherThanRepTime() throws {
+        let id = UUID()
+        var squat = exercise("Squat")
+        var pushup = exercise("Push-up")
+        squat.groupID = id
+        pushup.groupID = id
+        squat.groupKind = .emom
+        pushup.groupKind = .emom
+        squat.groupRounds = 10
+        pushup.groupRounds = 10
+        squat.groupClockSeconds = 60
+        pushup.groupClockSeconds = 60
+
+        let source = [squat, pushup]
+        let decoded = try JSONDecoder().decode(
+            [WorkoutTemplateBlock].self, from: JSONEncoder().encode(source)
+        )
+        XCTAssertEqual(decoded, source)
+        let executed = decoded.expandedForExecution()
+        XCTAssertEqual(executed.count, 20)
+        XCTAssertEqual(executed.first?.executionGroupKind, .emom)
+        XCTAssertEqual(executed.last?.executionRound, 10)
+        XCTAssertEqual(executed.last?.executionStationCount, 2)
+        XCTAssertEqual(ATHLTHWorkoutDurationEstimator.previewSeconds(for: source), 1200)
+    }
+
+    func testAMRAPHasOneRealTimeCapNotTwentyRoundsOfRepEstimates() {
+        let id = UUID()
+        var squat = exercise("Squat")
+        var pushup = exercise("Push-up")
+        squat.groupID = id
+        pushup.groupID = id
+        squat.groupKind = .amrap
+        pushup.groupKind = .amrap
+        squat.groupRounds = 20
+        pushup.groupRounds = 20
+        squat.groupClockSeconds = 720
+        pushup.groupClockSeconds = 720
+
+        let steps = [squat, pushup].expandedForExecution()
+        XCTAssertEqual(steps.count, 40)
+        XCTAssertEqual(steps.first?.executionGroupClockSeconds, 720)
+        XCTAssertEqual(ATHLTHWorkoutDurationEstimator.previewSeconds(for: [squat, pushup]), 720)
+    }
+
+    func testDropsetStagesRetainIndependentLoadsWithoutRecovery() throws {
+        let id = UUID()
+        var heavy = exercise("Biceps curl")
+        var medium = exercise("Biceps curl")
+        var light = exercise("Biceps curl")
+        heavy.groupID = id
+        medium.groupID = id
+        light.groupID = id
+        heavy.groupKind = .dropSet
+        medium.groupKind = .dropSet
+        light.groupKind = .dropSet
+        heavy.groupRounds = 1
+        medium.groupRounds = 1
+        light.groupRounds = 1
+        heavy.repetitions = 10
+        medium.repetitions = 8
+        light.repetitions = 6
+        heavy.targetWeightKilograms = 25
+        medium.targetWeightKilograms = 20
+        light.targetWeightKilograms = 15
+
+        let source = [heavy, medium, light]
+        let saved = try JSONDecoder().decode([WorkoutTemplateBlock].self,
+                                             from: JSONEncoder().encode(source))
+        let steps = saved.expandedForExecution()
+        XCTAssertEqual(steps.count, 3)
+        XCTAssertEqual(steps.map(\.targetWeightKilograms), [25, 20, 15])
+        XCTAssertEqual(steps.map(\.repetitions), [10, 8, 6])
+        XCTAssertEqual(steps.filter { $0.kind == .rest }.count, 0)
+        XCTAssertEqual(steps.map(\.executionGroupKind), [.dropSet, .dropSet, .dropSet])
+    }
+
     func testIntervalRepeatsRunAndRecoveryButSkipsFinalRecovery() {
         let id = UUID()
         var run = running()
