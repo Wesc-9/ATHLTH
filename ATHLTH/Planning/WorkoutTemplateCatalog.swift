@@ -453,7 +453,10 @@ extension Array where Element == WorkoutTemplateBlock {
                         // A recovery at the end of an interval group is a
                         // between-round break, not a mandatory final pause.
                         if round == rounds && position == members.count - 1
-                            && member.isRestOrActiveRecovery && rounds > 1 {
+                            && member.isRestOrActiveRecovery &&
+                            (rounds > 1 || current.groupKind == .circuit) {
+                            // A circuit's pause is between rounds only,
+                            // including when the athlete selects one round.
                             continue
                         }
                         append(member, title: rounds > 1
