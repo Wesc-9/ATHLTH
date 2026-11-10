@@ -5032,6 +5032,9 @@ struct WorkoutTemplateBuilderView: View {
                 }) else { return }
                 addRestBlock(toGroup: id)
             },
+            onMoveSupersetMember: { id, targetID in
+                moveDraggedGroupMember(id, over: targetID)
+            },
             onSetSupersetRounds: { id, rounds in
                 guard (1...20).contains(rounds) else { return }
                 for index in blocks.indices where
