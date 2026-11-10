@@ -4702,6 +4702,7 @@ struct WorkoutTemplateBuilderView: View {
                     switch group {
                     case .superset: createSuperset()
                     case .circuit: createCircuit()
+                    case .emom, .amrap, .dropSet: createStrengthMode(group)
                     case .intervals: openExercisePicker()
                     }
                 } else if pendingSavedWorkoutPicker {
@@ -5112,6 +5113,18 @@ struct WorkoutTemplateBuilderView: View {
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
                 createCircuit()
+            },
+            onAddStrengthMode: { phase, kind in
+                guard [.emom, .amrap, .dropSet].contains(kind) else { return }
+                selectedPhase = phase
+                studioVisiblePhases.insert(phase)
+                createStrengthMode(kind)
+            },
+            onSetGroupClock: { id, seconds in
+                guard seconds.isFinite && (30...3_600).contains(seconds) else { return }
+                for index in blocks.indices where blocks[index].groupID == id {
+                    blocks[index].groupClockSeconds = seconds
+                }
             },
             onAddExerciseToSuperset: { phase, id in
                 selectedPhase = phase
@@ -6527,6 +6540,9 @@ struct WorkoutTemplateBuilderView: View {
         case "interval": createIntervals()
         case "superset": createSuperset()
         case "circuit": createCircuit()
+        case "emom": createStrengthMode(.emom)
+        case "amrap": createStrengthMode(.amrap)
+        case "dropset": createStrengthMode(.dropSet)
         case "rest": addRestBlock()
         case "active_recovery": addActiveRecoveryBlock()
         case "stretching": addWellnessBlock(.stretching)
@@ -6791,10 +6807,15 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func createCircuit() {
-        // The first picked exercise creates a regular persisted group;
-        // the Studio card then adds stations, rounds and optional recovery.
         exerciseTargetGroupID = UUID()
         pendingNewGroupKind = .circuit
+        showingExercisePicker = true
+    }
+
+    private func createStrengthMode(_ mode: WorkoutBlockGroupKind) {
+        guard [.emom, .amrap, .dropSet].contains(mode) else { return }
+        exerciseTargetGroupID = UUID()
+        pendingNewGroupKind = mode
         showingExercisePicker = true
     }
 
@@ -6849,6 +6870,7 @@ struct WorkoutTemplateBuilderView: View {
             block.groupID = id
             block.groupKind = first.groupKind
             block.groupRounds = first.groupRounds
+            block.groupClockSeconds = first.groupClockSeconds
             block.setCount = nil
             block.restBetweenSetsSeconds = nil
         }
@@ -6857,7 +6879,7 @@ struct WorkoutTemplateBuilderView: View {
             // In strength groups the pause belongs at the end of each
             // round. Extra stations must be inserted before the pause.
             let position = block.kind == .exercise &&
-                blocks[last].groupKind?.isStrengthGroup == true &&
+                blocks[last].groupKind?.canInsertRoundPause == true &&
                 blocks[last].isRestOrActiveRecovery
                 ? last : last + 1
             blocks.insert(block, at: position)
@@ -6960,7 +6982,11 @@ struct WorkoutTemplateBuilderView: View {
            !blocks.contains(where: { $0.groupID == groupID }) {
             block.groupID = groupID
             block.groupKind = pendingNewGroupKind
-            block.groupRounds = 3
+            block.groupRounds = pendingNewGroupKind == .emom ? 10
+                : pendingNewGroupKind == .amrap ? 20
+                : pendingNewGroupKind == .dropSet ? 1 : 3
+            block.groupClockSeconds = pendingNewGroupKind == .emom ? 60
+                : pendingNewGroupKind == .amrap ? 720 : nil
         } else if groupID == nil {
             block.setCount = 3
             block.restBetweenSetsSeconds = 90
@@ -6975,7 +7001,27 @@ struct WorkoutTemplateBuilderView: View {
         if groupID == nil {
             block = ATHLTHRunningLibraryExerciseAdapter.adapt(block)
         }
-        insertBlock(block, toGroup: groupID)
+        if block.groupKind == .dropSet, let id = block.groupID {
+            // The first picked library exercise is the base. Each subsequent
+            // stage is an explicit effort with its own planned reps/load.
+            // Values are editable; never fabricate reduced weight in kg.
+            block.setCount = nil
+            block.repetitions = 10
+            insertBlock(block, toGroup: nil)
+            for reps in [8, 6] {
+                var stage = block
+                stage.groupID = nil
+                stage.groupKind = nil
+                stage.groupRounds = nil
+                stage.groupClockSeconds = nil
+                stage.editorDragID = UUID()
+                stage.repetitions = reps
+                stage.setCount = nil
+                insertBlock(stage, toGroup: id)
+            }
+        } else {
+            insertBlock(block, toGroup: groupID)
+        }
     }
 
     private func moveTimelineSection(from source: Int, to destination: Int) {
