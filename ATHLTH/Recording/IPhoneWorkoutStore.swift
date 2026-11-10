@@ -1825,7 +1825,9 @@ final class IPhoneWorkoutStore:
         let configuration = HKWorkoutConfiguration()
         configuration.activityType =
             workout.walking ? .walking : .running
-        let isIndoor = workout.runEnvironment != .outdoor
+        // Legacy recordings may have no environment field; those were
+        // outdoor GPS workouts, never interpret nil as indoor.
+        let isIndoor = workout.runEnvironment.map { $0 != .outdoor } ?? false
         configuration.locationType =
             isIndoor ? .indoor : .outdoor
 
