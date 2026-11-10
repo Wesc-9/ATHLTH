@@ -224,6 +224,8 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     init() {
+        let signpost = ATHLTHPerformance.begin("ExerciseLibraryStartup")
+        defer { ATHLTHPerformance.end("ExerciseLibraryStartup", id: signpost) }
         // Prefer a valid persisted snapshot; fall back to the bundled offline catalog.
         // This avoids decoding the same large exercise dataset twice at startup.
         loadCachedRepDB()
@@ -1316,6 +1318,8 @@ final class ExerciseLibraryStore: ObservableObject {
     }
 
     private func loadBundledRepDB() {
+        let signpost = ATHLTHPerformance.begin("RepDBBundledDecode")
+        defer { ATHLTHPerformance.end("RepDBBundledDecode", id: signpost) }
         guard let root = Self.bundledRepDBRoot,
               let data = try? Data(contentsOf: root.appendingPathComponent("exercises.json")),
               let dataset = try? JSONDecoder().decode(RepDBDataset.self, from: data) else {
