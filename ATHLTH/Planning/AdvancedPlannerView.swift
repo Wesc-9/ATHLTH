@@ -6660,6 +6660,15 @@ struct SessionEditorView: View {
                         if scratchBuilderClosedIntentionally {
                             scratchBuilderClosedIntentionally = false
                             restoreScratchComposerOnWake = false
+                            // Explicit discard deletes the child draft; an
+                            // explicit "Save draft" keeps its resume marker.
+                            if UserDefaults.standard.data(
+                                forKey: scratchComposerDraftStorageKey
+                            ) == nil {
+                                UserDefaults.standard.removeObject(
+                                    forKey: scratchComposerEntryKey
+                                )
+                            }
                             // An actual Cancel/Save Draft returns to the
                             // caller; there is no second editing screen.
                             Task { @MainActor in
@@ -10583,6 +10592,12 @@ struct SessionEditorView: View {
         guard let data = UserDefaults.standard.data(forKey: scratchComposerEntryKey)
         else { return nil }
         return try? JSONDecoder().decode(ScratchComposerEntry.self, from: data)
+    }
+
+    private var scratchComposerDraftStorageKey: String {
+        let context = "session-scratch.\(session.profile.userID.uuidString).\(scratchTimelineDraftID.uuidString)"
+        let encoded = Data(context.utf8).base64EncodedString()
+        return "athlth.workoutBuilder.draft.v1.\(session.profile.userID.uuidString).\(encoded)"
     }
 
     private var draftStorageKey: String {
