@@ -28,7 +28,28 @@ final class ATHLTHIntervalGroupEditingTests: XCTestCase {
         let (group, original) = recipe()
         let result = try XCTUnwrap(ATHLTHIntervalGroupEditing.individualSteps(in: original, groupID: group))
         XCTAssertEqual(result.count, 7)
-        XCTAssertEqual(result.expandedForExecution(), original.expandedForExecution())
+        // Individual editing intentionally removes group execution provenance.
+        // Compare the actual workout recipe (pace, time, HR targets, order)
+        // rather than provenance fields introduced for live group tracking.
+        func withoutExecutionProvenance(_ source: [WorkoutTemplateBlock])
+            -> [WorkoutTemplateBlock] {
+            source.map { step in
+                var copy = step
+                copy.executionGroupKind = nil
+                copy.executionGroupID = nil
+                copy.executionRound = nil
+                copy.executionTotalRounds = nil
+                copy.executionGroupClockSeconds = nil
+                copy.executionStationCount = nil
+                return copy
+            }
+        }
+        XCTAssertEqual(
+            withoutExecutionProvenance(result.expandedForExecution()),
+            withoutExecutionProvenance(original.expandedForExecution())
+        )
+        XCTAssertEqual(original.expandedForExecution().first?.executionGroupKind, .intervals)
+        XCTAssertNil(result.expandedForExecution().first?.executionGroupKind)
         XCTAssertTrue(result.allSatisfy { $0.groupID == nil && $0.groupRounds == nil })
         XCTAssertEqual(Set(result.map(\.editorDragID)).count, result.count)
         XCTAssertEqual(result.last?.kind, .run)
