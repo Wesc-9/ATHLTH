@@ -13,6 +13,11 @@ struct ATHLTHRunBasicSetupView: View {
     var selectedWorkoutTitle: String? = nil
     var onChooseRoute: (() -> Void)? = nil
     var onChooseWorkout: (() -> Void)? = nil
+    var onChooseGoal: (() -> Void)? = nil
+    var onChooseGhost: (() -> Void)? = nil
+    var onChooseStandardMode: (() -> Void)? = nil
+    var isGoalSelected = false
+    var isGhostSelected = false
     /// Basic offers one simple coach toggle; Advanced owns the full rules.
     var audioCoachEnabled: Binding<Bool>? = nil
 
@@ -47,12 +52,21 @@ struct ATHLTHRunBasicSetupView: View {
                 sectionHeading(
                     ATHLTHLocalization.choose(english: "Run type", norwegian: "Løpetype")
                 )
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 9) { runTiles }
-                    if dynamicTypeSize.isAccessibilitySize {
-                        VStack(spacing: 8) { runTiles }
-                    } else {
-                        HStack(spacing: 5) { runTiles }
+                if onChooseGoal != nil || onChooseGhost != nil {
+                    LazyVGrid(
+                        columns: [GridItem(.flexible()), GridItem(.flexible())],
+                        spacing: 9
+                    ) {
+                        runTiles
+                    }
+                } else {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 9) { runTiles }
+                        if dynamicTypeSize.isAccessibilitySize {
+                            VStack(spacing: 8) { runTiles }
+                        } else {
+                            HStack(spacing: 5) { runTiles }
+                        }
                     }
                 }
             }
@@ -189,8 +203,10 @@ struct ATHLTHRunBasicSetupView: View {
             choiceTile(
                 title: option.title,
                 symbol: option.icon,
-                selected: mode == option
+                selected: mode == option &&
+                    !isGoalSelected && !isGhostSelected
             ) {
+                onChooseStandardMode?()
                 if option == .route {
                     environment = .outdoor
                     onChooseRoute?()
@@ -199,6 +215,22 @@ struct ATHLTHRunBasicSetupView: View {
                 }
                 mode = option
             }
+        }
+        if let onChooseGoal {
+            choiceTile(
+                title: ATHLTHLocalization.choose(
+                    english: "Goal-based", norwegian: "Målstyrt"
+                ),
+                symbol: "target", selected: isGoalSelected,
+                action: onChooseGoal
+            )
+        }
+        if let onChooseGhost {
+            choiceTile(
+                title: "Ghost Race",
+                symbol: "figure.run.circle", selected: isGhostSelected,
+                action: onChooseGhost
+            )
         }
     }
 
@@ -213,6 +245,7 @@ struct ATHLTHRunBasicSetupView: View {
                 environment = option
                 if option != .outdoor && mode == .route {
                     mode = .free
+                    onChooseStandardMode?()
                 }
             }
         }
