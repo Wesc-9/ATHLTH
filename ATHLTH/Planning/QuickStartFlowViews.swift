@@ -510,6 +510,21 @@ enum RunQuickStartMode: String, CaseIterable, Identifiable {
     }
 }
 
+/// Basic running goals are projected to the same structured Watch/iPhone
+/// timeline as the Advanced editor, not a separate workout engine.
+enum ATHLTHBasicRunGoalKind: String, CaseIterable, Identifiable {
+    case distance, time, pace, heartRateZone
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .distance: return ATHLTHLocalization.choose(english: "Distance", norwegian: "Distanse")
+        case .time: return ATHLTHLocalization.choose(english: "Time", norwegian: "Tid")
+        case .pace: return ATHLTHLocalization.choose(english: "Pace", norwegian: "Tempo")
+        case .heartRateZone: return ATHLTHLocalization.choose(english: "HR zone", norwegian: "Pulssone")
+        }
+    }
+}
+
 enum RunEnvironment: String, CaseIterable, Identifiable, Codable, Hashable {
     case outdoor
     case indoor
@@ -1450,6 +1465,15 @@ struct RunQuickStartSheet: View {
     @State private var selectedRoute: TrainingRoute?
     @State private var selectedWorkout: RunningWorkoutTemplate?
     @State private var advancedWorkout: PlannedSession?
+    @State private var basicGoalSelected = false
+    @State private var basicGhostSelected = false
+    @State private var basicGoalKind: ATHLTHBasicRunGoalKind = .distance
+    @State private var basicGoalDistanceKilometers = 5
+    @State private var basicGoalTimeMinutes = 30
+    @State private var basicGoalPaceSecondsPerKilometer = 360
+    @State private var basicGoalHeartRateZone = 2
+    @State private var basicGoalWorkoutID = UUID()
+    @State private var basicGhostTargetMinutes = 40
     @State private var selectedFriendIDs: Set<UUID> = []
     @State private var socialMode:
         SocialWorkoutParticipationMode =
@@ -1542,6 +1566,26 @@ struct RunQuickStartSheet: View {
                             selectedWorkoutTitle: selectedWorkout?.title,
                             onChooseRoute: { showingRoutes = true },
                             onChooseWorkout: { showingRunningLibrary = true },
+                            onChooseGoal: {
+                                basicGoalSelected = true
+                                basicGhostSelected = false
+                                mode = .structured
+                                advancedWorkout = nil
+                                selectedWorkout = nil
+                            },
+                            onChooseGhost: {
+                                basicGoalSelected = false
+                                basicGhostSelected = true
+                                environment = .outdoor
+                                mode = .route
+                                if selectedRoute == nil { showingRoutes = true }
+                            },
+                            onChooseStandardMode: {
+                                basicGoalSelected = false
+                                basicGhostSelected = false
+                            },
+                            isGoalSelected: basicGoalSelected,
+                            isGhostSelected: basicGhostSelected,
                             audioCoachEnabled: session.canAccess(.audioCoach)
                                 ? $audioCoachDraft.enabled : nil
                         )
@@ -1554,11 +1598,18 @@ struct RunQuickStartSheet: View {
                         )
                     }
 
-                    if mode == .route || mode == .structured {
-                        if isAdvancedSetup {
-                            selectionCard
-                        } else {
-                            basicSelectedContent
+                    if basicGoalSelected {
+                        basicGoalSetupCard
+                    } else {
+                        if mode == .route || mode == .structured {
+                            if isAdvancedSetup {
+                                selectionCard
+                            } else {
+                                basicSelectedContent
+                            }
+                        }
+                        if basicGhostSelected {
+                            basicGhostSetupCard
                         }
                     }
 
@@ -1717,6 +1768,8 @@ struct RunQuickStartSheet: View {
                             return false
                         }
                         advancedWorkout = workout
+                        basicGoalSelected = false
+                        basicGhostSelected = false
                         selectedWorkout = nil
                         quickWorkoutName = workout.title
                         environment = ATHLTHQuickRunTimelineAdapter.environment(
@@ -1852,6 +1905,9 @@ struct RunQuickStartSheet: View {
                 firePendingQuickRun()
             }
             .onChange(of: environment) { _, newValue in
+                if newValue != .outdoor {
+                    basicGhostSelected = false
+                }
                 if newValue != .outdoor,
                    mode == .route {
                     mode = .free
@@ -2612,6 +2668,149 @@ struct RunQuickStartSheet: View {
         submitQuickRun(captureDevice: device)
     }
 
+    private var basicGoalWorkout: PlannedSession {
+        var step = WorkoutTemplateBlock(
+            sequence: 1, kind: .run,
+            title: ATHLTHLocalization.choose(
+                english: "Goal-based run", norwegian: "Målstyrt løping"
+            ),
+            exerciseSlug: nil,
+            distanceMeters: basicGoalKind == .distance
+                ? Double(basicGoalDistanceKilometers * 1_000) : nil,
+            repetitions: nil,
+            durationSeconds: basicGoalKind == .time
+                ? TimeInterval(basicGoalTimeMinutes * 60) : nil,
+            targetWeightKilograms: nil,
+            loadNote: nil, notes: nil, phase: .main
+        )
+        step.cardioActivity = .running
+        if basicGoalKind == .pace {
+            step.targetPaceSecondsPerKilometer =
+                Double(basicGoalPaceSecondsPerKilometer)
+        }
+        if basicGoalKind == .heartRateZone {
+            step.targetHeartRateZone = basicGoalHeartRateZone
+        }
+
+        var result = PlannedSession(
+            id: basicGoalWorkoutID,
+            title: quickWorkoutName.isEmpty ? step.title : quickWorkoutName,
+            kind: .running, scheduledStart: nil,
+            durationMinutes: basicGoalKind == .time
+                ? basicGoalTimeMinutes : nil,
+            targetDistanceKilometers: basicGoalKind == .distance
+                ? Double(basicGoalDistanceKilometers) : nil,
+            targetPaceSecondsPerKilometer: step.targetPaceSecondsPerKilometer,
+            routeID: nil, exercises: [], notes: nil
+        )
+        result.workoutBlocks = [step]
+        return ATHLTHQuickRunTimelineAdapter.withEnvironment(
+            result, environment: environment
+        )
+    }
+
+    private var basicGoalSetupCard: some View {
+        ATHLTHPlanSurface(density: .compact) {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(ATHLTHLocalization.choose(
+                    english: "Your running goal", norwegian: "Ditt løpemål"
+                ), systemImage: "target")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+                Picker(
+                    ATHLTHLocalization.choose(
+                        english: "Goal type", norwegian: "Måltype"
+                    ), selection: $basicGoalKind
+                ) {
+                    ForEach(ATHLTHBasicRunGoalKind.allCases) { kind in
+                        Text(kind.title).tag(kind)
+                    }
+                }
+                .pickerStyle(.menu)
+                .tint(ATHLTHTrainDesign.bronze)
+                switch basicGoalKind {
+                case .distance:
+                    Stepper(
+                        "\(basicGoalDistanceKilometers) km",
+                        value: $basicGoalDistanceKilometers, in: 1...42
+                    )
+                case .time:
+                    Stepper(
+                        "\(basicGoalTimeMinutes) min",
+                        value: $basicGoalTimeMinutes, in: 5...240, step: 5
+                    )
+                case .pace:
+                    Stepper(
+                        String(format: "%d:%02d min/km",
+                               basicGoalPaceSecondsPerKilometer / 60,
+                               basicGoalPaceSecondsPerKilometer % 60),
+                        value: $basicGoalPaceSecondsPerKilometer,
+                        in: 180...900, step: 5
+                    )
+                case .heartRateZone:
+                    Stepper(
+                        ATHLTHLocalization.choose(
+                            english: "Heart rate zone", norwegian: "Pulssone"
+                        ) + " \(basicGoalHeartRateZone)",
+                        value: $basicGoalHeartRateZone, in: 1...5
+                    )
+                }
+                if basicGoalKind == .pace || basicGoalKind == .heartRateZone {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Open run: use Finish when ready. Audio Coach can help you hold your target.",
+                        norwegian: "Åpen økt: avslutt selv når du er ferdig. Audio Coach kan hjelpe deg å holde målet."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+                if isAdvancedSetup {
+                    Button {
+                        showingDetailedWorkoutBuilder = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Edit in workout builder",
+                            norwegian: "Rediger i øktbyggeren"
+                        ), systemImage: "slider.horizontal.3")
+                    }
+                    .font(.subheadline.weight(.medium))
+                    .tint(ATHLTHTrainDesign.bronze)
+                }
+            }
+        }
+    }
+
+    private var basicGhostSetupCard: some View {
+        ATHLTHPlanSurface(density: .compact) {
+            VStack(alignment: .leading, spacing: 12) {
+                Label("Ghost Race", systemImage: "figure.run.circle")
+                    .font(.headline)
+                if selectedRoute == nil {
+                    Button {
+                        showingRoutes = true
+                    } label: {
+                        Label(ATHLTHLocalization.choose(
+                            english: "Choose a route",
+                            norwegian: "Velg rute"
+                        ), systemImage: "map")
+                    }
+                } else {
+                    Stepper(
+                        ATHLTHLocalization.choose(
+                            english: "Target finish", norwegian: "Måltid"
+                        ) + ": \(basicGhostTargetMinutes) min",
+                        value: $basicGhostTargetMinutes, in: 5...360, step: 5
+                    )
+                    Text(ATHLTHLocalization.choose(
+                        english: "The Ghost starts on the saved outdoor course. Change the target in Advanced for finer pacing.",
+                        norwegian: "Ghost starter på valgt utendørsrute. I Avansert kan du justere tempoet mer detaljert."
+                    ))
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+            }
+        }
+    }
+
     private func canSubmitQuickRun(
         captureDevice:
             WorkoutCaptureDevice
@@ -2628,7 +2827,8 @@ struct RunQuickStartSheet: View {
         case .route:
             return selectedRoute != nil
         case .structured:
-            return advancedWorkout != nil || selectedWorkout != nil
+            return basicGoalSelected ||
+                advancedWorkout != nil || selectedWorkout != nil
         }
     }
 
@@ -2657,6 +2857,11 @@ struct RunQuickStartSheet: View {
         // The environment chosen in Workout Details is authoritative.
         // A previously selected structured workout must not override it.
         let runEnvironment = environment
+        let launchAdvancedWorkout: PlannedSession? =
+            basicGoalSelected ? basicGoalWorkout : advancedWorkout
+        let basicGhostTarget: TimeInterval? = basicGhostSelected &&
+            mode == .route && guidanceRoute != nil && environment == .outdoor
+            ? TimeInterval(basicGhostTargetMinutes * 60) : nil
         var configuration = RunQuickStartConfiguration(
                 mode: mode,
                 route:
@@ -2672,7 +2877,7 @@ struct RunQuickStartSheet: View {
                 environment: runEnvironment,
                 treadmillInclinePercent:
                     runEnvironment == .treadmill
-                        ? advancedWorkout?.resolvedWorkoutBlocks
+                        ? launchAdvancedWorkout?.resolvedWorkoutBlocks
                             .first(where: { $0.kind == .run })?
                             .treadmillInclinePercent ?? 0
                         : nil,
@@ -2683,21 +2888,18 @@ struct RunQuickStartSheet: View {
                 routeAlerts:
                     routeAlerts,
                 ghostTargetDurationSeconds:
-                    isAdvancedSetup &&
-                    ghostDraft.enabled &&
-                    guidanceRoute != nil
-                        ? ghostDraft
-                            .targetDuration
-                        : nil,
+                    basicGhostTarget ?? (
+                        isAdvancedSetup && ghostDraft.enabled &&
+                        guidanceRoute != nil ? ghostDraft.targetDuration : nil
+                    ),
                 ghostUpdates:
-                    isAdvancedSetup &&
-                    guidanceRoute != nil &&
-                    ghostDraft.enabled &&
-                    ghostDraft.targetDuration != nil
-                        ? ghostDraft.resolvedUpdates(
-                            fallback: settings.ghostRaceAudioConfiguration
-                          )
-                        : nil,
+                    basicGhostTarget != nil
+                        ? settings.ghostRaceAudioConfiguration
+                        : (isAdvancedSetup && guidanceRoute != nil &&
+                           ghostDraft.enabled && ghostDraft.targetDuration != nil
+                            ? ghostDraft.resolvedUpdates(
+                                fallback: settings.ghostRaceAudioConfiguration
+                              ) : nil),
                 autoPauseEnabled:
                     runEnvironment == .outdoor &&
                     (
@@ -2728,7 +2930,7 @@ struct RunQuickStartSheet: View {
             )
         configuration.petIDs = selectedPetIDs
         configuration.advancedWorkout = mode == .structured
-            ? advancedWorkout.map {
+            ? launchAdvancedWorkout.map {
                 ATHLTHQuickRunTimelineAdapter.withEnvironment(
                     $0, environment: runEnvironment
                 )
