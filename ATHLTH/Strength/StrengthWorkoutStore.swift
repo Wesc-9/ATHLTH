@@ -2811,9 +2811,12 @@ final class StrengthWorkoutStore: ObservableObject {
                 equipment: [],
                 imageURL: nil
             )
-            let setCount = block.groupKind != nil
-                ? min(max(block.groupRounds ?? 1, 1), 20)
-                : min(max(block.setCount ?? 1, 1), 20)
+            // AMRAP has no predetermined number of rounds. Start with
+            // one round and extend the queue while its time window is open.
+            let setCount = block.groupKind == .amrap ? 1 :
+                block.groupKind != nil
+                    ? min(max(block.groupRounds ?? 1, 1), 20)
+                    : min(max(block.setCount ?? 1, 1), 20)
             let timed = block.durationSeconds != nil
             let sets: [StrengthSetLog] = (0..<setCount).map { index in
                 let target = block.individualSetTargets.flatMap { targets in
@@ -3378,7 +3381,8 @@ final class StrengthWorkoutStore: ObservableObject {
             automaticRestTimer:
                 automaticRestTimer,
             restSeconds:
-                resolvedRestSeconds
+                resolvedRestSeconds,
+            at: completedAt
         ) {
             activeWorkout = workout
             reloadDraftFromCurrentSet()
@@ -4210,12 +4214,67 @@ final class StrengthWorkoutStore: ObservableObject {
         return suggestion
     }
 
+    /// Returns one new AMRAP round only after the entire previous round
+    /// has been recorded. Does not infer work from timer ticks. A single
+    /// exercise AMRAP follows the same rules as a multi-station AMRAP.
+    @discardableResult
+    static func extendOpenEndedAMRAPGroupIfNeeded(
+        exercises: inout [StrengthExerciseLog],
+        groupID: UUID,
+        at now: Date
+    ) -> Bool {
+        let indices = exercises.indices.filter { exercises[$0].groupID == groupID }
+        guard let firstIndex = indices.first,
+              exercises[firstIndex].groupStyle == .amrap,
+              !indices.contains(where: { exercises[$0].sets.isEmpty }),
+              indices.allSatisfy({ index in
+                  exercises[index].sets.allSatisfy(\.isCompleted)
+              }),
+              ATHLTHStrengthModeClockPolicy.permitsCompletion(
+                modeRaw: StrengthExerciseGroupStyle.amrap.rawValue,
+                startedAt: exercises[firstIndex].groupStartedAt,
+                clockSeconds: exercises[firstIndex].groupClockSeconds,
+                roundIndex: 0, stationIndex: 0, stationCount: indices.count,
+                at: now
+              ) else { return false }
+
+        for index in indices {
+            guard let previous = exercises[index].sets.last else { continue }
+            var next = StrengthSetLog(
+                id: UUID(),
+                setNumber: previous.setNumber + 1,
+                plannedReps: previous.plannedReps,
+                plannedWeightKilograms: previous.plannedWeightKilograms,
+                completedReps: nil,
+                completedWeightKilograms: nil,
+                rpe: nil,
+                completedAt: nil,
+                restSeconds: 0
+            )
+            next.targetKind = previous.targetKind
+            next.plannedDurationSeconds = previous.plannedDurationSeconds
+            next.recordsWeight = previous.recordsWeight
+            next.loadKind = previous.loadKind
+            next.plannedResistanceLevel = previous.plannedResistanceLevel
+            next.plannedRPE = previous.plannedRPE
+            next.plannedRIR = previous.plannedRIR
+            next.plannedTempo = previous.plannedTempo
+            next.plannedSetType = previous.plannedSetType
+            next.plannedNote = previous.plannedNote
+            next.isWarmUp = previous.isWarmUp
+            exercises[index].sets.append(next)
+            exercises[index].completedAt = nil
+        }
+        return true
+    }
+
     private func advanceGroupedSetIfNeeded(
         workout: inout StrengthWorkoutLog,
         completedExerciseIndex: Int,
         completedSetIndex: Int,
         automaticRestTimer: Bool,
-        restSeconds: Int
+        restSeconds: Int,
+        at completedAt: Date
     ) -> Bool {
         guard workout.exercises.indices
                 .contains(
@@ -4236,9 +4295,18 @@ final class StrengthWorkoutStore: ObservableObject {
                         .groupID == groupID
                 }
 
-        guard groupIndices.count >= 2 else {
-            return false
-        }
+        guard groupIndices.count >= 2 ||
+              workout.exercises[completedExerciseIndex].groupStyle == .amrap
+        else { return false }
+
+        // A completed AMRAP round creates the next round while there is
+        // time remaining. This works for one station or many stations,
+        // without a preset twenty-round cap.
+        _ = Self.extendOpenEndedAMRAPGroupIfNeeded(
+            exercises: &workout.exercises,
+            groupID: groupID,
+            at: completedAt
+        )
 
         if let nextSameRound =
                 groupIndices.first(
