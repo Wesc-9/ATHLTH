@@ -1825,8 +1825,7 @@ final class IPhoneWorkoutStore:
         let configuration = HKWorkoutConfiguration()
         configuration.activityType =
             workout.walking ? .walking : .running
-        let isIndoor =
-            workout.runEnvironment == .treadmill
+        let isIndoor = workout.runEnvironment != .outdoor
         configuration.locationType =
             isIndoor ? .indoor : .outdoor
 
@@ -1851,9 +1850,10 @@ final class IPhoneWorkoutStore:
                     HKMetadataKeySyncVersion: 1,
                     HKMetadataKeyIndoorWorkout: isIndoor,
                     "ATHLTHDistanceSource": isIndoor
-                        ? (workout.indoorVenue == .indoorRunning ? "unavailable" :
-                            (workout.treadmillSpeedKilometersPerHour != nil
-                                ? "entered_belt_speed" : "unavailable"))
+                        ? (workout.runEnvironment == .treadmill &&
+                           workout.indoorVenue != .indoorRunning &&
+                           workout.treadmillSpeedKilometersPerHour != nil
+                            ? "entered_belt_speed" : "unavailable")
                         : "gps",
                     "ATHLTHIndoorVenue": workout.indoorVenue?.rawValue ?? "not_specified",
                     "ATHLTHIndoorSwitchActiveSeconds":
