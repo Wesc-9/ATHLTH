@@ -18,6 +18,48 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         return block
     }
 
+    func testModernSupersetRecipeOverridesStaleLegacyExerciseArray() {
+        let id = UUID()
+        let legacy = PlannedExercise(
+            id: UUID(), exerciseID: nil,
+            embeddedExercise: ExerciseSnapshot(
+                name: "Legacy Bench",
+                instructions: [], primaryMuscles: [], equipment: [],
+                imageURL: nil
+            ),
+            sets: 3, reps: 10, targetWeightKilograms: 25,
+            targetRPE: nil, restSeconds: 60, notes: nil
+        )
+        var first = exercise(10, weight: 40)
+        var second = exercise(12, weight: 25)
+        first.title = "Modern Squat"
+        second.title = "Modern Row"
+        first.groupID = id
+        second.groupID = id
+        first.groupKind = .superset
+        second.groupKind = .superset
+        first.groupRounds = 2
+        second.groupRounds = 2
+        var workout = PlannedSession(
+            id: UUID(), title: "Grouped workout", kind: .strength,
+            scheduledStart: nil, durationMinutes: 20,
+            targetDistanceKilometers: nil,
+            targetPaceSecondsPerKilometer: nil,
+            routeID: nil, exercises: [legacy], notes: nil
+        )
+        workout.workoutBlocks = [first, second]
+        let store = StrengthWorkoutStore()
+        store.start(
+            session: workout, watchSessionID: nil,
+            trackingMode: .simple, captureDevice: .iPhone
+        )
+        XCTAssertEqual(store.activeWorkout?.exercises.count, 2)
+        XCTAssertEqual(store.activeWorkout?.exercises.map { $0.exercise.name },
+                       ["Modern Squat", "Modern Row"])
+        XCTAssertEqual(store.activeWorkout?.exercises.map(\.groupID), [id, id])
+        XCTAssertEqual(store.activeWorkout?.exercises.map { $0.sets.count }, [2, 2])
+    }
+
     func testCircuitStrengthLogKeepsStationsRoundsAndPause() {
         let id = UUID()
         var squat = exercise(10, weight: 40)
