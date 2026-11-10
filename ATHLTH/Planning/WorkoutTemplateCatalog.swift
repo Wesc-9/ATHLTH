@@ -5174,6 +5174,28 @@ struct WorkoutTemplateBuilderView: View {
                     blocks[index].restBetweenSetsSeconds = Double(seconds)
                 }
             },
+            onAddDropStage: { id in
+                guard mayInsertStrengthModes,
+                      blocks.filter({ $0.groupID == id }).count < 12,
+                      let previous = blocks.last(where: {
+                        $0.groupID == id && $0.groupKind == .dropSet &&
+                        $0.kind == .exercise
+                      }) else { return }
+                // Repeat the same actual exercise with another independent
+                // set target, not a new catalog exercise.
+                var stage = previous
+                stage.editorDragID = UUID()
+                stage.targetWeightKilograms =
+                    previous.targetWeightKilograms.flatMap { previousWeight in
+                        previousWeight > 1
+                            ? max(0.5, floor(previousWeight * 0.8 * 2) / 2)
+                            : nil
+                    }
+                stage.repetitions = max((previous.repetitions ?? 8) - 2, 1)
+                stage.setCount = nil
+                stage.restBetweenSetsSeconds = nil
+                insertBlock(stage, toGroup: id)
+            },
             onAddExerciseToSuperset: { phase, id in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
