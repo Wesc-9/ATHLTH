@@ -2365,6 +2365,19 @@ final class WatchWorkoutManager: NSObject, ObservableObject {
         }
 
         let completedAt = Date()
+        guard ATHLTHStrengthModeClockPolicy.permitsCompletion(
+            modeRaw: snapshot.strengthModeRaw,
+            startedAt: snapshot.strengthModeStartedAt,
+            clockSeconds: snapshot.strengthModeClockSeconds,
+            roundIndex: snapshot.setIndex,
+            stationIndex: max(0, (snapshot.strengthModeStationIndex ?? 1) - 1),
+            stationCount: max(1, snapshot.strengthModeStationCount ?? 1),
+            at: completedAt
+        ) else {
+            // Keep the pending set available for an explicit skip; do not
+            // optimistically claim it was performed outside the clock window.
+            return
+        }
         let actualDuration = snapshot.isOpenEndedTimedSet == true
             ? snapshot.setEffortStartedAt.map {
                 Int(min(max(completedAt.timeIntervalSince($0).rounded(), 0), 7_200))
