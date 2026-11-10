@@ -118,6 +118,8 @@ enum RouteMapSnapshotCache {
             return cached
         }
 
+        let signpost = ATHLTHPerformance.begin("RouteThumbnailRender")
+        defer { ATHLTHPerformance.end("RouteThumbnailRender", id: signpost) }
         let requestedGeneration = generation
         let coordinates =
             route.coordinates
