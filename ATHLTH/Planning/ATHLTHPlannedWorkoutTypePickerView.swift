@@ -50,8 +50,6 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: compact ? 12 : 20) {
-                        header(compact: compact)
-
                         VStack(alignment: .leading, spacing: compact ? 5 : 9) {
                             Text("ATHLTH · PLAN")
                                 .font(.system(size: 11, weight: .bold))
@@ -112,7 +110,7 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
                         }
                     }
                     .padding(.horizontal, compact ? 16 : 20)
-                    .padding(.top, compact ? 8 : 18)
+                    .padding(.top, compact ? 16 : 18)
                     .padding(.bottom, compact ? 12 : 34)
                     .frame(maxWidth: 740)
                     .frame(maxWidth: .infinity)
@@ -120,7 +118,23 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
                 .scrollIndicators(.hidden)
             }
             .background(canvas.ignoresSafeArea())
-            .toolbar(.hidden, for: .navigationBar)
+            .navigationTitle(ATHLTHLocalization.choose(
+                english: "Choose workout type", norwegian: "Velg økttype"
+            ))
+            .navigationBarTitleDisplayMode(.inline)
+            // Use the same native cancellation toolbar button as the
+            // parent "Plan extra workout" sheet; don't draw a grey
+            // .bordered button inside the scrolling content.
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(ATHLTHLocalization.choose(
+                        english: "Back", norwegian: "Tilbake"
+                    )) {
+                        dismiss()
+                    }
+                    .accessibilityIdentifier("athlth-workout-type-back")
+                }
+            }
             .navigationDestination(for: ATHLTHPlannedWorkoutType.self) { type in
                 WorkoutTemplateLibraryView(
                     onSelectPlanned: { workout in
@@ -155,36 +169,6 @@ struct ATHLTHPlannedWorkoutTypePickerView: View {
             return min(178, max(146, (availableHeight - 224) / 3))
         }
         return min(250, max(180, (availableHeight - 290) / 2))
-    }
-
-    private func header(compact: Bool) -> some View {
-        HStack(spacing: 8) {
-            Button {
-                dismiss()
-            } label: {
-                Text(ATHLTHLocalization.choose(
-                    english: "Back", norwegian: "Tilbake"
-                ))
-                .frame(minWidth: 73, minHeight: 40)
-            }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
-
-            Spacer(minLength: 4)
-            Text(ATHLTHLocalization.choose(
-                english: "Choose workout type", norwegian: "Velg økttype"
-            ))
-            .font(.system(size: 16, weight: .semibold))
-            .foregroundStyle(ink)
-            .lineLimit(1)
-            .minimumScaleFactor(0.85)
-
-            Spacer(minLength: 4)
-            Color.clear
-                .frame(width: 90, height: 1)
-                .accessibilityHidden(true)
-        }
-        .padding(.bottom, compact ? 4 : 18)
     }
 
     private func openWorkoutType(_ type: ATHLTHPlannedWorkoutType) {
