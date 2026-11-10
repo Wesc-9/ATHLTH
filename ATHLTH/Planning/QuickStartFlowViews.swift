@@ -3568,7 +3568,8 @@ struct WalkQuickStartSheet: View {
 
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())],
                               spacing: 10) {
-                        ATHLTHBasicActivityModeTile(
+                        if session.canAccess(.audioCoach) {
+                            ATHLTHBasicActivityModeTile(
                             title: "Audio Coach",
                             subtitle: ATHLTHLocalization.choose(
                                 english: "Spoken guidance", norwegian: "Lydveiledning"
@@ -3578,6 +3579,7 @@ struct WalkQuickStartSheet: View {
                         ) {
                             guard session.canAccess(.audioCoach) else { return }
                             audioCoachDraft.enabled.toggle()
+                            }
                         }
                         ATHLTHBasicActivityModeTile(
                             title: ATHLTHLocalization.choose(
@@ -3594,12 +3596,12 @@ struct WalkQuickStartSheet: View {
                         }
                     }
 
-                    if showingWalkDetails || isAdvancedSetup {
                     if let plannedSession {
                         PlannedQuickStartContextCard(workout: plannedSession)
                     }
 
-                    WorkoutGearSelectionCard(
+                    if showingWalkDetails || isAdvancedSetup {
+                        WorkoutGearSelectionCard(
                         selectedGearIDs: $selectedGearIDs,
                         activity: .walking
                     )
