@@ -46,6 +46,37 @@ enum ATHLTHStudioSchedule {
         )
     }
 
+    /// One pass through saved plans produces both Home timelines. Each window
+    /// owns its own de-duplication set, preserving the previous behaviour
+    /// when a saved session ID occurs in multiple dates.
+    static func studioHomeWindows(
+        plans: [TrainingPlan],
+        standalone: [PlannedSession],
+        pausedPlanIDs: Set<UUID> = [],
+        deactivatedPlanIDs: Set<UUID> = [],
+        selectedWeekDate: Date,
+        upcomingFrom: Date = .now,
+        calendar sourceCalendar: Calendar = .current
+    ) -> (week: [Occurrence], upcoming: [Occurrence]) {
+        var calendar = sourceCalendar
+        calendar.firstWeekday = 2
+        let monday = HomeWeeklyProgressCalendar.weekInterval(
+            offset: 0, referenceDate: selectedWeekDate, calendar: calendar
+        ).start
+        let results = collect(
+            plans: plans,
+            standalone: standalone,
+            pausedPlanIDs: pausedPlanIDs,
+            deactivatedPlanIDs: deactivatedPlanIDs,
+            requests: [
+                WindowRequest(startDate: monday, days: 7, includeRestDays: true),
+                WindowRequest(startDate: upcomingFrom, days: 14, includeRestDays: false)
+            ],
+            calendar: calendar
+        )
+        return (week: results[0], upcoming: results[1])
+    }
+
     /// A calendar-date window used by iPad's Monday–Sunday overview.
     /// No past plans or recordings are marked completed by date alone.
     static func window(
@@ -58,24 +89,66 @@ enum ATHLTHStudioSchedule {
         calendar: Calendar = .current,
         includeRestDays: Bool = false
     ) -> [Occurrence] {
-        let start = calendar.startOfDay(for: startDate)
-        let end = calendar.date(byAdding: .day, value: max(1, min(days, 90)), to: start) ?? start
-        var entries: [Occurrence] = []
-        var identifiers: Set<String> = []
-        func append(_ item: PlannedSession, date: Date, planID: UUID?, planTitle: String?) {
-            guard (includeRestDays || !item.isExplicitRestDay),
-                  date >= start, date < end else { return }
-            let key = "\(planID?.uuidString ?? "standalone"):\(item.id.uuidString)"
-            guard identifiers.insert(key).inserted else { return }
-            entries.append(Occurrence(id: key, workout: item, date: date, planTitle: planTitle, planID: planID))
+        collect(
+            plans: plans,
+            standalone: standalone,
+            pausedPlanIDs: pausedPlanIDs,
+            deactivatedPlanIDs: deactivatedPlanIDs,
+            requests: [
+                WindowRequest(startDate: startDate, days: days,
+                              includeRestDays: includeRestDays)
+            ],
+            calendar: calendar
+        )[0]
+    }
+
+    private struct WindowRequest {
+        let startDate: Date
+        let days: Int
+        let includeRestDays: Bool
+    }
+
+    private static func collect(
+        plans: [TrainingPlan],
+        standalone: [PlannedSession],
+        pausedPlanIDs: Set<UUID>,
+        deactivatedPlanIDs: Set<UUID>,
+        requests: [WindowRequest],
+        calendar: Calendar
+    ) -> [[Occurrence]] {
+        let ranges = requests.map { request in
+            let start = calendar.startOfDay(for: request.startDate)
+            let end = calendar.date(
+                byAdding: .day,
+                value: max(1, min(request.days, 90)),
+                to: start
+            ) ?? start
+            return (start: start, end: end, includeRestDays: request.includeRestDays)
         }
+        var entries = requests.map { _ in [Occurrence]() }
+        var identifiers = requests.map { _ in Set<String>() }
+
+        func append(_ item: PlannedSession, date: Date,
+                    planID: UUID?, planTitle: String?) {
+            let key = "\(planID?.uuidString ?? "standalone"):\(item.id.uuidString)"
+            for index in ranges.indices {
+                let range = ranges[index]
+                guard (range.includeRestDays || !item.isExplicitRestDay),
+                      date >= range.start, date < range.end,
+                      identifiers[index].insert(key).inserted else { continue }
+                entries[index].append(Occurrence(
+                    id: key, workout: item, date: date,
+                    planTitle: planTitle, planID: planID
+                ))
+            }
+        }
+
         for plan in plans {
             guard !pausedPlanIDs.contains(plan.id),
-                  !deactivatedPlanIDs.contains(plan.id)
-            else { continue }
+                  !deactivatedPlanIDs.contains(plan.id) else { continue }
             for (weekOffset, week) in plan.weeks.enumerated() {
                 for day in week.days {
-                    // A plan with no start date can still hold explicitly dated sessions.
+                    // Explicit workout dates override the planned day.
                     let inferredDate = plan.startDate.flatMap { initial in
                         calendar.date(
                             byAdding: .day,
@@ -84,8 +157,10 @@ enum ATHLTHStudioSchedule {
                         )
                     }
                     for workout in day.sessions {
-                        guard let date = workout.scheduledStart ?? inferredDate else { continue }
-                        append(workout, date: date, planID: plan.id, planTitle: plan.title)
+                        guard let date = workout.scheduledStart ?? inferredDate
+                        else { continue }
+                        append(workout, date: date, planID: plan.id,
+                               planTitle: plan.title)
                     }
                 }
             }
@@ -94,9 +169,11 @@ enum ATHLTHStudioSchedule {
             guard let date = workout.scheduledStart else { continue }
             append(workout, date: date, planID: nil, planTitle: nil)
         }
-        return entries.sorted {
-            if $0.date == $1.date { return $0.id < $1.id }
-            return $0.date < $1.date
+        return entries.map { list in
+            list.sorted {
+                if $0.date == $1.date { return $0.id < $1.id }
+                return $0.date < $1.date
+            }
         }
     }
 }
