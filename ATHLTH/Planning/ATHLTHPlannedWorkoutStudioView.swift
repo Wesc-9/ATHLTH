@@ -18,6 +18,7 @@ struct ATHLTHPlannedWorkoutStudioView: View {
     let onAddSuperset: (WorkoutPhaseKind) -> Void
     let onAddExerciseToSuperset: (WorkoutPhaseKind, UUID) -> Void
     let onAddRestToSuperset: (WorkoutPhaseKind, UUID) -> Void
+    let onMoveSupersetMember: (UUID, UUID) -> Void
     let onSetSupersetRounds: (UUID, Int) -> Void
     let onUngroupSuperset: (UUID) -> Void
     let onDeleteSuperset: (UUID) -> Void
@@ -731,20 +732,39 @@ struct ATHLTHPlannedWorkoutStudioView: View {
         phase: WorkoutPhaseKind
     ) -> some View {
         let rows = entries(in: phase)
+        let supersetMembers = block.groupKind == .superset
+            ? rows.filter { $0.groupID == block.groupID && $0.groupKind == .superset }
+            : []
+        let supersetIndex = supersetMembers.firstIndex(where: {
+            $0.editorDragID == block.editorDragID
+        })
         return ATHLTHPlannedWorkoutStepRow(
             block: block,
             position: position,
-            canMoveUp: position > 1,
-            canMoveDown: position < rows.count,
+            canMoveUp: supersetIndex.map { $0 > 0 } ?? (position > 1),
+            canMoveDown: supersetIndex.map { $0 + 1 < supersetMembers.count }
+                ?? (position < rows.count),
             onEdit: { onEdit(block.editorDragID) },
             onDelete: { onRemove(block.editorDragID) },
             onMoveBy: { delta in
-                let destination = position - 1 + delta
-                guard rows.indices.contains(destination) else { return }
-                onMove(block.editorDragID, phase, rows[destination].editorDragID)
+                if let supersetIndex {
+                    let target = supersetIndex + delta
+                    guard supersetMembers.indices.contains(target) else { return }
+                    onMoveSupersetMember(
+                        block.editorDragID, supersetMembers[target].editorDragID
+                    )
+                } else {
+                    let destination = position - 1 + delta
+                    guard rows.indices.contains(destination) else { return }
+                    onMove(block.editorDragID, phase, rows[destination].editorDragID)
+                }
             },
             onReorderMove: { point in
-                liveReorder(block.editorDragID, finger: point)
+                if supersetIndex != nil {
+                    liveReorderSupersetMember(block.editorDragID, finger: point)
+                } else {
+                    liveReorder(block.editorDragID, finger: point)
+                }
             },
             onReorderEnd: endLiveReorder
         )
@@ -756,6 +776,49 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             }
         }
         .opacity(draggingID == block.editorDragID ? 0.13 : 1)
+    }
+
+    /// The ordinary drag policy deliberately moves a whole group. A drag
+    /// *inside* a superset moves only its selected member among the siblings.
+    private func liveReorderSupersetMember(_ id: UUID, finger: CGPoint) {
+        guard let block = blocks.first(where: { $0.editorDragID == id }),
+              let groupID = block.groupID,
+              block.groupKind == .superset else { return }
+        if draggingID == nil {
+            guard let startFrame = dragGeometry.rowFrames[id] else { return }
+            dragFingerOffsetY = finger.y - startFrame.midY
+            draggingID = id
+        }
+        guard draggingID == id else { return }
+        dragPoint = finger
+        let centerY = finger.y - dragFingerOffsetY
+        let members = blocks.filter {
+            $0.groupID == groupID && $0.groupKind == .superset
+        }
+        guard let index = members.firstIndex(where: {
+            $0.editorDragID == id
+        }) else { return }
+        if index + 1 < members.count {
+            let below = members.dropFirst(index + 1)
+            if let crossed = below.last(where: { neighbor in
+                guard let frame = dragGeometry.rowFrames[neighbor.editorDragID]
+                else { return false }
+                return centerY >= frame.midY
+            }) {
+                onMoveSupersetMember(id, crossed.editorDragID)
+                return
+            }
+        }
+        if index > 0 {
+            let above = members.prefix(index)
+            if let crossed = above.first(where: { neighbor in
+                guard let frame = dragGeometry.rowFrames[neighbor.editorDragID]
+                else { return false }
+                return centerY <= frame.midY
+            }) {
+                onMoveSupersetMember(id, crossed.editorDragID)
+            }
+        }
     }
 
     private func liveReorder(_ id: UUID, finger: CGPoint) {
