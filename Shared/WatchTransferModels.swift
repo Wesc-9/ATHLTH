@@ -1397,7 +1397,12 @@ enum ATHLTHStrengthModeClockPolicy {
         stationCount: Int,
         at now: Date = Date()
     ) -> Bool {
-        guard let modeRaw, let startedAt else { return true }
+        guard let modeRaw else { return true }
+        // A timed mode with no clock anchor must not silently accept work
+        // outside its intended window (e.g. an incomplete Watch transfer).
+        guard let startedAt else {
+            return modeRaw != "emom" && modeRaw != "amrap"
+        }
         let elapsed = max(0, now.timeIntervalSince(startedAt))
         switch modeRaw {
         case "amrap":
