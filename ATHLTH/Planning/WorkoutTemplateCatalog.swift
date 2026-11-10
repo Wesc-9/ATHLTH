@@ -4099,7 +4099,11 @@ struct WorkoutTemplateBuilderView: View {
               let target = blocks.firstIndex(where: { $0.editorDragID == targetID }),
               source != target,
               let group = blocks[source].groupID,
-              blocks[target].groupID == group else { return }
+              blocks[target].groupID == group,
+              // Keep an end-of-round recovery at the end of the group.
+              // Stations themselves can be reordered freely.
+              blocks[source].kind == .exercise,
+              blocks[target].kind == .exercise else { return }
         withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
             let moved = blocks.remove(at: source)
             blocks.insert(moved, at: target)
