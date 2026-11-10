@@ -11849,10 +11849,11 @@ private struct StrengthExerciseGroupBuilderView: View {
             )
         }
 
+        // This ad-hoc grouping sheet only edits ordinary supersets and
+        // circuits. Timed modes and drop sets retain their planned identity.
         _style = State(
             initialValue:
-                current?.groupStyle ??
-                .superset
+                current?.groupStyle == .circuit ? .circuit : .superset
         )
     }
 
@@ -11877,8 +11878,7 @@ private struct StrengthExerciseGroupBuilderView: View {
                         selection: $style
                     ) {
                         ForEach(
-                            StrengthExerciseGroupStyle
-                                .allCases
+                            [StrengthExerciseGroupStyle.superset, .circuit]
                         ) { option in
                             Text(option.title)
                                 .tag(option)
