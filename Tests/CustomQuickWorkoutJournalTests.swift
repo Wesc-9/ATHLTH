@@ -11,6 +11,35 @@ final class CustomQuickWorkoutJournalTests: XCTestCase {
         )
     }
 
+    func testBasicModeCatalogRespectsPreviouslyChosenActivity() {
+        for activity in CustomQuickWorkoutActivity.allCases {
+            XCTAssertTrue(ATHLTHBasicCustomActivityModePolicy.isAvailable(
+                .open, for: activity
+            ))
+        }
+        for activity in [CustomQuickWorkoutActivity.cycling, .rowing,
+                         .stairClimber, .mobility, .yoga, .sports, .other] {
+            XCTAssertFalse(ATHLTHBasicCustomActivityModePolicy.isAvailable(
+                .emom, for: activity
+            ))
+            XCTAssertFalse(ATHLTHBasicCustomActivityModePolicy.isAvailable(
+                .amrap, for: activity
+            ))
+        }
+        for activity in [CustomQuickWorkoutActivity.hiit, .circuit, .functional] {
+            XCTAssertTrue(ATHLTHBasicCustomActivityModePolicy.isAvailable(
+                .emom, for: activity
+            ))
+            XCTAssertTrue(ATHLTHBasicCustomActivityModePolicy.isAvailable(
+                .amrap, for: activity
+            ))
+        }
+        XCTAssertEqual(
+            ATHLTHBasicCustomActivityModePolicy.methods(for: .mobility),
+            [.open, .forTime]
+        )
+    }
+
     func testPhoneTimedWorkoutKeepsManualDistanceUnverified() throws {
         let record = try XCTUnwrap(CustomQuickWorkoutRecord.make(
             configuration: setup,
