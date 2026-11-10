@@ -6671,6 +6671,9 @@ struct SessionEditorView: View {
                             // without invoking the editor's Cancel action.
                             // Do not mistake this for an intentional exit.
                             restoreScratchComposerOnWake = true
+                            // The sheet may have been torn down by iOS.
+                            // Reopen the persisted draft, not a blank run.
+                            scratchResumingSavedComposer = true
                             if scenePhase == .active {
                                 Task { @MainActor in
                                     await Task.yield()
