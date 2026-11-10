@@ -55,3 +55,35 @@ final class ATHLTHSideMenuLayoutPolicyTests: XCTestCase {
         )
     }
 }
+
+final class ATHLTHStudioInboxPanelGesturePolicyTests: XCTestCase {
+    func testOpeningRequiresDeliberateLeftSwipe() {
+        XCTAssertTrue(ATHLTHStudioInboxPanelGesturePolicy.shouldOpen(
+            translation: CGSize(width: -85, height: 14)
+        ))
+        XCTAssertFalse(ATHLTHStudioInboxPanelGesturePolicy.shouldOpen(
+            translation: CGSize(width: 85, height: 0)
+        ))
+        XCTAssertFalse(ATHLTHStudioInboxPanelGesturePolicy.shouldOpen(
+            translation: CGSize(width: -25, height: 0)
+        ))
+        XCTAssertFalse(ATHLTHStudioInboxPanelGesturePolicy.shouldOpen(
+            translation: CGSize(width: -90, height: 90)
+        ))
+    }
+
+    func testClosingRequiresDeliberateRightSwipeOnPanelHeader() {
+        XCTAssertTrue(ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
+            translation: CGSize(width: 105, height: 10)
+        ))
+        XCTAssertFalse(ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
+            translation: CGSize(width: -120, height: 0)
+        ))
+        XCTAssertFalse(ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
+            translation: CGSize(width: 60, height: 0)
+        ))
+        XCTAssertFalse(ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
+            translation: CGSize(width: 110, height: 95)
+        ))
+    }
+}
