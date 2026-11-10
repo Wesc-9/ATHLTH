@@ -11,6 +11,9 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
     let route: TrainingRoute?
     let plannedDate: Date?
     let onDateChanged: ((Date) -> Void)?
+    /// Only supplied for running workouts. Other activities never expose
+    /// the running environment selector.
+    let runningEnvironment: Binding<RunEnvironment>?
 
     @State private var selectedDate: Date
 
@@ -21,7 +24,8 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         durationMinutes: Int?,
         route: TrainingRoute?,
         plannedDate: Date?,
-        onDateChanged: ((Date) -> Void)?
+        onDateChanged: ((Date) -> Void)?,
+        runningEnvironment: Binding<RunEnvironment>? = nil
     ) {
         _workoutName = workoutName
         self.activity = activity
@@ -30,6 +34,7 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
         self.route = route
         self.plannedDate = plannedDate
         self.onDateChanged = onDateChanged
+        self.runningEnvironment = runningEnvironment
         _selectedDate = State(initialValue: plannedDate ?? Date())
     }
 
@@ -227,6 +232,10 @@ struct ATHLTHPlannedWorkoutStudioHeader: View {
                         english: "Incline", norwegian: "Stigning"
                     ), inclineText)
                 }
+            }
+
+            if activity == .running, let runningEnvironment {
+                ATHLTHRunEnvironmentDetailRow(environment: runningEnvironment)
             }
 
             if plannedDate != nil {
