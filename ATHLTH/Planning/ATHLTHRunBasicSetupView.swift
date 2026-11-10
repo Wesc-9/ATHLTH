@@ -323,6 +323,7 @@ struct ATHLTHBasicActivityHero: View {
     let subtitle: String
     let symbol: String
     let isSelected: Bool
+    var actionTitle: String? = nil
     let action: () -> Void
 
     var body: some View {
@@ -354,7 +355,7 @@ struct ATHLTHBasicActivityHero: View {
                 HStack {
                     Image(systemName: "play.fill")
                         .font(.caption.weight(.bold))
-                    Text(ATHLTHLocalization.choose(
+                    Text(actionTitle ?? ATHLTHLocalization.choose(
                         english: "Choose free training",
                         norwegian: "Velg fri trening"
                     ))
@@ -395,47 +396,56 @@ struct ATHLTHBasicActivityModeTile: View {
     let subtitle: String
     let symbol: String
     let selected: Bool
+    var asNavigationLabel = false
     let action: () -> Void
 
+    @ViewBuilder
     var body: some View {
-        Button(action: action) {
-            VStack(alignment: .leading, spacing: 9) {
-                HStack {
-                    Image(systemName: symbol)
-                        .font(.system(size: 20, weight: .medium))
-                        .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    Spacer()
-                    if selected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(ATHLTHTrainDesign.bronze)
-                    }
-                }
-                Spacer(minLength: 0)
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(ATHLTHTrainDesign.ink)
-                    .fixedSize(horizontal: false, vertical: true)
-                Text(subtitle)
-                    .font(.caption)
-                    .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.68))
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            .padding(13)
-            .frame(maxWidth: .infinity, minHeight: 122, alignment: .topLeading)
-            .background(
-                selected ? ATHLTHTrainDesign.paleGold.opacity(0.45) : .white,
-                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
-            )
-            .overlay {
-                RoundedRectangle(cornerRadius: 17, style: .continuous)
-                    .strokeBorder(
-                        ATHLTHTrainDesign.bronze.opacity(selected ? 0.6 : 0.2),
-                        lineWidth: selected ? 1 : 0.8
-                    )
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 17))
+        if asNavigationLabel {
+            tileContent
+        } else {
+            Button(action: action) { tileContent }
+                .buttonStyle(.plain)
         }
-        .buttonStyle(.plain)
+    }
+
+    private var tileContent: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack {
+                Image(systemName: symbol)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundStyle(ATHLTHTrainDesign.bronze)
+                Spacer()
+                if selected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+            }
+            Spacer(minLength: 0)
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(ATHLTHTrainDesign.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.68))
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(13)
+        .frame(maxWidth: .infinity, minHeight: 122, alignment: .topLeading)
+        .background(
+            selected ? ATHLTHTrainDesign.paleGold.opacity(0.45) : .white,
+            in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 17, style: .continuous)
+                .strokeBorder(
+                    ATHLTHTrainDesign.bronze.opacity(selected ? 0.6 : 0.2),
+                    lineWidth: selected ? 1 : 0.8
+                )
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 17))
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
-
