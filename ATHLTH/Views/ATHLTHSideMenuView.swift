@@ -178,20 +178,32 @@ struct ATHLTHSideMenuView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text("ATHLTH")
-                    .font(.system(size: 20, weight: .semibold, design: .rounded))
-                    .tracking(2.6)
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+            HStack(alignment: .center, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("ATHLTH")
+                        .font(.system(size: 21, weight: .semibold, design: .rounded))
+                        .tracking(2.2)
+                        .foregroundStyle(menuInk)
+                    Text(ATHLTHLocalization.choose(
+                        english: "YOUR TRAINING SPACE",
+                        norwegian: "DITT TRENINGSROM"
+                    ))
+                    .font(.system(size: 9, weight: .medium))
+                    .tracking(1.25)
+                    .foregroundStyle(menuMuted)
+                }
 
-                Spacer(minLength: 10)
+                Spacer(minLength: 8)
 
                 Button(action: onDismiss) {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
+                        .foregroundStyle(menuInk)
+                        .frame(width: 40, height: 40)
+                        .background(menuCard, in: Circle())
+                        .overlay(Circle().strokeBorder(warmDivider, lineWidth: 1))
                         .frame(width: 44, height: 44)
-                        .background(Color.black.opacity(0.045), in: Circle())
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(ATHLTHLocalization.choose(
@@ -210,39 +222,44 @@ struct ATHLTHSideMenuView: View {
                         Text(session.profile.displayName.isEmpty
                              ? "ATHLTH"
                              : session.profile.displayName)
-                            .font(.headline.weight(.semibold))
-                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(menuInk)
                             .lineLimit(2)
+                            .multilineTextAlignment(.leading)
 
-                        if !session.profile.username.isEmpty {
-                            Text("@\(session.profile.username)")
-                                .font(.subheadline)
-                                .foregroundStyle(ATHLTHTheme.mutedText)
-                                .lineLimit(1)
-                        }
-
-                        Text(ATHLTHLocalization.choose(
-                            english: "View my profile",
-                            norwegian: "Se min profil"
-                        ))
-                        .font(.caption.weight(.medium))
-                        .foregroundStyle(ATHLTHTheme.accentDeep)
+                        Text(session.profile.username.isEmpty
+                             ? ATHLTHLocalization.choose(
+                                 english: "My profile", norwegian: "Min profil"
+                               )
+                             : "@\(session.profile.username)")
+                            .font(.caption)
+                            .foregroundStyle(menuMuted)
+                            .lineLimit(1)
                     }
-
-                    Spacer(minLength: 4)
-
-                    Image(systemName: "chevron.right")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
+                    Spacer(minLength: 2)
+                    Image(systemName: "arrow.up.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(menuBronze)
+                        .frame(width: 28, height: 28)
+                        .background(menuSurface, in: Circle())
+                        .accessibilityHidden(true)
                 }
-                .frame(minHeight: 62)
-                .contentShape(Rectangle())
+                .padding(.horizontal, 12)
+                .frame(minHeight: 78)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(menuCard, in: RoundedRectangle(cornerRadius: 18))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 18)
+                        .strokeBorder(warmDivider, lineWidth: 1)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 18))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(ATHLTHLocalization.choose(
                 english: "Open my ATHLTH profile",
                 norwegian: "Åpne ATHLTH-profilen min"
             ))
+            .accessibilityIdentifier("athlth-side-menu-profile")
         }
     }
 
@@ -262,11 +279,11 @@ struct ATHLTHSideMenuView: View {
                 profilePlaceholder
             }
         }
-        .frame(width: 54, height: 54)
+        .frame(width: 50, height: 50)
         .clipShape(Circle())
         .overlay {
             Circle()
-                .stroke(ATHLTHTheme.premiumGold.opacity(0.68), lineWidth: 1.5)
+                .strokeBorder(menuBronze.opacity(0.42), lineWidth: 1)
         }
     }
 
