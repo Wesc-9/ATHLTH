@@ -37,6 +37,27 @@ private enum ATHLTHNotificationScope: String, CaseIterable, Identifiable {
     }
 }
 
+/// An invitation only needs attention while the current user can still
+/// respond to it. Historical challenge notifications stay available below,
+/// but cancelled, completed or expired competitions are not pending actions.
+enum ATHLTHNotificationChallengeAttentionPolicy {
+    static func requiresResponse(
+        status: ATHLTHChallengeStatus,
+        participantState: ChallengeParticipantState?,
+        expiredWithoutOpponent: Bool
+    ) -> Bool {
+        guard !expiredWithoutOpponent, participantState == .invited else {
+            return false
+        }
+        switch status {
+        case .invited, .upcoming, .active:
+            return true
+        case .draft, .completed, .cancelled:
+            return false
+        }
+    }
+}
+
 struct ATHLTHNotificationCenterView: View {
     @EnvironmentObject private var notifications: ATHLTHNotificationStore
     @EnvironmentObject private var settings: AppSettingsStore
@@ -586,6 +607,23 @@ struct ATHLTHNotificationCenterView: View {
         if eventKind == "friend_request" ||
             eventKind == "follow_request" {
             return followRequest(for: item) != nil
+        }
+
+        // An old challenge_invite remains an event named "invite" even
+        // after the competition was cancelled. Its live challenge state and
+        // the recipient's actual invitation state determine priority.
+        if eventKind == "challenge_invite" ||
+            (item.challengeID != nil && eventKind.contains("invite")) {
+            guard let challengeID = item.challengeID,
+                  let challenge = challenges.challenge(id: challengeID)
+            else { return false }
+            return ATHLTHNotificationChallengeAttentionPolicy.requiresResponse(
+                status: challenge.status,
+                participantState: challenges.invitationParticipant(
+                    in: challenge, userID: session.profile.userID
+                )?.state,
+                expiredWithoutOpponent: challenge.expiredWithoutOpponent()
+            )
         }
 
         return eventKind.contains("invite")
