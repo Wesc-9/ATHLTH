@@ -114,4 +114,122 @@ final class ATHLTHStudioScheduleTests: XCTestCase {
         ), now: today, calendar: calendar))
     }
 
+    @MainActor
+    func testStudioHomeWindowsMatchSeparatePlanQueries() throws {
+        let suite = "ATHLTHStudioHomeWindows.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let store = AppSessionStore(defaults: defaults)
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let selectedWeek = try XCTUnwrap(
+            calendar.date(byAdding: .day, value: -7, to: today)
+        )
+        let monday = ATHLTHStudioHomeWeek.weekRange(
+            containing: selectedWeek
+        ).start
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Three weeks", summary: "", weekCount: 3, startDate: monday
+        ))
+        func exercise(_ title: String) -> PlannedSession {
+            PlannedSession(
+                id: UUID(), title: title, kind: .running,
+                scheduledStart: nil, durationMinutes: 35,
+                targetDistanceKilometers: nil,
+                targetPaceSecondsPerKilometer: nil,
+                routeID: nil, exercises: [], notes: nil
+            )
+        }
+        store.addSession(
+            exercise("Previous week"),
+            toDay: plan.weeks[0].days[1].id,
+            inPlan: plan.id
+        )
+        store.addSession(
+            exercise("Upcoming week"),
+            toDay: plan.weeks[1].days[3].id,
+            inPlan: plan.id
+        )
+        var rest = exercise("Rest day")
+        rest.workoutCategory = "rest_day"
+        store.addSession(rest, toDay: plan.weeks[0].days[2].id, inPlan: plan.id)
+        let stored = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let shared = ATHLTHStudioSchedule.studioHomeWindows(
+            plans: [stored, stored], standalone: [],
+            selectedWeekDate: selectedWeek,
+            upcomingFrom: today
+        )
+        let separateWeek = ATHLTHStudioSchedule.window(
+            plans: [stored, stored], standalone: [],
+            startDate: monday, days: 7, includeRestDays: true
+        )
+        let separateUpcoming = ATHLTHStudioSchedule.upcoming(
+            plans: [stored, stored], standalone: [],
+            now: today, days: 14
+        )
+        XCTAssertEqual(shared.week.map(\.id), separateWeek.map(\.id))
+        XCTAssertEqual(shared.upcoming.map(\.id), separateUpcoming.map(\.id))
+        XCTAssertEqual(shared.week.filter {
+            $0.workout.isExplicitRestDay
+        }.count, 1)
+        XCTAssertTrue(shared.upcoming.allSatisfy {
+            !$0.workout.isExplicitRestDay
+        })
+
+        // HomeWeek must not scan or alter dates when fed the shared window.
+        let originalWeek = ATHLTHStudioHomeWeek.make(
+            plans: [stored, stored], standalone: [],
+            recorded: [], now: selectedWeek
+        )
+        let projectedWeek = ATHLTHStudioHomeWeek.make(
+            plans: [stored, stored], standalone: [],
+            recorded: [], now: selectedWeek,
+            plannedOverride: shared.week
+        )
+        XCTAssertEqual(originalWeek.plannedCount, projectedWeek.plannedCount)
+        XCTAssertEqual(
+            originalWeek.days.flatMap(\.planned).map(\.id),
+            projectedWeek.days.flatMap(\.planned).map(\.id)
+        )
+        XCTAssertEqual(
+            originalWeek.days.flatMap(\.restDays).map(\.id),
+            projectedWeek.days.flatMap(\.restDays).map(\.id)
+        )
+    }
+
+    func testStudioHomeWindowsDeduplicateIndependentlyAcrossRanges() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Oslo"))
+        let monday = try XCTUnwrap(calendar.date(
+            from: DateComponents(year: 2026, month: 11, day: 9)
+        ))
+        let previousWeek = try XCTUnwrap(
+            calendar.date(byAdding: .weekOfYear, value: -1, to: monday)
+        )
+        let priorDate = try XCTUnwrap(
+            calendar.date(byAdding: .day, value: 2, to: previousWeek)
+        )
+        let upcomingDate = try XCTUnwrap(
+            calendar.date(byAdding: .day, value: 2, to: monday)
+        )
+        let sameID = UUID()
+        func exercise(at date: Date) -> PlannedSession {
+            PlannedSession(
+                id: sameID, title: "Repeated template ID", kind: .running,
+                scheduledStart: date, durationMinutes: 25,
+                targetDistanceKilometers: nil,
+                targetPaceSecondsPerKilometer: nil,
+                routeID: nil, exercises: [], notes: nil
+            )
+        }
+        let sessions = [exercise(at: priorDate), exercise(at: upcomingDate)]
+        let shared = ATHLTHStudioSchedule.studioHomeWindows(
+            plans: [], standalone: sessions,
+            selectedWeekDate: priorDate, upcomingFrom: monday,
+            calendar: calendar
+        )
+        XCTAssertEqual(shared.week.map(\.date), [priorDate])
+        XCTAssertEqual(shared.upcoming.map(\.date), [upcomingDate])
+    }
+
 }
