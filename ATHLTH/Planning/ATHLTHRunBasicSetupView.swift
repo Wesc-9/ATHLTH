@@ -9,6 +9,10 @@ struct ATHLTHRunBasicSetupView: View {
     @Binding var date: Date
 
     var scheduleEditable = false
+    /// For a planned scratch run, edit the date and structured workout here,
+    /// not through the legacy scheduling sheet behind this builder.
+    var workoutStepCount = 0
+    var onEditWorkout: (() -> Void)? = nil
     var selectedRouteTitle: String? = nil
     var selectedWorkoutTitle: String? = nil
     var onChooseRoute: (() -> Void)? = nil
@@ -21,7 +25,7 @@ struct ATHLTHRunBasicSetupView: View {
     /// Basic offers one simple coach toggle; Advanced owns the full rules.
     var audioCoachEnabled: Binding<Bool>? = nil
 
-    @State private var showsWorkoutDetails = false
+    @State private var showsBasicCoachSettings = false
 
     private let ink = ATHLTHTrainDesign.ink
     private let bronze = ATHLTHTrainDesign.bronze
@@ -49,6 +53,10 @@ struct ATHLTHRunBasicSetupView: View {
                 english: "Running", norwegian: "Løping"
             ))
 
+            if scheduleEditable {
+                plannedRunSummary
+            }
+
             ATHLTHBasicActivityHero(
                 title: ATHLTHLocalization.choose(
                     english: "Free running", norwegian: "Fri løping"
@@ -58,7 +66,8 @@ struct ATHLTHRunBasicSetupView: View {
                     norwegian: "Start uten plan. Legg til mål og veiledning hvis du ønsker."
                 ),
                 symbol: "figure.run",
-                isSelected: mode == .free && !isGoalSelected && !isGhostSelected
+                isSelected: mode == .free && !isGoalSelected && !isGhostSelected,
+                showsAction: false
             ) {
                 onChooseStandardMode?()
                 mode = .free
@@ -75,29 +84,35 @@ struct ATHLTHRunBasicSetupView: View {
                 runTiles
             }
 
-            DisclosureGroup(isExpanded: $showsWorkoutDetails) {
-                detailsCard
-                    .padding(.top, 10)
-            } label: {
-                HStack(spacing: 9) {
-                    Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(bronze)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Workout details", norwegian: "Øktdetaljer"
-                        ))
-                            .font(.subheadline.weight(.semibold))
+            // Basic has one visible run choice, not a second generic
+            // Workout Details editor that duplicates the schedule screen.
+            ATHLTHRunEnvironmentDetailRow(environment: $environment)
+                .padding(12)
+                .athlthTrainPaper()
+
+            if let audioCoachEnabled {
+                DisclosureGroup(isExpanded: $showsBasicCoachSettings) {
+                    Toggle(isOn: audioCoachEnabled) {
+                        Label("Audio Coach", systemImage: "waveform")
+                            .font(.subheadline.weight(.medium))
                             .foregroundStyle(ink)
-                        Text(environment.title)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     }
+                    .tint(bronze)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("athlth-basic-audio-coach")
+                    .padding(.top, 10)
+                } label: {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Audio Coach settings",
+                        norwegian: "Audio Coach-innstillinger"
+                    ), systemImage: "waveform")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ink)
                 }
-                .frame(minHeight: 44)
+                .tint(bronze)
+                .padding(14)
+                .athlthTrainPaper()
             }
-            .tint(bronze)
-            .padding(14)
-            .athlthTrainPaper()
         }
         .onChange(of: environment) { _, value in
             if value != .outdoor && mode == .route {
@@ -107,108 +122,96 @@ struct ATHLTHRunBasicSetupView: View {
         }
     }
 
-    private var detailsCard: some View {
-        VStack(alignment: .leading, spacing: 11) {
-            HStack(spacing: 10) {
+    /// The scheduling summary used to live in the *parent* editor after
+    /// Save and continue. Keep it here so a free run uses one cohesive sheet.
+    private var plannedRunSummary: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 12) {
                 Image(systemName: "figure.run")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.system(size: 21, weight: .medium))
                     .foregroundStyle(bronze)
-                    .frame(width: 44, height: 44)
-                    .background(ATHLTHTrainDesign.paleGold.opacity(0.45),
-                                in: RoundedRectangle(cornerRadius: 13))
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "WORKOUT DETAILS", norwegian: "ØKTDETALJER"
-                    ))
-                    .font(.system(size: 10, weight: .bold))
-                    .tracking(1.8)
-                    .foregroundStyle(bronze)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Running", norwegian: "Løping"
-                    ))
-                    .font(.system(size: 22, weight: .semibold, design: .serif))
+                    .frame(width: 35, height: 39)
+                    .accessibilityHidden(true)
+                Text(workoutName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                     ? suggestedName : workoutName)
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(ink)
-                }
-                Spacer(minLength: 0)
-            }
-
-            HStack(spacing: 8) {
-                TextField(
-                    "", text: $workoutName,
-                    prompt: Text(suggestedName)
-                        .foregroundStyle(.secondary.opacity(0.55))
-                )
-                .font(.subheadline.weight(.medium))
-                .tint(bronze)
-                .textInputAutocapitalization(.sentences)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Workout name (optional)", norwegian: "Navn på økt (valgfritt)"
+                    .lineLimit(2)
+                Spacer(minLength: 4)
+                Text(ATHLTHLocalization.format(
+                    english: "%d steps", norwegian: "%d deløkter",
+                    workoutStepCount
                 ))
-                if !workoutName.isEmpty {
-                    Button {
-                        workoutName = ""
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Clear name", norwegian: "Fjern navn"
-                        ), systemImage: "xmark.circle.fill")
-                        .labelStyle(.iconOnly)
-                        .foregroundStyle(.secondary)
-                    }
-                    .frame(minWidth: 44, minHeight: 44)
-                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
-            .frame(minHeight: 43)
-            .padding(.horizontal, 13)
-            .background(ATHLTHPlanDesign.canvas,
-                        in: RoundedRectangle(cornerRadius: 12))
+            .frame(minHeight: 49)
 
-            HStack(spacing: 8) {
-                if scheduleEditable {
-                    DatePicker(
-                        ATHLTHLocalization.choose(english: "Date", norwegian: "Dato"),
-                        selection: $date,
-                        displayedComponents: .date
-                    )
-                    .font(.caption)
-                    .frame(maxWidth: .infinity)
-                    DatePicker(
-                        ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"),
-                        selection: $date,
-                        displayedComponents: .hourAndMinute
-                    )
-                    .font(.caption)
-                    .frame(maxWidth: .infinity)
-                } else {
-                    Label(date.formatted(date: .abbreviated, time: .omitted),
-                          systemImage: "calendar")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    Label(date.formatted(date: .omitted, time: .shortened),
-                          systemImage: "clock")
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
+            Divider()
+
+            HStack(spacing: 10) {
+                Text(ATHLTHLocalization.choose(
+                    english: "Date and time", norwegian: "Dato og tid"
+                ))
+                .font(.subheadline)
+                .foregroundStyle(ink)
+                .layoutPriority(1)
+
+                Spacer(minLength: 3)
+
+                DatePicker(
+                    ATHLTHLocalization.choose(english: "Date", norwegian: "Dato"),
+                    selection: $date,
+                    displayedComponents: .date
+                )
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .accessibilityIdentifier("athlth-basic-run-planned-date")
+
+                DatePicker(
+                    ATHLTHLocalization.choose(english: "Time", norwegian: "Tid"),
+                    selection: $date,
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+                .datePickerStyle(.compact)
+                .accessibilityIdentifier("athlth-basic-run-planned-time")
             }
-            .font(.caption.weight(.medium))
-            .foregroundStyle(ink)
-            .frame(minHeight: 42)
-            .padding(.horizontal, scheduleEditable ? 0 : 12)
-            .background(ATHLTHPlanDesign.canvas,
-                        in: RoundedRectangle(cornerRadius: 12))
+            .frame(minHeight: 55)
 
-            ATHLTHRunEnvironmentDetailRow(environment: $environment)
-
-            if let audioCoachEnabled {
-                Toggle(isOn: audioCoachEnabled) {
-                    Label("Audio Coach", systemImage: "waveform")
+            if let onEditWorkout {
+                Divider()
+                Button(action: onEditWorkout) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "slider.horizontal.3")
+                            .foregroundStyle(bronze)
+                            .frame(width: 30)
+                        Text(ATHLTHLocalization.choose(
+                            english: "Edit workout",
+                            norwegian: "Rediger økten"
+                        ))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(ink)
+                        .foregroundStyle(bronze)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(bronze.opacity(0.75))
+                    }
+                    .frame(minHeight: 52)
+                    .contentShape(Rectangle())
                 }
-                .tint(bronze)
-                .frame(minHeight: 44)
-                .accessibilityIdentifier("athlth-basic-audio-coach")
+                .buttonStyle(.plain)
+                .accessibilityIdentifier("athlth-basic-run-edit-workout")
             }
         }
-        .padding(15)
-        .athlthTrainPaper()
+        .padding(.horizontal, 16)
+        .padding(.vertical, 7)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .overlay {
+            RoundedRectangle(cornerRadius: 20)
+                .strokeBorder(ATHLTHPlanDesign.outline, lineWidth: 0.7)
+        }
+        .accessibilityIdentifier("athlth-basic-run-summary")
     }
 
     private func sectionHeading(_ text: String) -> some View {
@@ -324,6 +327,7 @@ struct ATHLTHBasicActivityHero: View {
     let symbol: String
     let isSelected: Bool
     var actionTitle: String? = nil
+    var showsAction = true
     let action: () -> Void
 
     var body: some View {
@@ -352,24 +356,26 @@ struct ATHLTHBasicActivityHero: View {
                         .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.72))
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                HStack {
-                    Image(systemName: "play.fill")
-                        .font(.caption.weight(.bold))
-                    Text(actionTitle ?? ATHLTHLocalization.choose(
-                        english: "Choose free training",
-                        norwegian: "Velg fri trening"
-                    ))
-                        .font(.subheadline.weight(.semibold))
-                    Spacer()
-                    Image(systemName: "arrow.right")
+                if showsAction {
+                    HStack {
+                        Image(systemName: "play.fill")
+                            .font(.caption.weight(.bold))
+                        Text(actionTitle ?? ATHLTHLocalization.choose(
+                            english: "Choose free training",
+                            norwegian: "Velg fri trening"
+                        ))
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                        Image(systemName: "arrow.right")
+                    }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 15)
+                    .frame(minHeight: 46)
+                    .background(
+                        ATHLTHTrainDesign.bronze,
+                        in: RoundedRectangle(cornerRadius: 13)
+                    )
                 }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 15)
-                .frame(minHeight: 46)
-                .background(
-                    ATHLTHTrainDesign.bronze,
-                    in: RoundedRectangle(cornerRadius: 13)
-                )
             }
             .padding(18)
             .frame(maxWidth: .infinity, alignment: .leading)
