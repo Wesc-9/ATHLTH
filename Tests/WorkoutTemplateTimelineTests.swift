@@ -359,6 +359,37 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         }
     }
 
+    func testImportCannotSneakStrengthModesIntoRunningOrWalkingPlans() {
+        let modes: [WorkoutBlockGroupKind] = [
+            .superset, .circuit, .emom, .amrap, .dropSet
+        ]
+        for mode in modes {
+            var block = exercise("Strength station")
+            block.groupID = UUID()
+            block.groupKind = mode
+            let recipe = [block]
+
+            XCTAssertTrue(ATHLTHStrengthModeAvailability.canImport(
+                recipe, initialActivity: .strength, containsStrength: false
+            ))
+            XCTAssertTrue(ATHLTHStrengthModeAvailability.canImport(
+                recipe, initialActivity: nil, containsStrength: true
+            ))
+            for category in [ATHLTHPlannedWorkoutType.running,
+                             .walking, .cycling, .mobility] {
+                XCTAssertFalse(ATHLTHStrengthModeAvailability.canImport(
+                    recipe, initialActivity: category, containsStrength: true
+                ), "\(mode.rawValue) must not be imported into \(category)")
+            }
+        }
+        var run = exercise("Running")
+        run.groupID = UUID()
+        run.groupKind = .intervals
+        XCTAssertTrue(ATHLTHStrengthModeAvailability.canImport(
+            [run], initialActivity: .running, containsStrength: false
+        ))
+    }
+
     func testEMOMClockPolicyRejectsEarlyAndMissedSlots() {
         let started = Date(timeIntervalSince1970: 100_000)
         func allowed(_ second: Double, station: Int) -> Bool {
