@@ -171,6 +171,37 @@ final class ATHLTHStudioHomeWeekTests: XCTestCase {
         XCTAssertEqual(week.days[1].restDays.first?.workout.title, "Recovery")
     }
 
+    func testWeeklyOverviewIncludesLocalStrengthBeforeHealthSync() throws {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let local = StrengthWorkoutLog(
+            id: UUID(),
+            plannedSessionID: nil,
+            watchSessionID: nil,
+            captureDevice: .iPhone,
+            trackingMode: .simple,
+            title: "Local strength",
+            startedAt: today.addingTimeInterval(9 * 3_600),
+            endedAt: today.addingTimeInterval(9 * 3_600 + 1_800),
+            exercises: [],
+            healthMetrics: LinkedHealthWorkoutMetrics(
+                healthKitWorkoutUUID: nil,
+                duration: 1_800,
+                activeCalories: nil,
+                averageHeartRate: nil,
+                maxHeartRate: nil
+            )
+        )
+        let recordings = ATHLTHStudioRecordedWorkouts.merged(
+            health: [], localStrength: [local]
+        )
+        let week = ATHLTHStudioHomeWeek.make(
+            plans: [], standalone: [], recorded: recordings, now: today
+        )
+        XCTAssertEqual(week.recordedCount, 1)
+        XCTAssertEqual(week.days.flatMap(\.recorded).first?.activity, .strength)
+    }
+
     func testMultiplePlannedSessionsRemainSeparateOnSameDay() throws {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: .now)
