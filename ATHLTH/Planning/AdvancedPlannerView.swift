@@ -6032,30 +6032,9 @@ struct SessionEditorView: View {
                     }
 
                     if kind == .running {
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text(ATHLTHLocalization.choose(english: "Running environment", norwegian: "Hvor løper du?"))
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(ATHLTHPlanDesign.ink)
-                            Picker(ATHLTHLocalization.choose(english: "Running environment", norwegian: "Løpemiljø"),
-                                   selection: $runEnvironment) {
-                                Label(ATHLTHLocalization.choose(english: "Outdoor · GPS", norwegian: "Ute · GPS"),
-                                      systemImage: "location").tag(RunEnvironment.outdoor)
-                                Label(ATHLTHLocalization.choose(english: "Treadmill", norwegian: "Tredemølle"),
-                                      systemImage: "figure.run.treadmill").tag(RunEnvironment.treadmill)
-                            }
-                            .pickerStyle(.segmented)
-                            Text(runEnvironment == .treadmill
-                                ? ATHLTHLocalization.choose(
-                                    english: "Indoor running without GPS. Enter belt speed in km/h or target pace in min/km.",
-                                    norwegian: "Innendørs uten GPS. Legg inn møllehastighet i km/t eller tempo i min/km.")
-                                : ATHLTHLocalization.choose(
-                                    english: "Outdoor running can use GPS, routes and Ghost Race.",
-                                    norwegian: "Utendørs løping kan bruke GPS, ruter og Ghost Race."))
-                                .font(.caption)
-                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
-                        }
-                        .padding(.vertical, 6)
-
+                        // One compact row beside the other Workout Details,
+                        // not a separate full-width environment chooser.
+                        ATHLTHRunEnvironmentDetailRow(environment: $runEnvironment)
                     }
 
                     if kind == .running {
@@ -6905,7 +6884,7 @@ struct SessionEditorView: View {
                 }
             }
             .onChange(of: runEnvironment) { _, value in
-                if value == .treadmill {
+                if value != .outdoor {
                     selectedRouteID = nil
                     routeGuardianDraft.enabled = false
                     ghostDraft.enabled = false
@@ -10111,9 +10090,16 @@ struct SessionEditorView: View {
         distanceKilometers = workout.targetDistanceKilometers ?? 0
         distanceWasAdjustedManually = workout.targetDistanceKilometers != nil
         durationWasAdjustedManually = workout.durationMinutes != nil
-        runEnvironment = workout.workoutCategory == "treadmill" ||
-            workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run && $0.isIndoor == true })
-                ? .treadmill : .outdoor
+        runEnvironment = workout.workoutCategory == "treadmill"
+            ? .treadmill
+            : workout.workoutCategory == "indoor" ? .indoor
+            : workout.resolvedWorkoutBlocks.contains(where: {
+                $0.kind == .run && $0.isIndoor == true &&
+                    $0.treadmillInclinePercent != nil
+            }) ? .treadmill
+            : workout.resolvedWorkoutBlocks.contains(where: {
+                $0.kind == .run && $0.isIndoor == true
+            }) ? .indoor : .outdoor
         notes = workout.notes ?? ""
 
         let copiedExercises =
@@ -10282,9 +10268,12 @@ struct SessionEditorView: View {
                     ? nil
                     : workoutBlocks,
             workoutCategory:
-                kind == .running && runEnvironment == .treadmill
-                    ? "treadmill"
-                    : (workoutCategory == "treadmill" ? nil : workoutCategory),
+                kind == .running
+                    ? (runEnvironment == .treadmill ? "treadmill"
+                       : runEnvironment == .indoor ? "indoor"
+                       : (workoutCategory == "treadmill" ||
+                          workoutCategory == "indoor" ? "running" : workoutCategory))
+                    : workoutCategory,
             meetingPoint: selectedPartnerID != nil ? meetingPoint : nil,
             reminderMinutesBefore: scheduledTimeEnabled && reminderMinutesBefore > 0
                 ? reminderMinutesBefore : nil,
