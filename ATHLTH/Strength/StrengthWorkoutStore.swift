@@ -2833,11 +2833,17 @@ final class StrengthWorkoutStore: ObservableObject {
                     completedWeightKilograms: nil,
                     rpe: nil,
                     completedAt: nil,
-                    restSeconds: Int(min(max(
-                        block.restBetweenSetsSeconds ??
-                            (block.groupKind == nil ? 90 : 0),
-                        0
-                    ), 3_600)),
+                    // No automatic pause inside a drop set or a timed
+                    // EMOM/AMRAP. Superset and circuit may opt into a
+                    // station transition; their end-of-round pause is
+                    // kept separately on the group rest block.
+                    restSeconds: [.dropSet, .emom, .amrap].contains(block.groupKind)
+                        ? 0
+                        : Int(min(max(
+                            block.restBetweenSetsSeconds ??
+                                (block.groupKind == nil ? 90 : 0),
+                            0
+                        ), 3_600)),
                     isWarmUp: block.resolvedPhase == .warmup,
                     targetKind: timed ? .time : .reps,
                     plannedDurationSeconds: block.durationSeconds.flatMap { seconds in
