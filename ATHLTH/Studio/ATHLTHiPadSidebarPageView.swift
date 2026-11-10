@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Full-size Studio destinations for secondary iPad sidebar items.
-/// Profile remains a phone-sized sheet and Inbox remains a docked inspector;
-/// the remaining tools use the actual detail column instead of modal cards.
+/// Profile and Ghost Race use the detail column like Arena and Clubs.
+/// Only Messages keeps its independent docked inspector.
 struct ATHLTHiPadSidebarPageView: View {
     let destination: ATHLTHSideMenuDestination
     let onBack: () -> Void
@@ -66,6 +66,12 @@ struct ATHLTHiPadSidebarPageView: View {
             )
         case .arena:
             return "Arena"
+        case .ghostRace:
+            return "Ghost Race"
+        case .profile:
+            return ATHLTHLocalization.choose(
+                english: "Profile", norwegian: "Profil"
+            )
         case .clubs:
             return ATHLTHLocalization.choose(
                 english: "Clubs", norwegian: "Klubber"
@@ -85,6 +91,8 @@ struct ATHLTHiPadSidebarPageView: View {
         case .notifications: "bell"
         case .trainTogether: "person.2"
         case .arena: "trophy"
+        case .ghostRace: "flag.checkered"
+        case .profile: "person.crop.circle"
         case .clubs: "person.3"
         case .exerciseProgress: "chart.bar"
         default: "square.grid.2x2"
@@ -102,6 +110,10 @@ struct ATHLTHiPadSidebarPageView: View {
             TrainTogetherMarketplaceView()
         case .arena:
             ATHLTHArenaV3HomeView()
+        case .ghostRace:
+            GhostRaceHubView()
+        case .profile:
+            ATHLTHProfileView()
         case .clubs:
             ATHLTHCommunityV5View(initialTab: .clubs)
         case .exerciseProgress:
