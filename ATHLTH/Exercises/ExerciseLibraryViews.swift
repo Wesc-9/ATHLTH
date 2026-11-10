@@ -94,6 +94,18 @@ enum ATHLTHExerciseMuscleFilterPresentation {
     }
 }
 
+// Free strength starts a timing session, rather than describing an exercise.
+// The normal catalog must never duplicate its single add-exercise shortcut.
+enum ATHLTHFreeStrengthLibraryPresentation {
+    static func showsShortcut(isSelectingExercise: Bool) -> Bool {
+        isSelectingExercise
+    }
+
+    static func includesInExerciseResults(sourceIdentifier: String?) -> Bool {
+        sourceIdentifier != "athlth-native-free-strength-training"
+    }
+}
+
 struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
@@ -195,9 +207,11 @@ struct ExerciseLibraryView: View {
             // Free strength is a workout-start option, not a standalone
             // exercise for browsing, favoriting or opening in the library.
             // Keep it selectable only from an add-exercise flow.
-            let availableInContext = onSelect != nil ||
-                entry.sourceIdentifier != "athlth-native-free-strength-training"
-            return sourceMatches && favoriteMatches && availableInContext
+            let isExercise = ATHLTHFreeStrengthLibraryPresentation
+                .includesInExerciseResults(
+                    sourceIdentifier: entry.sourceIdentifier
+                )
+            return sourceMatches && favoriteMatches && isExercise
         }
     }
 
@@ -305,6 +319,9 @@ struct ExerciseLibraryView: View {
             translationAvailabilityBanner
 
             if selectedSection == .library,
+               ATHLTHFreeStrengthLibraryPresentation.showsShortcut(
+                   isSelectingExercise: onSelect != nil
+               ),
                let onSelect,
                let free = library.athlthCatalogExercises.first(where: {
                    $0.sourceIdentifier == "athlth-native-free-strength-training"
