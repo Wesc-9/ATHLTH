@@ -44,6 +44,93 @@ struct WatchFreeStrengthPage: View {
 }
 
 
+/// A compact, glanceable mode strip shared by the active set and status
+/// pages. Uses absolute dates so Watch does not depend on iPhone timer ticks.
+struct WatchStrengthModeStrip: View {
+    let snapshot: WatchStrengthSessionSnapshot
+
+    var body: some View {
+        if let raw = snapshot.strengthModeRaw {
+            TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                HStack(spacing: 6) {
+                    Text(modeName(raw))
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundStyle(WatchTheme.accentDeep)
+                    if raw == "dropset" {
+                        Text(ATHLTHLocalization.choose(
+                            english: "NO REST", norwegian: "UTEN PAUSE"
+                        ))
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundStyle(WatchTheme.muted)
+                    } else if raw == "emom" || raw == "amrap" {
+                        Text(clock(at: timeline.date, raw: raw))
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(WatchTheme.textPrimary)
+                    }
+                    Spacer(minLength: 0)
+                    if let round = snapshot.strengthModeRound,
+                       let total = snapshot.strengthModeTotalRounds,
+                       raw != "amrap", raw != "dropset" {
+                        Text("\(round)/\(total)")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(WatchTheme.muted)
+                    }
+                    if let station = snapshot.strengthModeStationIndex,
+                       let total = snapshot.strengthModeStationCount,
+                       total > 1 {
+                        Text("\(station)/\(total)")
+                            .font(.system(size: 8))
+                            .foregroundStyle(WatchTheme.muted)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            }
+            .accessibilityLabel(ATHLTHLocalization.choose(
+                english: "Training mode \(modeName(raw))",
+                norwegian: "Treningsmodus \(modeName(raw))"
+            ))
+        }
+    }
+
+    private func modeName(_ raw: String) -> String {
+        switch raw {
+        case "emom": return "EMOM"
+        case "amrap": return "AMRAP"
+        case "dropset": return ATHLTHLocalization.choose(
+            english: "DROP SET", norwegian: "DROPSETT"
+        )
+        case "circuit": return ATHLTHLocalization.choose(
+            english: "CIRCUIT", norwegian: "SIRKEL"
+        )
+        case "superset": return ATHLTHLocalization.choose(
+            english: "SUPERSET", norwegian: "SUPERSETT"
+        )
+        default: return ATHLTHLocalization.choose(
+            english: "STRENGTH", norwegian: "STYRKE"
+        )
+        }
+    }
+
+    private func clock(at date: Date, raw: String) -> String {
+        guard let started = snapshot.strengthModeStartedAt else { return "–" }
+        let seconds = snapshot.strengthModeClockSeconds ??
+            (raw == "emom" ? 60 : 720)
+        let elapsed = max(0, date.timeIntervalSince(started))
+        let remaining: TimeInterval
+        if raw == "emom" {
+            let slot = max(0, (snapshot.strengthModeRound ?? 1) - 1) *
+                max(1, snapshot.strengthModeStationCount ?? 1) +
+                max(0, (snapshot.strengthModeStationIndex ?? 1) - 1)
+            remaining = max(0, Double(slot + 1) * seconds - elapsed)
+        } else {
+            remaining = max(0, seconds - elapsed)
+        }
+        let value = max(0, Int(ceil(remaining)))
+        return String(format: "%02d:%02d", value / 60, value % 60)
+    }
+}
+
 /// Lightweight, read-only pages around the existing strength set editor.
 /// WatchWorkoutManager remains the sole owner of the workout and commands.
 struct WatchStrengthSessionStatusPage: View {
@@ -93,6 +180,8 @@ struct WatchStrengthSessionStatusPage: View {
                     }
                     .padding(11)
                     .watchSurface(radius: 18)
+
+                    WatchStrengthModeStrip(snapshot: snapshot)
 
                     HStack(spacing: 7) {
                         WatchStrengthReadout(
