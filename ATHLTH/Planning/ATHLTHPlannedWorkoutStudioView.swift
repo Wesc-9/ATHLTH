@@ -540,6 +540,28 @@ struct ATHLTHPlannedWorkoutStudioView: View {
             }
 
             if !collapsed {
+                if kind == .dropSet {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Set a positive weight for every stage, with each weight lower than the previous one. Tap a stage to edit repetitions and kg.",
+                        norwegian: "Angi vekt for hvert trinn. Vekten må være lavere enn i forrige trinn. Trykk på et trinn for å justere repetisjoner og kg."
+                    ), systemImage: "arrow.down.right")
+                    .font(.caption)
+                    .foregroundStyle(bronze)
+                } else if kind == .emom {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Each station starts on a new minute. Remaining seconds become rest.",
+                        norwegian: "Hver stasjon starter på et nytt minutt. Resterende sekunder blir pause."
+                    ), systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(bronze)
+                } else if kind == .amrap {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Select the total time in the options menu, then finish as many rounds as possible.",
+                        norwegian: "Velg totaltiden i menyen, og gjennomfør så mange runder du rekker."
+                    ), systemImage: "timer")
+                    .font(.caption)
+                    .foregroundStyle(bronze)
+                }
                 if exercises.count < kind.minimumStrengthExercises {
                     Label(ATHLTHLocalization.choose(
                         english: kind == .circuit
