@@ -287,43 +287,41 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
         }
         .background(cream.ignoresSafeArea())
-        .task(id: session.profile.userID) {
+        .task(id: "\(session.profile.userID.uuidString)-\(session.signedIn)-\(scenePhase == .active)-\(focusedPlanningDate == nil)") {
             guard ATHLTHDeviceRole.isIPad else { return }
             // Never display the previous account's live strength summary
             // while the next account's private status is still loading.
             remoteStrengthStatus = nil
+            // Pause Home-only polling while backgrounded, signed out or
+            // editing a full-screen plan. SwiftUI restarts on reactivation.
+            guard session.signedIn, scenePhase == .active,
+                  focusedPlanningDate == nil else { return }
             while !Task.isCancelled {
-                if session.signedIn, scenePhase == .active {
-                    let account = session.profile.userID
-                    let fetched =
-                        await ATHLTHPrivateLiveStrengthStatusStore.fetch(
-                            for: account
-                        )
-                    guard !Task.isCancelled,
-                          account == session.profile.userID else { return }
-                    remoteStrengthStatus = fetched
-                } else {
-                    remoteStrengthStatus = nil
-                }
+                let account = session.profile.userID
+                let fetched =
+                    await ATHLTHPrivateLiveStrengthStatusStore.fetch(
+                        for: account
+                    )
+                guard !Task.isCancelled,
+                      account == session.profile.userID else { return }
+                remoteStrengthStatus = fetched
                 try? await Task.sleep(for: .seconds(12))
             }
         }
-        .task(id: session.profile.userID) {
+        .task(id: "\(session.profile.userID.uuidString)-\(session.signedIn)-\(scenePhase == .active)-\(focusedPlanningDate == nil)") {
             guard ATHLTHDeviceRole.isIPad else { return }
             // Do not briefly show the previous signed-in account's map.
             remoteGhostStatus = nil
+            guard session.signedIn, scenePhase == .active,
+                  focusedPlanningDate == nil else { return }
             while !Task.isCancelled {
-                if session.signedIn, scenePhase == .active {
-                    let userID = session.profile.userID
-                    let fetched = await ATHLTHPrivateGhostSpectatorStore.fetch(
-                        for: userID
-                    )
-                    guard !Task.isCancelled, userID == session.profile.userID
-                    else { return }
-                    remoteGhostStatus = fetched
-                } else {
-                    remoteGhostStatus = nil
-                }
+                let userID = session.profile.userID
+                let fetched = await ATHLTHPrivateGhostSpectatorStore.fetch(
+                    for: userID
+                )
+                guard !Task.isCancelled, userID == session.profile.userID
+                else { return }
+                remoteGhostStatus = fetched
                 try? await Task.sleep(
                     for: .seconds(remoteGhostStatus == nil ? 12 : 4)
                 )
