@@ -269,6 +269,76 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         XCTAssertEqual(steps.map(\.executionGroupKind), [.dropSet, .dropSet, .dropSet])
     }
 
+    func testStructuredAMRAPGrowsOneRoundAtATimeBeforeDeadline() {
+        let id = UUID()
+        var pushup = exercise("Push-up")
+        var squat = exercise("Squat")
+        pushup.groupID = id
+        squat.groupID = id
+        pushup.groupKind = .amrap
+        squat.groupKind = .amrap
+        pushup.groupRounds = 20 // Previous fixed allocation is intentionally ignored.
+        squat.groupRounds = 20
+        pushup.groupClockSeconds = 180
+        squat.groupClockSeconds = 180
+        let followUp = exercise("Cool-down")
+        let initial = ATHLTHStructuredAMRAPProgression.initialSteps(
+            from: [pushup, squat, followUp]
+        )
+        XCTAssertEqual(initial.count, 3)
+        XCTAssertEqual(initial[0].executionRound, 1)
+        XCTAssertNil(ATHLTHStructuredAMRAPProgression.appendingNextRound(
+            to: initial, after: 0,
+            startedAt: Date(timeIntervalSince1970: 100),
+            now: Date(timeIntervalSince1970: 110)
+        ))
+        let started = Date(timeIntervalSince1970: 100)
+        let second = ATHLTHStructuredAMRAPProgression.appendingNextRound(
+            to: initial, after: 1, startedAt: started,
+            now: started.addingTimeInterval(30)
+        )
+        XCTAssertEqual(second?.count, 5)
+        XCTAssertEqual(second?[2].executionRound, 2)
+        XCTAssertEqual(second?[3].executionRound, 2)
+        XCTAssertEqual(second?[4].title, "Cool-down")
+        XCTAssertNil(ATHLTHStructuredAMRAPProgression.appendingNextRound(
+            to: second ?? initial, after: 3, startedAt: started,
+            now: started.addingTimeInterval(180)
+        ))
+    }
+
+    func testStructuredStrengthRuntimeCheckpointKeepsClockAndActualResults() throws {
+        let id = UUID()
+        var stage = exercise("Squat")
+        stage.groupID = id
+        stage.groupKind = .emom
+        stage.groupRounds = 3
+        stage.groupClockSeconds = 60
+        let first = ATHLTHStructuredAMRAPProgression.initialSteps(from: [stage])
+        let started = Date(timeIntervalSince1970: 100_000)
+        let actual = StructuredWorkoutStepResult(
+            stepID: first[0].id, title: "Squat",
+            groupKind: .emom, round: 1, repetitions: 10,
+            weightKilograms: 30, elapsedSeconds: 30, completed: true
+        )
+        let state = ATHLTHStructuredWorkoutCheckpoint(
+            workoutID: UUID(), savedAt: started.addingTimeInterval(32),
+            startedAt: started, stepEnteredAt: started.addingTimeInterval(30),
+            currentIndex: 1, completedIDs: [first[0].id],
+            results: [first[0].id: actual], modeStarts: [id: started],
+            executionBlocks: first, emomWaiting: false,
+            timedOutGroups: [], enteredReps: 10, enteredWeight: "30"
+        )
+        let read = try JSONDecoder().decode(
+            ATHLTHStructuredWorkoutCheckpoint.self,
+            from: JSONEncoder().encode(state)
+        )
+        XCTAssertEqual(read.executionBlocks.map(\.executionRound), [1, 2, 3])
+        XCTAssertEqual(read.results[first[0].id]?.repetitions, 10)
+        XCTAssertEqual(read.modeStarts[id], started)
+        XCTAssertEqual(read.currentIndex, 1)
+    }
+
     func testEMOMClockPolicyRejectsEarlyAndMissedSlots() {
         let started = Date(timeIntervalSince1970: 100_000)
         func allowed(_ second: Double, station: Int) -> Bool {
