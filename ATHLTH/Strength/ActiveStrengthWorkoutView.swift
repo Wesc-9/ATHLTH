@@ -2258,6 +2258,58 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     @ViewBuilder
+    /// A grouped workout retains real completed-set evidence rather than
+    /// inferring rounds from a plan or treating omitted sets as performance.
+    @ViewBuilder
+    private func focusedStrengthModeSummary(_ workout: StrengthWorkoutLog) -> some View {
+        let grouped = workout.exercises.compactMap(\.groupID)
+        let groupIDs = Array(Set(grouped)).sorted { $0.uuidString < $1.uuidString }
+        if !groupIDs.isEmpty {
+            ATHLTHPlanSurface(density: .compact) {
+                VStack(alignment: .leading, spacing: 11) {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Training modes", norwegian: "Treningsmoduser"
+                    ), systemImage: "checkmark.seal")
+                    .font(.headline)
+                    .foregroundStyle(ATHLTHPlanDesign.ink)
+
+                    ForEach(groupIDs, id: \.self) { id in
+                        let stations = workout.exercises.filter { $0.groupID == id }
+                        let actualSets = stations.flatMap(\.sets).filter(\.isCompleted).count
+                        let actualReps = stations.flatMap(\.sets)
+                            .filter(\.isCompleted)
+                            .compactMap(\.resolvedCompletedReps).reduce(0, +)
+                        let fullRounds = stations.map {
+                            $0.sets.filter(\.isCompleted).count
+                        }.min() ?? 0
+                        let style = stations.first?.groupStyle
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text(style?.title ?? ATHLTHLocalization.choose(
+                                    english: "Group", norwegian: "Gruppe"
+                                ))
+                                .font(.subheadline.weight(.semibold))
+                                Spacer()
+                                Text("\(fullRounds) " + ATHLTHLocalization.choose(
+                                    english: "full rounds", norwegian: "hele runder"
+                                ))
+                                .font(.caption.weight(.medium))
+                            }
+                            Text("\(actualSets) " + ATHLTHLocalization.choose(
+                                english: "completed efforts", norwegian: "fullførte sett"
+                            ) + " · \(actualReps) " + ATHLTHLocalization.choose(
+                                english: "actual reps", norwegian: "faktiske repetisjoner"
+                            ))
+                            .font(.caption)
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    }
+                }
+            }
+        }
+    }
+
     /// Premium, light mode guidance stays above the exercise and fixed
     /// set controls. It never obscures the rep/weight entry or Watch state.
     private func focusedStrengthModeCard(
@@ -2434,6 +2486,8 @@ struct ActiveStrengthWorkoutView: View {
                 focusedWorkoutSummaryMetrics(
                     workout
                 )
+
+                focusedStrengthModeSummary(workout)
 
                 focusedWorkoutRestSummary(
                     workout
