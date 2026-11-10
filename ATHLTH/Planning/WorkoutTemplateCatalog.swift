@@ -100,12 +100,15 @@ enum WorkoutPhaseKind: String, Codable, CaseIterable, Identifiable {
 
 enum WorkoutBlockGroupKind: String, Codable, Hashable {
     case superset
+    case circuit
     case intervals
 
     var title: String {
         switch self {
         case .superset:
             return ATHLTHLocalization.choose(english: "Superset", norwegian: "Supersett")
+        case .circuit:
+            return ATHLTHLocalization.choose(english: "Circuit training", norwegian: "Sirkeltrening")
         case .intervals:
             return ATHLTHLocalization.choose(english: "Intervals", norwegian: "Intervaller")
         }
@@ -114,9 +117,22 @@ enum WorkoutBlockGroupKind: String, Codable, Hashable {
     var symbol: String {
         switch self {
         case .superset: return "dumbbell.fill"
+        case .circuit: return "arrow.triangle.2.circlepath"
         case .intervals: return "repeat"
         }
     }
+
+    /// Required strength stations before a group can be saved.
+    /// Running intervals use their own independent validation.
+    var minimumStrengthExercises: Int {
+        switch self {
+        case .superset: return 2
+        case .circuit: return 3
+        case .intervals: return 0
+        }
+    }
+
+    var isStrengthGroup: Bool { self == .superset || self == .circuit }
 }
 
 struct WorkoutTemplateBlock: Codable, Hashable, Identifiable {
@@ -4011,17 +4027,22 @@ struct WorkoutTemplateBuilderView: View {
             initialActivity == .running && studioBasicRunMode == .free
         return (hasRunning || hasStrength || hasCycling ||
                 hasTimedWellness || basicFreeRun) &&
-            !hasIncompleteSuperset &&
+            !hasIncompleteStrengthGroup &&
             (!isPlannedWorkout || resolvedDurationMinutes != nil ||
              routeDistanceGoal || basicFreeRun)
     }
 
-    private var hasIncompleteSuperset: Bool {
+    private var hasIncompleteStrengthGroup: Bool {
         let groups = Set(blocks.compactMap { block -> UUID? in
-            block.groupKind == .superset ? block.groupID : nil
+            guard block.groupKind?.isStrengthGroup == true else { return nil }
+            return block.groupID
         })
         return groups.contains { id in
-            blocks.filter { $0.groupID == id && $0.kind == .exercise }.count < 2
+            guard let kind = blocks.first(where: { $0.groupID == id })?.groupKind
+            else { return false }
+            return blocks.filter {
+                $0.groupID == id && $0.kind == .exercise
+            }.count < kind.minimumStrengthExercises
         }
     }
 
@@ -4611,8 +4632,11 @@ struct WorkoutTemplateBuilderView: View {
                     openExercisePicker()
                 } else if let group = pendingExerciseChoice {
                     pendingExerciseChoice = nil
-                    if group == .superset { createSuperset() }
-                    else { openExercisePicker() }
+                    switch group {
+                    case .superset: createSuperset()
+                    case .circuit: createCircuit()
+                    case .intervals: openExercisePicker()
+                    }
                 } else if pendingSavedWorkoutPicker {
                     pendingSavedWorkoutPicker = false
                     showingSavedWorkoutPicker = true
@@ -5017,6 +5041,11 @@ struct WorkoutTemplateBuilderView: View {
                 studioVisiblePhases.insert(phase)
                 createSuperset()
             },
+            onAddCircuit: { phase in
+                selectedPhase = phase
+                studioVisiblePhases.insert(phase)
+                createCircuit()
+            },
             onAddExerciseToSuperset: { phase, id in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
@@ -5039,25 +5068,25 @@ struct WorkoutTemplateBuilderView: View {
                 guard (1...20).contains(rounds) else { return }
                 for index in blocks.indices where
                     blocks[index].groupID == id &&
-                    blocks[index].groupKind == .superset {
+                    blocks[index].groupKind?.isStrengthGroup == true {
                     blocks[index].groupRounds = rounds
                 }
             },
             onUngroupSuperset: { id in
                 for index in blocks.indices where
                     blocks[index].groupID == id &&
-                    blocks[index].groupKind == .superset {
+                    blocks[index].groupKind?.isStrengthGroup == true {
                     blocks[index].groupID = nil
                     blocks[index].groupKind = nil
                     blocks[index].groupRounds = nil
-                    // An ungrouped strength exercise should execute once,
-                    // not retain the repeated rounds of its old superset.
+                    // An ungrouped exercise executes once rather than
+                    // inheriting rounds from a supersett or circuit.
                     blocks[index].setCount = 1
                 }
             },
             onDeleteSuperset: { id in
                 blocks.removeAll {
-                    $0.groupID == id && $0.groupKind == .superset
+                    $0.groupID == id && $0.groupKind?.isStrengthGroup == true
                 }
                 resequence()
             },
@@ -5427,7 +5456,7 @@ struct WorkoutTemplateBuilderView: View {
                     .accessibilityLabel(tr("Drag to reorder group",
                                            "Dra for å flytte gruppe"))
 
-                Image(systemName: kind == .superset ? "dumbbell.fill" : "figure.run")
+                Image(systemName: kind.symbol)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(studioAccent)
                     .frame(width: 40, height: 40)
@@ -5621,8 +5650,13 @@ struct WorkoutTemplateBuilderView: View {
                     }
                 }
 
-                if kind == .superset && members.filter({ blocks[$0].kind == .exercise }).count < 2 {
-                    Label(tr("Add at least two exercises before saving.",
+                if kind.isStrengthGroup &&
+                    members.filter({ blocks[$0].kind == .exercise }).count <
+                        kind.minimumStrengthExercises {
+                    Label(kind == .circuit
+                        ? tr("Add at least three exercises before saving.",
+                             "Legg til minst tre øvelser før lagring.")
+                        : tr("Add at least two exercises before saving.",
                              "Legg til minst to øvelser før lagring."),
                           systemImage: "info.circle")
                         .font(.caption)
@@ -6231,6 +6265,13 @@ struct WorkoutTemplateBuilderView: View {
                             pendingExerciseChoice = .superset
                             showingBlockPicker = false
                         }
+                        if initialActivity == .strength {
+                            pickerRow(tr("Circuit training", "Sirkeltrening"),
+                                      icon: WorkoutBlockGroupKind.circuit.symbol) {
+                                pendingExerciseChoice = .circuit
+                                showingBlockPicker = false
+                            }
+                        }
                         pickerRow(tr("Rest", "Pause"), icon: "pause.fill") {
                             addRestBlock()
                             showingBlockPicker = false
@@ -6418,6 +6459,7 @@ struct WorkoutTemplateBuilderView: View {
         case "workout": showingSavedWorkoutPicker = true
         case "interval": createIntervals()
         case "superset": createSuperset()
+        case "circuit": createCircuit()
         case "rest": addRestBlock()
         case "active_recovery": addActiveRecoveryBlock()
         case "stretching": addWellnessBlock(.stretching)
@@ -6681,6 +6723,14 @@ struct WorkoutTemplateBuilderView: View {
         showingExercisePicker = true
     }
 
+    private func createCircuit() {
+        // The first picked exercise creates a regular persisted group;
+        // the Studio card then adds stations, rounds and optional recovery.
+        exerciseTargetGroupID = UUID()
+        pendingNewGroupKind = .circuit
+        showingExercisePicker = true
+    }
+
     private func createIntervals() {
         let id = UUID()
         var run = WorkoutTemplateBlock(
@@ -6737,10 +6787,10 @@ struct WorkoutTemplateBuilderView: View {
         }
         if let id = groupID,
            let last = blocks.indices.last(where: { blocks[$0].groupID == id }) {
-            // In supersets the pause belongs at the end of each round.
-            // Adding exercise number three must not place it after that pause.
+            // In strength groups the pause belongs at the end of each
+            // round. Extra stations must be inserted before the pause.
             let position = block.kind == .exercise &&
-                blocks[last].groupKind == .superset &&
+                blocks[last].groupKind?.isStrengthGroup == true &&
                 blocks[last].isRestOrActiveRecovery
                 ? last : last + 1
             blocks.insert(block, at: position)
