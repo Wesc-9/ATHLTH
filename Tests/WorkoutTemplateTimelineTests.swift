@@ -108,6 +108,65 @@ final class WorkoutTemplateTimelineTests: XCTestCase {
         )
     }
 
+    func testCircuitThreeStationsKeepOrderAndSkipLastRoundPause() throws {
+        let id = UUID()
+        let squat = exercise("Squat")
+        let row = exercise("Row")
+        var plank = exercise("Plank")
+        let rest = recovery()
+
+        plank.repetitions = nil
+        plank.durationSeconds = 45
+
+        var stations = [squat, row, plank, rest]
+        for index in stations.indices {
+            stations[index].groupID = id
+            stations[index].groupKind = .circuit
+            stations[index].groupRounds = 3
+        }
+
+        // The entire circuit survives template storage and reopening.
+        let saved = try JSONEncoder().encode(stations)
+        let decoded = try JSONDecoder().decode(
+            [WorkoutTemplateBlock].self, from: saved
+        )
+        XCTAssertEqual(decoded, stations)
+        XCTAssertTrue(decoded.allSatisfy {
+            $0.groupKind == .circuit && $0.groupRounds == 3
+        })
+
+        let executed = decoded.expandedForExecution()
+        XCTAssertEqual(executed.count, 11)
+        XCTAssertEqual(executed.map(\.kind), [
+            .exercise, .exercise, .exercise, .rest,
+            .exercise, .exercise, .exercise, .rest,
+            .exercise, .exercise, .exercise
+        ])
+        XCTAssertEqual(
+            executed.map { $0.title.components(separatedBy: " · ")[0] },
+            [
+                "Squat", "Row", "Plank", "Recovery",
+                "Squat", "Row", "Plank", "Recovery",
+                "Squat", "Row", "Plank"
+            ]
+        )
+        XCTAssertEqual(executed.filter { $0.kind == .rest }.count, 2)
+        XCTAssertEqual(
+            ATHLTHWorkoutDurationEstimator.previewSeconds(for: decoded),
+            537
+        )
+    }
+
+    func testCircuitAndSupersetRemainDistinctStrengthGroupKinds() {
+        XCTAssertEqual(WorkoutBlockGroupKind.circuit.rawValue, "circuit")
+        XCTAssertEqual(WorkoutBlockGroupKind.circuit.minimumStrengthExercises, 3)
+        XCTAssertEqual(WorkoutBlockGroupKind.superset.minimumStrengthExercises, 2)
+        XCTAssertEqual(WorkoutBlockGroupKind.intervals.minimumStrengthExercises, 0)
+        XCTAssertTrue(WorkoutBlockGroupKind.circuit.isStrengthGroup)
+        XCTAssertTrue(WorkoutBlockGroupKind.superset.isStrengthGroup)
+        XCTAssertFalse(WorkoutBlockGroupKind.intervals.isStrengthGroup)
+    }
+
     func testIntervalRepeatsRunAndRecoveryButSkipsFinalRecovery() {
         let id = UUID()
         var run = running()
