@@ -2677,6 +2677,12 @@ final class StrengthWorkoutStore: ObservableObject {
     /// appending never creates a second HKWorkoutSession/HealthKit entry.
     private static func strengthExerciseLogs(from session: PlannedSession)
         -> [StrengthExerciseLog] {
+        // The unified planner stores modern exercises in workoutBlocks, while
+        // older workouts still use PlannedExercise. Both must launch a real
+        // iPhone/Watch strength queue, not an empty live workout.
+        if session.exercises.isEmpty {
+            return strengthExerciseLogsFromBlocks(session.resolvedWorkoutBlocks)
+        }
         return session.exercises.map { planned in
             let setTargets =
                 planned.resolvedSetTargets
@@ -2744,6 +2750,92 @@ final class StrengthWorkoutStore: ObservableObject {
             return log
         }
 
+    }
+
+    /// Converts a saved grouped recipe into the same authoritative
+    /// strength log used by the live iPhone screen and Watch mirror.
+    /// Each group member has its own planned sets, but shares group identity
+    /// so completion cycles stations in order before the next round.
+    private static func strengthExerciseLogsFromBlocks(
+        _ source: [WorkoutTemplateBlock]
+    ) -> [StrengthExerciseLog] {
+        var queue: [StrengthExerciseLog] = []
+        for block in source {
+            if block.kind == .rest {
+                let last = queue.indices.last(where: { i in
+                    block.groupID == nil ||
+                    queue[i].groupID == block.groupID
+                })
+                if let last, let seconds = block.durationSeconds,
+                   seconds.isFinite && seconds >= 0 {
+                    let capped = min(Int(seconds.rounded()), 3_600)
+                    queue[last].restSecondsOverride = capped
+                    for setIndex in queue[last].sets.indices {
+                        queue[last].sets[setIndex].restSeconds = capped
+                    }
+                }
+                continue
+            }
+            guard block.kind == .exercise else { continue }
+            let snapshot = block.exerciseSnapshot ?? ExerciseSnapshot(
+                name: block.title,
+                instructions: [],
+                primaryMuscles: [],
+                equipment: [],
+                imageURL: nil
+            )
+            let setCount = block.groupKind != nil
+                ? min(max(block.groupRounds ?? 1, 1), 20)
+                : min(max(block.setCount ?? 1, 1), 20)
+            let timed = block.durationSeconds != nil
+            let sets: [StrengthSetLog] = (0..<setCount).map { index in
+                let target = block.individualSetTargets.flatMap { targets in
+                    targets.indices.contains(index) ? targets[index] : nil
+                }
+                return StrengthSetLog(
+                    id: UUID(),
+                    setNumber: index + 1,
+                    plannedReps: timed ? nil :
+                        (target?.repetitions ?? block.repetitions ?? 10),
+                    plannedWeightKilograms:
+                        target?.weightKilograms ?? block.targetWeightKilograms,
+                    completedReps: nil,
+                    completedWeightKilograms: nil,
+                    rpe: nil,
+                    completedAt: nil,
+                    restSeconds: block.groupKind == nil
+                        ? Int(min(max(block.restBetweenSetsSeconds ?? 90, 0), 3_600))
+                        : 0,
+                    isWarmUp: block.resolvedPhase == .warmup,
+                    targetKind: timed ? .time : .reps,
+                    plannedDurationSeconds: block.durationSeconds.flatMap { seconds in
+                        guard seconds.isFinite && seconds > 0 else { return nil }
+                        return min(max(Int(seconds.rounded()), 1), 7_200)
+                    }
+                )
+            }
+            let style: StrengthExerciseGroupStyle?
+            switch block.groupKind {
+            case .superset: style = .superset
+            case .circuit: style = .circuit
+            case .emom: style = .emom
+            case .amrap: style = .amrap
+            case .dropSet: style = .dropSet
+            case .intervals, nil: style = nil
+            }
+            queue.append(StrengthExerciseLog(
+                id: UUID(),
+                plannedExerciseID: block.exerciseID,
+                exercise: snapshot,
+                sets: sets,
+                completedAt: nil,
+                groupID: style != nil ? block.groupID : nil,
+                groupStyle: style,
+                groupClockSeconds: style == .emom ? 60 :
+                    (style == .amrap ? (block.groupClockSeconds ?? 720) : nil)
+            ))
+        }
+        return queue
     }
 
     /// Append a complete saved workout while preserving the existing active
