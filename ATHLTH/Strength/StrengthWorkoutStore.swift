@@ -2704,9 +2704,20 @@ final class StrengthWorkoutStore: ObservableObject {
     /// appending never creates a second HKWorkoutSession/HealthKit entry.
     private static func strengthExerciseLogs(from session: PlannedSession)
         -> [StrengthExerciseLog] {
-        // The unified planner stores modern exercises in workoutBlocks, while
-        // older workouts still use PlannedExercise. Both must launch a real
-        // iPhone/Watch strength queue, not an empty live workout.
+        // An explicit unified recipe is authoritative for grouped strength.
+        // Legacy exercise arrays can also be populated by an older editor,
+        // but using those in preference to the group blocks would discard
+        // the recorded mode, round order and per-station settings.
+        if let recipe = session.workoutBlocks,
+           recipe.contains(where: {
+               $0.kind == .exercise && $0.groupKind?.isStrengthGroup == true
+           }) {
+            return strengthExerciseLogsFromBlocks(recipe.sorted {
+                $0.sequence < $1.sequence
+            })
+        }
+        // Older workouts use PlannedExercise; newer ones can consist only of
+        // blocks. Never launch a blank strength queue for block-only recipes.
         if session.exercises.isEmpty {
             return strengthExerciseLogsFromBlocks(session.resolvedWorkoutBlocks)
         }
