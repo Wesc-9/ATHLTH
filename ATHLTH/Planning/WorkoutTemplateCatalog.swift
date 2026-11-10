@@ -3754,6 +3754,9 @@ struct WorkoutTemplateBuilderView: View {
     /// An embedded iPad inspector closes itself, not the surrounding plan.
     /// All iPhone callers keep their existing sheet dismissal.
     private let onCloseInline: (() -> Void)?
+    /// Distinguishes an explicit Save/Cancel from an iOS sheet that vanished
+    /// during backgrounding. Only the standalone scratch host supplies it.
+    private let onCloseRequested: (() -> Void)?
 
     init(
         initialTitle: String = "",
@@ -3779,7 +3782,8 @@ struct WorkoutTemplateBuilderView: View {
         onAddStandalone: ((PlannedSession) -> Bool)? = nil,
         onValidateSave: ((PlannedSession) -> String?)? = nil,
         saveButtonTitle: String? = nil,
-        onCloseInline: (() -> Void)? = nil
+        onCloseInline: (() -> Void)? = nil,
+        onCloseRequested: (() -> Void)? = nil
     ) {
         let startBlank = ATHLTHWorkoutDraftRecoveryPolicy.beginsNewStandaloneScratch(
             initialTitle: initialTitle,
@@ -3877,6 +3881,7 @@ struct WorkoutTemplateBuilderView: View {
         self.onValidateSave = onValidateSave
         self.saveButtonTitle = saveButtonTitle
         self.onCloseInline = onCloseInline
+        self.onCloseRequested = onCloseRequested
     }
 
     private struct StoredWorkoutDraft: Codable {
@@ -4427,6 +4432,7 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func closeWorkoutEditor() {
+        onCloseRequested?()
         if let onCloseInline {
             onCloseInline()
         } else {
