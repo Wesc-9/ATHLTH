@@ -5690,11 +5690,17 @@ struct SessionEditorView: View {
         _workoutCategory = State(
             initialValue: workout.workoutCategory
         )
-        _runEnvironment = State(initialValue:
-            workout.workoutCategory == "treadmill" ||
-            workout.resolvedWorkoutBlocks.contains(where: { $0.kind == .run && $0.isIndoor == true })
-                ? .treadmill : .outdoor
-        )
+        let storedRunEnvironment: RunEnvironment =
+            workout.workoutCategory == "treadmill" ? .treadmill :
+            workout.workoutCategory == "indoor" ? .indoor :
+            workout.resolvedWorkoutBlocks.contains(where: {
+                $0.kind == .run && $0.isIndoor == true &&
+                    $0.treadmillInclinePercent != nil
+            }) ? .treadmill :
+            workout.resolvedWorkoutBlocks.contains(where: {
+                $0.kind == .run && $0.isIndoor == true
+            }) ? .indoor : .outdoor
+        _runEnvironment = State(initialValue: storedRunEnvironment)
         _meetingPoint = State(initialValue: workout.meetingPoint)
         _physicalMeetup = State(initialValue: true)
         _allowInviteeExercises = State(initialValue: workout.allowInviteeExercises == true)
