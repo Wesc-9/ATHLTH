@@ -3896,6 +3896,7 @@ struct WorkoutTemplateBuilderView: View {
         let routeAlertConfiguration: WatchRouteAlertConfiguration?
         let ghostTargetDurationSeconds: TimeInterval?
         let ghostUpdates: WatchGhostRaceAudioConfiguration?
+        let runningEnvironment: RunEnvironment?
     }
 
     private var draftStorageKey: String {
@@ -3955,6 +3956,14 @@ struct WorkoutTemplateBuilderView: View {
         selectedPhase = stored.selectedPhase ?? selectedPhase
         studioAdvanced = stored.studioAdvanced ?? studioAdvanced
         studioBasicDate = stored.studioDate ?? studioBasicDate
+        if initialActivity == .running {
+            studioBasicRunEnvironment = stored.runningEnvironment ??
+                stored.blocks.first(where: { $0.kind == .run }).map { block in
+                    block.isIndoor == true
+                        ? (block.treadmillInclinePercent != nil ? .treadmill : .indoor)
+                        : .outdoor
+                } ?? studioBasicRunEnvironment
+        }
         resumeExercisePickerAfterWake = stored.pendingExercisePicker ?? false
         resumeRunningPickerAfterWake = stored.pendingRunningPicker ?? false
         collapsedGroupIDs = Set(blocks.compactMap(\.groupID))
@@ -4012,7 +4021,9 @@ struct WorkoutTemplateBuilderView: View {
             ghostUpdates: ghostDraft.enabled
                 ? ghostDraft.resolvedUpdates(
                     fallback: settings.ghostRaceAudioConfiguration
-                  ) : nil
+                  ) : nil,
+            runningEnvironment: initialActivity == .running
+                ? studioBasicRunEnvironment : nil
         )
         guard let data = try? JSONEncoder().encode(snapshot) else { return }
         UserDefaults.standard.set(data, forKey: draftStorageKey)
@@ -4493,6 +4504,11 @@ struct WorkoutTemplateBuilderView: View {
                 }
             }
             .onChange(of: blocks) { _, _ in
+                if isPlannedWorkout && initialActivity == .running {
+                    // New running steps inherit the environment selected in
+                    // Workout Details, including when added in Advanced.
+                    synchronizeRunningEnvironment()
+                }
                 // A changed recipe updates the estimate even if the
                 // user previously entered a time. Keep the field editable.
                 manualDurationMinutes = nil
@@ -4548,6 +4564,9 @@ struct WorkoutTemplateBuilderView: View {
             .onChange(of: selectedPhase) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioAdvanced) { _, _ in persistWorkoutDraft() }
             .onChange(of: studioBasicDate) { _, _ in persistWorkoutDraft() }
+            .onChange(of: studioBasicRunEnvironment) { _, _ in
+                persistWorkoutDraft()
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active {
                     // A suspended iOS sheet can be implicitly dismissed.
@@ -4606,7 +4625,9 @@ struct WorkoutTemplateBuilderView: View {
             durationMinutes: resolvedDurationMinutes,
             route: activeRoute,
             plannedDate: plannedDate,
-            onDateChanged: onScheduledTimeChanged
+            onDateChanged: onScheduledTimeChanged,
+            runningEnvironment: initialActivity == .running
+                ? $studioBasicRunEnvironment : nil
         )
         .overlay(alignment: .topTrailing) {
             workoutExtrasMenu
@@ -4735,17 +4756,9 @@ struct WorkoutTemplateBuilderView: View {
                     onScheduledTimeChanged?(value)
                 }
             }
-            .onChange(of: studioBasicRunEnvironment) { _, place in
+            .onChange(of: studioBasicRunEnvironment) { _, _ in
                 guard isPlannedWorkout, initialActivity == .running else { return }
-                for index in blocks.indices where blocks[index].kind == .run {
-                    blocks[index].isIndoor = place != .outdoor
-                    blocks[index].treadmillInclinePercent =
-                        place == .treadmill ? 0 : nil
-                }
-                if place != .outdoor && studioBasicRunMode == .route {
-                    studioBasicRunMode = .free
-                    selectedRouteID = nil
-                }
+                synchronizeRunningEnvironment()
             }
             .onChange(of: studioBasicRunMode) { _, mode in
                 guard isPlannedWorkout, !studioAdvanced,
@@ -7184,6 +7197,28 @@ struct WorkoutTemplateBuilderView: View {
         }
     }
 
+    /// The compact environment picker in Workout Details is authoritative
+    /// for the run blocks in both Basic and Advanced. Preserve explicit
+    /// treadmill inclines instead of resetting every selection to 0%.
+    private func synchronizeRunningEnvironment() {
+        guard isPlannedWorkout, initialActivity == .running else { return }
+        let place = studioBasicRunEnvironment
+        for index in blocks.indices where blocks[index].kind == .run {
+            let indoor = place != .outdoor
+            let incline = place == .treadmill
+                ? (blocks[index].treadmillInclinePercent ?? 0) : nil
+            if blocks[index].isIndoor != indoor ||
+               blocks[index].treadmillInclinePercent != incline {
+                blocks[index].isIndoor = indoor
+                blocks[index].treadmillInclinePercent = incline
+            }
+        }
+        if place != .outdoor {
+            if selectedRouteID != nil { selectedRouteID = nil }
+            if studioBasicRunMode == .route { studioBasicRunMode = .free }
+        }
+    }
+
     private var basicFreeRunningKind: WorkoutKind {
         if isPlannedWorkout && !studioAdvanced &&
            initialActivity == .running && studioBasicRunMode == .free &&
@@ -7245,7 +7280,7 @@ struct WorkoutTemplateBuilderView: View {
                 fallback: settings.ghostRaceAudioConfiguration
               )
             : nil
-        if isPlannedWorkout, initialActivity == .running, !studioAdvanced {
+        if isPlannedWorkout, initialActivity == .running {
             switch studioBasicRunEnvironment {
             case .outdoor: workout.workoutCategory = "running"
             case .indoor: workout.workoutCategory = "indoor"
