@@ -13,6 +13,8 @@ struct ATHLTHRunBasicSetupView: View {
     var selectedWorkoutTitle: String? = nil
     var onChooseRoute: (() -> Void)? = nil
     var onChooseWorkout: (() -> Void)? = nil
+    /// Basic offers one simple coach toggle; Advanced owns the full rules.
+    var audioCoachEnabled: Binding<Bool>? = nil
 
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -158,6 +160,17 @@ struct ATHLTHRunBasicSetupView: View {
             .padding(.horizontal, scheduleEditable ? 0 : 12)
             .background(ATHLTHPlanDesign.canvas,
                         in: RoundedRectangle(cornerRadius: 12))
+
+            if let audioCoachEnabled {
+                Toggle(isOn: audioCoachEnabled) {
+                    Label("Audio Coach", systemImage: "waveform")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(ink)
+                }
+                .tint(bronze)
+                .frame(minHeight: 44)
+                .accessibilityIdentifier("athlth-basic-audio-coach")
+            }
         }
         .padding(15)
         .athlthTrainPaper()
