@@ -3925,17 +3925,26 @@ struct WorkoutTemplateBuilderView: View {
         // reopening the same saved draft ID may restore its prior timeline.
         guard !isNewStandaloneScratch || resumeSavedScratchDraft else { return }
         guard let data = UserDefaults.standard.data(forKey: draftStorageKey),
-              let stored = try? JSONDecoder().decode(StoredWorkoutDraft.self, from: data),
-              ATHLTHWorkoutDraftRecoveryPolicy.accepts(
-                  storedSignature: stored.signature,
-                  currentSignature: initialDraftSignature,
-                  context: draftContext,
-                  storedSourceTitle: stored.sourceTitle,
-                  currentSourceTitle: initialSourceTitle,
-                  storedSourceID: stored.sourceTemplateID,
-                  currentSourceID: sourceTemplateID,
-                  savedAt: stored.updatedAt
-              ) else { return }
+              let stored = try? JSONDecoder().decode(StoredWorkoutDraft.self, from: data)
+        else { return }
+
+        // The caller explicitly resumed a per-account, uniquely identified
+        // scratch draft. Its original source signature may differ because the
+        // old hosting Form normalizes blank titles on app recreation.
+        // The unique draft context is authoritative in this one case.
+        let explicitlyResumedScratch = resumeSavedScratchDraft &&
+            draftContext.hasPrefix("session-scratch.\(session.profile.userID.uuidString).")
+        let matchingSource = ATHLTHWorkoutDraftRecoveryPolicy.accepts(
+            storedSignature: stored.signature,
+            currentSignature: initialDraftSignature,
+            context: draftContext,
+            storedSourceTitle: stored.sourceTitle,
+            currentSourceTitle: initialSourceTitle,
+            storedSourceID: stored.sourceTemplateID,
+            currentSourceID: sourceTemplateID,
+            savedAt: stored.updatedAt
+        )
+        guard explicitlyResumedScratch || matchingSource else { return }
         title = stored.title
         blocks = ATHLTHWorkoutSetExpansion.collapsingLegacySets(in: stored.blocks)
         selectedRouteID = stored.routeID
