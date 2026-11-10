@@ -90,6 +90,42 @@ final class ATHLTHStudioRecordedWorkoutsTests: XCTestCase {
         XCTAssertEqual(result.count, unrelated.count + 1)
     }
 
+    func testNearbyHealthWorkoutAcrossBucketBoundaryIsNotDoubleCounted() {
+        let start = Date(timeIntervalSince1970: 1_800_000_119)
+        let healthLike = WorkoutSummary(localStrengthWorkout: strength(
+            started: start
+        ))
+        let local = strength(started: start.addingTimeInterval(2))
+        let result = ATHLTHStudioRecordedWorkouts.merged(
+            health: [healthLike], localStrength: [local]
+        )
+        XCTAssertEqual(result.count, 1)
+    }
+
+    func testHealthWorkoutExactly120SecondsAwayIsNotMerged() {
+        let start = Date(timeIntervalSince1970: 1_800_000_119)
+        let healthLike = WorkoutSummary(localStrengthWorkout: strength(
+            started: start.addingTimeInterval(120)
+        ))
+        let local = strength(started: start)
+        let result = ATHLTHStudioRecordedWorkouts.merged(
+            health: [healthLike], localStrength: [local]
+        )
+        XCTAssertEqual(result.count, 2)
+    }
+
+    func testHealthWorkout119SecondsAwayIsMerged() {
+        let start = Date(timeIntervalSince1970: 1_800_000_119)
+        let healthLike = WorkoutSummary(localStrengthWorkout: strength(
+            started: start.addingTimeInterval(-119)
+        ))
+        let local = strength(started: start)
+        let result = ATHLTHStudioRecordedWorkouts.merged(
+            health: [healthLike], localStrength: [local]
+        )
+        XCTAssertEqual(result.count, 1)
+    }
+
     func testDifferentDurationAtNearbyStartRemainsSeparate() {
         let moment = Date(timeIntervalSince1970: 1_800_000_000)
         let local = strength(started: moment)
