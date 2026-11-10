@@ -1278,6 +1278,11 @@ struct WatchStrengthExerciseSummary: Codable, Hashable {
     /// Count omitted on this exercise, distinct from completed efforts.
     var skippedSets: Int? = nil
     var isEmbeddedRunningInterval: Bool? = nil
+    /// Planned group identity and timing; optional for older Watch snapshots.
+    var strengthGroupID: UUID? = nil
+    var strengthGroupStyleRaw: String? = nil
+    var strengthGroupClockSeconds: TimeInterval? = nil
+    var strengthGroupStartedAt: Date? = nil
 }
 
 /// Absolute-date countdown snapshot. No display ticks are transmitted over WatchConnectivity.
@@ -1363,6 +1368,14 @@ struct WatchStrengthSessionSnapshot: Codable, Hashable {
     /// Repetition sets can start a count-up effort clock from the Watch.
     var setEffortStartedAt: Date? = nil
     var isOpenEndedTimedSet: Bool? = nil
+    /// Active group context for glanceable Watch guidance, not measured work.
+    var strengthModeRaw: String? = nil
+    var strengthModeClockSeconds: TimeInterval? = nil
+    var strengthModeStartedAt: Date? = nil
+    var strengthModeRound: Int? = nil
+    var strengthModeTotalRounds: Int? = nil
+    var strengthModeStationIndex: Int? = nil
+    var strengthModeStationCount: Int? = nil
     /// Optional for compatibility with Watch snapshots made before plate-only
     /// input support. Nil means keep the legacy total-weight input.
     /// Draft/load commands always carry TOTAL kilograms, bar included.
