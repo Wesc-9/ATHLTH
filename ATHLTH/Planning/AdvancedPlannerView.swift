@@ -5495,6 +5495,11 @@ struct SessionEditorView: View {
     @State private var selectedScratchWorkoutType: ATHLTHPlannedWorkoutType?
     @State private var scratchTimelineDraftID = UUID()
     @State private var showingUnifiedWorkoutComposer = false
+    // Restore an involuntarily dismissed scratch builder after app suspension.
+    @State private var restoreScratchComposerOnWake = false
+    // Solo scratch sessions are saved directly from the shared builder,
+    // avoiding the legacy "Plan extra workout" intermediary.
+    @State private var closeAfterScratchSave = false
     @State private var showingRecoveryRestPlanner = false
     @State private var selectedPartnerID: UUID?
     @State private var partnerPlanningExpanded = false
@@ -6631,7 +6636,28 @@ struct SessionEditorView: View {
                 }
                 .presentationDetents([.large])
             }
-            .sheet(isPresented: $showingUnifiedWorkoutComposer) {
+            .sheet(
+                isPresented: $showingUnifiedWorkoutComposer,
+                onDismiss: {
+                    if closeAfterScratchSave {
+                        closeAfterScratchSave = false
+                        restoreScratchComposerOnWake = false
+                        // Wait until the child sheet has fully gone before
+                        // dismissing its owner, avoiding overlapping sheets.
+                        Task { @MainActor in
+                            await Task.yield()
+                            dismiss()
+                        }
+                    } else if scenePhase == .active &&
+                        !restoreScratchComposerOnWake &&
+                        isStandalone && selectedScratchWorkoutType != nil &&
+                        onPreparedWorkout == nil && selectedPartnerID == nil {
+                        // Cancel/back from a scratch workout returns to the
+                        // caller. The existing draft remains recoverable.
+                        dismiss()
+                    }
+                }
+            ) {
                 WorkoutTemplateBuilderView(
                     initialTitle: title,
                     initialBlocks: workoutPlanningPreviewBlocks,
@@ -6645,7 +6671,22 @@ struct SessionEditorView: View {
                     initialActivity: selectedScratchWorkoutType,
                     onScheduledTimeChanged: { scheduledTime = $0 },
                     onAddStandalone: { updated in
-                        applyScratchTimeline(updated)
+                        if isStandalone, onPreparedWorkout == nil,
+                           selectedPartnerID == nil, !saveToActivePlan {
+                            // Preserve the complete workout snapshot
+                            // (music, gear, run environment, coach, blocks).
+                            // The parent must not re-compose a reduced
+                            // version or show the old 0-step confirmation.
+                            var scheduled = updated
+                            scheduled.scheduledStart = scheduledTime
+                            persistSession(scheduled)
+                            finishDraft()
+                            closeAfterScratchSave = true
+                        } else {
+                            // Existing plan, partner and proposal flows keep
+                            // their original confirmation/save behavior.
+                            applyScratchTimeline(updated)
+                        }
                         return true
                     }
                 )
@@ -6867,7 +6908,24 @@ struct SessionEditorView: View {
                 persistDraft()
             }
             .onChange(of: scenePhase) { _, phase in
-                if phase != .active { persistDraft() }
+                if phase != .active {
+                    if isStandalone && selectedScratchWorkoutType != nil &&
+                        showingUnifiedWorkoutComposer && !draftFinalized {
+                        restoreScratchComposerOnWake = true
+                    }
+                    persistDraft()
+                } else if restoreScratchComposerOnWake && !draftFinalized {
+                    Task { @MainActor in
+                        await Task.yield()
+                        guard restoreScratchComposerOnWake && !draftFinalized else {
+                            return
+                        }
+                        restoreScratchComposerOnWake = false
+                        if !showingUnifiedWorkoutComposer {
+                            showingUnifiedWorkoutComposer = true
+                        }
+                    }
+                }
             }
             .onChange(of: selectedRouteID) { oldRouteID, newRouteID in
                 syncMetricsFromRouteChange(
