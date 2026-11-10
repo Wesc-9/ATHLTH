@@ -350,6 +350,9 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
     var rpe: Double?
     var completedAt: Date?
     var restSeconds: Int?
+    /// A missed/skipped EMOM station is resolved but never completed.
+    /// It does not contribute repetitions, volume or records.
+    var skippedAt: Date? = nil
 
     // Planned effort targets are separate from the athlete's logged result.
     // Optional fields keep all existing workout history decodable.
@@ -528,6 +531,10 @@ struct StrengthSetLog: Identifiable, Codable, Hashable {
 
     var isCompleted: Bool {
         completedAt != nil
+    }
+
+    var isResolved: Bool {
+        completedAt != nil || skippedAt != nil
     }
 
     var countsTowardTrainingLoad: Bool {
