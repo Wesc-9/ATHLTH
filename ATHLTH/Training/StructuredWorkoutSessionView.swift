@@ -335,6 +335,217 @@ struct StructuredWorkoutSessionView: View {
         }
     }
 
+    /// Focused premium mode strip: planned clock, current round/station,
+    /// next action. The timer is computed from absolute dates, not tick counts,
+    /// so the displayed clock remains accurate after background/resume.
+    private func liveModeCard(_ block: WorkoutTemplateBlock) -> some View {
+        let kind = block.executionGroupKind ?? .superset
+        let index = blocks.prefix(currentIndex).filter {
+            $0.executionGroupID == block.executionGroupID
+        }.count
+        return VStack(alignment: .leading, spacing: 14) {
+            HStack {
+                Label(kind.title.uppercased(), systemImage: kind.symbol)
+                    .font(.caption.weight(.bold))
+                    .tracking(1.1)
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                Spacer()
+                if let round = block.executionRound,
+                   let total = block.executionTotalRounds, kind != .amrap {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Round \(round)/\(total)",
+                        norwegian: "Runde \(round)/\(total)"
+                    ))
+                    .font(.caption.weight(.semibold))
+                }
+            }
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let date = context.date
+                let remaining = timeRemaining(for: block, at: date, ordinal: index)
+                HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    if kind.usesGroupClock, let remaining {
+                        Text(Self.clockText(remaining))
+                            .font(.system(size: 43, weight: .bold, design: .rounded))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .contentTransition(.numericText())
+                    } else {
+                        Text("\(index + 1)")
+                            .font(.system(size: 37, weight: .bold, design: .rounded))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                        Text("/")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                        Text("\(block.executionStationCount ?? 1)")
+                            .font(.headline)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    VStack(alignment: .trailing, spacing: 3) {
+                        Text(kind == .emom
+                             ? ATHLTHLocalization.choose(english: "Next minute", norwegian: "Neste minutt")
+                             : kind == .amrap
+                             ? ATHLTHLocalization.choose(english: "Time remaining", norwegian: "Tid igjen")
+                             : ATHLTHLocalization.choose(english: "Current stage", norwegian: "Aktivt trinn"))
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(kind == .emom && emomWaitingForMinute
+                            ? ATHLTHLocalization.choose(english: "Rest until next tick", norwegian: "Pause frem til neste minutt")
+                            : block.title)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(ATHLTHTheme.primaryText)
+                            .multilineTextAlignment(.trailing)
+                    }
+                }
+                .onChange(of: date) { _, next in
+                    checkTimedMode(at: next)
+                }
+            }
+            if kind == .dropSet {
+                Text(ATHLTHLocalization.choose(
+                    english: "Record each weight reduction separately. No rest between drops.",
+                    norwegian: "Registrer hver vektreduksjon separat. Ingen pause mellom trinnene."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else if kind == .amrap {
+                Text(ATHLTHLocalization.choose(
+                    english: "Complete as many rounds as possible before time runs out.",
+                    norwegian: "Fullfør så mange runder du rekker før tiden går ut."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            } else if kind == .emom {
+                Text(ATHLTHLocalization.choose(
+                    english: "Finish the task and rest until the next minute. Unfinished slots are skipped, never counted as completed.",
+                    norwegian: "Fullfør oppgaven og hvil til neste minutt. Ikke fullførte minutter telles aldri som utført."
+                ))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            if let next = blocks.dropFirst(currentIndex + 1).first,
+               next.executionGroupID == block.executionGroupID {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.right")
+                    Text(ATHLTHLocalization.choose(english: "Up next:", norwegian: "Neste:") +
+                         " " + next.title)
+                        .lineLimit(2)
+                }
+                .font(.caption.weight(.medium))
+                .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
+        }
+        .padding(17)
+        .background(
+            Color.white.opacity(0.94),
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .strokeBorder(ATHLTHTheme.accent.opacity(0.20), lineWidth: 1)
+        }
+    }
+
+    private func actualSetInputs(_ block: WorkoutTemplateBlock) -> some View {
+        ATHLTHCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Label(ATHLTHLocalization.choose(
+                    english: "Record actual result", norwegian: "Registrer faktisk resultat"
+                ), systemImage: "checkmark.square")
+                .font(.headline)
+                if block.durationSeconds == nil {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Repetitions", norwegian: "Repetisjoner"
+                        ))
+                        Spacer()
+                        Stepper(value: $enteredReps, in: 0...500) {
+                            Text("\(enteredReps)")
+                                .monospacedDigit()
+                                .font(.title3.weight(.semibold))
+                        }
+                        .fixedSize(horizontal: true, vertical: false)
+                    }
+                } else if let target = block.durationSeconds {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Planned: \(Int(target)) seconds",
+                        norwegian: "Planlagt: \(Int(target)) sekunder"
+                    ), systemImage: "clock")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Actual load (kg)", norwegian: "Faktisk belastning (kg)"
+                    ))
+                    Spacer()
+                    TextField("kg", text: $enteredWeight)
+                        .keyboardType(.decimalPad)
+                        .multilineTextAlignment(.trailing)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 92)
+                }
+                if block.executionGroupKind == .dropSet {
+                    Text(ATHLTHLocalization.choose(
+                        english: "Use the weight actually lifted, not the previous stage's weight.",
+                        norwegian: "Bruk vekten du faktisk løftet, ikke vekten fra forrige trinn."
+                    ))
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private static func clockText(_ interval: TimeInterval) -> String {
+        let seconds = max(Int(ceil(interval)), 0)
+        return String(format: "%02d:%02d", seconds / 60, seconds % 60)
+    }
+
+    private func timeRemaining(
+        for block: WorkoutTemplateBlock, at date: Date, ordinal: Int
+    ) -> TimeInterval? {
+        guard let id = block.executionGroupID,
+              let started = modeStarts[id],
+              let kind = block.executionGroupKind else { return nil }
+        let elapsed = max(date.timeIntervalSince(started), 0)
+        switch kind {
+        case .emom:
+            return max(0, (Double(ordinal + 1) *
+                (block.executionGroupClockSeconds ?? 60)) - elapsed)
+        case .amrap:
+            return max(0, (block.executionGroupClockSeconds ?? 720) - elapsed)
+        case .superset, .circuit, .dropSet, .intervals:
+            return nil
+        }
+    }
+
+    private func checkTimedMode(at date: Date) {
+        guard !savedCompletion, let block = currentBlock,
+              let id = block.executionGroupID,
+              let started = modeStarts[id],
+              let kind = block.executionGroupKind else { return }
+        let elapsed = max(date.timeIntervalSince(started), 0)
+        if kind == .amrap {
+            if elapsed >= (block.executionGroupClockSeconds ?? 720),
+               amrapTimedOutGroups.insert(id).inserted {
+                // Stop accepting new work at the deadline. The completed
+                // repetitions and stages remain intact for the review.
+                showingFinishConfirmation = !completedBlockIDs.isEmpty
+            }
+        } else if kind == .emom {
+            let ordinal = blocks.prefix(currentIndex).filter {
+                $0.executionGroupID == id
+            }.count
+            let boundary = Double(ordinal + 1) *
+                (block.executionGroupClockSeconds ?? 60)
+            if elapsed >= boundary {
+                if !emomWaitingForMinute { record(block, completed: false) }
+                goToNextStep()
+            }
+        }
+    }
+
     private func currentBlockCard(
         _ block: WorkoutTemplateBlock
     ) -> some View {
