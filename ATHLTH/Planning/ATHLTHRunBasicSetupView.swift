@@ -353,3 +353,129 @@ struct ATHLTHRunEnvironmentDetailRow: View {
         )
     }
 }
+
+/// Shared, activity-independent hierarchy for the second Quick Train screen.
+/// Activity selection happens before this view. A prominent free session is
+/// always followed by smaller alternative mode tiles; no business logic lives
+/// inside these reusable presentation components.
+struct ATHLTHBasicActivityHero: View {
+    let title: String
+    let subtitle: String
+    let symbol: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 14) {
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 25, weight: .medium))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                        .frame(width: 52, height: 52)
+                        .background(.white.opacity(0.85),
+                                    in: RoundedRectangle(cornerRadius: 15))
+                    Spacer(minLength: 0)
+                    Image(systemName: isSelected
+                          ? "checkmark.circle.fill" : "arrow.up.right")
+                        .font(.system(size: 19, weight: .medium))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                }
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.system(size: 23, weight: .semibold, design: .serif))
+                        .foregroundStyle(ATHLTHTrainDesign.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.72))
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                HStack {
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.bold))
+                    Text(ATHLTHLocalization.choose(
+                        english: "Choose free training",
+                        norwegian: "Velg fri trening"
+                    ))
+                        .font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Image(systemName: "arrow.right")
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 15)
+                .frame(minHeight: 46)
+                .background(
+                    ATHLTHTrainDesign.bronze,
+                    in: RoundedRectangle(cornerRadius: 13)
+                )
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                ATHLTHTrainDesign.paleGold.opacity(isSelected ? 0.55 : 0.27),
+                in: RoundedRectangle(cornerRadius: 23, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 23, style: .continuous)
+                    .strokeBorder(
+                        ATHLTHTrainDesign.bronze.opacity(isSelected ? 0.7 : 0.22),
+                        lineWidth: isSelected ? 1.2 : 0.8
+                    )
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 23))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("athlth-basic-free-hero")
+    }
+}
+
+struct ATHLTHBasicActivityModeTile: View {
+    let title: String
+    let subtitle: String
+    let symbol: String
+    let selected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 9) {
+                HStack {
+                    Image(systemName: symbol)
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    Spacer()
+                    if selected {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(ATHLTHTrainDesign.bronze)
+                    }
+                }
+                Spacer(minLength: 0)
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(ATHLTHTrainDesign.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHTrainDesign.ink.opacity(0.68))
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(13)
+            .frame(maxWidth: .infinity, minHeight: 122, alignment: .topLeading)
+            .background(
+                selected ? ATHLTHTrainDesign.paleGold.opacity(0.45) : .white,
+                in: RoundedRectangle(cornerRadius: 17, style: .continuous)
+            )
+            .overlay {
+                RoundedRectangle(cornerRadius: 17, style: .continuous)
+                    .strokeBorder(
+                        ATHLTHTrainDesign.bronze.opacity(selected ? 0.6 : 0.2),
+                        lineWidth: selected ? 1 : 0.8
+                    )
+            }
+            .contentShape(RoundedRectangle(cornerRadius: 17))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
