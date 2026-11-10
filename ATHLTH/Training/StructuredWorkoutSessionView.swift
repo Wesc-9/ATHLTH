@@ -1,6 +1,18 @@
 import Foundation
 import SwiftUI
 
+/// Actual values confirmed on the live screen, never fabricated from a plan.
+struct StructuredWorkoutStepResult: Codable, Hashable {
+    var stepID: String
+    var title: String
+    var groupKind: WorkoutBlockGroupKind?
+    var round: Int?
+    var repetitions: Int?
+    var weightKilograms: Double?
+    var elapsedSeconds: TimeInterval
+    var completed: Bool
+}
+
 struct StructuredWorkoutCompletion: Identifiable, Codable, Hashable {
     let id: UUID
     let workoutTemplateID: UUID?
@@ -13,6 +25,9 @@ struct StructuredWorkoutCompletion: Identifiable, Codable, Hashable {
     let totalBlockCount: Int
     // Optional for compatibility with previously saved workout history.
     var sourcePlanID: UUID? = nil
+    /// Optional so older histories continue decoding.
+    var actualStepResults: [StructuredWorkoutStepResult]? = nil
+    var timedOutModes: [String]? = nil
 
     var duration: TimeInterval {
         max(endedAt.timeIntervalSince(startedAt), 0)
@@ -86,6 +101,14 @@ struct StructuredWorkoutSessionView: View {
     @State private var showingDiscardConfirmation = false
     @State private var hasStarted = false
     @State private var savedCompletion = false
+    @State private var results: [String: StructuredWorkoutStepResult] = [:]
+    @State private var modeStarts: [UUID: Date] = [:]
+    @State private var stepEnteredAt = Date()
+    @State private var emomWaitingForMinute = false
+    @State private var amrapTimedOutGroups: Set<UUID> = []
+    @State private var enteredReps = 0
+    @State private var enteredWeight = ""
+    @State private var showAllSteps = false
 
     private var blocks: [WorkoutTemplateBlock] {
         workout.resolvedWorkoutBlocks.expandedForExecution()
@@ -115,7 +138,13 @@ struct StructuredWorkoutSessionView: View {
                     sessionHeader
 
                     if let currentBlock {
+                        if currentBlock.executionGroupKind != nil {
+                            liveModeCard(currentBlock)
+                        }
                         currentBlockCard(currentBlock)
+                        if currentBlock.kind == .exercise && !savedCompletion {
+                            actualSetInputs(currentBlock)
+                        }
                     }
 
                     blockTimeline
@@ -213,6 +242,7 @@ struct StructuredWorkoutSessionView: View {
                 if !hasStarted {
                     startedAt = Date()
                     hasStarted = true
+                    setupCurrentStep()
                     // This view itself is the iPhone interval/strength
                     // recorder. A ready lobby is only marked started when
                     // its first real recording screen becomes active.
@@ -236,6 +266,9 @@ struct StructuredWorkoutSessionView: View {
                 of: savedCompletion
             ) { _, _ in
                 updateScreenAwakeState()
+            }
+            .onChange(of: currentIndex) { _, _ in
+                setupCurrentStep()
             }
         }
     }
@@ -551,7 +584,10 @@ struct StructuredWorkoutSessionView: View {
                 )
 
             ForEach(
-                Array(blocks.enumerated()),
+                Array(blocks.enumerated()).filter { index, _ in
+                    showAllSteps || (index >= max(0, currentIndex - 1) &&
+                        index <= currentIndex + 5)
+                },
                 id: \.element.id
             ) { index, block in
                 Button {
@@ -667,6 +703,16 @@ struct StructuredWorkoutSessionView: View {
         }
     }
 
+    private var recordedRepetitions: Int {
+        results.values.filter(\.completed).compactMap(\.repetitions).reduce(0, +)
+    }
+
+    private var recordedVolume: Double {
+        results.values.filter(\.completed).reduce(0) { total, result in
+            total + Double(result.repetitions ?? 0) * (result.weightKilograms ?? 0)
+        }
+    }
+
     private var completionConfirmation: some View {
         ATHLTHCard {
             Label(
@@ -687,6 +733,22 @@ struct StructuredWorkoutSessionView: View {
             .font(.caption)
             .foregroundStyle(.secondary)
             .padding(.top, 4)
+            Divider().padding(.vertical, 6)
+            Text("\(results.values.filter(\.completed).count) " +
+                 ATHLTHLocalization.choose(english: "recorded stages", norwegian: "registrerte trinn"))
+                .font(.subheadline.weight(.medium))
+            Text("\(recordedRepetitions) " +
+                 ATHLTHLocalization.choose(english: "repetitions", norwegian: "repetisjoner") +
+                 " · " + String(format: "%.0f kg", recordedVolume))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            ForEach(Array(Set(results.values.compactMap {
+                $0.groupKind?.title
+            })).sorted(), id: \.self) { mode in
+                Label(mode, systemImage: "checkmark.circle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ATHLTHTheme.accentDeep)
+            }
         }
     }
 
@@ -724,7 +786,11 @@ struct StructuredWorkoutSessionView: View {
                         completeCurrentAndAdvance()
                     } label: {
                         Label(
-                            currentIndex >= blocks.count - 1
+                            emomWaitingForMinute
+                                ? ATHLTHLocalization.choose(
+                                    english: "Waiting for next minute", norwegian: "Venter på neste minutt"
+                                )
+                                : currentIndex >= blocks.count - 1
                                 ? ATHLTHLocalization.choose(
                                     english: "Complete block",
                                     norwegian: "Fullfør blokk"
@@ -743,7 +809,12 @@ struct StructuredWorkoutSessionView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .tint(ATHLTHTheme.accentDeep)
-                    .disabled(blocks.isEmpty)
+                    .disabled(blocks.isEmpty || emomWaitingForMinute ||
+                        currentBlock.flatMap { block in
+                            block.executionGroupID.map {
+                                amrapTimedOutGroups.contains($0)
+                            }
+                        } == true)
                 }
             }
             .padding(.horizontal, 18)
@@ -753,18 +824,56 @@ struct StructuredWorkoutSessionView: View {
     }
 
     private func completeCurrentAndAdvance() {
-        guard let currentBlock else {
+        guard let block = currentBlock else { return }
+        if let id = block.executionGroupID,
+           amrapTimedOutGroups.contains(id) { return }
+        guard !emomWaitingForMinute else { return }
+        record(block, completed: true)
+        if block.executionGroupKind == .emom {
+            // Completing a station early is an intentional rest. The next
+            // station starts at the absolute minute boundary, not immediately.
+            emomWaitingForMinute = true
             return
         }
+        goToNextStep()
+    }
 
-        completedBlockIDs.insert(
-            currentBlock.id
-        )
-
+    private func goToNextStep() {
+        emomWaitingForMinute = false
         if currentIndex < blocks.count - 1 {
             currentIndex += 1
         } else {
             showingFinishConfirmation = true
+        }
+    }
+
+    private func record(_ block: WorkoutTemplateBlock, completed: Bool) {
+        guard results[block.id] == nil else { return }
+        let typedWeight = Double(enteredWeight.replacingOccurrences(of: ",", with: "."))
+        let value = typedWeight.flatMap { $0.isFinite && $0 >= 0 ? $0 : nil }
+        let recorded = StructuredWorkoutStepResult(
+            stepID: block.id,
+            title: block.title,
+            groupKind: block.executionGroupKind,
+            round: block.executionRound,
+            repetitions: completed && block.kind == .exercise && block.durationSeconds == nil
+                ? max(0, enteredReps) : nil,
+            weightKilograms: completed && block.kind == .exercise ? value : nil,
+            elapsedSeconds: max(Date().timeIntervalSince(stepEnteredAt), 0),
+            completed: completed
+        )
+        results[block.id] = recorded
+        if completed { completedBlockIDs.insert(block.id) }
+    }
+
+    private func setupCurrentStep() {
+        guard let block = currentBlock else { return }
+        stepEnteredAt = Date()
+        enteredReps = max(block.repetitions ?? 0, 0)
+        enteredWeight = block.targetWeightKilograms.map { String($0) } ?? ""
+        emomWaitingForMinute = false
+        if let id = block.executionGroupID, modeStarts[id] == nil {
+            modeStarts[id] = Date()
         }
     }
 
@@ -782,7 +891,7 @@ struct StructuredWorkoutSessionView: View {
         // Ignore repeated confirmation taps and empty sessions. A saved
         // structured completion is evidence for the linked training plan.
         guard !savedCompletion, !completedBlockIDs.isEmpty else { return }
-        let completion =
+        var completion =
             StructuredWorkoutCompletion(
                 id: UUID(),
                 workoutTemplateID:
@@ -799,6 +908,10 @@ struct StructuredWorkoutSessionView: View {
                 sourcePlanID: linkedPlanID
             )
 
+        completion.actualStepResults = results.values.sorted {
+            $0.stepID < $1.stepID
+        }
+        completion.timedOutModes = Array(amrapTimedOutGroups).map { $0.uuidString }
         StructuredWorkoutCompletionStore.save(
             completion,
             userID: session.profile.userID
