@@ -643,6 +643,7 @@ extension RunQuickStartConfiguration {
         savedRoutes: [TrainingRoute]
     ) -> SocialWorkoutInvitePayload {
         let resolvedRoute: TrainingRoute? = {
+            guard environment == .outdoor else { return nil }
             if let route {
                 return route
             }
@@ -666,9 +667,9 @@ extension RunQuickStartConfiguration {
             durationMinutes: nil,
             targetDistanceKilometers: nil,
             targetPaceSecondsPerKilometer: nil,
-            routeID:
-                resolvedRoute?.id ??
-                workout?.routeID,
+            routeID: environment == .outdoor
+                ? (resolvedRoute?.id ?? workout?.routeID)
+                : nil,
             exercises: [],
             notes: nil
         )
