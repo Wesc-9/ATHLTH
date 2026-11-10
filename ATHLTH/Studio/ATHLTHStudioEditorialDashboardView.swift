@@ -108,6 +108,15 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
     }
 
+    /// A transparent activity hint, not a recovery diagnosis or AI promise.
+    /// Planned training always takes precedence over a generic suggestion.
+    private var homeRecommendation: ATHLTHStudioHomeRecommendation.Result {
+        ATHLTHStudioHomeRecommendation.make(
+            nextWorkoutTitle: nextWorkout?.workout.title,
+            workouts: recordedWorkouts
+        )
+    }
+
     private var calendarWeek: ATHLTHStudioHomeWeek.Snapshot {
         ATHLTHStudioHomeWeek.make(
             plans: session.trainingPlans,
@@ -187,6 +196,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             weekCard(calendarWeek, width: width)
                         }
 
+                        // Fact-based recommendation with an explicit reason.
+                        recommendationCard
                         // Coach already lives in the toolbar. Prioritize
                         // factual progress rather than repeated advice.
                         progressCard(wide: split)
@@ -388,6 +399,53 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
         .buttonStyle(.plain)
         .accessibilityIdentifier("athlth-ipad-active-training-plan")
+    }
+
+    private var recommendationCard: some View {
+        let recommendation = homeRecommendation
+        return HStack(alignment: .center, spacing: 16) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(bronze)
+                .frame(width: 44, height: 44)
+                .background(cream, in: RoundedRectangle(cornerRadius: 13))
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 5) {
+                Text(tr("Today's recommendation", "Dagens anbefaling"))
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(bronze)
+                Text(tr(recommendation.titleEnglish, recommendation.titleNorwegian))
+                    .font(.system(size: 19, weight: .medium, design: .serif))
+                    .foregroundStyle(ink)
+                Text(tr(recommendation.reasonEnglish, recommendation.reasonNorwegian))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 6)
+            Button {
+                if let item = nextWorkout {
+                    onOpenWorkout(item)
+                } else {
+                    onStartQuick()
+                }
+            } label: {
+                Label(
+                    nextWorkout == nil
+                        ? tr("Choose workout", "Velg økt")
+                        : tr("View workout", "Se økt"),
+                    systemImage: "arrow.up.right"
+                )
+                .lineLimit(1)
+            }
+            .buttonStyle(.bordered)
+            .tint(bronze)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.white, in: RoundedRectangle(cornerRadius: 20))
+        .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
+        .accessibilityIdentifier("athlth-ipad-home-recommendation")
     }
 
     private var nextWorkoutCard: some View {
