@@ -180,11 +180,13 @@ struct ATHLTHStudioEditorialDashboardView: View {
         )
     }
 
-    private var calendarWeek: ATHLTHStudioHomeWeek.Snapshot {
+    private func calendarWeek(
+        recorded: [WorkoutSummary]
+    ) -> ATHLTHStudioHomeWeek.Snapshot {
         ATHLTHStudioHomeWeek.make(
             plans: session.trainingPlans,
             standalone: session.standalonePlannedSessions,
-            recorded: recordedWorkouts,
+            recorded: recorded,
             pausedPlanIDs: session.pausedTrainingPlanIDs,
             deactivatedPlanIDs: session.deactivatedTrainingPlanIDs,
             now: selectedDate
@@ -199,6 +201,11 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     onClose: { self.focusedPlanningDate = nil }
                 )
             } else {
+                // A single render pass shares one merged workout history and
+                // week projection across the calendar and summary/chart.
+                // New Health/local data automatically triggers a fresh pass.
+                let workouts = recordedWorkouts
+                let week = calendarWeek(recorded: workouts)
                 let width = geometry.size.width
                 let split = width >= 730 && !dynamicTypeSize.isAccessibilitySize
                 let threeColumns = width >= 880 && !dynamicTypeSize.isAccessibilitySize
@@ -211,7 +218,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         // narrows. Keep the week visible above the stacked
                         // cards so another day can be selected immediately.
                         if !split {
-                            weekCard(calendarWeek, width: width)
+                            weekCard(week, width: width)
                         }
 
                         // The other device owns Ghost Race recording.
@@ -256,14 +263,14 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         }
 
                         if split {
-                            weekCard(calendarWeek, width: width)
+                            weekCard(week, width: width)
                         }
 
                         // Fact-based recommendation with an explicit reason.
                         recommendationCard
                         // Coach already lives in the toolbar. Prioritize
                         // factual progress rather than repeated advice.
-                        progressCard(wide: split)
+                        progressCard(wide: split, recorded: workouts, week: week)
                     }
                     .padding(.horizontal, split ? 22 : 14)
                     .padding(.vertical, 17)
@@ -964,9 +971,13 @@ struct ATHLTHStudioEditorialDashboardView: View {
 
     /// Keep progress on a single calm surface. On wide iPads the chart and
     /// the selected week's totals share a row; on narrow windows they stack.
-    private func progressCard(wide: Bool) -> some View {
+    private func progressCard(
+        wide: Bool,
+        recorded: [WorkoutSummary],
+        week: ATHLTHStudioHomeWeek.Snapshot
+    ) -> some View {
         let data = ATHLTHStudioAnalytics.snapshot(
-            from: recordedWorkouts,
+            from: recorded,
             days: periodDays
         )
         return VStack(alignment: .leading, spacing: 12) {
@@ -999,7 +1010,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         Rectangle()
                             .fill(outline.opacity(0.85))
                             .frame(width: 1)
-                        weeklyActivitySummary
+                        weeklyActivitySummary(week)
                             .frame(width: 205, alignment: .leading)
                     }
                 } else {
@@ -1007,7 +1018,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     Rectangle()
                         .fill(outline.opacity(0.75))
                         .frame(height: 1)
-                    weeklyActivitySummary
+                    weeklyActivitySummary(week)
                 }
             }
 
@@ -1079,14 +1090,16 @@ struct ATHLTHStudioEditorialDashboardView: View {
         }
     }
 
-    private var weeklyActivitySummary: some View {
+    private func weeklyActivitySummary(
+        _ week: ATHLTHStudioHomeWeek.Snapshot
+    ) -> some View {
         VStack(alignment: .leading, spacing: 11) {
             Text(tr("SELECTED WEEK", "VALGT UKE"))
                 .font(.system(size: 10, weight: .semibold))
                 .tracking(1.3)
                 .foregroundStyle(bronze)
             HStack(alignment: .firstTextBaseline) {
-                Text("\(calendarWeek.plannedCount)")
+                Text("\(week.plannedCount)")
                     .font(.system(size: 24, weight: .semibold, design: .rounded))
                     .foregroundStyle(ink)
                     .monospacedDigit()
@@ -1095,7 +1108,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
                     .foregroundStyle(.secondary)
             }
             HStack(alignment: .firstTextBaseline) {
-                Text("\(calendarWeek.recordedCount)")
+                Text("\(week.recordedCount)")
                     .font(.system(size: 24, weight: .semibold, design: .rounded))
                     .foregroundStyle(ink)
                     .monospacedDigit()
