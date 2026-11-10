@@ -59,10 +59,12 @@ enum ATHLTHQuickRunTimelineAdapter {
     }
 
     static func environment(for workout: PlannedSession) -> RunEnvironment {
+        if workout.workoutCategory == "treadmill" { return .treadmill }
+        if workout.workoutCategory == "indoor" { return .indoor }
         let runs = workout.resolvedWorkoutBlocks.filter { $0.kind == .run }
-        guard runs.first?.isIndoor == true else { return .outdoor }
-        return runs.contains { $0.treadmillInclinePercent != nil } ||
-            workout.workoutCategory == "treadmill" ? .treadmill : .indoor
+        guard runs.contains(where: { $0.isIndoor == true }) else { return .outdoor }
+        return runs.contains(where: { $0.treadmillInclinePercent != nil })
+            ? .treadmill : .indoor
     }
 
     /// Apply the choice from Workout Details to the full ordered running
@@ -110,11 +112,15 @@ enum ATHLTHQuickRunTimelineAdapter {
                 block.distanceMeters != nil ? .distance :
                 block.durationSeconds != nil ? .time : .open
             let phase: String
-            switch block.resolvedPhase {
-            case .warmup: phase = "warmup"
-            case .main: phase = "work"
-            case .recovery: phase = "recovery"
-            case .cooldown: phase = "cooldown"
+            if block.isRestOrActiveRecovery || block.resolvedPhase == .recovery {
+                phase = "recovery"
+            } else {
+                switch block.resolvedPhase {
+                case .warmup: phase = "warmup"
+                case .main: phase = "work"
+                case .recovery: phase = "recovery"
+                case .cooldown: phase = "cooldown"
+                }
             }
             let pace = block.targetPaceSecondsPerKilometer
             let effort = block.targetEffortRPE.map { "RPE \($0)" }
