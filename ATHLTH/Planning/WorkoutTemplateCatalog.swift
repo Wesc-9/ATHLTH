@@ -4091,6 +4091,7 @@ struct WorkoutTemplateBuilderView: View {
         return (hasRunning || hasStrength || hasCycling ||
                 hasTimedWellness || basicFreeRun) &&
             !hasIncompleteStrengthGroup &&
+            !hasInvalidDropSetWeights &&
             (!isPlannedWorkout || resolvedDurationMinutes != nil ||
              routeDistanceGoal || basicFreeRun)
     }
@@ -4106,6 +4107,27 @@ struct WorkoutTemplateBuilderView: View {
             return blocks.filter {
                 $0.groupID == id && $0.kind == .exercise
             }.count < kind.minimumStrengthExercises
+        }
+    }
+
+    /// A drop set must have strictly decreasing *planned* weights.
+    /// Do not silently invent load values or treat identical weights as a drop.
+    private var hasInvalidDropSetWeights: Bool {
+        let ids = Set(blocks.compactMap { block -> UUID? in
+            block.groupKind == .dropSet ? block.groupID : nil
+        })
+        return ids.contains { id in
+            let stages = blocks.filter {
+                $0.groupID == id && $0.kind == .exercise
+            }
+            guard stages.count >= 2 else { return true }
+            let loads = stages.compactMap(\.targetWeightKilograms)
+            guard loads.count == stages.count,
+                  loads.allSatisfy({ $0.isFinite && $0 > 0 })
+            else { return true }
+            return zip(loads, loads.dropFirst()).contains { first, next in
+                next >= first
+            }
         }
     }
 
