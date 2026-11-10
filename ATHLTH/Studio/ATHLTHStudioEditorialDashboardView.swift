@@ -88,6 +88,73 @@ enum ATHLTHStudioHomeRecommendation {
     }
 }
 
+/// Remote Ghost updates own their SwiftUI state, so a four-second spectator
+/// refresh never invalidates the entire Studio Home calendar and charts.
+private struct ATHLTHStudioGhostHomeStatusView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var snapshot: ATHLTHPrivateGhostSpectatorSnapshot?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if let snapshot, snapshot.isFresh() {
+                ATHLTHStudioPrivateGhostSpectatorCard(snapshot: snapshot)
+            }
+        }
+        .task(id: "\(session.profile.userID.uuidString)-\(session.signedIn)-\(scenePhase == .active)") {
+            snapshot = nil
+            guard ATHLTHDeviceRole.isIPad, session.signedIn,
+                  scenePhase == .active else { return }
+            while !Task.isCancelled {
+                let userID = session.profile.userID
+                let fetched = await ATHLTHPrivateGhostSpectatorStore.fetch(
+                    for: userID
+                )
+                guard !Task.isCancelled, userID == session.profile.userID
+                else { return }
+                snapshot = fetched
+                try? await Task.sleep(
+                    for: .seconds(snapshot == nil ? 12 : 4)
+                )
+            }
+        }
+    }
+}
+
+/// A local strength session takes priority over the remote read-only card.
+/// Neither remote fetch nor refresh changes Home's other derived data.
+private struct ATHLTHStudioStrengthHomeStatusView: View {
+    @EnvironmentObject private var session: AppSessionStore
+    @EnvironmentObject private var strength: StrengthWorkoutStore
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var snapshot: ATHLTHPrivateLiveStrengthSnapshot?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if strength.activeWorkout != nil {
+                ATHLTHStudioLiveStrengthReadOnlyCard()
+            } else if let snapshot, snapshot.isFresh() {
+                ATHLTHStudioRemoteStrengthStatusCard(snapshot: snapshot)
+            }
+        }
+        .task(id: "\(session.profile.userID.uuidString)-\(session.signedIn)-\(scenePhase == .active)") {
+            snapshot = nil
+            guard ATHLTHDeviceRole.isIPad, session.signedIn,
+                  scenePhase == .active else { return }
+            while !Task.isCancelled {
+                let account = session.profile.userID
+                let fetched = await ATHLTHPrivateLiveStrengthStatusStore.fetch(
+                    for: account
+                )
+                guard !Task.isCancelled, account == session.profile.userID
+                else { return }
+                snapshot = fetched
+                try? await Task.sleep(for: .seconds(12))
+            }
+        }
+    }
+}
+
 /// iPad-only Studio home, inspired by the approved airy ATHLTH Studio reference.
 /// The content is sourced from existing local session and Health stores; no
 /// demonstration values, artificial readiness scores or implicit completions.
@@ -118,8 +185,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
     /// Auto-follow today unless the user explicitly browses a date.
     @State private var followsToday = true
     @State private var showingReadinessExplanation = false
-    @State private var remoteStrengthStatus: ATHLTHPrivateLiveStrengthSnapshot?
-    @State private var remoteGhostStatus: ATHLTHPrivateGhostSpectatorSnapshot?
 
     private let cream = Color(red: 0.984, green: 0.978, blue: 0.966)
     private let ink = Color(red: 0.18, green: 0.17, blue: 0.16)
@@ -227,23 +292,10 @@ struct ATHLTHStudioEditorialDashboardView: View {
                             weekCard(week, width: width)
                         }
 
-                        // The other device owns Ghost Race recording.
-                        // iPad offers a wide, read-only live course surface.
-                        if let remoteGhostStatus, remoteGhostStatus.isFresh() {
-                            ATHLTHStudioPrivateGhostSpectatorCard(
-                                snapshot: remoteGhostStatus
-                            )
-                        }
-
-                        // Live workout data is displayed, never edited, on iPad.
-                        if strength.activeWorkout != nil {
-                            ATHLTHStudioLiveStrengthReadOnlyCard()
-                        } else if let remoteStrengthStatus,
-                                  remoteStrengthStatus.isFresh() {
-                            ATHLTHStudioRemoteStrengthStatusCard(
-                                snapshot: remoteStrengthStatus
-                            )
-                        }
+                        // Isolated read-only live cards do not trigger
+                        // recomputation of the week and recorded workouts.
+                        ATHLTHStudioGhostHomeStatusView()
+                        ATHLTHStudioStrengthHomeStatusView()
 
                         // Preserve the approved warm-white Studio appearance.
                         // The week calendar keeps the entire content width.
@@ -287,46 +339,6 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
         }
         .background(cream.ignoresSafeArea())
-        .task(id: "\(session.profile.userID.uuidString)-\(session.signedIn)-\(scenePhase == .active)-\(focusedPlanningDate == nil)") {
-            guard ATHLTHDeviceRole.isIPad else { return }
-            // Never display the previous account's live strength summary
-            // while the next account's private status is still loading.
-            remoteStrengthStatus = nil
-            // Pause Home-only polling while backgrounded, signed out or
-            // editing a full-screen plan. SwiftUI restarts on reactivation.
-            guard session.signedIn, scenePhase == .active,
-                  focusedPlanningDate == nil else { return }
-            while !Task.isCancelled {
-                let account = session.profile.userID
-                let fetched =
-                    await ATHLTHPrivateLiveStrengthStatusStore.fetch(
-                        for: account
-                    )
-                guard !Task.isCancelled,
-                      account == session.profile.userID else { return }
-                remoteStrengthStatus = fetched
-                try? await Task.sleep(for: .seconds(12))
-            }
-        }
-        .task(id: "\(session.profile.userID.uuidString)-\(session.signedIn)-\(scenePhase == .active)-\(focusedPlanningDate == nil)") {
-            guard ATHLTHDeviceRole.isIPad else { return }
-            // Do not briefly show the previous signed-in account's map.
-            remoteGhostStatus = nil
-            guard session.signedIn, scenePhase == .active,
-                  focusedPlanningDate == nil else { return }
-            while !Task.isCancelled {
-                let userID = session.profile.userID
-                let fetched = await ATHLTHPrivateGhostSpectatorStore.fetch(
-                    for: userID
-                )
-                guard !Task.isCancelled, userID == session.profile.userID
-                else { return }
-                remoteGhostStatus = fetched
-                try? await Task.sleep(
-                    for: .seconds(remoteGhostStatus == nil ? 12 : 4)
-                )
-            }
-        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active, followsToday, focusedPlanningDate == nil {
                 selectedDate = .now
