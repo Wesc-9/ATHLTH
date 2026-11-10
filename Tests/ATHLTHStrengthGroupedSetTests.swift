@@ -189,6 +189,37 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         XCTAssertEqual(logs[1].sets.map(\.restSeconds), [15, 15, 15])
     }
 
+    func testGroupRoundPauseNeverAddsRecoveryAfterLastRound() {
+        for kind in [WorkoutBlockGroupKind.superset, .circuit] {
+            let id = UUID()
+            var first = exercise(10, weight: 30)
+            var second = exercise(8, weight: 20)
+            first.groupID = id
+            second.groupID = id
+            first.groupKind = kind
+            second.groupKind = kind
+            first.groupRounds = 3
+            second.groupRounds = 3
+            var recovery = WorkoutTemplateBlock(
+                sequence: 3, kind: .rest, title: "Rest between rounds",
+                exerciseSlug: nil, distanceMeters: nil,
+                repetitions: nil, durationSeconds: 60,
+                targetWeightKilograms: nil, loadNote: nil, notes: nil,
+                phase: .main
+            )
+            recovery.groupID = id
+            recovery.groupKind = kind
+            recovery.groupRounds = 3
+
+            let output = StrengthWorkoutStore.strengthExerciseLogsFromBlocks(
+                [first, second, recovery]
+            )
+            XCTAssertEqual(output.count, 2)
+            XCTAssertNil(output[1].restSecondsOverride)
+            XCTAssertEqual(output[1].sets.map(\.restSeconds), [60, 60, 0])
+        }
+    }
+
     func testOneParentCreatesIndividualExecutionSetsAndPauses() {
         var block = exercise()
         var targets = ATHLTHWorkoutSetExpansion.targets(for: block)
