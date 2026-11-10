@@ -322,19 +322,23 @@ struct ATHLTHSideMenuView: View {
         }
     }
 
-    /// Library name opens the complete hub. Only the separate trailing
-    /// chevron expands or collapses the four personal shortcuts.
+    /// Tapping the name opens the library; only the trailing chevron expands
+    /// the four personal destinations. Preserve these distinct actions.
     private var trainingLibraryMenu: some View {
         VStack(spacing: 2) {
             HStack(spacing: 0) {
                 Button {
                     onSelect(.trainingLibrary)
                 } label: {
-                    HStack(spacing: 12) {
+                    HStack(spacing: 10) {
                         Image(systemName: "books.vertical")
-                            .font(.system(size: 18, weight: .regular))
-                            .frame(width: 22)
-                            .foregroundStyle(ATHLTHTheme.accentDeep)
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundStyle(menuBronze)
+                            .frame(width: 32, height: 32)
+                            .background(
+                                menuSurface,
+                                in: RoundedRectangle(cornerRadius: 10)
+                            )
                             .accessibilityHidden(true)
 
                         Text(ATHLTHLocalization.choose(
@@ -342,12 +346,13 @@ struct ATHLTHSideMenuView: View {
                             norwegian: "Treningsbibliotek"
                         ))
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(ATHLTHTheme.primaryText)
-
-                        Spacer(minLength: 4)
+                        .foregroundStyle(menuInk)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
+                        .minimumScaleFactor(0.85)
+                        Spacer(minLength: 0)
                     }
-                    .padding(.leading, 11)
-                    .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 58 : 46)
+                    .padding(.leading, 8)
+                    .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 58 : 48)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
@@ -363,12 +368,12 @@ struct ATHLTHSideMenuView: View {
                         isTrainingLibraryExpanded.toggle()
                     }
                 } label: {
-                    Image(systemName: isTrainingLibraryExpanded
-                          ? "chevron.up" : "chevron.down")
+                    Image(systemName: "chevron.down")
                         .font(.system(size: 12, weight: .semibold))
-                        .foregroundStyle(ATHLTHTheme.mutedText)
-                        .frame(width: 48,
-                               height: dynamicTypeSize.isAccessibilitySize ? 58 : 46)
+                        .foregroundStyle(menuBronze)
+                        .rotationEffect(.degrees(isTrainingLibraryExpanded ? 180 : 0))
+                        .frame(width: 42,
+                               height: dynamicTypeSize.isAccessibilitySize ? 58 : 48)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -381,6 +386,12 @@ struct ATHLTHSideMenuView: View {
                         : "Vis snarveier i treningsbiblioteket"
                 ))
                 .accessibilityIdentifier("athlth-side-menu-training-library-expand")
+            }
+            .background {
+                if isTrainingLibraryExpanded {
+                    RoundedRectangle(cornerRadius: 13)
+                        .fill(menuBronze.opacity(0.07))
+                }
             }
 
             if isTrainingLibraryExpanded {
@@ -410,7 +421,13 @@ struct ATHLTHSideMenuView: View {
                         icon: "bookmark"
                     )
                 }
-                .padding(.leading, 18)
+                .padding(.leading, 10)
+                .overlay(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(menuBronze.opacity(0.30))
+                        .frame(width: 2)
+                        .padding(.vertical, 7)
+                }
                 .padding(.bottom, 4)
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
@@ -494,34 +511,52 @@ struct ATHLTHSideMenuView: View {
         )
     }
 
-    /// The former Home hero actions now live immediately under Hjem. Their
-    /// destinations and unread counters remain identical to the old toolbar.
+    /// Quick actions live together rather than in three competing tiles.
+    /// Their destinations and unread counters remain unchanged.
     private var homeUtilityActions: some View {
-        HStack(alignment: .top, spacing: 9) {
-            utilityAction(
-                .search,
-                english: "Search",
-                norwegian: "Søk",
-                icon: "magnifyingglass"
-            )
-            utilityAction(
-                .inbox,
-                english: "Inbox",
-                norwegian: "Innboks",
-                icon: "tray",
-                count: homeUnreadInbox
-            )
-            utilityAction(
-                .notifications,
-                english: "Alerts",
-                norwegian: "Varsler",
-                icon: "bell",
-                count: homeUnreadNotifications
-            )
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(warmDivider)
+                .frame(height: 1)
+                .padding(.horizontal, 7)
+                .padding(.bottom, 6)
+
+            HStack(alignment: .center, spacing: 0) {
+                utilityAction(
+                    .search,
+                    english: "Search",
+                    norwegian: "Søk",
+                    icon: "magnifyingglass"
+                )
+                utilitySeparator
+                utilityAction(
+                    .inbox,
+                    english: "Inbox",
+                    norwegian: "Innboks",
+                    icon: "tray",
+                    count: homeUnreadInbox
+                )
+                utilitySeparator
+                utilityAction(
+                    .notifications,
+                    english: "Alerts",
+                    norwegian: "Varsler",
+                    icon: "bell",
+                    count: homeUnreadNotifications
+                )
+            }
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, 4)
+        .padding(.horizontal, 6)
+        .padding(.bottom, 3)
         .accessibilityIdentifier("athlth-side-menu-home-utilities")
+    }
+
+    private var utilitySeparator: some View {
+        Rectangle()
+            .fill(warmDivider)
+            .frame(width: 1, height: 30)
+            .padding(.bottom, 2)
+            .accessibilityHidden(true)
     }
 
     private func utilityAction(
@@ -538,40 +573,37 @@ struct ATHLTHSideMenuView: View {
         return Button {
             onSelect(destination)
         } label: {
-            VStack(spacing: 7) {
+            VStack(spacing: 5) {
                 ZStack(alignment: .topTrailing) {
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Color.white.opacity(0.88))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 14)
-                                .strokeBorder(warmDivider, lineWidth: 1)
-                        }
-                        .frame(height: 46)
-                        .overlay {
-                            Image(systemName: icon)
-                                .font(.system(size: 19, weight: .medium))
-                                .foregroundStyle(ATHLTHTheme.accentDeep)
-                        }
+                    Image(systemName: icon)
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(menuBronze)
+                        .frame(width: 35, height: 34)
+                        .background(
+                            menuSurface,
+                            in: RoundedRectangle(cornerRadius: 10)
+                        )
 
                     if count > 0 {
                         Text(count > 99 ? "99+" : "\(count)")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: 9, weight: .bold))
                             .foregroundStyle(.white)
-                            .padding(.horizontal, 6)
-                            .frame(minHeight: 18)
+                            .padding(.horizontal, 5)
+                            .frame(minHeight: 17)
                             .background(Color.red, in: Capsule())
-                            .offset(x: 3, y: -6)
+                            .offset(x: 10, y: -6)
                             .accessibilityHidden(true)
                     }
                 }
 
                 Text(name)
-                    .font(.caption.weight(.medium))
-                    .foregroundStyle(ATHLTHTheme.primaryText)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(menuInk)
                     .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+                    .minimumScaleFactor(0.84)
             }
             .frame(maxWidth: .infinity)
+            .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 82 : 69)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
