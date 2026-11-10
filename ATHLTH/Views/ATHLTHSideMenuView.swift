@@ -289,11 +289,11 @@ struct ATHLTHSideMenuView: View {
 
     private var profilePlaceholder: some View {
         Circle()
-            .fill(ATHLTHTheme.premiumGoldSoft)
+            .fill(menuSurface)
             .overlay {
                 Image(systemName: "person.fill")
                     .font(.system(size: 19))
-                    .foregroundStyle(ATHLTHTheme.accentDeep)
+                    .foregroundStyle(menuBronze)
             }
     }
 
@@ -597,10 +597,11 @@ struct ATHLTHSideMenuView: View {
                 }
 
                 Text(name)
-                    .font(.system(size: 11, weight: .medium))
+                    .font(.caption.weight(.medium))
                     .foregroundStyle(menuInk)
-                    .lineLimit(1)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? 2 : 1)
                     .minimumScaleFactor(0.84)
+                    .multilineTextAlignment(.center)
             }
             .frame(maxWidth: .infinity)
             .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 82 : 69)
@@ -653,13 +654,7 @@ struct ATHLTHSideMenuView: View {
             .buttonStyle(.plain)
             .accessibilityIdentifier("athlth-side-menu-settings")
 
-            Text("YOUR BODY. YOUR DATA. YOUR PROGRESS.")
-                .font(.system(size: 8, weight: .medium))
-                .tracking(1.05)
-                .foregroundStyle(menuMuted)
-                .lineLimit(1)
-                .minimumScaleFactor(0.72)
-                .padding(.bottom, 1)
+            // Leave breathing room below Settings rather than a tiny slogan.
         }
     }
 }
