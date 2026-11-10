@@ -4544,6 +4544,15 @@ struct WorkoutTemplateBuilderView: View {
                     }
                     resequence()
                 }
+                if studioBasicGhostSelected, let route = activeRoute {
+                    ghostDraft.enabled = true
+                    ghostDraft.setTargetTimeText(
+                        GhostTargetTimeFormatter.string(
+                            TimeInterval(studioBasicGhostMinutes * 60)
+                        ),
+                        distanceKilometers: route.distanceKilometers
+                    )
+                }
                 persistWorkoutDraft()
             }
             .onChange(of: selectedWorkoutGearIDs) { _, _ in
