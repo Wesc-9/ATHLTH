@@ -49,6 +49,9 @@ enum StrengthEffortMetric: String, Codable, CaseIterable, Identifiable, Hashable
 enum StrengthExerciseGroupStyle: String, Codable, CaseIterable, Identifiable, Hashable {
     case superset
     case circuit
+    case emom
+    case amrap
+    case dropSet = "dropset"
 
     var id: String { rawValue }
 
@@ -64,6 +67,11 @@ enum StrengthExerciseGroupStyle: String, Codable, CaseIterable, Identifiable, Ha
                 english: "Circuit",
                 norwegian: "Sirkel"
             )
+        case .emom: return "EMOM"
+        case .amrap: return "AMRAP"
+        case .dropSet: return ATHLTHLocalization.choose(
+            english: "Drop set", norwegian: "Dropsett"
+        )
         }
     }
 }
@@ -537,6 +545,11 @@ struct StrengthExerciseLog: Identifiable, Codable, Hashable {
     var restSecondsOverride: Int? = nil
     var groupID: UUID? = nil
     var groupStyle: StrengthExerciseGroupStyle? = nil
+    /// Planned timer config for EMOM/AMRAP, never a measured result.
+    var groupClockSeconds: TimeInterval? = nil
+    /// Recorded when this group first becomes active. Optional so
+    /// existing history and Watch transfers stay decodable.
+    var groupStartedAt: Date? = nil
     var substitutedFromExerciseName: String? = nil
     // Actual transition time from finishing this exercise until the athlete
     // explicitly confirms that they are ready to start the next exercise.
