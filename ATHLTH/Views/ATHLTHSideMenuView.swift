@@ -614,7 +614,7 @@ struct ATHLTHSideMenuView: View {
     }
 
     private var footer: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 11) {
             Rectangle()
                 .fill(warmDivider)
                 .frame(height: 1)
@@ -622,30 +622,44 @@ struct ATHLTHSideMenuView: View {
             Button {
                 onSelect(.settings)
             } label: {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "Settings",
-                        norwegian: "Innstillinger"
-                    ),
-                    systemImage: "gearshape"
-                )
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .frame(minHeight: 46)
-                .foregroundStyle(.white)
-                .background(
-                    ATHLTHTheme.accentDeep,
-                    in: RoundedRectangle(cornerRadius: 16)
-                )
+                HStack(spacing: 10) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(menuBronze)
+                        .frame(width: 32, height: 32)
+                        .background(menuSurface, in: RoundedRectangle(cornerRadius: 10))
+                        .accessibilityHidden(true)
+
+                    Text(ATHLTHLocalization.choose(
+                        english: "Settings", norwegian: "Innstillinger"
+                    ))
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(menuInk)
+                    Spacer(minLength: 5)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(menuMuted.opacity(0.6))
+                        .accessibilityHidden(true)
+                }
+                .padding(.horizontal, 13)
+                .frame(minHeight: dynamicTypeSize.isAccessibilitySize ? 58 : 50)
+                .background(menuCard, in: RoundedRectangle(cornerRadius: 15))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 15)
+                        .strokeBorder(warmDivider, lineWidth: 1)
+                }
+                .contentShape(RoundedRectangle(cornerRadius: 15))
             }
             .buttonStyle(.plain)
+            .accessibilityIdentifier("athlth-side-menu-settings")
 
             Text("YOUR BODY. YOUR DATA. YOUR PROGRESS.")
-                .font(.system(size: 9, weight: .medium))
-                .tracking(1.1)
-                .foregroundStyle(ATHLTHTheme.mutedText)
+                .font(.system(size: 8, weight: .medium))
+                .tracking(1.05)
+                .foregroundStyle(menuMuted)
                 .lineLimit(1)
-                .minimumScaleFactor(0.8)
+                .minimumScaleFactor(0.72)
+                .padding(.bottom, 1)
         }
     }
 }
