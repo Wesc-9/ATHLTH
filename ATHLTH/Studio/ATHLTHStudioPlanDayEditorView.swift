@@ -12,23 +12,12 @@ struct ATHLTHStudioPlanDayEditorView: View {
     let day: TrainingPlanDay
     let date: Date?
     let onOpenAdvanced: (UUID) -> Void
-    /// The iPad canvas supplies the shared iPhone workout engine for new sessions.
-    var onCreateAdvanced: (() -> Void)? = nil
+    /// Required shared iPhone/Train workout engine, not a second iPad editor.
+    let onCreateAdvanced: () -> Void
     var onStartWorkout: ((UUID, UUID) -> Void)? = nil
     var onSendToWatch: ((UUID, UUID) -> Void)? = nil
     var onStartAfter: ((UUID, UUID, TimeInterval) -> Void)? = nil
 
-    @State private var isEditing = false
-    @State private var originalWorkout: PlannedSession?
-    @State private var expectedVersion = 0
-    @State private var title = ""
-    @State private var kind: WorkoutKind = .running
-    @State private var hasDuration = true
-    @State private var duration = 45
-    @State private var distanceKilometers = 0.0
-    @State private var hasStartTime = false
-    @State private var startTime = Date.now
-    @State private var notes = ""
     @State private var pendingDelete: PlannedSession?
     @State private var showingDeleteConfirmation = false
     @State private var message: String?
@@ -48,11 +37,7 @@ struct ATHLTHStudioPlanDayEditorView: View {
             VStack(alignment: .leading, spacing: 18) {
                 header
                 Divider()
-                if isEditing {
-                    editForm
-                } else {
-                    dayContents
-                }
+                dayContents
             }
             .padding(19)
         }
@@ -171,11 +156,7 @@ struct ATHLTHStudioPlanDayEditorView: View {
 
             if dayIsEditable && !hasRestDay {
                 Button {
-                    if let onCreateAdvanced {
-                        onCreateAdvanced()
-                    } else {
-                        beginNewWorkout()
-                    }
+                    onCreateAdvanced()
                 } label: {
                     Label(ATHLTHLocalization.choose(
                         english: "Create workout", norwegian: "Opprett økt"
@@ -355,27 +336,25 @@ struct ATHLTHStudioPlanDayEditorView: View {
                 ))
             }
 
-            HStack(spacing: 8) {
-                if isEditable(workout) {
-                    Button {
-                        beginEdit(workout)
-                    } label: {
-                        Label(ATHLTHLocalization.choose(
-                            english: "Quick edit", norwegian: "Hurtigredigering"
-                        ), systemImage: "slider.horizontal.3")
-                    }
-                    .buttonStyle(.bordered)
-                }
+            if isEditable(workout) {
                 Button {
+                    // The shared Train editor preserves the full workout recipe.
                     onOpenAdvanced(workout.id)
                 } label: {
                     Label(ATHLTHLocalization.choose(
-                        english: "Full editor", norwegian: "Full redigering"
-                    ), systemImage: "arrow.up.right")
+                        english: "Edit workout", norwegian: "Rediger økt"
+                    ), systemImage: "square.and.pencil")
+                    .frame(maxWidth: .infinity, minHeight: 44)
                 }
-                .buttonStyle(.plain)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(ATHLTHStudioStyle.gold)
+                .buttonStyle(.bordered)
+                .tint(ATHLTHStudioStyle.ink)
+                .accessibilityIdentifier("athlth-studio-shared-workout-editor")
+            } else {
+                Label(ATHLTHLocalization.choose(
+                    english: "Read-only workout", norwegian: "Økten kan ikke redigeres"
+                ), systemImage: "lock")
+                .font(.caption)
+                .foregroundStyle(.secondary)
             }
             if isEditable(workout) {
                 removeAction(for: workout)
@@ -418,254 +397,6 @@ struct ATHLTHStudioPlanDayEditorView: View {
             healthWorkouts: health.workouts,
             strengthHistory: strength.workoutHistory
         )
-    }
-
-    private var editForm: some View {
-        VStack(alignment: .leading, spacing: 15) {
-            HStack {
-                Text(originalWorkout == nil
-                     ? ATHLTHLocalization.choose(english: "New workout", norwegian: "Ny økt")
-                     : ATHLTHLocalization.choose(english: "Edit workout", norwegian: "Rediger økt"))
-                    .font(.headline)
-                Spacer()
-                Button {
-                    isEditing = false
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title3)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel(ATHLTHLocalization.choose(
-                    english: "Cancel editing", norwegian: "Avbryt redigering"
-                ))
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                fieldLabel(english: "Workout name", norwegian: "Navn på økt")
-                TextField(kind.title, text: $title)
-                    .textFieldStyle(.roundedBorder)
-                    .accessibilityLabel(ATHLTHLocalization.choose(
-                        english: "Workout name", norwegian: "Navn på økt"
-                    ))
-                Text(ATHLTHLocalization.choose(
-                    english: "Leave empty to use the activity name.",
-                    norwegian: "La feltet stå tomt for å bruke aktivitetens navn."
-                ))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                fieldLabel(english: "Activity", norwegian: "Aktivitet")
-                Picker(ATHLTHLocalization.choose(
-                    english: "Activity", norwegian: "Aktivitet"
-                ), selection: $kind) {
-                    ForEach(WorkoutKind.allCases) { choice in
-                        Label(choice.title, systemImage: choice.systemImage)
-                            .tag(choice)
-                    }
-                }
-                .pickerStyle(.menu)
-                .disabled(originalWorkout?.isStructuredWorkout == true ||
-                          !(originalWorkout?.exercises.isEmpty ?? true))
-                Text(ATHLTHLocalization.choose(
-                    english: "Structured exercise types are edited with the full workout editor.",
-                    norwegian: "Økttyper med øvelser og intervaller endres i full øktredigering."
-                ))
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-            }
-
-            Toggle(ATHLTHLocalization.choose(
-                english: "Planned duration", norwegian: "Planlagt varighet"
-            ), isOn: $hasDuration)
-            if hasDuration {
-                Stepper(value: $duration, in: 5...360, step: 5) {
-                    Text("\(duration) min")
-                        .font(.subheadline.weight(.medium))
-                }
-            }
-
-            if kind == .running || kind == .walking {
-                VStack(alignment: .leading, spacing: 6) {
-                    fieldLabel(english: "Target distance (km)", norwegian: "Måldistanse (km)")
-                    TextField(
-                        ATHLTHLocalization.choose(
-                            english: "Optional distance", norwegian: "Valgfri distanse"
-                        ),
-                        value: $distanceKilometers,
-                        format: .number
-                    )
-                    .keyboardType(.decimalPad)
-                    .textFieldStyle(.roundedBorder)
-                }
-            }
-
-            Toggle(ATHLTHLocalization.choose(
-                english: "Set a start time", norwegian: "Velg starttid"
-            ), isOn: $hasStartTime)
-            if hasStartTime {
-                DatePicker(
-                    ATHLTHLocalization.choose(
-                        english: "Start", norwegian: "Start"
-                    ),
-                    selection: $startTime,
-                    displayedComponents: .hourAndMinute
-                )
-            }
-
-            VStack(alignment: .leading, spacing: 6) {
-                fieldLabel(english: "Workout notes", norwegian: "Notater")
-                TextEditor(text: $notes)
-                    .scrollContentBackground(.hidden)
-                    .frame(minHeight: 85)
-                    .padding(7)
-                    .background(ATHLTHStudioStyle.canvas, in: RoundedRectangle(cornerRadius: 10))
-            }
-
-            if let originalWorkout, originalWorkout.isStructuredWorkout ||
-                    !originalWorkout.exercises.isEmpty {
-                Label(ATHLTHLocalization.choose(
-                    english: "Existing intervals, exercises and sets are preserved. Edit them in the full workout editor.",
-                    norwegian: "Eksisterende intervaller, øvelser og sett beholdes. Rediger dem i full øktredigering."
-                ), systemImage: "checkmark.shield")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
-            HStack(spacing: 10) {
-                Button {
-                    saveDraft()
-                } label: {
-                    Label(ATHLTHLocalization.choose(
-                        english: "Save workout", norwegian: "Lagre økt"
-                    ), systemImage: "checkmark")
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .tint(ATHLTHStudioStyle.ink)
-                .keyboardShortcut("s", modifiers: .command)
-
-                Button {
-                    isEditing = false
-                } label: {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Cancel", norwegian: "Avbryt"
-                    ))
-                }
-                .buttonStyle(.bordered)
-            }
-        }
-    }
-
-    private func fieldLabel(english: String, norwegian: String) -> some View {
-        Text(ATHLTHLocalization.choose(english: english, norwegian: norwegian))
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(ATHLTHStudioStyle.ink)
-    }
-
-    private func beginNewWorkout() {
-        guard dayIsEditable, !hasRestDay else { return }
-        originalWorkout = nil
-        expectedVersion = plan.version
-        title = ""
-        kind = .running
-        duration = 45
-        hasDuration = true
-        distanceKilometers = 0
-        hasStartTime = false
-        startTime = date ?? .now
-        notes = ""
-        isEditing = true
-    }
-
-    private func beginEdit(_ workout: PlannedSession) {
-        guard isEditable(workout) else { return }
-        originalWorkout = workout
-        expectedVersion = plan.version
-        title = workout.title
-        kind = workout.kind
-        hasDuration = workout.durationMinutes != nil
-        duration = min(360, max(5, workout.durationMinutes ?? 45))
-        distanceKilometers = workout.targetDistanceKilometers ?? 0
-        hasStartTime = workout.scheduledStart != nil
-        startTime = workout.scheduledStart ?? (date ?? .now)
-        notes = workout.notes ?? ""
-        isEditing = true
-    }
-
-    private func saveDraft() {
-        guard dayIsEditable,
-              distanceKilometers.isFinite,
-              distanceKilometers >= 0,
-              distanceKilometers <= 1_000 else {
-            message = ATHLTHLocalization.choose(
-                english: "Enter a valid distance or leave it at zero.",
-                norwegian: "Oppgi en gyldig distanse, eller la den stå på null."
-            )
-            return
-        }
-
-        let proposedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let effectiveTitle = proposedTitle.isEmpty ? kind.title : proposedTitle
-        guard effectiveTitle.count <= 120 else {
-            message = ATHLTHLocalization.choose(
-                english: "Workout names must be 120 characters or shorter.",
-                norwegian: "Øktnavn kan ikke overstige 120 tegn."
-            )
-            return
-        }
-        guard !hasRestDay || originalWorkout != nil else {
-            message = ATHLTHLocalization.choose(
-                english: "Remove the rest day before adding a workout.",
-                norwegian: "Fjern hviledagen før du legger til en økt."
-            )
-            return
-        }
-
-        var draft = originalWorkout ?? PlannedSession(
-            id: UUID(),
-            title: effectiveTitle,
-            kind: kind,
-            scheduledStart: nil,
-            durationMinutes: nil,
-            targetDistanceKilometers: nil,
-            targetPaceSecondsPerKilometer: nil,
-            routeID: nil,
-            exercises: [],
-            notes: nil
-        )
-        draft.title = effectiveTitle
-        draft.kind = kind
-        draft.durationMinutes = hasDuration ? duration : nil
-        if kind == .running || kind == .walking {
-            draft.targetDistanceKilometers = distanceKilometers > 0 ? distanceKilometers : nil
-        } else {
-            draft.targetDistanceKilometers = nil
-        }
-        draft.scheduledStart = hasStartTime ? startTime : nil
-        draft.notes = notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? nil : notes.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        let success = session.savePlanStudioWorkout(
-            draft,
-            inPlan: plan.id,
-            dayID: day.id,
-            editingWorkoutID: originalWorkout?.id,
-            expectedPlanVersion: expectedVersion,
-            healthWorkouts: health.workouts,
-            strengthHistory: strength.workoutHistory
-        )
-        if success {
-            isEditing = false
-            originalWorkout = nil
-        } else {
-            message = ATHLTHLocalization.choose(
-                english: "The plan changed, this day is in the past, or the workout is already completed. Your draft remains open; review the plan before trying again.",
-                norwegian: "Planen ble endret, dagen er passert eller økten er allerede fullført. Utkastet er beholdt; kontroller planen før du prøver igjen."
-            )
-        }
     }
 
     private func insertTemplate(_ template: PlannedSession) {
@@ -738,6 +469,5 @@ struct ATHLTHStudioPlanDayEditorView: View {
             )
             return
         }
-        isEditing = false
     }
 }

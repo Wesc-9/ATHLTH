@@ -585,7 +585,7 @@ struct ATHLTHStudioPlanCanvasView: View {
                 }
                 .frame(maxHeight: .infinity)
             } else if width >= 875 {
-                ATHLTHStudioResizablePlanColumns {
+                ATHLTHStudioPlanningColumns {
                     weekNavigation(plan, selectedIndex: weekIndex,
                                    selectedDay: day, selectedDate: dayDate)
                 } calendar: {

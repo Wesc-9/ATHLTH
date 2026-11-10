@@ -142,7 +142,7 @@ struct ATHLTHStudioPlannerView: View {
             .environment(\.athlthStudioFullscreenEditing, true)
         }
         .sheet(isPresented: $showingCoachAdaptation) {
-            CoachPlanAdaptationView(planID: openedPlanID)
+            CoachPlanAdaptationView(planID: openedPlanID ?? session.activePlan?.id)
                 .presentationDetents([.large])
         }
     }

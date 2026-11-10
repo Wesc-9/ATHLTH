@@ -101,6 +101,41 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
     }
 
     @MainActor
+    func testFavoriteTemplateCanBeAddedTwiceWithoutOverwritingTheSelectedDay() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        let template = workout(name: "Favorite full-body")
+        let templateID = store.saveSharedWorkout(template)
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Shared engine", summary: "", weekCount: 2,
+            startDate: Calendar.current.startOfDay(for: Date())
+        ))
+        let dayID = plan.weeks[0].days[2].id
+        let existing = workout(name: "Already planned")
+        store.addSession(existing, toDay: dayID, inPlan: plan.id)
+
+        XCTAssertTrue(store.insertSavedWorkoutIntoPlan(
+            templateID: templateID, planID: plan.id, dayID: dayID
+        ))
+        XCTAssertTrue(store.insertSavedWorkoutIntoPlan(
+            templateID: templateID, planID: plan.id, dayID: dayID
+        ))
+        let updated = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        let sessions = updated.weeks[0].days[2].sessions
+        XCTAssertEqual(sessions.count, 3)
+        XCTAssertTrue(sessions.contains(where: { $0.id == existing.id }))
+        XCTAssertEqual(sessions.filter { $0.title == template.title }.count, 2)
+        XCTAssertEqual(Set(sessions.map(\.id)).count, 3)
+        XCTAssertFalse(sessions.contains(where: { $0.id == templateID }))
+        XCTAssertTrue(updated.weeks[0].days[1].sessions.isEmpty)
+        XCTAssertEqual(
+            store.savedWorkoutTemplates.first(where: { $0.id == templateID })?.title,
+            template.title
+        )
+    }
+
+    @MainActor
     private func makeStore() -> (AppSessionStore, UserDefaults, String) {
         let name = "ATHLTHTrainPlanStudioIntegrationTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
