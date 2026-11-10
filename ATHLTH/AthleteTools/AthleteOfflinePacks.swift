@@ -78,6 +78,8 @@ final class AthleteOfflinePackStore: ObservableObject {
     /// not only in the now-hidden manual offline-pack view. The manifest
     /// prevents loading an unrelated exercise image with the same UUID.
     static func cachedRouteSnapshot(routeID: UUID, userID: UUID) -> UIImage? {
+        let signpost = ATHLTHPerformance.begin("OfflineRouteSnapshotLookup")
+        defer { ATHLTHPerformance.end("OfflineRouteSnapshotLookup", id: signpost) }
         guard let root = try? FileManager.default.url(
             for: .applicationSupportDirectory, in: .userDomainMask,
             appropriateFor: nil, create: false
