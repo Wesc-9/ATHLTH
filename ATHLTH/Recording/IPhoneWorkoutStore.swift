@@ -38,6 +38,15 @@ struct PhoneWorkoutPauseInterval: Codable, Equatable {
 
 /// Manually entered treadmill belt speed. Elapsed workout time excludes pauses;
 /// entries are historical observations, not treadmill control commands.
+/// One source of truth for iPhone recording and HealthKit export.
+/// Legacy records with no environment are outdoor; generic indoor is not
+/// a treadmill unless the athlete chose that recording environment.
+enum ATHLTHPhoneRunEnvironmentPolicy {
+    static func isIndoor(_ environment: RunEnvironment?) -> Bool {
+        environment == .indoor || environment == .treadmill
+    }
+}
+
 struct PhoneTreadmillSpeedEntry: Codable, Hashable {
     let activeElapsedSeconds: TimeInterval
     let kilometersPerHour: Double
@@ -1827,7 +1836,7 @@ final class IPhoneWorkoutStore:
             workout.walking ? .walking : .running
         // Legacy recordings may have no environment field; those were
         // outdoor GPS workouts, never interpret nil as indoor.
-        let isIndoor = workout.runEnvironment.map { $0 != .outdoor } ?? false
+        let isIndoor = ATHLTHPhoneRunEnvironmentPolicy.isIndoor(workout.runEnvironment)
         configuration.locationType =
             isIndoor ? .indoor : .outdoor
 
