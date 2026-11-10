@@ -3731,6 +3731,7 @@ struct WorkoutTemplateBuilderView: View {
     @State private var actionNotice: String?
     private let draftContext: String
     private let isNewStandaloneScratch: Bool
+    private let resumeSavedScratchDraft: Bool
     private let sourceTemplateID: UUID?
     private let initialQuickAdd: String?
     private let initialFocusedBlockIndex: Int?
@@ -3770,6 +3771,7 @@ struct WorkoutTemplateBuilderView: View {
         initialDurationOverrideMinutes: Int? = nil,
         initialExtras: ATHLTHWorkoutPlannerExtras = .init(),
         draftContext: String = "shared-template",
+        resumeSavedScratchDraft: Bool = false,
         sourceTemplateID: UUID? = nil,
         plannedDate: Date? = nil,
         initialActivity: ATHLTHPlannedWorkoutType? = nil,
@@ -3847,6 +3849,7 @@ struct WorkoutTemplateBuilderView: View {
             ATHLTHWorkoutDurationEstimator.minutes(for: initialRecipe)).map(String.init) ?? "")
         self.draftContext = draftContext
         self.isNewStandaloneScratch = startBlank
+        self.resumeSavedScratchDraft = resumeSavedScratchDraft
         self.sourceTemplateID = sourceTemplateID
         self.initialQuickAdd = startBlank ? nil : initialQuickAdd
         self.initialFocusedBlockIndex = initialFocusedBlockIndex
@@ -3918,9 +3921,9 @@ struct WorkoutTemplateBuilderView: View {
     }
 
     private func restoreWorkoutDraft() {
-        // An explicit fresh scratch session must never rehydrate a previous
-        // same-activity attempt from the reused editor draft storage key.
-        guard !isNewStandaloneScratch else { return }
+        // New scratch sessions start blank. Only a caller explicitly
+        // reopening the same saved draft ID may restore its prior timeline.
+        guard !isNewStandaloneScratch || resumeSavedScratchDraft else { return }
         guard let data = UserDefaults.standard.data(forKey: draftStorageKey),
               let stored = try? JSONDecoder().decode(StoredWorkoutDraft.self, from: data),
               ATHLTHWorkoutDraftRecoveryPolicy.accepts(
