@@ -7,9 +7,13 @@ struct ATHLTHStudioPlanCanvasView: View {
     var onStartWorkout: ((UUID, UUID) -> Void)? = nil
     var onSendToWatch: ((UUID, UUID) -> Void)? = nil
     var onStartAfter: ((UUID, UUID, TimeInterval) -> Void)? = nil
+    var requestedPlanID: UUID? = nil
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var health: HealthKitManager
     @EnvironmentObject private var strength: StrengthWorkoutStore
+    @EnvironmentObject private var favorites: LibraryFavoritesStore
+    @EnvironmentObject private var runningLibrary: RunningWorkoutLibraryStore
+    @StateObject private var workoutCatalog = WorkoutTemplateCatalogStore()
 
     @State private var selectedPlanID: UUID?
     @State private var selectedWeekID: UUID?
@@ -19,7 +23,18 @@ struct ATHLTHStudioPlanCanvasView: View {
     @SceneStorage("athlth.studio.canvas.planID") private var scenePlanID = ""
     @SceneStorage("athlth.studio.canvas.weekID") private var sceneWeekID = ""
     @SceneStorage("athlth.studio.canvas.dayID") private var sceneDayID = ""
-    @SceneStorage("athlth.studio.plan.viewMode") private var viewMode = "overview"
+    // Entering the canvas always starts with Planning, not a restored Overview tab.
+    @State private var viewMode = "week"
+    @State private var favoriteQuery = ""
+    @State private var pendingFavorite: FavoriteInsertion?
+
+    private struct FavoriteInsertion {
+        let planID: UUID
+        let dayID: UUID
+        let scheduledDate: Date
+        let workout: PlannedSession
+        let savedTemplateID: UUID?
+    }
     @State private var copyingWeekID: UUID?
     @State private var pendingWeekCopyTarget: UUID?
     @State private var lastWeekCopy: AppSessionStore.PlanStudioWeekCopyReceipt?
@@ -145,6 +160,11 @@ struct ATHLTHStudioPlanCanvasView: View {
                 newPlanWeeks = 4
                 storedNewPlanStart = 0
             }
+            // Each new entrance uses the standard view and column widths.
+            viewMode = StudioPlanMode.week.rawValue
+            if let requestedPlanID, session.trainingPlan(withID: requestedPlanID) != nil {
+                selectedPlanID = requestedPlanID
+            }
             if selectedPlanID == nil {
                 let restoredPlanID = UUID(uuidString: scenePlanID)
                 let plan = restoredPlanID.flatMap {
@@ -164,6 +184,17 @@ struct ATHLTHStudioPlanCanvasView: View {
             newPlanStart = storedNewPlanStart > 0
                 ? Date(timeIntervalSince1970: storedNewPlanStart)
                 : session.suggestedTrainingPlanStartDate
+        }
+        .task {
+            async let favs: Void = favorites.refresh()
+            async let workouts: Void = workoutCatalog.refresh()
+            _ = await (favs, workouts)
+        }
+        .onChange(of: requestedPlanID) { _, updated in
+            if let updated, session.trainingPlan(withID: updated) != nil {
+                selectedPlanID = updated
+                viewMode = StudioPlanMode.week.rawValue
+            }
         }
         .onChange(of: newPlanStart) { _, date in
             storedNewPlanStart = date.timeIntervalSince1970
@@ -243,6 +274,47 @@ struct ATHLTHStudioPlanCanvasView: View {
                 }
             )
             .environment(\.athlthStudioFullscreenEditing, true)
+        }
+        .confirmationDialog(
+            ATHLTHLocalization.choose(
+                english: "This day already has a workout",
+                norwegian: "Denne dagen har allerede en økt"
+            ),
+            isPresented: Binding(
+                get: { pendingFavorite != nil },
+                set: { if !$0 { pendingFavorite = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(ATHLTHLocalization.choose(
+                english: "Add as an extra workout",
+                norwegian: "Legg til som en ekstra økt"
+            )) {
+                if let favorite = pendingFavorite {
+                    insertFavorite(favorite, replacingExisting: false)
+                }
+                pendingFavorite = nil
+            }
+            if let favorite = pendingFavorite,
+               let plan = session.trainingPlan(withID: favorite.planID),
+               let day = plan.weeks.flatMap(\.days).first(where: { $0.id == favorite.dayID }),
+               day.sessions.filter({ !$0.isExplicitRestDay }).count == 1 {
+                Button(ATHLTHLocalization.choose(
+                    english: "Replace existing workout",
+                    norwegian: "Erstatt eksisterende økt"
+                ), role: .destructive) {
+                    insertFavorite(favorite, replacingExisting: true)
+                    pendingFavorite = nil
+                }
+            }
+            Button(ATHLTHLocalization.choose(
+                english: "Cancel", norwegian: "Avbryt"
+            ), role: .cancel) { pendingFavorite = nil }
+        } message: {
+            Text(ATHLTHLocalization.choose(
+                english: "Keep the current workout and add another, or replace it. Completed workouts cannot be replaced.",
+                norwegian: "Behold økten og legg til en ekstra, eller erstatt den. Fullførte økter kan ikke erstattes."
+            ))
         }
         .confirmationDialog(
             ATHLTHLocalization.choose(
@@ -361,7 +433,10 @@ struct ATHLTHStudioPlanCanvasView: View {
                 .padding(.horizontal, 7)
             }
             if inlineWorkout == nil && inlineNewWorkout == nil &&
-               viewMode == StudioPlanMode.week.rawValue {
+               viewMode == StudioPlanMode.week.rawValue &&
+               plan.weeks.contains(where: { week in
+                   week.days.contains(where: { !$0.sessions.isEmpty })
+               }) {
                 planMetrics(plan, selectedWeek: week)
             }
 
@@ -510,13 +585,12 @@ struct ATHLTHStudioPlanCanvasView: View {
                 }
                 .frame(maxHeight: .infinity)
             } else if width >= 875 {
-                HStack(alignment: .top, spacing: 13) {
-                    weekNavigation(plan, selectedIndex: weekIndex)
-                        .frame(width: min(198, width * 0.21))
-
+                ATHLTHStudioPlanningColumns {
+                    weekNavigation(plan, selectedIndex: weekIndex,
+                                   selectedDay: day, selectedDate: dayDate)
+                } calendar: {
                     weekCanvas(plan, week: week, weekIndex: weekIndex)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-
+                } dayEditor: {
                     ATHLTHStudioPlanDayEditorView(
                         plan: plan,
                         day: day,
@@ -532,7 +606,6 @@ struct ATHLTHStudioPlanCanvasView: View {
                         onStartAfter: onStartAfter
                     )
                     .id(day.id)
-                    .frame(width: min(344, max(286, width * 0.31)))
                     .frame(maxHeight: .infinity)
                 }
             } else {
@@ -673,23 +746,6 @@ struct ATHLTHStudioPlanCanvasView: View {
                     .buttonStyle(.bordered)
                     .keyboardShortcut("z", modifiers: [.command, .shift])
                 }
-            }
-
-            if viewMode == StudioPlanMode.week.rawValue,
-               inlineWorkout == nil {
-                Button {
-                    copyingWeekID = plan.weeks[currentWeekIndex(in: plan)].id
-                    copyMessage = nil
-                } label: {
-                    Label(
-                        ATHLTHLocalization.choose(
-                            english: "Copy week", norwegian: "Kopier uke"
-                        ),
-                        systemImage: "square.on.square"
-                    )
-                    .labelStyle(.titleAndIcon)
-                }
-                .buttonStyle(.bordered)
             }
 
             Label(
@@ -911,23 +967,7 @@ struct ATHLTHStudioPlanCanvasView: View {
                 ), systemImage: "slider.horizontal.3")
             }
             .buttonStyle(.bordered)
-
-            Button {
-                newPlanStart = session.suggestedTrainingPlanStartDate
-                newPlanName = ""
-                newPlanSummary = ""
-                newPlanWeeks = 4
-                creatingPlan = true
-            } label: {
-                Label(
-                    ATHLTHLocalization.choose(
-                        english: "New plan", norwegian: "Ny plan"
-                    ),
-                    systemImage: "plus"
-                )
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(ATHLTHStudioStyle.ink)
+            .controlSize(.small)
         }
     }
 
@@ -989,7 +1029,9 @@ struct ATHLTHStudioPlanCanvasView: View {
 
     private func weekNavigation(
         _ plan: TrainingPlan,
-        selectedIndex: Int
+        selectedIndex: Int,
+        selectedDay: TrainingPlanDay,
+        selectedDate: Date?
     ) -> some View {
         VStack(alignment: .leading, spacing: 13) {
             HStack {
@@ -1018,41 +1060,66 @@ struct ATHLTHStudioPlanCanvasView: View {
             }
             Divider()
             Text(ATHLTHLocalization.choose(
-                english: "SAVED WORKOUTS", norwegian: "LAGREDE ØKTER"
+                english: "FAVORITE WORKOUTS", norwegian: "FAVORITTØKTER"
             ))
             .font(.caption.weight(.semibold))
             .tracking(1)
             .foregroundStyle(ATHLTHStudioStyle.gold)
 
-            if session.savedWorkoutTemplates.isEmpty {
+            TextField(ATHLTHLocalization.choose(
+                english: "Search favorites", norwegian: "Søk i favoritter"
+            ), text: $favoriteQuery)
+            .font(.caption)
+            .padding(9)
+            .background(ATHLTHStudioStyle.canvas,
+                        in: RoundedRectangle(cornerRadius: 10))
+
+            let saved = session.savedWorkoutTemplates.filter {
+                favorites.isFavorite(.workout, itemID: $0.id.uuidString) &&
+                $0.title.localizedStandardContains(favoriteQuery)
+            }
+            let catalog = workoutCatalog.entries.filter {
+                favorites.isFavorite(.workout, itemID: $0.id.uuidString) &&
+                $0.title.localizedStandardContains(favoriteQuery)
+            }
+            let running = runningLibrary.allTemplates.filter {
+                favorites.isFavorite(.workout, itemID: $0.id.uuidString) &&
+                $0.title.localizedStandardContains(favoriteQuery)
+            }
+            if saved.isEmpty && catalog.isEmpty && running.isEmpty {
                 Text(ATHLTHLocalization.choose(
-                    english: "Your library is empty.",
-                    norwegian: "Biblioteket ditt er tomt."
+                    english: "Star workouts in the library to use them here.",
+                    norwegian: "Merk økter med stjerne i biblioteket for å bruke dem her."
                 ))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 5) {
-                        ForEach(session.savedWorkoutTemplates.prefix(12)) { item in
-                            Label(item.title, systemImage: item.kind.systemImage)
-                                .font(.caption)
-                                .lineLimit(2)
-                                .padding(8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .background(
-                                    ATHLTHStudioStyle.canvas,
-                                    in: RoundedRectangle(cornerRadius: 9)
-                                )
-                                .draggable("library:\(item.id.uuidString)")
-                                .accessibilityHint(ATHLTHLocalization.choose(
-                                    english: "Drag to a future day",
-                                    norwegian: "Dra til en fremtidig dag"
-                                ))
+                        ForEach(saved) { item in
+                            favoriteWorkoutRow(item.title, symbol: item.kind.systemImage) {
+                                selectFavorite(item, savedID: item.id, plan: plan,
+                                               day: selectedDay, date: selectedDate)
+                            }
+                            .draggable("library:\(item.id.uuidString)")
+                        }
+                        ForEach(catalog) { item in
+                            favoriteWorkoutRow(item.title, symbol: item.systemImage) {
+                                selectFavorite(item.plannedSession(), savedID: nil,
+                                               plan: plan, day: selectedDay, date: selectedDate)
+                            }
+                            .draggable("catalog:\(item.id.uuidString)")
+                        }
+                        ForEach(running) { item in
+                            favoriteWorkoutRow(item.title, symbol: "figure.run") {
+                                selectFavorite(item.plannedSession(), savedID: nil,
+                                               plan: plan, day: selectedDay, date: selectedDate)
+                            }
+                            .draggable("running:\(item.id.uuidString)")
                         }
                     }
                 }
-                .frame(maxHeight: 185)
+                .frame(maxHeight: 245)
             }
         }
         .padding(14)
@@ -1060,6 +1127,108 @@ struct ATHLTHStudioPlanCanvasView: View {
         .overlay {
             RoundedRectangle(cornerRadius: 20)
                 .stroke(ATHLTHStudioStyle.outline.opacity(0.5))
+        }
+    }
+
+
+    private func favoriteWorkoutRow(
+        _ title: String, symbol: String, action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Image(systemName: symbol)
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(ATHLTHStudioStyle.ink)
+                    .lineLimit(2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "plus.circle")
+                    .font(.caption2)
+                    .foregroundStyle(ATHLTHStudioStyle.gold)
+            }
+            .padding(9)
+            .background(ATHLTHStudioStyle.canvas,
+                        in: RoundedRectangle(cornerRadius: 10))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityHint(ATHLTHLocalization.choose(
+            english: "Add to the selected day; you can also drag it to another day.",
+            norwegian: "Legg til på valgt dag, eller dra økten til en annen dag."
+        ))
+    }
+
+    private func selectFavorite(
+        _ workout: PlannedSession, savedID: UUID?,
+        plan: TrainingPlan, day: TrainingPlanDay, date: Date?
+    ) {
+        guard let date,
+              Calendar.current.startOfDay(for: date) >=
+                Calendar.current.startOfDay(for: .now),
+              !day.sessions.contains(where: \.isExplicitRestDay),
+              session.trainingPlan(withID: plan.id)?.version == plan.version else {
+            warning = ATHLTHLocalization.choose(
+                english: "This day is unavailable. Select a future training day.",
+                norwegian: "Denne dagen er ikke tilgjengelig. Velg en fremtidig treningsdag."
+            )
+            return
+        }
+        let choice = FavoriteInsertion(planID: plan.id, dayID: day.id,
+            scheduledDate: date, workout: workout, savedTemplateID: savedID)
+        if day.sessions.isEmpty {
+            insertFavorite(choice, replacingExisting: false)
+        } else {
+            pendingFavorite = choice
+        }
+    }
+
+    private func insertFavorite(_ choice: FavoriteInsertion, replacingExisting: Bool) {
+        guard let current = session.trainingPlan(withID: choice.planID),
+              let day = current.weeks.flatMap(\.days)
+                .first(where: { $0.id == choice.dayID }),
+              !day.sessions.contains(where: \.isExplicitRestDay),
+              Calendar.current.startOfDay(for: choice.scheduledDate) >=
+                Calendar.current.startOfDay(for: .now) else {
+            warning = ATHLTHLocalization.choose(
+                english: "This plan or day changed. Review it before adding a workout.",
+                norwegian: "Planen eller dagen er endret. Kontroller den før du legger til en økt."
+            )
+            return
+        }
+        let succeeded: Bool
+        if replacingExisting,
+           day.sessions.filter({ !$0.isExplicitRestDay }).count == 1,
+           let existing = day.sessions.first {
+            let replacement = choice.workout.studioReplacement(keepingIDFrom: existing)
+            succeeded = session.savePlanStudioWorkout(
+                replacement, inPlan: current.id, dayID: day.id,
+                editingWorkoutID: existing.id, expectedPlanVersion: current.version,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            )
+        } else if let savedID = choice.savedTemplateID {
+            succeeded = session.insertSavedWorkoutIntoPlan(
+                templateID: savedID, planID: current.id, dayID: day.id
+            )
+        } else {
+            succeeded = session.savePlanStudioWorkout(
+                choice.workout, inPlan: current.id, dayID: day.id,
+                editingWorkoutID: nil, expectedPlanVersion: current.version,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            )
+        }
+        if succeeded {
+            selectedWeekID = current.weeks.first(where: {
+                $0.days.contains(where: { $0.id == day.id })
+            })?.id
+            selectedDayID = day.id
+        } else {
+            warning = ATHLTHLocalization.choose(
+                english: "Could not add or replace this workout. Completed workouts and stale plan versions are protected.",
+                norwegian: "Kunne ikke legge til eller erstatte økten. Fullførte økter og utdaterte planversjoner er beskyttet."
+            )
         }
     }
 
@@ -1138,6 +1307,14 @@ struct ATHLTHStudioPlanCanvasView: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+        .contextMenu {
+            Button(ATHLTHLocalization.choose(
+                english: "Copy this week", norwegian: "Kopier denne uken"
+            ), systemImage: "square.on.square") {
+                copyingWeekID = week.id
+                copyMessage = nil
+            }
+        }
     }
 
     private func weekCanvas(
@@ -1163,18 +1340,6 @@ struct ATHLTHStudioPlanCanvasView: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer(minLength: 6)
-                Picker(ATHLTHLocalization.choose(
-                    english: "Drag action", norwegian: "Drahandling"
-                ), selection: $dropMode) {
-                    Text(ATHLTHLocalization.choose(
-                        english: "Move", norwegian: "Flytt"
-                    )).tag(DropMode.move)
-                    Text(ATHLTHLocalization.choose(
-                        english: "Copy", norwegian: "Kopier"
-                    )).tag(DropMode.copy)
-                }
-                .pickerStyle(.segmented)
-                .frame(maxWidth: 145)
             }
 
             if let block = plan.trainingBlocks?.first(where: {
@@ -1369,6 +1534,24 @@ struct ATHLTHStudioPlanCanvasView: View {
                    .sessions.first(where: { !oldIDs.contains($0.id) }) {
                 _ = newSession.id
             }
+        } else if raw.hasPrefix("catalog:"),
+                  let catalogID = UUID(uuidString: String(raw.dropFirst("catalog:".count))),
+                  let item = workoutCatalog.entries.first(where: { $0.id == catalogID }) {
+            success = session.savePlanStudioWorkout(
+                item.plannedSession(), inPlan: plan.id, dayID: target.id,
+                editingWorkoutID: nil, expectedPlanVersion: plan.version,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            )
+        } else if raw.hasPrefix("running:"),
+                  let templateID = UUID(uuidString: String(raw.dropFirst("running:".count))),
+                  let item = runningLibrary.allTemplates.first(where: { $0.id == templateID }) {
+            success = session.savePlanStudioWorkout(
+                item.plannedSession(), inPlan: plan.id, dayID: target.id,
+                editingWorkoutID: nil, expectedPlanVersion: plan.version,
+                healthWorkouts: health.workouts,
+                strengthHistory: strength.workoutHistory
+            )
         } else if let workoutID = UUID(uuidString: raw) {
             if dropMode == .copy {
                 let oldIDs = Set(target.sessions.map(\.id))
