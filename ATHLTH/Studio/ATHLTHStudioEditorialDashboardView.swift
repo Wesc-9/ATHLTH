@@ -532,6 +532,7 @@ struct ATHLTHStudioEditorialDashboardView: View {
             }
             .frame(minHeight: 44)
             .padding(.top, 2)
+            selectedDayWorkouts(activeDay)
             if !hasHealth {
                 Button(action: onOpenSettings) {
                     Label(
@@ -553,6 +554,86 @@ struct ATHLTHStudioEditorialDashboardView: View {
         .background(.white, in: RoundedRectangle(cornerRadius: 20))
         .overlay(RoundedRectangle(cornerRadius: 20).stroke(outline))
         .accessibilityIdentifier("athlth-ipad-weekly-overview")
+    }
+
+    @ViewBuilder
+    private func selectedDayWorkouts(_ day: ATHLTHStudioHomeWeek.Day?) -> some View {
+        if let day {
+            VStack(alignment: .leading, spacing: 9) {
+                ForEach(day.planned, id: \.workout.id) { entry in
+                    HStack(spacing: 12) {
+                        Image(systemName: entry.workout.kind.systemImage)
+                            .font(.system(size: 17, weight: .medium))
+                            .foregroundStyle(bronze)
+                            .frame(width: 28)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(entry.workout.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(ink)
+                            HStack(spacing: 8) {
+                                if let minutes = entry.workout.durationMinutes {
+                                    Text("\(minutes) min")
+                                }
+                                if completed(entry) {
+                                    Label(tr("Completed", "Fullført"),
+                                          systemImage: "checkmark.circle.fill")
+                                } else {
+                                    Text(tr("Planned", "Planlagt"))
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 4)
+                        Button {
+                            onOpenWorkout(entry)
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .frame(width: 38, height: 38)
+                        }
+                        .accessibilityLabel(tr("Workout details", "Øktdetaljer"))
+                        if canStart(entry) {
+                            Button {
+                                onStartWorkout(entry)
+                            } label: {
+                                Label(tr("Start", "Start"), systemImage: "play.fill")
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(bronze)
+                        }
+                    }
+                    .padding(12)
+                    .background(cream, in: RoundedRectangle(cornerRadius: 13))
+                }
+                ForEach(day.recorded) { workout in
+                    Button {
+                        onInspect(workout)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(bronze)
+                                .frame(width: 28)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(workout.activity.rawValue.capitalized)
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(ink)
+                                Text("\(Int(workout.duration / 60)) min · " +
+                                     tr("Recorded workout", "Registrert økt"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(12)
+                        .background(cream, in: RoundedRectangle(cornerRadius: 13))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .accessibilityIdentifier("athlth-ipad-selected-day-workouts")
+        }
     }
 
     private func weekSelectionSummary(
@@ -613,7 +694,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
         return Button {
             followsToday = false
             selectedDate = day.date
-            onSelectWeekDay(day.date)
+            // Keep the selected day's workouts directly below the week strip.
+            // The side inspector is reserved for conversations and activity.
         } label: {
             VStack(spacing: 8) {
                 HStack {
@@ -681,8 +763,8 @@ struct ATHLTHStudioEditorialDashboardView: View {
         )
         .accessibilityAddTraits(selected ? .isSelected : [])
         .accessibilityHint(tr(
-            "Show this day's workouts in the right sidebar",
-            "Vis dagens økter i høyre sidepanel"
+            "Show this day's workouts beneath the calendar",
+            "Vis dagens økter under kalenderen"
         ))
         .accessibilityIdentifier(
             "athlth-ipad-week-day-\(Calendar.current.startOfDay(for: day.date).timeIntervalSince1970)"
