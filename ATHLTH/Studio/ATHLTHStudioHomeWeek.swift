@@ -57,7 +57,8 @@ enum ATHLTHStudioHomeWeek {
         pausedPlanIDs: Set<UUID> = [],
         deactivatedPlanIDs: Set<UUID> = [],
         now: Date = .now,
-        calendar sourceCalendar: Calendar = .current
+        calendar sourceCalendar: Calendar = .current,
+        plannedOverride: [ATHLTHStudioSchedule.Occurrence]? = nil
     ) -> Snapshot {
         var calendar = sourceCalendar
         calendar.firstWeekday = 2
@@ -68,7 +69,9 @@ enum ATHLTHStudioHomeWeek {
         )
         let monday = weekInterval.start
 
-        let planned = ATHLTHStudioSchedule.window(
+        // Reuse Studio's shared plan traversal when supplied by Home.
+        // Standalone callers retain the original seven-day calculation.
+        let planned = plannedOverride ?? ATHLTHStudioSchedule.window(
             plans: plans,
             standalone: standalone,
             pausedPlanIDs: pausedPlanIDs,
