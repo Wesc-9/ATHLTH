@@ -160,20 +160,29 @@ final class TrophyStore: ObservableObject {
                 )
 
         if let currentUserID {
-            if let owner =
-                    stateOwnerUserID,
-               owner != currentUserID {
-                unlocks = []
-                showcaseIDs = []
-                trophyInscriptions = [:]
+            // Rehydrate only a cache already verified for this exact user.
+            // This also makes signing out then returning offline work without
+            // ever showing a previous account's trophy cabinet.
+            if stateOwnerUserID != currentUserID {
+                let saved = Self.loadState()
+                if saved.ownerUserID == currentUserID {
+                    unlocks = saved.unlocks
+                    showcaseIDs = saved.showcaseIDs
+                    trophyInscriptions = saved.trophyInscriptions ?? [:]
+                    hasInitializedShowcase = saved.hasInitializedShowcase
+                    showcaseUpdatedAt = saved.showcaseUpdatedAt
+                } else {
+                    unlocks = []
+                    showcaseIDs = []
+                    trophyInscriptions = [:]
+                    hasInitializedShowcase = false
+                    showcaseUpdatedAt = nil
+                }
                 revealQueue = []
                 pendingReveal = nil
-                hasInitializedShowcase = false
-                showcaseUpdatedAt = nil
             }
 
-            stateOwnerUserID =
-                currentUserID
+            stateOwnerUserID = currentUserID
         }
 
         if currentUserID != nil,
