@@ -2,6 +2,57 @@ import Foundation
 
 /// Executes the same chronological WorkoutTemplateBlock timeline built in
 /// Plan -> From Scratch without creating a separate running editor or recorder.
+/// Translates Basic goals to the same persisted workout timeline as
+/// Advanced. A pace/zone goal remains open-ended until athlete finishes it.
+enum ATHLTHBasicRunGoalRecipe {
+    static func make(
+        id: UUID,
+        title: String,
+        kind: ATHLTHBasicRunGoalKind,
+        distanceKilometers: Int,
+        timeMinutes: Int,
+        paceSecondsPerKilometer: Int,
+        heartRateZone: Int,
+        environment: RunEnvironment
+    ) -> PlannedSession {
+        var step = WorkoutTemplateBlock(
+            sequence: 1, kind: .run,
+            title: ATHLTHLocalization.choose(
+                english: "Goal-based run", norwegian: "Målstyrt løping"
+            ),
+            exerciseSlug: nil,
+            distanceMeters: kind == .distance
+                ? Double(max(1, distanceKilometers) * 1_000) : nil,
+            repetitions: nil,
+            durationSeconds: kind == .time
+                ? TimeInterval(max(1, timeMinutes) * 60) : nil,
+            targetWeightKilograms: nil, loadNote: nil, notes: nil,
+            phase: .main
+        )
+        step.cardioActivity = .running
+        if kind == .pace {
+            step.targetPaceSecondsPerKilometer =
+                Double(min(max(180, paceSecondsPerKilometer), 900))
+        }
+        if kind == .heartRateZone {
+            step.targetHeartRateZone = min(max(heartRateZone, 1), 5)
+        }
+        var result = PlannedSession(
+            id: id, title: title.isEmpty ? step.title : title,
+            kind: .running, scheduledStart: nil,
+            durationMinutes: kind == .time ? max(1, timeMinutes) : nil,
+            targetDistanceKilometers: kind == .distance
+                ? Double(max(1, distanceKilometers)) : nil,
+            targetPaceSecondsPerKilometer: step.targetPaceSecondsPerKilometer,
+            routeID: nil, exercises: [], notes: nil
+        )
+        result.workoutBlocks = [step]
+        return ATHLTHQuickRunTimelineAdapter.withEnvironment(
+            result, environment: environment
+        )
+    }
+}
+
 enum ATHLTHQuickRunTimelineAdapter {
     /// A library run is projected only to seed the shared studio; its
     /// source template is never mutated unless the user saves a new one.
