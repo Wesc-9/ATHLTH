@@ -154,6 +154,8 @@ final class ATHLTHAutomaticOfflineLibraryStore: ObservableObject {
 
     private func prepareCurrentLibrary() async {
         guard active, let accountID = signedInAccountID else { return }
+        let signpost = ATHLTHPerformance.begin("OfflineLibraryPreparation")
+        defer { ATHLTHPerformance.end("OfflineLibraryPreparation", id: signpost) }
         let plans = latestPlans
         let routes = latestRoutes
         for plan in plans {
