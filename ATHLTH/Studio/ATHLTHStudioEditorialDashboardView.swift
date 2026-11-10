@@ -25,6 +25,69 @@ enum ATHLTHStudioDayCompletionPolicy {
     }
 }
 
+/// Recommendation derived only from observed workout categories and saved plans.
+/// No synthetic readiness, medical claims or inferred completion.
+enum ATHLTHStudioHomeRecommendation {
+    struct Result {
+        let titleEnglish: String
+        let titleNorwegian: String
+        let reasonEnglish: String
+        let reasonNorwegian: String
+    }
+
+    static func make(
+        nextWorkoutTitle: String?,
+        workouts: [WorkoutSummary],
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) -> Result {
+        if let title = nextWorkoutTitle, !title.isEmpty {
+            return Result(
+                titleEnglish: title,
+                titleNorwegian: title,
+                reasonEnglish: "You already have a workout scheduled. Review your plan before starting.",
+                reasonNorwegian: "Du har allerede en planlagt økt. Se gjennom planen før du starter."
+            )
+        }
+        let start = calendar.date(byAdding: .day, value: -7, to: now) ?? now
+        let recent = workouts.filter {
+            $0.startDate >= start && $0.startDate <= now
+        }
+        if recent.isEmpty {
+            return Result(
+                titleEnglish: "Start with a workout that suits you",
+                titleNorwegian: "Velg en økt som passer deg",
+                reasonEnglish: "No recent workout history is available. Pick a comfortable starting point.",
+                reasonNorwegian: "Ingen nylig treningshistorikk er tilgjengelig. Velg en passende start."
+            )
+        }
+        let strengthCount = recent.filter { $0.activity == .strength }.count
+        let runCount = recent.filter { $0.activity == .running }.count
+        if strengthCount == 0 && runCount > 0 {
+            return Result(
+                titleEnglish: "Consider a strength session",
+                titleNorwegian: "Vurder en styrkeøkt",
+                reasonEnglish: "You have recorded running but no strength training in the last seven days.",
+                reasonNorwegian: "Du har registrert løping, men ingen styrkeøkt de siste sju dagene."
+            )
+        }
+        if runCount == 0 && strengthCount > 0 {
+            return Result(
+                titleEnglish: "Consider an easy walk or run",
+                titleNorwegian: "Vurder en rolig tur eller løpetur",
+                reasonEnglish: "You have recorded strength training but no running in the last seven days.",
+                reasonNorwegian: "Du har registrert styrketrening, men ingen løping de siste sju dagene."
+            )
+        }
+        return Result(
+            titleEnglish: "Choose based on how you feel today",
+            titleNorwegian: "Velg etter dagsformen",
+            reasonEnglish: "Your recent training is recorded. Adjust the next session to your energy and goals.",
+            reasonNorwegian: "Nylig trening er registrert. Tilpass neste økt til energi og mål."
+        )
+    }
+}
+
 /// iPad-only Studio home, inspired by the approved airy ATHLTH Studio reference.
 /// The content is sourced from existing local session and Health stores; no
 /// demonstration values, artificial readiness scores or implicit completions.
