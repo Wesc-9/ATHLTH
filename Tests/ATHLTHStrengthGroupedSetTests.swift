@@ -125,6 +125,70 @@ final class ATHLTHStrengthGroupedSetTests: XCTestCase {
         XCTAssertEqual(logs[0].sets.count, 2)
     }
 
+    func testEMOMResolvesMissedMinuteWithoutInventingVolume() throws {
+        let id = UUID()
+        let started = Date(timeIntervalSince1970: 100_000)
+        var first = exercise(10, weight: 25)
+        var second = exercise(12, weight: 10)
+        first.groupID = id
+        second.groupID = id
+        first.groupKind = .emom
+        second.groupKind = .emom
+        first.groupRounds = 3
+        second.groupRounds = 3
+        first.groupClockSeconds = 60
+        second.groupClockSeconds = 60
+        var logs = StrengthWorkoutStore.strengthExerciseLogsFromBlocks([first, second])
+        for index in logs.indices { logs[index].groupStartedAt = started }
+        logs[0].sets[0].completedAt = started.addingTimeInterval(35)
+        logs[0].sets[0].completedReps = 10
+        logs[0].sets[0].completedWeightKilograms = 25
+
+        let advanced = try XCTUnwrap(StrengthWorkoutStore.reconcileEMOMWindows(
+            exercises: &logs, groupID: id,
+            at: started.addingTimeInterval(121)
+        ))
+        XCTAssertEqual(advanced.skippedSlots, 1)
+        XCTAssertEqual(advanced.nextExerciseIndex, 0)
+        XCTAssertEqual(advanced.nextSetIndex, 1)
+        XCTAssertTrue(logs[0].sets[0].isCompleted)
+        XCTAssertFalse(logs[1].sets[0].isCompleted)
+        XCTAssertTrue(logs[1].sets[0].isResolved)
+        XCTAssertNotNil(logs[1].sets[0].skippedAt)
+        XCTAssertEqual(logs[1].sets[0].volumeKilograms, 0)
+        XCTAssertEqual(logs[1].skippedPlannedSetCount, 1)
+
+        let again = try XCTUnwrap(StrengthWorkoutStore.reconcileEMOMWindows(
+            exercises: &logs, groupID: id,
+            at: started.addingTimeInterval(122)
+        ))
+        XCTAssertEqual(again.skippedSlots, 0)
+        XCTAssertEqual(logs[1].skippedPlannedSetCount, 1)
+        let restored = try JSONDecoder().decode(
+            [StrengthExerciseLog].self,
+            from: JSONEncoder().encode(logs)
+        )
+        XCTAssertTrue(restored[1].sets[0].isResolved)
+        XCTAssertFalse(restored[1].sets[0].isCompleted)
+    }
+
+    func testGroupedStrengthStationTransitionIsSeparateFromRoundPause() {
+        let id = UUID()
+        var squat = exercise(10, weight: 40)
+        var press = exercise(12, weight: 15)
+        squat.groupID = id
+        press.groupID = id
+        squat.groupKind = .circuit
+        press.groupKind = .circuit
+        squat.groupRounds = 3
+        press.groupRounds = 3
+        squat.restBetweenSetsSeconds = 15
+        press.restBetweenSetsSeconds = 15
+        let logs = StrengthWorkoutStore.strengthExerciseLogsFromBlocks([squat, press])
+        XCTAssertEqual(logs[0].sets.map(\.restSeconds), [15, 15, 15])
+        XCTAssertEqual(logs[1].sets.map(\.restSeconds), [15, 15, 15])
+    }
+
     func testOneParentCreatesIndividualExecutionSetsAndPauses() {
         var block = exercise()
         var targets = ATHLTHWorkoutSetExpansion.targets(for: block)
