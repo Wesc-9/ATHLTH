@@ -28,6 +28,14 @@ enum ATHLTHOfflineLibraryPreparationPolicy {
         existing: AthleteOfflinePack?
     ) -> Bool {
         guard let existing else { return true }
+        let referencedRoutes = relatedRoutes(for: plan, from: routes)
+        // Most foreground and tab refreshes have not edited the plan.
+        // A structural equality fast path avoids four full JSON encodes on
+        // the MainActor. If anything differs, retain the original canonical
+        // encoded comparison to preserve exact offline invalidation rules.
+        if plan == existing.plan && referencedRoutes == existing.routes {
+            return false
+        }
         let encoder = JSONEncoder()
         // Dictionary keys otherwise may encode in a different order and
         // repeatedly invalidate a perfectly good offline snapshot.
@@ -37,7 +45,7 @@ enum ATHLTHOfflineLibraryPreparationPolicy {
         guard let planned = try? encoder.encode(plan),
               let stored = try? encoder.encode(existing.plan),
               let related = try? encoder.encode(
-                relatedRoutes(for: plan, from: routes)
+                referencedRoutes
               ),
               let storedRoutes = try? encoder.encode(existing.routes)
         else { return true }
