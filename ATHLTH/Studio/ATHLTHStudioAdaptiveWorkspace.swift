@@ -31,10 +31,9 @@ enum ATHLTHStudioWorkspaceLayout {
 struct ATHLTHStudioAdaptiveWorkspace<Plan: View, Editor: View, FocusRail: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    /// Shared across new and existing plans so users do not need to resize
-    /// each editor separately. An individual drag is committed on release.
-    @AppStorage("athlth.studio.workspace.planColumnFraction")
-    private var savedPlanFraction = 0.32
+    /// A temporary edit-session preference: every opening uses the standard
+    /// layout again, including after previous iPad Stage Manager resizing.
+    @State private var savedPlanFraction = 0.32
 
     @GestureState private var dragTranslation: CGFloat = 0
     @State private var focusOnWorkout = false
@@ -100,6 +99,7 @@ struct ATHLTHStudioAdaptiveWorkspace<Plan: View, Editor: View, FocusRail: View>:
             }
         }
         .background(ATHLTHStudioStyle.canvas.ignoresSafeArea())
+        .onAppear { savedPlanFraction = 0.32 }
     }
 
     private func planWidth(for width: CGFloat) -> CGFloat {
