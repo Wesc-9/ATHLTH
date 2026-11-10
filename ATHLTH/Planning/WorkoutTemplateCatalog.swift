@@ -4999,6 +4999,55 @@ struct WorkoutTemplateBuilderView: View {
                 studioVisiblePhases.insert(phase)
                 openExercisePicker()
             },
+            onAddFreeStrength: { phase in
+                selectedPhase = phase
+                studioVisiblePhases.insert(phase)
+                // Reuse the exact ATHLTH-native exercise available in
+                // the library instead of creating a duplicate entry.
+                if let freeStrength = exerciseLibrary.athlthCatalogExercises.first(where: {
+                    $0.sourceIdentifier == "athlth-native-free-strength-training"
+                }) {
+                    addExerciseBlock(freeStrength)
+                } else {
+                    openExercisePicker()
+                }
+            },
+            onAddSuperset: { phase in
+                selectedPhase = phase
+                studioVisiblePhases.insert(phase)
+                createSuperset()
+            },
+            onAddExerciseToSuperset: { phase, id in
+                selectedPhase = phase
+                studioVisiblePhases.insert(phase)
+                openExercisePicker(for: id)
+            },
+            onSetSupersetRounds: { id, rounds in
+                guard (1...20).contains(rounds) else { return }
+                for index in blocks.indices where
+                    blocks[index].groupID == id &&
+                    blocks[index].groupKind == .superset {
+                    blocks[index].groupRounds = rounds
+                }
+            },
+            onUngroupSuperset: { id in
+                for index in blocks.indices where
+                    blocks[index].groupID == id &&
+                    blocks[index].groupKind == .superset {
+                    blocks[index].groupID = nil
+                    blocks[index].groupKind = nil
+                    blocks[index].groupRounds = nil
+                    // An ungrouped strength exercise should execute once,
+                    // not retain the repeated rounds of its old superset.
+                    blocks[index].setCount = 1
+                }
+            },
+            onDeleteSuperset: { id in
+                blocks.removeAll {
+                    $0.groupID == id && $0.groupKind == .superset
+                }
+                resequence()
+            },
             onAddRest: { phase in
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
