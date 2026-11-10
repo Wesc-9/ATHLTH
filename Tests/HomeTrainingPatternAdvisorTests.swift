@@ -243,4 +243,75 @@ final class HomeTrainingPatternAdvisorTests: XCTestCase {
         )
         XCTAssertEqual(overloaded.suggestedWorkout, .restDay)
     }
+    private func completedStrength(
+        id: UUID = UUID(),
+        startedAt: Date,
+        healthID: UUID? = nil
+    ) -> StrengthWorkoutLog {
+        StrengthWorkoutLog(
+            id: id,
+            plannedSessionID: nil,
+            watchSessionID: nil,
+            captureDevice: .iPhone,
+            trackingMode: .simple,
+            title: "Strength",
+            startedAt: startedAt,
+            endedAt: startedAt.addingTimeInterval(1_800),
+            exercises: [],
+            healthMetrics: LinkedHealthWorkoutMetrics(
+                healthKitWorkoutUUID: healthID,
+                duration: 1_800,
+                activeCalories: nil,
+                averageHeartRate: nil,
+                maxHeartRate: nil
+            )
+        )
+    }
+
+    func testIndexedMergeKeepsOneStrengthWorkoutWhenHealthAlreadyImportedIt() {
+        let started = now.addingTimeInterval(-3_600)
+        let healthLog = completedStrength(startedAt: started)
+        let appleSummary = WorkoutSummary(localStrengthWorkout: healthLog)
+        let independentLog = completedStrength(
+            startedAt: started.addingTimeInterval(-2_400)
+        )
+        let merged = HomeTrainingPatternAdvisor.snapshot(
+            workouts: [appleSummary],
+            strengthHistory: [healthLog, independentLog],
+            phoneHistory: [],
+            now: now
+        )
+        XCTAssertEqual(merged.events.filter { $0.activity == .strength }.count, 2)
+    }
+
+    func testIndexedMergePreservesTwoStrengthWorkoutsOutsideTimeWindow() {
+        let started = now.addingTimeInterval(-3_600)
+        let first = completedStrength(startedAt: started)
+        let second = completedStrength(
+            startedAt: started.addingTimeInterval(121)
+        )
+        let merged = HomeTrainingPatternAdvisor.snapshot(
+            workouts: [],
+            strengthHistory: [first, second],
+            phoneHistory: [],
+            now: now
+        )
+        XCTAssertEqual(merged.events.count, 2)
+    }
+
+    func testIndexedMergeDeduplicatesNearbyUnlinkedStrengthSessions() {
+        let started = now.addingTimeInterval(-3_600)
+        let first = completedStrength(startedAt: started)
+        let second = completedStrength(
+            startedAt: started.addingTimeInterval(119)
+        )
+        let merged = HomeTrainingPatternAdvisor.snapshot(
+            workouts: [],
+            strengthHistory: [first, second],
+            phoneHistory: [],
+            now: now
+        )
+        XCTAssertEqual(merged.events.count, 1)
+    }
+
 }
