@@ -2258,6 +2258,114 @@ struct ActiveStrengthWorkoutView: View {
     }
 
     @ViewBuilder
+    /// Premium, light mode guidance stays above the exercise and fixed
+    /// set controls. It never obscures the rep/weight entry or Watch state.
+    private func focusedStrengthModeCard(
+        workout: StrengthWorkoutLog,
+        exercise: StrengthExerciseLog
+    ) -> some View {
+        let kind = exercise.groupStyle ?? .superset
+        let group = workout.exercises.filter { $0.groupID == exercise.groupID }
+        let station = group.firstIndex(where: { $0.id == exercise.id }) ?? 0
+        return ATHLTHPlanSurface(density: .compact) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: kind == .dropSet ? "arrow.down.right"
+                          : kind == .emom ? "clock.arrow.circlepath"
+                          : kind == .amrap ? "timer" : "square.stack.3d.up")
+                        .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                    Text(kind.title)
+                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .foregroundStyle(ATHLTHPlanDesign.ink)
+                    Spacer(minLength: 4)
+                    if kind != .amrap && kind != .dropSet {
+                        Text("\(strength.currentSetIndex + 1)/\(exercise.sets.count)")
+                            .font(.subheadline.weight(.semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                    }
+                }
+                if kind == .emom || kind == .amrap {
+                    TimelineView(.periodic(from: .now, by: 1)) { timeline in
+                        let remaining = ATHLTHStrengthModeClockPolicy.remainingSeconds(
+                            modeRaw: kind.rawValue,
+                            startedAt: exercise.groupStartedAt,
+                            clockSeconds: exercise.groupClockSeconds,
+                            roundIndex: strength.currentSetIndex,
+                            stationIndex: station,
+                            stationCount: group.count,
+                            at: timeline.date
+                        )
+                        let allowed = ATHLTHStrengthModeClockPolicy.permitsCompletion(
+                            modeRaw: kind.rawValue,
+                            startedAt: exercise.groupStartedAt,
+                            clockSeconds: exercise.groupClockSeconds,
+                            roundIndex: strength.currentSetIndex,
+                            stationIndex: station,
+                            stationCount: group.count,
+                            at: timeline.date
+                        )
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(remaining.map {
+                                let seconds = max(0, Int(ceil($0)))
+                                return String(format: "%02d:%02d",
+                                              seconds / 60, seconds % 60)
+                            } ?? "–")
+                                .font(.system(size: 38, weight: .bold, design: .rounded))
+                                .monospacedDigit()
+                                .foregroundStyle(ATHLTHPlanDesign.ink)
+                            Spacer()
+                            Text(kind == .amrap && remaining == 0
+                                 ? ATHLTHLocalization.choose(
+                                    english: "Time's up · review the workout",
+                                    norwegian: "Tiden er ute · se over økten"
+                                 )
+                                 : kind == .emom && !allowed
+                                 ? ATHLTHLocalization.choose(
+                                    english: "Wait for your minute or skip a missed station",
+                                    norwegian: "Vent på ditt minutt eller hopp over en stasjon"
+                                 )
+                                 : ATHLTHLocalization.choose(
+                                    english: "Active work window", norwegian: "Aktivt arbeidsvindu"
+                                 ))
+                                .font(.caption.weight(.medium))
+                                .multilineTextAlignment(.trailing)
+                                .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                        }
+                    }
+                } else {
+                    HStack {
+                        Text(ATHLTHLocalization.choose(
+                            english: "Station", norwegian: "Stasjon"
+                        ) + " \(station + 1)/\(max(group.count, 1))")
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                        Text(kind == .dropSet
+                             ? ATHLTHLocalization.choose(
+                                english: "Reduce load · no rest",
+                                norwegian: "Reduser vekt · ingen pause"
+                             )
+                             : ATHLTHLocalization.choose(
+                                english: "Next station follows", norwegian: "Neste stasjon følger"
+                             ))
+                            .font(.caption)
+                    }
+                    .foregroundStyle(ATHLTHPlanDesign.secondaryInk)
+                }
+
+                if let next = strength.nextPendingExercise,
+                   next.groupID == exercise.groupID {
+                    Label(ATHLTHLocalization.choose(
+                        english: "Next: \(next.exercise.displayName)",
+                        norwegian: "Neste: \(next.exercise.displayName)"
+                    ), systemImage: "arrow.right")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(ATHLTHPlanDesign.accentInk)
+                }
+            }
+        }
+    }
+
     private func focusedStrengthContent(
         workout: StrengthWorkoutLog,
         exercise: StrengthExerciseLog
@@ -2272,6 +2380,10 @@ struct ActiveStrengthWorkoutView: View {
             focusedWorkoutStatus(
                 workout
             )
+
+            if exercise.groupStyle != nil {
+                focusedStrengthModeCard(workout: workout, exercise: exercise)
+            }
 
             if workoutComplete {
                 focusedBetweenExerciseRestCard(workout)
