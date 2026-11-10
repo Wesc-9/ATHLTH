@@ -50,10 +50,16 @@ enum ATHLTHStudioHomeRecommendation {
             )
         }
         let start = calendar.date(byAdding: .day, value: -7, to: now) ?? now
-        let recent = workouts.filter {
-            $0.startDate >= start && $0.startDate <= now
+        var recentCount = 0
+        var strengthCount = 0
+        var runCount = 0
+        for workout in workouts where workout.startDate >= start &&
+            workout.startDate <= now {
+            recentCount += 1
+            if workout.activity == .strength { strengthCount += 1 }
+            if workout.activity == .running { runCount += 1 }
         }
-        if recent.isEmpty {
+        if recentCount == 0 {
             return Result(
                 titleEnglish: "Start with a workout that suits you",
                 titleNorwegian: "Velg en økt som passer deg",
@@ -61,8 +67,6 @@ enum ATHLTHStudioHomeRecommendation {
                 reasonNorwegian: "Ingen nylig treningshistorikk er tilgjengelig. Velg en passende start."
             )
         }
-        let strengthCount = recent.filter { $0.activity == .strength }.count
-        let runCount = recent.filter { $0.activity == .running }.count
         if strengthCount == 0 && runCount > 0 {
             return Result(
                 titleEnglish: "Consider a strength session",
