@@ -5143,6 +5143,7 @@ struct WorkoutTemplateBuilderView: View {
                 openExercisePicker()
             },
             onAddFreeStrength: { phase in
+                guard mayInsertStrengthModes else { return }
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
                 // Reuse the exact ATHLTH-native exercise available in
@@ -5175,7 +5176,11 @@ struct WorkoutTemplateBuilderView: View {
                 createStrengthMode(kind)
             },
             onSetGroupClock: { id, seconds in
-                guard seconds.isFinite && (30...3_600).contains(seconds) else { return }
+                guard mayInsertStrengthModes,
+                      blocks.contains(where: {
+                          $0.groupID == id && $0.groupKind?.usesGroupClock == true
+                      }),
+                      seconds.isFinite && (30...3_600).contains(seconds) else { return }
                 for index in blocks.indices where blocks[index].groupID == id {
                     blocks[index].groupClockSeconds = seconds
                 }
@@ -5210,11 +5215,19 @@ struct WorkoutTemplateBuilderView: View {
                 insertBlock(stage, toGroup: id)
             },
             onAddExerciseToSuperset: { phase, id in
+                guard mayInsertStrengthModes,
+                      blocks.contains(where: {
+                          $0.groupID == id && $0.groupKind?.isStrengthGroup == true
+                      }) else { return }
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
                 openExercisePicker(for: id)
             },
             onAddRestToSuperset: { phase, id in
+                guard mayInsertStrengthModes,
+                      blocks.contains(where: {
+                          $0.groupID == id && $0.groupKind?.canInsertRoundPause == true
+                      }) else { return }
                 selectedPhase = phase
                 studioVisiblePhases.insert(phase)
                 // One end-of-round rest; the execution engine omits the
@@ -6429,15 +6442,14 @@ struct WorkoutTemplateBuilderView: View {
                             showingBlockPicker = false
                         }
                         if mayInsertStrengthModes {
-                            pickerRow(tr("Superset", "Supersett"),
-                                      icon: "square.stack.3d.up") {
-                                pendingExerciseChoice = .superset
-                                showingBlockPicker = false
-                            }
-                            pickerRow(tr("Circuit training", "Sirkeltrening"),
-                                      icon: WorkoutBlockGroupKind.circuit.symbol) {
-                                pendingExerciseChoice = .circuit
-                                showingBlockPicker = false
+                            ForEach([
+                                WorkoutBlockGroupKind.superset, .circuit,
+                                .emom, .amrap, .dropSet
+                            ], id: \.self) { kind in
+                                pickerRow(kind.title, icon: kind.symbol) {
+                                    pendingExerciseChoice = kind
+                                    showingBlockPicker = false
+                                }
                             }
                         }
                         pickerRow(tr("Rest", "Pause"), icon: "pause.fill") {
@@ -6473,8 +6485,14 @@ struct WorkoutTemplateBuilderView: View {
     private var savedWorkoutPickerSheet: some View {
         NavigationStack {
             List {
-                ForEach(session.savedWorkoutTemplates.filter {
-                    !($0.workoutBlocks ?? []).isEmpty
+                ForEach(session.savedWorkoutTemplates.filter { workout in
+                    let imported = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
+                    return !imported.isEmpty && (
+                        mayInsertStrengthModes ||
+                        !imported.contains(where: {
+                            $0.groupKind?.isStrengthGroup == true
+                        })
+                    )
                 }) { workout in
                     Button {
                         appendSavedWorkout(workout)
@@ -6655,7 +6673,12 @@ struct WorkoutTemplateBuilderView: View {
         // Read either current workoutBlocks or the legacy running/strength
         // recipe; an older library workout must never insert zero exercises.
         let source = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-        guard !source.isEmpty else { return }
+        guard !source.isEmpty,
+              // Direct/imported library content cannot bypass activity gating.
+              mayInsertStrengthModes || !source.contains(where: {
+                  $0.groupKind?.isStrengthGroup == true
+              })
+        else { return }
         if isPlannedWorkout && !studioAdvanced && initialActivity == .running {
             removeBasicOwnedBlocks()
         }
