@@ -10,30 +10,32 @@ enum ATHLTHStudioRecordedWorkouts {
     ) -> [WorkoutSummary] {
         var combined = health
         var knownIDs = Set(health.map(\.id))
-        // Sort the matching activity once. Binary search limits each local
-        // strength log to nearby HealthKit start times instead of scanning the
-        // entire Health history on every Home render.
-        let healthStrength = health.filter { $0.activity == .strength }
-            .sorted { $0.startDate < $1.startDate }
+        // Group existing Health strength workouts into two-minute buckets.
+        // This avoids re-sorting the entire Health history every time Home
+        // observes a new HealthKit or local-strength store update.
+        func bucket(for date: Date) -> Int {
+            Int(floor(date.timeIntervalSince1970 / 120))
+        }
+        var healthStrengthByBucket: [Int: [WorkoutSummary]] = [:]
+        for workout in health where workout.activity == .strength {
+            healthStrengthByBucket[bucket(for: workout.startDate), default: []]
+                .append(workout)
+        }
 
         func hasMatchingHealth(start: Date, duration: TimeInterval) -> Bool {
-            let lowerBound = start.addingTimeInterval(-120)
-            let upperBound = start.addingTimeInterval(120)
-            var low = 0
-            var high = healthStrength.count
-            while low < high {
-                let mid = low + (high - low) / 2
-                if healthStrength[mid].startDate <= lowerBound {
-                    low = mid + 1
-                } else {
-                    high = mid
+            let index = bucket(for: start)
+            // Adjacent buckets preserve the previous strict +/-120 second
+            // start-time and duration window, including bucket boundaries.
+            for near in (index - 1)...(index + 1) {
+                guard let candidates = healthStrengthByBucket[near] else {
+                    continue
                 }
-            }
-            while low < healthStrength.count {
-                let candidate = healthStrength[low]
-                if candidate.startDate >= upperBound { break }
-                if abs(candidate.duration - duration) < 120 { return true }
-                low += 1
+                if candidates.contains(where: {
+                    abs($0.startDate.timeIntervalSince(start)) < 120 &&
+                        abs($0.duration - duration) < 120
+                }) {
+                    return true
+                }
             }
             return false
         }
