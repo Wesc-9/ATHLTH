@@ -295,7 +295,9 @@ struct ATHLTHStudioEditorialDashboardView: View {
                         // Isolated read-only live cards do not trigger
                         // recomputation of the week and recorded workouts.
                         ATHLTHStudioGhostHomeStatusView()
+                            .id(session.profile.userID)
                         ATHLTHStudioStrengthHomeStatusView()
+                            .id(session.profile.userID)
 
                         // Preserve the approved warm-white Studio appearance.
                         // The week calendar keeps the entire content width.
