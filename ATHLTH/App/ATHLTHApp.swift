@@ -2,6 +2,7 @@ import Combine
 import CoreLocation
 import Foundation
 import SwiftUI
+import Supabase
 
 /// XCTest launches ATHLTH as a host process for model and persistence tests.
 /// Do not initialize the complete production scene, HealthKit mirroring or
@@ -90,6 +91,7 @@ private struct ATHLTHSceneRootView: View {
     @StateObject private var libraryFavorites = LibraryFavoritesStore()
     @StateObject private var libraryRecents = LibraryRecentsStore()
     @StateObject private var trophies = TrophyStore()
+    @StateObject private var profileRecords = ATHLTHProfileRecordSyncStore()
     @StateObject private var spotifyPlayback = SpotifyPlaybackStore()
     @StateObject private var homeAssistant = HomeAssistantConnectionStore()
     @StateObject private var watchConnection = AppleWatchConnectionStore()
@@ -199,6 +201,7 @@ private struct ATHLTHSceneRootView: View {
                 .environmentObject(libraryFavorites)
                 .environmentObject(libraryRecents)
                 .environmentObject(trophies)
+                .environmentObject(profileRecords)
                 .environmentObject(spotifyPlayback)
                 .environmentObject(homeAssistant)
                 .environmentObject(watchConnection)
@@ -222,6 +225,9 @@ private struct ATHLTHSceneRootView: View {
                 appSession.signedIn ? appSession.profile.userID : nil
             )
             studioPlanSync.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
+            profileRecords.switchAccount(
                 appSession.signedIn ? appSession.profile.userID : nil
             )
             if appSession.signedIn {
@@ -273,6 +279,10 @@ private struct ATHLTHSceneRootView: View {
             studioPlanSync.switchAccount(
                 signedIn ? appSession.profile.userID : nil
             )
+            profileRecords.switchAccount(
+                signedIn ? appSession.profile.userID : nil
+            )
+            if !signedIn { trophies.clearForSignOut() }
             if signedIn {
                 studioPlanSync.scheduleSync(session: appSession)
             }
@@ -302,6 +312,9 @@ private struct ATHLTHSceneRootView: View {
         .onChange(of: appSession.profile.userID) { _, _ in
             // The account identity can be resolved after the signed-in
             // flag, especially when recovering an older offline install.
+            profileRecords.switchAccount(
+                appSession.signedIn ? appSession.profile.userID : nil
+            )
             scheduleAutomaticOfflinePreparation()
         }
         .onReceive(NotificationCenter.default.publisher(
@@ -629,6 +642,7 @@ struct AppRootView: View {
     @EnvironmentObject private var spotifyPlayback: SpotifyPlaybackStore
     @EnvironmentObject private var homeAssistant: HomeAssistantConnectionStore
     @EnvironmentObject private var trophies: TrophyStore
+    @EnvironmentObject private var profileRecords: ATHLTHProfileRecordSyncStore
     @EnvironmentObject private var deviceRelay: WorkoutDeviceRelayStore
     @ObservedObject private var pushManager =
         APNsPushManager.shared
@@ -1500,6 +1514,49 @@ struct AppRootView: View {
                 } catch {
                     break
                 }
+            }
+        }
+        // Listen to changes for this authenticated account while foregrounded.
+        // Revision events do not expose award facts or HealthKit data.
+        .task(id: "\(appSession.signedIn)-\(appSession.profile.userID)-\(scenePhase == .active)") {
+            guard appSession.signedIn, scenePhase == .active else { return }
+            let userID = appSession.profile.userID
+            profileRecords.switchAccount(userID)
+            await profileRecords.refresh(userID: userID)
+            guard appSession.signedIn, appSession.profile.userID == userID else { return }
+            await refreshTrophiesAndNotifications()
+
+            if ATHLTHDeviceRole.isIPhone, health.hasRequestedAuthorization {
+                let localRecords = (try? await health.personalRecords()) ?? []
+                await profileRecords.publishAvailable(
+                    userID: userID,
+                    healthRecords: localRecords,
+                    stats: nil,
+                    strength: strengthWorkout,
+                    performanceWorkouts: health.workouts
+                )
+            }
+
+            guard appSession.signedIn,
+                  appSession.profile.userID == userID,
+                  !Task.isCancelled else { return }
+            let channel = await SupabaseEnvironment.client.channel(
+                "athlth-private-account-\(userID.uuidString)"
+            )
+            let changes = await channel.postgresChange(
+                AnyAction.self, schema: "public",
+                table: "athlth_account_sync_events"
+            )
+            await channel.subscribe()
+            defer { Task { await channel.unsubscribe() } }
+            for await _ in changes {
+                guard !Task.isCancelled, scenePhase == .active,
+                      appSession.signedIn,
+                      appSession.profile.userID == userID else { break }
+                do { try await Task.sleep(for: .milliseconds(450)) }
+                catch { break }
+                await profileRecords.refresh(userID: userID)
+                await refreshTrophiesAndNotifications()
             }
         }
         .onChange(of: homeAssistant.shareOnlineStatus) { _, _ in
