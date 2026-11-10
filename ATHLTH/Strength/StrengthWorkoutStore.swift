@@ -2780,7 +2780,7 @@ final class StrengthWorkoutStore: ObservableObject {
     /// strength log used by the live iPhone screen and Watch mirror.
     /// Each group member has its own planned sets, but shares group identity
     /// so completion cycles stations in order before the next round.
-    private static func strengthExerciseLogsFromBlocks(
+    static func strengthExerciseLogsFromBlocks(
         _ source: [WorkoutTemplateBlock]
     ) -> [StrengthExerciseLog] {
         var queue: [StrengthExerciseLog] = []
