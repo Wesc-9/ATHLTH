@@ -106,6 +106,18 @@ enum ATHLTHFreeStrengthLibraryPresentation {
     }
 }
 
+// Scanning is a live-workout action, not a general library or planning card.
+// Callers must opt in explicitly from an active strength training flow.
+enum ATHLTHEquipmentScanVisibilityPolicy {
+    static func showsEntryPoint(
+        isLiveWorkoutPicker: Bool,
+        isSelectingExercise: Bool,
+        isLibraryTab: Bool
+    ) -> Bool {
+        isLiveWorkoutPicker && isSelectingExercise && isLibraryTab
+    }
+}
+
 struct ExerciseLibraryView: View {
     @EnvironmentObject private var library: ExerciseLibraryStore
     @EnvironmentObject private var session: AppSessionStore
@@ -121,6 +133,7 @@ struct ExerciseLibraryView: View {
     let selectionTitle: String?
     let selectedExerciseCounts: [UUID: Int]
     let onSelect: ((ExerciseLibraryEntry) -> Void)?
+    let allowsEquipmentScan: Bool
 
     @State private var query = ""
     @State private var queryInput = ""
@@ -160,6 +173,7 @@ struct ExerciseLibraryView: View {
         initialBodyPart: String = "All",
         selectionTitle: String? = nil,
         selectedExerciseCounts: [UUID: Int] = [:],
+        allowsEquipmentScan: Bool = false,
         onSelect: ((ExerciseLibraryEntry) -> Void)? = nil
     ) {
         self.source = source
@@ -167,6 +181,7 @@ struct ExerciseLibraryView: View {
         self.selectionTitle = selectionTitle
         self.selectedExerciseCounts = selectedExerciseCounts
         self.onSelect = onSelect
+        self.allowsEquipmentScan = allowsEquipmentScan
         // Callers may still pass legacy detailed muscle names. Keep the
         // picker aligned with the nine visible familiar groups.
         let normalizedBodyPart =
@@ -339,10 +354,15 @@ struct ExerciseLibraryView: View {
             }
 
 
-            Button {
-                beginEquipmentScan()
-            } label: {
-                HStack(spacing: 11) {
+            if ATHLTHEquipmentScanVisibilityPolicy.showsEntryPoint(
+                isLiveWorkoutPicker: allowsEquipmentScan,
+                isSelectingExercise: onSelect != nil,
+                isLibraryTab: selectedSection == .library
+            ) {
+                Button {
+                    beginEquipmentScan()
+                } label: {
+                    HStack(spacing: 11) {
                     Image(systemName: "camera.viewfinder")
                         .font(.system(size: 19, weight: .medium))
                         .foregroundStyle(ATHLTHPlanDesign.accent)
@@ -386,9 +406,10 @@ struct ExerciseLibraryView: View {
                         .stroke(ATHLTHPlanDesign.outline, lineWidth: 1)
                 }
             }
-            .buttonStyle(.plain)
-            .padding(.horizontal, 16)
-            .padding(.bottom, 5)
+                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 5)
+            }
 
             if scannerResultsActive {
                 equipmentScanFilterSummary
