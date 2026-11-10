@@ -2210,7 +2210,7 @@ struct ATHLTHHomeView: View {
             plannedActivity: activity,
             plannedWorkoutTitle: scheduled?.workout.title,
             trainingHistory: HomeDailyRecommendationPolicy.TrainingHistory.from(
-                workouts: health.workouts
+                workouts: homeRecordedWorkouts
             ),
             personalizedHistory: homeRecommendationHistory
         )
