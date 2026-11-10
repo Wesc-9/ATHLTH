@@ -34,6 +34,21 @@ private enum ATHLTHStudioDestination: String, CaseIterable, Identifiable {
     }
 }
 
+/// Intent thresholds for the iPad message-panel grip and header.
+/// The conversation area never installs these gestures: it must retain
+/// exactly the same horizontal scroll, attachments and interactions as iPhone.
+enum ATHLTHStudioInboxPanelGesturePolicy {
+    static func shouldOpen(translation: CGSize) -> Bool {
+        translation.width <= -30 &&
+            abs(translation.height) <= abs(translation.width) * 0.55
+    }
+
+    static func shouldClose(translation: CGSize) -> Bool {
+        translation.width >= 85 &&
+            abs(translation.height) <= abs(translation.width) * 0.55
+    }
+}
+
 struct ATHLTHiPadStudioRootView: View {
     @EnvironmentObject private var session: AppSessionStore
     @EnvironmentObject private var messaging: MessagingStore
@@ -151,7 +166,9 @@ struct ATHLTHiPadStudioRootView: View {
                             .simultaneousGesture(
                                 DragGesture(minimumDistance: 15)
                                     .onEnded { value in
-                                        if value.translation.width < -30 {
+                                        if ATHLTHStudioInboxPanelGesturePolicy.shouldOpen(
+                                            translation: value.translation
+                                        ) {
                                             openMessageHub()
                                         }
                                     }
@@ -222,6 +239,7 @@ struct ATHLTHiPadStudioRootView: View {
                                 norwegian: "Åpne eller lukk innboksen"
                             ))
                             .accessibilityIdentifier("athlth-ipad-inbox-panel")
+                            .keyboardShortcut("m", modifiers: [.command, .shift])
                         }
                     }
             }
@@ -364,8 +382,9 @@ struct ATHLTHiPadStudioRootView: View {
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 24)
                         .onEnded { value in
-                            if value.translation.width > 85 &&
-                                abs(value.translation.height) < 45 {
+                            if ATHLTHStudioInboxPanelGesturePolicy.shouldClose(
+                                translation: value.translation
+                            ) {
                                 withAnimation(messagePanelAnimation) {
                                     showingInspector = false
                                 }
