@@ -72,6 +72,11 @@ final class ATHLTHProfileRecordSyncStore: ObservableObject {
 
     func value(for kind: ProfileFeaturedRecordKind, local: String) -> String {
         let local = local.trimmingCharacters(in: .whitespacesAndNewlines)
+        // iPhone owns the fresh measured result; iPad displays the shared
+        // account snapshot instead of replacing it with a stale local PR.
+        if !ATHLTHDeviceRole.isIPhone,
+           let shared = values[kind.rawValue]?.display_value,
+           !shared.isEmpty { return shared }
         if !local.isEmpty && local != "—" { return local }
         return values[kind.rawValue]?.display_value ?? "—"
     }
