@@ -3555,8 +3555,11 @@ struct WalkQuickStartSheet: View {
                             english: "Start free walk", norwegian: "Start fri gåtur"
                         )
                     ) {
-                        startWalk(using: watchConnected && !ATHLTHDeviceRole.isIPad
-                                  ? .appleWatch : .iPhone)
+                        startWalk(using:
+                            trainingDeviceProvider == .appleWatch &&
+                            watchConnected && !ATHLTHDeviceRole.isIPad
+                                ? .appleWatch : .iPhone
+                        )
                     }
 
                     Text(ATHLTHLocalization.choose(
