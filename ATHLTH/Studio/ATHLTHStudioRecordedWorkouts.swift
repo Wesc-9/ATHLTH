@@ -9,25 +9,51 @@ enum ATHLTHStudioRecordedWorkouts {
         localStrength: [StrengthWorkoutLog]
     ) -> [WorkoutSummary] {
         var combined = health
-        let healthIDs = Set(health.map(\.id))
-        let knownIDs = Set(health.map(\.id))
+        var knownIDs = Set(health.map(\.id))
+        // Sort the matching activity once. Binary search limits each local
+        // strength log to nearby HealthKit start times instead of scanning the
+        // entire Health history on every Home render.
+        let healthStrength = health.filter { $0.activity == .strength }
+            .sorted { $0.startDate < $1.startDate }
+
+        func hasMatchingHealth(start: Date, duration: TimeInterval) -> Bool {
+            let lowerBound = start.addingTimeInterval(-120)
+            let upperBound = start.addingTimeInterval(120)
+            var low = 0
+            var high = healthStrength.count
+            while low < high {
+                let mid = low + (high - low) / 2
+                if healthStrength[mid].startDate <= lowerBound {
+                    low = mid + 1
+                } else {
+                    high = mid
+                }
+            }
+            while low < healthStrength.count {
+                let candidate = healthStrength[low]
+                if candidate.startDate >= upperBound { break }
+                if abs(candidate.duration - duration) < 120 { return true }
+                low += 1
+            }
+            return false
+        }
 
         for local in localStrength {
             guard let ended = local.endedAt,
                   ended >= local.startedAt else { continue }
 
-            let linkedID = local.healthMetrics.healthKitWorkoutUUID
-            if let linkedID, healthIDs.contains(linkedID) { continue }
-            if knownIDs.contains(local.id) { continue }
+            let recordedID = local.healthMetrics.healthKitWorkoutUUID ?? local.id
+            if knownIDs.contains(recordedID) || knownIDs.contains(local.id) {
+                continue
+            }
 
             let localDuration = ended.timeIntervalSince(local.startedAt)
-            let foundMatchingHealth = health.contains {
-                $0.activity == .strength &&
-                abs($0.startDate.timeIntervalSince(local.startedAt)) < 120 &&
-                abs($0.duration - localDuration) < 120
+            if hasMatchingHealth(start: local.startedAt, duration: localDuration) {
+                continue
             }
-            if foundMatchingHealth { continue }
 
+            knownIDs.insert(recordedID)
+            knownIDs.insert(local.id)
             combined.append(WorkoutSummary(localStrengthWorkout: local))
         }
         return combined.sorted { $0.startDate > $1.startDate }
