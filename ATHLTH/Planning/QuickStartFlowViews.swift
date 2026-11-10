@@ -3947,7 +3947,8 @@ struct StrengthQuickStartSheet: View {
                                     norwegian: "Velg øvelser og sett"
                                 ),
                                 symbol: "list.bullet.clipboard",
-                                selected: false
+                                selected: false,
+                                asNavigationLabel: true
                             ) {}
                         }
                         .buttonStyle(.plain)
@@ -3960,7 +3961,8 @@ struct StrengthQuickStartSheet: View {
                                     title: kind.title,
                                     subtitle: modeSubtitle(kind),
                                     symbol: kind.symbol,
-                                    selected: false
+                                    selected: false,
+                                asNavigationLabel: true
                                 ) {}
                             }
                             .buttonStyle(.plain)
