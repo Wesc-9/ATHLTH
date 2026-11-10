@@ -176,6 +176,21 @@ final class ATHLTHStudioScheduleTests: XCTestCase {
             !$0.workout.isExplicitRestDay
         })
 
+        let paused = ATHLTHStudioSchedule.studioHomeWindows(
+            plans: [stored], standalone: [],
+            pausedPlanIDs: [stored.id],
+            selectedWeekDate: selectedWeek, upcomingFrom: today
+        )
+        XCTAssertTrue(paused.week.isEmpty)
+        XCTAssertTrue(paused.upcoming.isEmpty)
+        let deactivated = ATHLTHStudioSchedule.studioHomeWindows(
+            plans: [stored], standalone: [],
+            deactivatedPlanIDs: [stored.id],
+            selectedWeekDate: selectedWeek, upcomingFrom: today
+        )
+        XCTAssertTrue(deactivated.week.isEmpty)
+        XCTAssertTrue(deactivated.upcoming.isEmpty)
+
         // HomeWeek must not scan or alter dates when fed the shared window.
         let originalWeek = ATHLTHStudioHomeWeek.make(
             plans: [stored, stored], standalone: [],
