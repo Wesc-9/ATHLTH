@@ -108,6 +108,18 @@ enum ATHLTHStrengthModeAvailability {
         initialActivity == .strength ||
             (initialActivity == nil && containsStrength)
     }
+
+    /// Gate both picker visibility and the actual import action. Saved
+    /// workouts must not bypass a running/walking/cycling editor's type.
+    static func canImport(
+        _ recipe: [WorkoutTemplateBlock],
+        initialActivity: ATHLTHPlannedWorkoutType?,
+        containsStrength: Bool
+    ) -> Bool {
+        !recipe.contains(where: { $0.groupKind?.isStrengthGroup == true }) ||
+            canCreate(initialActivity: initialActivity,
+                      containsStrength: containsStrength)
+    }
 }
 
 enum WorkoutBlockGroupKind: String, Codable, Hashable {
@@ -6487,12 +6499,11 @@ struct WorkoutTemplateBuilderView: View {
             List {
                 ForEach(session.savedWorkoutTemplates.filter { workout in
                     let imported = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
-                    return !imported.isEmpty && (
-                        mayInsertStrengthModes ||
-                        !imported.contains(where: {
-                            $0.groupKind?.isStrengthGroup == true
-                        })
-                    )
+                    return !imported.isEmpty &&
+                        ATHLTHStrengthModeAvailability.canImport(
+                            imported, initialActivity: initialActivity,
+                            containsStrength: hasStrength
+                        )
                 }) { workout in
                     Button {
                         appendSavedWorkout(workout)
@@ -6674,10 +6685,10 @@ struct WorkoutTemplateBuilderView: View {
         // recipe; an older library workout must never insert zero exercises.
         let source = ATHLTHUnifiedWorkout.editorBlocks(from: workout)
         guard !source.isEmpty,
-              // Direct/imported library content cannot bypass activity gating.
-              mayInsertStrengthModes || !source.contains(where: {
-                  $0.groupKind?.isStrengthGroup == true
-              })
+              ATHLTHStrengthModeAvailability.canImport(
+                  source, initialActivity: initialActivity,
+                  containsStrength: hasStrength
+              )
         else { return }
         if isPlannedWorkout && !studioAdvanced && initialActivity == .running {
             removeBasicOwnedBlocks()
