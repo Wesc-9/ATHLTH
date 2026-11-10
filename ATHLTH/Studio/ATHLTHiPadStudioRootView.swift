@@ -326,19 +326,15 @@ struct ATHLTHiPadStudioRootView: View {
             // Do not create a separate iPad conversation design or composer.
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(ATHLTHLocalization.choose(
-                            english: "Messages", norwegian: "Meldinger"
-                        ))
-                        .font(.system(size: 21, weight: .medium, design: .serif))
-                        .foregroundStyle(ink)
-                        Text(ATHLTHLocalization.choose(
-                            english: "Your conversations and requests",
-                            norwegian: "Samtaler og meldingsforespørsler"
-                        ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    }
+                    Label(
+                        ATHLTHLocalization.choose(
+                            english: "Inbox panel", norwegian: "Innbokspanel"
+                        ),
+                        systemImage: "bubble.left.and.bubble.right"
+                    )
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(ink)
+                    .labelStyle(.titleAndIcon)
                     Spacer(minLength: 4)
                     if unreadMessagesCount > 0 {
                         Text(unreadMessagesCount > 99
@@ -356,8 +352,22 @@ struct ATHLTHiPadStudioRootView: View {
                     inspectorCollapseButton
                 }
                 .padding(.horizontal, 17)
-                .padding(.top, 13)
-                .padding(.bottom, 11)
+                .padding(.top, 8)
+                .padding(.bottom, 7)
+                .contentShape(Rectangle())
+                // Only the panel chrome responds to a dismiss swipe. The
+                // unchanged iPhone conversation keeps its own gestures.
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 24)
+                        .onEnded { value in
+                            if value.translation.width > 85 &&
+                                abs(value.translation.height) < 45 {
+                                withAnimation(messagePanelAnimation) {
+                                    showingInspector = false
+                                }
+                            }
+                        }
+                )
                 Rectangle()
                     .fill(gold.opacity(0.18))
                     .frame(height: 1)
