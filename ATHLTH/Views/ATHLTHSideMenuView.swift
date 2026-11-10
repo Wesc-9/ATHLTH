@@ -31,14 +31,19 @@ struct ATHLTHSideMenuView: View {
     let onSelect: (ATHLTHSideMenuDestination) -> Void
     let onDismiss: () -> Void
 
-    private let menuSurface = Color(red: 0.992, green: 0.984, blue: 0.969)
-    private let warmDivider = Color(red: 0.84, green: 0.78, blue: 0.67).opacity(0.28)
+    // A restrained porcelain-and-bronze palette, consistent with ATHLTH Home.
+    private let menuSurface = Color(red: 0.983, green: 0.978, blue: 0.968)
+    private let menuCard = Color(red: 0.997, green: 0.995, blue: 0.991)
+    private let menuInk = Color(red: 0.19, green: 0.18, blue: 0.17)
+    private let menuMuted = Color(red: 0.47, green: 0.45, blue: 0.42)
+    private let menuBronze = Color(red: 0.60, green: 0.45, blue: 0.29)
+    private let warmDivider = Color(red: 0.77, green: 0.72, blue: 0.65).opacity(0.30)
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 Button(action: onDismiss) {
-                    Color.black.opacity(0.34)
+                    Color.black.opacity(0.40)
                         .ignoresSafeArea()
                         .contentShape(Rectangle())
                 }
@@ -50,17 +55,17 @@ struct ATHLTHSideMenuView: View {
 
                 VStack(alignment: .leading, spacing: 0) {
                     header
-                        .padding(.horizontal, 19)
-                        .padding(.top, 8)
+                        .padding(.horizontal, 17)
+                        .padding(.top, 12)
+                        .padding(.bottom, 12)
 
                     Rectangle()
                         .fill(warmDivider)
                         .frame(height: 1)
-                        .padding(.horizontal, 19)
-                        .padding(.top, 14)
+                        .padding(.horizontal, 17)
 
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 18) {
+                        VStack(alignment: .leading, spacing: 20) {
                             menuSection(
                                 english: "HOME",
                                 norwegian: "HJEM"
@@ -120,14 +125,15 @@ struct ATHLTHSideMenuView: View {
                             }
                         }
                         .padding(.horizontal, 14)
-                        .padding(.vertical, 18)
+                        .padding(.top, 17)
+                        .padding(.bottom, 24)
                     }
                     .scrollIndicators(.hidden)
 
                     footer
-                        .padding(.horizontal, 20)
-                        .padding(.top, 10)
-                        .padding(.bottom, 10)
+                        .padding(.horizontal, 17)
+                        .padding(.top, 8)
+                        .padding(.bottom, 12)
                 }
                 .frame(
                     width: ATHLTHSideMenuLayoutPolicy.width(
@@ -136,19 +142,11 @@ struct ATHLTHSideMenuView: View {
                     height: geometry.size.height
                 )
                 .background {
-                    LinearGradient(
-                        colors: [
-                            menuSurface,
-                            Color.white.opacity(0.98),
-                            menuSurface
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .ignoresSafeArea(edges: .vertical)
+                    menuSurface
+                        .ignoresSafeArea(edges: .vertical)
                 }
                 .overlay(alignment: .trailing) {
-                    ATHLTHTheme.premiumGold.opacity(0.16)
+                    menuBronze.opacity(0.15)
                         .frame(width: 1)
                         .allowsHitTesting(false)
                 }
@@ -156,11 +154,11 @@ struct ATHLTHSideMenuView: View {
                     UnevenRoundedRectangle(
                         topLeadingRadius: 0,
                         bottomLeadingRadius: 0,
-                        bottomTrailingRadius: 25,
-                        topTrailingRadius: 25
+                        bottomTrailingRadius: 28,
+                        topTrailingRadius: 28
                     )
                 )
-                .shadow(color: .black.opacity(0.14), radius: 20, x: 7, y: 0)
+                .shadow(color: .black.opacity(0.15), radius: 28, x: 8, y: 0)
                 .simultaneousGesture(
                     DragGesture(minimumDistance: 24)
                         .onEnded { value in
