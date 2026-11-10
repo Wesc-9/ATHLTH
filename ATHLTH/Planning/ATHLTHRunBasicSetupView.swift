@@ -262,3 +262,48 @@ struct ATHLTHRunBasicSetupView: View {
         .frame(maxWidth: .infinity)
     }
 }
+
+ 
+/// Compact run-environment choice for the Workout Details card.
+/// Keeps the three existing recording environments rather than creating
+/// a competing GPS/Watch workout mode.
+struct ATHLTHRunEnvironmentDetailRow: View {
+    @Binding var environment: RunEnvironment
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Label(
+                ATHLTHLocalization.choose(
+                    english: "Running environment", norwegian: "Løpemiljø"
+                ),
+                systemImage: "figure.run"
+            )
+            .font(.subheadline.weight(.medium))
+            .foregroundStyle(ATHLTHTrainDesign.ink)
+
+            Spacer(minLength: 8)
+
+            Picker(
+                ATHLTHLocalization.choose(
+                    english: "Running environment", norwegian: "Løpemiljø"
+                ),
+                selection: $environment
+            ) {
+                ForEach(RunEnvironment.allCases) { option in
+                    Label(option.title, systemImage: option.systemImage)
+                        .tag(option)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+            .tint(ATHLTHTrainDesign.bronze)
+            .accessibilityIdentifier("athlth-run-environment-detail-picker")
+        }
+        .frame(minHeight: 44)
+        .padding(.horizontal, 12)
+        .background(
+            ATHLTHPlanDesign.canvas,
+            in: RoundedRectangle(cornerRadius: 12)
+        )
+    }
+}
