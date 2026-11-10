@@ -63,6 +63,43 @@ final class ATHLTHStudioRecordedWorkoutsTests: XCTestCase {
         XCTAssertEqual(result.count, 1)
     }
 
+    func testRepeatedLocalLogDoesNotDuplicateHomeRecording() {
+        let local = strength()
+        let result = ATHLTHStudioRecordedWorkouts.merged(
+            health: [], localStrength: [local, local]
+        )
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.id, local.id)
+    }
+
+    func testMatchingHealthIsFoundAmongUnrelatedHealthRecords() {
+        let moment = Date(timeIntervalSince1970: 1_800_000_000)
+        let local = strength(started: moment)
+        let unrelated = (0..<80).map { offset in
+            WorkoutSummary(localStrengthWorkout: strength(
+                started: moment.addingTimeInterval(Double(offset + 2) * 3_600)
+            ))
+        }
+        let match = WorkoutSummary(localStrengthWorkout: strength(
+            started: moment.addingTimeInterval(45)
+        ))
+        let result = ATHLTHStudioRecordedWorkouts.merged(
+            health: unrelated + [match], localStrength: [local]
+        )
+        XCTAssertEqual(result.count, unrelated.count + 1)
+    }
+
+    func testDifferentDurationAtNearbyStartRemainsSeparate() {
+        let moment = Date(timeIntervalSince1970: 1_800_000_000)
+        let local = strength(started: moment)
+        var other = WorkoutSummary(localStrengthWorkout: strength(started: moment))
+        other.duration = 900
+        let result = ATHLTHStudioRecordedWorkouts.merged(
+            health: [other], localStrength: [local]
+        )
+        XCTAssertEqual(result.count, 2)
+    }
+
     func testUnfinishedLocalStrengthIsNotCountedAsRecorded() {
         let active = strength(finished: false)
         let result = ATHLTHStudioRecordedWorkouts.merged(
