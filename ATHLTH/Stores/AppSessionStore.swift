@@ -3973,6 +3973,14 @@ final class AppSessionStore: ObservableObject {
                 of: date
             )
         }
+        // Enforce the same Plan Studio policy at the shared data boundary.
+        // A different entry point (iPhone, iPad or saved library) must not
+        // bypass read-only historical dates or place a workout on a rest day.
+        guard calendar.startOfDay(for: date) >= calendar.startOfDay(for: Date()),
+              !originalDay.sessions.contains(where: \.isExplicitRestDay),
+              (!source.isExplicitRestDay || originalDay.sessions.isEmpty)
+        else { return false }
+
         let copy = makeIndependentPlanStudioCopy(
             source: source, scheduled: scheduled
         )

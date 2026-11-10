@@ -136,6 +136,51 @@ final class ATHLTHTrainPlanStudioIntegrationTests: XCTestCase {
     }
 
     @MainActor
+    func testSharedWorkoutInsertionRespectsExplicitRestDays() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let templateID = store.saveSharedWorkout(workout(name: "Favorite"))
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Rest safety", summary: "", weekCount: 1,
+            startDate: Calendar.current.startOfDay(for: Date())
+        ))
+        let dayID = plan.weeks[0].days[0].id
+        var rest = workout(name: "Rest")
+        rest.kind = .recovery
+        rest.workoutCategory = "rest_day"
+        store.addSession(rest, toDay: dayID, inPlan: plan.id)
+
+        XCTAssertFalse(store.insertSavedWorkoutIntoPlan(
+            templateID: templateID, planID: plan.id, dayID: dayID
+        ))
+        let current = try XCTUnwrap(store.trainingPlan(withID: plan.id))
+        XCTAssertEqual(current.weeks[0].days[0].sessions.count, 1)
+        XCTAssertTrue(current.weeks[0].days[0].sessions[0].isExplicitRestDay)
+    }
+
+    @MainActor
+    func testSharedWorkoutInsertionCannotRewriteHistoricalDays() throws {
+        let (store, defaults, suite) = makeStore()
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let templateID = store.saveSharedWorkout(workout(name: "Favorite"))
+        let past = try XCTUnwrap(Calendar.current.date(
+            byAdding: .day, value: -14, to: Calendar.current.startOfDay(for: Date())
+        ))
+        let plan = try XCTUnwrap(store.createTrainingPlan(
+            title: "Historical safety", summary: "", weekCount: 1,
+            startDate: past
+        ))
+        XCTAssertFalse(store.insertSavedWorkoutIntoPlan(
+            templateID: templateID,
+            planID: plan.id,
+            dayID: plan.weeks[0].days[0].id
+        ))
+        XCTAssertTrue(try XCTUnwrap(
+            store.trainingPlan(withID: plan.id)
+        ).weeks[0].days[0].sessions.isEmpty)
+    }
+
+    @MainActor
     private func makeStore() -> (AppSessionStore, UserDefaults, String) {
         let name = "ATHLTHTrainPlanStudioIntegrationTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: name)!
