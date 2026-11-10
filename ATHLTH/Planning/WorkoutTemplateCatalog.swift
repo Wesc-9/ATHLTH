@@ -5022,6 +5022,16 @@ struct WorkoutTemplateBuilderView: View {
                 studioVisiblePhases.insert(phase)
                 openExercisePicker(for: id)
             },
+            onAddRestToSuperset: { phase, id in
+                selectedPhase = phase
+                studioVisiblePhases.insert(phase)
+                // One end-of-round rest; the execution engine omits the
+                // final recovery on the last round.
+                guard !blocks.contains(where: {
+                    $0.groupID == id && $0.isRestOrActiveRecovery
+                }) else { return }
+                addRestBlock(toGroup: id)
+            },
             onSetSupersetRounds: { id, rounds in
                 guard (1...20).contains(rounds) else { return }
                 for index in blocks.indices where
@@ -6724,8 +6734,14 @@ struct WorkoutTemplateBuilderView: View {
         }
         if let id = groupID,
            let last = blocks.indices.last(where: { blocks[$0].groupID == id }) {
-            blocks.insert(block, at: last + 1)
-            expandedBlockIndex = last + 1
+            // In supersets the pause belongs at the end of each round.
+            // Adding exercise number three must not place it after that pause.
+            let position = block.kind == .exercise &&
+                blocks[last].groupKind == .superset &&
+                blocks[last].isRestOrActiveRecovery
+                ? last : last + 1
+            blocks.insert(block, at: position)
+            expandedBlockIndex = position
         } else {
             let position = ATHLTHWorkoutPhasePlacement.insertionIndex(
                 for: block.resolvedPhase, in: blocks
