@@ -808,6 +808,9 @@ enum WorkoutLaunchCoordinator {
         try await watchConnection.requireNoActiveWatchWorkout()
 
         let selectedRoute: TrainingRoute? = {
+            // A saved structured route cannot re-enable GPS/route Ghost
+            // after the athlete selects an indoor environment.
+            guard configuration.environment == .outdoor else { return nil }
             if let route = configuration.route {
                 return route
             }
